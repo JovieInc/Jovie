@@ -479,16 +479,16 @@ When scanning Linear for issues to work on, always filter with:
 
 ### Pre-Push Gate
 
-Before pushing to a branch, agents MUST pass locally:
-1. `pnpm turbo typecheck` (monorepo typecheck)
-2. `pnpm --filter web exec tsc --noEmit` (web typecheck)
-3. `pnpm biome check --write apps/web` (lint + auto-fix formatting) — **must use `--write` to apply fixes before checking**
-4. `pnpm vitest --run --changed` (affected tests)
-5. `pnpm --filter web lint:server-boundaries` (boundaries)
+The gstack skill pipeline handles verification. The standard agent workflow is:
 
-**IMPORTANT:** Always run `pnpm biome check --write apps/web` (not just `--check`) so formatting issues are fixed in-place before the pre-push hook runs. The pre-push hook calls `biome check .` (read-only) and will reject pushes with formatter violations. Running `--write` first prevents this.
+1. `/qa` — Systematic QA testing (skip if already run manually)
+2. `/review` — Pre-landing code review (skip if already run manually)
+3. `/ship` — Tests, review, version bump, PR creation/update
+4. `/land-and-deploy` — Merge, CI wait, deploy verification
 
-Do NOT push code that fails any of these. Fix first, push once.
+`/ship` runs typecheck, lint, and tests as part of its pre-flight checks. There is no separate `/verify` step.
+
+**IMPORTANT:** Always run `pnpm biome check --write apps/web` before pushing so formatting issues are fixed in-place. The pre-push hook calls `biome check .` (read-only) and will reject pushes with formatter violations.
 
 ### One PR = One Concern
 
@@ -505,19 +505,48 @@ Do NOT push code that fails any of these. Fix first, push once.
 ### Incremental Shipping (Ship Fast, Fail Fast)
 
 - When a command produces multiple independent fixes, ship each as its own PR
-- Push and enable auto-merge immediately — don't wait for CI before starting the next fix
+- **Open a draft PR on first push** — CI runs immediately, giving early feedback
+- Push frequently — concurrency groups cancel stale CI runs automatically
+- Run `/ship` when ready — it detects the draft PR and promotes it to ready-for-review
 - CI runs in parallel on all PRs while the agent continues working
 - This maximizes throughput: N PRs x parallel CI > 1 large PR x serial CI
-- If a PR fails CI, the agent can fix it while other PRs continue merging
-- Each PR must still pass /verify locally before pushing
+- If a PR fails CI, fix and push again; don't create a new PR
+- Enable auto-merge only after the PR is marked ready (not while draft)
+
+### Draft PR First Workflow (Parallel Agents)
+
+AI agents MUST follow the "draft PR first, commit often" pattern for all non-trivial work:
+
+1. **First commit on branch:** Push immediately and open a draft PR:
+   ```bash
+   git push -u origin <branch-name>
+   gh pr create --draft --base main --title "WIP: <description>" --body "Draft — CI feedback loop in progress"
+   ```
+
+2. **Iterate on CI feedback:** Push frequently. Each push triggers CI with cancel-in-progress
+   (stale runs are automatically cancelled). Check CI status:
+   ```bash
+   gh pr checks <pr-number> --json name,state,conclusion
+   ```
+   Fix failures, push again.
+
+3. **Finalize:** When CI is green and code is ready, run `/ship`. The ship skill detects
+   the existing draft PR, updates its title/body with the standard template, and marks
+   it ready for review.
+
+**Why draft PRs first:**
+- CI catches build failures (now a merge gate), type errors, and test regressions within minutes
+- Parallel agents see each other's in-progress branches via PR list
+- Concurrency groups cancel stale CI runs automatically — frequent pushes are cheap
+- The PR summary comment gives a structured view of all check statuses
 
 ### PR Labels (Required)
 
 Agents must apply PR labels intentionally. Labels are part of the CI control plane, not just project organization.
 
-- Add `testing` when a PR needs the heavyweight verification lanes beyond the default fast merge gate.
-- Add `testing` for changes affecting public routes, rendering, deploy behavior, migrations, auth, billing, middleware/proxy logic, environment/config loading, or any flow that should get preview QA and extended CI before merge.
-- Add `testing` when agent QA, browser crawling, or preview-environment validation should run against the PR before it merges.
+- Add `testing` when a PR needs the heavyweight verification lanes (E2E, smoke tests, full build with secrets) beyond the default merge gate.
+- Add `testing` for changes affecting deploy behavior, migrations, auth, billing, middleware/proxy logic, environment/config loading, or any flow that should get E2E and preview QA before merge.
+- Note: Build (public routes), Lighthouse, a11y, and layout-guard now run on ALL PRs without the `testing` label. The `testing` label is only needed for E2E/smoke/preview-deploy lanes.
 
 - Add `needs-human` when the PR should be held for human review or automation must stop.
 - Add `needs-human` for risky or ambiguous changes, incidents/hotfixes needing human judgment, unexpected CI/deploy behavior, security-sensitive changes, or any case where the agent is not confident the PR should continue through auto-merge.
@@ -562,13 +591,12 @@ When in doubt, skip auto-merge and request review.
 
 ## Pre-PR Checklist (required before opening any PR)
 
-1. **Run `/verify`** - Self-verification: typecheck, lint, tests, security checks
-2. **Run `/simplify`** - Simplify recently modified code for clarity
-3. **After pushing your branch, immediately open a draft PR** using GitHub CLI:
-   ```bash
-   gh pr create --draft --base main --title "<Linear issue title>" --body "## Summary\n- ...\n\nLinear: https://linear.app/jovie/issue/<ISSUE-ID>"
-   ```
-4. **Enable automerge** with squash:
+1. **Open a draft PR early** — push your first meaningful commit and create a draft PR immediately (see "Draft PR First Workflow" above)
+2. **Iterate** — push frequently, let CI catch issues, fix and push again
+3. **When ready to ship:** run `/qa` → `/review` → `/ship` (skip `/qa` or `/review` if already run manually)
+4. `/ship` handles: tests, review, version bump, CHANGELOG, commit, push, PR creation/update
+5. `/land-and-deploy` handles: merge, CI wait, deploy verification
+6. **Enable automerge** with squash after the PR is marked ready:
    ```bash
    gh pr merge --auto --squash
    ```

@@ -1420,12 +1420,40 @@ git push -u origin <branch-name>
 
 ---
 
-## Step 8: Create PR
+## Step 8: Create or Update PR
 
-Create a pull request using `gh`:
+First, check if a PR already exists for this branch:
 
 ```bash
-gh pr create --base <base> --title "<type>: <summary>" --body "$(cat <<'EOF'
+gh pr view --json number,state,isDraft,url 2>/dev/null
+```
+
+**If a draft PR exists** (isDraft == true):
+1. Update the PR title and body with the standard ship template (see body format below).
+2. Mark it ready for review:
+   ```bash
+   gh pr edit <number> --title "<type>: <summary>" --body "<standard body below>"
+   gh pr ready <number>
+   ```
+3. Output the PR URL.
+
+**If a non-draft PR already exists** (isDraft == false):
+1. Update the body if needed:
+   ```bash
+   gh pr edit <number> --body "<standard body below>"
+   ```
+2. Output the PR URL.
+
+**If no PR exists** (gh pr view returned non-zero exit code):
+1. Create a new PR:
+   ```bash
+   gh pr create --base <base> --title "<type>: <summary>" --body "<standard body below>"
+   ```
+2. Output the PR URL.
+
+**Standard PR body format** (used for both create and edit):
+
+```
 ## Summary
 <bullet points from CHANGELOG>
 
@@ -1459,8 +1487,6 @@ gh pr create --base <base> --title "<type>: <summary>" --body "$(cat <<'EOF'
 - [x] All Vitest tests pass (N tests)
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
-EOF
-)"
 ```
 
 **Output the PR URL** — then proceed to Step 8.5.
