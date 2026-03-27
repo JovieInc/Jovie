@@ -2,7 +2,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Building2 } from 'lucide-react';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import type { AdminPlatformStats } from '@/lib/admin/platform-stats';
+import type { AdminPlatformStats } from '@/lib/admin/types';
 
 interface PlatformStatsStripProps {
   readonly stats: AdminPlatformStats;

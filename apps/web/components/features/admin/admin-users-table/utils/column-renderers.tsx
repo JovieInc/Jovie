@@ -15,7 +15,7 @@ import {
 } from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import type { AdminUserRow } from '@/lib/admin/users';
+import type { AdminUserRow } from '@/lib/admin/types';
 
 /**
  * Renders the name cell with name and email (truncated with tooltip).

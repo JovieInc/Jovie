@@ -25,9 +25,6 @@ export type { UserStateInput } from './canonical-user-state';
 // (preserves existing import paths) or directly from canonical-user-state.ts.
 export {
   CanonicalUserState,
-  // Temporary alias — tests reference UserState extensively via dynamic imports.
-  // TODO: Migrate test files to CanonicalUserState, then remove this alias.
-  CanonicalUserState as UserState,
   canAccessApp,
   canAccessOnboarding,
   getRedirectForState,

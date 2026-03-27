@@ -84,9 +84,18 @@ export const LINKTREE_VERIFICATION_PATTERNS = [
  * Known platform-owned pixel IDs (not creator-owned).
  * Seeded manually, auto-refreshed by ingestion batch suppression query.
  * These are filtered out at read-time, not during detection.
+ *
+ * Last checked: 2026-03-27
+ * Checked profiles: linktr.ee/linktree, /TikTok, /selenagomez, /Billieeilish,
+ *   /shopify, /therock — all had null facebookPixelId/googleAnalyticsId/tiktokPixelId.
+ * Linktree only injects fbq('init'), ttq.load(), gtag('config') with creator-
+ * configured IDs. Platform-owned tracking uses separate systems (Datadog,
+ * ingress endpoint, Google Ad Manager). No platform-owned pixel IDs were found;
+ * Linktree's fb:app_id and GAM network code are not pixel IDs and are not
+ * detected by the pixel extractor, so they are not listed here.
  */
 export const SUPPRESSED_PIXEL_IDS = new Set<string>([
-  // TODO: Populate by checking view-source on a few Linktree profiles
+  // Add platform-owned pixel IDs here as they are discovered.
 ]);
 
 /**

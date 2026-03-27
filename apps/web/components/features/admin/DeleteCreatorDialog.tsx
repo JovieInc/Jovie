@@ -14,7 +14,7 @@ import { useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 
 interface DeleteCreatorDialogProps
   extends Readonly<{

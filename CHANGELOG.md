@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.84] - 2026-03-27
+
+### Changed
+
+- Migrate all test files from `UserState` to `CanonicalUserState` and remove backward-compat alias from `gate.ts` [internal]
+- Create shared admin types barrel file (`lib/admin/types.ts`) and update 46 admin components to import types from it, removing the ESLint server-only override [internal]
+- Add ESLint rule enforcing type-only exports in `lib/admin/types.ts` [internal]
+- Update ESLint server-only-imports rule to allow `@/lib/admin/types` and `@/lib/admin/csv-configs/` [internal]
+
+### Fixed
+
+- Artist profile settings page no longer crashes when a social link has an unexpected `platformType` value from the database; unknown values now fall back to the "Web" section with a Sentry breadcrumb for observability
+- Unsafe type cast in `PreviewDataHydrator` replaced with runtime validation guard to prevent bad DB data from being laundered into trusted app state
+- Fix batch fit scoring to apply pixel suppression filtering (matching individual scoring path) [internal]
+- Unskip avatar upload validation error tracking test (hook already implemented) [internal]
+- Document Linktree suppressed pixel ID methodology (no platform-owned pixel IDs detected) [internal]
+
 ## [26.4.83] - 2026-03-27
 
 ### Changed
