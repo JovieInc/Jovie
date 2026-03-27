@@ -28,9 +28,9 @@ import {
   saveBandsintownApiKey,
   syncFromBandsintown,
 } from '@/app/app/(shell)/dashboard/tour-dates/actions';
+import { SettingsActionRow } from '@/components/features/dashboard/molecules/SettingsActionRow';
+import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { TouringSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import {
   Dialog,
@@ -39,7 +39,6 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { queryKeys, useBandsintownConnectionQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
@@ -70,46 +69,30 @@ export function SettingsTouringSection({
 
   if (isLoading) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
-      >
-        <ContentSectionHeader
-          title='Bandsintown'
-          subtitle='Connect Bandsintown to keep the tour dates on your profile up to date.'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='px-4 py-3'>
+      <SettingsPanel>
+        <div className='px-4 py-4 sm:px-5'>
           <TouringSectionSkeleton />
         </div>
-      </DashboardCard>
+      </SettingsPanel>
     );
   }
 
   if (isError) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
-      >
-        <ContentSectionHeader
-          title='Bandsintown'
-          subtitle='Connect Bandsintown to keep the tour dates on your profile up to date.'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='px-4 py-3'>
-          <ContentSurfaceCard className='space-y-3 bg-surface-0 p-3.5'>
-            <p className='text-[13px] text-secondary-token'>
-              Failed to load connection status.
-            </p>
-            <Button variant='ghost' size='sm' onClick={() => refetch()}>
-              Try again
-            </Button>
-          </ContentSurfaceCard>
+      <SettingsPanel>
+        <div className='px-4 py-4 sm:px-5'>
+          <SettingsActionRow
+            icon={<Calendar className='h-4 w-4' aria-hidden />}
+            title='Unable to load Bandsintown'
+            description='We could not load your touring connection status.'
+            action={
+              <Button variant='ghost' size='sm' onClick={() => refetch()}>
+                Try again
+              </Button>
+            }
+          />
         </div>
-      </DashboardCard>
+      </SettingsPanel>
     );
   }
 
@@ -155,30 +138,15 @@ export function SettingsTouringSection({
   };
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
-    >
-      <ContentSectionHeader
-        title='Bandsintown'
-        subtitle='Connect Bandsintown to keep the tour dates on your profile up to date.'
-        className='min-h-0 px-4 py-3'
-      />
-      <div className='px-4 py-3'>
-        <ContentSurfaceCard className='space-y-3 bg-surface-0 p-4'>
-          <div className='space-y-1'>
-            <p className='text-[13px] font-[510] text-primary-token'>
-              {isConnected
-                ? 'Bandsintown connected'
-                : 'Bandsintown not connected'}
-            </p>
-            <p className='text-[13px] leading-[18px] text-secondary-token'>
-              Tour dates will appear on your public profile when connected.
-            </p>
-          </div>
-
-          <div className='flex flex-wrap items-center gap-2'>
+    <SettingsPanel>
+      <div className='px-4 py-4 sm:px-5'>
+        <SettingsActionRow
+          icon={<Calendar className='h-4 w-4' aria-hidden />}
+          title={
+            isConnected ? 'Bandsintown connected' : 'Bandsintown not connected'
+          }
+          description='Tour dates appear on your public profile when this connection is active.'
+          action={
             <BandsintownConnectionPill
               connected={isConnected}
               artistName={connectedArtist}
@@ -188,8 +156,8 @@ export function SettingsTouringSection({
               onSyncNow={handleSyncNow}
               onDisconnect={() => setDisconnectDialogOpen(true)}
             />
-          </div>
-        </ContentSurfaceCard>
+          }
+        />
       </div>
 
       <BandsintownConnectDialog
@@ -209,7 +177,7 @@ export function SettingsTouringSection({
         variant='destructive'
         onConfirm={handleDisconnectConfirm}
       />
-    </DashboardCard>
+    </SettingsPanel>
   );
 }
 

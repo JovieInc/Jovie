@@ -184,4 +184,52 @@ describe('musicfetch resilient client', () => {
     expect(mockReserveMusicfetchBudget).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('preserves API error details on non-retryable HTTP failures', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      headers: { get: () => null },
+      text: async () =>
+        JSON.stringify({
+          error: {
+            status: 400,
+            message: 'services - Invalid value "soundCloud"',
+          },
+        }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { musicfetchRequest } = await import(
+      '@/lib/musicfetch/resilient-client'
+    );
+
+    await expect(
+      musicfetchRequest(
+        '/url',
+        new URLSearchParams({ url: 'https://open.spotify.com/artist/1' }),
+        {
+          timeoutMs: 2000,
+        }
+      )
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      details: 'services - Invalid value "soundCloud"',
+    });
+
+    await expect(
+      musicfetchRequest(
+        '/url',
+        new URLSearchParams({ url: 'https://open.spotify.com/artist/1' }),
+        {
+          timeoutMs: 2000,
+        }
+      )
+    ).rejects.toThrow(
+      'MusicFetch API error: 400 - services - Invalid value "soundCloud"'
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(mockReserveMusicfetchBudget).toHaveBeenCalledTimes(2);
+  });
 });

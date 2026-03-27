@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { AvatarQuality } from '@/lib/profile/avatar-quality';
 import { OnboardingV2Form } from './onboarding-v2/OnboardingV2Form';
 
 /** Max age (ms) for a pendingClaim entry to be considered valid (10 minutes). */
@@ -40,6 +41,8 @@ interface OnboardingFormWrapperProps {
   readonly initialResumeStep?: string | null;
   /** Existing profile avatar URL for step-resume users */
   readonly existingAvatarUrl?: string | null;
+  /** Existing avatar quality metadata for step-resume users */
+  readonly existingAvatarQuality?: AvatarQuality | null;
   /** Existing profile bio for step-resume users */
   readonly existingBio?: string | null;
   /** Existing profile genres for step-resume users */
@@ -56,6 +59,7 @@ export function OnboardingFormWrapper({
   initialProfileId = null,
   initialResumeStep = null,
   existingAvatarUrl = null,
+  existingAvatarQuality = null,
   existingBio = null,
   existingGenres = null,
 }: OnboardingFormWrapperProps) {
@@ -98,6 +102,7 @@ export function OnboardingFormWrapper({
         initialProfileId={initialProfileId}
         initialResumeStep={initialResumeStep}
         existingAvatarUrl={existingAvatarUrl}
+        existingAvatarQuality={existingAvatarQuality}
         existingBio={existingBio}
         existingGenres={existingGenres}
       />

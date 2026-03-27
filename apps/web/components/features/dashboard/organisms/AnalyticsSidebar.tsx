@@ -6,10 +6,12 @@ import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import {
   DrawerStatGrid,
   DrawerSurfaceCard,
+  DrawerTabbedCard,
   DrawerTabs,
   EntitySidebarShell,
   StatTile,
 } from '@/components/molecules/drawer';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -254,20 +256,45 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
       data-testid='analytics-sidebar'
       title='Analytics'
       onClose={onClose}
+      headerMode='minimal'
       headerActions={
-        <AppSegmentControl
-          value={range}
-          onValueChange={setRange}
-          options={RANGE_OPTIONS}
-          size='sm'
-          className='shrink-0'
-          aria-label='Analytics time range'
+        <DrawerHeaderActions
+          primaryActions={[]}
+          overflowActions={[]}
+          onClose={onClose}
         />
+      }
+      entityHeader={
+        <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+          <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+            <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+              Analytics
+            </p>
+          </div>
+          <div className='flex items-start justify-between gap-3 p-3.5'>
+            <div className='space-y-0.5'>
+              <p className='text-[15px] font-[590] tracking-[-0.016em] text-primary-token'>
+                Audience funnel
+              </p>
+              <p className='text-[12px] leading-[16px] text-secondary-token'>
+                Views, clicks, and top traffic sources.
+              </p>
+            </div>
+            <AppSegmentControl
+              value={range}
+              onValueChange={setRange}
+              options={RANGE_OPTIONS}
+              size='sm'
+              className='shrink-0'
+              aria-label='Analytics time range'
+            />
+          </div>
+        </DrawerSurfaceCard>
       }
     >
       <div
         className={cn(
-          'space-y-2.5 transition-opacity duration-150',
+          'space-y-2 transition-opacity duration-150',
           isFetching && !loading && 'opacity-70'
         )}
       >
@@ -289,17 +316,19 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
             />
           </div>
         </DrawerStatGrid>
-
-        {/* Breakdown tabs */}
-        <DrawerTabs
-          value={activeTab}
-          onValueChange={value => setActiveTab(value as AnalyticsTab)}
-          options={ANALYTICS_TAB_OPTIONS}
-          ariaLabel='Analytics data tabs'
-        />
-
-        {/* Ranked list card */}
-        <DrawerSurfaceCard className='min-h-[196px] p-2'>
+        <DrawerTabbedCard
+          testId='analytics-sidebar-tabbed-card'
+          tabs={
+            <DrawerTabs
+              value={activeTab}
+              onValueChange={value => setActiveTab(value as AnalyticsTab)}
+              options={ANALYTICS_TAB_OPTIONS}
+              className='w-full'
+              ariaLabel='Analytics data tabs'
+            />
+          }
+          contentClassName='pt-2'
+        >
           {activeTab === 'cities' && (
             <RankedList
               icon={MapPin}
@@ -348,7 +377,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
               emptyMessage='No link data yet'
             />
           )}
-        </DrawerSurfaceCard>
+        </DrawerTabbedCard>
       </div>
     </EntitySidebarShell>
   );

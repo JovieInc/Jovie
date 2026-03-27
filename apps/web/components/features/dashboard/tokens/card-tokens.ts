@@ -8,10 +8,10 @@ import { contentSurfaceCardVariants } from '@/components/molecules/ContentSurfac
  * radii, shadows, and padding across all dashboard components.
  *
  * Design principles (from Linear):
- * 1. Flat surfaces — all content cards share the parent surface color
- * 2. Separation via 1px borders only (no shadows on content cards)
- * 3. Hover uses bg color changes only (no shadow/scale/translate)
- * 4. Shadows reserved exclusively for popovers/dropdowns
+ * 1. Cards sit on one consistent subtle elevation tier across light and dark.
+ * 2. Separation comes from a thin seam border plus a single low-depth shadow.
+ * 3. Hover uses bg/border changes only — cards do not jump tiers on hover.
+ * 4. Stronger shadows are still reserved for popovers/dropdowns only.
  */
 
 // Animation tokens - Linear-style timing
@@ -205,34 +205,34 @@ export const cardTokens = {
 /**
  * Linear Surface Tokens
  *
- * Flat surface system matching Linear.app — all content surfaces are
- * the same level as their parent. Separation is via 1px borders only.
- * No color-mix depth, no shadows (except popovers).
+ * Shared app-card system matching Linear.app — content cards sit on one
+ * subtle elevation tier with a seam border and a low-depth shadow.
+ * Popovers remain the only noticeably stronger floating surface.
  */
 export const LINEAR_SURFACE = {
   /** Drawer section card — border-separated section inside sidebars. */
   drawerCard:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
+    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[var(--linear-app-card-shadow)]',
 
   /** Smaller drawer section card — inline property groups. */
   drawerCardSm:
-    'rounded-[8px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
+    'rounded-[8px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[var(--linear-app-card-shadow)]',
 
   /** Primary sidebar card — header/analytics cards in sidebars. */
   sidebarCard:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
+    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[var(--linear-app-card-shadow)]',
 
   /** Content container — wraps tables, mobile lists, empty states. */
   contentContainer:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
+    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[var(--linear-app-card-shadow)]',
 
   /** Banner/callout card. */
   bannerCard:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
+    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[var(--linear-app-card-shadow)]',
 
   /** Dialog inner card — sections inside dialogs. */
   dialogCard:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
+    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[var(--linear-app-card-shadow)]',
 
   /** Sticky header — toolbar-like headers with backdrop blur. */
   stickyHeader:

@@ -148,7 +148,7 @@ export async function publishIdentityLinks(
  *
  * Identity links store DSP registry keys (snake_case: apple_music, soundcloud).
  * First tries direct key lookup, then falls back to MusicFetch service name
- * mapping (camelCase: appleMusic, soundCloud) for backward compat.
+ * mapping (for example: appleMusic, soundcloud) for compatibility.
  */
 function findDspEntry(
   platform: string

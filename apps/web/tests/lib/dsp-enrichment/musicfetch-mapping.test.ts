@@ -65,7 +65,6 @@ function makeFullArtistResult(
       appleMusic: { url: 'https://music.apple.com/us/artist/test/123456' },
       youtube: { url: 'https://www.youtube.com/channel/UCabc' },
       youtubeMusic: { url: 'https://music.youtube.com/channel/UCabc' },
-      soundCloud: { url: 'https://soundcloud.com/testartist' },
       soundcloud: { url: 'https://soundcloud.com/testartist' },
       deezer: { url: 'https://www.deezer.com/artist/789012' },
       tidal: { url: 'https://tidal.com/browse/artist/345678' },
@@ -197,7 +196,7 @@ describe('extractMusicFetchLinks', () => {
           id: '7985446',
           link: 'https://tidal.com/browse/artist/7985446',
         },
-        soundCloud: { id: '7444372', link: 'https://soundcloud.com/dualipa' },
+        soundcloud: { id: '7444372', link: 'https://soundcloud.com/dualipa' },
         youtube: { link: 'https://www.youtube.com/channel/UCabc' },
       },
     };
@@ -214,6 +213,26 @@ describe('extractMusicFetchLinks', () => {
     expect(links.find(l => l.platformId === 'apple_music')?.url).toBe(
       'https://music.apple.com/us/artist/dua-lipa/1031397873?app=music'
     );
+  });
+
+  it('maps corrected canonical service keys such as soundcloud and netease', () => {
+    const artistData = makeFullArtistResult({
+      services: {
+        soundcloud: { url: 'https://soundcloud.com/testartist' },
+        netease: { url: 'https://music.163.com/artist?id=123' },
+        soundCloud: { url: 'https://soundcloud.com/legacy-testartist' },
+        netEase: { url: 'https://music.163.com/artist?id=999' },
+      },
+    });
+
+    const links = extractMusicFetchLinks(artistData, SPOTIFY_URL, SIGNAL);
+    const platformIds = links
+      .map(link => link.platformId)
+      .filter(
+        platformId => platformId === 'soundcloud' || platformId === 'netease'
+      );
+
+    expect(platformIds).toEqual(['soundcloud', 'netease']);
   });
 
   it('deduplicates links when the same URL appears twice', () => {

@@ -62,7 +62,6 @@ export const EXPECTED_ERROR_PATTERNS = [
   // Clerk dev-mode specific messages (safe to ignore in test)
   'clerk: clerk has been loaded with development keys', // dev publishable key warning
   'clerk: the request to /v1/client/handshake', // handshake 400 in dev-browser-missing mode
-  'publishable key', // Clerk publishable key mismatch warning
   'test-pass-', // Clerk test-mode password prefix
 
   // Network errors from browser-level failures (not app bugs)
@@ -77,8 +76,6 @@ export const EXPECTED_ERROR_PATTERNS = [
 
   // CSP and security headers (expected in test/dev)
   'content security policy', // CSP violations from dev tooling
-  'blocked by cors', // CORS blocks on third-party scripts in dev
-  'cross-origin', // cross-origin warnings on third-party resources
 
   // NOTE: console.warn is NOT captured by the error listener (msg.type() === 'error' only).
   // This pattern catches the rare case where something calls console.error("Warning: ...")
@@ -108,6 +105,21 @@ export const EXPECTED_ERROR_PATTERNS = [
 
   // Next.js internals — redirect() causes negative performance marks
   'negative time stamp',
+] as const;
+
+const EXPECTED_WARNING_PATTERNS = [
+  'clerk: clerk has been loaded with development keys',
+  'clerk: the request to /v1/client/handshake',
+  'refreshing the session token resulted in an infinite redirect loop',
+  'dev-browser-missing',
+  'react hook',
+  'usecontext',
+  'invalid hook call',
+] as const;
+
+const EXPECTED_WARNING_REGEXES = [
+  /the resource https:\/\/.*\/npm\/@clerk\/ui@1(?:\.\d+\.\d+)?\/dist\/ui\.browser\.js was preloaded .* but not used/i,
+  /the resource https:\/\/.*\/npm\/@clerk\/clerk-js@6(?:\.\d+\.\d+)?\/dist\/clerk\.browser\.js was preloaded .* but not used/i,
 ] as const;
 
 // ============================================================================
@@ -152,6 +164,20 @@ export function isExpectedError(errorText: string): boolean {
     return true;
   }
   return EXPECTED_ERROR_PATTERNS.some(pattern => lowerText.includes(pattern));
+}
+
+/**
+ * Check if a console warning is expected in smoke tests.
+ * Keep this list tighter than error filtering so we only suppress
+ * reproducible vendor noise from the Clerk local-dev path.
+ */
+export function isExpectedWarning(warningText: string): boolean {
+  const lowerText = warningText.toLowerCase();
+
+  return (
+    EXPECTED_WARNING_PATTERNS.some(pattern => lowerText.includes(pattern)) ||
+    EXPECTED_WARNING_REGEXES.some(pattern => pattern.test(warningText))
+  );
 }
 
 /**
