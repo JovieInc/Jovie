@@ -22,14 +22,12 @@ import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbarActionButton,
   TableEmptyState,
+  TableShell,
+  TableSurfaceHeader,
+  TableSurfaceToolbar,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { convertContextMenuItems } from '@/components/organisms/table/molecules/TableContextMenu';
-import {
-  AdminTableHeader,
-  AdminTableSubheader,
-} from '@/features/admin/table/AdminTableHeader';
-import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { useDismissFeedbackMutation } from '@/lib/queries';
 
@@ -276,11 +274,11 @@ export function AdminFeedbackTable({
   return (
     <div className='flex h-full min-h-[620px] overflow-hidden'>
       <div className='h-full w-full border-r border-subtle bg-(--linear-app-content-surface) lg:w-[58%]'>
-        <AdminTableHeader
+        <TableSurfaceHeader
           title='Feedback'
           subtitle='Triage product feedback and close the loop with clear status.'
         />
-        <AdminTableSubheader
+        <TableSurfaceToolbar
           start={
             <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
               {rows.length} item{rows.length === 1 ? '' : 's'}
@@ -298,7 +296,7 @@ export function AdminFeedbackTable({
             />
           }
         />
-        <AdminTableShell testId='admin-feedback-table'>
+        <TableShell testId='admin-feedback-table'>
           {() => (
             <UnifiedTable
               data={rows}
@@ -323,7 +321,7 @@ export function AdminFeedbackTable({
               }
             />
           )}
-        </AdminTableShell>
+        </TableShell>
       </div>
 
       <EntitySidebarShell

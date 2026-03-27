@@ -18,15 +18,13 @@ import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   TableBulkActionsToolbar,
+  TableShell,
+  TableSurfaceHeader,
+  TableSurfaceToolbar,
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
-import {
-  AdminTableHeader,
-  AdminTableSubheader,
-} from '@/features/admin/table/AdminTableHeader';
-import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdminTableKeyboardNavigation';
 import { useCreatorActions } from '@/features/admin/useCreatorActions';
 import { useCreatorVerification } from '@/features/admin/useCreatorVerification';
@@ -423,7 +421,7 @@ export function AdminCreatorProfilesUnified({
   return (
     <>
       <div className='flex-1 min-h-0 overflow-hidden min-w-0 h-full'>
-        <AdminTableShell
+        <TableShell
           testId='admin-creators-content'
           className='rounded-none border-0'
           scrollContainerProps={{
@@ -437,11 +435,11 @@ export function AdminCreatorProfilesUnified({
                 onClearSelection={handleClearSelection}
                 actions={bulkActions}
               />
-              <AdminTableHeader
+              <TableSurfaceHeader
                 title='Creators'
                 subtitle='Manage creator profiles, verification, and feature status.'
               />
-              <AdminTableSubheader
+              <TableSurfaceToolbar
                 start={
                   <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
                     Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
@@ -500,7 +498,7 @@ export function AdminCreatorProfilesUnified({
               }}
             />
           )}
-        </AdminTableShell>
+        </TableShell>
       </div>
       <DeleteCreatorDialog
         profile={profileToDelete}

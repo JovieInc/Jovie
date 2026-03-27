@@ -13,14 +13,12 @@ import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbarActionButton,
   TableBulkActionsToolbar,
+  TableShell,
+  TableSurfaceHeader,
+  TableSurfaceToolbar,
   useRowSelection,
   type ViewMode,
 } from '@/components/organisms/table';
-import {
-  AdminTableHeader,
-  AdminTableSubheader,
-} from '@/features/admin/table/AdminTableHeader';
-import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import {
   KanbanBoard,
   type KanbanColumn,
@@ -278,7 +276,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
 
   return (
     <QueryErrorBoundary fallback={TableErrorFallback}>
-      <AdminTableShell
+      <TableShell
         testId='admin-waitlist-table'
         className='rounded-none border-0'
         toolbar={
@@ -293,11 +291,11 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
             )}
 
             {/* Main toolbar (always visible) */}
-            <AdminTableHeader
+            <TableSurfaceHeader
               title='Waitlist'
               subtitle='Track pipeline state and move prospects from new to claimed.'
             />
-            <AdminTableSubheader
+            <TableSurfaceToolbar
               start={
                 <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
                   Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
@@ -388,7 +386,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
             />
           )
         }
-      </AdminTableShell>
+      </TableShell>
     </QueryErrorBoundary>
   );
 }

@@ -7,7 +7,13 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { DrawerLoadingSkeleton } from '@/components/molecules/drawer';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
-import { TableEmptyState, useRowSelection } from '@/components/organisms/table';
+import {
+  TableEmptyState,
+  TableShell,
+  TableSurfaceHeader,
+  TableSurfaceToolbar,
+  useRowSelection,
+} from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { CreatorProfileTableRow } from '@/features/admin/CreatorProfileTableRow';
 import {
@@ -15,11 +21,6 @@ import {
   type SortableColumnKey,
 } from '@/features/admin/creator-sort-config';
 import { AdminCreatorsTableHeader } from '@/features/admin/table/AdminCreatorsTableHeader';
-import {
-  AdminTableHeader,
-  AdminTableSubheader,
-} from '@/features/admin/table/AdminTableHeader';
-import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdminTableKeyboardNavigation';
 import { useCreatorActions } from '@/features/admin/useCreatorActions';
 import { useCreatorVerification } from '@/features/admin/useCreatorVerification';
@@ -395,23 +396,23 @@ export function AdminCreatorProfilesWithSidebar({
     <div className='flex h-full min-h-0 flex-col md:flex-row md:items-stretch'>
       <div className='flex-1 min-h-0 overflow-hidden'>
         <QueryErrorBoundary fallback={TableErrorFallback}>
-          <AdminTableShell
+          <TableShell
             scrollContainerProps={{
               tabIndex: 0,
               onKeyDown: handleKeyDown,
             }}
             toolbar={
               <>
-                <AdminTableHeader
+                <TableSurfaceHeader
                   title='Creators'
                   subtitle='Manage creator profiles, verification, and feature status.'
                 />
-                <AdminTableSubheader>
+                <TableSurfaceToolbar>
                   <div className='hidden text-[11px] text-secondary-token tabular-nums md:block'>
                     Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
                     {total.toLocaleString()} profiles
                   </div>
-                </AdminTableSubheader>
+                </TableSurfaceToolbar>
               </>
             }
           >
@@ -488,7 +489,7 @@ export function AdminCreatorProfilesWithSidebar({
                 </tbody>
               </table>
             )}
-          </AdminTableShell>
+          </TableShell>
         </QueryErrorBoundary>
       </div>
       {sidebarOpen && effectiveContact ? (

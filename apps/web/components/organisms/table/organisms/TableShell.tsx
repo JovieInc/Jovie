@@ -3,16 +3,15 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-export interface AdminTableShellRenderProps {
+export interface TableShellRenderProps {
   readonly headerElevated: boolean;
-  /** Pixel offset for sticky table headers when a toolbar is present. */
   readonly stickyTopPx: number;
 }
 
-export interface AdminTableShellProps {
+export interface TableShellProps {
   readonly toolbar?: React.ReactNode;
   readonly footer?: React.ReactNode;
-  readonly children: (props: AdminTableShellRenderProps) => React.ReactNode;
+  readonly children: (props: TableShellRenderProps) => React.ReactNode;
   readonly className?: string;
   readonly testId?: string;
   readonly scrollContainerProps?: Readonly<
@@ -21,13 +20,9 @@ export interface AdminTableShellProps {
   readonly scrollContainerRef?: React.RefObject<HTMLDivElement>;
 }
 
-/**
- * Throttle interval for scroll handler (ms).
- * 100ms provides smooth visual updates while reducing state updates from 60+/sec to 10/sec.
- */
 const SCROLL_THROTTLE_MS = 100;
 
-export function AdminTableShell({
+export function TableShell({
   toolbar,
   footer,
   children,
@@ -35,7 +30,7 @@ export function AdminTableShell({
   testId,
   scrollContainerProps,
   scrollContainerRef: externalRef,
-}: Readonly<AdminTableShellProps>) {
+}: Readonly<TableShellProps>) {
   const internalRef = React.useRef<HTMLDivElement | null>(null);
   const tableContainerRef = externalRef ?? internalRef;
   const [headerElevated, setHeaderElevated] = React.useState(false);
@@ -48,7 +43,6 @@ export function AdminTableShell({
     const container = tableContainerRef.current;
     if (!container) return;
 
-    // Helper to update header elevation state
     const updateHeaderElevation = () => {
       rafIdRef.current = null;
       const isScrolled = container.scrollTop > 0;
@@ -56,13 +50,10 @@ export function AdminTableShell({
       lastScrollTimeRef.current = Date.now();
     };
 
-    // Throttled scroll handler using requestAnimationFrame + time check
     const handleScroll = () => {
       const now = Date.now();
 
-      // Skip if we're within the throttle window
       if (now - lastScrollTimeRef.current < SCROLL_THROTTLE_MS) {
-        // Schedule one final update after throttle period ends
         if (rafIdRef.current !== null) {
           return;
         }
@@ -75,7 +66,6 @@ export function AdminTableShell({
       setHeaderElevated(prev => (prev === isScrolled ? prev : isScrolled));
     };
 
-    // Initial check
     handleScroll();
     container.addEventListener('scroll', handleScroll, { passive: true });
 
@@ -120,7 +110,7 @@ export function AdminTableShell({
     >
       <div
         ref={tableContainerRef}
-        className='min-h-0 flex-1 overflow-auto flex flex-col focus-visible:outline-none'
+        className='min-h-0 flex-1 flex flex-col overflow-auto focus-visible:outline-none'
         {...scrollContainerProps}
       >
         {toolbar ? (
