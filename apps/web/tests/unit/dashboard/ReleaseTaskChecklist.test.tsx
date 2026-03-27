@@ -134,6 +134,7 @@ describe('ReleaseTaskChecklist', () => {
     );
 
     expect(scrollRegion).toBeInTheDocument();
+    expect(scrollRegion).toHaveAttribute('data-scroll-mode', 'internal');
     expect(scrollRegion).toHaveTextContent('Marketing');
     expect(scrollRegion).toHaveTextContent('Submit to playlists');
   });

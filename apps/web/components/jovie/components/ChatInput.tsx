@@ -319,9 +319,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 'min-w-0 flex-1 resize-none bg-transparent',
                 'text-primary-token placeholder:text-tertiary-token',
                 'focus:outline-none',
-                isCompact
-                  ? 'max-h-32 py-1.5 text-[14px] leading-6'
-                  : 'max-h-48 py-1.5 text-[14px] leading-6',
+                'py-1.5 text-[14px] leading-6',
+                isCompact ? 'max-h-32' : 'max-h-48',
                 isExpanded
                   ? isCompact
                     ? 'min-h-[64px]'

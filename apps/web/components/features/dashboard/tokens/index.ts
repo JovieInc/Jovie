@@ -14,6 +14,7 @@ export type {
   CardStatus,
   CardVariant,
   LinearSurface,
+  LinearSurfaceTier,
 } from './card-tokens';
 export { cardTokens, LINEAR_SURFACE, LINEAR_SURFACE_TIER } from './card-tokens';
 

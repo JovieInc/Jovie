@@ -60,6 +60,10 @@ describe('SidebarLinkRow interactions', () => {
       'data-surface-variant',
       'track'
     );
+    expect(screen.getByTestId('track-link-row')).toHaveAttribute(
+      'data-surface-style',
+      'outlined'
+    );
     expect(screen.getByText('Spotify')).toBeInTheDocument();
     expect(
       screen.getAllByRole('button', { name: 'Open Spotify' }).length

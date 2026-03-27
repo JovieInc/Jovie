@@ -87,7 +87,7 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
     });
     console.log('📸 Saved: release-sidebar-detail.png');
 
-    await sidebar.getByTestId('drawer-tab-platforms').click();
+    await sidebar.getByTestId('drawer-tab-links').click();
     await waitForSettle(page);
     await sidebar.screenshot({
       path: `${OUTPUT_DIR}/release-sidebar-platforms.png`,

@@ -169,6 +169,7 @@ export function SidebarLinkRow({
         )}
         data-testid={testId}
         data-surface-variant={surfaceVariant}
+        data-surface-style={isTrackVariant ? 'outlined' : 'plain'}
       >
         {/* Left: Icon + Label */}
         <div className='flex min-w-0 flex-1 items-center gap-2.25'>

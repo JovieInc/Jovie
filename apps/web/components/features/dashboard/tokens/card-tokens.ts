@@ -268,3 +268,5 @@ export type CardBorder = keyof typeof cardTokens.border;
 export type CardVariant = keyof typeof cardTokens.variants;
 export type CardStatus = keyof typeof cardTokens.status;
 export type LinearSurface = keyof typeof LINEAR_SURFACE;
+export type LinearSurfaceTier =
+  (typeof LINEAR_SURFACE_TIER)[keyof typeof LINEAR_SURFACE_TIER];

@@ -159,6 +159,7 @@ export function ReleaseTaskChecklist({
         data-testid={
           isCompact ? 'release-task-checklist-scroll-region' : undefined
         }
+        data-scroll-mode={isCompact ? 'internal' : undefined}
       >
         {Array.from(groups.entries()).map(([category, group]) => (
           <ReleaseTaskCategoryGroup
