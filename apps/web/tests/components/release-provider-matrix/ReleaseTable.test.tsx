@@ -163,6 +163,8 @@ describe('ReleaseTable', () => {
     const expandedRow = screen.getByTestId('release-row-release_1');
     const selectedRow = screen.getByTestId('release-row-release_2');
 
+    expect(expandedRow.className).toContain('rounded-[10px]');
+    expect(selectedRow.className).toContain('rounded-[10px]');
     expect(expandedRow.className).toContain(
       'color-mix(in_oklab,var(--linear-bg-surface-1)_60%,var(--linear-bg-surface-0))'
     );
@@ -170,6 +172,16 @@ describe('ReleaseTable', () => {
       'inset_2px_0_0_0_var(--linear-border-focus)'
     );
     expect(expandedRow.className).not.toBe(selectedRow.className);
+  });
+
+  it('gives idle release rows the same visible rounded hover silhouette', () => {
+    render(<ReleaseTable {...commonProps} showTracks={false} />);
+
+    const idleRow = screen.getByTestId('release-row-release_1');
+    expect(idleRow.className).toContain('rounded-[10px]');
+    expect(idleRow.className).toContain(
+      'hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)]'
+    );
   });
 
   it('passes the selected track state into expanded track rows', () => {

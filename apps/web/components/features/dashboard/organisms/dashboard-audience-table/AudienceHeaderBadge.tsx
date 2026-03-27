@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { DRAWER_TABS_RAIL_CLASSNAME } from '@/components/molecules/drawer/DrawerTabs';
 import {
   PAGE_TOOLBAR_ICON_CLASS,
   PAGE_TOOLBAR_ICON_STROKE_WIDTH,
@@ -50,23 +51,30 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
   };
 
   return (
-    <div className='scrollbar-hide flex min-w-0 items-center gap-1 overflow-x-auto pb-px'>
-      {VIEW_OPTIONS.map(({ value, icon }) => (
-        <PageToolbarTabButton
-          key={value}
-          active={view === value}
-          onClick={() => onViewChange(value)}
-          className={cn('whitespace-nowrap')}
-          icon={
-            <Icon
-              name={icon}
-              className={PAGE_TOOLBAR_ICON_CLASS}
-              strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
-            />
-          }
-          label={labels[value]}
-        />
-      ))}
+    <div className='scrollbar-hide min-w-0 overflow-x-auto pb-px'>
+      <div
+        className={cn(
+          DRAWER_TABS_RAIL_CLASSNAME,
+          'w-max min-w-full rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1'
+        )}
+      >
+        {VIEW_OPTIONS.map(({ value, icon }) => (
+          <PageToolbarTabButton
+            key={value}
+            active={view === value}
+            onClick={() => onViewChange(value)}
+            className={cn('whitespace-nowrap')}
+            icon={
+              <Icon
+                name={icon}
+                className={PAGE_TOOLBAR_ICON_CLASS}
+                strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+              />
+            }
+            label={labels[value]}
+          />
+        ))}
+      </div>
     </div>
   );
 });

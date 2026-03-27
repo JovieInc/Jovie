@@ -61,10 +61,15 @@ describe('WaitlistSettingsPanel', () => {
     renderWithQueryClient(<WaitlistSettingsPanel />);
 
     await waitFor(() => {
-      expect(screen.getByText('Waitlist gate controls')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Control approvals, auto-accept behavior, and daily intake limits.'
+        )
+      ).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Today: 3')).toBeInTheDocument();
+    expect(screen.getByText('Today: 3 approvals')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
   });
 
   it('shows an error state when loading settings fails', async () => {

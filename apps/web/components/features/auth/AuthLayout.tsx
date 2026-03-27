@@ -10,8 +10,8 @@ import {
 import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
 import { cn } from '@/lib/utils';
@@ -154,13 +154,9 @@ export function AuthLayout({
         <div className='absolute top-4 right-4 z-50'>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <CircleIconButton
-                size='sm'
-                variant='outline'
-                ariaLabel='Open menu'
-              >
+              <AppIconButton ariaLabel='Open menu' variant='ghost'>
                 <MoreHorizontal />
-              </CircleIconButton>
+              </AppIconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end' sideOffset={8}>
               <SignOutButton redirectUrl={logoutRedirectUrl}>

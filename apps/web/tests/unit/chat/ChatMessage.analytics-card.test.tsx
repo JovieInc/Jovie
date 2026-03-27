@@ -6,9 +6,17 @@ import { fastRender } from '@/tests/utils/fast-render';
 
 vi.mock('motion/react', () => ({
   motion: {
-    div: ({ children, ...props }: ComponentProps<'div'>) => (
-      <div {...props}>{children}</div>
-    ),
+    div: ({
+      children,
+      initial: _initial,
+      animate: _animate,
+      transition: _transition,
+      ...props
+    }: ComponentProps<'div'> & {
+      initial?: unknown;
+      animate?: unknown;
+      transition?: unknown;
+    }) => <div {...props}>{children}</div>,
   },
   useReducedMotion: () => true,
 }));
@@ -22,6 +30,25 @@ vi.mock('@/components/jovie/components/ChatMarkdown', () => ({
 }));
 
 describe('ChatMessage analytics cards', () => {
+  it('renders assistant replies with neutral message chrome', () => {
+    const messageProps = {
+      id: 'assistant-2',
+      role: 'assistant' as const,
+      parts: [{ type: 'text', text: 'Here is a cleaner response.' }],
+    };
+    const { container } = fastRender(<ChatMessage {...messageProps} />);
+
+    expect(screen.getByText('Jovie', { selector: 'span' })).toBeTruthy();
+    expect(screen.getByText('Reply')).toBeTruthy();
+
+    const replyBubble = container.querySelector('.rounded-\\[18px\\]');
+    expect(replyBubble).toBeTruthy();
+    expect(replyBubble?.className).toContain(
+      'bg-(--linear-app-content-surface)'
+    );
+    expect(replyBubble?.className).not.toContain('bg-accent/95');
+  });
+
   it('renders a chat analytics card for showTopInsights tool results', () => {
     const parts = [
       { type: 'text', text: 'Here are the strongest signals I see.' },

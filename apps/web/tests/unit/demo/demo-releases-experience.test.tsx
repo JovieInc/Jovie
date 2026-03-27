@@ -1,4 +1,3 @@
-import { TooltipProvider } from '@jovie/ui';
 import {
   fireEvent,
   render,
@@ -150,9 +149,7 @@ const { DemoReleasesExperience } = await import(
 function renderDemo() {
   return render(
     <NuqsTestingAdapter>
-      <TooltipProvider>
-        <DemoReleasesExperience />
-      </TooltipProvider>
+      <DemoReleasesExperience />
     </NuqsTestingAdapter>
   );
 }
