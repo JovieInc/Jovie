@@ -15,13 +15,14 @@ describe('SettingsSection', () => {
     );
 
     const heading = screen.getByRole('heading', { name: 'Artist Profile' });
-    expect(heading.className).toContain('text-[15px]');
+    expect(heading.className).toContain('text-[24px]');
+    expect(heading.className).toContain('sm:text-[28px]');
     expect(heading.className).toContain('dashboard-heading');
 
     const description = screen
       .getByText('Photo, display name, and username.')
       .closest('p');
-    expect(description?.className).toContain('text-[12px]');
+    expect(description?.className).toContain('text-[13px]');
     expect(description?.className).toContain('dashboard-body');
   });
 });

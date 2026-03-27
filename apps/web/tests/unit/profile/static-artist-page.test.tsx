@@ -322,34 +322,24 @@ describe('StaticArtistPage', () => {
     expect(screen.getByTestId('public-profile-template-v2')).toBeDefined();
   });
 
-  it('keeps contact mode on the legacy template when V2 is enabled', () => {
+  it.each([
+    'profile',
+    'listen',
+    'subscribe',
+    'contact',
+    'tour',
+    'tip',
+    'about',
+  ] as const)('routes %s mode through the V2 template when enabled', mode => {
     render(
       <StaticArtistPage
-        mode='contact'
+        mode={mode}
         artist={mockArtist}
         socialLinks={mockSocialLinks}
         contacts={[]}
-        subtitle='Contact'
-        showTipButton={false}
-        showBackButton={true}
-        profileV2Enabled
-      />
-    );
-
-    expect(screen.queryByTestId('public-profile-template-v2')).toBeNull();
-    expect(screen.getByTestId('artist-page-shell')).toBeDefined();
-  });
-
-  it('still routes subscribe mode through the V2 template when enabled', () => {
-    render(
-      <StaticArtistPage
-        mode='subscribe'
-        artist={mockArtist}
-        socialLinks={mockSocialLinks}
-        contacts={[]}
-        subtitle='Get notified'
-        showTipButton={false}
-        showBackButton={true}
+        subtitle='Artist'
+        showTipButton={mode === 'tip'}
+        showBackButton={mode !== 'profile'}
         profileV2Enabled
       />
     );

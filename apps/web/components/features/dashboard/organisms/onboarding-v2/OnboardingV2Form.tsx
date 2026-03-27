@@ -41,6 +41,7 @@ import {
   ONBOARDING_PREVIEW_SNAPSHOT_KEY,
   ONBOARDING_WELCOME_REPLY_KEY,
 } from '@/lib/onboarding/session-keys';
+import type { AvatarQuality } from '@/lib/profile/avatar-quality';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
@@ -138,6 +139,7 @@ interface LateArrival {
 
 interface OnboardingV2FormProps {
   readonly existingAvatarUrl?: string | null;
+  readonly existingAvatarQuality?: AvatarQuality | null;
   readonly existingBio?: string | null;
   readonly existingGenres?: string[] | null;
   readonly initialDisplayName?: string;
@@ -698,6 +700,7 @@ function PreviewPanel({
 
 export function OnboardingV2Form({
   existingAvatarUrl = null,
+  existingAvatarQuality = null,
   existingBio = null,
   existingGenres = null,
   initialDisplayName = '',
@@ -710,6 +713,7 @@ export function OnboardingV2Form({
   userId,
 }: Readonly<OnboardingV2FormProps>) {
   const router = useRouter();
+  void existingAvatarQuality;
   const searchParams = useSearchParams();
   const normalizedInitialHandle = initialHandle.trim().toLowerCase();
   const initialStep = normalizeResumeStep(initialResumeStep);
