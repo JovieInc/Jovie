@@ -20,6 +20,11 @@ export {
   type DrawerButtonProps,
 } from './DrawerButton';
 export {
+  DRAWER_CARD_ACTION_BUTTON_CLASSNAME,
+  DrawerCardActionBar,
+  type DrawerCardActionBarProps,
+} from './DrawerCardActionBar';
+export {
   DrawerEmptyState,
   type DrawerEmptyStateProps,
 } from './DrawerEmptyState';
@@ -67,12 +72,21 @@ export {
   DrawerSettingsToggle,
   type DrawerSettingsToggleProps,
 } from './DrawerSettingsToggle';
+export {
+  DrawerSplitButton,
+  type DrawerSplitButtonAction,
+  type DrawerSplitButtonProps,
+} from './DrawerSplitButton';
 export { DrawerStatGrid, type DrawerStatGridProps } from './DrawerStatGrid';
 export {
   DRAWER_SURFACE_CARD_CLASSNAME,
   DrawerSurfaceCard,
   type DrawerSurfaceCardProps,
 } from './DrawerSurfaceCard';
+export {
+  DrawerTabbedCard,
+  type DrawerTabbedCardProps,
+} from './DrawerTabbedCard';
 export { DrawerTabs, type DrawerTabsProps } from './DrawerTabs';
 export {
   EntityHeaderCard,

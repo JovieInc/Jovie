@@ -5,6 +5,7 @@ import { musicFetchEnrichmentPayloadSchema } from '@/lib/dsp-enrichment/jobs/mus
 import { sendClaimInvitePayloadSchema } from '@/lib/email/jobs/send-claim-invite';
 import { captureError } from '@/lib/error-tracking';
 import {
+  isMusicfetchInvalidServicesError,
   MusicfetchBudgetExceededError,
   MusicfetchRequestError,
 } from '@/lib/musicfetch/errors';
@@ -66,6 +67,13 @@ export function determineJobFailure(error: unknown): {
     (error instanceof MusicfetchRequestError && error.statusCode === 429)
   ) {
     return { message: error.message, reason: 'rate_limited' };
+  }
+
+  if (
+    error instanceof MusicfetchRequestError &&
+    isMusicfetchInvalidServicesError(error)
+  ) {
+    return { message: error.message, reason: 'permanent' };
   }
 
   const message =
@@ -154,6 +162,14 @@ export function getCreatorProfileIdFromJob(
   return parsed.success ? parsed.data.creatorProfileId : null;
 }
 
+function shouldRetryJob(
+  job: Pick<typeof ingestionJobs.$inferSelect, 'attempts' | 'maxAttempts'>,
+  reason: JobFailureReason
+): boolean {
+  const maxAttempts = job.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+  return reason !== 'permanent' && job.attempts < maxAttempts;
+}
+
 /**
  * Handle job failure with retry logic.
  */
@@ -164,7 +180,7 @@ export async function handleIngestionJobFailure(
 ): Promise<void> {
   const { message, reason } = determineJobFailure(error);
   const maxAttempts = job.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
-  const shouldRetry = job.attempts < maxAttempts;
+  const shouldRetry = shouldRetryJob(job, reason);
 
   const creatorProfileId = getCreatorProfileIdFromJob(job);
   if (creatorProfileId) {
@@ -336,8 +352,8 @@ export async function failJob(
   options: { reason?: JobFailureReason } = {}
 ): Promise<void> {
   const maxAttempts = job.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
-  const shouldRetry = job.attempts < maxAttempts;
   const reason = options.reason ?? 'transient';
+  const shouldRetry = shouldRetryJob(job, reason);
 
   if (shouldRetry) {
     const backoffMs = calculateBackoff(job.attempts, reason);

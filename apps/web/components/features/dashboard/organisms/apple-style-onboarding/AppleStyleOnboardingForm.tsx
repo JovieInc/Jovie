@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { enrichProfileFromDsp } from '@/app/onboarding/actions/enrich-profile';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthBackButton } from '@/features/auth';
 import { ProfileLiveCelebration } from '@/features/dashboard/molecules/ProfileLiveCelebration';
@@ -20,7 +22,6 @@ import {
 } from '@/lib/auth/plan-intent';
 import { useFeatureGate } from '@/lib/feature-flags/client';
 import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
-import { enrichProfileFromDsp } from '../../../../../app/onboarding/actions/enrich-profile';
 import { getOnboardingDashboardInitialQuery } from './onboardingDashboardQuery';
 
 import type { AppleStyleOnboardingFormProps } from './types';
@@ -349,7 +350,7 @@ export function AppleStyleOnboardingForm({
 
         <Link
           href='#main-content'
-          className='sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 px-4 py-2 rounded-md z-50 btn btn-primary btn-sm'
+          className={`sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 focus-visible:z-50 ${APP_CONTROL_BUTTON_CLASS}`}
         >
           Skip to main content
         </Link>

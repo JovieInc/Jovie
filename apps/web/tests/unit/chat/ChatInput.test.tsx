@@ -1,4 +1,5 @@
 import { TooltipProvider } from '@jovie/ui';
+import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -51,5 +52,33 @@ describe('ChatInput', () => {
 
     // Dropdown menu receives focus when opened (standard Radix behavior)
     expect(getByRole('menu')).toBeInTheDocument();
+  });
+
+  it('reveals quick actions when the composer is focused', () => {
+    const onQuickActionSelect = vi.fn();
+    fastRender(
+      <TooltipProvider>
+        <ChatInput
+          {...baseProps}
+          quickActions={[
+            {
+              label: 'Summarize this thread',
+              prompt: 'Summarize this thread in three concise bullets.',
+            },
+          ]}
+          onQuickActionSelect={onQuickActionSelect}
+          variant='compact'
+        />
+      </TooltipProvider>
+    );
+
+    fireEvent.focus(
+      screen.getByRole('textbox', { name: /chat message input/i })
+    );
+
+    expect(screen.getByTestId('chat-input-quick-actions')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Summarize this thread' })
+    ).toBeInTheDocument();
   });
 });

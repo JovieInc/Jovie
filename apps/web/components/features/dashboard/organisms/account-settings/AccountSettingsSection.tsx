@@ -78,20 +78,10 @@ export function AccountSettingsSection({
   isGrowth = false,
 }: AccountSettingsSectionProps) {
   return (
-    <div className='space-y-0' data-testid='account-settings-section'>
+    <div className='space-y-6' data-testid='account-settings-section'>
       <ClerkAccountSections />
-      <div>
-        <SettingsGroupHeading className='pb-3 pt-6'>
-          Appearance
-        </SettingsGroupHeading>
-        <SettingsAppearanceSection />
-      </div>
-      <div>
-        <SettingsGroupHeading className='pb-3 pt-6'>
-          Notifications
-        </SettingsGroupHeading>
-        <SettingsNotificationsSection isGrowth={isGrowth} />
-      </div>
+      <SettingsAppearanceSection />
+      <SettingsNotificationsSection isGrowth={isGrowth} />
     </div>
   );
 }
