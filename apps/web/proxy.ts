@@ -23,6 +23,7 @@ import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
 import { isStagingHost, resolveClerkKeys } from '@/lib/auth/staging-clerk-keys';
 import {
+  isTestAuthBypassEnabled,
   resolveTestBypassUserId,
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_HEADER,
@@ -944,10 +945,11 @@ export default async function middleware(
   const investorResponse = await handleInvestorRequest(req, event);
   if (investorResponse) return investorResponse;
 
-  if (process.env.NODE_ENV === 'test') {
+  if (isTestAuthBypassEnabled()) {
     const testMode = req.headers.get(TEST_MODE_HEADER)?.trim();
-    if (testMode === TEST_AUTH_BYPASS_MODE) {
-      return handleRequest(req, resolveTestBypassUserId(req.headers));
+    const testBypassUserId = resolveTestBypassUserId(req.headers, req.cookies);
+    if (testMode === TEST_AUTH_BYPASS_MODE || testBypassUserId) {
+      return handleRequest(req, testBypassUserId);
     }
   }
 

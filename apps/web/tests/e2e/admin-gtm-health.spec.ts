@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { ClerkTestError, signInUser } from '../helpers/clerk-auth';
 import { expect, test } from './setup';
 import {
   assertNoCriticalErrors,
@@ -12,10 +13,35 @@ async function expectAdminPage(
   page: import('@playwright/test').Page,
   path: string
 ) {
-  const response = await smokeNavigateWithRetry(page, path, {
+  let response = await smokeNavigateWithRetry(page, path, {
     timeout: 120_000,
     retries: 2,
   });
+
+  if (
+    page.url().includes('/signin') ||
+    page.url().includes('/sign-in') ||
+    page.url().includes('/signup') ||
+    page.url().includes('/sign-up')
+  ) {
+    try {
+      await signInUser(page);
+    } catch (error) {
+      if (error instanceof ClerkTestError) {
+        test.skip(
+          true,
+          `Admin smoke requires authenticated session: ${error.message}`
+        );
+        return;
+      }
+      throw error;
+    }
+
+    response = await smokeNavigateWithRetry(page, path, {
+      timeout: 120_000,
+      retries: 2,
+    });
+  }
 
   expect(response?.status()).toBe(200);
   await waitForHydration(page);

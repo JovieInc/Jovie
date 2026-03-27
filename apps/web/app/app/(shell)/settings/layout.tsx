@@ -4,7 +4,7 @@ export default function SettingsLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className='mx-auto w-full max-w-[720px] space-y-5 px-3 pb-6 pt-1 sm:px-4 lg:px-5'>
+    <div className='mx-auto w-full max-w-[820px] space-y-6 px-4 pb-10 pt-4 sm:px-6 lg:px-8'>
       {children}
     </div>
   );

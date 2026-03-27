@@ -79,7 +79,7 @@ export const MAX_DEPTH_BY_JOB_TYPE: Record<SupportedRecursiveJobType, number> =
 /**
  * Job failure reason for backoff calculation.
  */
-export type JobFailureReason = 'rate_limited' | 'transient';
+export type JobFailureReason = 'permanent' | 'rate_limited' | 'transient';
 
 /**
  * Job processor function signature.

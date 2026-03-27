@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import type { ReactNode } from 'react';
+import { type ReactNode, Suspense } from 'react';
 
 export const metadata: Metadata = {
   robots: {
@@ -9,10 +9,12 @@ export const metadata: Metadata = {
   },
 };
 
+export const revalidate = false;
+
 export default function DemoLayout({
   children,
 }: Readonly<{
   children: ReactNode;
 }>) {
-  return children;
+  return <Suspense fallback={null}>{children}</Suspense>;
 }

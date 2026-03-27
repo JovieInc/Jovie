@@ -19,6 +19,9 @@ const isSmokeOnly = process.env.SMOKE_ONLY === '1';
 const isCI = !!process.env.CI;
 const isFullMatrix = process.env.E2E_FULL_MATRIX === '1';
 const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
+const useTestAuthBypass =
+  process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
+  (isCI && !process.env.BASE_URL);
 const sentryE2eEnabled =
   process.env.SENTRY_E2E_REPORTING === '1' && Boolean(process.env.SENTRY_DSN);
 
@@ -142,9 +145,16 @@ export default defineConfig({
             NODE_ENV: 'test',
             PORT: '3100',
             NEXT_PUBLIC_E2E_MODE: '1',
+            E2E_USE_TEST_AUTH_BYPASS: useTestAuthBypass ? '1' : '0',
             NEXT_DISABLE_TOOLBAR: '1',
             E2E_FAST_ONBOARDING: '1',
             E2E_ALLOW_DEV_CSP: '1',
+            ...(useTestAuthBypass
+              ? {
+                  NEXT_PUBLIC_CLERK_MOCK: '1',
+                  NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
+                }
+              : {}),
             NODE_OPTIONS:
               `${process.env.NODE_OPTIONS || ''} --max-old-space-size=8192`.trim(),
           },

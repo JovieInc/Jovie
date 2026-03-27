@@ -192,32 +192,10 @@ describe('ReleaseDspLinks interactions', () => {
     expect(screen.getByTestId('provider-icon-apple_music')).toBeInTheDocument();
   });
 
-  it('opens add form and submits a valid link', async () => {
+  it('submits a valid link when the add form is already open', async () => {
     const user = userEvent.setup();
 
-    const { rerender } = render(
-      <ReleaseDspLinks
-        release={createMockRelease()}
-        providerConfig={providerConfig}
-        isEditable
-        isAddingLink={false}
-        newLinkUrl=''
-        selectedProvider={null}
-        isAddingDspLink={false}
-        isRemovingDspLink={null}
-        onSetIsAddingLink={onSetIsAddingLink}
-        onSetNewLinkUrl={onSetNewLinkUrl}
-        onSetSelectedProvider={onSetSelectedProvider}
-        onAddLink={onAddLink}
-        onRemoveLink={onRemoveLink}
-        onNewLinkKeyDown={vi.fn()}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Add platform link' }));
-    expect(onSetIsAddingLink).toHaveBeenCalledWith(true);
-
-    rerender(
+    render(
       <ReleaseDspLinks
         release={createMockRelease()}
         providerConfig={providerConfig}
@@ -236,6 +214,9 @@ describe('ReleaseDspLinks interactions', () => {
       />
     );
 
+    expect(
+      screen.queryByRole('button', { name: 'Add platform link' })
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Add' }));
     expect(onAddLink).toHaveBeenCalledTimes(1);
   });

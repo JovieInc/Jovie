@@ -72,6 +72,7 @@ export function TrackDetailPanel({
             isrc={track.isrc}
             isExplicit={track.isExplicit}
             variant='drawer'
+            showIsrc={false}
           />
         </div>
       </DrawerSurfaceCard>

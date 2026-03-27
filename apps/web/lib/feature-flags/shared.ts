@@ -64,7 +64,7 @@ export const FEATURE_FLAGS = {
   SHOW_FEATURE_SHOWCASE: false,
 
   /** Final CTA section on marketing homepage. */
-  SHOW_FINAL_CTA: false,
+  SHOW_FINAL_CTA: true,
 } as const;
 
 export type CodeFlagName = keyof typeof FEATURE_FLAGS;

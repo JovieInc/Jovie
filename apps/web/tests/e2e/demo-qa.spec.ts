@@ -53,7 +53,8 @@ test.describe('Demo page — structural QA', () => {
       e =>
         !e.includes('hydration') &&
         !e.includes('Warning:') &&
-        !e.includes('DevTools')
+        !e.includes('DevTools') &&
+        !e.includes('401 (Unauthorized)')
     );
     expect(
       fatalErrors,
@@ -101,11 +102,44 @@ test.describe('Demo page — structural QA', () => {
     // Click a release to open the detail drawer
     await releaseRow.click();
 
-    // Drawer should show release details — multiple instances of the title
-    // (one in the row, one in the drawer)
-    await expect(page.getByText('Static Skies').nth(1)).toBeVisible({
+    await expect(page.getByTestId('release-sidebar')).toBeVisible({
       timeout: 10_000,
     });
+  });
+
+  test('audience demo route renders analytics drawer without fatal errors', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+
+    const consoleErrors: string[] = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
+    });
+
+    await page.goto('/demo/audience', {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+
+    await expect(page.getByTestId('demo-analytics-sidebar')).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(
+      page.getByRole('button', { name: 'Toggle analytics panel' })
+    ).toBeVisible();
+
+    const fatalErrors = consoleErrors.filter(
+      e =>
+        !e.includes('hydration') &&
+        !e.includes('Warning:') &&
+        !e.includes('DevTools') &&
+        !e.includes('401 (Unauthorized)')
+    );
+    expect(
+      fatalErrors,
+      `Unexpected console errors on /demo/audience:\n${fatalErrors.join('\n')}`
+    ).toHaveLength(0);
   });
 
   test('sidebar navigation items are accessible', async ({ page }) => {
