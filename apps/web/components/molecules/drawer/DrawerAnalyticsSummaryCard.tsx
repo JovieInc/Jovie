@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { DrawerSurfaceCard } from './DrawerSurfaceCard';
 
 export interface DrawerAnalyticsSummaryMetric {
-  readonly id?: string;
+  readonly id: string;
   readonly label: string;
   readonly value: string;
   readonly hint?: string;
@@ -110,7 +110,7 @@ export function DrawerAnalyticsSummaryCard({
           {state === 'ready' && metrics.length > 0 ? (
             <div className={cn('grid gap-2.5', gridClassName)}>
               {metrics.map(metric => (
-                <MetricTile key={metric.id ?? metric.label} {...metric} />
+                <MetricTile key={metric.id} {...metric} />
               ))}
             </div>
           ) : null}

@@ -7,8 +7,18 @@ describe('DrawerAnalyticsSummaryCard', () => {
     render(
       <DrawerAnalyticsSummaryCard
         metrics={[
-          { label: 'Profile views', value: '120', hint: 'Visitors' },
-          { label: 'Link clicks', value: '42', hint: 'Outbound' },
+          {
+            id: 'profile-views',
+            label: 'Profile views',
+            value: '120',
+            hint: 'Visitors',
+          },
+          {
+            id: 'link-clicks',
+            label: 'Link clicks',
+            value: '42',
+            hint: 'Outbound',
+          },
         ]}
         state='ready'
         footer={<button type='button'>Last 30 days</button>}
@@ -36,8 +46,8 @@ describe('DrawerAnalyticsSummaryCard', () => {
     render(
       <DrawerAnalyticsSummaryCard
         metrics={[
-          { label: 'Profile views', value: '0' },
-          { label: 'Link clicks', value: '0' },
+          { id: 'profile-views', label: 'Profile views', value: '0' },
+          { id: 'link-clicks', label: 'Link clicks', value: '0' },
         ]}
         state='loading'
         testId='analytics-card'
@@ -56,7 +66,9 @@ describe('DrawerAnalyticsSummaryCard', () => {
   it('marks the whole card busy when dimmed content includes a footer', () => {
     render(
       <DrawerAnalyticsSummaryCard
-        metrics={[{ label: 'Profile views', value: '120' }]}
+        metrics={[
+          { id: 'profile-views', label: 'Profile views', value: '120' },
+        ]}
         state='ready'
         dimmed={true}
         footer={<button type='button'>Last 30 days</button>}
