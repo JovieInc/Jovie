@@ -16,11 +16,12 @@ import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   TableEmptyState,
+  TableShell,
+  TableSurfaceHeader,
+  TableSurfaceToolbar,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
-import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
-import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import type { AdminReleaseRow } from '@/lib/admin/releases';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import {
@@ -328,14 +329,22 @@ export function AdminReleasesTableUnified({
   );
 
   return (
-    <AdminTableShell
+    <TableShell
       toolbar={
-        <AdminTableSubheader>
-          <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-            {total.toLocaleString()} release{total === 1 ? '' : 's'}
-          </div>
-          <div className={PAGE_TOOLBAR_END_GROUP_CLASS} />
-        </AdminTableSubheader>
+        <>
+          <TableSurfaceHeader
+            title='Releases'
+            subtitle='Review metadata quality, provider coverage, and ingestion issues.'
+          />
+          <TableSurfaceToolbar
+            start={
+              <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+                {total.toLocaleString()} release{total === 1 ? '' : 's'}
+              </div>
+            }
+            end={<div className={PAGE_TOOLBAR_END_GROUP_CLASS} />}
+          />
+        </>
       }
     >
       {() => (
@@ -353,6 +362,6 @@ export function AdminReleasesTableUnified({
           onLoadMore={fetchNextPage}
         />
       )}
-    </AdminTableShell>
+    </TableShell>
   );
 }
