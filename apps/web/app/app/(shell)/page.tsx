@@ -1,23 +1,18 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { getSessionContext } from '@/lib/auth/session';
 import { ChatPageClient } from './chat/ChatPageClient';
 import { getDashboardData } from './dashboard/actions';
 
 const DASHBOARD_DESCRIPTION = 'Start a new thread with Jovie AI';
 
-const getDashboardTitle = async () => {
-  const profile = await getSessionContext({ requireProfile: false })
-    .then(result => result.profile)
-    .catch(() => null);
-  const displayName = profile?.displayName?.trim();
-
-  return displayName ? `${displayName} | Jovie` : 'Home | Jovie';
-};
-
 export async function generateMetadata(): Promise<Metadata> {
+  // Reuse getDashboardData() which is deduplicated via React.cache() —
+  // avoids a separate getSessionContext() DB call for metadata.
+  const data = await getDashboardData();
+  const displayName = data.selectedProfile?.displayName?.trim();
+
   return {
-    title: await getDashboardTitle(),
+    title: displayName ? `${displayName} | Jovie` : 'Home | Jovie',
     description: DASHBOARD_DESCRIPTION,
   };
 }

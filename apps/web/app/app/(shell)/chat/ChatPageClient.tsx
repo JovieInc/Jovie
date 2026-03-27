@@ -2,6 +2,7 @@
 
 import { Button, SimpleTooltip } from '@jovie/ui';
 import { AlertCircle, Check, Copy, RefreshCw } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -12,14 +13,14 @@ import {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
-import { JovieChat } from '@/components/jovie/JovieChat';
+import { ChatMessageSkeleton } from '@/components/jovie/components/ChatMessageSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { PreviewToggleButton } from '@/features/dashboard/layout/PreviewToggleButton';
-import { ProfileContactSidebar } from '@/features/dashboard/organisms/profile-contact-sidebar';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { env } from '@/lib/env-client';
@@ -31,6 +32,42 @@ import {
 import { useDashboardSocialLinksQuery } from '@/lib/queries';
 import { addBreadcrumb, captureMessage } from '@/lib/sentry/client-lite';
 import { getHometownFromSettings } from '@/types/db';
+
+// Code-split heavy components — JovieChat pulls in Framer Motion, react-virtual,
+// and 13+ sub-components. ProfileContactSidebar loads mutation hooks and a tab system.
+// Both are interactive-only so SSR is unnecessary.
+const JovieChat = dynamic(
+  () =>
+    import('@/components/jovie/JovieChat').then(mod => ({
+      default: mod.JovieChat,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className='flex h-full flex-col' data-testid='chat-loading'>
+        <div className='flex-1'>
+          <ChatMessageSkeleton />
+        </div>
+        <div className='border-t border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 pb-4 pt-4 sm:px-5 sm:pb-6'>
+          <div className='mx-auto w-full max-w-2xl space-y-3'>
+            <LoadingSkeleton height='h-12' width='w-full' rounded='lg' />
+            <div className='flex justify-center'>
+              <LoadingSkeleton height='h-3' width='w-40' rounded='sm' />
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+  }
+);
+
+const ProfileContactSidebar = dynamic(
+  () =>
+    import('@/features/dashboard/organisms/profile-contact-sidebar').then(
+      mod => ({ default: mod.ProfileContactSidebar })
+    ),
+  { ssr: false }
+);
 
 interface ChatPageClientProps {
   readonly conversationId?: string;

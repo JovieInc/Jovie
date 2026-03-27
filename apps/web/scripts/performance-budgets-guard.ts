@@ -425,15 +425,48 @@ const measureWarmShellResponse = async (
 
 /**
  * Measure skeleton-to-content time.
- * Waits for [data-testid="releases-loading"] to disappear and real content to render.
+ *
+ * For dashboard releases: waits for [data-testid="releases-loading"] to disappear.
+ * For /app (chat): waits for [data-testid="chat-loading"] to disappear or
+ * [data-testid="chat-content"] to appear.
+ * Falls back to generic skeleton/content detection.
  */
 const measureSkeletonToContent = async (
   page: Awaited<
     ReturnType<Awaited<ReturnType<typeof chromium.launch>>['newPage']>
-  >
+  >,
+  pathname?: string
 ): Promise<number> => {
   const start = Date.now();
+  const isChatPage = pathname === '/app' || pathname === '/app/';
 
+  if (isChatPage) {
+    try {
+      // Wait for either: shell skeleton gone, or chat content visible
+      await Promise.race([
+        page
+          .waitForSelector('[data-testid="dashboard-shell-skeleton"]', {
+            state: 'detached',
+            timeout: 15000,
+          })
+          .then(() =>
+            page.waitForSelector('[data-testid="chat-content"]', {
+              state: 'visible',
+              timeout: 10000,
+            })
+          ),
+        page.waitForSelector('[data-testid="chat-content"]', {
+          state: 'visible',
+          timeout: 15000,
+        }),
+      ]);
+      return Date.now() - start;
+    } catch {
+      return Date.now() - start;
+    }
+  }
+
+  // Dashboard releases path
   try {
     await page.waitForSelector('[data-testid="releases-loading"]', {
       state: 'detached',
@@ -535,7 +568,10 @@ const collectMetrics = async (
     await page.addInitScript(PERF_BUDGET_INIT_SCRIPT);
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    const skeletonToContentPromise = measureSkeletonToContent(page);
+    const skeletonToContentPromise = measureSkeletonToContent(
+      page,
+      new URL(url).pathname
+    );
 
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {
       logWarning(

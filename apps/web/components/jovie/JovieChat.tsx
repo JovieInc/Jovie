@@ -335,6 +335,7 @@ export function JovieChat({
     <div
       ref={dropZoneRef}
       className='relative flex h-full flex-col bg-[linear-gradient(180deg,color-mix(in_oklab,var(--linear-app-content-surface)_14%,transparent),transparent_18%)]'
+      data-testid='chat-content'
     >
       {/* Hidden file input for image attachments */}
       <input

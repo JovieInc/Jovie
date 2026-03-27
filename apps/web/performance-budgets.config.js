@@ -25,6 +25,17 @@ const defaultPublicResourceBudgets = [
   { resourceType: 'total', budget: 1200 },
 ];
 
+// Dashboard pages carry TanStack table + Radix UI + Clerk auth overhead.
+// Baseline (2026-03-19): script 2000KB, stylesheet 457KB, total 2563KB.
+// Budgets set ~10% above baseline; tighten as we code-split.
+const dashboardResourceBudgets = [
+  { resourceType: 'script', budget: 2200 },
+  { resourceType: 'image', budget: 500 },
+  { resourceType: 'font', budget: 100 },
+  { resourceType: 'stylesheet', budget: 500 },
+  { resourceType: 'total', budget: 2800 },
+];
+
 const onboardingResourceBudgets = [
   { resourceType: 'script', budget: 2600 },
   { resourceType: 'image', budget: 700 },
@@ -172,6 +183,22 @@ module.exports = {
       resourceSizes: onboardingResourceBudgets,
     },
     {
+      path: '/app',
+      auth: true,
+      timings: [
+        // Main dashboard (chat-first) — Gmail rule: 100ms perceived, 500ms hard budget.
+        // Skeleton must appear fast; content streams in via Suspense.
+        { metric: 'first-contentful-paint', budget: 1200 },
+        { metric: 'largest-contentful-paint', budget: 2000 },
+        { metric: 'cumulative-layout-shift', budget: 0.1 },
+        { metric: 'first-input-delay', budget: 100 },
+        { metric: 'time-to-first-byte', budget: 800 },
+        // Custom: time from navigation to chat content visible
+        { metric: 'skeleton-to-content', budget: 500 },
+      ],
+      resourceSizes: dashboardResourceBudgets,
+    },
+    {
       path: '/app/dashboard/releases',
       auth: true,
       timings: [
@@ -184,16 +211,7 @@ module.exports = {
         // Custom: time from navigation to skeleton disappearing / real content visible
         { metric: 'skeleton-to-content', budget: 500 },
       ],
-      resourceSizes: [
-        // Dashboard pages carry TanStack table + Radix UI + Clerk auth overhead.
-        // Baseline (2026-03-19): script 2000KB, stylesheet 457KB, total 2563KB.
-        // Budgets set ~10% above baseline; tighten as we code-split.
-        { resourceType: 'script', budget: 2200 },
-        { resourceType: 'image', budget: 500 },
-        { resourceType: 'font', budget: 100 },
-        { resourceType: 'stylesheet', budget: 500 },
-        { resourceType: 'total', budget: 2800 },
-      ],
+      resourceSizes: dashboardResourceBudgets,
     },
     ...onboardingStepBudgets,
   ],
