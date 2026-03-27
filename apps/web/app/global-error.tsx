@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import { captureException } from '@/lib/sentry/client-lite';
-import { getSentryMode, isSentryInitialized } from '@/lib/sentry/init';
 
 /**
  * Global error page for Next.js App Router.
@@ -25,39 +23,16 @@ export default function GlobalError({
   reset: () => void;
 }>) {
   useEffect(() => {
-    // Capture error in Sentry with SDK variant awareness
-    const sentryMode = getSentryMode();
-    const isInitialized = isSentryInitialized();
-
-    if (isInitialized) {
-      try {
+    void import('@/lib/sentry/client-lite')
+      .then(({ captureException }) => {
         captureException(error, {
-          extra: {
-            digest: error.digest,
-            sentryMode, // Include SDK mode for debugging
-          },
-          tags: {
-            globalError: 'true',
-            sentryMode, // Tag to filter by SDK variant in Sentry dashboard
-          },
+          extra: { digest: error.digest },
+          tags: { globalError: 'true' },
         });
-      } catch (sentryError) {
-        // Fallback: Sentry capture failed - this should be rare but provides resilience
-        console.error('[GlobalError] Sentry capture failed:', sentryError);
-        console.error('[GlobalError] Original error:', error);
-      }
-    } else {
-      // Fallback: Sentry not initialized - log to console
-      // This can happen during initial load before SDK is ready
-      console.error(
-        '[GlobalError] Sentry not initialized, logging error:',
-        error,
-        {
-          digest: error.digest,
-          sentryMode,
-        }
-      );
-    }
+      })
+      .catch(() => {
+        // Keep the global error boundary resilient even if telemetry fails.
+      });
   }, [error]);
 
   return (
