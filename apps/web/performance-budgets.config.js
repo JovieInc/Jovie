@@ -25,17 +25,25 @@ const defaultPublicResourceBudgets = [
   { resourceType: 'total', budget: 1200 },
 ];
 
-// Dashboard pages carry TanStack table + Radix UI + Clerk auth overhead.
-// Baseline (2026-03-19): script 2000KB, stylesheet 457KB, total 2563KB.
-// Budgets set ~10% above baseline; tighten as we code-split.
-const dashboardResourceBudgets = [
-  // Baseline (2026-03-27): script ~2150-2500KB (varies with lazy chunks loaded).
-  // Budget set at p95 + 10% headroom.
+// /app chat page: lighter payload (no TanStack table, no row virtualisation).
+// Baseline (2026-03-27): script ~2150-2500KB (varies with lazy chunks loaded).
+const chatResourceBudgets = [
   { resourceType: 'script', budget: 2750 },
   { resourceType: 'image', budget: 500 },
   { resourceType: 'font', budget: 100 },
   { resourceType: 'stylesheet', budget: 500 },
   { resourceType: 'total', budget: 3100 },
+];
+
+// /app/dashboard/releases: heavier payload (TanStack table + row virtualisation).
+// Baseline (2026-03-19): script 2000KB, stylesheet 457KB, total 2563KB.
+// Budgets set ~10% above baseline; tighten as we code-split.
+const releasesResourceBudgets = [
+  { resourceType: 'script', budget: 2200 },
+  { resourceType: 'image', budget: 500 },
+  { resourceType: 'font', budget: 100 },
+  { resourceType: 'stylesheet', budget: 500 },
+  { resourceType: 'total', budget: 2800 },
 ];
 
 const onboardingResourceBudgets = [
@@ -203,7 +211,7 @@ module.exports = {
         // Custom: time from navigation to chat content visible
         { metric: 'skeleton-to-content', budget: 2000 },
       ],
-      resourceSizes: dashboardResourceBudgets,
+      resourceSizes: chatResourceBudgets,
     },
     {
       path: '/app/dashboard/releases',
@@ -218,7 +226,7 @@ module.exports = {
         // Custom: time from navigation to skeleton disappearing / real content visible
         { metric: 'skeleton-to-content', budget: 500 },
       ],
-      resourceSizes: dashboardResourceBudgets,
+      resourceSizes: releasesResourceBudgets,
     },
     ...onboardingStepBudgets,
   ],

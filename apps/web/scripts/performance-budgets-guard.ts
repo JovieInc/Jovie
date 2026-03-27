@@ -427,8 +427,8 @@ const measureWarmShellResponse = async (
  * Measure skeleton-to-content time.
  *
  * For dashboard releases: waits for [data-testid="releases-loading"] to disappear.
- * For /app (chat): waits for [data-testid="chat-loading"] to disappear or
- * [data-testid="chat-content"] to appear.
+ * For /app (chat): waits for [data-testid="chat-content"] to appear (JovieChat mounted)
+ * or the dashboard nav to appear (shell + data loaded).
  * Falls back to generic skeleton/content detection.
  */
 const measureSkeletonToContent = async (
@@ -442,16 +442,11 @@ const measureSkeletonToContent = async (
 
   if (isChatPage) {
     try {
-      // Wait for chat content to be visible. The dynamic import renders
-      // data-testid="chat-content" once JovieChat mounts. If that's not
-      // found (e.g. profile missing, error state), fall back to the
-      // dashboard nav appearing which means the shell + data loaded.
+      // Wait for chat content or dashboard nav to become visible.
+      // chat-content appears when JovieChat mounts; dashboard nav
+      // appears when the shell renders (fallback for error/no-profile states).
       await Promise.race([
         page.waitForSelector('[data-testid="chat-content"]', {
-          state: 'visible',
-          timeout: 15000,
-        }),
-        page.waitForSelector('[data-testid="chat-loading"]', {
           state: 'visible',
           timeout: 15000,
         }),
