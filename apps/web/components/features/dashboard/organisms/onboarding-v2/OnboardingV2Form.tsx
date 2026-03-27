@@ -46,9 +46,9 @@ import type { AvatarQuality } from '@/lib/profile/avatar-quality';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
-const DISCOVERY_POLL_INTERVAL_MS = 2000;
-const DISCOVERY_STAGE_TIMEOUT_MS = 15000;
-const DISCOVERY_AUTO_ADVANCE_MS = 1500;
+const DISCOVERY_POLL_INTERVAL_MS = 1200;
+const DISCOVERY_STAGE_TIMEOUT_MS = 10000;
+const DISCOVERY_AUTO_ADVANCE_MS = 800;
 
 type StepId =
   | 'handle'
@@ -179,12 +179,18 @@ function normalizeResumeStep(step: string | null | undefined): StepId | null {
       return 'handle';
     case 'spotify':
       return 'spotify';
+    case 'artist-confirm':
+      return 'artist-confirm';
+    case 'upgrade':
+      return 'upgrade';
     case 'dsp':
       return 'dsp';
     case 'social':
       return 'social';
     case 'releases':
       return 'releases';
+    case 'late-arrivals':
+      return 'late-arrivals';
     case 'profile-ready':
       return 'profile-ready';
     default:

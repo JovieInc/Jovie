@@ -13,6 +13,11 @@ import { buildSpotifyArtistUrl } from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
 import type { SpotifyArtistResult } from './route';
 
+export interface SearchEnrichmentResult {
+  degraded: boolean;
+  results: SpotifyArtistResult[];
+}
+
 /**
  * Apply VIP boost to search results, prioritizing featured creators
  * for exact name matches. Filters out other results with the same
@@ -23,20 +28,34 @@ export async function applyVipBoost(
   query: string,
   limit: number
 ): Promise<SpotifyArtistResult[]> {
+  const enriched = await applyVipBoostWithMeta(results, query, limit);
+  return enriched.results;
+}
+
+export async function applyVipBoostWithMeta(
+  results: SpotifyArtistResult[],
+  query: string,
+  limit: number
+): Promise<SearchEnrichmentResult> {
   try {
-    const vipMap = await getFeaturedCreatorsForSearch();
+    const vipLookup = await getFeaturedCreatorsForSearch();
     const normalizedQuery = query.toLowerCase().trim();
-    const vipArtist = vipMap.get(normalizedQuery);
+    const vipArtist = Object.hasOwn(vipLookup, normalizedQuery)
+      ? vipLookup[normalizedQuery]
+      : undefined;
 
     if (!vipArtist) {
-      return results;
+      return { degraded: false, results };
     }
 
-    return boostVipArtist(results, vipArtist, limit);
+    return {
+      degraded: false,
+      results: boostVipArtist(results, vipArtist, limit),
+    };
   } catch (vipError) {
     // VIP lookup failure should not break search - log and continue
     logger.warn('[Spotify Search] VIP lookup failed:', vipError);
-    return results;
+    return { degraded: true, results };
   }
 }
 
@@ -128,20 +147,34 @@ const getCachedClaimedSpotifyIds = unstable_cache(
 export async function annotateClaimedStatus(
   results: SpotifyArtistResult[]
 ): Promise<SpotifyArtistResult[]> {
-  if (results.length === 0) return results;
+  const enriched = await annotateClaimedStatusWithMeta(results);
+  return enriched.results;
+}
+
+export async function annotateClaimedStatusWithMeta(
+  results: SpotifyArtistResult[]
+): Promise<SearchEnrichmentResult> {
+  if (results.length === 0) {
+    return { degraded: false, results };
+  }
 
   try {
     const spotifyIds = results.map(r => r.id);
     const claimedIds = new Set(await getCachedClaimedSpotifyIds(spotifyIds));
 
-    if (claimedIds.size === 0) return results;
+    if (claimedIds.size === 0) {
+      return { degraded: false, results };
+    }
 
-    return results.map(r =>
-      claimedIds.has(r.id) ? { ...r, isClaimed: true } : r
-    );
+    return {
+      degraded: false,
+      results: results.map(r =>
+        claimedIds.has(r.id) ? { ...r, isClaimed: true } : r
+      ),
+    };
   } catch (error) {
     logger.warn('[Spotify Search] Claimed status lookup failed:', error);
-    return results;
+    return { degraded: true, results };
   }
 }
 
