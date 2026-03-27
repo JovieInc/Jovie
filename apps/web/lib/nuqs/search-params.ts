@@ -18,6 +18,11 @@ import {
   parseAsString,
   parseAsStringLiteral,
 } from 'nuqs/server';
+import {
+  adminGrowthViews,
+  adminOutreachQueues,
+  adminPeopleViews,
+} from '@/constants/admin-navigation';
 import { profileModes } from '@/features/profile/registry';
 
 export { parseAsString as sortFieldParser } from 'nuqs/server';
@@ -267,6 +272,54 @@ export const adminUsersSearchParams = createSearchParamsCache({
 export const adminWaitlistSearchParams = createSearchParamsCache({
   page: pageParser,
   pageSize: pageSizeParser,
+});
+
+export const adminPeopleViewParser =
+  parseAsStringLiteral(adminPeopleViews).withDefault('waitlist');
+
+export const adminPeopleSortFields = [
+  'created_asc',
+  'created_desc',
+  'verified_desc',
+  'verified_asc',
+  'claimed_desc',
+  'claimed_asc',
+  'name_asc',
+  'name_desc',
+  'email_asc',
+  'email_desc',
+  'release_date_desc',
+  'release_date_asc',
+  'title_asc',
+  'title_desc',
+] as const;
+
+export type AdminPeopleSort = (typeof adminPeopleSortFields)[number];
+
+export const adminPeopleSortParser = parseAsStringLiteral(
+  adminPeopleSortFields
+).withDefault('created_desc');
+
+export const adminPeopleSearchParams = createSearchParamsCache({
+  page: pageParser,
+  pageSize: pageSizeParser,
+  view: adminPeopleViewParser,
+  sort: adminPeopleSortParser,
+  q: searchQueryParser,
+});
+
+export const adminGrowthViewParser =
+  parseAsStringLiteral(adminGrowthViews).withDefault('leads');
+
+export const adminOutreachQueueParser =
+  parseAsStringLiteral(adminOutreachQueues).withDefault('all');
+
+export const adminGrowthSearchParams = createSearchParamsCache({
+  page: pageParser,
+  pageSize: pageSizeParser,
+  view: adminGrowthViewParser,
+  queue: adminOutreachQueueParser,
+  q: searchQueryParser,
 });
 
 // ============================================================================

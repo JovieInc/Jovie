@@ -2,22 +2,15 @@
 
 import { Button } from '@jovie/ui';
 import * as Switch from '@radix-ui/react-switch';
-import {
-  ExternalLink,
-  Send,
-  ShieldCheck,
-  Terminal,
-  UserPlus,
-  Users,
-} from 'lucide-react';
+import { ExternalLink, Terminal } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { CampaignSettingsPanel } from '@/components/features/admin/campaigns/CampaignSettingsPanel';
 import { WaitlistSettingsPanel } from '@/components/features/admin/WaitlistSettingsPanel';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { APP_ROUTES } from '@/constants/routes';
 import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
+import { adminNavigationSections } from '@/features/dashboard/dashboard-nav/config';
 
 const DEV_TOOLBAR_COOKIE = '__dev_toolbar';
 
@@ -69,6 +62,10 @@ function AdminLink({ href, icon: Icon, title, description }: AdminLinkProps) {
     </ContentSurfaceCard>
   );
 }
+
+const quickLinkSections = adminNavigationSections.filter(section =>
+  ['Workspaces', 'Utilities'].includes(section.label)
+);
 
 /**
  * Admin settings section - only visible to admin users.
@@ -141,31 +138,23 @@ export function SettingsAdminSection() {
           subtitle='Quick links to admin data views and operational tools.'
           className='min-h-0 px-4 py-3'
         />
-        <div className='space-y-2 px-4 py-3'>
-          <AdminLink
-            href={APP_ROUTES.ADMIN_WAITLIST}
-            icon={UserPlus}
-            title='Waitlist'
-            description='Review signups and approval queue.'
-          />
-          <AdminLink
-            href={APP_ROUTES.ADMIN_CAMPAIGNS}
-            icon={Send}
-            title='Campaigns'
-            description='Invite throughput, claim funnel, and send controls.'
-          />
-          <AdminLink
-            href={APP_ROUTES.ADMIN_CREATORS}
-            icon={Users}
-            title='Creator Management'
-            description='Verify, feature, and manage creator profiles.'
-          />
-          <AdminLink
-            href={APP_ROUTES.ADMIN}
-            icon={ShieldCheck}
-            title='Admin Dashboard'
-            description='Platform metrics, activity logs, and system health.'
-          />
+        <div className='space-y-4 px-4 py-3'>
+          {quickLinkSections.map(section => (
+            <div key={section.label} className='space-y-2'>
+              <p className='text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
+                {section.label}
+              </p>
+              {section.items.map(item => (
+                <AdminLink
+                  key={item.id}
+                  href={item.href}
+                  icon={item.icon}
+                  title={item.name}
+                  description={item.description ?? 'Open admin workspace'}
+                />
+              ))}
+            </div>
+          ))}
         </div>
       </DashboardCard>
     </div>

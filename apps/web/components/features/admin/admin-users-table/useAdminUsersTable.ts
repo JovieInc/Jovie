@@ -37,6 +37,7 @@ export function useAdminUsersTable({
   total,
   search,
   sort,
+  basePath = APP_ROUTES.ADMIN_USERS,
 }: AdminUsersTableProps): UseAdminUsersTableReturn {
   const router = useRouter();
   const notifications = useNotifications();
@@ -44,7 +45,7 @@ export function useAdminUsersTable({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const pagination = useAdminTablePaginationLinks<AdminUsersSort>({
-    basePath: APP_ROUTES.ADMIN_USERS,
+    basePath,
     page,
     pageSize,
     search,

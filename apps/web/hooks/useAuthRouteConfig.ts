@@ -1,8 +1,14 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
 
+import {
+  getAdminGrowthViewLabel,
+  getAdminPeopleViewLabel,
+  isAdminGrowthView,
+  isAdminPeopleView,
+} from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
@@ -27,6 +33,7 @@ export interface AuthRouteConfig {
  */
 export function useAuthRouteConfig(): AuthRouteConfig {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const isDemoReleasesRoute = pathname === APP_ROUTES.DEMO;
 
   // Detect section based on pathname
@@ -59,6 +66,34 @@ export function useAuthRouteConfig(): AuthRouteConfig {
       lastPart = parts[parts.length - 2];
     }
 
+    if (pathname === APP_ROUTES.ADMIN_PEOPLE) {
+      const adminPeopleView = searchParams.get('view');
+      const label = isAdminPeopleView(adminPeopleView)
+        ? getAdminPeopleViewLabel(adminPeopleView)
+        : getBreadcrumbLabel('people');
+
+      return [
+        {
+          label,
+          href: pathname,
+        },
+      ];
+    }
+
+    if (pathname === APP_ROUTES.ADMIN_GROWTH) {
+      const adminGrowthView = searchParams.get('view');
+      const label = isAdminGrowthView(adminGrowthView)
+        ? getAdminGrowthViewLabel(adminGrowthView)
+        : getBreadcrumbLabel('growth');
+
+      return [
+        {
+          label,
+          href: pathname,
+        },
+      ];
+    }
+
     // Use centralized label map with sentence case
     const label = getBreadcrumbLabel(lastPart);
 
@@ -68,7 +103,7 @@ export function useAuthRouteConfig(): AuthRouteConfig {
         href: pathname,
       },
     ];
-  }, [isDemoReleasesRoute, pathname]);
+  }, [isDemoReleasesRoute, pathname, searchParams]);
 
   // Show mobile bottom tabs on all authenticated sections so users always
   // have persistent navigation on mobile (dashboard, settings, and admin).
@@ -86,6 +121,8 @@ export function useAuthRouteConfig(): AuthRouteConfig {
       pathname.includes('/waitlist') ||
       pathname.includes('/feedback') ||
       pathname.includes('/campaigns') ||
+      pathname.includes('/people') ||
+      pathname.includes('/growth') ||
       pathname.includes('/releases'),
     [isDemoReleasesRoute, pathname]
   );
