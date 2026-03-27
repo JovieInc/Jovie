@@ -1,18 +1,15 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import {
-  ExternalLink,
-  Terminal,
-} from 'lucide-react';
+import { ExternalLink, Terminal } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { CampaignSettingsPanel } from '@/components/features/admin/campaigns/CampaignSettingsPanel';
 import { WaitlistSettingsPanel } from '@/components/features/admin/WaitlistSettingsPanel';
 import { SettingsActionRow } from '@/components/features/dashboard/molecules/SettingsActionRow';
 import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
-import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
 import { adminNavigationSections } from '@/features/dashboard/dashboard-nav/config';
+import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
 
 const DEV_TOOLBAR_COOKIE = '__dev_toolbar';
 

@@ -3,7 +3,6 @@ import {
   Banknote,
   Briefcase,
   CalendarDays,
-  Download,
   FolderKanban,
   HandCoins,
   Home,

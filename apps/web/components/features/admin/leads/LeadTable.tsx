@@ -245,7 +245,7 @@ export function LeadTable({
   basePath = APP_ROUTES.ADMIN_LEADS,
 }: Readonly<LeadTableProps>) {
   const router = useRouter();
- 
+
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState(initialSearch);
