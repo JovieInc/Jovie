@@ -5,8 +5,8 @@ import { QueryProvider } from '@/components/providers/QueryProvider';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { AiDemo } from '@/features/home/AiDemo';
+import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { HeroSpotifySearch } from '@/features/home/HeroSpotifySearch';
-import { LazyAuthRedirectHandler } from '@/features/home/LazyAuthRedirectHandler';
 import { ProfileMockup } from '@/features/home/ProfileMockup';
 import { TIM_WHITE_PROFILE } from '@/features/home/tim-white';
 import {
@@ -178,7 +178,7 @@ function Divider() {
 export default function LaunchPage() {
   return (
     <div className='relative min-h-screen'>
-      <LazyAuthRedirectHandler />
+      <AuthRedirectHandler />
 
       {/* Structured Data */}
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>

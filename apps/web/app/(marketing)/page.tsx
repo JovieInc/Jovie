@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { FeatureShowcase } from '@/features/home/FeatureShowcase';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
 import { HeroCinematic } from '@/features/home/HeroCinematic';
-import { LazyAuthRedirectHandler } from '@/features/home/LazyAuthRedirectHandler';
 import { LogoBar } from '@/features/home/LogoBar';
 import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
 import {
@@ -163,7 +163,7 @@ export default function HomePage() {
           : 'relative min-h-screen'
       }
     >
-      <LazyAuthRedirectHandler />
+      <AuthRedirectHandler />
 
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
