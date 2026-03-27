@@ -1,5 +1,9 @@
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import {
+  PageContent,
+  PageHeader,
+  PageShell,
+} from '@/components/organisms/PageShell';
 
 const ADMIN_ACTIVITY_ROW_KEYS = Array.from(
   { length: 8 },
@@ -64,6 +68,10 @@ export function AdminActivitySkeleton() {
 export default function AdminActivityLoading() {
   return (
     <PageShell>
+      <PageHeader
+        title='Activity'
+        description='Monitor recent operator actions and system outcomes.'
+      />
       <PageContent noPadding>
         <AdminActivitySkeleton />
       </PageContent>

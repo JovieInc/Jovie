@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import {
+  PageContent,
+  PageHeader,
+  PageShell,
+} from '@/components/organisms/PageShell';
 import { ActivityTableUnified } from '@/features/admin/ActivityTableUnified';
 import { getAdminActivityFeed } from '@/lib/admin/overview';
 import { AdminActivitySkeleton } from './loading';
@@ -15,7 +19,7 @@ async function ActivityContent() {
   const items = await getAdminActivityFeed(50);
   return (
     <PageContent noPadding>
-      <ActivityTableUnified items={items} />
+      <ActivityTableUnified items={items} showHeader={false} />
     </PageContent>
   );
 }
@@ -23,6 +27,10 @@ async function ActivityContent() {
 export default function AdminActivityPage() {
   return (
     <PageShell>
+      <PageHeader
+        title='Activity'
+        description='Monitor recent operator actions and system outcomes.'
+      />
       <Suspense fallback={<AdminActivitySkeleton />}>
         <ActivityContent />
       </Suspense>

@@ -5,14 +5,12 @@ import type { CellContext, ColumnDef } from '@tanstack/react-table';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Activity } from 'lucide-react';
 import { useMemo } from 'react';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
+  PageToolbar,
   UnifiedTable,
 } from '@/components/organisms/table';
-import {
-  AdminTableHeader,
-  AdminTableSubheader,
-} from '@/features/admin/table/AdminTableHeader';
 import type {
   AdminActivityItem,
   AdminActivityStatus,
@@ -76,6 +74,7 @@ function renderStatusCell(status: AdminActivityStatus) {
 
 interface ActivityTableUnifiedProps {
   readonly items: AdminActivityItem[];
+  readonly showHeader?: boolean;
 }
 
 /** Standard row class for activity table */
@@ -85,6 +84,7 @@ const columnHelper = createColumnHelper<AdminActivityItem>();
 
 export function ActivityTableUnified({
   items,
+  showHeader = true,
 }: Readonly<ActivityTableUnifiedProps>) {
   // Define table columns using TanStack Table
   const columns = useMemo<ColumnDef<AdminActivityItem, any>[]>(
@@ -130,13 +130,18 @@ export function ActivityTableUnified({
       className='h-full border-0 bg-(--linear-app-content-surface)'
       data-testid='admin-activity-content'
     >
-      <AdminTableHeader
-        title='Activity'
-        subtitle='Monitor operational actions and recent system outcomes.'
-      />
-      <AdminTableSubheader
-        start={<p className={PAGE_TOOLBAR_META_TEXT_CLASS}>Last 7 days.</p>}
-      />
+      {showHeader ? (
+        <ContentSectionHeader
+          title='Activity'
+          subtitle='Monitor operational actions and recent system outcomes.'
+          className='bg-(--linear-app-content-surface)'
+        />
+      ) : null}
+      <div className='bg-(--linear-app-content-surface)'>
+        <PageToolbar
+          start={<p className={PAGE_TOOLBAR_META_TEXT_CLASS}>Last 7 days.</p>}
+        />
+      </div>
       <div className='overflow-x-auto'>
         <UnifiedTable
           data={items}
