@@ -13,6 +13,7 @@ export const TIMEOUTS = {
 
 export const CATALOG_OUTPUT_DIR = 'screenshot-catalog/current';
 export const PUBLIC_EXPORT_DIR = 'public/product-screenshots';
+export const OUTPUT_DIR = PUBLIC_EXPORT_DIR;
 
 /**
  * Selectors for dev overlays that must be hidden before capturing screenshots.

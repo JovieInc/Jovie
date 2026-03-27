@@ -525,6 +525,7 @@ export function UnifiedTable<TData>({
           onKeyDown={handleKeyDown}
           onFocusChange={setFocusedIndex}
           getRowClassName={getRowClassName}
+          getRowTestId={getRowTestId}
           onRowShiftClick={onRowShiftClick}
         />
       );
@@ -566,6 +567,7 @@ export function UnifiedTable<TData>({
       handleKeyDown,
       setFocusedIndex,
       getRowClassName,
+      getRowTestId,
       onRowShiftClick,
       getExpandableRowId,
       expandedRowIds,

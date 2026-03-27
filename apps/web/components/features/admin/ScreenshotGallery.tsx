@@ -335,7 +335,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                       <a
                         href={selected.publicUrl}
                         target='_blank'
-                        rel='noreferrer'
+                        rel='noopener noreferrer'
                       >
                         Public Export
                       </a>

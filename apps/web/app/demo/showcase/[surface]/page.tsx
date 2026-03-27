@@ -11,6 +11,12 @@ interface DemoShowcasePageProps {
   readonly params: Promise<{ surface: string }>;
 }
 
+function isDemoShowcaseSurfaceId(
+  value: string
+): value is DemoShowcaseSurfaceId {
+  return DEMO_SHOWCASE_SURFACE_IDS.includes(value as DemoShowcaseSurfaceId);
+}
+
 export const metadata: Metadata = {
   title: 'Jovie Demo Showcase',
 };
@@ -21,7 +27,7 @@ export default async function DemoShowcasePage({
   params,
 }: Readonly<DemoShowcasePageProps>) {
   const { surface } = await params;
-  if (!DEMO_SHOWCASE_SURFACE_IDS.includes(surface as DemoShowcaseSurfaceId)) {
+  if (!isDemoShowcaseSurfaceId(surface)) {
     notFound();
   }
 
@@ -29,5 +35,5 @@ export default async function DemoShowcasePage({
     return <DemoPublicProfileSurface />;
   }
 
-  return <DemoShowcaseSurface surface={surface as DemoShowcaseSurfaceId} />;
+  return <DemoShowcaseSurface surface={surface} />;
 }

@@ -11,6 +11,7 @@ on:
       - 'apps/web/app/demo/**'
       - 'apps/web/components/**'
       - 'apps/web/features/**'
+      - 'apps/web/lib/screenshots/**'
       - 'apps/web/tests/product-screenshots/**'
       - 'apps/web/tailwind.config.*'
       - 'apps/web/app/**/layout.tsx'

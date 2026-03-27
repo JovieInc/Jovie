@@ -156,7 +156,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       id: 'onboarding-dsp-desktop',
       title: 'Onboarding DSP Step',
       route: '/demo/showcase/onboarding-dsp',
-      waitFor: 'input[placeholder*="Spotify link"]',
+      waitFor: '[data-testid="spotify-link-input"]',
     },
     {
       id: 'onboarding-profile-review-desktop',

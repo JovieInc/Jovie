@@ -14,8 +14,10 @@ import { DemoClientProviders } from './DemoClientProviders';
 import { DemoSettingsPanel } from './DemoSettingsPanel';
 import type { DemoShowcaseSurfaceId } from './showcase-surfaces';
 
+type DemoRenderableSurfaceId = Exclude<DemoShowcaseSurfaceId, 'public-profile'>;
+
 interface DemoShowcaseSurfaceProps {
-  readonly surface: DemoShowcaseSurfaceId;
+  readonly surface: DemoRenderableSurfaceId;
 }
 
 const HANDLE_VALIDATION_MOCK = {
@@ -180,7 +182,9 @@ export function DemoShowcaseSurface({
           </DemoClientProviders>
         </div>
       );
-    default:
-      return null;
+    default: {
+      const exhaustiveCheck: never = surface;
+      return exhaustiveCheck;
+    }
   }
 }
