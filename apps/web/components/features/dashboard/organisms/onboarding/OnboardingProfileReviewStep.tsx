@@ -2,11 +2,6 @@
 
 import { AlertCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { EnrichedProfileData } from '@/app/onboarding/actions/enrich-profile';
-import {
-  updateOnboardingProfile,
-  verifyProfileHasAvatar,
-} from '@/app/onboarding/actions/update-profile';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { AuthButton } from '@/features/auth';
@@ -15,6 +10,11 @@ import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import type { AvatarQuality } from '@/lib/profile/avatar-quality';
 import { useUserAvatarMutation } from '@/lib/queries/useUserAvatarMutation';
 import { cn } from '@/lib/utils';
+import type { EnrichedProfileData } from '../../../../../app/onboarding/actions/enrich-profile';
+import {
+  updateOnboardingProfile,
+  verifyProfileHasAvatar,
+} from '../../../../../app/onboarding/actions/update-profile';
 import {
   canProceedFromProfileReview,
   validateDisplayName as validateDisplayNameGuard,
