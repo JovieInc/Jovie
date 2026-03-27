@@ -224,7 +224,7 @@ export function EmailQueuePanel() {
               <Button
                 size='sm'
                 onClick={() => {
-                  void queuePendingEmails();
+                  queuePendingEmails();
                 }}
                 disabled={queueing || loading || pendingTotal === 0}
               >
