@@ -185,7 +185,7 @@ function createUpdateChain(result: unknown[]) {
   const mockReturning = vi.fn().mockResolvedValue(result);
   const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
   const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
-  return { set: mockSet };
+  return { set: mockSet, where: mockWhere, returning: mockReturning };
 }
 
 /** Standard mock Clerk user with verified email */
@@ -421,7 +421,7 @@ describe('@critical gate.ts', () => {
     it('adopts an existing email row when the insert error wraps users_email_unique', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue(
-        mockClerkUser('e2e+clerk_test@jov.ie')
+        mockClerkUser('MixedCase+clerk_test@Jov.ie')
       );
 
       let selectCallCount = 0;
@@ -439,7 +439,7 @@ describe('@critical gate.ts', () => {
           cause: {
             code: '23505',
             constraint: 'users_email_unique',
-            detail: 'Key (email)=(e2e+clerk_test@jov.ie) already exists.',
+            detail: 'Key (email)=(MixedCase+clerk_test@Jov.ie) already exists.',
             message:
               'duplicate key value violates unique constraint "users_email_unique"',
           },
@@ -449,9 +449,8 @@ describe('@critical gate.ts', () => {
       mockDbInsert.mockReturnValue(
         createFailingInsertChain(wrappedUniqueError)
       );
-      mockDbUpdate.mockReturnValue(
-        createUpdateChain([{ id: 'adopted-user-id' }])
-      );
+      const updateChain = createUpdateChain([{ id: 'adopted-user-id' }]);
+      mockDbUpdate.mockReturnValue(updateChain);
 
       mockResolveProfileState.mockReturnValue({
         state: UserState.NEEDS_ONBOARDING,
@@ -464,6 +463,9 @@ describe('@critical gate.ts', () => {
       expect(result.dbUserId).toBe('adopted-user-id');
       expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
       expect(mockDbUpdate).toHaveBeenCalled();
+      expect(updateChain.where).toHaveBeenCalledWith({
+        eq: 'MixedCase+clerk_test@Jov.ie',
+      });
       expect(mockCaptureCriticalError).not.toHaveBeenCalled();
     });
 
