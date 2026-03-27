@@ -569,14 +569,15 @@ export function ProfileContactSidebar() {
       isOpen={isOpen}
       ariaLabel='Profile Contact'
       title={headerTitle}
-      headerActions={closeOnlyHeaderActions}
       headerMode='minimal'
+      hideMinimalHeaderBar
+      minimalTabsPlacement='header'
       entityHeader={
         <div className='space-y-3'>
           <div
             className={cn(
               LINEAR_SURFACE.sidebarCard,
-              'overflow-hidden px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+              'relative overflow-hidden px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
             )}
           >
             <ProfileContactHeader
@@ -590,6 +591,8 @@ export function ProfileContactSidebar() {
             <DrawerCardActionBar
               primaryActions={primaryActions}
               overflowActions={overflowActions}
+              onClose={close}
+              overflowTriggerPlacement='card-top-right'
               className='mx-[-14px] mt-3'
             />
           </div>
@@ -609,18 +612,15 @@ export function ProfileContactSidebar() {
         </div>
       }
       tabs={
-        <div className='flex items-center gap-1'>
-          <DrawerTabs
-            value={resolvedCategory}
-            onValueChange={value =>
-              setSelectedCategory(value as CategoryOption | 'about')
-            }
-            options={PROFILE_TAB_OPTIONS}
-            className='flex-1'
-            ariaLabel='Profile sidebar view'
-          />
-          <div className='h-[26px] w-[26px] shrink-0'>
-            {supportsAddAction && (
+        <DrawerTabs
+          value={resolvedCategory}
+          onValueChange={value =>
+            setSelectedCategory(value as CategoryOption | 'about')
+          }
+          options={PROFILE_TAB_OPTIONS}
+          ariaLabel='Profile sidebar view'
+          actions={
+            supportsAddAction ? (
               <AppIconButton
                 type='button'
                 onClick={() => handleAddLink(resolvedCategory)}
@@ -629,9 +629,10 @@ export function ProfileContactSidebar() {
               >
                 <Plus className='h-3.5 w-3.5' />
               </AppIconButton>
-            )}
-          </div>
-        </div>
+            ) : undefined
+          }
+          actionsClassName='h-[26px] w-[26px]'
+        />
       }
     >
       {resolvedCategory === 'about' ? (

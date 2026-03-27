@@ -37,6 +37,11 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Rule:** Marketing CTAs always link to `/signup` (not `/claim`, `/register`, or `/waitlist`). `/claim` is the artist profile claim flow (different intent).
 
+### Marketing traction copy must be factual
+**Mistake:** Homepage marketing copy claimed artist adoption counts that were not true (`500+` and `47+ artists already on Jovie`).
+
+**Rule:** Never invent or estimate adoption metrics in marketing copy. If the current number is not verified, use qualitative launch-stage language instead of a hard count.
+
 ### CSS cache corruption after git worktree switches
 **Mistake:** Switching branches or running `git stash`/`pop` while the dev server is running corrupts the Turbopack CSS cache. Tokens appear to render wrong values even though source CSS is correct.
 

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DrawerTabs } from '@/components/molecules/drawer/DrawerTabs';
 
 describe('DrawerTabs', () => {
-  it('renders the tab rail as a borderless wrapper inside the parent card', () => {
+  it('renders the tab rail as a horizontal scroller by default', () => {
     render(
       <DrawerTabs
         value='details'
@@ -16,10 +16,12 @@ describe('DrawerTabs', () => {
       />
     );
 
+    const scroller = screen.getByTestId('drawer-tabs-scroll');
     const tablist = screen.getByRole('tablist', { name: 'Drawer tabs' });
+
+    expect(scroller).toContainElement(tablist);
     expect(tablist).toBeInTheDocument();
     expect(tablist).toHaveAttribute('aria-label', 'Drawer tabs');
-    expect(tablist.className).toContain('overflow-x-auto');
     expect(tablist.className).toContain('flex-nowrap');
   });
 
@@ -62,6 +64,9 @@ describe('DrawerTabs', () => {
       />
     );
 
+    expect(screen.getByTestId('drawer-tabs-scroll')).not.toContainElement(
+      screen.getByRole('button', { name: 'Add platform' })
+    );
     expect(
       screen.getByRole('button', { name: 'Add platform' })
     ).toBeInTheDocument();
@@ -83,14 +88,40 @@ describe('DrawerTabs', () => {
           { value: 'tasks', label: 'Tasks' },
         ]}
         ariaLabel='Release drawer tabs'
+        actions={<button type='button'>Add platform</button>}
       />
     );
 
+    const scroller = screen.getByTestId('drawer-tabs-scroll');
+    const tablist = screen.getByRole('tablist', {
+      name: 'Release drawer tabs',
+    });
+    const actionsButton = screen.getByRole('button', { name: 'Add platform' });
+
+    expect(scroller).toContainElement(tablist);
+    expect(scroller).not.toContainElement(actionsButton);
     expect(screen.getByRole('tab', { name: 'Tasks' }).className).toContain(
       'shrink-0'
     );
+  });
+
+  it('supports wrap mode for consumers that opt out of horizontal scrolling', () => {
+    render(
+      <DrawerTabs
+        value='details'
+        onValueChange={vi.fn()}
+        options={[
+          { value: 'details', label: 'Details' },
+          { value: 'activity', label: 'Activity' },
+        ]}
+        ariaLabel='Wrapped drawer tabs'
+        overflowMode='wrap'
+      />
+    );
+
+    expect(screen.queryByTestId('drawer-tabs-scroll')).not.toBeInTheDocument();
     expect(
-      screen.getByRole('tablist', { name: 'Release drawer tabs' }).className
-    ).toContain('scroll-smooth');
+      screen.getByRole('tablist', { name: 'Wrapped drawer tabs' }).className
+    ).toContain('flex-wrap');
   });
 });

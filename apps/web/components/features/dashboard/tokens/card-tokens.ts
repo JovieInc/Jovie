@@ -207,20 +207,22 @@ export const cardTokens = {
  *
  * Shared app-card system matching Linear.app — content cards sit on one
  * subtle elevation tier with a seam border and a low-depth shadow.
- * Popovers remain the only noticeably stronger floating surface.
+ * Sidebar and drawer cards sit one step above that so they read as
+ * floating above the drawer/main content field, while popovers remain
+ * the strongest floating surface.
  */
+const elevatedSidebarCardShadow =
+  'shadow-[0_12px_28px_rgba(15,23,42,0.08),0_2px_6px_rgba(15,23,42,0.05)]';
+
 export const LINEAR_SURFACE = {
   /** Drawer section card — border-separated section inside sidebars. */
-  drawerCard:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[var(--linear-app-card-shadow)]',
+  drawerCard: `rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) ${elevatedSidebarCardShadow}`,
 
   /** Smaller drawer section card — inline property groups. */
-  drawerCardSm:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[var(--linear-app-card-shadow)]',
+  drawerCardSm: `rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) ${elevatedSidebarCardShadow}`,
 
   /** Primary sidebar card — header/analytics cards in sidebars. */
-  sidebarCard:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[var(--linear-app-card-shadow)]',
+  sidebarCard: `rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) ${elevatedSidebarCardShadow}`,
 
   /** Content container — wraps tables, mobile lists, empty states. */
   contentContainer:

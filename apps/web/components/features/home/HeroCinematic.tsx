@@ -52,7 +52,6 @@ export function HeroCinematic({
 
                 <div className='relative flex-shrink-0 lg:flex-none'>
                   <div
-                    className='animate-hero-phone-float'
                     style={{
                       filter:
                         'drop-shadow(0 25px 60px rgba(0,0,0,0.35)) drop-shadow(0 8px 30px rgba(94,106,210,0.15))',

@@ -117,13 +117,15 @@ vi.mock('@/components/molecules/drawer', () => ({
     onValueChange,
     options,
     actions,
+    overflowMode,
   }: {
     value: string;
     onValueChange: (value: string) => void;
     options: Array<{ value: string; label: string }>;
     actions?: React.ReactNode;
+    overflowMode?: 'wrap' | 'scroll';
   }) => (
-    <div>
+    <div data-overflow-mode={overflowMode} data-testid='drawer-tabs'>
       {options.map(option => (
         <button
           key={option.value}
@@ -359,6 +361,10 @@ describe('ReleaseSidebar Links tab', () => {
     // Switch to Track list
     await user.click(screen.getByRole('tab', { name: /tracks/i }));
     expect(screen.getByTestId('tracklist')).toBeInTheDocument();
+
+    // Switch to Tasks
+    await user.click(screen.getByRole('tab', { name: /tasks/i }));
+    expect(screen.getByTestId('task-checklist')).toBeInTheDocument();
   });
 
   it('preserves active tab when release changes', async () => {
@@ -420,5 +426,14 @@ describe('ReleaseSidebar Links tab', () => {
     expect(
       screen.queryByTestId('release-tab-panel-card')
     ).not.toBeInTheDocument();
+  });
+
+  it('opts the release sidebar tabs into horizontal scroll mode', () => {
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    expect(screen.getByTestId('drawer-tabs')).toHaveAttribute(
+      'data-overflow-mode',
+      'scroll'
+    );
   });
 });

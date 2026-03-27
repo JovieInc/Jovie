@@ -70,4 +70,27 @@ describe('EntitySidebarShell', () => {
     expect(screen.getByText('Entity header content')).toBeInTheDocument();
     expect(screen.getByText('Drawer tabs')).toBeInTheDocument();
   });
+
+  it('can promote minimal-mode tabs into the full-width sticky header and hide the empty utility bar', () => {
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Profile drawer'
+        title='Profile title'
+        headerMode='minimal'
+        hideMinimalHeaderBar
+        minimalTabsPlacement='header'
+        entityHeader={<div>Entity header content</div>}
+        tabs={<div>Drawer tabs</div>}
+      >
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    expect(
+      screen.queryByTestId('entity-sidebar-tabs-card')
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Drawer tabs')).toBeInTheDocument();
+    expect(screen.getByText('Body content')).toBeInTheDocument();
+  });
 });

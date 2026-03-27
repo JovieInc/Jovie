@@ -21,7 +21,6 @@ import {
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
-import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
 import {
   CONTACT_ROLE_OPTIONS,
@@ -232,14 +231,6 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     onClose: handleClose,
   });
 
-  const closeOnlyHeaderActions = (
-    <DrawerHeaderActions
-      primaryActions={[]}
-      overflowActions={[]}
-      onClose={handleClose}
-    />
-  );
-
   const hasContact = Boolean(contact);
   const roleLabel = contact
     ? getContactRoleLabel(contact.role, contact.customLabel)
@@ -310,8 +301,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       isOpen={isOpen}
       ariaLabel='Contact details'
       title={headerTitle}
-      onClose={handleClose}
-      headerActions={closeOnlyHeaderActions}
+      onClose={hasContact ? undefined : handleClose}
       headerMode='minimal'
       contextMenuItems={contextMenuItems}
       isEmpty={!hasContact}
@@ -329,7 +319,10 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       }
       entityHeader={
         contact ? (
-          <DrawerSurfaceCard variant='card' className='overflow-hidden p-3'>
+          <DrawerSurfaceCard
+            variant='card'
+            className='relative overflow-hidden p-3'
+          >
             <p className='mb-2 text-[10.5px] font-[510] leading-none text-tertiary-token'>
               Contact
             </p>
@@ -344,6 +337,8 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             <DrawerCardActionBar
               primaryActions={primaryActions}
               overflowActions={overflowActions}
+              onClose={handleClose}
+              overflowTriggerPlacement='card-top-right'
               className='mx-[-12px] mt-3'
             />
           </DrawerSurfaceCard>
