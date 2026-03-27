@@ -51,18 +51,12 @@ export default function PresenceLoading() {
               />
               <LoadingSkeleton height='h-3' width='w-16' rounded='sm' />
             </div>
-            <LoadingSkeleton
-              height='h-5'
-              width='w-16'
-              rounded='full'
-              className='w-[120px]'
-            />
-            <LoadingSkeleton
-              height='h-5'
-              width='w-12'
-              rounded='full'
-              className='w-[100px]'
-            />
+            <div className='w-[120px]'>
+              <LoadingSkeleton height='h-5' width='w-16' rounded='full' />
+            </div>
+            <div className='w-[100px]'>
+              <LoadingSkeleton height='h-5' width='w-12' rounded='full' />
+            </div>
             <LoadingSkeleton height='h-3' width='w-8' rounded='sm' />
           </div>
         ))}

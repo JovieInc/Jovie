@@ -169,7 +169,7 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
 
   const selectedItem =
     data.items.find(i => i.matchId === selectedMatchId) ?? null;
-  const isSidebarOpen = selectedMatchId !== null;
+  const isSidebarOpen = selectedItem !== null;
 
   // Column definitions (stable reference)
   const columns = useMemo(() => createPresenceColumns(), []);
@@ -206,7 +206,10 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
     [selectedMatchId]
   );
 
-  // Keyboard nav: only update selection when sidebar is already open
+  // Keyboard nav: only update selection when sidebar is already open.
+  // Safe to index data.items directly because this table has no client-side
+  // sorting — sort order is determined server-side in actions.ts. If client-side
+  // sorting is ever added, this must resolve the item from the table's row model.
   const handleFocusedRowChange = useCallback(
     (index: number) => {
       if (selectedMatchId !== null && data.items[index]) {
@@ -224,9 +227,10 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
     [selectedMatchId]
   );
 
-  // Row test IDs (replaces presence-card- testids)
+  // Row test IDs (replaces presence-card- testids).
+  // Uses matchId for uniqueness since multiple matches can exist per provider.
   const getRowTestId = useCallback(
-    (item: DspPresenceItem) => `presence-row-${item.providerId}`,
+    (item: DspPresenceItem) => `presence-row-${item.matchId}`,
     []
   );
 
