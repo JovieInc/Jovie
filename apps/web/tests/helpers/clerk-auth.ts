@@ -46,6 +46,61 @@ async function enableTestAuthBypass(page: Page): Promise<void> {
   ]);
 }
 
+async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
+  await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
+    timeout: 120_000,
+    retries: 2,
+  });
+
+  if (isClerkHandshakeUrl(page.url())) {
+    throw new ClerkTestError(
+      'Clerk redirected to a handshake flow after sign-in on the current preview target.',
+      'CLERK_SETUP_FAILED'
+    );
+  }
+
+  let hasReloaded = false;
+  await expect(async () => {
+    const overlay = page.locator(
+      '[data-nextjs-dialog-overlay], [data-nextjs-toast]'
+    );
+    if (await overlay.isVisible({ timeout: 500 }).catch(() => false)) {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(500);
+    }
+
+    const tryAgain = page.locator('button:has-text("Try again")');
+    if (await tryAgain.isVisible({ timeout: 500 }).catch(() => false)) {
+      await tryAgain.click();
+      await page.waitForTimeout(1000);
+    }
+
+    const dashNav = page.locator('nav[aria-label="Dashboard navigation"]');
+    const userButton = page.locator('[data-clerk-element="userButton"]');
+    const chatComposer = page
+      .locator(
+        'textarea, [contenteditable="true"], button:has-text("New thread")'
+      )
+      .first();
+    const main = page.locator('main').first();
+    const isShellReady = async () =>
+      (page.url().includes('/app') &&
+        !page.url().includes('/signin') &&
+        !page.url().includes('/sign-in') &&
+        !page.url().includes('/onboarding') &&
+        (await main.isVisible().catch(() => false))) ||
+      (await dashNav.isVisible().catch(() => false)) ||
+      (await userButton.isVisible().catch(() => false)) ||
+      (await chatComposer.isVisible().catch(() => false));
+
+    if (!(await isShellReady()) && !hasReloaded) {
+      hasReloaded = true;
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+    }
+
+    await expect.poll(isShellReady, { timeout: 5000 }).toBe(true);
+  }).toPass({ timeout: 120_000, intervals: [3000, 5000, 10000, 15000] });
+}
 /**
  * Check if the test target is a production deployment (jov.ie).
  * Used to gate heavy test suites that should only run against testing environments.
@@ -252,10 +307,7 @@ export async function signInUser(
 ) {
   if (isTestAuthBypassEnabled()) {
     await enableTestAuthBypass(page);
-    await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
-      timeout: 120_000,
-      retries: 2,
-    });
+    await waitForShellReadyAfterAuth(page);
     return page;
   }
 
@@ -429,62 +481,7 @@ export async function signInUser(
     page.off('console', handleConsoleMessage);
   }
 
-  // After sign-in, navigate to a stable authenticated shell route to verify auth.
-  // Profile data can 404 transiently in local dev and should not be the auth probe.
-  await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
-    timeout: 120_000,
-    retries: 2,
-  });
-
-  if (isClerkHandshakeUrl(page.url())) {
-    throw new ClerkTestError(
-      'Clerk redirected to a handshake flow after sign-in on the current preview target.',
-      'CLERK_SETUP_FAILED'
-    );
-  }
-
-  // Dismiss Next.js dev error overlay and wait for page to stabilize
-  // Handles React hydration mismatches (nonce attr) and transient hooks errors
-  let hasReloaded = false;
-  await expect(async () => {
-    // Dismiss error overlay if present
-    const overlay = page.locator(
-      '[data-nextjs-dialog-overlay], [data-nextjs-toast]'
-    );
-    if (await overlay.isVisible({ timeout: 500 }).catch(() => false)) {
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(500);
-    }
-    // Click "Try again" on error boundary if present
-    const tryAgain = page.locator('button:has-text("Try again")');
-    if (await tryAgain.isVisible({ timeout: 500 }).catch(() => false)) {
-      await tryAgain.click();
-      await page.waitForTimeout(1000);
-    }
-    // Verify dashboard element is visible
-    const dashNav = page.locator('nav[aria-label="Dashboard navigation"]');
-    const userButton = page.locator('[data-clerk-element="userButton"]');
-    const chatComposer = page
-      .locator(
-        'textarea, [contenteditable="true"], button:has-text("New thread")'
-      )
-      .first();
-    const main = page.locator('main').first();
-    const isShellReady = async () =>
-      (page.url().includes('/app') &&
-        !page.url().includes('/signin') &&
-        !page.url().includes('/sign-in') &&
-        !page.url().includes('/onboarding') &&
-        (await main.isVisible().catch(() => false))) ||
-      (await dashNav.isVisible().catch(() => false)) ||
-      (await userButton.isVisible().catch(() => false)) ||
-      (await chatComposer.isVisible().catch(() => false));
-    if (!(await isShellReady()) && !hasReloaded) {
-      hasReloaded = true;
-      await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
-    }
-    await expect.poll(isShellReady, { timeout: 5000 }).toBe(true);
-  }).toPass({ timeout: 120_000, intervals: [3000, 5000, 10000, 15000] });
+  await waitForShellReadyAfterAuth(page);
 
   return page;
 }
