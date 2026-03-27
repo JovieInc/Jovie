@@ -37,6 +37,28 @@ interface ReleaseSmartLinkAnalyticsProps {
   readonly artistName?: string | null;
 }
 
+function getReleaseAnalyticsState({
+  isLoading,
+  hasError,
+  data,
+}: {
+  readonly isLoading: boolean;
+  readonly hasError: boolean;
+  readonly data: ReleaseSidebarAnalytics | null;
+}) {
+  const isInitialLoading = isLoading && !data;
+
+  if (isInitialLoading) {
+    return 'loading' as const;
+  }
+
+  if (hasError) {
+    return 'error' as const;
+  }
+
+  return 'ready' as const;
+}
+
 function ReleaseSmartLinkControl({
   release,
   artistName,
@@ -185,17 +207,19 @@ export function ReleaseSmartLinkAnalytics({
   const last7DaysClicks = data?.last7DaysClicks ?? 0;
 
   const showEmpty = !isLoading && !hasError && totalClicks === 0;
-  const state = isLoading && !data ? 'loading' : hasError ? 'error' : 'ready';
+  const state = getReleaseAnalyticsState({ isLoading, hasError, data });
 
   return (
     <DrawerAnalyticsSummaryCard
       metrics={[
         {
+          id: 'total-clicks',
           label: 'Total clicks',
           value: numberFormatter.format(totalClicks),
           hint: 'All time',
         },
         {
+          id: 'last-7-days-clicks',
           label: 'Last 7 days',
           value: numberFormatter.format(last7DaysClicks),
           hint: 'Recent',

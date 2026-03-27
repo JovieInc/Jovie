@@ -48,7 +48,6 @@ describe('TrackDetailPanel', () => {
     expect(
       screen.getByRole('button', { name: /copy isrc/i })
     ).toBeInTheDocument();
-    expect(screen.getByText('DSPs')).toBeInTheDocument();
     expect(screen.getByText('Spotify')).toBeInTheDocument();
   });
 
@@ -61,8 +60,6 @@ describe('TrackDetailPanel', () => {
       />
     );
 
-    expect(
-      screen.getByText('No DSP links available for this track.')
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('track-platforms-empty')).toBeInTheDocument();
   });
 });

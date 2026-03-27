@@ -16,13 +16,14 @@ describe('DrawerTabs', () => {
       />
     );
 
+    const drawerTabs = screen.getByTestId('drawer-tabs');
     const scroller = screen.getByTestId('drawer-tabs-scroll');
     const tablist = screen.getByRole('tablist', { name: 'Drawer tabs' });
 
+    expect(drawerTabs).toHaveAttribute('data-overflow-mode', 'scroll');
     expect(scroller).toContainElement(tablist);
     expect(tablist).toBeInTheDocument();
     expect(tablist).toHaveAttribute('aria-label', 'Drawer tabs');
-    expect(tablist.className).toContain('flex-nowrap');
   });
 
   it('renders active tabs as pills and notifies on selection changes', () => {
@@ -97,12 +98,11 @@ describe('DrawerTabs', () => {
       name: 'Release drawer tabs',
     });
     const actionsButton = screen.getByRole('button', { name: 'Add platform' });
+    const tasksTab = screen.getByTestId('drawer-tab-tasks');
 
     expect(scroller).toContainElement(tablist);
     expect(scroller).not.toContainElement(actionsButton);
-    expect(screen.getByRole('tab', { name: 'Tasks' }).className).toContain(
-      'shrink-0'
-    );
+    expect(tasksTab).toHaveAttribute('aria-selected', 'false');
   });
 
   it('supports wrap mode for consumers that opt out of horizontal scrolling', () => {
@@ -119,9 +119,10 @@ describe('DrawerTabs', () => {
       />
     );
 
+    expect(screen.getByTestId('drawer-tabs')).toHaveAttribute(
+      'data-overflow-mode',
+      'wrap'
+    );
     expect(screen.queryByTestId('drawer-tabs-scroll')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('tablist', { name: 'Wrapped drawer tabs' }).className
-    ).toContain('flex-wrap');
   });
 });

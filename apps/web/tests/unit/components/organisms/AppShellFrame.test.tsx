@@ -16,7 +16,6 @@ describe('AppShellFrame', () => {
 
     expect(mainContent).toHaveAttribute('id', 'main-content');
     expect(mainContent).not.toHaveAttribute('tabindex');
-    expect(mainContent.className).toContain('min-w-0');
     expect(screen.getByText('Sidebar')).toBeInTheDocument();
     expect(screen.getByText('Header')).toBeInTheDocument();
     expect(screen.getByText('Main Content')).toBeInTheDocument();

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { DrawerAnalyticsSummaryCard } from '@/components/molecules/drawer';
+import { DrawerAnalyticsSummaryCard } from './DrawerAnalyticsSummaryCard';
 
 describe('DrawerAnalyticsSummaryCard', () => {
   it('renders large metrics and an optional footer', () => {

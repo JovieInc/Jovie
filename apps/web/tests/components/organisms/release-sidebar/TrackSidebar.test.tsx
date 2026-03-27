@@ -54,7 +54,7 @@ describe('TrackSidebar', () => {
       screen.getAllByRole('button', { name: /copy isrc/i }).length
     ).toBeGreaterThan(0);
 
-    await user.click(screen.getByRole('tab', { name: 'DSPs' }));
+    await user.click(screen.getByTestId('drawer-tab-platforms'));
 
     expect(
       screen.queryByRole('button', { name: /copy isrc/i })
@@ -72,7 +72,7 @@ describe('TrackSidebar', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'DSPs' }));
+    await user.click(screen.getByTestId('drawer-tab-platforms'));
 
     expect(screen.getByTestId('track-platforms-empty')).toBeInTheDocument();
   });

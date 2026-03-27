@@ -647,6 +647,7 @@ export function ReleaseSidebar({
           availablePlatformProviders.length > 0
             ? {
                 ariaLabel: 'Add DSP link',
+                testId: 'release-sidebar-add-dsp-link',
                 icon: <Plus className='h-3.5 w-3.5' aria-hidden='true' />,
                 onClick: handleOpenPlatformAddForm,
               }

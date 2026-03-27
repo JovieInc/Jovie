@@ -31,6 +31,29 @@ const RANGE_OPTIONS: RangeOption[] = [
   { value: 'all', label: 'All time', requiresPro: true },
 ];
 
+function getProfileAnalyticsState({
+  isLoading,
+  isError,
+  data,
+}: {
+  readonly isLoading: boolean;
+  readonly isError: boolean;
+  readonly data: unknown;
+}) {
+  const isInitialLoading = isLoading && !data;
+  const isInitialError = isError && !data;
+
+  if (isInitialLoading) {
+    return 'loading' as const;
+  }
+
+  if (isInitialError) {
+    return 'error' as const;
+  }
+
+  return 'ready' as const;
+}
+
 export function ProfileAnalyticsSummary() {
   const [range, setRange] = useState<AnalyticsRange>('30d');
   const { data, isLoading, isFetching, isError } = useDashboardAnalyticsQuery({
@@ -41,8 +64,7 @@ export function ProfileAnalyticsSummary() {
   const currentOption =
     RANGE_OPTIONS.find(o => o.value === range) ?? RANGE_OPTIONS[1];
 
-  const state =
-    isLoading && !data ? 'loading' : isError && !data ? 'error' : 'ready';
+  const state = getProfileAnalyticsState({ isLoading, isError, data });
 
   const profileViews = data?.profile_views ?? 0;
   const totalClicks = data?.total_clicks ?? 0;
@@ -51,11 +73,13 @@ export function ProfileAnalyticsSummary() {
     <DrawerAnalyticsSummaryCard
       metrics={[
         {
+          id: 'profile-views',
           label: 'Profile views',
           value: numberFormatter.format(profileViews),
           hint: 'Visitors',
         },
         {
+          id: 'link-clicks',
           label: 'Link clicks',
           value: numberFormatter.format(totalClicks),
           hint: 'Outbound',

@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { DrawerSurfaceCard } from './DrawerSurfaceCard';
 
 export interface DrawerAnalyticsSummaryMetric {
+  readonly id?: string;
   readonly label: string;
   readonly value: string;
   readonly hint?: string;
@@ -21,7 +22,7 @@ export interface DrawerAnalyticsSummaryCardProps {
 }
 
 const METRIC_TILE_CLASSNAME =
-  'rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
+  'rounded-[8px] border border-subtle bg-surface-0 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
 
 function MetricTile({
   label,
@@ -102,7 +103,7 @@ export function DrawerAnalyticsSummaryCard({
         {state === 'ready' && metrics.length > 0 ? (
           <div className={cn('grid gap-2.5', gridClassName)}>
             {metrics.map(metric => (
-              <MetricTile key={metric.label} {...metric} />
+              <MetricTile key={metric.id ?? metric.label} {...metric} />
             ))}
           </div>
         ) : null}
@@ -117,9 +118,7 @@ export function DrawerAnalyticsSummaryCard({
       </div>
 
       {footer ? (
-        <div className='border-t border-(--linear-app-frame-seam) px-3 py-2.5'>
-          {footer}
-        </div>
+        <div className='border-t border-subtle px-3 py-2.5'>{footer}</div>
       ) : null}
     </DrawerSurfaceCard>
   );

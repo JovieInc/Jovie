@@ -87,14 +87,14 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
     });
     console.log('📸 Saved: release-sidebar-detail.png');
 
-    await page.getByRole('tab', { name: 'Platforms' }).click();
+    await sidebar.getByTestId('drawer-tab-links').click();
     await waitForSettle(page);
     await sidebar.screenshot({
       path: `${OUTPUT_DIR}/release-sidebar-platforms.png`,
     });
     console.log('📸 Saved: release-sidebar-platforms.png');
 
-    await page.getByRole('tab', { name: 'Tasks' }).click();
+    await sidebar.getByTestId('drawer-tab-tasks').click();
     await waitForSettle(page);
     await sidebar.screenshot({
       path: `${OUTPUT_DIR}/release-sidebar-tasks.png`,
