@@ -7,6 +7,7 @@ const mockParseJsonBody = vi.hoisted(() => vi.fn());
 const mockPushLeadToInstantly = vi.hoisted(() => vi.fn());
 const mockGetAppUrl = vi.hoisted(() => vi.fn());
 const mockEq = vi.hoisted(() => vi.fn(() => 'eq-clause'));
+const mockGte = vi.hoisted(() => vi.fn(() => 'gte-clause'));
 const mockAnd = vi.hoisted(() => vi.fn(() => 'and-clause'));
 const mockAsc = vi.hoisted(() => vi.fn(() => 'asc-clause'));
 const mockDesc = vi.hoisted(() => vi.fn(() => 'desc-clause'));
@@ -14,25 +15,41 @@ const mockCount = vi.hoisted(() => vi.fn(() => 'count-clause'));
 const mockIsNotNull = vi.hoisted(() => vi.fn(() => 'not-null-clause'));
 const mockIsNull = vi.hoisted(() => vi.fn(() => 'is-null-clause'));
 const mockLt = vi.hoisted(() => vi.fn(() => 'lt-clause'));
+const mockNe = vi.hoisted(() => vi.fn(() => 'ne-clause'));
 const mockOr = vi.hoisted(() => vi.fn(() => 'or-clause'));
+const mockSql = vi.hoisted(() => vi.fn(() => 'sql-clause'));
 
-const { mockDb, mockSelect, mockUpdate, mockUpdateReturning } = vi.hoisted(
-  () => {
-    const mockSelect = vi.fn();
-    const mockUpdateReturning = vi.fn();
-    const mockUpdateWhere = vi.fn(() => ({ returning: mockUpdateReturning }));
-    const mockUpdateSet = vi.fn(() => ({ where: mockUpdateWhere }));
-    const mockUpdate = vi.fn(() => ({ set: mockUpdateSet }));
-    return {
-      mockDb: { select: mockSelect, update: mockUpdate },
-      mockSelect,
-      mockUpdate,
-      mockUpdateSet,
-      mockUpdateWhere,
-      mockUpdateReturning,
-    };
-  }
-);
+const {
+  mockDb,
+  mockExecute,
+  mockInsert,
+  mockSelect,
+  mockUpdate,
+  mockUpdateReturning,
+} = vi.hoisted(() => {
+  const mockSelect = vi.fn();
+  const mockExecute = vi.fn();
+  const mockInsert = vi.fn();
+  const mockUpdateReturning = vi.fn();
+  const mockUpdateWhere = vi.fn(() => ({ returning: mockUpdateReturning }));
+  const mockUpdateSet = vi.fn(() => ({ where: mockUpdateWhere }));
+  const mockUpdate = vi.fn(() => ({ set: mockUpdateSet }));
+  return {
+    mockDb: {
+      select: mockSelect,
+      update: mockUpdate,
+      execute: mockExecute,
+      insert: mockInsert,
+    },
+    mockExecute,
+    mockInsert,
+    mockSelect,
+    mockUpdate,
+    mockUpdateSet,
+    mockUpdateWhere,
+    mockUpdateReturning,
+  };
+});
 
 vi.mock('drizzle-orm', () => ({
   and: mockAnd,
@@ -40,10 +57,13 @@ vi.mock('drizzle-orm', () => ({
   count: mockCount,
   desc: mockDesc,
   eq: mockEq,
+  gte: mockGte,
   isNotNull: mockIsNotNull,
   isNull: mockIsNull,
   lt: mockLt,
+  ne: mockNe,
   or: mockOr,
+  sql: mockSql,
 }));
 
 vi.mock('@/constants/domains', () => ({
@@ -95,11 +115,16 @@ vi.mock('@/lib/db/schema/leads', () => ({
     instantlyLeadId: 'instantly-lead-id',
     outreachQueuedAt: 'outreach-queued-at',
     dmSentAt: 'dm-sent-at',
+    firstContactedAt: 'first-contacted-at',
+    lastContactedAt: 'last-contacted-at',
     dmCopy: 'dm-copy',
     scrapedAt: 'scraped-at',
     createdAt: 'created-at',
     updatedAt: 'updated-at',
     priorityScore: 'priority-score',
+  },
+  leadPipelineSettings: {
+    id: 'lead-pipeline-settings-id',
   },
 }));
 
@@ -127,6 +152,13 @@ describe('GET /api/admin/outreach', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSelect.mockReset();
+    mockSelect.mockImplementation(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn().mockResolvedValue([{ total: 0 }]),
+      })),
+    }));
+    mockExecute.mockReset();
+    mockInsert.mockReset();
     mockUpdate.mockReset();
     mockUpdateReturning.mockReset();
     mockGetCurrentUserEntitlements.mockReset();
@@ -216,7 +248,7 @@ describe('GET /api/admin/outreach', () => {
     ]);
     expect(data.pendingTotal).toBe(1);
     expect(mockCaptureWarning).toHaveBeenCalledWith(
-      '[admin/outreach] leads enrichment columns missing; falling back to legacy select',
+      '[admin/outreach] leads schema columns missing; falling back to legacy select',
       expect.any(Error),
       { route: '/api/admin/outreach' }
     );
@@ -224,6 +256,28 @@ describe('GET /api/admin/outreach', () => {
 
   it('queues pending email outreach only when explicitly triggered', async () => {
     mockSelect
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn().mockResolvedValue([
+              {
+                dailySendCap: 10,
+                maxPerHour: 5,
+              },
+            ]),
+          })),
+        })),
+      }))
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn().mockResolvedValue([{ total: 0 }]),
+        })),
+      }))
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn().mockResolvedValue([{ total: 0 }]),
+        })),
+      }))
       .mockImplementationOnce(() => ({
         from: vi.fn(() => ({
           where: vi.fn(() => ({
@@ -244,7 +298,9 @@ describe('GET /api/admin/outreach', () => {
       }))
       .mockImplementationOnce(() => ({
         from: vi.fn(() => ({
-          where: vi.fn().mockResolvedValue([{ total: 0 }]),
+          where: vi.fn(() => ({
+            limit: vi.fn().mockResolvedValue([]),
+          })),
         })),
       }))
       .mockImplementationOnce(() => ({
@@ -285,6 +341,28 @@ describe('GET /api/admin/outreach', () => {
 
   it('skips leads already claimed by another queue request', async () => {
     mockSelect
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn().mockResolvedValue([
+              {
+                dailySendCap: 10,
+                maxPerHour: 5,
+              },
+            ]),
+          })),
+        })),
+      }))
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn().mockResolvedValue([{ total: 0 }]),
+        })),
+      }))
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn().mockResolvedValue([{ total: 0 }]),
+        })),
+      }))
       .mockImplementationOnce(() => ({
         from: vi.fn(() => ({
           where: vi.fn(() => ({

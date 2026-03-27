@@ -1,7 +1,19 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+
+function assertDocumentOrder(elements: HTMLElement[]) {
+  for (let index = 1; index < elements.length; index += 1) {
+    const previous = elements[index - 1];
+    const current = elements[index];
+    expect(
+      previous.compareDocumentPosition(current) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  }
+}
 
 const drawerToggleButtonMock = vi.fn((props: Record<string, unknown>) => (
   <button type='button' data-testid='drawer-toggle-button'>
@@ -23,6 +35,14 @@ vi.mock(
 
 vi.mock('@/components/atoms/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span>{name}</span>,
+}));
+
+vi.mock('@/components/molecules/HeaderSearchAction', () => ({
+  HeaderSearchAction: () => (
+    <button type='button' data-testid='toolbar-search'>
+      Search
+    </button>
+  ),
 }));
 
 vi.mock('@/components/atoms/AppSegmentControl', () => ({
@@ -60,8 +80,22 @@ vi.mock('@/components/organisms/table', () => ({
   PAGE_TOOLBAR_END_GROUP_CLASS: 'end-group',
   PAGE_TOOLBAR_ICON_CLASS: 'icon',
   PAGE_TOOLBAR_ICON_STROKE_WIDTH: 2,
-  PageToolbar: ({ start, end }: { start: ReactNode; end: ReactNode }) => (
-    <div>
+  PageToolbar: ({
+    start,
+    end,
+    className,
+    topDivider,
+  }: {
+    start: ReactNode;
+    end: ReactNode;
+    className?: string;
+    topDivider?: boolean;
+  }) => (
+    <div
+      data-testid='page-toolbar'
+      data-top-divider={topDivider ? 'true' : undefined}
+      className={className}
+    >
       <div>{start}</div>
       <div>{end}</div>
     </div>
@@ -78,6 +112,17 @@ vi.mock('@/components/organisms/table', () => ({
     </button>
   ),
   ExportCSVButton: () => <button type='button'>Export</button>,
+  PageToolbarActionButton: ({
+    label,
+    onClick,
+  }: {
+    label: ReactNode;
+    onClick?: () => void;
+  }) => (
+    <button type='button' onClick={onClick}>
+      {label}
+    </button>
+  ),
 }));
 
 const { ReleaseTableSubheader, DEFAULT_RELEASE_FILTERS } = await import(
@@ -85,7 +130,7 @@ const { ReleaseTableSubheader, DEFAULT_RELEASE_FILTERS } = await import(
 );
 
 describe('ReleaseTableSubheader', () => {
-  it('does not render drawer toggle in toolbar (moved to header)', () => {
+  it('attaches the divider to the top edge of the subheader shell', () => {
     render(
       <ReleaseTableSubheader
         releases={[] as ReleaseViewModel[]}
@@ -94,11 +139,48 @@ describe('ReleaseTableSubheader', () => {
         onFiltersChange={() => undefined}
         releaseView='tracks'
         onReleaseViewChange={() => undefined}
+        searchQuery=''
+        onSearchQueryChange={() => undefined}
       />
     );
 
-    expect(
-      screen.queryByTestId('drawer-toggle-button')
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('page-toolbar')).toHaveAttribute(
+      'data-top-divider',
+      'true'
+    );
+  });
+
+  it('orders toolbar controls as search, filters, display, export, preview, and create', async () => {
+    const user = userEvent.setup();
+    const onCreateRelease = vi.fn();
+
+    render(
+      <ReleaseTableSubheader
+        releases={[] as ReleaseViewModel[]}
+        selectedIds={new Set<string>()}
+        filters={DEFAULT_RELEASE_FILTERS}
+        onFiltersChange={() => undefined}
+        releaseView='tracks'
+        onReleaseViewChange={() => undefined}
+        searchQuery=''
+        onSearchQueryChange={() => undefined}
+        onCreateRelease={onCreateRelease}
+        canCreateManualReleases
+      />
+    );
+
+    const controls = [
+      screen.getByTestId('toolbar-search'),
+      screen.getByRole('button', { name: 'Filters' }),
+      screen.getByRole('button', { name: /display/i }),
+      screen.getByRole('button', { name: 'Export' }),
+      screen.getByTestId('drawer-toggle-button'),
+      screen.getByRole('button', { name: 'New Release' }),
+    ];
+
+    assertDocumentOrder(controls);
+
+    await user.click(screen.getByRole('button', { name: 'New Release' }));
+    expect(onCreateRelease).toHaveBeenCalledTimes(1);
   });
 });

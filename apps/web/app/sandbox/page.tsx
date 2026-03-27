@@ -1,7 +1,13 @@
 import { Button, Input } from '@jovie/ui';
+import type { Metadata } from 'next';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
+
+export const metadata: Metadata = {
+  robots: NOINDEX_ROBOTS,
+};
 
 export default function SandboxPage() {
   return (

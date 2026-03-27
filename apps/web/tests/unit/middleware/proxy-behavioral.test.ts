@@ -43,6 +43,7 @@ const mocks = vi.hoisted(() => ({
   }),
   isStagingHost: vi.fn().mockReturnValue(false),
   shouldBypassClerkForRequest: vi.fn().mockReturnValue(true),
+  isTestAuthBypassEnabled: vi.fn().mockReturnValue(true),
   resolveTestBypassUserId: vi.fn().mockReturnValue(null),
   createBotResponse: vi.fn(),
   clerkMiddleware: vi.fn(),
@@ -87,6 +88,7 @@ vi.mock('@/lib/auth/clerk-middleware-bypass', () => ({
   shouldBypassClerkForRequest: mocks.shouldBypassClerkForRequest,
 }));
 vi.mock('@/lib/auth/test-mode', () => ({
+  isTestAuthBypassEnabled: mocks.isTestAuthBypassEnabled,
   TEST_AUTH_BYPASS_MODE: 'test-auth-bypass',
   TEST_MODE_HEADER: 'x-test-mode',
   resolveTestBypassUserId: mocks.resolveTestBypassUserId,
@@ -111,6 +113,7 @@ vi.mock('@/constants/app', () => ({
   HOMEPAGE_REGION_COOKIE: 'homepage_region',
 }));
 vi.mock('@/constants/domains', () => ({
+  BASE_URL: 'https://jov.ie',
   HOSTNAME: 'jov.ie',
 }));
 
@@ -142,6 +145,7 @@ function createUnauthenticatedRequest(
   options: Parameters<typeof createTestRequest>[0] = {}
 ) {
   mocks.resolveTestBypassUserId.mockReturnValue(null);
+  mocks.isTestAuthBypassEnabled.mockReturnValue(true);
   return createTestRequest(options);
 }
 
@@ -554,6 +558,38 @@ describe('proxy.ts middleware', () => {
       const location = res.headers.get('location');
       expect(location).toContain('jov.ie');
       expect(location).toContain('/some-page');
+    });
+  });
+
+  describe('support.jov.ie redirect', () => {
+    it('308 redirects support.jov.ie to jov.ie/support and preserves query params', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/articles/649224-jovie-password-reset',
+        hostname: 'support.jov.ie',
+        searchParams: { ref: '123' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(308);
+      const location = res.headers.get('location');
+      expect(location).toBe('https://jov.ie/support?ref=123');
+    });
+
+    it('redirects support.jov.ie investor paths before investor handling runs', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/investor-portal/respond',
+        hostname: 'support.jov.ie',
+        searchParams: {
+          t: 'token-123',
+          action: 'interested',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(308);
+      expect(res.headers.get('location')).toBe(
+        'https://jov.ie/support?t=token-123&action=interested'
+      );
     });
   });
 });

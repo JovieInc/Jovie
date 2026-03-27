@@ -74,6 +74,7 @@ export const ServerEnvSchema = z.object({
   INGESTION_CRON_SECRET: z.string().optional(),
 
   // URL encryption (required in production/preview)
+  LEAD_ATTRIBUTION_SECRET: z.string().optional(),
   URL_ENCRYPTION_KEY: z.string().optional(),
 
   // Cron job authentication
@@ -165,6 +166,11 @@ export const ServerEnvSchema = z.object({
   JOVIE_GOOGLE_API_SECRET: z.string().optional(),
   JOVIE_TIKTOK_PIXEL_ID: z.string().optional(),
   JOVIE_TIKTOK_ACCESS_TOKEN: z.string().optional(),
+
+  // E2E / Playwright auth helpers
+  E2E_USE_TEST_AUTH_BYPASS: z.string().optional(),
+  E2E_CLERK_USER_ID: z.string().optional(),
+  E2E_CLERK_USER_USERNAME: z.string().optional(),
 });
 
 /**
@@ -202,6 +208,7 @@ export const ENV_KEYS = [
   'STRIPE_PRICE_GROWTH_MONTHLY',
   'STRIPE_PRICE_GROWTH_YEARLY',
   'INGESTION_CRON_SECRET',
+  'LEAD_ATTRIBUTION_SECRET',
   'URL_ENCRYPTION_KEY',
   'CRON_SECRET',
   'METADATA_HASH_KEY',
@@ -253,4 +260,7 @@ export const ENV_KEYS = [
   'JOVIE_GOOGLE_API_SECRET',
   'JOVIE_TIKTOK_PIXEL_ID',
   'JOVIE_TIKTOK_ACCESS_TOKEN',
+  'E2E_USE_TEST_AUTH_BYPASS',
+  'E2E_CLERK_USER_ID',
+  'E2E_CLERK_USER_USERNAME',
 ] as const satisfies readonly (keyof z.infer<typeof ServerEnvSchema>)[];

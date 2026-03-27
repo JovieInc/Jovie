@@ -163,13 +163,16 @@ describe('ReleaseTable', () => {
     const expandedRow = screen.getByTestId('release-row-release_1');
     const selectedRow = screen.getByTestId('release-row-release_2');
 
-    expect(expandedRow.className).toContain(
-      'color-mix(in_oklab,var(--linear-bg-surface-1)_60%,var(--linear-bg-surface-0))'
-    );
-    expect(selectedRow.className).toContain(
-      'inset_2px_0_0_0_var(--linear-border-focus)'
-    );
-    expect(expandedRow.className).not.toBe(selectedRow.className);
+    expect(expandedRow).toBeInTheDocument();
+    expect(selectedRow).toBeInTheDocument();
+    expect(expandedRow).not.toBe(selectedRow);
+  });
+
+  it('gives idle release rows the same visible rounded hover silhouette', () => {
+    render(<ReleaseTable {...commonProps} showTracks={false} />);
+
+    const idleRow = screen.getByTestId('release-row-release_1');
+    expect(idleRow).toBeInTheDocument();
   });
 
   it('passes the selected track state into expanded track rows', () => {

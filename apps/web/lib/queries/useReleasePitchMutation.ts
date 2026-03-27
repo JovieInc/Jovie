@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
-import type { GeneratedPitches } from '@/lib/services/pitch';
+import type { GeneratedPitches } from '@/lib/services/pitch/types';
 import { FetchError } from './fetch';
 
 /**

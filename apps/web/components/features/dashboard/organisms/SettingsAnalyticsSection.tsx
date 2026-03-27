@@ -2,9 +2,8 @@
 
 import { BarChart3 } from 'lucide-react';
 import { useCallback } from 'react';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { useOptimisticToggle } from '@/features/dashboard/hooks/useOptimisticToggle';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
 import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
@@ -50,37 +49,35 @@ export function SettingsAnalyticsSection({
   });
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
-    >
-      <ContentSectionHeader
-        title='Analytics filtering'
-        subtitle='Control whether your own visits are excluded from profile analytics.'
-        className='min-h-0 px-4 py-3'
-        actions={<SettingsStatusPill status={saveStatus} />}
-        actionsClassName='w-auto shrink-0'
-      />
-      <div className='space-y-3 px-4 py-3'>
-        <SettingsToggleRow
-          title='Exclude Yourself from Analytics'
-          description='When enabled, your own visits to your profile page will not be counted in your analytics data.'
-          checked={excludeSelf}
-          onCheckedChange={handleToggle}
-          disabled={isPending}
-          ariaLabel='Exclude yourself from analytics'
-          gated={!isPro}
-          gateFeatureContext='Filter your own visits'
-        />
+    <SettingsPanel actions={<SettingsStatusPill status={saveStatus} />}>
+      <div className='space-y-3 px-4 py-4 sm:px-5'>
+        {isPro ? (
+          <SettingsToggleRow
+            icon={<BarChart3 className='h-4 w-4' aria-hidden />}
+            title='Exclude your own visits'
+            description='Keep your own profile views and link clicks out of analytics so the numbers reflect your audience, not your testing.'
+            checked={excludeSelf}
+            onCheckedChange={handleToggle}
+            disabled={isPending}
+            ariaLabel='Exclude yourself from analytics'
+          />
+        ) : (
+          <SettingsToggleRow
+            gated
+            icon={<BarChart3 className='h-4 w-4' aria-hidden />}
+            title='Exclude your own visits'
+            description='Keep your own profile views and link clicks out of analytics so the numbers reflect your audience, not your testing.'
+            gateFeatureContext='Filter your own visits'
+          />
+        )}
         {isPro && excludeSelf ? (
           <ContentSurfaceCard className='flex items-start gap-3 bg-surface-0 p-3.5'>
-            <BarChart3 className='h-4 w-4 text-secondary-token mt-0.5 shrink-0' />
+            <BarChart3 className='mt-0.5 h-4 w-4 shrink-0 text-secondary-token' />
             <div>
-              <p className='text-[13px] font-[510] text-primary-token'>
-                Self-Filtering Active
+              <p className='text-[13px] font-[560] tracking-[-0.02em] text-primary-token'>
+                Self-filtering active
               </p>
-              <p className='text-[13px] text-secondary-token mt-1'>
+              <p className='mt-1 text-[13px] text-secondary-token'>
                 Your own profile views and link clicks are being excluded from
                 your analytics.
               </p>
@@ -88,6 +85,6 @@ export function SettingsAnalyticsSection({
           </ContentSurfaceCard>
         ) : null}
       </div>
-    </DashboardCard>
+    </SettingsPanel>
   );
 }

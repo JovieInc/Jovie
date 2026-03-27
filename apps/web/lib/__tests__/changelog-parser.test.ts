@@ -273,4 +273,116 @@ describe('parseChangelog', () => {
     expect(releases).toHaveLength(1);
     expect(releases[0].version).toBe('1.0.0');
   });
+
+  it('filters entries tagged internal even when the marker is suffix-cased', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+### Changed
+
+- Public improvement
+- Shared cron auth helper with timing-safe bearer verification [INTERNAL]
+- Better pricing copy
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].sections.changed).toEqual([
+      'Public improvement',
+      'Better pricing copy',
+    ]);
+  });
+
+  it('filters admin and control-plane route disclosures', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+### Added
+
+- New pricing comparison page
+- Admin releases table at /app/admin/releases
+- Test-only /api/changelog/subscribe debugging endpoint
+- Public profile analytics are easier to understand
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].sections.added).toEqual([
+      'New pricing comparison page',
+      'Public profile analytics are easier to understand',
+    ]);
+  });
+
+  it('filters internal summaries while preserving public entries', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+> Hardened webhook dispatch with Redis-backed dedupe [internal]
+
+### Fixed
+
+- Sign-in page loads faster
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].summary).toBe('');
+    expect(releases[0].sections.fixed).toEqual(['Sign-in page loads faster']);
+  });
+
+  it('does not promote a later blockquote when the first summary is internal', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+> Hardened webhook dispatch with Redis-backed dedupe [internal]
+> Customer-facing summary that should stay hidden
+
+### Fixed
+
+- Sign-in page loads faster
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].summary).toBe('');
+  });
+
+  it('filters internal cost and budget disclosures', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+### Changed
+
+- Lowered checkout friction for fans
+- Reduced outreach cost from $400 to $250 per week
+- Budget cap now enforced at $1000 for internal testing
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].sections.changed).toEqual([
+      'Lowered checkout friction for fans',
+    ]);
+  });
+
+  it('keeps public admin-role and token entries visible', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+### Changed
+
+- Team admins can now manage subscription billing
+- Users can now revoke personal API tokens
+- Design tokens now support accent overrides
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].sections.changed).toEqual([
+      'Team admins can now manage subscription billing',
+      'Users can now revoke personal API tokens',
+      'Design tokens now support accent overrides',
+    ]);
+  });
+
+  it('does not treat lowercase common words as vendor leaks', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+### Changed
+
+- Added turbo mode for playlist cleanup
+- conductor notes now show in exported setlists
+- Reduced Sentry error noise
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].sections.changed).toEqual([
+      'Added turbo mode for playlist cleanup',
+      'conductor notes now show in exported setlists',
+    ]);
+    expect(releases[0].sections.changed).not.toContain(
+      'Reduced Sentry error noise'
+    );
+  });
 });

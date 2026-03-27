@@ -30,13 +30,13 @@ export function SettingsSection({
       id={id}
       aria-labelledby={headingId}
       aria-describedby={descriptionId}
-      className={cn('scroll-mt-4', className)}
+      className={cn('scroll-mt-6 space-y-5', className)}
     >
-      <div className='space-y-0.5 pb-3'>
+      <div className='space-y-1'>
         <h2
           id={headingId}
           className={cn(
-            'dashboard-heading text-[15px] font-[590] tracking-[-0.02em] text-primary-token',
+            'dashboard-heading text-[24px] font-[590] tracking-[-0.035em] text-primary-token sm:text-[28px]',
             titleClassName
           )}
         >
@@ -45,8 +45,9 @@ export function SettingsSection({
         {description ? (
           <p
             id={descriptionId}
+            data-testid={`${id}-description`}
             className={cn(
-              'dashboard-body text-[12px] text-secondary-token',
+              'dashboard-body max-w-[60ch] text-[13px] leading-[19px] text-secondary-token',
               descriptionClassName
             )}
           >
@@ -54,7 +55,7 @@ export function SettingsSection({
           </p>
         ) : null}
       </div>
-      <div className='space-y-3'>{children}</div>
+      <div className='space-y-4'>{children}</div>
     </section>
   );
 }

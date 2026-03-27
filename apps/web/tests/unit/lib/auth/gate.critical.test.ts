@@ -169,6 +169,25 @@ function createInsertChain(result: unknown[]) {
   return { values: mockValues };
 }
 
+/** Creates an insert chain whose returning() rejects with the given error. */
+function createFailingInsertChain(error: unknown) {
+  const mockReturning = vi.fn().mockRejectedValue(error);
+  const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
+  const mockValues = vi.fn().mockReturnValue({
+    onConflictDoUpdate: mockOnConflict,
+    returning: mockReturning,
+  });
+  return { values: mockValues };
+}
+
+/** Creates an update chain: db.update(...).set(...).where(...).returning(...) */
+function createUpdateChain(result: unknown[]) {
+  const mockReturning = vi.fn().mockResolvedValue(result);
+  const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
+  const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
+  return { set: mockSet, where: mockWhere, returning: mockReturning };
+}
+
 /** Standard mock Clerk user with verified email */
 function mockClerkUser(email = 'test@example.com') {
   return {
@@ -397,6 +416,57 @@ describe('@critical gate.ts', () => {
       expect(result.redirectTo).toBe('/error/user-creation-failed');
       expect(result.context.errorCode).toBe('USER_CREATION_FAILED');
       expect(mockCaptureCriticalError).toHaveBeenCalled();
+    });
+
+    it('adopts an existing email row when the insert error wraps users_email_unique', async () => {
+      mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
+      mockCachedCurrentUser.mockResolvedValue(
+        mockClerkUser('MixedCase+clerk_test@Jov.ie')
+      );
+
+      let selectCallCount = 0;
+      mockDbSelect.mockImplementation(() => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return createJoinSelectChain([]);
+        }
+        return createJoinSelectChain([]);
+      });
+
+      const wrappedUniqueError = new Error(
+        'Failed query: insert into "users"',
+        {
+          cause: {
+            code: '23505',
+            constraint: 'users_email_unique',
+            detail: 'Key (email)=(MixedCase+clerk_test@Jov.ie) already exists.',
+            message:
+              'duplicate key value violates unique constraint "users_email_unique"',
+          },
+        }
+      );
+
+      mockDbInsert.mockReturnValue(
+        createFailingInsertChain(wrappedUniqueError)
+      );
+      const updateChain = createUpdateChain([{ id: 'adopted-user-id' }]);
+      mockDbUpdate.mockReturnValue(updateChain);
+
+      mockResolveProfileState.mockReturnValue({
+        state: UserState.NEEDS_ONBOARDING,
+        profileId: null,
+        redirectTo: '/onboarding?fresh_signup=true',
+      });
+
+      const result = await resolveUserState();
+
+      expect(result.dbUserId).toBe('adopted-user-id');
+      expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+      expect(mockDbUpdate).toHaveBeenCalled();
+      expect(updateChain.where).toHaveBeenCalledWith({
+        eq: 'MixedCase+clerk_test@Jov.ie',
+      });
+      expect(mockCaptureCriticalError).not.toHaveBeenCalled();
     });
 
     it('syncs email from Clerk when DB email differs from verified Clerk email', async () => {

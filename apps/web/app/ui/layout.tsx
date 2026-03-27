@@ -1,6 +1,12 @@
 import { TooltipProvider } from '@jovie/ui';
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
+
+export const metadata: Metadata = {
+  robots: NOINDEX_ROBOTS,
+};
 
 const NAV_ITEMS = [
   {

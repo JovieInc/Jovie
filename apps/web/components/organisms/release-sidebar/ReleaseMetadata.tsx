@@ -44,21 +44,30 @@ const CANVAS_STATUS_CONFIG: Record<
 
 const CANVAS_STATUS_OPTIONS: CanvasStatus[] = ['uploaded', 'not_set'];
 const METADATA_ROW_PROPS = {
-  labelWidth: 72,
+  labelWidth: 74,
   size: 'sm' as const,
 };
 const METADATA_TEXT_CLASSNAME =
-  'text-[11px] leading-[14px] text-secondary-token';
+  'text-[12px] font-[460] leading-[16px] text-primary-token';
 const METADATA_MUTED_TEXT_CLASSNAME =
-  'text-[10.5px] leading-[14px] text-tertiary-token';
-const METADATA_BADGE_CLASSNAME = 'text-[9.5px] font-[510]';
-const METADATA_ROW_CLASSNAME =
-  'rounded-none px-2 py-1.5 first:pt-0.5 last:pb-0.5';
+  'text-[11px] leading-[15px] text-tertiary-token';
+const METADATA_LABEL_CLASSNAME =
+  'text-[10px] font-[510] leading-[13px] tracking-[0.01em] text-tertiary-token';
+const METADATA_VALUE_CLASSNAME =
+  'text-[12px] leading-[16px] text-primary-token';
+const METADATA_BADGE_CLASSNAME =
+  'h-5 rounded-full border border-subtle bg-surface-0 px-2 text-[9.5px] font-[510] tracking-[-0.01em] shadow-none';
+const METADATA_ROW_CLASSNAME = 'rounded-none px-0 py-1 first:pt-0 last:pb-0';
+const METADATA_STACK_CLASSNAME = 'space-y-0.5';
+const METADATA_COPY_CELL_CLASSNAME =
+  'h-5.5 rounded-full px-1.5 text-[10.5px] leading-none tracking-[0.02em]';
+const METADATA_COPY_TEXT_CELL_CLASSNAME =
+  'h-5.5 rounded-full px-1.5 text-[10.5px] font-[460] leading-none';
 
 function PopularityScore({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <span className='text-[11px] tabular-nums text-secondary-token'>
+    <span className='text-[11.5px] font-[460] tabular-nums text-primary-token'>
       {clamped} / 100
     </span>
   );
@@ -70,14 +79,14 @@ function ReleaseTypeBadges({ release }: { readonly release: Release }) {
     <div className='flex flex-wrap items-center gap-1.5'>
       <Badge
         size='sm'
-        className={`h-5 rounded-md px-1.5 text-[9.5px] font-[510] ${typeStyle.bg} ${typeStyle.text}`}
+        className={`${METADATA_BADGE_CLASSNAME} ${typeStyle.bg} ${typeStyle.text}`}
       >
         {typeStyle.label}
       </Badge>
       {release.isExplicit && (
         <Badge
           size='sm'
-          className='h-5 rounded-md bg-red-500/10 px-1.5 text-[9.5px] font-[510] text-red-600 dark:text-red-300'
+          className='h-5 rounded-full border border-transparent bg-red-500/10 px-2 text-[9.5px] font-[510] tracking-[-0.01em] text-red-600 shadow-none dark:text-red-300'
         >
           E
         </Badge>
@@ -139,17 +148,19 @@ export function ReleaseMetadata({
   return (
     <DrawerSurfaceCard
       className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
+      testId='release-metadata-card'
     >
-      <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-        <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-          Metadata
-        </p>
-      </div>
-      <div className='p-1.5'>
-        <div className='divide-y divide-(--linear-app-frame-seam)'>
+      <div className='p-3'>
+        <div
+          className={METADATA_STACK_CLASSNAME}
+          data-testid='release-metadata-grid'
+          data-dividers='false'
+        >
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
+            labelClassName={METADATA_LABEL_CLASSNAME}
+            valueClassName={METADATA_VALUE_CLASSNAME}
             label='Type'
             value={<ReleaseTypeBadges release={release} />}
             align='start'
@@ -158,6 +169,7 @@ export function ReleaseMetadata({
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
+            labelClassName={METADATA_LABEL_CLASSNAME}
             label='ISRC'
             value={
               <CopyableMonospaceCell
@@ -165,6 +177,7 @@ export function ReleaseMetadata({
                 label='ISRC'
                 size='sm'
                 maxWidth={140}
+                className={METADATA_COPY_CELL_CLASSNAME}
               />
             }
           />
@@ -172,6 +185,7 @@ export function ReleaseMetadata({
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
+            labelClassName={METADATA_LABEL_CLASSNAME}
             label='UPC'
             value={
               <CopyableMonospaceCell
@@ -179,6 +193,7 @@ export function ReleaseMetadata({
                 label='UPC'
                 size='sm'
                 maxWidth={140}
+                className={METADATA_COPY_CELL_CLASSNAME}
               />
             }
           />
@@ -186,6 +201,7 @@ export function ReleaseMetadata({
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
+            labelClassName={METADATA_LABEL_CLASSNAME}
             label='Label'
             value={
               release.label ? (
@@ -194,7 +210,10 @@ export function ReleaseMetadata({
                   label='Label'
                   size='sm'
                   maxWidth={140}
-                  className='font-sans'
+                  className={cn(
+                    METADATA_COPY_TEXT_CELL_CLASSNAME,
+                    'font-sans tracking-normal'
+                  )}
                 />
               ) : (
                 <MetadataFallbackValue>Unknown</MetadataFallbackValue>
@@ -205,6 +224,8 @@ export function ReleaseMetadata({
             <DrawerPropertyRow
               {...METADATA_ROW_PROPS}
               className={METADATA_ROW_CLASSNAME}
+              labelClassName={METADATA_LABEL_CLASSNAME}
+              valueClassName={METADATA_VALUE_CLASSNAME}
               label={
                 <CopyrightLabel
                   symbol='℗'
@@ -223,9 +244,10 @@ export function ReleaseMetadata({
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
+            labelClassName={METADATA_LABEL_CLASSNAME}
             label='Tracks'
             value={
-              <span className='text-[11px] tabular-nums text-secondary-token'>
+              <span className='text-[11.5px] font-[460] tabular-nums text-primary-token'>
                 {release.totalTracks}{' '}
                 {release.totalTracks === 1 ? 'track' : 'tracks'}
               </span>
@@ -235,6 +257,8 @@ export function ReleaseMetadata({
             <DrawerPropertyRow
               {...METADATA_ROW_PROPS}
               className={METADATA_ROW_CLASSNAME}
+              labelClassName={METADATA_LABEL_CLASSNAME}
+              valueClassName={METADATA_VALUE_CLASSNAME}
               label={
                 <CopyrightLabel
                   symbol='©'
@@ -253,15 +277,16 @@ export function ReleaseMetadata({
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
+            labelClassName={METADATA_LABEL_CLASSNAME}
             label='Canvas'
             value={
               onCanvasStatusChange ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <DrawerButton
-                      tone='ghost'
+                      tone='secondary'
                       size='sm'
-                      className='-mx-1 h-6 gap-1 rounded-md border-transparent px-1 py-0.5 text-[11px] font-[400] leading-[14px] text-secondary-token'
+                      className='-mx-0.5 h-5.5 gap-1 rounded-full border-subtle bg-surface-0 px-2 text-[10.5px] font-[510] leading-none text-secondary-token shadow-none hover:bg-surface-0'
                     >
                       <span>{canvasStatusDisplayLabel}</span>
                       <ChevronDown
@@ -316,6 +341,7 @@ export function ReleaseMetadata({
             <DrawerPropertyRow
               {...METADATA_ROW_PROPS}
               className={METADATA_ROW_CLASSNAME}
+              labelClassName={METADATA_LABEL_CLASSNAME}
               label='Popularity'
               value={<PopularityScore value={release.spotifyPopularity} />}
             />
@@ -324,9 +350,10 @@ export function ReleaseMetadata({
             <DrawerPropertyRow
               {...METADATA_ROW_PROPS}
               className={METADATA_ROW_CLASSNAME}
+              labelClassName={METADATA_LABEL_CLASSNAME}
               label='Duration'
               value={
-                <span className='text-[11px] tabular-nums text-secondary-token'>
+                <span className='text-[11.5px] font-[460] tabular-nums text-primary-token'>
                   {formatDuration(release.totalDurationMs)}
                 </span>
               }
@@ -336,6 +363,8 @@ export function ReleaseMetadata({
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
+            labelClassName={METADATA_LABEL_CLASSNAME}
+            valueClassName={METADATA_VALUE_CLASSNAME}
             label='Released'
             value={
               release.releaseDate ? (
@@ -355,6 +384,7 @@ export function ReleaseMetadata({
             <DrawerPropertyRow
               {...METADATA_ROW_PROPS}
               className={METADATA_ROW_CLASSNAME}
+              labelClassName={METADATA_LABEL_CLASSNAME}
               label='Genres'
               value={
                 <div className='flex flex-wrap gap-1'>
@@ -362,7 +392,7 @@ export function ReleaseMetadata({
                     <Badge
                       key={genre}
                       variant='secondary'
-                      className='rounded-md bg-surface-1 px-1.5 py-0 text-[9.5px] font-[510] text-secondary-token'
+                      className='rounded-full border border-subtle bg-surface-0 px-2 py-0 text-[9.5px] font-[510] tracking-[-0.01em] text-secondary-token shadow-none'
                     >
                       {genre}
                     </Badge>

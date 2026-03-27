@@ -37,6 +37,15 @@ function renderReleaseMetadata(release: Release) {
 }
 
 describe('ReleaseMetadata canvas status', () => {
+  it('renders metadata as a single divider-free grid', () => {
+    renderReleaseMetadata(buildRelease());
+
+    expect(screen.getByTestId('release-metadata-grid')).toHaveAttribute(
+      'data-dividers',
+      'false'
+    );
+  });
+
   it('shows set status when canvas is uploaded', () => {
     renderReleaseMetadata(buildRelease({ canvasStatus: 'uploaded' }));
 

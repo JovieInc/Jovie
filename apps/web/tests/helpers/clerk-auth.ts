@@ -1,11 +1,106 @@
 import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  TEST_AUTH_BYPASS_MODE,
+  TEST_MODE_COOKIE,
+  TEST_USER_ID_COOKIE,
+} from '@/lib/auth/test-mode';
 import { smokeNavigateWithRetry } from '../e2e/utils/smoke-test-utils';
 import { primeVercelBypassCookie } from './vercel-preview';
 
 const AUTH_READY_ROUTE = APP_ROUTES.DASHBOARD;
 
+function isTestAuthBypassEnabled(): boolean {
+  return process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+}
+
+function getTestAuthBypassUserId(): string | null {
+  const userId = process.env.E2E_CLERK_USER_ID?.trim();
+  return userId && userId.length > 0 ? userId : null;
+}
+
+async function enableTestAuthBypass(page: Page): Promise<void> {
+  const userId = getTestAuthBypassUserId();
+  if (!userId) {
+    throw new ClerkTestError(
+      'E2E_CLERK_USER_ID is required when test auth bypass is enabled.',
+      'MISSING_CREDENTIALS'
+    );
+  }
+
+  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  await page.context().addCookies([
+    {
+      name: TEST_MODE_COOKIE,
+      value: TEST_AUTH_BYPASS_MODE,
+      url: baseUrl,
+      sameSite: 'Lax',
+    },
+    {
+      name: TEST_USER_ID_COOKIE,
+      value: userId,
+      url: baseUrl,
+      sameSite: 'Lax',
+    },
+  ]);
+}
+
+async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
+  await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
+    timeout: 120_000,
+    retries: 2,
+  });
+
+  if (isClerkHandshakeUrl(page.url())) {
+    throw new ClerkTestError(
+      'Clerk redirected to a handshake flow after sign-in on the current preview target.',
+      'CLERK_SETUP_FAILED'
+    );
+  }
+
+  let hasReloaded = false;
+  await expect(async () => {
+    const overlay = page.locator(
+      '[data-nextjs-dialog-overlay], [data-nextjs-toast]'
+    );
+    if (await overlay.isVisible({ timeout: 500 }).catch(() => false)) {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(500);
+    }
+
+    const tryAgain = page.locator('button:has-text("Try again")');
+    if (await tryAgain.isVisible({ timeout: 500 }).catch(() => false)) {
+      await tryAgain.click();
+      await page.waitForTimeout(1000);
+    }
+
+    const dashNav = page.locator('nav[aria-label="Dashboard navigation"]');
+    const userButton = page.locator('[data-clerk-element="userButton"]');
+    const chatComposer = page
+      .locator(
+        'textarea, [contenteditable="true"], button:has-text("New thread")'
+      )
+      .first();
+    const main = page.locator('main').first();
+    const isShellReady = async () =>
+      (page.url().includes('/app') &&
+        !page.url().includes('/signin') &&
+        !page.url().includes('/sign-in') &&
+        !page.url().includes('/onboarding') &&
+        (await main.isVisible().catch(() => false))) ||
+      (await dashNav.isVisible().catch(() => false)) ||
+      (await userButton.isVisible().catch(() => false)) ||
+      (await chatComposer.isVisible().catch(() => false));
+
+    if (!(await isShellReady()) && !hasReloaded) {
+      hasReloaded = true;
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+    }
+
+    await expect.poll(isShellReady, { timeout: 5000 }).toBe(true);
+  }).toPass({ timeout: 120_000, intervals: [3000, 5000, 10000, 15000] });
+}
 /**
  * Check if the test target is a production deployment (jov.ie).
  * Used to gate heavy test suites that should only run against testing environments.
@@ -32,6 +127,10 @@ export function isTestingEnvironment(): boolean {
 export function hasClerkCredentials(
   credentials: { username?: string; password?: string } = {}
 ): boolean {
+  if (isTestAuthBypassEnabled()) {
+    return getTestAuthBypassUserId() !== null;
+  }
+
   const username =
     credentials.username ?? process.env.E2E_CLERK_USER_USERNAME ?? '';
   const password =
@@ -108,6 +207,32 @@ export function isClerkTestEmail(email: string): boolean {
   return email.includes('+clerk_test');
 }
 
+export function isClerkHandshakeUrl(url: string): boolean {
+  return (
+    url.includes('clerk') &&
+    (url.includes('handshake') || url.includes('dev-browser'))
+  );
+}
+
+const CLERK_ORIGIN_MISMATCH_PATTERNS = [
+  /production keys are only allowed for domain/i,
+  /request http origin header must be equal to or a subdomain of the requesting url/i,
+];
+
+export function isClerkOriginMismatchMessage(message: string): boolean {
+  return CLERK_ORIGIN_MISMATCH_PATTERNS.some(pattern => pattern.test(message));
+}
+
+export function hasClerkOriginMismatchSignal(
+  errorMessage: string,
+  consoleMessages: readonly string[] = []
+): boolean {
+  return (
+    isClerkOriginMismatchMessage(errorMessage) ||
+    consoleMessages.some(isClerkOriginMismatchMessage)
+  );
+}
+
 /**
  * Creates or reuses a Clerk test user session for the given email.
  *
@@ -180,6 +305,12 @@ export async function signInUser(
     password = process.env.E2E_CLERK_USER_PASSWORD,
   }: { username?: string; password?: string } = {}
 ) {
+  if (isTestAuthBypassEnabled()) {
+    await enableTestAuthBypass(page);
+    await waitForShellReadyAfterAuth(page);
+    return page;
+  }
+
   if (!username) {
     throw new ClerkTestError(
       'E2E test user credentials not configured. Set E2E_CLERK_USER_USERNAME.',
@@ -214,6 +345,17 @@ export async function signInUser(
   // This is required for the testing token to be included in Clerk's FAPI requests
   await setupClerkTestingToken({ page });
 
+  const clerkConsoleMessages: string[] = [];
+  const handleConsoleMessage = (message: {
+    type(): string;
+    text(): string;
+  }) => {
+    if (message.type() === 'error' || message.type() === 'warning') {
+      clerkConsoleMessages.push(message.text());
+    }
+  };
+  page.on('console', handleConsoleMessage);
+
   await primeVercelBypassCookie(
     page,
     process.env.BASE_URL,
@@ -230,6 +372,13 @@ export async function signInUser(
     timeout: 120_000,
     retries: 2,
   });
+
+  if (isClerkHandshakeUrl(page.url())) {
+    throw new ClerkTestError(
+      'Clerk redirected to a handshake flow on the current preview target.',
+      'CLERK_SETUP_FAILED'
+    );
+  }
 
   // Wait for Clerk JS to load from CDN before calling clerk.signIn()
   // The @clerk/testing library has a hard 30s timeout for window.Clerk.loaded.
@@ -288,11 +437,20 @@ export async function signInUser(
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
+    const sawOriginMismatch = hasClerkOriginMismatchSignal(
+      msg,
+      clerkConsoleMessages
+    );
 
     // Handle "already signed in" — testing token may auto-authenticate
     if (msg.includes('already signed in')) {
       console.log('  Already signed in via testing token, continuing...');
       // Continue to verification below
+    } else if (sawOriginMismatch) {
+      throw new ClerkTestError(
+        'Clerk rejected the current preview/local origin for the configured keys.',
+        'CLERK_SETUP_FAILED'
+      );
     } else {
       // Check if Clerk JS even loaded
       const clerkLoaded = await page
@@ -319,57 +477,11 @@ export async function signInUser(
       // Re-throw the original error if Clerk was loaded but signIn failed
       throw error;
     }
+  } finally {
+    page.off('console', handleConsoleMessage);
   }
 
-  // After sign-in, navigate to a stable authenticated shell route to verify auth.
-  // Profile data can 404 transiently in local dev and should not be the auth probe.
-  await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
-    timeout: 120_000,
-    retries: 2,
-  });
-
-  // Dismiss Next.js dev error overlay and wait for page to stabilize
-  // Handles React hydration mismatches (nonce attr) and transient hooks errors
-  let hasReloaded = false;
-  await expect(async () => {
-    // Dismiss error overlay if present
-    const overlay = page.locator(
-      '[data-nextjs-dialog-overlay], [data-nextjs-toast]'
-    );
-    if (await overlay.isVisible({ timeout: 500 }).catch(() => false)) {
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(500);
-    }
-    // Click "Try again" on error boundary if present
-    const tryAgain = page.locator('button:has-text("Try again")');
-    if (await tryAgain.isVisible({ timeout: 500 }).catch(() => false)) {
-      await tryAgain.click();
-      await page.waitForTimeout(1000);
-    }
-    // Verify dashboard element is visible
-    const dashNav = page.locator('nav[aria-label="Dashboard navigation"]');
-    const userButton = page.locator('[data-clerk-element="userButton"]');
-    const chatComposer = page
-      .locator(
-        'textarea, [contenteditable="true"], button:has-text("New thread")'
-      )
-      .first();
-    const main = page.locator('main').first();
-    const isShellReady = async () =>
-      (page.url().includes('/app') &&
-        !page.url().includes('/signin') &&
-        !page.url().includes('/sign-in') &&
-        !page.url().includes('/onboarding') &&
-        (await main.isVisible().catch(() => false))) ||
-      (await dashNav.isVisible().catch(() => false)) ||
-      (await userButton.isVisible().catch(() => false)) ||
-      (await chatComposer.isVisible().catch(() => false));
-    if (!(await isShellReady()) && !hasReloaded) {
-      hasReloaded = true;
-      await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
-    }
-    await expect.poll(isShellReady, { timeout: 5000 }).toBe(true);
-  }).toPass({ timeout: 120_000, intervals: [3000, 5000, 10000, 15000] });
+  await waitForShellReadyAfterAuth(page);
 
   return page;
 }

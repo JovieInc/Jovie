@@ -1,8 +1,9 @@
 'use client';
 
-import { Input } from '@jovie/ui';
 import { useEffect, useRef } from 'react';
-import { FORM_LAYOUT } from '@/lib/auth/constants';
+import { AuthTextInput } from '@/components/atoms/AuthTextInput';
+import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
+import { cn } from '@/lib/utils';
 import {
   type FormErrors,
   getSocialPlatformPrefix,
@@ -78,11 +79,11 @@ export function WaitlistSocialStep({
             return (
               <label
                 key={option.value}
-                className={`rounded-full px-3 py-1.5 text-(--linear-caption-size) font-(--linear-caption-weight) transition-colors border focus-within:ring-2 focus-within:ring-(--linear-border-focus)/40 focus-within:ring-offset-2 ${
-                  isSelected
-                    ? 'bg-surface-3 text-primary-token border-subtle'
-                    : 'bg-transparent text-tertiary-token border-subtle hover:bg-surface-2'
-                }`}
+                className={cn(
+                  AUTH_SURFACE.pillOption,
+                  isSelected && AUTH_SURFACE.pillOptionActive,
+                  'cursor-pointer focus-within:border-(--linear-border-focus) focus-within:ring-2 focus-within:ring-(--linear-border-focus)/16'
+                )}
               >
                 <input
                   ref={el => {
@@ -110,7 +111,7 @@ export function WaitlistSocialStep({
             <label htmlFor='primarySocialUrl' className='sr-only'>
               Social profile link
             </label>
-            <Input
+            <AuthTextInput
               ref={el => {
                 urlInputRef.current = el;
                 setUrlInputRef(el);
@@ -133,7 +134,7 @@ export function WaitlistSocialStep({
             />
           </>
         ) : (
-          <div className='w-full flex items-center gap-2 rounded-full border border-subtle bg-surface-0 px-4 py-3 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/40 focus-within:ring-offset-2 transition-colors duration-150'>
+          <div className={cn(AUTH_SURFACE.fieldShell, 'gap-2')}>
             <span className='text-sm text-secondary-token whitespace-nowrap'>
               {getSocialPlatformPrefix(socialPlatform).display}
             </span>
@@ -155,7 +156,7 @@ export function WaitlistSocialStep({
                   ? 'waitlist-primary-social-url-error'
                   : undefined
               }
-              className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus-visible:outline-none'
+              className={AUTH_SURFACE.fieldInput}
               placeholder='yourusername'
               disabled={isSubmitting}
               onKeyDown={handleKeyDown}

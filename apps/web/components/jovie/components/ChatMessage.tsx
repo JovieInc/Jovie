@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import React, { useMemo } from 'react';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import {
@@ -167,7 +168,7 @@ export function ChatMessage({
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
       {isUser ? (
-        <div className='max-w-[78%] rounded-[14px] bg-accent/95 px-4 py-3 text-accent-foreground'>
+        <div className='max-w-[78%] rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-2 px-4 py-3.5 text-primary-token shadow-none'>
           {fileParts.length > 0 && (
             <div className={cn('flex flex-wrap gap-2', messageText && 'mb-2')}>
               {(() => {
@@ -208,19 +209,27 @@ export function ChatMessage({
       ) : (
         <div className='flex max-w-[78%] flex-col'>
           {messageText && (
-            <div className='rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-3.5 text-primary-token'>
-              <div className='mb-3 flex items-center gap-2'>
-                <span className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-[510] tracking-[-0.01em] text-secondary-token'>
+            <div className='space-y-2'>
+              <div className='flex items-center gap-2 pl-0.5'>
+                <span className='flex h-5.5 w-5.5 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
+                  <BrandLogo size={10} tone='auto' rounded={false} />
+                </span>
+                <span className='text-[11px] font-[560] tracking-[-0.01em] text-secondary-token'>
                   Jovie
                 </span>
                 <span className='text-[11px] text-tertiary-token'>
                   {isStreaming ? 'Writing reply…' : 'Reply'}
                 </span>
               </div>
-              <ChatMarkdown
-                content={messageText}
-                isStreaming={Boolean(isStreaming)}
-              />
+              <div
+                data-testid='chat-message-reply-bubble'
+                className='rounded-[18px] border border-subtle bg-surface-1 px-4 py-3.5 text-primary-token shadow-card'
+              >
+                <ChatMarkdown
+                  content={messageText}
+                  isStreaming={Boolean(isStreaming)}
+                />
+              </div>
             </div>
           )}
 
@@ -249,7 +258,7 @@ export function ChatMessage({
                 <button
                   type='button'
                   onClick={() => copy(messageText)}
-                  className='flex h-7 items-center gap-1.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2.5 text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+                  className='flex h-7 items-center gap-1.5 rounded-full border border-subtle bg-app-control px-2.5 text-secondary-token shadow-app-control transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token hover:shadow-app-control-hover focus-visible:border-focus focus-visible:bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 active:border-default active:bg-surface-1 active:shadow-app-control-active'
                   aria-label={
                     isSuccess ? 'Copied to clipboard' : 'Copy message'
                   }

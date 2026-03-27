@@ -114,21 +114,19 @@ describe('JovieChat styling regressions', () => {
     expect(loadingAvatar).toBeTruthy();
     expect(loadingBubble).toBeTruthy();
 
-    // Verify border classes were removed from loading avatar
-    expect(loadingAvatar!.classList.contains('border')).toBe(false);
-    expect(loadingAvatar!.classList.contains('border-subtle')).toBe(false);
-
-    // Verify the loading avatar retains its non-border classes (including flex)
+    // Verify the loading avatar now matches the assistant meta-chip treatment
+    expect(loadingAvatar!.classList.contains('border')).toBe(true);
     expect(loadingAvatar!.classList.contains('flex')).toBe(true);
     expect(loadingAvatar!.classList.contains('items-center')).toBe(true);
     expect(loadingAvatar!.classList.contains('justify-center')).toBe(true);
+    expect(loadingAvatar!.className).toContain('rounded-full');
 
     // Verify the loading bubble uses the same framed surface as assistant replies
     expect(loadingBubble!.classList.contains('border')).toBe(true);
     expect(loadingBubble!.classList.contains('border-subtle')).toBe(false);
 
     // Verify the loading bubble still has its expected non-border classes
-    expect(loadingBubble!.className).toContain('rounded-[16px]');
+    expect(loadingBubble!.className).toContain('rounded-[18px]');
     expect(loadingBubble!.className).toContain(
       'bg-(--linear-app-content-surface)'
     );

@@ -1,10 +1,15 @@
 'use client';
 
-import { Button, type CommonDropdownItem, Label } from '@jovie/ui';
-import { ExternalLink } from 'lucide-react';
+import { type CommonDropdownItem, Label } from '@jovie/ui';
 import { useMemo, useState } from 'react';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
+import {
+  DrawerCardActionBar,
+  DrawerSurfaceCard,
+  DrawerTabs,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
+import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { BASE_URL } from '@/constants/domains';
 import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { ProfileAboutTab } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab';
@@ -57,6 +62,12 @@ export function AdminProfileSidebar({
     return mapContactLinksToPreviewLinks(contact);
   }, [contact]);
 
+  const { primaryActions, overflowActions } = useProfileHeaderParts({
+    username: profile?.username ?? '',
+    displayName: profile?.displayName ?? profile?.username ?? '',
+    profilePath: profile?.username ? `/${profile.username}` : '',
+  });
+
   if (!profile || !contact) {
     return (
       <EntitySidebarShell
@@ -64,6 +75,7 @@ export function AdminProfileSidebar({
         ariaLabel='Creator profile'
         title='Creator profile'
         onClose={onClose}
+        headerMode='minimal'
         contextMenuItems={contextMenuItems}
         isEmpty
         emptyMessage='Select a creator profile to view details.'
@@ -80,45 +92,39 @@ export function AdminProfileSidebar({
       ariaLabel='Creator profile'
       title='Creator profile'
       onClose={onClose}
+      headerMode='minimal'
       entityHeader={
-        <div className='space-y-1.5'>
-          <ProfileContactHeader
-            displayName={profile.displayName ?? profile.username}
-            username={profile.username}
-            avatarUrl={profile.avatarUrl}
-          />
-          <div className='pt-0.5'>
-            <div className='grid grid-cols-[88px,minmax(0,1fr)] items-center gap-3'>
-              <Label className='text-xs font-medium text-secondary-token'>
-                Profile link
-              </Label>
-              <div className='flex items-center gap-2'>
+        <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+          <div className='border-b border-subtle px-3 py-2'>
+            <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+              Creator profile
+            </p>
+          </div>
+          <div className='space-y-3 p-3.5'>
+            <ProfileContactHeader
+              displayName={profile.displayName ?? profile.username}
+              username={profile.username}
+              avatarUrl={profile.avatarUrl}
+            />
+            <div className='pt-0.5'>
+              <div className='grid grid-cols-[88px,minmax(0,1fr)] items-center gap-3'>
+                <Label className='text-xs font-medium text-secondary-token'>
+                  Profile link
+                </Label>
                 <CopyLinkInput
                   url={`${BASE_URL}/${profile.username}`}
                   size='md'
                   className='flex-1'
                   inputClassName='h-7 rounded-md border-subtle bg-surface-0 px-2 py-1 text-[11px]'
                 />
-                <Button
-                  type='button'
-                  size='icon'
-                  variant='ghost'
-                  className='h-7 w-7 shrink-0 border border-transparent bg-surface-0 hover:border-subtle hover:bg-surface-1'
-                  onClick={() =>
-                    globalThis.open(
-                      `${BASE_URL}/${profile.username}`,
-                      '_blank',
-                      'noopener,noreferrer'
-                    )
-                  }
-                  aria-label='Open public profile'
-                >
-                  <ExternalLink className='h-4 w-4' aria-hidden='true' />
-                </Button>
               </div>
             </div>
           </div>
-        </div>
+          <DrawerCardActionBar
+            primaryActions={primaryActions}
+            overflowActions={overflowActions}
+          />
+        </DrawerSurfaceCard>
       }
       tabs={
         <DrawerTabs

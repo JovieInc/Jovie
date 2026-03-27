@@ -39,6 +39,7 @@ import {
 import type { AdminUserRow } from '@/lib/admin/users';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { QueryErrorBoundary, useAdminUsersInfiniteQuery } from '@/lib/queries';
+import { mergeHrefSearchParams } from '@/lib/utils/merge-href-search-params';
 import { AdminUserDetailDrawer } from './AdminUserDetailDrawer';
 import {
   type BuildAdminUserActionsCallbacks,
@@ -135,7 +136,14 @@ function AdminUserMobileCard({
 }
 
 export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
-  const { users: initialUsers, pageSize, total, search, sort } = props;
+  const {
+    users: initialUsers,
+    pageSize,
+    total,
+    search,
+    sort,
+    basePath = APP_ROUTES.ADMIN_USERS,
+  } = props;
   const [searchTerm, setSearchTerm] = useState(search);
 
   useEffect(() => {
@@ -203,8 +211,12 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         }
       >
         <HeaderSearchAction
-          action={APP_ROUTES.ADMIN_USERS}
-          clearHref={`${APP_ROUTES.ADMIN_USERS}?sort=${sort}`}
+          action={basePath}
+          clearHref={mergeHrefSearchParams(basePath, {
+            page: 1,
+            q: null,
+            sort,
+          })}
           searchValue={searchTerm}
           onSearchValueChange={setSearchTerm}
           placeholder='Search by email, name, or handle'
@@ -215,7 +227,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         />
       </DashboardHeaderActionGroup>
     ),
-    [searchTerm, sort]
+    [basePath, searchTerm, sort]
   );
 
   useEffect(() => {
@@ -490,46 +502,41 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     <QueryErrorBoundary fallback={TableErrorFallback}>
       <div className='flex h-full'>
         <div className='flex-1 min-w-0'>
+          <AdminTableHeader
+            title='Users'
+            subtitle='Review lifecycle state, profile completion, and suppression health.'
+          />
+          <AdminTableSubheader
+            start={
+              <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+                Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                {total.toLocaleString()} users
+              </div>
+            }
+            end={
+              <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
+                <ExportCSVButton<AdminUserRow>
+                  getData={() => users}
+                  columns={usersCSVColumns}
+                  filename={USERS_CSV_FILENAME_PREFIX}
+                  disabled={users.length === 0}
+                  ariaLabel='Export users to CSV file'
+                  chrome='page-toolbar'
+                  iconOnly
+                  tooltipLabel='Export'
+                />
+              </div>
+            }
+          />
           <AdminTableShell
             testId='admin-users-content'
             className='rounded-none border-0'
             toolbar={
-              <>
-                {/* Bulk actions toolbar (shows when rows selected) */}
-                <TableBulkActionsToolbar
-                  selectedCount={selectedCount}
-                  onClearSelection={clearSelection}
-                  actions={bulkActions}
-                />
-
-                {/* Main toolbar (always visible) */}
-                <AdminTableHeader
-                  title='Users'
-                  subtitle='Review lifecycle state, profile completion, and suppression health.'
-                />
-                <AdminTableSubheader
-                  start={
-                    <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-                      Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                      {total.toLocaleString()} users
-                    </div>
-                  }
-                  end={
-                    <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
-                      <ExportCSVButton<AdminUserRow>
-                        getData={() => users}
-                        columns={usersCSVColumns}
-                        filename={USERS_CSV_FILENAME_PREFIX}
-                        disabled={users.length === 0}
-                        ariaLabel='Export users to CSV file'
-                        chrome='page-toolbar'
-                        iconOnly
-                        tooltipLabel='Export'
-                      />
-                    </div>
-                  }
-                />
-              </>
+              <TableBulkActionsToolbar
+                selectedCount={selectedCount}
+                onClearSelection={clearSelection}
+                actions={bulkActions}
+              />
             }
           >
             {() =>

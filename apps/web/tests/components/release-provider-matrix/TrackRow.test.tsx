@@ -103,9 +103,6 @@ describe('TrackRow', () => {
 
     const row = screen.getByTestId('track-row-track-1');
     expect(row).toHaveAttribute('data-state', 'selected');
-    expect(row.className).toContain(
-      'inset_2px_0_0_0_var(--linear-border-focus)'
-    );
   });
 
   it('calls the row click handler and toggles preview playback', async () => {

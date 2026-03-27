@@ -14,6 +14,7 @@ import * as Sentry from '@sentry/nextjs';
 import { MUSICFETCH_ALL_SERVICES } from '@/lib/dsp-registry';
 import { env } from '@/lib/env-server';
 import {
+  isMusicfetchInvalidServicesError,
   MusicfetchBudgetExceededError,
   MusicfetchRequestError,
   musicfetchRequest,
@@ -84,7 +85,12 @@ export function isMusicFetchAvailable(): boolean {
 /**
  * Look up an artist by their Spotify URL via MusicFetch.io.
  *
- * Returns cross-platform DSP links and social profiles, or null on failure.
+ * Returns cross-platform DSP links and social profiles, or null for
+ * non-retryable lookup failures.
+ *
+ * @throws {MusicfetchRequestError} When MusicFetch rejects the configured
+ * service list with an invalid-services 400 detected by
+ * isMusicfetchInvalidServicesError().
  */
 export async function fetchArtistBySpotifyUrl(
   spotifyUrl: string
@@ -141,6 +147,7 @@ export async function fetchArtistBySpotifyUrl(
             spotifyUrl,
             statusCode: error.statusCode,
             retryAfterSeconds: error.retryAfterSeconds,
+            details: error.details,
             budgetScope:
               error instanceof MusicfetchBudgetExceededError
                 ? error.budgetScope
@@ -149,6 +156,9 @@ export async function fetchArtistBySpotifyUrl(
           });
 
           if (error.statusCode === 400) {
+            if (isMusicfetchInvalidServicesError(error)) {
+              throw error;
+            }
             return null;
           }
 

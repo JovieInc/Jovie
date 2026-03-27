@@ -6,7 +6,15 @@ import { LeadPipelineControls } from '@/features/admin/leads/LeadPipelineControl
 import { LeadTable } from '@/features/admin/leads/LeadTable';
 import { UnifiedUrlIntake } from '@/features/admin/leads/UnifiedUrlIntake';
 
-export function LeadPipelineWorkspace() {
+interface LeadPipelineWorkspaceProps {
+  readonly initialSearch?: string;
+  readonly basePath?: string;
+}
+
+export function LeadPipelineWorkspace({
+  initialSearch,
+  basePath,
+}: Readonly<LeadPipelineWorkspaceProps>) {
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
@@ -20,7 +28,11 @@ export function LeadPipelineWorkspace() {
         </div>
         <LeadKeywordsManager />
       </div>
-      <LeadTable refreshKey={refreshKey} />
+      <LeadTable
+        refreshKey={refreshKey}
+        initialSearch={initialSearch}
+        basePath={basePath}
+      />
     </div>
   );
 }

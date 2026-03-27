@@ -28,6 +28,8 @@ export type VipArtist = {
   popularity: number;
 };
 
+export type VipArtistLookup = Record<string, VipArtist>;
+
 function mulberry32(a: number) {
   return function () {
     let t = (a += 0x6d2b79f5);
@@ -332,11 +334,9 @@ export const getCreatorByHandle = unstable_cache(
  * Returns a Map of normalized display names to VIP artist data.
  * Only includes creators with valid Spotify IDs.
  */
-async function queryFeaturedCreatorsForSearch(): Promise<
-  Map<string, VipArtist>
-> {
+async function queryFeaturedCreatorsForSearch(): Promise<VipArtistLookup> {
   if (!(await doesTableExist(TABLE_NAMES.creatorProfiles))) {
-    return new Map();
+    return {};
   }
 
   const data = await db
@@ -357,7 +357,7 @@ async function queryFeaturedCreatorsForSearch(): Promise<
     )
     .limit(200);
 
-  const vipMap = new Map<string, VipArtist>();
+  const vipLookup = Object.create(null) as VipArtistLookup;
 
   for (const creator of data) {
     // Skip creators without Spotify IDs
@@ -366,16 +366,16 @@ async function queryFeaturedCreatorsForSearch(): Promise<
     }
 
     const normalizedName = creator.displayName.toLowerCase().trim();
-    vipMap.set(normalizedName, {
+    vipLookup[normalizedName] = {
       spotifyId: creator.spotifyId,
       name: creator.displayName,
       imageUrl: creator.avatarUrl,
       followers: creator.spotifyFollowers ?? 0,
       popularity: creator.spotifyPopularity ?? 0,
-    });
+    };
   }
 
-  return vipMap;
+  return vipLookup;
 }
 
 /**

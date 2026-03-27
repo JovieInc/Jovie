@@ -137,6 +137,18 @@ describe('sitemap', () => {
     );
     expect(albumMatches).toHaveLength(1);
 
+    for (const blockedUrl of [
+      'https://jov.ie/demo',
+      'https://jov.ie/sandbox',
+      'https://jov.ie/spinner-test',
+      'https://jov.ie/sentry-example-page',
+      'https://jov.ie/ui/buttons',
+      'https://jov.ie/hud',
+      'https://jov.ie/investor-portal',
+    ]) {
+      expect(entries.map(entry => entry.url)).not.toContain(blockedUrl);
+    }
+
     expect(selectMock).toHaveBeenCalledTimes(3);
     expect(queryMock).toHaveBeenCalled();
   });

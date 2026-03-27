@@ -30,6 +30,7 @@ module.exports = {
       fontWeight: {
         normal: 'var(--font-weight-normal)', // 400
         book: 'var(--font-weight-book)', // 450 — Linear's UI default
+        caption: 'var(--linear-caption-weight)', // 510 — compact app controls
         medium: 'var(--font-weight-medium)', // 500
         semibold: 'var(--font-weight-semibold)', // 538 — Linear-specific
         bold: 'var(--font-weight-bold)', // 590 — Linear-specific
@@ -45,6 +46,7 @@ module.exports = {
       fontSize: {
         '2xs': ['var(--text-2xs)', { lineHeight: '1.25' }], // 11px
         app: ['var(--text-app)', { lineHeight: '1.4' }], // 13px — Linear's default
+        caption: ['var(--linear-caption-size)', { lineHeight: '1.4' }], // 13px — compact app controls
       },
 
       // Linear spacing tokens
@@ -55,6 +57,10 @@ module.exports = {
         'linear-4': 'var(--linear-space-4)',
         'linear-6': 'var(--linear-space-6)',
         'linear-8': 'var(--linear-space-8)',
+        'app-control-sm': 'var(--linear-app-control-height-sm)',
+        'button-md': 'var(--linear-button-height-md)',
+        'app-control-x': 'var(--linear-app-control-padding-x)',
+        'app-header': 'var(--linear-app-header-padding-x)',
       },
 
       // Border radius - Linear-extracted values
@@ -158,6 +164,7 @@ module.exports = {
         default: 'var(--color-border-default)',
         strong: 'var(--color-border-strong)',
         accent: 'var(--color-accent)',
+        focus: 'var(--color-border-focus)',
         success: 'var(--color-success)',
         error: 'var(--color-error)',
         warning: 'var(--color-warning)',
@@ -166,6 +173,10 @@ module.exports = {
 
       // Background colors for semantic states
       backgroundColor: {
+        'app-control':
+          'color-mix(in oklab, var(--linear-app-content-surface) 97%, var(--linear-bg-surface-0))',
+        'toolbar-pill':
+          'color-mix(in oklab, var(--linear-app-content-surface) 98%, var(--linear-bg-surface-0))',
         'success-subtle': 'var(--color-success-subtle)',
         'error-subtle': 'var(--color-error-subtle)',
         'warning-subtle': 'var(--color-warning-subtle)',
@@ -181,6 +192,12 @@ module.exports = {
         'card-elevated': 'var(--shadow-card-elevated)',
         divider: 'var(--shadow-divider)',
         'button-inset': 'var(--shadow-button-inset)',
+        'app-control':
+          '0 1px 1px rgba(0,0,0,0.04), 0 3px 6px -4px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.04)',
+        'app-control-hover':
+          '0 1px 1px rgba(0,0,0,0.05), 0 6px 12px -8px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.04)',
+        'app-control-active':
+          '0 1px 1px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.04)',
       },
 
       // Transition duration - Linear's precise timing
@@ -201,6 +218,7 @@ module.exports = {
       // Ring colors (for focus rings)
       ringColor: {
         accent: 'var(--color-accent)',
+        focus: 'var(--color-border-focus)',
         success: 'var(--color-success)',
         error: 'var(--color-error)',
         warning: 'var(--color-warning)',

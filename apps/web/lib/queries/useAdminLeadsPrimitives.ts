@@ -17,7 +17,21 @@ export interface LeadPipelineSettings {
   discoveryEnabled: boolean;
   autoIngestEnabled: boolean;
   autoIngestMinFitScore: number;
+  autoIngestDailyLimit: number;
   dailyQueryBudget: number;
+  dailySendCap: number;
+  maxPerHour: number;
+  rampMode: 'manual' | 'recommend_only';
+  guardrailsEnabled: boolean;
+  guardrailThresholds: {
+    minimumSampleSize: number;
+    increaseClaimClickRate: number;
+    holdClaimClickRateFloor: number;
+    pauseClaimClickRateFloor: number;
+    maxBounceComplaintRate: number;
+    maxUnsubscribeRate: number;
+    maxProviderFailureRate: number;
+  };
   queriesUsedToday: number;
 }
 
@@ -28,9 +42,12 @@ export interface AdminLead {
   displayName: string | null;
   status: string;
   fitScore: number | null;
+  sourcePlatform: string;
   hasPaidTier: boolean | null;
   hasSpotifyLink: boolean;
   hasInstagram: boolean;
+  hasTrackingPixels: boolean;
+  trackingPixelPlatforms: string[];
   musicToolsDetected: string[];
   contactEmail: string | null;
   createdAt: string;

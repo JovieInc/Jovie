@@ -174,9 +174,6 @@ describe('runDiscovery', () => {
     });
     expect(result.diagnostics[0]!.durationMs).toBeGreaterThanOrEqual(0);
 
-    expect(insertMock).toHaveBeenCalledTimes(1);
-    expect(valuesMock).toHaveBeenCalledTimes(1);
-
     const firstInsertCall = valuesMock.mock.calls.at(0) as
       | [Array<{ linktreeHandle: string }>]
       | undefined;

@@ -22,6 +22,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isInternalEntry } from './lib/changelog-filter-rules.mjs';
 import { getLatestRelease } from './lib/changelog-parser.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -38,18 +39,16 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const INTERNAL_PREFIX = '[internal]';
-
 function filterPublicEntries(entries) {
   if (!entries || entries.length === 0) return [];
-  return entries.filter(e => !e.startsWith(INTERNAL_PREFIX));
+  return entries.filter(entry => !isInternalEntry(entry));
 }
 
 /**
  * Check if a summary is public (not tagged [internal]).
  */
 function isPublicSummary(summary) {
-  return summary && !summary.startsWith(INTERNAL_PREFIX);
+  return summary && !isInternalEntry(summary);
 }
 
 function entriesToHtml(sections, summary) {

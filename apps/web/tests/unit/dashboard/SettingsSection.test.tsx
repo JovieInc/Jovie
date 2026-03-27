@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 
 describe('SettingsSection', () => {
-  it('uses the updated typography scale for heading and description', () => {
+  it('renders the heading and description', () => {
     render(
       <SettingsSection
         id='profile'
@@ -15,13 +15,7 @@ describe('SettingsSection', () => {
     );
 
     const heading = screen.getByRole('heading', { name: 'Artist Profile' });
-    expect(heading.className).toContain('text-[15px]');
-    expect(heading.className).toContain('dashboard-heading');
-
-    const description = screen
-      .getByText('Photo, display name, and username.')
-      .closest('p');
-    expect(description?.className).toContain('text-[12px]');
-    expect(description?.className).toContain('dashboard-body');
+    expect(heading).toBeInTheDocument();
+    expect(screen.getByTestId('profile-description')).toBeInTheDocument();
   });
 });

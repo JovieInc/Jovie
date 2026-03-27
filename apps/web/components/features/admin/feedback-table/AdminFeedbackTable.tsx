@@ -2,17 +2,18 @@
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ClipboardCopy, MessageSquareText, XCircle } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
-  DrawerButton,
+  DrawerCardActionBar,
   DrawerPropertyRow,
   DrawerSection,
   DrawerSurfaceCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { type DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import {
   type ContextMenuItemType,
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -181,18 +182,29 @@ export function AdminFeedbackTable({
   const [selectedId, setSelectedId] = useState<string | null>(
     items[0]?.id ?? null
   );
-  const { mutateAsync: dismissFeedback, isPending: isDismissing } =
-    useDismissFeedbackMutation();
+  const { mutateAsync: dismissFeedback } = useDismissFeedbackMutation();
   const [rows, setRows] = useState(items);
+  const [dismissingIds, setDismissingIds] = useState<Record<string, true>>({});
+  const dismissingIdsRef = useRef<Set<string>>(new Set());
 
   const selected = useMemo(
     () => rows.find(item => item.id === selectedId) ?? null,
     [rows, selectedId]
   );
 
+  const isDismissPending = useCallback(
+    (id: string) => Boolean(dismissingIds[id]),
+    [dismissingIds]
+  );
+
   const dismissRow = useCallback(
     async (item: FeedbackRow) => {
       if (item.status === 'dismissed') return;
+      if (dismissingIdsRef.current.has(item.id)) return;
+
+      dismissingIdsRef.current.add(item.id);
+      setDismissingIds(current => ({ ...current, [item.id]: true }));
+
       try {
         await dismissFeedback(item.id);
         setRows(current =>
@@ -208,6 +220,13 @@ export function AdminFeedbackTable({
         );
       } catch {
         // Error toast handled by mutation's onError callback
+      } finally {
+        dismissingIdsRef.current.delete(item.id);
+        setDismissingIds(current => {
+          const next = { ...current };
+          delete next[item.id];
+          return next;
+        });
       }
     },
     [dismissFeedback]
@@ -232,10 +251,10 @@ export function AdminFeedbackTable({
         label: 'Dismiss',
         icon: <XCircle className='h-4 w-4' />,
         onClick: () => dismissRow(item),
-        disabled: item.status === 'dismissed',
+        disabled: item.status === 'dismissed' || isDismissPending(item.id),
       },
     ],
-    [copyRowAsMarkdown, dismissRow]
+    [copyRowAsMarkdown, dismissRow, isDismissPending]
   );
 
   const copyAllAsMarkdown = useCallback(async () => {
@@ -329,66 +348,76 @@ export function AdminFeedbackTable({
         ariaLabel='Feedback details'
         title='Feedback details'
         onClose={() => setSelectedId(null)}
+        headerMode='minimal'
         isEmpty={!selected}
         emptyMessage='Select a feedback row to view details.'
         entityHeader={
           selected ? (
-            <div className='space-y-1.5'>
-              <p className='text-[12px] leading-[16px] text-secondary-token'>
-                Source: {selected.source} ·{' '}
-                {new Date(selected.createdAtIso).toLocaleString()}
-              </p>
-              <div className='space-y-0.5'>
-                <p className='truncate text-[15px] font-[590] leading-[18px] tracking-[-0.015em] text-primary-token'>
-                  {getFeedbackUserLabel(selected.user)}
-                </p>
-                <p className='truncate text-[12px] leading-[16px] text-secondary-token'>
-                  {selected.user.email ?? 'No email available'}
+            <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+              <div className='border-b border-subtle px-3 py-2'>
+                <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+                  Feedback
                 </p>
               </div>
-            </div>
-          ) : undefined
-        }
-        footer={
-          selected ? (
-            <div className='space-y-2'>
-              <div className='flex items-center gap-2'>
-                <DrawerButton
-                  type='button'
-                  tone='secondary'
-                  onClick={() => dismissRow(selected)}
-                  disabled={selected.status === 'dismissed'}
-                  loading={isDismissing}
-                >
-                  Dismiss
-                </DrawerButton>
-                <DrawerButton
-                  type='button'
-                  tone='secondary'
-                  onClick={() => copyRowAsMarkdown(selected)}
-                >
-                  <ClipboardCopy className='mr-1.5 h-3.5 w-3.5' />
-                  Copy as Markdown
-                </DrawerButton>
+              <div className='space-y-1.5 p-3.5'>
+                <p className='text-[12px] leading-[16px] text-secondary-token'>
+                  Source: {selected.source} ·{' '}
+                  {new Date(selected.createdAtIso).toLocaleString()}
+                </p>
+                <div className='space-y-0.5'>
+                  <p className='truncate text-[15px] font-[590] leading-[18px] tracking-[-0.015em] text-primary-token'>
+                    {getFeedbackUserLabel(selected.user)}
+                  </p>
+                  <p className='truncate text-[12px] leading-[16px] text-secondary-token'>
+                    {selected.user.email ?? 'No email available'}
+                  </p>
+                </div>
               </div>
-              <span className='text-[12px] leading-[16px] text-tertiary-token'>
-                {(() => {
-                  if (selected.status !== 'dismissed') {
-                    return 'Marked as pending';
-                  }
-                  const date = selected.dismissedAtIso
-                    ? new Date(selected.dismissedAtIso).toLocaleString()
-                    : '';
-                  return `Dismissed ${date}`;
-                })()}
-              </span>
-            </div>
+              <DrawerCardActionBar
+                primaryActions={
+                  [
+                    ...(selected.status !== 'dismissed'
+                      ? [
+                          {
+                            id: 'dismiss-feedback',
+                            label: 'Dismiss',
+                            icon: XCircle,
+                            disabled: isDismissPending(selected.id),
+                            onClick: () => {
+                              void dismissRow(selected);
+                            },
+                          } satisfies DrawerHeaderAction,
+                        ]
+                      : []),
+                    {
+                      id: 'copy-feedback-markdown',
+                      label: 'Copy as Markdown',
+                      icon: ClipboardCopy,
+                      onClick: () => {
+                        void copyRowAsMarkdown(selected);
+                      },
+                    } satisfies DrawerHeaderAction,
+                  ] satisfies readonly DrawerHeaderAction[]
+                }
+              />
+              <div className='border-t border-subtle px-3.5 py-2'>
+                <span className='text-[12px] leading-[16px] text-tertiary-token'>
+                  {selected.status !== 'dismissed'
+                    ? 'Marked as pending'
+                    : `Dismissed ${
+                        selected.dismissedAtIso
+                          ? new Date(selected.dismissedAtIso).toLocaleString()
+                          : ''
+                      }`}
+                </span>
+              </div>
+            </DrawerSurfaceCard>
           ) : undefined
         }
       >
         {selected ? (
           <>
-            <DrawerSection title='User' className='space-y-1.5'>
+            <DrawerSection title='User' className='space-y-1.5' surface='card'>
               <div className='space-y-1'>
                 <DrawerPropertyRow
                   label='User'
@@ -412,22 +441,24 @@ export function AdminFeedbackTable({
               title='Feedback'
               collapsible={false}
               className='space-y-1.5'
+              surface='card'
             >
-              <DrawerSurfaceCard className='rounded-md bg-surface-0 px-2.5 py-2 text-[12.5px] leading-[19px] whitespace-pre-wrap text-primary-token'>
+              <div className='rounded-md bg-surface-0 px-2.5 py-2 text-[12.5px] leading-[19px] whitespace-pre-wrap text-primary-token'>
                 {selected.message}
-              </DrawerSurfaceCard>
+              </div>
             </DrawerSection>
 
             <DrawerSection
               title='Context'
               collapsible={false}
               className='space-y-1.5'
+              surface='card'
             >
-              <DrawerSurfaceCard className='overflow-auto rounded-md bg-surface-0 p-0'>
+              <div className='overflow-auto rounded-md bg-surface-0 p-0'>
                 <pre className='p-2.5 text-[10.5px] leading-[16px] text-secondary-token'>
                   {JSON.stringify(selected.context, null, 2)}
                 </pre>
-              </DrawerSurfaceCard>
+              </div>
             </DrawerSection>
           </>
         ) : null}

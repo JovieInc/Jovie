@@ -163,24 +163,24 @@ function SettingsNavigation({
   return (
     <nav
       aria-label={`${section} navigation`}
-      className='flex flex-1 flex-col gap-3 overflow-hidden'
+      className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
     >
       <div>
-        <span className='mb-1 block px-2.5 text-[12px] tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-          General
+        <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+          Account
         </span>
         <SettingsNavGroup items={userItems} pathname={pathname} />
       </div>
       <div>
-        <span className='mb-1 block px-2.5 text-[12px] tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-          {artistName || 'Artist'}
+        <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+          Workspace
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />
       </div>
       {isAdmin && (
         <div>
-          <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-            Admin
+          <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+            Administration
           </span>
           <SettingsNavGroup
             items={[adminSettingsNavItem]}
@@ -214,20 +214,12 @@ function SidebarHeaderNav({
         if (isInSettings) {
           return (
             <div className='flex w-full items-center gap-2'>
-              <div className='min-w-0 group-data-[collapsible=icon]:hidden'>
-                <p className='text-2xs tracking-tight text-sidebar-item-icon/70 [font-weight:var(--font-weight-nav)]'>
-                  Artist
-                </p>
-                <p className='truncate text-app tracking-tight text-sidebar-item-foreground/88 [font-weight:var(--font-weight-nav)]'>
-                  Settings
-                </p>
-              </div>
               <Link
                 href={APP_ROUTES.DASHBOARD}
-                aria-label='Exit settings and return to app'
+                aria-label='Back to app'
                 className={cn(
-                  'ml-auto inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-sidebar-border/70 px-2 text-app tracking-tight text-sidebar-item-foreground/78 transition-[background,color,border-color] duration-normal ease-interactive hover:border-sidebar-border hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:border-sidebar-border focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground/95 [font-weight:var(--font-weight-nav)]',
-                  'rounded-full group-data-[collapsible=icon]:ml-0 group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
+                  'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-app tracking-tight text-sidebar-item-foreground/75 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground/95 [font-weight:var(--font-weight-nav)]',
+                  'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
                 )}
               >
                 <ArrowLeft
@@ -235,7 +227,7 @@ function SidebarHeaderNav({
                   aria-hidden='true'
                 />
                 <span className='truncate group-data-[collapsible=icon]:hidden'>
-                  Exit
+                  Back to app
                 </span>
               </Link>
             </div>
@@ -319,7 +311,8 @@ function SidebarHeaderNav({
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
   const { isAdmin: isUserAdmin, creatorProfiles } = useDashboardData();
   const pathname = usePathname();
-  const isDemoRoute = pathname === APP_ROUTES.DEMO;
+  const isDemoRoute =
+    pathname === APP_ROUTES.DEMO || pathname.startsWith(`${APP_ROUTES.DEMO}/`);
   const isInSettings = section === 'settings';
   const isAdmin = section === 'admin';
   const isDashboardOrAdmin = section !== 'settings';
@@ -340,7 +333,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       <SidebarHeader
         className={cn(
           'relative justify-center gap-0 px-2.5',
-          isInSettings ? 'min-h-12 py-2' : 'h-10 pt-[6px] pb-0'
+          isInSettings ? 'h-10 py-0' : 'h-10 pt-[6px] pb-0'
         )}
       >
         <SidebarHeaderNav
@@ -365,24 +358,26 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <div className='mt-auto shrink-0'>
-        <div className='px-2 pb-1'>
-          <NowPlayingCard />
-        </div>
-        {!isDemoRoute ? <SidebarUpgradeBanner /> : null}
-        <SidebarInstallBanner />
-
-        {isUserAdmin && (
-          <div className='pl-2 pr-3.5 pb-2 pt-1'>
-            <span className='text-2xs text-sidebar-muted/80 select-none'>
-              v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
-              {process.env.NEXT_PUBLIC_BUILD_SHA
-                ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
-                : ''}
-            </span>
+      {!isInSettings ? (
+        <div className='mt-auto shrink-0'>
+          <div className='px-2 pb-1'>
+            <NowPlayingCard />
           </div>
-        )}
-      </div>
+          {!isDemoRoute ? <SidebarUpgradeBanner /> : null}
+          <SidebarInstallBanner />
+
+          {isUserAdmin && (
+            <div className='pl-2 pr-3.5 pb-2 pt-1'>
+              <span className='text-2xs text-sidebar-muted/80 select-none'>
+                v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
+                {process.env.NEXT_PUBLIC_BUILD_SHA
+                  ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
+                  : ''}
+              </span>
+            </div>
+          )}
+        </div>
+      ) : null}
     </Sidebar>
   );
 }

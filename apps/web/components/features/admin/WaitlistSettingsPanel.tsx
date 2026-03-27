@@ -1,16 +1,26 @@
 'use client';
 
 import { Button, Input } from '@jovie/ui';
-import { Loader2 } from 'lucide-react';
+import { Hash, Loader2, ShieldCheck, UserPlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
+import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
+import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
 import {
   useWaitlistSettingsMutation,
   useWaitlistSettingsQuery,
   type WaitlistSettingsResponse,
 } from '@/lib/queries';
+
+const MAX_AUTO_ACCEPT_DAILY_LIMIT = 10_000;
+
+function clampDailyLimit(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.min(MAX_AUTO_ACCEPT_DAILY_LIMIT, Math.max(0, Math.trunc(value)));
+}
 
 export function WaitlistSettingsPanel() {
   const {
@@ -39,40 +49,59 @@ export function WaitlistSettingsPanel() {
     save({
       gateEnabled: settings.gateEnabled,
       autoAcceptEnabled: settings.autoAcceptEnabled,
-      autoAcceptDailyLimit: settings.autoAcceptDailyLimit,
+      autoAcceptDailyLimit: clampDailyLimit(settings.autoAcceptDailyLimit),
     });
   };
 
   if (loading) {
     return (
-      <ContentSurfaceCard className='flex items-center gap-2 px-4 py-3.5 text-[13px] text-secondary-token'>
-        <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
-        Loading waitlist settings...
-      </ContentSurfaceCard>
+      <SettingsPanel
+        title='Waitlist gate'
+        description='Control approvals, auto-accept behavior, and daily intake limits.'
+      >
+        <div className='flex items-center gap-2 px-4 py-4 text-[13px] text-secondary-token sm:px-5'>
+          <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
+          Loading waitlist settings...
+        </div>
+      </SettingsPanel>
     );
   }
 
   if (isError || !settings) {
     return (
-      <ContentSurfaceCard className='border-destructive/25 bg-destructive/5 px-4 py-3.5 text-[13px] text-destructive'>
-        {error instanceof Error
-          ? error.message
-          : 'Unable to load waitlist settings. Please refresh and try again.'}
-      </ContentSurfaceCard>
+      <SettingsPanel
+        title='Waitlist gate'
+        description='Control approvals, auto-accept behavior, and daily intake limits.'
+      >
+        <div className='px-4 py-4 text-[13px] text-destructive sm:px-5'>
+          {error instanceof Error
+            ? error.message
+            : 'Unable to load waitlist settings. Please refresh and try again.'}
+        </div>
+      </SettingsPanel>
     );
   }
 
   return (
-    <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
-      <ContentSectionHeader
-        title='Waitlist gate controls'
-        subtitle='Control approvals, auto-accept behavior, and daily intake limits.'
-        className='min-h-0 px-4 py-3'
-      />
-
-      <div className='space-y-3 px-4 py-3'>
-        <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
+    <SettingsPanel
+      title='Waitlist gate'
+      description='Control approvals, auto-accept behavior, and daily intake limits.'
+      actions={
+        <Button
+          variant='primary'
+          size='sm'
+          onClick={handleSave}
+          disabled={saving}
+        >
+          {saving && <Loader2 className='mr-1.5 h-3 w-3 animate-spin' />}
+          Save
+        </Button>
+      }
+    >
+      <div className='divide-y divide-subtle/60 px-4 sm:px-5'>
+        <div className='py-3.5'>
           <SettingsToggleRow
+            icon={<ShieldCheck className='h-4 w-4' aria-hidden />}
             title='Waitlist gate'
             description='When disabled, new submissions bypass manual approval.'
             checked={settings.gateEnabled}
@@ -84,10 +113,11 @@ export function WaitlistSettingsPanel() {
             ariaLabel='Toggle waitlist gate'
             disabled={saving}
           />
-        </ContentSurfaceCard>
+        </div>
 
-        <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
+        <div className='py-3.5'>
           <SettingsToggleRow
+            icon={<UserPlus className='h-4 w-4' aria-hidden />}
             title='Auto-accept'
             description='Automatically approve a limited number of new submissions each day.'
             checked={settings.autoAcceptEnabled}
@@ -99,52 +129,39 @@ export function WaitlistSettingsPanel() {
             ariaLabel='Toggle auto-accept'
             disabled={saving}
           />
-        </ContentSurfaceCard>
+        </div>
 
-        <ContentSurfaceCard className='flex items-center justify-between gap-3 bg-surface-0 px-4 py-3.5'>
-          <div className='min-w-0'>
-            <p className='text-[13px] font-[510] text-primary-token'>
-              Daily limit
-            </p>
-            <p className='mt-0.5 text-[13px] text-secondary-token'>
-              Today: {settings.autoAcceptedToday}
-            </p>
-          </div>
-          <Input
-            type='number'
-            min={0}
-            max={10000}
-            value={settings.autoAcceptDailyLimit}
-            onChange={event => {
-              const next = Number.parseInt(event.target.value, 10);
-              setSettings(current =>
-                current
-                  ? {
-                      ...current,
-                      autoAcceptDailyLimit: Number.isFinite(next) ? next : 0,
-                    }
-                  : current
-              );
-            }}
-            size='sm'
-            className='w-24 text-right tabular-nums'
-            disabled={saving}
-            aria-label='Daily auto-accept limit'
+        <div className='py-3.5'>
+          <SettingsActionRow
+            icon={<Hash className='h-4 w-4' aria-hidden />}
+            title='Daily limit'
+            description={`Today: ${settings.autoAcceptedToday} approvals`}
+            action={
+              <Input
+                type='number'
+                min={0}
+                max={MAX_AUTO_ACCEPT_DAILY_LIMIT}
+                value={settings.autoAcceptDailyLimit}
+                onChange={event => {
+                  const next = Number.parseInt(event.target.value, 10);
+                  setSettings(current =>
+                    current
+                      ? {
+                          ...current,
+                          autoAcceptDailyLimit: clampDailyLimit(next),
+                        }
+                      : current
+                  );
+                }}
+                size='sm'
+                className='w-24 text-right tabular-nums'
+                disabled={saving}
+                aria-label='Daily auto-accept limit'
+              />
+            }
           />
-        </ContentSurfaceCard>
-
-        <div className='flex justify-end pt-1'>
-          <Button
-            variant='primary'
-            size='sm'
-            onClick={handleSave}
-            disabled={saving}
-          >
-            {saving && <Loader2 className='mr-1.5 h-3 w-3 animate-spin' />}
-            Save
-          </Button>
         </div>
       </div>
-    </ContentSurfaceCard>
+    </SettingsPanel>
   );
 }

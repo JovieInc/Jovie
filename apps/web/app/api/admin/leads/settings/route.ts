@@ -2,9 +2,14 @@ import { eq } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { getDeepErrorMessage } from '@/lib/db/errors';
 import { leadPipelineSettings } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
-import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
+import {
+  captureError,
+  captureWarning,
+  getSafeErrorMessage,
+} from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -16,8 +21,83 @@ const settingsUpdateSchema = z.object({
   discoveryEnabled: z.boolean().optional(),
   autoIngestEnabled: z.boolean().optional(),
   autoIngestMinFitScore: z.number().int().min(0).max(100).optional(),
+  autoIngestDailyLimit: z.number().int().min(1).max(1000).optional(),
   dailyQueryBudget: z.number().int().min(1).max(10000).optional(),
+  dailySendCap: z.number().int().min(1).max(10000).optional(),
+  maxPerHour: z.number().int().min(1).max(1000).optional(),
+  rampMode: z.enum(['manual', 'recommend_only']).optional(),
+  guardrailsEnabled: z.boolean().optional(),
+  guardrailThresholds: z
+    .object({
+      minimumSampleSize: z.number().int().min(1).max(10_000),
+      increaseClaimClickRate: z.number().min(0).max(1),
+      holdClaimClickRateFloor: z.number().min(0).max(1),
+      pauseClaimClickRateFloor: z.number().min(0).max(1),
+      maxBounceComplaintRate: z.number().min(0).max(1),
+      maxUnsubscribeRate: z.number().min(0).max(1),
+      maxProviderFailureRate: z.number().min(0).max(1),
+    })
+    .optional(),
 });
+
+function makeDefaultSettings() {
+  return {
+    enabled: false,
+    discoveryEnabled: true,
+    autoIngestEnabled: false,
+    autoIngestMinFitScore: 70,
+    autoIngestDailyLimit: 10,
+    dailyQueryBudget: 100,
+    dailySendCap: 10,
+    maxPerHour: 5,
+    rampMode: 'manual' as const,
+    guardrailsEnabled: true,
+    guardrailThresholds: {
+      minimumSampleSize: 30,
+      increaseClaimClickRate: 0.06,
+      holdClaimClickRateFloor: 0.03,
+      pauseClaimClickRateFloor: 0.03,
+      maxBounceComplaintRate: 0.03,
+      maxUnsubscribeRate: 0.05,
+      maxProviderFailureRate: 0.1,
+    },
+    queriesUsedToday: 0,
+  };
+}
+
+function isMissingLeadPipelineSettingsSchemaError(error: unknown): boolean {
+  const candidate = error as
+    | {
+        code?: string;
+        sqlState?: string;
+        cause?: { code?: string; sqlState?: string };
+      }
+    | undefined;
+  const errorCode =
+    candidate?.code ??
+    candidate?.sqlState ??
+    candidate?.cause?.code ??
+    candidate?.cause?.sqlState;
+
+  if (errorCode === '42P01' || errorCode === '42703') {
+    return true;
+  }
+
+  const message = getDeepErrorMessage(error).toLowerCase();
+  if (!message.includes('does not exist')) {
+    return false;
+  }
+
+  return [
+    'lead_pipeline_settings',
+    'column "daily_send_cap"',
+    'column "max_per_hour"',
+    'column "ramp_mode"',
+    'column "guardrails_enabled"',
+    'column "guardrail_thresholds"',
+    'column "auto_ingest_daily_limit"',
+  ].some(pattern => message.includes(pattern));
+}
 
 /**
  * GET /api/admin/leads/settings — Return pipeline settings.
@@ -56,6 +136,18 @@ export async function GET() {
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
+    if (isMissingLeadPipelineSettingsSchemaError(error)) {
+      await captureWarning(
+        '[admin/leads/settings] lead pipeline settings schema missing; returning defaults',
+        error,
+        { route: '/api/admin/leads/settings' }
+      );
+      return NextResponse.json(
+        { settings: makeDefaultSettings() },
+        { status: 200, headers: NO_STORE_HEADERS }
+      );
+    }
+
     await captureError('Failed to get pipeline settings', error, {
       route: '/api/admin/leads/settings',
     });

@@ -67,7 +67,7 @@ function formatTimeAgo(date: Date): string {
   return new Date(date).toLocaleDateString();
 }
 
-export function AdminIngestPageClient({ history }: AdminIngestPageClientProps) {
+export function AdminIngestContent({ history }: AdminIngestPageClientProps) {
   const router = useRouter();
 
   const handleIngestComplete = useCallback(() => {
@@ -75,85 +75,86 @@ export function AdminIngestPageClient({ history }: AdminIngestPageClientProps) {
   }, [router]);
 
   return (
+    <div className='space-y-6'>
+      <ContentSurfaceCard>
+        <ContentSectionHeader
+          title='Single profile ingest'
+          subtitle='Ingest a creator by URL or Spotify artist name search.'
+          actions={
+            <IngestProfileDropdown onIngestPending={handleIngestComplete} />
+          }
+          className='min-h-0 px-4 py-3'
+          actionsClassName='shrink-0'
+        />
+      </ContentSurfaceCard>
+
+      <BatchIngestForm onComplete={handleIngestComplete} />
+
+      <ContentSurfaceCard className='overflow-hidden'>
+        <ContentSectionHeader
+          title='Recent ingest history'
+          subtitle={`Last ${history.length} ingest events from the audit log.`}
+          className='min-h-0 px-4 py-3'
+        />
+        <div className='px-4 py-3'>
+          {history.length === 0 ? (
+            <EmptyState
+              icon={<History className='size-5' />}
+              heading='No ingest events yet'
+              description='Single profile imports and batch ingest runs will appear here.'
+              className='py-8'
+            />
+          ) : (
+            <ul className='max-h-[480px] divide-y divide-(--linear-border-subtle) overflow-y-auto'>
+              {history.map(row => {
+                const config = EVENT_LABELS[row.type] ?? {
+                  label: row.type,
+                  className: 'text-secondary-token',
+                };
+                return (
+                  <li
+                    key={row.id}
+                    className='grid grid-cols-[auto,minmax(0,1fr),auto] items-start gap-2 py-2 text-xs sm:flex sm:items-center sm:gap-3'
+                  >
+                    <EventIcon type={row.type} />
+                    <span
+                      className={cn(
+                        'min-w-[80px] font-medium',
+                        config.className
+                      )}
+                    >
+                      {config.label}
+                    </span>
+                    <span className='col-span-2 min-w-0 truncate text-primary-token sm:col-auto sm:flex-1'>
+                      {row.handle ? `@${row.handle}` : (row.spotifyId ?? '--')}
+                    </span>
+                    {row.failureReason && (
+                      <span
+                        className='col-span-3 text-wrap break-words text-error sm:col-auto sm:max-w-[200px] sm:truncate'
+                        title={row.failureReason}
+                      >
+                        {row.failureReason}
+                      </span>
+                    )}
+                    <span className='col-start-3 row-start-1 shrink-0 text-right text-tertiary-token sm:ml-auto'>
+                      {formatTimeAgo(row.createdAt)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </ContentSurfaceCard>
+    </div>
+  );
+}
+
+export function AdminIngestPageClient(props: AdminIngestPageClientProps) {
+  return (
     <PageShell>
       <PageContent>
-        <div className='space-y-6'>
-          {/* Single profile ingest */}
-          <ContentSurfaceCard>
-            <ContentSectionHeader
-              title='Single profile ingest'
-              subtitle='Ingest a creator by URL or Spotify artist name search.'
-              actions={
-                <IngestProfileDropdown onIngestPending={handleIngestComplete} />
-              }
-              className='min-h-0 px-4 py-3'
-              actionsClassName='shrink-0'
-            />
-          </ContentSurfaceCard>
-
-          {/* Batch ingest */}
-          <BatchIngestForm onComplete={handleIngestComplete} />
-
-          {/* Ingest history */}
-          <ContentSurfaceCard className='overflow-hidden'>
-            <ContentSectionHeader
-              title='Recent ingest history'
-              subtitle={`Last ${history.length} ingest events from the audit log.`}
-              className='min-h-0 px-4 py-3'
-            />
-            <div className='px-4 py-3'>
-              {history.length === 0 ? (
-                <EmptyState
-                  icon={<History className='size-5' />}
-                  heading='No ingest events yet'
-                  description='Single profile imports and batch ingest runs will appear here.'
-                  className='py-8'
-                />
-              ) : (
-                <ul className='max-h-[480px] divide-y divide-(--linear-border-subtle) overflow-y-auto'>
-                  {history.map(row => {
-                    const config = EVENT_LABELS[row.type] ?? {
-                      label: row.type,
-                      className: 'text-secondary-token',
-                    };
-                    return (
-                      <li
-                        key={row.id}
-                        className='grid grid-cols-[auto,minmax(0,1fr),auto] items-start gap-2 py-2 text-xs sm:flex sm:items-center sm:gap-3'
-                      >
-                        <EventIcon type={row.type} />
-                        <span
-                          className={cn(
-                            'min-w-[80px] font-medium',
-                            config.className
-                          )}
-                        >
-                          {config.label}
-                        </span>
-                        <span className='col-span-2 min-w-0 truncate text-primary-token sm:col-auto sm:flex-1'>
-                          {row.handle
-                            ? `@${row.handle}`
-                            : (row.spotifyId ?? '--')}
-                        </span>
-                        {row.failureReason && (
-                          <span
-                            className='col-span-3 text-wrap break-words text-error sm:col-auto sm:max-w-[200px] sm:truncate'
-                            title={row.failureReason}
-                          >
-                            {row.failureReason}
-                          </span>
-                        )}
-                        <span className='col-start-3 row-start-1 shrink-0 text-right text-tertiary-token sm:ml-auto'>
-                          {formatTimeAgo(row.createdAt)}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          </ContentSurfaceCard>
-        </div>
+        <AdminIngestContent {...props} />
       </PageContent>
     </PageShell>
   );

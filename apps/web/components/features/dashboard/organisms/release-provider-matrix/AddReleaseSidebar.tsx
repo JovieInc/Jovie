@@ -215,6 +215,7 @@ export function AddReleaseSidebar({
       data-testid='add-release-sidebar'
       title='New Release'
       onClose={handleClose}
+      headerMode='minimal'
       entityHeader={
         <DrawerSurfaceCard
           className={ADD_RELEASE_CARD_CLASSNAME}
@@ -251,28 +252,28 @@ export function AddReleaseSidebar({
               data-testid='entity-header-card'
             />
           </div>
+          <div className='border-t border-subtle px-3.5 py-2'>
+            <DrawerButton
+              tone='primary'
+              className='h-8 w-full'
+              onClick={handleSubmit}
+              disabled={isSubmitting || !title.trim()}
+            >
+              {isSubmitting ? (
+                <>
+                  <LoadingSpinner size='sm' tone='inverse' className='mr-2' />
+                  Creating...
+                </>
+              ) : (
+                'Create Release'
+              )}
+            </DrawerButton>
+          </div>
         </DrawerSurfaceCard>
-      }
-      footer={
-        <DrawerButton
-          tone='primary'
-          className='h-8 w-full rounded-[8px]'
-          onClick={handleSubmit}
-          disabled={isSubmitting || !title.trim()}
-        >
-          {isSubmitting ? (
-            <>
-              <LoadingSpinner size='sm' tone='inverse' className='mr-2' />
-              Creating...
-            </>
-          ) : (
-            'Create Release'
-          )}
-        </DrawerButton>
       }
     >
       <DrawerSurfaceCard className={ADD_RELEASE_CARD_CLASSNAME}>
-        <div className='border-b border-(--linear-app-frame-seam) px-3.5 py-2'>
+        <div className='border-b border-subtle px-3.5 py-2'>
           <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
             Details
           </p>

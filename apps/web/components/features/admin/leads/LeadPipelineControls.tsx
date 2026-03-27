@@ -298,7 +298,24 @@ export function LeadPipelineControls() {
             />
           </div>
 
-          <div className='grid gap-3 px-(--linear-app-content-padding-x) py-3.5 sm:grid-cols-2'>
+          <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
+            <div>
+              <p className='text-sm text-primary-token'>Guardrails enabled</p>
+              <p className='text-xs text-secondary-token'>
+                Enforce throttle recommendations and pause signals in admin.
+              </p>
+            </div>
+            <Switch
+              checked={settings.guardrailsEnabled}
+              onCheckedChange={checked =>
+                setSettings(s => (s ? { ...s, guardrailsEnabled: checked } : s))
+              }
+              aria-label='Toggle guardrails'
+              disabled={saveSettingsMutation.isPending}
+            />
+          </div>
+
+          <div className='grid gap-3 px-(--linear-app-content-padding-x) py-3.5 sm:grid-cols-2 xl:grid-cols-3'>
             <label htmlFor='auto-ingest-min-score' className='block'>
               <span className='text-sm text-primary-token'>
                 Min fit score for auto-ingest
@@ -353,6 +370,108 @@ export function LeadPipelineControls() {
                 Used today: {settings.queriesUsedToday}
               </p>
             </label>
+
+            <label htmlFor='auto-ingest-daily-limit' className='block'>
+              <span className='text-sm text-primary-token'>
+                Auto-ingest daily limit
+              </span>
+              <Input
+                id='auto-ingest-daily-limit'
+                type='number'
+                min={1}
+                max={1000}
+                value={settings.autoIngestDailyLimit}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                  const val = Number.parseInt(e.target.value, 10);
+                  setSettings(s =>
+                    s
+                      ? {
+                          ...s,
+                          autoIngestDailyLimit: Number.isFinite(val) ? val : 10,
+                        }
+                      : s
+                  );
+                }}
+                className='mt-1 w-24'
+                disabled={saveSettingsMutation.isPending}
+              />
+            </label>
+
+            <label htmlFor='daily-send-cap' className='block'>
+              <span className='text-sm text-primary-token'>Daily send cap</span>
+              <Input
+                id='daily-send-cap'
+                type='number'
+                min={1}
+                max={10000}
+                value={settings.dailySendCap}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                  const val = Number.parseInt(e.target.value, 10);
+                  setSettings(s =>
+                    s
+                      ? {
+                          ...s,
+                          dailySendCap: Number.isFinite(val) ? val : 10,
+                        }
+                      : s
+                  );
+                }}
+                className='mt-1 w-24'
+                disabled={saveSettingsMutation.isPending}
+              />
+            </label>
+
+            <label htmlFor='max-per-hour' className='block'>
+              <span className='text-sm text-primary-token'>Max per hour</span>
+              <Input
+                id='max-per-hour'
+                type='number'
+                min={1}
+                max={1000}
+                value={settings.maxPerHour}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                  const val = Number.parseInt(e.target.value, 10);
+                  setSettings(s =>
+                    s
+                      ? {
+                          ...s,
+                          maxPerHour: Number.isFinite(val) ? val : 5,
+                        }
+                      : s
+                  );
+                }}
+                className='mt-1 w-24'
+                disabled={saveSettingsMutation.isPending}
+              />
+            </label>
+          </div>
+
+          <div className='flex items-center justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
+            <div>
+              <p className='text-sm text-primary-token'>Ramp mode</p>
+              <p className='text-xs text-secondary-token'>
+                Manual keeps operator approval in charge. Recommend-only
+                surfaces scale advice without auto-increasing sends.
+              </p>
+            </div>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() =>
+                setSettings(s =>
+                  s
+                    ? {
+                        ...s,
+                        rampMode:
+                          s.rampMode === 'manual' ? 'recommend_only' : 'manual',
+                      }
+                    : s
+                )
+              }
+              disabled={saveSettingsMutation.isPending}
+            >
+              {settings.rampMode === 'manual' ? 'Manual' : 'Recommend only'}
+            </Button>
           </div>
 
           <div className='flex flex-wrap gap-2 px-(--linear-app-content-padding-x) py-3.5'>

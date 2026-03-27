@@ -42,6 +42,7 @@ export function DspPresenceSidebar({ item, onClose }: DspPresenceSidebarProps) {
       ariaLabel={`${label} profile details`}
       title={label}
       onClose={onClose}
+      headerMode='minimal'
       isEmpty={!item}
       emptyMessage='Select a platform to view details.'
       entityHeader={item ? <SidebarEntityHeader item={item} /> : undefined}
@@ -55,33 +56,40 @@ function SidebarEntityHeader({ item }: { readonly item: DspPresenceItem }) {
   const label = PROVIDER_LABELS[item.providerId];
 
   return (
-    <div className='flex items-center gap-2'>
-      {item.externalArtistImageUrl ? (
-        <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
-          <Image
-            src={item.externalArtistImageUrl}
-            alt={item.externalArtistName ?? label}
-            fill
-            sizes='36px'
-            className='object-cover'
-            unoptimized={isExternalDspImage(item.externalArtistImageUrl)}
-          />
-        </div>
-      ) : (
-        <div className='flex h-9 w-9 items-center justify-center rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
-          <DspProviderIcon provider={item.providerId} size='lg' />
-        </div>
-      )}
-      <div className='min-w-0 flex-1'>
-        <div className='truncate text-[14px] font-[590] text-primary-token'>
-          {item.externalArtistName ?? 'Unknown Artist'}
-        </div>
-        <div className='mt-0.5 flex items-center gap-1.5 text-[12px] text-tertiary-token'>
-          <DspProviderIcon provider={item.providerId} size='sm' />
-          <span>{label}</span>
+    <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+      <div className='border-b border-subtle px-3 py-2'>
+        <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+          DSP profile
+        </p>
+      </div>
+      <div className='flex items-center gap-2 p-3.5'>
+        {item.externalArtistImageUrl ? (
+          <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-subtle bg-surface-0'>
+            <Image
+              src={item.externalArtistImageUrl}
+              alt={item.externalArtistName ?? label}
+              fill
+              sizes='36px'
+              className='object-cover'
+              unoptimized={isExternalDspImage(item.externalArtistImageUrl)}
+            />
+          </div>
+        ) : (
+          <div className='flex h-9 w-9 items-center justify-center rounded-full border border-subtle bg-surface-0'>
+            <DspProviderIcon provider={item.providerId} size='lg' />
+          </div>
+        )}
+        <div className='min-w-0 flex-1'>
+          <div className='truncate text-[14px] font-[590] text-primary-token'>
+            {item.externalArtistName ?? 'Unknown Artist'}
+          </div>
+          <div className='mt-0.5 flex items-center gap-1.5 text-[12px] text-tertiary-token'>
+            <DspProviderIcon provider={item.providerId} size='sm' />
+            <span>{label}</span>
+          </div>
         </div>
       </div>
-    </div>
+    </DrawerSurfaceCard>
   );
 }
 
@@ -91,8 +99,12 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
 
   return (
     <div className='space-y-3'>
-      <DrawerSection title='Match Status' className='space-y-1.5'>
-        <DrawerSurfaceCard variant='card' className='space-y-2 p-3'>
+      <DrawerSection
+        title='Match Status'
+        className='space-y-1.5'
+        surface='card'
+      >
+        <div className='space-y-2'>
           <div className='flex items-center justify-between'>
             <span className='text-[12px] text-tertiary-token'>Status</span>
             <MatchStatusBadge status={item.status} size='sm' />
@@ -117,11 +129,15 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
               </span>
             </div>
           )}
-        </DrawerSurfaceCard>
+        </div>
       </DrawerSection>
 
       {item.confidenceBreakdown && (
-        <DrawerSection title='Confidence Breakdown' className='space-y-1.5'>
+        <DrawerSection
+          title='Confidence Breakdown'
+          className='space-y-1.5'
+          surface='card'
+        >
           <MatchConfidenceBreakdown
             breakdown={item.confidenceBreakdown}
             totalScore={item.confidenceScore}
@@ -129,8 +145,8 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
         </DrawerSection>
       )}
 
-      <DrawerSection title='Actions' className='space-y-1.5'>
-        <DrawerSurfaceCard variant='card' className='space-y-2 p-2'>
+      <DrawerSection title='Actions' className='space-y-1.5' surface='card'>
+        <div className='space-y-2'>
           {item.externalArtistUrl && (
             <a
               href={item.externalArtistUrl}
@@ -141,7 +157,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
               <Button
                 variant='ghost'
                 size='sm'
-                className='h-8 w-full justify-start rounded-[8px] border border-transparent px-2.5 text-[12px] font-[510] text-tertiary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+                className='h-8 w-full justify-start rounded-full border-subtle bg-surface-0 px-3 text-[12px] font-[510]'
               >
                 <Icon name='ExternalLink' className='mr-1.5 h-3.5 w-3.5' />
                 View on {label}
@@ -150,7 +166,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
           )}
 
           {isSuggested && <SuggestedMatchActions matchId={item.matchId} />}
-        </DrawerSurfaceCard>
+        </div>
       </DrawerSection>
     </div>
   );
@@ -174,7 +190,7 @@ function SuggestedMatchActions({ matchId }: { readonly matchId: string }) {
         size='sm'
         onClick={() => rejectMatch(matchId)}
         disabled={isLoading}
-        className='h-8 flex-1 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 text-[12px] font-[510] text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+        className='h-8 flex-1 rounded-full border border-subtle bg-surface-0 text-[12px] font-[510]'
       >
         {isRejecting ? 'Rejecting...' : 'Reject'}
       </Button>
@@ -183,7 +199,7 @@ function SuggestedMatchActions({ matchId }: { readonly matchId: string }) {
         size='sm'
         onClick={() => confirmMatch(matchId)}
         disabled={isLoading}
-        className='h-8 flex-1 rounded-[8px] text-[12px] font-[510]'
+        className='h-8 flex-1 rounded-full text-[12px] font-[510]'
       >
         {isConfirming ? 'Confirming...' : 'Confirm Match'}
       </Button>

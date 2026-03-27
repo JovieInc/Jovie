@@ -204,6 +204,89 @@ describe('parseChangelog', () => {
       'Tips now process correctly',
     ]);
   });
+
+  it('does not treat lowercase common words as vendor leaks', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+### Changed
+
+- Added turbo mode for playlist cleanup
+- conductor notes now show in exported setlists
+- Reduced Sentry error noise
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].sections.changed).toEqual([
+      'Added turbo mode for playlist cleanup',
+      'conductor notes now show in exported setlists',
+    ]);
+    expect(result.releases[0].internalSections.changed).toEqual([
+      'Reduced Sentry error noise',
+    ]);
+  });
+
+  it('treats suffix-tagged internal entries as internal', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+### Changed
+
+- Public launch checklist refresh
+- Shared cron auth helper with timing-safe bearer verification [INTERNAL]
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].sections.changed).toEqual([
+      'Public launch checklist refresh',
+    ]);
+    expect(result.releases[0].internalSections.changed).toEqual([
+      'Shared cron auth helper with timing-safe bearer verification [INTERNAL]',
+    ]);
+  });
+
+  it('drops internal summaries from public output', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+> Hardened webhook dispatch with Redis-backed dedupe [internal]
+
+### Fixed
+
+- Tips now process correctly
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].summary).toBe('');
+    expect(result.releases[0].sections.fixed).toEqual([
+      'Tips now process correctly',
+    ]);
+  });
+
+  it('does not promote a later blockquote when the first summary is internal', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+> Hardened webhook dispatch with Redis-backed dedupe [internal]
+> Customer-facing summary that should stay hidden
+
+### Fixed
+
+- Tips now process correctly
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].summary).toBe('');
+  });
+
+  it('keeps public admin-role and token entries visible', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+### Changed
+
+- Team admins can now manage subscription billing
+- Users can now revoke personal API tokens
+- Design tokens now support accent overrides
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].sections.changed).toEqual([
+      'Team admins can now manage subscription billing',
+      'Users can now revoke personal API tokens',
+      'Design tokens now support accent overrides',
+    ]);
+  });
 });
 
 describe('getLatestRelease', () => {

@@ -3,12 +3,14 @@
 import { Check, Copy, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { DrawerSurfaceCard } from '@/components/molecules/drawer';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { useReleasePitchMutation } from '@/lib/queries/useReleasePitchMutation';
 import {
   type GeneratedPitches,
   PLATFORM_LIMITS,
   type PlatformKey,
-} from '@/lib/services/pitch';
+} from '@/lib/services/pitch/types';
 import { cn } from '@/lib/utils';
 
 const PLATFORM_CONFIG = [
@@ -145,8 +147,10 @@ export function ReleasePitchSection({
   const panelId = `pitch-panel-${selectedPlatform}`;
 
   return (
-    <div className='space-y-1.5'>
-      {/* Header */}
+    <DrawerSurfaceCard
+      className={cn(LINEAR_SURFACE.drawerCardSm, 'space-y-2.5 p-3')}
+      testId='release-pitch-card'
+    >
       <div className='flex items-center justify-between'>
         <div className='flex items-center gap-1.5'>
           <Sparkles className='h-3.5 w-3.5 text-tertiary-token' />
@@ -159,8 +163,7 @@ export function ReleasePitchSection({
         )}
       </div>
 
-      {/* Text area */}
-      <div className='relative min-h-[80px] rounded-lg border border-subtle bg-surface-1 p-2.5'>
+      <div className='relative min-h-[80px] rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-2.5'>
         {isPending && (
           <div className='animate-pulse space-y-1.5'>
             <div className='h-2.5 w-full rounded bg-surface-2' />
@@ -210,13 +213,12 @@ export function ReleasePitchSection({
         )}
       </div>
 
-      {/* Bottom bar: platform tabs + generate button */}
       <div className='flex items-center justify-between'>
         <div
           ref={tabsRef}
           role='tablist'
           aria-label='Platform pitches'
-          className='flex items-center gap-0.5'
+          className='flex flex-wrap items-center gap-1'
           onKeyDown={handleKeyDown}
         >
           {PLATFORM_CONFIG.map(({ key, label, shortLabel }) => (
@@ -230,10 +232,10 @@ export function ReleasePitchSection({
               tabIndex={selectedPlatform === key ? 0 : -1}
               onClick={() => setSelectedPlatform(key)}
               className={cn(
-                'rounded-md px-1.5 py-0.5 text-[10px] font-medium transition-colors',
+                'inline-flex min-h-6 items-center justify-center rounded-full border px-2 py-0.5 text-[10px] font-medium transition-[background-color,border-color,color] duration-150',
                 selectedPlatform === key
-                  ? 'bg-accent-token/10 text-accent-token'
-                  : 'text-tertiary-token hover:text-secondary-token'
+                  ? 'border-default bg-surface-0 text-primary-token'
+                  : 'border-(--linear-app-frame-seam) bg-transparent text-tertiary-token hover:border-default hover:bg-surface-0 hover:text-secondary-token'
               )}
             >
               {shortLabel}
@@ -246,8 +248,7 @@ export function ReleasePitchSection({
           onClick={handleGenerate}
           disabled={isPending}
           className={cn(
-            'rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors',
-            'bg-accent-token/10 text-accent-token hover:bg-accent-token/20',
+            'inline-flex min-h-6 items-center justify-center rounded-full border border-(--linear-app-frame-seam) px-2.5 py-0.5 text-[10px] font-medium text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token',
             'disabled:cursor-not-allowed disabled:opacity-50'
           )}
         >
@@ -258,6 +259,6 @@ export function ReleasePitchSection({
           })()}
         </button>
       </div>
-    </div>
+    </DrawerSurfaceCard>
   );
 }

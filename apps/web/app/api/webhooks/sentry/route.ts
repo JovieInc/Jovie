@@ -188,10 +188,6 @@ export async function POST(request: NextRequest) {
         }),
         timeoutMs: DISPATCH_TIMEOUT_MS,
         context: 'GitHub repository dispatch for Sentry webhook',
-        retry: {
-          maxRetries: 2,
-          baseDelayMs: 500,
-        },
       }
     );
 
