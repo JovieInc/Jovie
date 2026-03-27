@@ -105,6 +105,10 @@ export const EXPECTED_ERROR_PATTERNS = [
 
   // Next.js internals — redirect() causes negative performance marks
   'negative time stamp',
+
+  // React dev warning for script tags rendered inside components.
+  // This is framework noise in local E2E and not a dashboard route regression.
+  'encountered a script tag while rendering react component',
 ] as const;
 
 const EXPECTED_WARNING_PATTERNS = [
