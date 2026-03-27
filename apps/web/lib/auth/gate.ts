@@ -134,6 +134,11 @@ async function tryAdoptExistingUser(
   if (!email) return null;
   if (!isUniqueViolation(insertError, 'users_email_unique')) return null;
 
+  const conflictDetail = unwrapPgError(insertError).detail ?? '';
+  const conflictingEmail =
+    /Key \(email\)=\((.+)\) already exists\./.exec(conflictDetail)?.[1] ??
+    normalizeEmail(email);
+
   const [adopted] = await db
     .update(users)
     .set({
@@ -141,7 +146,7 @@ async function tryAdoptExistingUser(
       userStatus,
       updatedAt: new Date(),
     })
-    .where(eq(users.email, normalizeEmail(email)))
+    .where(eq(users.email, conflictingEmail))
     .returning({ id: users.id });
 
   return adopted?.id ?? null;
