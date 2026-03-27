@@ -115,6 +115,15 @@ export function isClerkHandshakeUrl(url: string): boolean {
   );
 }
 
+const CLERK_ORIGIN_MISMATCH_PATTERNS = [
+  /production keys are only allowed for domain/i,
+  /request http origin header must be equal to or a subdomain of the requesting url/i,
+];
+
+export function isClerkOriginMismatchMessage(message: string): boolean {
+  return CLERK_ORIGIN_MISMATCH_PATTERNS.some(pattern => pattern.test(message));
+}
+
 /**
  * Creates or reuses a Clerk test user session for the given email.
  *
@@ -221,6 +230,17 @@ export async function signInUser(
   // This is required for the testing token to be included in Clerk's FAPI requests
   await setupClerkTestingToken({ page });
 
+  const clerkConsoleErrors: string[] = [];
+  const handleConsoleMessage = (message: {
+    type(): string;
+    text(): string;
+  }) => {
+    if (message.type() === 'error') {
+      clerkConsoleErrors.push(message.text());
+    }
+  };
+  page.on('console', handleConsoleMessage);
+
   await primeVercelBypassCookie(
     page,
     process.env.BASE_URL,
@@ -302,11 +322,19 @@ export async function signInUser(
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
+    const sawOriginMismatch =
+      isClerkOriginMismatchMessage(msg) ||
+      clerkConsoleErrors.some(isClerkOriginMismatchMessage);
 
     // Handle "already signed in" — testing token may auto-authenticate
     if (msg.includes('already signed in')) {
       console.log('  Already signed in via testing token, continuing...');
       // Continue to verification below
+    } else if (sawOriginMismatch) {
+      throw new ClerkTestError(
+        'Clerk rejected the current preview/local origin for the configured keys.',
+        'CLERK_SETUP_FAILED'
+      );
     } else {
       // Check if Clerk JS even loaded
       const clerkLoaded = await page
@@ -333,6 +361,8 @@ export async function signInUser(
       // Re-throw the original error if Clerk was loaded but signIn failed
       throw error;
     }
+  } finally {
+    page.off('console', handleConsoleMessage);
   }
 
   // After sign-in, navigate to a stable authenticated shell route to verify auth.
