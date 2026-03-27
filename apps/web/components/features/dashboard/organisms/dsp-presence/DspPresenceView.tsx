@@ -171,6 +171,13 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
     data.items.find(i => i.matchId === selectedMatchId) ?? null;
   const isSidebarOpen = selectedItem !== null;
 
+  // Clear stale selection when item disappears from data (e.g. after reject)
+  useEffect(() => {
+    if (selectedMatchId && !selectedItem) {
+      setSelectedMatchId(null);
+    }
+  }, [selectedMatchId, selectedItem]);
+
   // Column definitions (stable reference)
   const columns = useMemo(() => createPresenceColumns(), []);
 
@@ -181,7 +188,7 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
 
   useEffect(() => {
     const toggle = () => {
-      if (selectedMatchId) {
+      if (isSidebarOpen) {
         setSelectedMatchId(null);
       } else if (itemsRef.current.length > 0) {
         setSelectedMatchId(itemsRef.current[0].matchId);
