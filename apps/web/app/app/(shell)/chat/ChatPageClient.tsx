@@ -3,7 +3,7 @@
 import { Button, SimpleTooltip } from '@jovie/ui';
 import { AlertCircle, Check, Copy, RefreshCw } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   type PreviewPanelLink,
@@ -37,6 +37,19 @@ interface ChatPageClientProps {
   readonly isFirstSession?: boolean;
   readonly appleMusicConnected?: boolean;
   readonly appleMusicArtistName?: string | null;
+}
+
+const WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS = [1500, 3000, 5000] as const;
+
+function shouldRetryWelcomeChatBootstrap(status: number | null): boolean {
+  return (
+    status === null ||
+    status === 404 ||
+    status === 500 ||
+    status === 502 ||
+    status === 503 ||
+    status === 504
+  );
 }
 
 /**
@@ -76,8 +89,13 @@ export function ChatPageClient({
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
   const [autoRetryCount, setAutoRetryCount] = useState(0);
-  const [hasBootstrappedWelcomeChat, setHasBootstrappedWelcomeChat] =
-    useState(false);
+  const [welcomeChatBootstrapState, setWelcomeChatBootstrapState] = useState<
+    'idle' | 'pending' | 'scheduled' | 'done' | 'failed'
+  >('idle');
+  const welcomeChatRetryCountRef = useRef(0);
+  const welcomeChatRetryTimeoutRef = useRef<ReturnType<
+    typeof globalThis.setTimeout
+  > | null>(null);
 
   const hasProfilesButNoSelection =
     creatorProfiles.length > 0 && !selectedProfile && !needsOnboarding;
@@ -89,6 +107,14 @@ export function ChatPageClient({
   const canAutoRetry = isProfileSetupRace && autoRetryCount < 3;
   const enablePreviewPanel = !env.IS_E2E;
   const fromOnboarding = searchParams.get('from') === 'onboarding';
+
+  useEffect(() => {
+    return () => {
+      if (welcomeChatRetryTimeoutRef.current !== null) {
+        globalThis.clearTimeout(welcomeChatRetryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Register ProfileContactSidebar in the unified right panel system
   useRegisterRightPanel(
@@ -283,15 +309,47 @@ export function ChatPageClient({
       !fromOnboarding ||
       conversationId ||
       !activeProfile ||
-      hasBootstrappedWelcomeChat
+      welcomeChatBootstrapState !== 'idle'
     ) {
       return;
     }
 
     const controller = new AbortController();
 
+    const scheduleRetry = (status: number | null) => {
+      if (
+        !shouldRetryWelcomeChatBootstrap(status) ||
+        welcomeChatRetryCountRef.current >=
+          WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS.length
+      ) {
+        setWelcomeChatBootstrapState('failed');
+        notifications.error(
+          'We could not start your onboarding chat. Refresh to try again.'
+        );
+        return;
+      }
+
+      const delay =
+        WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS[
+          welcomeChatRetryCountRef.current
+        ] ??
+        WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS[
+          WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS.length - 1
+        ];
+
+      welcomeChatRetryCountRef.current += 1;
+      setWelcomeChatBootstrapState('scheduled');
+      if (welcomeChatRetryTimeoutRef.current !== null) {
+        globalThis.clearTimeout(welcomeChatRetryTimeoutRef.current);
+      }
+      welcomeChatRetryTimeoutRef.current = globalThis.setTimeout(() => {
+        welcomeChatRetryTimeoutRef.current = null;
+        setWelcomeChatBootstrapState('idle');
+      }, delay);
+    };
+
     const bootstrapWelcomeChat = async () => {
-      setHasBootstrappedWelcomeChat(true);
+      setWelcomeChatBootstrapState('pending');
 
       let initialReply = '';
       try {
@@ -310,13 +368,17 @@ export function ChatPageClient({
       });
 
       if (!response.ok) {
-        setHasBootstrappedWelcomeChat(false);
+        if (!controller.signal.aborted) {
+          scheduleRetry(response.status);
+        }
         return;
       }
 
       const payload = (await response.json()) as {
         route?: string;
       };
+      welcomeChatRetryCountRef.current = 0;
+      setWelcomeChatBootstrapState('done');
 
       try {
         globalThis.sessionStorage?.removeItem(ONBOARDING_WELCOME_REPLY_KEY);
@@ -333,7 +395,7 @@ export function ChatPageClient({
     const bootstrapPromise = bootstrapWelcomeChat();
     bootstrapPromise.catch(() => {
       if (!controller.signal.aborted) {
-        setHasBootstrappedWelcomeChat(false);
+        scheduleRetry(null);
       }
     });
 
@@ -344,8 +406,9 @@ export function ChatPageClient({
     activeProfile,
     conversationId,
     fromOnboarding,
-    hasBootstrappedWelcomeChat,
+    notifications,
     router,
+    welcomeChatBootstrapState,
   ]);
 
   // Profile unavailable — show actionable error instead of infinite spinner.
