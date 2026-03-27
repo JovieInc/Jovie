@@ -7,4 +7,5 @@ export interface AdminUsersTableProps {
   readonly total: number;
   readonly search: string;
   readonly sort: AdminUsersSort;
+  readonly basePath?: string;
 }
