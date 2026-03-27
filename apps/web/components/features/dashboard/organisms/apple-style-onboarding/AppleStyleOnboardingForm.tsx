@@ -38,6 +38,7 @@ export function AppleStyleOnboardingForm({
   shouldAutoSubmitHandle = false,
   initialStepIndex = 0,
   existingAvatarUrl = null,
+  existingAvatarQuality = null,
   existingBio = null,
   existingGenres = null,
 }: Readonly<AppleStyleOnboardingFormProps>) {
@@ -323,6 +324,7 @@ export function AppleStyleOnboardingForm({
               isDspEnriching || isAutoConnectEnriching || isConnecting
             }
             existingAvatarUrl={existingAvatarUrl}
+            avatarQuality={existingAvatarQuality}
             existingBio={existingBio}
             existingGenres={existingGenres}
             isStepResume={initialStepIndex > 0}
