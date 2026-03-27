@@ -1,10 +1,50 @@
 import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  TEST_AUTH_BYPASS_MODE,
+  TEST_MODE_COOKIE,
+  TEST_USER_ID_COOKIE,
+} from '@/lib/auth/test-mode';
 import { smokeNavigateWithRetry } from '../e2e/utils/smoke-test-utils';
 import { primeVercelBypassCookie } from './vercel-preview';
 
 const AUTH_READY_ROUTE = APP_ROUTES.DASHBOARD;
+
+function isTestAuthBypassEnabled(): boolean {
+  return process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+}
+
+function getTestAuthBypassUserId(): string | null {
+  const userId = process.env.E2E_CLERK_USER_ID?.trim();
+  return userId && userId.length > 0 ? userId : null;
+}
+
+async function enableTestAuthBypass(page: Page): Promise<void> {
+  const userId = getTestAuthBypassUserId();
+  if (!userId) {
+    throw new ClerkTestError(
+      'E2E_CLERK_USER_ID is required when test auth bypass is enabled.',
+      'MISSING_CREDENTIALS'
+    );
+  }
+
+  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  await page.context().addCookies([
+    {
+      name: TEST_MODE_COOKIE,
+      value: TEST_AUTH_BYPASS_MODE,
+      url: baseUrl,
+      sameSite: 'Lax',
+    },
+    {
+      name: TEST_USER_ID_COOKIE,
+      value: userId,
+      url: baseUrl,
+      sameSite: 'Lax',
+    },
+  ]);
+}
 
 /**
  * Check if the test target is a production deployment (jov.ie).
@@ -32,6 +72,10 @@ export function isTestingEnvironment(): boolean {
 export function hasClerkCredentials(
   credentials: { username?: string; password?: string } = {}
 ): boolean {
+  if (isTestAuthBypassEnabled()) {
+    return getTestAuthBypassUserId() !== null;
+  }
+
   const username =
     credentials.username ?? process.env.E2E_CLERK_USER_USERNAME ?? '';
   const password =
@@ -180,6 +224,15 @@ export async function signInUser(
     password = process.env.E2E_CLERK_USER_PASSWORD,
   }: { username?: string; password?: string } = {}
 ) {
+  if (isTestAuthBypassEnabled()) {
+    await enableTestAuthBypass(page);
+    await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
+      timeout: 120_000,
+      retries: 2,
+    });
+    return page;
+  }
+
   if (!username) {
     throw new ClerkTestError(
       'E2E test user credentials not configured. Set E2E_CLERK_USER_USERNAME.',

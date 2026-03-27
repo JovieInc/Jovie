@@ -170,6 +170,42 @@ describe('cached auth utilities', () => {
       expect(result).toBeNull();
     });
 
+    it('returns a synthetic verified Clerk user in test bypass mode', async () => {
+      vi.stubEnv('NODE_ENV', 'test');
+      vi.stubEnv('E2E_CLERK_USER_USERNAME', 'e2e+bypass@example.com');
+      mockHeaders.mockResolvedValue(
+        new Headers({
+          cookie: '__e2e_test_mode=bypass-auth; __e2e_test_user_id=user_cookie',
+        })
+      );
+
+      const { getCachedCurrentUser } = await import('@/lib/auth/cached');
+      const result = await getCachedCurrentUser();
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'user_cookie',
+          username: 'e2e+bypass',
+          fullName: 'E2E Test',
+          primaryEmailAddress: expect.objectContaining({
+            emailAddress: 'e2e+bypass@example.com',
+            verification: expect.objectContaining({
+              status: 'verified',
+            }),
+          }),
+        })
+      );
+      expect(result?.emailAddresses).toEqual([
+        expect.objectContaining({
+          emailAddress: 'e2e+bypass@example.com',
+          verification: expect.objectContaining({
+            status: 'verified',
+          }),
+        }),
+      ]);
+      expect(mockCurrentUser).not.toHaveBeenCalled();
+    });
+
     it('deduplicates multiple calls within the same request', async () => {
       const mockUserResult = {
         id: 'user_dedupe',
