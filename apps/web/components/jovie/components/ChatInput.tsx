@@ -270,13 +270,14 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       <form onSubmit={handleFormSubmit}>
         <div
           className={cn(
-            'overflow-hidden rounded-[18px] border shadow-[var(--linear-app-card-shadow)] transition-[border-color,background-color,box-shadow] duration-200',
+            'overflow-hidden border transition-[border-color,background-color,box-shadow,border-radius] duration-200',
+            isExpanded ? 'rounded-[24px]' : 'rounded-full',
             'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
             isOverLimit
               ? 'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20'
               : isExpanded
-                ? 'border-default bg-surface-0 shadow-[0_1px_1px_rgba(0,0,0,0.04),0_14px_36px_-24px_rgba(15,23,42,0.45),var(--linear-app-card-shadow)]'
-                : 'border-(--linear-app-frame-seam)'
+                ? 'border-black/8 bg-surface-0 shadow-[0_1px_0_rgba(255,255,255,0.65),0_18px_34px_-28px_rgba(15,23,42,0.45)] dark:border-white/10 dark:shadow-[0_1px_0_rgba(255,255,255,0.08),0_18px_34px_-28px_rgba(0,0,0,0.7)]'
+                : 'border-black/6 shadow-[0_1px_0_rgba(255,255,255,0.72),0_10px_22px_-20px_rgba(15,23,42,0.42)] dark:border-white/8 dark:shadow-[0_1px_0_rgba(255,255,255,0.06),0_10px_22px_-20px_rgba(0,0,0,0.68)]'
           )}
         >
           {hasPendingImages && onRemoveImage && (
@@ -290,7 +291,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
           <div
             className={cn(
-              'flex items-end gap-2 px-3 py-3',
+              'flex items-end gap-2 px-3 py-2.5',
               isExpanded && 'pb-2'
             )}
           >
@@ -318,16 +319,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 'min-w-0 flex-1 resize-none bg-transparent',
                 'text-primary-token placeholder:text-tertiary-token',
                 'focus:outline-none',
-                isCompact
-                  ? 'max-h-32 py-1.5 text-[14px] leading-6'
-                  : 'max-h-48 py-2 text-[14px] leading-6',
+                'py-1.5 text-[14px] leading-6',
+                isCompact ? 'max-h-32' : 'max-h-48',
                 isExpanded
                   ? isCompact
                     ? 'min-h-[64px]'
                     : 'min-h-[88px]'
-                  : isCompact
-                    ? 'min-h-[28px]'
-                    : 'min-h-[36px]'
+                  : 'min-h-[28px]'
               )}
               onKeyDown={handleKeyDown}
               onInput={handleInput}
@@ -386,7 +384,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           </div>
 
           {isExpanded && (
-            <div className='border-t border-(--linear-app-frame-seam) px-3 pb-3 pt-2.5'>
+            <div className='border-t border-black/6 px-3 pb-3 pt-2.5 dark:border-white/8'>
               <div className='flex items-center justify-between gap-3'>
                 <span className='text-[11px] font-[560] tracking-[-0.01em] text-secondary-token'>
                   {isCompact ? 'Ask a follow-up' : 'Ask Jovie'}
@@ -412,7 +410,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                           onClick={() => onQuickActionSelect?.(action.prompt)}
                           className={cn(
                             getChatPromptPillClass('compact'),
-                            'min-w-[154px] max-w-[220px] py-1.5'
+                            'min-w-[124px] max-w-[172px]'
                           )}
                         >
                           <span className='truncate'>{action.label}</span>

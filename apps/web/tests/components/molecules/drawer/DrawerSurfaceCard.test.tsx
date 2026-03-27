@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
+import { LINEAR_SURFACE_TIER } from '@/features/dashboard/tokens';
 
 describe('DrawerSurfaceCard', () => {
   it('defaults to the flat variant', () => {
@@ -40,12 +40,14 @@ describe('DrawerSurfaceCard', () => {
   });
 
   it('keeps drawer and sidebar cards on a higher elevation tier than main content containers', () => {
-    expect(LINEAR_SURFACE.drawerCard).not.toBe(LINEAR_SURFACE.contentContainer);
-    expect(LINEAR_SURFACE.drawerCardSm).not.toBe(
-      LINEAR_SURFACE.contentContainer
+    expect(LINEAR_SURFACE_TIER.drawerCard).toBeGreaterThan(
+      LINEAR_SURFACE_TIER.contentContainer
     );
-    expect(LINEAR_SURFACE.sidebarCard).not.toBe(
-      LINEAR_SURFACE.contentContainer
+    expect(LINEAR_SURFACE_TIER.drawerCardSm).toBeGreaterThan(
+      LINEAR_SURFACE_TIER.contentContainer
+    );
+    expect(LINEAR_SURFACE_TIER.sidebarCard).toBeGreaterThan(
+      LINEAR_SURFACE_TIER.contentContainer
     );
   });
 });
