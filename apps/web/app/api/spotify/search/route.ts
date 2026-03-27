@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
-import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
+import { captureError } from '@/lib/error-tracking';
 
 export type { SpotifyArtistResult } from '@/lib/contracts/api';
 
@@ -51,6 +51,45 @@ class SearchEnrichmentFallbackError extends Error {
     super('Spotify search enrichment fell back to a degraded payload');
     this.name = 'SearchEnrichmentFallbackError';
   }
+}
+
+function handleSearchError(
+  error: unknown,
+  q: string,
+  limit: number,
+  headers: HeadersInit
+): NextResponse {
+  if (error instanceof CircuitOpenError) {
+    captureError('[Spotify Search] Circuit open', error, {
+      source: 'spotify_search_api',
+      query: q,
+      limit,
+    });
+    return NextResponse.json(
+      {
+        error: 'Service temporarily unavailable',
+        code: 'SERVICE_UNAVAILABLE',
+      },
+      { status: 503, headers }
+    );
+  }
+
+  captureError('[Spotify Search] Search failed', error, {
+    source: 'spotify_search_api',
+    query: q,
+    limit,
+  });
+
+  logger.error('[Spotify Search] Search failed:', {
+    query: q,
+    limit,
+    error: error instanceof Error ? error.message : String(error),
+  });
+
+  return NextResponse.json(
+    { error: 'Search failed', code: 'SEARCH_FAILED' },
+    { status: 500, headers }
+  );
 }
 
 function validateSearchQuery(q: string | undefined): NextResponse | null {
@@ -210,36 +249,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(results, { headers: rateLimitHeaders });
   } catch (error) {
-    // Handle circuit breaker open error
-    if (error instanceof CircuitOpenError) {
-      Sentry.captureException(error, {
-        tags: { source: 'spotify_search_api' },
-        extra: { query: q, limit, circuitStats: error.stats },
-      });
-      return NextResponse.json(
-        {
-          error: 'Service temporarily unavailable',
-          code: 'SERVICE_UNAVAILABLE',
-        },
-        { status: 503, headers: rateLimitHeaders }
-      );
-    }
-
-    // Log and capture other errors
-    Sentry.captureException(error, {
-      tags: { source: 'spotify_search_api' },
-      extra: { query: q, limit },
-    });
-
-    logger.error('[Spotify Search] Search failed:', {
-      query: q,
-      limit,
-      error: error instanceof Error ? error.message : String(error),
-    });
-
-    return NextResponse.json(
-      { error: 'Search failed', code: 'SEARCH_FAILED' },
-      { status: 500, headers: rateLimitHeaders }
-    );
+    return handleSearchError(error, q, limit, rateLimitHeaders);
   }
 }

@@ -14,6 +14,7 @@ import {
   type ChatInsightsToolResult,
   isToolInvocationPart,
   type MessagePart,
+  type SocialLinkRemovalToolResult,
   type SocialLinkToolResult,
   type ToolInvocationPart,
 } from '../types';
@@ -28,6 +29,32 @@ const ChatMarkdown = dynamic(
   () => import('./ChatMarkdown').then(m => ({ default: m.ChatMarkdown })),
   { ssr: false }
 );
+
+function isInsightsResult(result: unknown): result is ChatInsightsToolResult {
+  return typeof result === 'object' && result !== null && 'success' in result;
+}
+
+function isSocialLinkResult(result: unknown): result is SocialLinkToolResult {
+  return (
+    typeof result === 'object' &&
+    result !== null &&
+    'platform' in result &&
+    'normalizedUrl' in result &&
+    'originalUrl' in result
+  );
+}
+
+function isSocialLinkRemovalResult(
+  result: unknown
+): result is SocialLinkRemovalToolResult {
+  return (
+    typeof result === 'object' &&
+    result !== null &&
+    'linkId' in result &&
+    'platform' in result &&
+    'url' in result
+  );
+}
 
 function renderToolCard(
   toolInvocation: ToolInvocationPart,
@@ -44,22 +71,18 @@ function renderToolCard(
   if (
     toolInvocation.toolName === 'showTopInsights' &&
     toolInvocation.state === 'result' &&
-    toolInvocation.result?.success
+    isInsightsResult(toolInvocation.result)
   ) {
-    return (
-      <ChatAnalyticsCard
-        result={toolInvocation.result as unknown as ChatInsightsToolResult}
-      />
-    );
+    return <ChatAnalyticsCard result={toolInvocation.result} />;
   }
 
   if (
     toolInvocation.toolName === 'proposeSocialLink' &&
     toolInvocation.state === 'result' &&
-    toolInvocation.result?.success &&
+    isSocialLinkResult(toolInvocation.result) &&
     profileId
   ) {
-    const result = toolInvocation.result as unknown as SocialLinkToolResult;
+    const result = toolInvocation.result;
     return (
       <ChatLinkConfirmationCard
         profileId={profileId}
@@ -73,14 +96,10 @@ function renderToolCard(
   if (
     toolInvocation.toolName === 'proposeSocialLinkRemoval' &&
     toolInvocation.state === 'result' &&
-    toolInvocation.result?.success &&
+    isSocialLinkRemovalResult(toolInvocation.result) &&
     profileId
   ) {
-    const result = toolInvocation.result as {
-      linkId: string;
-      platform: string;
-      url: string;
-    };
+    const result = toolInvocation.result;
     return (
       <ChatLinkRemovalCard
         profileId={profileId}
