@@ -165,6 +165,11 @@ export const ServerEnvSchema = z.object({
   JOVIE_GOOGLE_API_SECRET: z.string().optional(),
   JOVIE_TIKTOK_PIXEL_ID: z.string().optional(),
   JOVIE_TIKTOK_ACCESS_TOKEN: z.string().optional(),
+
+  // E2E / Playwright auth helpers
+  E2E_USE_TEST_AUTH_BYPASS: z.string().optional(),
+  E2E_CLERK_USER_ID: z.string().optional(),
+  E2E_CLERK_USER_USERNAME: z.string().optional(),
 });
 
 /**
@@ -253,4 +258,7 @@ export const ENV_KEYS = [
   'JOVIE_GOOGLE_API_SECRET',
   'JOVIE_TIKTOK_PIXEL_ID',
   'JOVIE_TIKTOK_ACCESS_TOKEN',
+  'E2E_USE_TEST_AUTH_BYPASS',
+  'E2E_CLERK_USER_ID',
+  'E2E_CLERK_USER_USERNAME',
 ] as const satisfies readonly (keyof z.infer<typeof ServerEnvSchema>)[];

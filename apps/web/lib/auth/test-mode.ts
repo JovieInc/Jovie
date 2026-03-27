@@ -5,10 +5,7 @@ export const TEST_MODE_COOKIE = '__e2e_test_mode';
 export const TEST_USER_ID_COOKIE = '__e2e_test_user_id';
 
 export function isTestAuthBypassEnabled(): boolean {
-  return (
-    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
-    process.env.NODE_ENV === 'test'
-  );
+  return process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 }
 
 interface HeaderReader {
@@ -21,6 +18,43 @@ interface CookieReader {
 
 function normalizeHeaderValue(value: string | null): string | null {
   return value?.trim() || null;
+}
+
+function extractHostname(value: string | null): string | null {
+  const normalized = normalizeHeaderValue(value)?.split(',')[0]?.trim() ?? null;
+  if (!normalized) {
+    return null;
+  }
+
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+    try {
+      return new URL(normalized).hostname.toLowerCase();
+    } catch {
+      return null;
+    }
+  }
+
+  return normalized.replace(/:\d+$/, '').toLowerCase();
+}
+
+function isLoopbackHost(hostname: string | null): boolean {
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1' ||
+    hostname === '[::1]' ||
+    Boolean(hostname?.endsWith('.localhost'))
+  );
+}
+
+function isTrustedTestBypassRequest(headerReader: HeaderReader): boolean {
+  const hostname =
+    extractHostname(headerReader.get('x-forwarded-host')) ??
+    extractHostname(headerReader.get('host')) ??
+    extractHostname(headerReader.get('origin')) ??
+    extractHostname(headerReader.get('referer'));
+
+  return isLoopbackHost(hostname);
 }
 
 function getCookieValueFromHeader(
@@ -47,12 +81,17 @@ function getCookieValueFromHeader(
 /**
  * Returns a mocked auth userId when test bypass headers are present.
  *
- * This is strictly test-only and gated by NODE_ENV=test at call-sites.
+ * This is strictly test-only, requires explicit opt-in via
+ * E2E_USE_TEST_AUTH_BYPASS, and is only honored for loopback requests.
  */
 export function resolveTestBypassUserId(
   headerReader: HeaderReader,
   cookieReader?: CookieReader
 ): string | null {
+  if (!isTestAuthBypassEnabled()) {
+    return null;
+  }
+
   const headerMode = normalizeHeaderValue(headerReader.get(TEST_MODE_HEADER));
   const cookieMode = normalizeHeaderValue(
     cookieReader?.get(TEST_MODE_COOKIE)?.value ??
@@ -63,13 +102,17 @@ export function resolveTestBypassUserId(
     return null;
   }
 
+  if (!isTrustedTestBypassRequest(headerReader)) {
+    return null;
+  }
+
   return (
     normalizeHeaderValue(headerReader.get(TEST_USER_ID_HEADER)) ??
     normalizeHeaderValue(
       cookieReader?.get(TEST_USER_ID_COOKIE)?.value ??
         getCookieValueFromHeader(headerReader, TEST_USER_ID_COOKIE)
     ) ??
-    normalizeHeaderValue(process.env.TEST_CLERK_USER_ID ?? null) ??
+    normalizeHeaderValue(process.env.E2E_CLERK_USER_ID ?? null) ??
     'user_test'
   );
 }

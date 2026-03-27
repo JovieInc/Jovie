@@ -128,9 +128,10 @@ describe('require-auth.ts', () => {
     });
 
     it('bypasses Clerk auth in test mode when bypass header is present', async () => {
-      vi.stubEnv('NODE_ENV', 'test');
+      vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
       mockHeaders.mockResolvedValue(
         new Headers({
+          host: 'localhost:3100',
           'x-test-mode': 'bypass-auth',
           'x-test-user-id': 'user_test_header',
         })
@@ -164,9 +165,10 @@ describe('require-auth.ts', () => {
     });
 
     it('returns bypassed user id in test mode with bypass header', async () => {
-      vi.stubEnv('NODE_ENV', 'test');
+      vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
       mockHeaders.mockResolvedValue(
         new Headers({
+          host: 'localhost:3100',
           'x-test-mode': 'bypass-auth',
           'x-test-user-id': 'user_test_header',
         })

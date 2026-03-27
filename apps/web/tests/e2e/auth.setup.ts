@@ -20,22 +20,26 @@ setup('authenticate', async ({ page, baseURL }) => {
   if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
     console.log('  Test auth bypass enabled, skipping Clerk auth bootstrap');
     const testUserId = process.env.E2E_CLERK_USER_ID?.trim();
-    if (baseURL && testUserId) {
-      await page.context().addCookies([
-        {
-          name: TEST_MODE_COOKIE,
-          value: TEST_AUTH_BYPASS_MODE,
-          url: baseURL,
-          sameSite: 'Lax',
-        },
-        {
-          name: TEST_USER_ID_COOKIE,
-          value: testUserId,
-          url: baseURL,
-          sameSite: 'Lax',
-        },
-      ]);
+    const cookieBaseUrl = baseURL ?? process.env.BASE_URL;
+    if (!cookieBaseUrl || !testUserId) {
+      throw new Error(
+        'E2E_USE_TEST_AUTH_BYPASS requires both baseURL/BASE_URL and E2E_CLERK_USER_ID.'
+      );
     }
+    await page.context().addCookies([
+      {
+        name: TEST_MODE_COOKIE,
+        value: TEST_AUTH_BYPASS_MODE,
+        url: cookieBaseUrl,
+        sameSite: 'Lax',
+      },
+      {
+        name: TEST_USER_ID_COOKIE,
+        value: testUserId,
+        url: cookieBaseUrl,
+        sameSite: 'Lax',
+      },
+    ]);
     await page.context().storageState({ path: AUTH_FILE });
     return;
   }
