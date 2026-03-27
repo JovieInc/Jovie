@@ -724,13 +724,16 @@ describe('musicfetch-enrichment', () => {
         ([values]) =>
           (values as { providerId?: string }).providerId === 'apple_music'
       )?.[0] as { externalArtistId?: string } | undefined;
-      const repairCall = mockPlainDbOnConflictDoUpdate.mock.calls.find(
-        ([args]) =>
-          Boolean(
-            (args as { set?: { externalArtistId?: unknown } }).set
-              ?.externalArtistId
-          )
-      )?.[0] as { set?: { externalArtistId?: unknown } } | undefined;
+      const appleMusicInsertIndex = mockPlainDbValues.mock.calls.findIndex(
+        ([values]) =>
+          (values as { providerId?: string }).providerId === 'apple_music'
+      );
+      const repairCall =
+        appleMusicInsertIndex >= 0
+          ? (mockPlainDbOnConflictDoUpdate.mock.calls[
+              appleMusicInsertIndex
+            ]?.[0] as { set?: { externalArtistId?: unknown } } | undefined)
+          : undefined;
       const externalArtistIdSqlParts = getOnConflictSqlParts(
         repairCall?.set?.externalArtistId
       );
@@ -768,13 +771,16 @@ describe('musicfetch-enrichment', () => {
         ([values]) =>
           (values as { providerId?: string }).providerId === 'spotify'
       );
-      const spotifyRepairCall = mockPlainDbOnConflictDoUpdate.mock.calls.find(
-        ([args]) =>
-          getOnConflictSqlParts(
-            (args as { set?: { externalArtistId?: unknown } }).set
-              ?.externalArtistId
-          )
-      )?.[0] as { set?: { externalArtistId?: unknown } } | undefined;
+      const spotifyInsertIndex = mockPlainDbValues.mock.calls.findIndex(
+        ([values]) =>
+          (values as { providerId?: string }).providerId === 'spotify'
+      );
+      const spotifyRepairCall =
+        spotifyInsertIndex >= 0
+          ? (mockPlainDbOnConflictDoUpdate.mock.calls[
+              spotifyInsertIndex
+            ]?.[0] as { set?: { externalArtistId?: unknown } } | undefined)
+          : undefined;
       const externalArtistIdSqlParts = getOnConflictSqlParts(
         spotifyRepairCall?.set?.externalArtistId
       );

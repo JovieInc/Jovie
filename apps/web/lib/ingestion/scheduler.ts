@@ -172,7 +172,7 @@ export async function handleIngestionJobFailure(
 ): Promise<void> {
   const { message, reason } = determineJobFailure(error);
   const maxAttempts = job.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
-  const shouldRetry = job.attempts < maxAttempts;
+  const shouldRetry = reason !== 'permanent' && job.attempts < maxAttempts;
 
   const creatorProfileId = getCreatorProfileIdFromJob(job);
   if (creatorProfileId) {
