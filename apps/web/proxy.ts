@@ -25,8 +25,6 @@ import { isStagingHost, resolveClerkKeys } from '@/lib/auth/staging-clerk-keys';
 import {
   isTestAuthBypassEnabled,
   resolveTestBypassUserId,
-  TEST_AUTH_BYPASS_MODE,
-  TEST_MODE_HEADER,
 } from '@/lib/auth/test-mode';
 import {
   COOKIE_BANNER_REQUIRED_COOKIE,
@@ -946,9 +944,8 @@ export default async function middleware(
   if (investorResponse) return investorResponse;
 
   if (isTestAuthBypassEnabled()) {
-    const testMode = req.headers.get(TEST_MODE_HEADER)?.trim();
     const testBypassUserId = resolveTestBypassUserId(req.headers, req.cookies);
-    if (testMode === TEST_AUTH_BYPASS_MODE || testBypassUserId) {
+    if (testBypassUserId) {
       return handleRequest(req, testBypassUserId);
     }
   }

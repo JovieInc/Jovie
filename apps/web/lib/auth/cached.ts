@@ -7,11 +7,12 @@ import {
   isTestAuthBypassEnabled,
   resolveTestBypassUserId,
 } from '@/lib/auth/test-mode';
+import { env } from '@/lib/env-server';
 
 type CachedCurrentUser = Awaited<ReturnType<typeof currentUser>>;
 
 function getBypassUserEmail(): string {
-  const configuredEmail = process.env.E2E_CLERK_USER_USERNAME?.trim();
+  const configuredEmail = env.E2E_CLERK_USER_USERNAME?.trim();
   return configuredEmail && configuredEmail.length > 0
     ? configuredEmail
     : 'e2e@jov.ie';
