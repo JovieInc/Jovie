@@ -144,7 +144,7 @@ export function useJovieChat({
     );
   }, [existingConversation]);
 
-  const { messages, sendMessage, status, setMessages } = useChat({
+  const { messages, sendMessage, status, setMessages, stop } = useChat({
     transport,
     onError: error => {
       captureException(error, {
@@ -697,5 +697,7 @@ export function useJovieChat({
     submitMessage: doSubmit,
     setChatError,
     isRateLimited,
+    /** Stop the current AI generation */
+    stop,
   };
 }
