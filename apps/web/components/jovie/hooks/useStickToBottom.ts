@@ -41,7 +41,6 @@ export function useStickToBottom({
 }: UseStickToBottomOptions): UseStickToBottomReturn {
   const [isStuckToBottom, setIsStuckToBottom] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const totalSizeElementRef = useRef<HTMLDivElement | null>(null);
   const observerRef = useRef<ResizeObserver | null>(null);
   const isStuckRef = useRef(true);
 
@@ -93,8 +92,6 @@ export function useStickToBottom({
       observerRef.current.disconnect();
       observerRef.current = null;
     }
-
-    totalSizeElementRef.current = node;
 
     if (!node) return;
 

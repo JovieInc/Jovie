@@ -9,7 +9,13 @@ import {
 } from '@jovie/ui';
 import { ArrowUp, ImagePlus, Loader2, Mic, MicOff, Plus } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { forwardRef, useCallback, useRef, useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -264,12 +270,18 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const maxHeight = isCompact ? 128 : 192;
     const minHeight = 28;
 
+    // Internal textarea ref for width measurement
+    const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
+    // Forward the ref to the parent while keeping internal access
+    useImperativeHandle(ref, () => internalTextareaRef.current!, []);
+
     // Smooth textarea height measurement (no height:'auto' trick)
     const { measuredHeight, isAtMaxHeight, containerRef, hiddenDivRef } =
       useTextareaAutosize({
         value,
         minHeight,
         maxHeight,
+        textareaRef: internalTextareaRef,
       });
 
     // Dictation baseline snapshot
@@ -408,7 +420,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
             {/* Animated textarea */}
             <motion.textarea
-              ref={ref}
+              ref={internalTextareaRef}
               value={value}
               onChange={e => onChange(e.target.value)}
               placeholder={placeholder}

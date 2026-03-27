@@ -9,6 +9,8 @@ interface UseTextareaAutosizeOptions {
   minHeight: number;
   /** Maximum height in pixels */
   maxHeight: number;
+  /** Ref to the actual textarea element for width measurement */
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
 }
 
 interface UseTextareaAutosizeReturn {
@@ -16,9 +18,9 @@ interface UseTextareaAutosizeReturn {
   measuredHeight: number;
   /** Whether the textarea is at max height (should show overflow scroll) */
   isAtMaxHeight: boolean;
-  /** Ref to attach to the textarea's parent container for width sync */
+  /** Ref to attach to the textarea's parent container */
   containerRef: React.RefObject<HTMLDivElement | null>;
-  /** The hidden measurement div to render (portal-free, inside containerRef) */
+  /** The hidden measurement div ref */
   hiddenDivRef: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -37,51 +39,53 @@ export function useTextareaAutosize({
   value,
   minHeight,
   maxHeight,
+  textareaRef,
 }: UseTextareaAutosizeOptions): UseTextareaAutosizeReturn {
   const [measuredHeight, setMeasuredHeight] = useState(minHeight);
   const containerRef = useRef<HTMLDivElement>(null);
   const hiddenDivRef = useRef<HTMLDivElement>(null);
 
-  // Measure on value change
-  useLayoutEffect(() => {
+  // Remeasure height (extracted so it can be called from both value change and width change)
+  const remeasure = () => {
     const hiddenDiv = hiddenDivRef.current;
     if (!hiddenDiv) return;
 
-    // Set content with trailing newline to ensure last line is measured
     hiddenDiv.textContent = value + '\n';
     const scrollHeight = hiddenDiv.scrollHeight;
     const clamped = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
     setMeasuredHeight(clamped);
-  }, [value, minHeight, maxHeight]);
+  };
 
-  // Sync hidden div width with container via ResizeObserver
+  // Measure on value change
+  // biome-ignore lint/correctness/useExhaustiveDependencies: remeasure reads value/min/max from closure
+  useLayoutEffect(remeasure, [value, minHeight, maxHeight]);
+
+  // Sync hidden div width with the textarea's actual width (not the container row)
+  // and remeasure height when width changes (responsive resize, sidebar toggle, etc.)
   useEffect(() => {
-    const container = containerRef.current;
+    const textarea = textareaRef.current;
     const hiddenDiv = hiddenDivRef.current;
-    if (!container || !hiddenDiv) return;
+    if (!textarea || !hiddenDiv) return;
 
-    const syncWidth = () => {
-      const width = container.getBoundingClientRect().width;
-      hiddenDiv.style.width = `${width}px`;
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const syncWidthAndRemeasure = () => {
+      const width = textarea.getBoundingClientRect().width;
+      if (width > 0) {
+        hiddenDiv.style.width = `${width}px`;
+        remeasure();
+      }
     };
 
     // Initial sync
-    syncWidth();
+    syncWidthAndRemeasure();
 
-    const observer = new ResizeObserver(syncWidth);
-    observer.observe(container);
+    const observer = new ResizeObserver(syncWidthAndRemeasure);
+    observer.observe(textarea);
 
     return () => observer.disconnect();
-  }, []);
-
-  // Reset height when value is cleared (e.g., after send)
-  const prevValueRef = useRef(value);
-  useLayoutEffect(() => {
-    if (value === '' && prevValueRef.current !== '') {
-      setMeasuredHeight(minHeight);
-    }
-    prevValueRef.current = value;
-  }, [value, minHeight]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [textareaRef]);
 
   const isAtMaxHeight = measuredHeight >= maxHeight;
 
