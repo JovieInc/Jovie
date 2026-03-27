@@ -126,6 +126,11 @@ export function ReleaseTable({
 
   // Stable callbacks for UnifiedTable props
   const getRowId = useCallback((row: ReleaseViewModel) => row.id, []);
+  const getRowTestId = useCallback(
+    (_row: ReleaseViewModel, index: number) =>
+      index === 0 ? 'release-row' : undefined,
+    []
+  );
   const getRowClassName = useCallback(
     (row: ReleaseViewModel) => {
       const isRowExpanded = showTracks && isExpanded(row.id);
@@ -346,6 +351,7 @@ export function ReleaseTable({
       getContextMenuItems={getContextMenuItems}
       onRowClick={onEdit}
       getRowId={getRowId}
+      getRowTestId={getRowTestId}
       getRowClassName={getRowClassName}
       enableVirtualization={shouldVirtualize && !groupByYear}
       rowHeight={rowHeight}

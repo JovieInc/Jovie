@@ -4,6 +4,7 @@ import {
   DEMO_SHOWCASE_SURFACE_IDS,
   type DemoShowcaseSurfaceId,
 } from '@/components/features/demo/showcase-surfaces';
+import { DemoPublicProfileSurface } from '@/features/demo/DemoPublicProfileSurface';
 import { DemoShowcaseSurface } from '@/features/demo/DemoShowcaseSurface';
 
 interface DemoShowcasePageProps {
@@ -22,6 +23,10 @@ export default async function DemoShowcasePage({
   const { surface } = await params;
   if (!DEMO_SHOWCASE_SURFACE_IDS.includes(surface as DemoShowcaseSurfaceId)) {
     notFound();
+  }
+
+  if (surface === 'public-profile') {
+    return <DemoPublicProfileSurface />;
   }
 
   return <DemoShowcaseSurface surface={surface as DemoShowcaseSurfaceId} />;

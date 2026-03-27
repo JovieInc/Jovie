@@ -55,3 +55,29 @@ export interface ScreenshotCatalogEntry extends ScreenshotManifestEntry {
   readonly url: string;
   readonly publicUrl?: string;
 }
+
+export function isScreenshotManifestEntry(
+  value: unknown
+): value is ScreenshotManifestEntry {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const entry = value as Partial<ScreenshotManifestEntry>;
+  return (
+    typeof entry.id === 'string' &&
+    typeof entry.title === 'string' &&
+    typeof entry.group === 'string' &&
+    typeof entry.groupLabel === 'string' &&
+    typeof entry.route === 'string' &&
+    typeof entry.viewport === 'string' &&
+    typeof entry.theme === 'string' &&
+    Array.isArray(entry.consumers) &&
+    entry.consumers.every(consumer => typeof consumer === 'string') &&
+    typeof entry.capturedAt === 'string' &&
+    typeof entry.imagePath === 'string' &&
+    (typeof entry.gitSha === 'string' || entry.gitSha === null) &&
+    (typeof entry.publicExportPath === 'string' ||
+      entry.publicExportPath === undefined)
+  );
+}

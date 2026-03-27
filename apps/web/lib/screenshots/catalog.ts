@@ -7,7 +7,11 @@ import {
   SCREENSHOT_SCENARIO_IDS,
   SCREENSHOT_SCENARIOS,
 } from './registry';
-import type { ScreenshotCatalogEntry, ScreenshotManifestEntry } from './types';
+import {
+  isScreenshotManifestEntry,
+  type ScreenshotCatalogEntry,
+  type ScreenshotManifestEntry,
+} from './types';
 
 const CATALOG_ROOT = resolveMonorepoPath(
   'apps',
@@ -29,31 +33,6 @@ function getCatalogImagePath(id: string) {
 
 function getPublicExportAbsolutePath(relativePath: string) {
   return join(PUBLIC_EXPORT_ROOT, relativePath);
-}
-
-function isScreenshotManifestEntry(
-  value: unknown
-): value is ScreenshotManifestEntry {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const entry = value as Partial<ScreenshotManifestEntry>;
-  return (
-    typeof entry.id === 'string' &&
-    typeof entry.title === 'string' &&
-    typeof entry.group === 'string' &&
-    typeof entry.groupLabel === 'string' &&
-    typeof entry.route === 'string' &&
-    typeof entry.viewport === 'string' &&
-    typeof entry.theme === 'string' &&
-    Array.isArray(entry.consumers) &&
-    typeof entry.capturedAt === 'string' &&
-    typeof entry.imagePath === 'string' &&
-    (typeof entry.gitSha === 'string' || entry.gitSha === null) &&
-    (typeof entry.publicExportPath === 'string' ||
-      typeof entry.publicExportPath === 'undefined')
-  );
 }
 
 async function readManifest(): Promise<readonly ScreenshotManifestEntry[]> {

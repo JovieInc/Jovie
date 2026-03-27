@@ -1,10 +1,7 @@
 'use client';
 
-import { TooltipProvider } from '@jovie/ui';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
 import type { EnrichedProfileData } from '@/app/onboarding/actions/enrich-profile';
-import { NuqsProvider } from '@/components/providers/NuqsProvider';
 import { AuthLayout } from '@/features/auth';
 import { OnboardingDspStep } from '@/features/dashboard/organisms/onboarding/OnboardingDspStep';
 import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding/OnboardingHandleStep';
@@ -12,14 +9,22 @@ import { OnboardingProfileReviewStep } from '@/features/dashboard/organisms/onbo
 import { DashboardAnalyticsDemo } from '@/features/home/demo/DashboardAnalyticsDemo';
 import { DashboardEarningsDemo } from '@/features/home/demo/DashboardEarningsDemo';
 import { DashboardLinksDemo } from '@/features/home/demo/DashboardLinksDemo';
-import { ClerkSafeDefaultsProvider } from '@/hooks/useClerkSafe';
 import { DemoAuthShell } from './DemoAuthShell';
+import { DemoClientProviders } from './DemoClientProviders';
 import { DemoSettingsPanel } from './DemoSettingsPanel';
 import type { DemoShowcaseSurfaceId } from './showcase-surfaces';
 
 interface DemoShowcaseSurfaceProps {
   readonly surface: DemoShowcaseSurfaceId;
 }
+
+const HANDLE_VALIDATION_MOCK = {
+  available: true,
+  checking: false,
+  error: null,
+  clientValid: true,
+  suggestions: ['soravale', 'soravalemusic'],
+};
 
 const PROFILE_REVIEW_DATA: EnrichedProfileData = {
   name: 'Sora Vale',
@@ -29,34 +34,6 @@ const PROFILE_REVIEW_DATA: EnrichedProfileData = {
   genres: ['Indie Electronic', 'Synthwave', 'Ambient Pop'],
   followers: 184_000,
 };
-
-function DemoOnboardingProviders({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            retry: false,
-            staleTime: Number.POSITIVE_INFINITY,
-            refetchOnMount: false,
-            refetchOnWindowFocus: false,
-          },
-        },
-      })
-  );
-
-  return (
-    <ClerkSafeDefaultsProvider>
-      <QueryClientProvider client={queryClient}>
-        <NuqsProvider>
-          <TooltipProvider delayDuration={1200}>{children}</TooltipProvider>
-        </NuqsProvider>
-      </QueryClientProvider>
-    </ClerkSafeDefaultsProvider>
-  );
-}
 
 function DemoShowcasePanel({
   title,
@@ -89,13 +66,6 @@ export function DemoShowcaseSurface({
 }: Readonly<DemoShowcaseSurfaceProps>) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [handleInput, setHandleInput] = useState('soravale');
-  const handleValidation = {
-    available: true,
-    checking: false,
-    error: null,
-    clientValid: true,
-    suggestions: ['soravale', 'soravalemusic'],
-  };
   const noop = useCallback(() => {}, []);
 
   switch (surface) {
@@ -135,7 +105,7 @@ export function DemoShowcaseSurface({
     case 'onboarding-handle':
       return (
         <div data-testid='demo-showcase-onboarding-handle'>
-          <DemoOnboardingProviders>
+          <DemoClientProviders>
             <AuthLayout
               formTitle='Choose your handle'
               showFormTitle={false}
@@ -147,7 +117,7 @@ export function DemoShowcaseSurface({
                 title='Choose your handle'
                 prompt='This is how fans will find and remember you.'
                 handleInput={handleInput}
-                handleValidation={handleValidation}
+                handleValidation={HANDLE_VALIDATION_MOCK}
                 stateError={null}
                 isSubmitting={false}
                 isTransitioning={false}
@@ -158,13 +128,13 @@ export function DemoShowcaseSurface({
                 onSuggestionClick={setHandleInput}
               />
             </AuthLayout>
-          </DemoOnboardingProviders>
+          </DemoClientProviders>
         </div>
       );
     case 'onboarding-dsp':
       return (
         <div data-testid='demo-showcase-onboarding-dsp'>
-          <DemoOnboardingProviders>
+          <DemoClientProviders>
             <AuthLayout
               formTitle='Connect your music'
               showFormTitle={false}
@@ -180,13 +150,13 @@ export function DemoShowcaseSurface({
                 isTransitioning={false}
               />
             </AuthLayout>
-          </DemoOnboardingProviders>
+          </DemoClientProviders>
         </div>
       );
     case 'onboarding-profile-review':
       return (
         <div data-testid='demo-showcase-onboarding-profile-review'>
-          <DemoOnboardingProviders>
+          <DemoClientProviders>
             <AuthLayout
               formTitle='Your profile'
               showFormTitle={false}
@@ -207,7 +177,7 @@ export function DemoShowcaseSurface({
                 isStepResume
               />
             </AuthLayout>
-          </DemoOnboardingProviders>
+          </DemoClientProviders>
         </div>
       );
     default:

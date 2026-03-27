@@ -3,6 +3,7 @@ export const DEMO_SHOWCASE_SURFACE_IDS = [
   'earnings',
   'links',
   'settings',
+  'public-profile',
   'onboarding-handle',
   'onboarding-dsp',
   'onboarding-profile-review',

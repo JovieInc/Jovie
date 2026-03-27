@@ -13,7 +13,10 @@ import {
   SCREENSHOT_SCENARIOS,
   SCREENSHOT_VIEWPORTS,
 } from '../../lib/screenshots/registry';
-import type { ScreenshotManifestEntry } from '../../lib/screenshots/types';
+import {
+  isScreenshotManifestEntry,
+  type ScreenshotManifestEntry,
+} from '../../lib/screenshots/types';
 import {
   assertNoDevOverlays,
   CATALOG_OUTPUT_DIR,
@@ -28,29 +31,6 @@ const MANIFEST_PATH = join(CATALOG_OUTPUT_DIR, 'manifest.json');
 
 async function ensureDirectory(path: string) {
   await mkdir(path, { recursive: true });
-}
-
-function isManifestEntry(value: unknown): value is ScreenshotManifestEntry {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const entry = value as Partial<ScreenshotManifestEntry>;
-  return (
-    typeof entry.id === 'string' &&
-    typeof entry.title === 'string' &&
-    typeof entry.group === 'string' &&
-    typeof entry.groupLabel === 'string' &&
-    typeof entry.route === 'string' &&
-    typeof entry.viewport === 'string' &&
-    typeof entry.theme === 'string' &&
-    Array.isArray(entry.consumers) &&
-    typeof entry.capturedAt === 'string' &&
-    typeof entry.imagePath === 'string' &&
-    (typeof entry.gitSha === 'string' || entry.gitSha === null) &&
-    (typeof entry.publicExportPath === 'string' ||
-      typeof entry.publicExportPath === 'undefined')
-  );
 }
 
 async function readOptionalFile(path: string): Promise<Buffer | null> {
@@ -72,7 +52,7 @@ async function removeOrphanFiles(
   await Promise.all(
     files
       .filter(file => !ownedFiles.has(file))
-      .map(file => rm(join(directory, file), { force: true }))
+      .map(file => rm(join(directory, file), { force: true, recursive: true }))
   );
 }
 
@@ -101,7 +81,9 @@ async function readManifestEntries() {
     }
 
     return new Map(
-      parsed.filter(isManifestEntry).map(entry => [entry.id, entry] as const)
+      parsed
+        .filter(isScreenshotManifestEntry)
+        .map(entry => [entry.id, entry] as const)
     );
   } catch {
     return new Map<string, ScreenshotManifestEntry>();
@@ -226,7 +208,7 @@ async function prepareScenario(
   if (scenario.interaction === 'open-first-release') {
     await waitForImages(page, 'table').catch(() => {});
     await waitForSettle(page, 2000);
-    await page.locator('tbody tr').first().click();
+    await page.locator('[data-testid="release-row"]').first().click();
     await expect(page.locator(scenario.waitFor).first()).toBeVisible({
       timeout: TIMEOUTS.SIDEBAR_VISIBLE,
     });

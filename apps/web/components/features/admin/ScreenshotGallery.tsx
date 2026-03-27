@@ -143,6 +143,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   key={filter.id}
                   type='button'
                   onClick={() => setGroupFilter(filter.id)}
+                  aria-pressed={groupFilter === filter.id}
                   className={`rounded-full border px-3 py-1.5 text-[12px] ${
                     groupFilter === filter.id
                       ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
@@ -160,6 +161,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                 key={filter.id}
                 type='button'
                 onClick={() => setConsumerFilter(filter.id)}
+                aria-pressed={consumerFilter === filter.id}
                 className={`rounded-full border px-3 py-1.5 text-[12px] ${
                   consumerFilter === filter.id
                     ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
