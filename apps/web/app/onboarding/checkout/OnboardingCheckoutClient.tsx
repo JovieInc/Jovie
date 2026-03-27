@@ -7,9 +7,10 @@ import { Avatar } from '@/components/molecules/Avatar/Avatar';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
-import { FORM_LAYOUT } from '@/lib/auth/constants';
+import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
+import { cn } from '@/lib/utils';
 
 interface OnboardingCheckoutClientProps {
   readonly plan: PlanIntentTier;
@@ -96,7 +97,10 @@ function ProfilePreviewCard({
               type='button'
               aria-pressed={!showBranding}
               onClick={onToggleBranding}
-              className='group flex w-full items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors hover:bg-surface-1'
+              className={cn(
+                AUTH_SURFACE.fieldShell,
+                'justify-between px-3.5 py-2.5'
+              )}
             >
               <span className='text-[13px] text-secondary-token'>
                 Jovie branding
@@ -128,7 +132,7 @@ function ProfilePreviewCard({
       </ContentSurfaceCard>
 
       {spotifyFollowers && spotifyFollowers > 0 ? (
-        <div className='mb-4 flex items-start gap-2.5 rounded-lg border border-subtle bg-surface-1 px-4 py-3'>
+        <ContentSurfaceCard className='mb-4 px-4 py-3'>
           <Sparkles className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)' />
           <p className='text-[13px] text-secondary-token'>
             You have{' '}
@@ -138,7 +142,7 @@ function ProfilePreviewCard({
             . {planDisplayName} analytics shows exactly where they&apos;re
             listening from.
           </p>
-        </div>
+        </ContentSurfaceCard>
       ) : null}
     </>
   );
@@ -160,11 +164,11 @@ function BillingIntervalSelector({
       <legend className='sr-only'>Billing interval</legend>
       <div className='flex items-center justify-center gap-3'>
         <label
-          className={`cursor-pointer rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${
-            isAnnual
-              ? 'text-tertiary-token hover:text-secondary-token'
-              : 'bg-surface-1 text-primary-token'
-          }`}
+          className={cn(
+            AUTH_SURFACE.pillOption,
+            !isAnnual && AUTH_SURFACE.pillOptionActive,
+            'cursor-pointer'
+          )}
         >
           <input
             type='radio'
@@ -176,11 +180,11 @@ function BillingIntervalSelector({
           Monthly
         </label>
         <label
-          className={`cursor-pointer rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${
-            isAnnual
-              ? 'bg-surface-1 text-primary-token'
-              : 'text-tertiary-token hover:text-secondary-token'
-          }`}
+          className={cn(
+            AUTH_SURFACE.pillOption,
+            isAnnual && AUTH_SURFACE.pillOptionActive,
+            'cursor-pointer'
+          )}
         >
           <input
             type='radio'
@@ -335,21 +339,25 @@ export function OnboardingCheckoutClient({
         ) : null}
 
         {/* Pro highlights */}
-        <div className='mb-6 space-y-2.5'>
-          {PRO_HIGHLIGHTS.map(item => (
-            <div key={item.label} className='flex items-start gap-3'>
-              <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-1'>
-                <item.icon className='h-4 w-4 text-(--linear-accent)' />
+        <ContentSurfaceCard className='mb-6 p-4'>
+          <div className='space-y-2.5'>
+            {PRO_HIGHLIGHTS.map(item => (
+              <div key={item.label} className='flex items-start gap-3'>
+                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-surface-1'>
+                  <item.icon className='h-4 w-4 text-(--linear-accent)' />
+                </div>
+                <div>
+                  <p className='text-[13px] font-medium text-primary-token'>
+                    {item.label}
+                  </p>
+                  <p className='text-[12px] text-tertiary-token'>
+                    {item.detail}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className='text-[13px] font-medium text-primary-token'>
-                  {item.label}
-                </p>
-                <p className='text-[12px] text-tertiary-token'>{item.detail}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </ContentSurfaceCard>
 
         {/* Annual toggle */}
         {hasAnnualOption ? (
@@ -372,12 +380,12 @@ export function OnboardingCheckoutClient({
 
         {/* Error message */}
         {error ? (
-          <div
-            className='mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-[13px] text-destructive'
+          <ContentSurfaceCard
+            className='mb-4 border-destructive/30 bg-destructive/5 px-4 py-3 text-[13px] text-destructive'
             role='alert'
           >
             {error}
-          </div>
+          </ContentSurfaceCard>
         ) : null}
 
         {/* CTA */}

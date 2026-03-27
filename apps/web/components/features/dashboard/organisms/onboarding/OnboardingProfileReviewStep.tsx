@@ -10,8 +10,9 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { AuthButton } from '@/features/auth';
 import { track } from '@/lib/analytics';
-import { FORM_LAYOUT } from '@/lib/auth/constants';
+import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { useUserAvatarMutation } from '@/lib/queries/useUserAvatarMutation';
+import { cn } from '@/lib/utils';
 import {
   canProceedFromProfileReview,
   validateDisplayName as validateDisplayNameGuard,
@@ -380,37 +381,56 @@ export function OnboardingProfileReviewStep({
                 {/* Editable Name + Handle */}
                 <div className='text-center w-full'>
                   {isEditingName ? (
-                    <div className='flex flex-col items-center gap-1'>
-                      <input
-                        ref={nameInputRef}
-                        type='text'
-                        value={editableDisplayName}
-                        onChange={e => setEditableDisplayName(e.target.value)}
-                        onBlur={handleNameBlur}
-                        onKeyDown={handleNameKeyDown}
-                        maxLength={50}
-                        className='text-[16px] font-[590] text-primary-token text-center bg-transparent border-b border-accent outline-none w-full max-w-[280px] pb-0.5'
-                        aria-label='Edit display name'
-                      />
+                    <div className='flex w-full flex-col items-center gap-1.5'>
+                      <div
+                        className={cn(
+                          AUTH_SURFACE.fieldShell,
+                          'mx-auto max-w-[280px] justify-center px-3 py-2.5'
+                        )}
+                      >
+                        <input
+                          ref={nameInputRef}
+                          type='text'
+                          value={editableDisplayName}
+                          onChange={e => setEditableDisplayName(e.target.value)}
+                          onBlur={handleNameBlur}
+                          onKeyDown={handleNameKeyDown}
+                          maxLength={50}
+                          className={cn(
+                            AUTH_SURFACE.fieldInput,
+                            'text-center text-[15px] font-[590]'
+                          )}
+                          aria-label='Edit display name'
+                        />
+                      </div>
                       {nameError && (
                         <p className='text-[11px] text-red-500'>{nameError}</p>
                       )}
                     </div>
                   ) : (
-                    <button
-                      type='button'
-                      onClick={startEditingName}
-                      className='group cursor-pointer'
-                      aria-label='Click to edit display name'
-                    >
-                      <p className='text-[16px] font-[590] text-primary-token group-hover:text-accent transition-colors'>
-                        {editableDisplayName}
-                      </p>
-                    </button>
+                    <div className='flex flex-col items-center gap-2'>
+                      <button
+                        type='button'
+                        onClick={startEditingName}
+                        className='group cursor-pointer'
+                        aria-label='Click to edit display name'
+                      >
+                        <p className='text-[16px] font-[590] text-primary-token group-hover:text-accent transition-colors'>
+                          {editableDisplayName}
+                        </p>
+                      </button>
+                      <button
+                        type='button'
+                        onClick={startEditingName}
+                        className={AUTH_SURFACE.inlineAction}
+                      >
+                        Edit name
+                      </button>
+                    </div>
                   )}
-                  <p className='text-[13px] text-tertiary-token mt-1'>
-                    @{handle}
-                  </p>
+                  <div className='mt-2'>
+                    <span className={AUTH_SURFACE.subtlePill}>@{handle}</span>
+                  </div>
                 </div>
 
                 {/* Bio */}
@@ -424,10 +444,7 @@ export function OnboardingProfileReviewStep({
                 {genres.length > 0 && (
                   <div className='flex flex-wrap justify-center gap-1.5'>
                     {genres.slice(0, 3).map(genre => (
-                      <span
-                        key={genre}
-                        className='rounded-full bg-surface-1 px-2.5 py-0.5 text-[11px] font-[510] text-secondary-token capitalize'
-                      >
+                      <span key={genre} className={AUTH_SURFACE.subtlePill}>
                         {genre}
                       </span>
                     ))}
