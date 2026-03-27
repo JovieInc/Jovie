@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 
 describe('DrawerSurfaceCard', () => {
   it('defaults to the flat variant', () => {
@@ -33,5 +34,18 @@ describe('DrawerSurfaceCard', () => {
     expect(className).toContain('rounded-[10px]');
     expect(className).toContain('border-(--linear-app-frame-seam)');
     expect(className).toContain('bg-(--linear-app-content-surface)');
+    expect(className).toContain(
+      'shadow-[0_12px_28px_rgba(15,23,42,0.08),0_2px_6px_rgba(15,23,42,0.05)]'
+    );
+  });
+
+  it('keeps drawer and sidebar cards on a higher elevation tier than main content containers', () => {
+    expect(LINEAR_SURFACE.drawerCard).not.toBe(LINEAR_SURFACE.contentContainer);
+    expect(LINEAR_SURFACE.drawerCardSm).not.toBe(
+      LINEAR_SURFACE.contentContainer
+    );
+    expect(LINEAR_SURFACE.sidebarCard).not.toBe(
+      LINEAR_SURFACE.contentContainer
+    );
   });
 });

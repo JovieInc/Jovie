@@ -24,7 +24,7 @@ const webServerCommand = process.env.DATABASE_URL
 
 export default defineConfig({
   testDir: './tests/product-screenshots',
-  testMatch: '**/catalog.spec.ts',
+  testMatch: '**/*.spec.ts',
   fullyParallel: false, // Run sequentially for deterministic screenshots
   forbidOnly: true,
   retries: 1, // One retry in case of flaky image loads

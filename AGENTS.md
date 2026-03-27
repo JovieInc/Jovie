@@ -320,6 +320,7 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 - `app/layout.tsx` must not read per-request headers for marketing; theme init belongs in static `/public/theme-init.js` (no nonce).
 - Middleware (`proxy.ts`) should only issue CSP nonces for app/protected/API paths. Marketing routes must not depend on nonce or geo headers for rendering.
 - Homepage "See It In Action" must not hit the database during SSR; use static `FALLBACK_AVATARS` only.
+- Marketing copy must not invent adoption metrics, customer counts, waitlist sizes, or traction claims. If a number is not verified and current, use non-quantified launch-stage copy instead.
 - Blog and changelog pages must be fully static, reading content from filesystem at build time only.
 - Cookie banner remains client-driven (localStorage + server cookie write) without server-provided `x-show-cookie-banner` headers.
 - Structured data on marketing pages should be rendered without `biome-ignore`; use string children inside `<script type="application/ld+json">` and `safeJsonLdStringify()` whenever user-controlled content is involved.

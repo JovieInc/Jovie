@@ -44,7 +44,7 @@ export function FinalCTASection() {
           </div>
 
           <p className='mt-5 text-[11px] tracking-[0.01em] text-quaternary-token'>
-            Join 500+ independent artists already on Jovie.
+            Be one of the first artists on Jovie.
           </p>
         </div>
       </MarketingContainer>

@@ -33,6 +33,8 @@ export interface EntitySidebarShellProps {
   readonly headerActions?: ReactNode;
   /** Minimal mode keeps top chrome utility-only and moves entity header into scrollable content. */
   readonly headerMode?: 'standard' | 'minimal';
+  /** Hide the utility-only top bar in minimal mode. */
+  readonly hideMinimalHeaderBar?: boolean;
 
   /** Entity header slot — image + name area below the header bar */
   readonly entityHeader?: ReactNode;
@@ -40,6 +42,8 @@ export interface EntitySidebarShellProps {
   readonly actionsInEntityHeader?: boolean;
   /** Tabs slot — SegmentControl rendered below entity header */
   readonly tabs?: ReactNode;
+  /** Controls where tabs render when headerMode is minimal. */
+  readonly minimalTabsPlacement?: 'card' | 'header';
   /** Optional className override for the tabs wrapper */
   readonly tabsContainerClassName?: string;
 
@@ -89,9 +93,11 @@ export function EntitySidebarShell({
   onClose,
   headerActions,
   headerMode = 'standard',
+  hideMinimalHeaderBar = false,
   entityHeader,
   actionsInEntityHeader = false,
   tabs,
+  minimalTabsPlacement = 'card',
   tabsContainerClassName,
   children,
   footer,
@@ -99,6 +105,9 @@ export function EntitySidebarShell({
   emptyMessage = 'Select an item to view details.',
 }: EntitySidebarShellProps) {
   const isMinimalHeader = headerMode === 'minimal';
+  const showMinimalHeaderBar = !(isMinimalHeader && hideMinimalHeaderBar);
+  const renderMinimalTabsInHeader =
+    isMinimalHeader && minimalTabsPlacement === 'header';
   const resolvedHeaderTitle = isMinimalHeader ? (
     <span className='sr-only'>{ariaLabel}</span>
   ) : (
@@ -143,14 +152,16 @@ export function EntitySidebarShell({
                 'border-b border-transparent backdrop-blur-[12px]'
               )}
             >
-              <DrawerHeader
-                title={resolvedHeaderTitle}
-                actions={titleBarActions}
-                className={cn(
-                  isMinimalHeader &&
-                    'min-h-[34px] px-2.5 py-1 lg:min-h-[36px] lg:px-3'
-                )}
-              />
+              {showMinimalHeaderBar ? (
+                <DrawerHeader
+                  title={resolvedHeaderTitle}
+                  actions={titleBarActions}
+                  className={cn(
+                    isMinimalHeader &&
+                      'min-h-[34px] px-2.5 py-1 lg:min-h-[36px] lg:px-3'
+                  )}
+                />
+              ) : null}
 
               {!isMinimalHeader && entityHeader ? (
                 <div className='overflow-visible px-3 pb-2.5 pt-2.5'>
@@ -167,6 +178,19 @@ export function EntitySidebarShell({
                 <div
                   className={cn(
                     'overflow-visible border-t border-(--linear-app-frame-seam) px-3 py-2 [&>*]:w-full',
+                    tabsContainerClassName
+                  )}
+                >
+                  {tabs}
+                </div>
+              ) : null}
+
+              {renderMinimalTabsInHeader && tabs ? (
+                <div
+                  className={cn(
+                    showMinimalHeaderBar &&
+                      'border-t border-(--linear-app-frame-seam)',
+                    'overflow-visible px-3 py-2 [&>*]:w-full',
                     tabsContainerClassName
                   )}
                 >
@@ -192,7 +216,7 @@ export function EntitySidebarShell({
                     {entityHeader}
                   </div>
                 ) : null}
-                {isMinimalHeader && tabs ? (
+                {isMinimalHeader && tabs && !renderMinimalTabsInHeader ? (
                   <DrawerSurfaceCard
                     variant='card'
                     className='overflow-hidden'

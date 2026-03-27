@@ -44,6 +44,7 @@ export function TrackPlatformLinksSection({
             label={PROVIDER_LABELS[provider.key] ?? provider.label}
             url={provider.url}
             deepLinkPlatform={provider.key}
+            surfaceVariant='track'
           />
         ))}
       </div>
