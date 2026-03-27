@@ -73,6 +73,13 @@ export interface ChatInsightsToolResult extends ChatInsightSummary {
   readonly success: boolean;
 }
 
+export interface SocialLinkRemovalToolResult {
+  readonly success: boolean;
+  readonly linkId: string;
+  readonly platform: string;
+  readonly url: string;
+}
+
 export interface ToolInvocationPart {
   type: 'tool-invocation';
   toolInvocationId: string;

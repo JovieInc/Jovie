@@ -135,8 +135,8 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
       eventType: 'subscription_created',
     });
 
-    // Activate referral if this user was referred.
-    // Awaited so failures are surfaced instead of silently dropped.
+    // Activate referral if this user was referred (best-effort).
+    // Awaited to preserve ordering before cache invalidation; failures are logged, not thrown.
     await tryActivateReferral(userId);
 
     // Invalidate client cache

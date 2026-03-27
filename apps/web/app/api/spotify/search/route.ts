@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
-import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
+import { captureError } from '@/lib/error-tracking';
 
 export type { SpotifyArtistResult } from '@/lib/contracts/api';
 
@@ -60,9 +60,10 @@ function handleSearchError(
   headers: HeadersInit
 ): NextResponse {
   if (error instanceof CircuitOpenError) {
-    Sentry.captureException(error, {
-      tags: { source: 'spotify_search_api' },
-      extra: { query: q, limit, circuitStats: error.stats },
+    captureError('[Spotify Search] Circuit open', error, {
+      source: 'spotify_search_api',
+      query: q,
+      limit,
     });
     return NextResponse.json(
       {
@@ -73,9 +74,10 @@ function handleSearchError(
     );
   }
 
-  Sentry.captureException(error, {
-    tags: { source: 'spotify_search_api' },
-    extra: { query: q, limit },
+  captureError('[Spotify Search] Search failed', error, {
+    source: 'spotify_search_api',
+    query: q,
+    limit,
   });
 
   logger.error('[Spotify Search] Search failed:', {
