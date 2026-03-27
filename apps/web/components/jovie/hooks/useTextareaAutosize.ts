@@ -57,7 +57,6 @@ export function useTextareaAutosize({
   };
 
   // Measure on value change
-  // biome-ignore lint/correctness/useExhaustiveDependencies: remeasure reads value/min/max from closure
   useLayoutEffect(remeasure, [value, minHeight, maxHeight]);
 
   // Sync hidden div width with the textarea's actual width (not the container row)
