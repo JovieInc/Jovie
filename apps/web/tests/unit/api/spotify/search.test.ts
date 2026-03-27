@@ -9,6 +9,11 @@ const mockIsSpotifyAvailable = vi.hoisted(() => vi.fn());
 const mockSearchArtists = vi.hoisted(() => vi.fn());
 const mockGetAlphabetResults = vi.hoisted(() => vi.fn());
 const mockCacheQuery = vi.hoisted(() => vi.fn());
+const mockApplyVipBoost = vi.hoisted(() => vi.fn());
+const mockApplyVipBoostWithMeta = vi.hoisted(() => vi.fn());
+const mockAnnotateClaimedStatus = vi.hoisted(() => vi.fn());
+const mockAnnotateClaimedStatusWithMeta = vi.hoisted(() => vi.fn());
+const mockBoostClaimedArtists = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
@@ -30,14 +35,14 @@ vi.mock('@/lib/spotify/circuit-breaker', () => ({
 }));
 
 vi.mock('@/app/api/spotify/search/helpers', () => ({
-  applyVipBoost: vi.fn((results: unknown[]) => Promise.resolve(results)),
-  boostClaimedArtists: vi.fn((results: unknown[]) => results),
+  applyVipBoost: mockApplyVipBoost,
+  applyVipBoostWithMeta: mockApplyVipBoostWithMeta,
+  boostClaimedArtists: mockBoostClaimedArtists,
   parseLimit: vi.fn(
     (_param: string | null, defaultVal: number, _max: number) => defaultVal
   ),
-  annotateClaimedStatus: vi.fn((results: unknown[]) =>
-    Promise.resolve(results)
-  ),
+  annotateClaimedStatus: mockAnnotateClaimedStatus,
+  annotateClaimedStatusWithMeta: mockAnnotateClaimedStatusWithMeta,
 }));
 
 vi.mock('@/lib/spotify/alphabet-cache', () => ({
@@ -81,6 +86,19 @@ describe('GET /api/spotify/search', () => {
       async (_key: string, queryFn: () => Promise<unknown>) => queryFn()
     );
     mockGetAlphabetResults.mockResolvedValue(null);
+    mockAnnotateClaimedStatus.mockImplementation((results: unknown[]) =>
+      Promise.resolve(results)
+    );
+    mockAnnotateClaimedStatusWithMeta.mockImplementation((results: unknown[]) =>
+      Promise.resolve({ degraded: false, results })
+    );
+    mockBoostClaimedArtists.mockImplementation((results: unknown[]) => results);
+    mockApplyVipBoost.mockImplementation((results: unknown[]) =>
+      Promise.resolve(results)
+    );
+    mockApplyVipBoostWithMeta.mockImplementation((results: unknown[]) =>
+      Promise.resolve({ degraded: false, results })
+    );
   });
 
   it('returns 400 when query is missing', async () => {
@@ -198,6 +216,81 @@ describe('GET /api/spotify/search', () => {
       'spotify:search:test:5',
       expect.any(Function),
       { ttlSeconds: 300, useRedis: true }
+    );
+  });
+
+  it('allows VIP injection when the filtered result set is empty', async () => {
+    mockSearchArtists.mockResolvedValue([]);
+    mockApplyVipBoostWithMeta.mockResolvedValue({
+      degraded: false,
+      results: [
+        {
+          id: 'vip-id',
+          name: 'VIP Artist',
+          url: 'https://open.spotify.com/artist/vip-id',
+          followers: 1234,
+          popularity: 88,
+        },
+      ],
+    });
+
+    const response = await GET(
+      new NextRequest('http://localhost/api/spotify/search?q=vip%20artist')
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toHaveLength(1);
+    expect(data[0].id).toBe('vip-id');
+    expect(mockApplyVipBoostWithMeta).toHaveBeenCalledWith([], 'vip artist', 5);
+  });
+
+  it('returns degraded enrichment results without caching them at the response layer', async () => {
+    mockSearchArtists.mockResolvedValue([
+      {
+        spotifyId: 'artist_1',
+        name: 'Artist One',
+        imageUrl: null,
+        popularity: 42,
+        followerCount: 1234,
+      },
+    ]);
+    mockAnnotateClaimedStatusWithMeta.mockResolvedValue({
+      degraded: true,
+      results: [
+        {
+          id: 'artist_1',
+          name: 'Artist One',
+          url: 'https://open.spotify.com/artist/artist_1',
+          followers: 1234,
+          popularity: 42,
+        },
+      ],
+    });
+    mockApplyVipBoostWithMeta.mockResolvedValue({
+      degraded: false,
+      results: [
+        {
+          id: 'artist_1',
+          name: 'Artist One',
+          url: 'https://open.spotify.com/artist/artist_1',
+          followers: 1234,
+          popularity: 42,
+        },
+      ],
+    });
+
+    const response = await GET(
+      new NextRequest('http://localhost/api/spotify/search?q=artist')
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data[0].id).toBe('artist_1');
+    expect(mockCacheQuery).toHaveBeenCalledWith(
+      'spotify:search:response:artist:5',
+      expect.any(Function),
+      { ttlSeconds: 60, useRedis: true }
     );
   });
 
