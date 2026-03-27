@@ -314,3 +314,14 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 **Effort:** S (human: ~1 day / CC: ~15 min)
 **Priority:** P2
 **Depends on:** Auto pitch generator PR.
+
+---
+
+## Flaky onboarding performance budget test
+
+**What:** `tests/components/dashboard/organisms/onboarding-v2-performance.test.tsx` — handle screen render budget (200ms) fails intermittently (measured 378ms). The threshold may be too tight for CI runners.
+
+**Why:** Blocks CI with false positives. Not a real regression, just environment-dependent timing.
+
+**Priority:** P2
+**Noticed on:** itstimwhite/ci-pr-strictness (2026-03-27) — pre-existing, not caused by branch changes.
