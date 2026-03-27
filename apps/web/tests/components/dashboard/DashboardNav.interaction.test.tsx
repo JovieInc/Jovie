@@ -129,17 +129,17 @@ describe('DashboardNav interactions', () => {
     );
   });
 
-  it('shows grouped admin navigation with growth links for admin users', () => {
+  it('shows grouped admin navigation with the consolidated workspaces for admin users', () => {
     renderDashboardNav({ isAdmin: true });
 
-    expect(screen.getByText('Growth')).toBeDefined();
-    expect(screen.getByRole('link', { name: 'Leads' })).toHaveAttribute(
+    expect(screen.getByText('Workspaces')).toBeDefined();
+    expect(screen.getByRole('link', { name: 'People' })).toHaveAttribute(
       'href',
-      APP_ROUTES.ADMIN_LEADS
+      APP_ROUTES.ADMIN_PEOPLE
     );
-    expect(screen.getByRole('link', { name: 'Outreach' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Growth' })).toHaveAttribute(
       'href',
-      APP_ROUTES.ADMIN_OUTREACH
+      APP_ROUTES.ADMIN_GROWTH
     );
   });
 
