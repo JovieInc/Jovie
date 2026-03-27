@@ -9,7 +9,6 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 
 const MODE_LABELS: Record<SwipeableProfileMode, string> = {
   profile: 'Home',
-  listen: 'Listen',
   tour: 'Tour',
   about: 'About',
   tip: 'Tip',

@@ -1,6 +1,7 @@
 'use client';
 
 import { Input } from '@jovie/ui';
+import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
@@ -19,6 +20,7 @@ const PROFILE_INPUT_CLASS =
 
 export function SettingsProfileSection({
   artist,
+  avatarQuality,
   onArtistUpdate,
   onRefresh,
 }: SettingsProfileSectionProps) {
@@ -97,6 +99,19 @@ export function SettingsProfileSection({
             acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
           />
         </div>
+        {avatarQuality.status === 'low' ? (
+          <div className='flex items-start gap-3 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[12px] text-secondary-token'>
+            <AlertCircle
+              className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'
+              aria-hidden='true'
+            />
+            <p>
+              This photo is only {avatarQuality.width}x{avatarQuality.height}.
+              Jovie profiles look best at 512x512 or higher, so upload a sharper
+              image before this goes live at full size.
+            </p>
+          </div>
+        ) : null}
 
         <div className='flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between'>
           <label
