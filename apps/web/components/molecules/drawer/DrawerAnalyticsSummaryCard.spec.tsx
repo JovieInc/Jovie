@@ -33,16 +33,40 @@ describe('DrawerAnalyticsSummaryCard', () => {
   });
 
   it('renders loading placeholders while data is pending', () => {
-    const { container } = render(
+    render(
       <DrawerAnalyticsSummaryCard
         metrics={[
           { label: 'Profile views', value: '0' },
           { label: 'Link clicks', value: '0' },
         ]}
         state='loading'
+        testId='analytics-card'
       />
     );
 
-    expect(container.querySelectorAll('.skeleton')).toHaveLength(6);
+    expect(screen.getByTestId('analytics-card')).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
+    expect(
+      screen.getByRole('status', { name: 'Loading analytics' })
+    ).toBeInTheDocument();
+  });
+
+  it('marks the whole card busy when dimmed content includes a footer', () => {
+    render(
+      <DrawerAnalyticsSummaryCard
+        metrics={[{ label: 'Profile views', value: '120' }]}
+        state='ready'
+        dimmed={true}
+        footer={<button type='button'>Last 30 days</button>}
+        testId='analytics-card'
+      />
+    );
+
+    expect(screen.getByTestId('analytics-card')).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
   });
 });

@@ -68,26 +68,36 @@ export function ProfileAnalyticsSummary() {
 
   const profileViews = data?.profile_views ?? 0;
   const totalClicks = data?.total_clicks ?? 0;
+  const isEmpty =
+    state === 'ready' &&
+    data !== undefined &&
+    profileViews === 0 &&
+    totalClicks === 0;
 
   return (
     <DrawerAnalyticsSummaryCard
-      metrics={[
-        {
-          id: 'profile-views',
-          label: 'Profile views',
-          value: numberFormatter.format(profileViews),
-          hint: 'Visitors',
-        },
-        {
-          id: 'link-clicks',
-          label: 'Link clicks',
-          value: numberFormatter.format(totalClicks),
-          hint: 'Outbound',
-        },
-      ]}
+      metrics={
+        isEmpty
+          ? []
+          : [
+              {
+                id: 'profile-views',
+                label: 'Profile views',
+                value: numberFormatter.format(profileViews),
+                hint: 'Visitors',
+              },
+              {
+                id: 'link-clicks',
+                label: 'Link clicks',
+                value: numberFormatter.format(totalClicks),
+                hint: 'Outbound',
+              },
+            ]
+      }
       state={state}
       dimmed={isFetching}
-      errorMessage='No data yet.'
+      emptyMessage='No data yet.'
+      errorMessage='Analytics unavailable'
       testId='profile-analytics-summary'
       footer={
         state === 'ready' ? (

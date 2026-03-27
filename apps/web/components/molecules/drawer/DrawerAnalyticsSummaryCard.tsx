@@ -48,7 +48,7 @@ function MetricTile({
 
 function LoadingMetricTile() {
   return (
-    <div className={METRIC_TILE_CLASSNAME}>
+    <div aria-hidden='true' className={METRIC_TILE_CLASSNAME}>
       <div className='h-[11px] w-16 rounded skeleton' />
       <div className='mt-2 h-6 w-12 rounded skeleton' />
       <div className='mt-2 h-[10px] w-14 rounded skeleton' />
@@ -67,6 +67,7 @@ export function DrawerAnalyticsSummaryCard({
 }: Readonly<DrawerAnalyticsSummaryCardProps>) {
   const tileCount = metrics.length > 0 ? metrics.length : 2;
   const gridClassName = tileCount === 1 ? 'grid-cols-1' : 'grid-cols-2';
+  const isBusy = dimmed || state === 'loading';
   const loadingMetricKeys = Array.from(
     { length: tileCount },
     (_, slot) => `loading-${tileCount}-${slot}`
@@ -77,49 +78,56 @@ export function DrawerAnalyticsSummaryCard({
       variant='card'
       testId={testId}
       className='overflow-hidden'
+      aria-busy={isBusy ? true : undefined}
     >
       <div
         className={cn(
-          'space-y-3 px-3 py-3 transition-opacity duration-150',
+          'transition-opacity duration-150',
           dimmed && 'opacity-60'
         )}
       >
-        {state === 'loading' ? (
-          <div className={cn('grid gap-2.5', gridClassName)}>
-            {loadingMetricKeys.map(metricKey => (
-              <LoadingMetricTile key={metricKey} />
-            ))}
-          </div>
-        ) : null}
+        <div className='space-y-3 px-3 py-3'>
+          {state === 'loading' ? (
+            <div
+              role='status'
+              aria-label='Loading analytics'
+              className={cn('grid gap-2.5', gridClassName)}
+            >
+              {loadingMetricKeys.map(metricKey => (
+                <LoadingMetricTile key={metricKey} />
+              ))}
+            </div>
+          ) : null}
 
-        {state === 'error' ? (
-          <div className='flex min-h-[72px] items-center'>
-            <p className='text-[12px] leading-[18px] tracking-[0.01em] text-secondary-token'>
-              {errorMessage}
-            </p>
-          </div>
-        ) : null}
+          {state === 'error' ? (
+            <div className='flex min-h-[72px] items-center'>
+              <p className='text-[12px] leading-[18px] tracking-[0.01em] text-secondary-token'>
+                {errorMessage}
+              </p>
+            </div>
+          ) : null}
 
-        {state === 'ready' && metrics.length > 0 ? (
-          <div className={cn('grid gap-2.5', gridClassName)}>
-            {metrics.map(metric => (
-              <MetricTile key={metric.id ?? metric.label} {...metric} />
-            ))}
-          </div>
-        ) : null}
+          {state === 'ready' && metrics.length > 0 ? (
+            <div className={cn('grid gap-2.5', gridClassName)}>
+              {metrics.map(metric => (
+                <MetricTile key={metric.id ?? metric.label} {...metric} />
+              ))}
+            </div>
+          ) : null}
 
-        {state === 'ready' && metrics.length === 0 && emptyMessage ? (
-          <div className='flex min-h-[72px] items-center'>
-            <p className='text-[12px] leading-[18px] tracking-[0.01em] text-secondary-token'>
-              {emptyMessage}
-            </p>
-          </div>
+          {state === 'ready' && metrics.length === 0 && emptyMessage ? (
+            <div className='flex min-h-[72px] items-center'>
+              <p className='text-[12px] leading-[18px] tracking-[0.01em] text-secondary-token'>
+                {emptyMessage}
+              </p>
+            </div>
+          ) : null}
+        </div>
+
+        {footer ? (
+          <div className='border-t border-subtle px-3 py-2.5'>{footer}</div>
         ) : null}
       </div>
-
-      {footer ? (
-        <div className='border-t border-subtle px-3 py-2.5'>{footer}</div>
-      ) : null}
     </DrawerSurfaceCard>
   );
 }
