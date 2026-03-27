@@ -76,9 +76,9 @@ export function AdminTablePagination({
   );
 
   return (
-    <div className='flex flex-wrap items-center justify-between gap-3 border-t border-subtle px-(--linear-app-header-padding-x) py-2.5 text-[12px] text-secondary-token'>
+    <div className='flex min-w-0 items-center gap-3 overflow-x-auto overflow-y-hidden border-t border-subtle px-(--linear-app-header-padding-x) py-2.5 text-[12px] text-secondary-token scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
       {/* Page info */}
-      <div className='flex items-center gap-2'>
+      <div className='flex shrink-0 items-center gap-2'>
         <span className='tabular-nums'>
           <span className='hidden sm:inline'>Page </span>
           <span className='font-[560] text-primary-token'>{page}</span>
@@ -93,7 +93,7 @@ export function AdminTablePagination({
       </div>
 
       {/* Controls */}
-      <div className='flex items-center gap-3'>
+      <div className='ml-auto flex shrink-0 items-center gap-3'>
         {showPageSizeSelector && (
           <div className='hidden items-center gap-2 sm:flex'>
             <span>Rows per page</span>

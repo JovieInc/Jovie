@@ -84,12 +84,12 @@ export function TableStandardToolbar({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3.5 py-2',
+        'flex min-w-0 items-center gap-3 overflow-x-auto overflow-y-hidden border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3.5 py-2 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         className
       )}
     >
       {/* Left section: Checkbox + count badge + bulk actions */}
-      <div className='flex items-center gap-3'>
+      <div className='flex shrink-0 items-center gap-3'>
         {onToggleSelectAll && (
           <Checkbox
             checked={headerCheckboxState}
@@ -131,7 +131,7 @@ export function TableStandardToolbar({
       </div>
 
       {/* Right section: Search, export, primary actions, clear */}
-      <div className='flex items-center gap-3'>
+      <div className='ml-auto flex shrink-0 items-center gap-3'>
         {/* Search - shown when no selection */}
         {!hasSelection && searchComponent}
 

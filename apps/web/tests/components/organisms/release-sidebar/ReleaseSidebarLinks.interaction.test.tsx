@@ -392,9 +392,9 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
+    await user.click(screen.getByRole('tab', { name: 'DSPs' }));
     expect(screen.getByTestId('drawer-split-button')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Add platform link' }));
+    await user.click(screen.getByRole('button', { name: 'Add DSP link' }));
     await user.click(screen.getByRole('button', { name: 'Apple Music' }));
 
     const urlInput = screen.getByPlaceholderText(
@@ -427,8 +427,8 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
-    await user.click(screen.getByRole('button', { name: 'Add platform link' }));
+    await user.click(screen.getByRole('tab', { name: 'DSPs' }));
+    await user.click(screen.getByRole('button', { name: 'Add DSP link' }));
     await user.click(screen.getByRole('button', { name: 'Spotify' }));
     await user.type(
       screen.getByPlaceholderText('https://open.spotify.com/...'),
@@ -460,9 +460,9 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
+    await user.click(screen.getByRole('tab', { name: 'DSPs' }));
     expect(
-      screen.queryByRole('button', { name: 'Add platform link' })
+      screen.queryByRole('button', { name: 'Add DSP link' })
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove Spotify' }));
 

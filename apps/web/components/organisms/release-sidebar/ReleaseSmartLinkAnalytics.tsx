@@ -5,13 +5,10 @@ import { Copy, ExternalLink, Link2, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  DrawerEmptyState,
+  DrawerAnalyticsSummaryCard,
   DrawerInlineIconButton,
-  DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
 import type { Release, ReleaseSidebarAnalytics } from './types';
@@ -76,7 +73,7 @@ function ReleaseSmartLinkControl({
   return (
     <div className='space-y-1.5'>
       <div
-        className='flex h-8 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2.5'
+        className='flex h-9 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2.5'
         data-testid='release-smart-link-control'
       >
         <Link2
@@ -100,7 +97,7 @@ function ReleaseSmartLinkControl({
             toast.error('Failed to copy link');
           }}
           title='Copy smart link'
-          className='h-5 w-5 rounded-full text-tertiary-token'
+          className='h-7 w-7 rounded-full text-tertiary-token'
         >
           <Copy className='h-3 w-3' />
         </DrawerInlineIconButton>
@@ -110,7 +107,7 @@ function ReleaseSmartLinkControl({
             globalThis.open(smartLinkUrl, '_blank', 'noopener,noreferrer');
           }}
           title='Open smart link'
-          className='h-5 w-5 rounded-full text-tertiary-token'
+          className='h-7 w-7 rounded-full text-tertiary-token'
         >
           <ExternalLink className='h-3 w-3' />
         </DrawerInlineIconButton>
@@ -122,7 +119,7 @@ function ReleaseSmartLinkControl({
           trigger={
             <DrawerInlineIconButton
               title='Share smart link'
-              className='h-5 w-5 rounded-full text-tertiary-token'
+              className='h-7 w-7 rounded-full text-tertiary-token'
             >
               <Share2 className='h-3 w-3' />
             </DrawerInlineIconButton>
@@ -188,63 +185,28 @@ export function ReleaseSmartLinkAnalytics({
   const last7DaysClicks = data?.last7DaysClicks ?? 0;
 
   const showEmpty = !isLoading && !hasError && totalClicks === 0;
-
-  const showSkeleton = isLoading && !data;
+  const state = isLoading && !data ? 'loading' : hasError ? 'error' : 'ready';
 
   return (
-    <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
+    <DrawerAnalyticsSummaryCard
+      metrics={[
+        {
+          label: 'Total clicks',
+          value: numberFormatter.format(totalClicks),
+          hint: 'All time',
+        },
+        {
+          label: 'Last 7 days',
+          value: numberFormatter.format(last7DaysClicks),
+          hint: 'Recent',
+        },
+      ]}
+      state={state}
+      dimmed={isSwitching}
+      errorMessage='Analytics unavailable'
       testId='release-smart-link-analytics'
-    >
-      {/* Analytics metrics */}
-      <div className='px-3 pb-3 pt-3'>
-        {showSkeleton && (
-          <div className='grid grid-cols-2 gap-3'>
-            <div className='space-y-1'>
-              <div className='h-[9px] w-12 rounded skeleton' />
-              <div className='h-4 w-8 rounded skeleton' />
-              <div className='h-[9px] w-10 rounded skeleton' />
-            </div>
-            <div className='space-y-1'>
-              <div className='h-[9px] w-12 rounded skeleton' />
-              <div className='h-4 w-8 rounded skeleton' />
-              <div className='h-[9px] w-10 rounded skeleton' />
-            </div>
-          </div>
-        )}
-
-        {!showSkeleton && hasError && (
-          <DrawerEmptyState
-            className='min-h-[52px] px-0 py-0'
-            message='Analytics unavailable'
-          />
-        )}
-
-        {!showSkeleton && !hasError && (
-          <div
-            className={cn(
-              'space-y-3 transition-opacity duration-100',
-              isSwitching && 'opacity-50'
-            )}
-          >
-            <div className='grid grid-cols-2 gap-3'>
-              <AnalyticsMetric
-                label='Total clicks'
-                value={numberFormatter.format(totalClicks)}
-                hint='All time'
-              />
-              <AnalyticsMetric
-                label='Last 7 days'
-                value={numberFormatter.format(last7DaysClicks)}
-                hint='Recent'
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {release.smartLinkPath && (
-        <div className='px-3 pb-3 pt-0'>
+      footer={
+        release.smartLinkPath ? (
           <ReleaseSmartLinkControl
             release={release}
             artistName={artistName}
@@ -254,32 +216,8 @@ export function ReleaseSmartLinkAnalytics({
                 : undefined
             }
           />
-        </div>
-      )}
-    </DrawerSurfaceCard>
-  );
-}
-
-function AnalyticsMetric({
-  label,
-  value,
-  hint,
-  className,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly hint: string;
-  readonly className?: string;
-}) {
-  return (
-    <div className={cn('space-y-px', className)}>
-      <p className='text-[10.5px] font-[500] leading-[14px] text-tertiary-token'>
-        {label}
-      </p>
-      <p className='tabular-nums text-[18px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
-        {value}
-      </p>
-      <p className='text-[10px] leading-[13px] text-tertiary-token'>{hint}</p>
-    </div>
+        ) : undefined
+      }
+    />
   );
 }

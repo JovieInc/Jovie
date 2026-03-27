@@ -37,7 +37,7 @@ export function ContentSectionHeaderSkeleton({
   return (
     <div
       className={cn(
-        'flex min-h-(--linear-app-header-height) shrink-0 flex-wrap items-center justify-between gap-3 border-b border-subtle bg-transparent px-(--linear-app-header-padding-x) py-1.5',
+        'flex min-h-(--linear-app-header-height) min-w-0 shrink-0 items-center justify-between gap-3 overflow-x-auto overflow-y-hidden border-b border-subtle bg-transparent px-(--linear-app-header-padding-x) py-1.5 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         className
       )}
       aria-hidden='true'
@@ -50,7 +50,7 @@ export function ContentSectionHeaderSkeleton({
       {items.length > 0 ? (
         <div
           className={cn(
-            'flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end',
+            'flex shrink-0 items-center justify-end gap-2',
             actionsClassName
           )}
         >

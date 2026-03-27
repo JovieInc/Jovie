@@ -29,7 +29,25 @@ async function expectPillChrome(locator: Locator) {
   expect(metrics.height).toBeLessThanOrEqual(29.5);
   expect(metrics.radius).toBeGreaterThanOrEqual(999);
   expect(metrics.borderTop).toBeGreaterThan(0);
-  expect(metrics.boxShadow).not.toBe('none');
+  expect(hasVisibleShadow(metrics.boxShadow)).toBeTruthy();
+}
+
+function hasVisibleShadow(boxShadow: string) {
+  if (boxShadow === 'none') return false;
+
+  const segments = boxShadow.split(/,\s(?=rgba?\()/u);
+
+  return segments.some(segment => {
+    const alphaMatch = segment.match(
+      /rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(?:,\s*([0-9.]+))?\s*\)/u
+    );
+    const alpha = alphaMatch?.[1] === undefined ? 1 : Number(alphaMatch[1]);
+    const pxMatches = [...segment.matchAll(/-?\d+(?:\.\d+)?px/gu)].map(match =>
+      Number(match[0].slice(0, -2))
+    );
+    const hasOffset = pxMatches.some(value => value !== 0);
+    return alpha > 0 && hasOffset;
+  });
 }
 
 async function expectFlatPillChrome(locator: Locator) {
@@ -47,7 +65,7 @@ async function expectFlatPillChrome(locator: Locator) {
   expect(metrics.height).toBeLessThanOrEqual(29.5);
   expect(metrics.radius).toBeGreaterThanOrEqual(999);
   expect(metrics.borderTop).toBeGreaterThan(0);
-  expect(metrics.boxShadow).toBe('none');
+  expect(hasVisibleShadow(metrics.boxShadow)).toBeFalsy();
 }
 
 async function expectCardChrome(locator: Locator) {
@@ -85,7 +103,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`${theme}: /demo toolbar pills and release drawer follow parity invariants`, async ({
     page,
   }) => {
-    await page.goto('/demo', { waitUntil: 'domcontentloaded' });
+    await page.goto('/demo', { waitUntil: 'networkidle' });
     await setTheme(page, theme);
 
     const displayButton = page.getByRole('button', { name: 'Display' }).first();
@@ -111,7 +129,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(drawer.getByTestId('release-tab-panel-card')).toHaveCount(0);
 
     const detailsTab = drawer.getByRole('tab', { name: 'Details' });
-    const platformsTab = drawer.getByRole('tab', { name: 'Platforms' });
+    const platformsTab = drawer.getByRole('tab', { name: 'DSPs' });
     const metadataCard = drawer.getByTestId('release-metadata-card');
     await expect(detailsTab).toBeVisible();
     await expect(platformsTab).toBeVisible();
@@ -141,7 +159,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`${theme}: /demo/audience analytics drawer uses minimal top chrome and card surfaces`, async ({
     page,
   }) => {
-    await page.goto('/demo/audience', { waitUntil: 'domcontentloaded' });
+    await page.goto('/demo/audience', { waitUntil: 'networkidle' });
     await setTheme(page, theme);
 
     const drawer = page.getByTestId('demo-analytics-sidebar');

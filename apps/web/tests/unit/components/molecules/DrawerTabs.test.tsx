@@ -19,6 +19,8 @@ describe('DrawerTabs', () => {
     const tablist = screen.getByRole('tablist', { name: 'Drawer tabs' });
     expect(tablist).toBeInTheDocument();
     expect(tablist).toHaveAttribute('aria-label', 'Drawer tabs');
+    expect(tablist.className).toContain('overflow-x-auto');
+    expect(tablist.className).toContain('flex-nowrap');
   });
 
   it('renders active tabs as pills and notifies on selection changes', () => {
@@ -66,5 +68,29 @@ describe('DrawerTabs', () => {
     expect(
       screen.getByRole('tablist', { name: 'Drawer tabs' })
     ).toContainElement(screen.getByRole('tab', { name: 'Details' }));
+  });
+
+  it('keeps tabs on a single horizontal rail when labels are long', () => {
+    render(
+      <DrawerTabs
+        value='details'
+        onValueChange={vi.fn()}
+        options={[
+          { value: 'tracks', label: 'Tracks' },
+          { value: 'links', label: 'DSPs' },
+          { value: 'details', label: 'Details' },
+          { value: 'lyrics', label: 'Lyrics' },
+          { value: 'tasks', label: 'Tasks' },
+        ]}
+        ariaLabel='Release drawer tabs'
+      />
+    );
+
+    expect(screen.getByRole('tab', { name: 'Tasks' }).className).toContain(
+      'shrink-0'
+    );
+    expect(
+      screen.getByRole('tablist', { name: 'Release drawer tabs' }).className
+    ).toContain('scroll-smooth');
   });
 });

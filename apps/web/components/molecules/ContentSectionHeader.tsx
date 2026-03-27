@@ -27,7 +27,7 @@ export function ContentSectionHeader({
   return (
     <div
       className={cn(
-        'flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-(--linear-app-header-padding-x)',
+        'flex min-w-0 shrink-0 items-center justify-between gap-2 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-(--linear-app-header-padding-x)',
         density === 'compact'
           ? 'min-h-[34px] py-1'
           : 'min-h-(--linear-app-header-height) py-1.5',
@@ -56,7 +56,10 @@ export function ContentSectionHeader({
       </div>
       {actions ? (
         <div
-          className={cn('w-full sm:w-auto sm:justify-end', actionsClassName)}
+          className={cn(
+            'ml-auto flex shrink-0 items-center justify-end gap-1',
+            actionsClassName
+          )}
         >
           {actions}
         </div>

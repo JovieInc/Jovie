@@ -1196,11 +1196,13 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
               let deletedCount = 0;
               for (const clerkId of clerkIdsToInvalidate) {
                 const proxyStateCacheKey = `proxy:user-state:${clerkId}`;
+                const adminRoleCacheKey = `admin:role:${clerkId}`;
                 deletedCount += await redis.del(proxyStateCacheKey);
+                deletedCount += await redis.del(adminRoleCacheKey);
               }
 
               console.log(
-                `    ✓ Invalidated proxy state cache for E2E user (${deletedCount} key(s) across ${clerkIdsToInvalidate.length} Clerk ID(s))`
+                `    ✓ Invalidated proxy/admin caches for E2E user (${deletedCount} key(s) across ${clerkIdsToInvalidate.length} Clerk ID(s))`
               );
             } catch (error) {
               console.warn(

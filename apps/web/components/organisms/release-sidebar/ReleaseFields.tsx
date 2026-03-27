@@ -33,9 +33,7 @@ export function ReleaseFields({
     parts.push(`${totalTracks} ${totalTracks === 1 ? 'track' : 'tracks'}`);
   }
   if (platformCount != null && platformCount > 0) {
-    parts.push(
-      `${platformCount} ${platformCount === 1 ? 'platform' : 'platforms'}`
-    );
+    parts.push(`${platformCount} ${platformCount === 1 ? 'DSP' : 'DSPs'}`);
   }
 
   return (

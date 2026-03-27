@@ -339,7 +339,7 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
 
     // Switch to Links tab
-    await user.click(screen.getByRole('tab', { name: /platforms/i }));
+    await user.click(screen.getByRole('tab', { name: /dsps/i }));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
     expect(screen.queryByTestId('tracklist')).not.toBeInTheDocument();
 
@@ -368,7 +368,7 @@ describe('ReleaseSidebar Links tab', () => {
     );
 
     // Switch to Links tab
-    await user.click(screen.getByRole('tab', { name: /platforms/i }));
+    await user.click(screen.getByRole('tab', { name: /dsps/i }));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
 
     // Change release
@@ -392,14 +392,14 @@ describe('ReleaseSidebar Links tab', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: /platforms/i }));
+    await user.click(screen.getByRole('tab', { name: /dsps/i }));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-split-button')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Add platform link' })
+      screen.getByRole('button', { name: 'Add DSP link' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /refresh platforms/i })
+      screen.getByRole('button', { name: /refresh dsps/i })
     ).toBeInTheDocument();
   });
 
