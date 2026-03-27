@@ -248,6 +248,18 @@ export const LINEAR_SURFACE = {
     'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-[0_8px_24px_rgba(0,0,0,0.08)]',
 } as const;
 
+export const LINEAR_SURFACE_TIER = {
+  drawerCard: 2,
+  drawerCardSm: 2,
+  sidebarCard: 2,
+  contentContainer: 1,
+  bannerCard: 1,
+  dialogCard: 1,
+  stickyHeader: 1,
+  toolbar: 1,
+  popover: 3,
+} as const;
+
 // Type exports for TypeScript consumers
 export type CardPadding = keyof typeof cardTokens.padding;
 export type CardRadius = keyof typeof cardTokens.radius;
@@ -256,3 +268,5 @@ export type CardBorder = keyof typeof cardTokens.border;
 export type CardVariant = keyof typeof cardTokens.variants;
 export type CardStatus = keyof typeof cardTokens.status;
 export type LinearSurface = keyof typeof LINEAR_SURFACE;
+export type LinearSurfaceTier =
+  (typeof LINEAR_SURFACE_TIER)[keyof typeof LINEAR_SURFACE_TIER];

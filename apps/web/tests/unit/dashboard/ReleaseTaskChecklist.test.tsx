@@ -133,7 +133,8 @@ describe('ReleaseTaskChecklist', () => {
       'release-task-checklist-scroll-region'
     );
 
-    expect(scrollRegion).toHaveClass('overflow-y-auto', 'min-h-0');
+    expect(scrollRegion).toBeInTheDocument();
+    expect(scrollRegion).toHaveAttribute('data-scroll-mode', 'internal');
     expect(scrollRegion).toHaveTextContent('Marketing');
     expect(scrollRegion).toHaveTextContent('Submit to playlists');
   });

@@ -557,7 +557,7 @@ export function JovieChat({
           </div>
 
           {/* Input pinned at bottom */}
-          <div className='border-t border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 pb-4 pt-4 sm:px-5 sm:pb-6'>
+          <div className='bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-6'>
             <div className='mx-auto w-full max-w-2xl space-y-3'>
               {isRateLimited && (
                 <p className='text-xs text-tertiary-token' aria-live='polite'>

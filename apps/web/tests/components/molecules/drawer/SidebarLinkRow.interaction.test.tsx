@@ -56,12 +56,18 @@ describe('SidebarLinkRow interactions', () => {
       />
     );
 
-    expect(screen.getByTestId('track-link-row')).toHaveClass(
-      'rounded-[10px]',
-      'border',
-      'lg:hover:bg-surface-0',
-      'focus-within:bg-surface-0'
+    expect(screen.getByTestId('track-link-row')).toHaveAttribute(
+      'data-surface-variant',
+      'track'
     );
+    expect(screen.getByTestId('track-link-row')).toHaveAttribute(
+      'data-surface-style',
+      'outlined'
+    );
+    expect(screen.getByText('Spotify')).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('button', { name: 'Open Spotify' }).length
+    ).toBeGreaterThan(0);
   });
 
   it('supports copy and open actions for a valid URL', async () => {

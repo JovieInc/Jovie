@@ -99,6 +99,7 @@ export function DrawerCardActionBar({
         className
       )}
       data-testid='drawer-card-action-bar'
+      data-overflow-placement={overflowTriggerPlacement}
     >
       {overflowTriggerPlacement === 'card-top-right' && overflowTrigger ? (
         <div className='absolute right-3 top-3 z-10'>{overflowTrigger}</div>
