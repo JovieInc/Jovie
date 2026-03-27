@@ -33,7 +33,7 @@ export default async function ShopPage({ params }: Readonly<Props>) {
 
   const result = await getProfileWithUser(username.toLowerCase());
 
-  if (!result || !result.isPublic) {
+  if (!result?.isPublic) {
     notFound();
   }
 
