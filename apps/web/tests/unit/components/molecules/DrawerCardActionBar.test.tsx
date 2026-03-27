@@ -70,7 +70,10 @@ describe('DrawerCardActionBar', () => {
     expect(
       screen.getByTestId('drawer-card-overflow-trigger')
     ).toBeInTheDocument();
-    expect(screen.getByTestId('drawer-card-action-bar')).toHaveClass('pr-11');
+    expect(screen.getByTestId('drawer-card-action-bar')).toHaveAttribute(
+      'data-overflow-placement',
+      'card-top-right'
+    );
     expect(screen.getByTestId('table-action-menu-items')).toHaveTextContent(
       'Open profile'
     );

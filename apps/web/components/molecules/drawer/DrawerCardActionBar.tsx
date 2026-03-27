@@ -95,10 +95,12 @@ export function DrawerCardActionBar({
     <div
       className={cn(
         'flex flex-wrap items-center gap-1.5 border-t border-(--linear-app-frame-seam) px-2.5 py-2',
+        overflowTriggerPlacement === 'card-top-right' && 'relative',
         overflowTriggerPlacement === 'card-top-right' && 'pr-11',
         className
       )}
       data-testid='drawer-card-action-bar'
+      data-overflow-placement={overflowTriggerPlacement}
     >
       {overflowTriggerPlacement === 'card-top-right' && overflowTrigger ? (
         <div className='absolute right-3 top-3 z-10'>{overflowTrigger}</div>

@@ -55,6 +55,7 @@ export function DrawerTabs<T extends string>({
           key={option.value}
           type='button'
           role='tab'
+          data-testid={`drawer-tab-${option.value}`}
           aria-selected={value === option.value}
           onClick={() => onValueChange(option.value)}
           className={cn(

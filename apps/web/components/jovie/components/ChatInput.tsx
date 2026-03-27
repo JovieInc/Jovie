@@ -326,9 +326,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   ? isCompact
                     ? 'min-h-[64px]'
                     : 'min-h-[88px]'
-                  : isCompact
-                    ? 'min-h-[28px]'
-                    : 'min-h-[28px]'
+                  : 'min-h-[28px]'
               )}
               onKeyDown={handleKeyDown}
               onInput={handleInput}
