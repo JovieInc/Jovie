@@ -30,6 +30,7 @@ module.exports = {
       fontWeight: {
         normal: 'var(--font-weight-normal)', // 400
         book: 'var(--font-weight-book)', // 450 — Linear's UI default
+        caption: 'var(--linear-caption-weight)', // 510 — compact app controls
         medium: 'var(--font-weight-medium)', // 500
         semibold: 'var(--font-weight-semibold)', // 538 — Linear-specific
         bold: 'var(--font-weight-bold)', // 590 — Linear-specific
@@ -45,6 +46,7 @@ module.exports = {
       fontSize: {
         '2xs': ['var(--text-2xs)', { lineHeight: '1.25' }], // 11px
         app: ['var(--text-app)', { lineHeight: '1.4' }], // 13px — Linear's default
+        caption: ['var(--linear-caption-size)', { lineHeight: '1.4' }], // 13px — compact app controls
       },
 
       // Linear spacing tokens
@@ -56,6 +58,7 @@ module.exports = {
         'linear-6': 'var(--linear-space-6)',
         'linear-8': 'var(--linear-space-8)',
         'app-control-sm': 'var(--linear-app-control-height-sm)',
+        'button-md': 'var(--linear-button-height-md)',
         'app-control-x': 'var(--linear-app-control-padding-x)',
         'app-header': 'var(--linear-app-header-padding-x)',
       },

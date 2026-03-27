@@ -211,7 +211,7 @@ export function ChatMessage({
           {messageText && (
             <div className='space-y-2'>
               <div className='flex items-center gap-2 pl-0.5'>
-                <span className='flex h-5.5 w-5.5 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token'>
+                <span className='flex h-5.5 w-5.5 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
                   <BrandLogo size={10} tone='auto' rounded={false} />
                 </span>
                 <span className='text-[11px] font-[560] tracking-[-0.01em] text-secondary-token'>
@@ -223,7 +223,7 @@ export function ChatMessage({
               </div>
               <div
                 data-testid='chat-message-reply-bubble'
-                className='rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-3.5 text-primary-token shadow-[var(--linear-app-card-shadow)]'
+                className='rounded-[18px] border border-subtle bg-surface-1 px-4 py-3.5 text-primary-token shadow-card'
               >
                 <ChatMarkdown
                   content={messageText}
@@ -258,7 +258,7 @@ export function ChatMessage({
                 <button
                   type='button'
                   onClick={() => copy(messageText)}
-                  className='flex h-7 items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2.5 text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+                  className='flex h-7 items-center gap-1.5 rounded-full border border-subtle bg-app-control px-2.5 text-secondary-token shadow-app-control transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token hover:shadow-app-control-hover focus-visible:border-focus focus-visible:bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 active:border-default active:bg-surface-1 active:shadow-app-control-active'
                   aria-label={
                     isSuccess ? 'Copied to clipboard' : 'Copy message'
                   }

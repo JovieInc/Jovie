@@ -26,6 +26,14 @@ interface UseProfileHeaderPartsProps {
   readonly onClose?: () => void;
 }
 
+function escapeVCardText(value: string): string {
+  return value
+    .replaceAll('\\', '\\\\')
+    .replace(/\r\n|\r|\n/g, '\\n')
+    .replaceAll(';', '\\;')
+    .replaceAll(',', '\\,');
+}
+
 function generateVCard(
   displayName: string,
   username: string,
@@ -34,9 +42,9 @@ function generateVCard(
   return [
     'BEGIN:VCARD',
     'VERSION:3.0',
-    `FN:${displayName || username}`,
+    `FN:${escapeVCardText(displayName || username)}`,
     `URL:${profileUrl}`,
-    `NOTE:Jovie profile: @${username}`,
+    `NOTE:${escapeVCardText(`Jovie profile: @${username}`)}`,
     'END:VCARD',
   ].join('\r\n');
 }

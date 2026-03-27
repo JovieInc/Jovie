@@ -5,35 +5,40 @@ import * as React from 'react';
 import { SettingsPlanGateLabel } from '@/components/atoms/SettingsPlanGateLabel';
 import { cn } from '@/lib/utils';
 
-export interface SettingsToggleRowProps {
+interface SettingsToggleRowBaseProps {
   readonly id?: string;
   readonly icon?: React.ReactNode;
   readonly title: string;
   readonly description?: string;
+  readonly className?: string;
+}
+
+export interface InteractiveSettingsToggleRowProps
+  extends SettingsToggleRowBaseProps {
+  readonly gated?: false;
   readonly checked: boolean;
   readonly onCheckedChange: (checked: boolean) => void;
   readonly disabled?: boolean;
-  readonly className?: string;
   readonly ariaLabel: string;
-  readonly gated?: boolean;
-  readonly gatePlanName?: string;
-  readonly gateFeatureContext?: string;
 }
 
-export function SettingsToggleRow({
-  id,
-  icon,
-  title,
-  description,
-  checked,
-  onCheckedChange,
-  disabled = false,
-  className,
-  ariaLabel,
-  gated = false,
-  gatePlanName = 'Pro',
-  gateFeatureContext,
-}: Readonly<SettingsToggleRowProps>) {
+export interface GatedSettingsToggleRowProps
+  extends SettingsToggleRowBaseProps {
+  readonly gated: true;
+  readonly gatePlanName?: string;
+  readonly gateFeatureContext?: string;
+  readonly checked?: never;
+  readonly onCheckedChange?: never;
+  readonly disabled?: never;
+  readonly ariaLabel?: never;
+}
+
+export type SettingsToggleRowProps =
+  | InteractiveSettingsToggleRowProps
+  | GatedSettingsToggleRowProps;
+
+export function SettingsToggleRow(props: Readonly<SettingsToggleRowProps>) {
+  const { id, icon, title, description, className } = props;
   const reactId = React.useId();
   const baseId = id ?? `settings-toggle-${reactId}`;
   const titleId = `${baseId}-title`;
@@ -58,7 +63,7 @@ export function SettingsToggleRow({
             id={titleId}
             className={cn(
               'text-[13px] font-[560] tracking-[-0.02em]',
-              gated ? 'text-tertiary-token' : 'text-primary-token'
+              props.gated ? 'text-tertiary-token' : 'text-primary-token'
             )}
           >
             {title}
@@ -68,7 +73,7 @@ export function SettingsToggleRow({
               id={descriptionId}
               className={cn(
                 'mt-1 text-[13px] leading-[18px]',
-                gated ? 'text-quaternary-token' : 'text-secondary-token'
+                props.gated ? 'text-quaternary-token' : 'text-secondary-token'
               )}
             >
               {description}
@@ -78,17 +83,17 @@ export function SettingsToggleRow({
       </div>
 
       <div className='flex min-h-8 items-center justify-end'>
-        {gated ? (
+        {props.gated ? (
           <SettingsPlanGateLabel
-            planName={gatePlanName}
-            featureContext={gateFeatureContext}
+            planName={props.gatePlanName ?? 'Pro'}
+            featureContext={props.gateFeatureContext}
           />
         ) : (
           <Switch
-            checked={checked}
-            onCheckedChange={onCheckedChange}
-            disabled={disabled}
-            aria-label={ariaLabel}
+            checked={props.checked}
+            onCheckedChange={props.onCheckedChange}
+            disabled={props.disabled ?? false}
+            aria-label={props.ariaLabel}
             aria-labelledby={titleId}
             aria-describedby={descriptionId}
           />

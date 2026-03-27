@@ -78,7 +78,7 @@ async function copyUTMUrl(params: {
   url: string;
   preset: UTMPreset;
   context: UTMContext;
-}) {
+}): Promise<boolean> {
   const result = buildUTMUrl({
     url: params.url,
     params: params.preset.params,
@@ -90,7 +90,7 @@ async function copyUTMUrl(params: {
     toast.success(`Copied with ${params.preset.label} UTM`, {
       description: 'Link includes tracking parameters',
     });
-    return;
+    return true;
   }
 
   captureError(
@@ -104,6 +104,7 @@ async function copyUTMUrl(params: {
   toast.error('Could not copy UTM link', {
     description: 'Please try again or copy manually.',
   });
+  return false;
 }
 
 /**
@@ -148,8 +149,10 @@ export function getUTMShareContextMenuItems(params: {
       label: `Copy for ${preset.label}`,
       icon: resolvePresetIcon(preset),
       onClick: async () => {
-        await copyUTMUrl({ url: smartLinkUrl, preset, context });
-        onCopied?.(preset.id);
+        const copied = await copyUTMUrl({ url: smartLinkUrl, preset, context });
+        if (copied) {
+          onCopied?.(preset.id);
+        }
       },
     };
     items.push(action);
@@ -178,8 +181,10 @@ export function getUTMShareActionMenuItems(params: {
     label: preset.label,
     icon: resolvePresetIcon(preset),
     onClick: async () => {
-      await copyUTMUrl({ url: smartLinkUrl, preset, context });
-      onCopied?.(preset.id);
+      const copied = await copyUTMUrl({ url: smartLinkUrl, preset, context });
+      if (copied) {
+        onCopied?.(preset.id);
+      }
     },
   }));
 
@@ -217,10 +222,11 @@ export function getUTMShareDropdownItems(params: {
     id: `utm-share-${preset.id}`,
     label: preset.label,
     icon: resolvePresetIcon(preset),
-    onClick: () => {
-      void copyUTMUrl({ url: smartLinkUrl, preset, context }).then(() => {
+    onClick: async () => {
+      const copied = await copyUTMUrl({ url: smartLinkUrl, preset, context });
+      if (copied) {
         onCopied?.(preset.id);
-      });
+      }
     },
   }));
 

@@ -1,11 +1,30 @@
 import React from 'react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildUTMContext,
   getUTMShareActionMenuItems,
   getUTMShareContextMenuItems,
   getUTMShareDropdownItems,
 } from '@/lib/utm/share-menu-items';
+
+const mockCopyToClipboard = vi.fn();
+const mockToastError = vi.fn();
+const mockToastSuccess = vi.fn();
+
+vi.mock('@/hooks/useClipboard', () => ({
+  copyToClipboard: (...args: unknown[]) => mockCopyToClipboard(...args),
+}));
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: (...args: unknown[]) => mockToastError(...args),
+    success: (...args: unknown[]) => mockToastSuccess(...args),
+  },
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: vi.fn(),
+}));
 
 const context = buildUTMContext({
   smartLinkUrl: 'https://example.com/release',
@@ -14,6 +33,12 @@ const context = buildUTMContext({
 });
 
 describe('share-menu-items', () => {
+  beforeEach(() => {
+    mockCopyToClipboard.mockReset();
+    mockToastError.mockReset();
+    mockToastSuccess.mockReset();
+  });
+
   it('adds brand icons to default quick preset dropdown submenu items', () => {
     const items = getUTMShareDropdownItems({
       smartLinkUrl: 'https://example.com/release',
@@ -93,5 +118,48 @@ describe('share-menu-items', () => {
     expect(React.isValidElement(iconById['utm-share-twitter-post'])).toBe(true);
     expect(iconById['utm-share-newsletter']).toBeDefined();
     expect(React.isValidElement(iconById['utm-share-newsletter'])).toBe(true);
+  });
+
+  it('only calls onCopied after a successful action-menu copy', async () => {
+    mockCopyToClipboard.mockResolvedValue(false);
+    const onCopied = vi.fn();
+
+    const items = getUTMShareActionMenuItems({
+      smartLinkUrl: 'https://example.com/release',
+      context,
+      onCopied,
+    });
+
+    const submenu = items.find(item => item.id === 'utm-share-submenu');
+    const firstPreset = submenu?.children?.[0];
+
+    await firstPreset?.onClick?.();
+
+    expect(onCopied).not.toHaveBeenCalled();
+    expect(mockToastError).toHaveBeenCalledTimes(1);
+  });
+
+  it('only calls onCopied after a successful dropdown copy', async () => {
+    mockCopyToClipboard.mockResolvedValue(true);
+    const onCopied = vi.fn();
+
+    const items = getUTMShareDropdownItems({
+      smartLinkUrl: 'https://example.com/release',
+      context,
+      onCopied,
+    });
+
+    const submenu = items.find(item => item.type === 'submenu');
+
+    if (!submenu || submenu.type !== 'submenu') {
+      throw new Error('Expected submenu item in UTM dropdown items');
+    }
+
+    const firstPreset = submenu.items.find(item => item.type === 'action');
+
+    await firstPreset?.onClick?.();
+
+    expect(onCopied).toHaveBeenCalledTimes(1);
+    expect(mockToastSuccess).toHaveBeenCalledTimes(1);
   });
 });
