@@ -160,6 +160,10 @@ export default defineConfig({
         replacement: `${path.resolve(__dirname, './app/(marketing)')}/`,
       },
       {
+        find: /^@\/app\/\(shell\)\//,
+        replacement: `${path.resolve(__dirname, './app/app/(shell)')}/`,
+      },
+      {
         find: /^@\/app\//,
         replacement: `${path.resolve(__dirname, './app')}/`,
       },
