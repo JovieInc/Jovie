@@ -34,9 +34,7 @@ describe('DrawerSurfaceCard', () => {
     expect(className).toContain('rounded-[10px]');
     expect(className).toContain('border-(--linear-app-frame-seam)');
     expect(className).toContain('bg-(--linear-app-content-surface)');
-    expect(className).toContain(
-      'shadow-[0_12px_28px_rgba(15,23,42,0.08),0_2px_6px_rgba(15,23,42,0.05)]'
-    );
+    expect(className).toContain('shadow-[var(--linear-app-card-shadow)]');
   });
 
   it('keeps drawer and sidebar cards on a higher elevation tier than main content containers', () => {

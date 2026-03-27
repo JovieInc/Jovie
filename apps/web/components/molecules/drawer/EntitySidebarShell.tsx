@@ -108,11 +108,9 @@ export function EntitySidebarShell({
   const showMinimalHeaderBar = !(isMinimalHeader && hideMinimalHeaderBar);
   const renderMinimalTabsInHeader =
     isMinimalHeader && minimalTabsPlacement === 'header';
-  const resolvedHeaderTitle = isMinimalHeader ? (
-    <span className='sr-only'>{ariaLabel}</span>
-  ) : (
-    title
-  );
+  const resolvedHeaderTitle = isMinimalHeader
+    ? (title ?? <span className='sr-only'>{ariaLabel}</span>)
+    : title;
   const titleBarActions = actionsInEntityHeader ? (
     onClose ? (
       <DrawerHeaderActions

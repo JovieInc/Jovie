@@ -41,6 +41,7 @@ import {
   EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { APP_ROUTES } from '@/constants/routes';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
@@ -675,10 +676,20 @@ export function ReleaseSidebar({
       isOpen={isOpen}
       width={width}
       ariaLabel='Release details'
+      title='Releases'
       onKeyDown={handleKeyDown}
       contextMenuItems={contextMenuItems}
       data-testid='release-sidebar'
       headerMode='minimal'
+      headerActions={
+        onClose ? (
+          <DrawerHeaderActions
+            primaryActions={[]}
+            overflowActions={[]}
+            onClose={onClose}
+          />
+        ) : undefined
+      }
       isEmpty={!release}
       emptyMessage='Select a release in the table to view its details.'
     >

@@ -5,13 +5,13 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export const DRAWER_TABS_RAIL_CLASSNAME =
-  'inline-flex min-w-0 items-center gap-1 rounded-full border-0 bg-transparent p-0';
+  'inline-flex min-w-0 items-center gap-0.5 rounded-[5px] border-0 bg-transparent p-0';
 
 export const DRAWER_TABS_TRIGGER_CLASSNAME =
-  'inline-flex min-h-7 items-center justify-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-transparent px-2.5 py-1 text-[11.5px] font-[510] tracking-[-0.01em] text-tertiary-token transition-[background-color,color,border-color] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token';
+  'inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-transparent px-3 py-1 text-[12px] font-normal tracking-normal text-tertiary-token transition-[background-color,color,border-color] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token';
 
 export const DRAWER_TABS_TRIGGER_ACTIVE_CLASSNAME =
-  'border-(--linear-app-frame-seam) bg-surface-0 text-primary-token';
+  'border-(--linear-app-frame-seam) bg-surface-1 text-primary-token';
 
 export interface DrawerTabsProps<T extends string> {
   readonly value: T;

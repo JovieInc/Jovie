@@ -211,8 +211,7 @@ export const cardTokens = {
  * floating above the drawer/main content field, while popovers remain
  * the strongest floating surface.
  */
-const elevatedSidebarCardShadow =
-  'shadow-[0_12px_28px_rgba(15,23,42,0.08),0_2px_6px_rgba(15,23,42,0.05)]';
+const elevatedSidebarCardShadow = 'shadow-[var(--linear-app-card-shadow)]';
 
 export const LINEAR_SURFACE = {
   /** Drawer section card — border-separated section inside sidebars. */
