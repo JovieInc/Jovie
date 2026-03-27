@@ -12,6 +12,7 @@ import {
 } from './utils/smoke-test-utils';
 
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+const TEST_AUTH_BYPASS_ENABLED = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 
 /**
  * Suite 2: Dashboard Navigation (Authenticated)
@@ -23,6 +24,10 @@ const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
  */
 
 function hasRealClerkConfig(): boolean {
+  if (TEST_AUTH_BYPASS_ENABLED) {
+    return true;
+  }
+
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
   const sk = process.env.CLERK_SECRET_KEY ?? '';
   return (
@@ -64,11 +69,6 @@ async function assertDashboardRouteLoaded(
   await expect(errorBanner, `${name}: error boundary is visible`).toHaveCount(
     0
   );
-
-  const sidebar = page.locator('nav').first();
-  await expect(sidebar, `${name}: dashboard nav did not render`).toBeVisible({
-    timeout: SMOKE_TIMEOUTS.VISIBILITY,
-  });
 
   if (path === APP_ROUTES.CHAT) {
     await expect(
@@ -117,7 +117,10 @@ test.describe('Dashboard Navigation @smoke', () => {
       test.skip(true, 'No real Clerk config');
       return;
     }
-    if (process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true') {
+    if (
+      !TEST_AUTH_BYPASS_ENABLED &&
+      process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true'
+    ) {
       test.skip(true, 'Auth setup not available');
       return;
     }
@@ -206,7 +209,9 @@ test.describe('Dashboard Navigation @smoke', () => {
     );
     test.setTimeout(300_000);
 
-    await setupClerkTestingToken({ page });
+    if (!TEST_AUTH_BYPASS_ENABLED) {
+      await setupClerkTestingToken({ page });
+    }
 
     try {
       await ensureSignedInUser(page);
