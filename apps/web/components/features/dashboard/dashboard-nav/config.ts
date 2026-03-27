@@ -1,27 +1,28 @@
 import {
+  Activity,
   Banknote,
+  Briefcase,
   CalendarDays,
   Download,
+  FolderKanban,
   HandCoins,
   Home,
   IdCard,
   Image as ImageIcon,
+  LayoutDashboard,
   Lock,
   MailCheck,
-  MessageSquare,
   Music,
   PieChart,
   Radio,
-  Search,
-  Send,
   Settings,
   ShieldCheck,
   SquarePen,
   UserCircle,
-  UserPlus,
   Users,
 } from 'lucide-react';
 
+import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 
 import type { NavItem } from './types';
@@ -163,85 +164,22 @@ export const settingsNavigation: NavItem[] = [
   ...artistSettingsNavigation,
 ];
 
-export const adminNavigation: NavItem[] = [
-  {
-    name: 'Dashboard',
-    href: APP_ROUTES.ADMIN,
-    id: 'admin_overview',
-    icon: ShieldCheck,
-    description: 'Internal metrics and operations',
-  },
-  {
-    name: 'Leads',
-    href: APP_ROUTES.ADMIN_LEADS,
-    id: 'admin_leads',
-    icon: Search,
-    description: 'Discover, qualify, and action growth leads',
-  },
-  {
-    name: 'Outreach',
-    href: APP_ROUTES.ADMIN_OUTREACH,
-    id: 'admin_outreach',
-    icon: MailCheck,
-    description: 'Run and review outreach workflows',
-  },
-  {
-    name: 'Campaigns',
-    href: APP_ROUTES.ADMIN_CAMPAIGNS,
-    id: 'admin_campaigns',
-    icon: Send,
-    description: 'Manage creator claim campaigns',
-  },
-  {
-    name: 'Waitlist',
-    href: APP_ROUTES.ADMIN_WAITLIST,
-    id: 'admin_waitlist',
-    icon: UserPlus,
-    description: 'Review and manage waitlist signups',
-  },
-  {
-    name: 'Creators',
-    href: APP_ROUTES.ADMIN_CREATORS,
-    id: 'admin_creators',
-    icon: Users,
-    description: 'Manage creator profiles and verification',
-  },
-  {
-    name: 'Ingest',
-    href: APP_ROUTES.ADMIN_INGEST,
-    id: 'admin_ingest',
-    icon: Download,
-    description: 'Manually ingest creator profiles',
-  },
-  {
-    name: 'Users',
-    href: APP_ROUTES.ADMIN_USERS,
-    id: 'admin_users',
-    icon: UserCircle,
-    description: 'Review signed up users and billing status',
-  },
-  {
-    name: 'Feedback',
-    href: APP_ROUTES.ADMIN_FEEDBACK,
-    id: 'admin_feedback',
-    icon: MessageSquare,
-    description: 'Review user feedback',
-  },
-  {
-    name: 'Activity',
-    href: APP_ROUTES.ADMIN_ACTIVITY,
-    id: 'admin_activity',
-    icon: PieChart,
-    description: 'Review recent system and creator activity',
-  },
-  {
-    name: 'Screenshots',
-    href: APP_ROUTES.ADMIN_SCREENSHOTS,
-    id: 'admin_screenshots',
-    icon: ImageIcon,
-    description: 'View generated UI screenshots',
-  },
-];
+const adminIconById = {
+  overview: LayoutDashboard,
+  people: Users,
+  growth: FolderKanban,
+  activity: Activity,
+  investors: Briefcase,
+  screenshots: ImageIcon,
+} as const;
+
+export const adminNavigation: NavItem[] = ADMIN_NAV_REGISTRY.map(item => ({
+  name: item.label,
+  href: item.href,
+  id: `admin_${item.id}`,
+  icon: adminIconById[item.id],
+  description: item.description,
+}));
 
 export interface AdminNavSection {
   label: string;
@@ -250,28 +188,18 @@ export interface AdminNavSection {
 
 export const adminNavigationSections: AdminNavSection[] = [
   {
-    label: 'Growth',
-    items: [
-      adminNavigation.find(item => item.id === 'admin_leads')!,
-      adminNavigation.find(item => item.id === 'admin_outreach')!,
-      adminNavigation.find(item => item.id === 'admin_campaigns')!,
-      adminNavigation.find(item => item.id === 'admin_ingest')!,
-    ],
-  },
-  {
-    label: 'Data',
-    items: [
-      adminNavigation.find(item => item.id === 'admin_waitlist')!,
-      adminNavigation.find(item => item.id === 'admin_creators')!,
-      adminNavigation.find(item => item.id === 'admin_users')!,
-      adminNavigation.find(item => item.id === 'admin_feedback')!,
-    ],
-  },
-  {
-    label: 'Operations',
+    label: 'Workspaces',
     items: [
       adminNavigation.find(item => item.id === 'admin_overview')!,
+      adminNavigation.find(item => item.id === 'admin_people')!,
+      adminNavigation.find(item => item.id === 'admin_growth')!,
       adminNavigation.find(item => item.id === 'admin_activity')!,
+    ],
+  },
+  {
+    label: 'Utilities',
+    items: [
+      adminNavigation.find(item => item.id === 'admin_investors')!,
       adminNavigation.find(item => item.id === 'admin_screenshots')!,
     ],
   },

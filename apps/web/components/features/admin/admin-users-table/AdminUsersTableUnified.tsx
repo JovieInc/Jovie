@@ -18,16 +18,14 @@ import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   TableBulkActionsToolbar,
+  TableShell,
+  TableSurfaceHeader,
+  TableSurfaceToolbar,
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
-import {
-  AdminTableHeader,
-  AdminTableSubheader,
-} from '@/features/admin/table/AdminTableHeader';
-import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
@@ -39,6 +37,7 @@ import {
 import type { AdminUserRow } from '@/lib/admin/users';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { QueryErrorBoundary, useAdminUsersInfiniteQuery } from '@/lib/queries';
+import { mergeHrefSearchParams } from '@/lib/utils/merge-href-search-params';
 import { AdminUserDetailDrawer } from './AdminUserDetailDrawer';
 import {
   type BuildAdminUserActionsCallbacks,
@@ -135,7 +134,14 @@ function AdminUserMobileCard({
 }
 
 export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
-  const { users: initialUsers, pageSize, total, search, sort } = props;
+  const {
+    users: initialUsers,
+    pageSize,
+    total,
+    search,
+    sort,
+    basePath = APP_ROUTES.ADMIN_USERS,
+  } = props;
   const [searchTerm, setSearchTerm] = useState(search);
 
   useEffect(() => {
@@ -203,8 +209,12 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         }
       >
         <HeaderSearchAction
-          action={APP_ROUTES.ADMIN_USERS}
-          clearHref={`${APP_ROUTES.ADMIN_USERS}?sort=${sort}`}
+          action={basePath}
+          clearHref={mergeHrefSearchParams(basePath, {
+            page: 1,
+            q: null,
+            sort,
+          })}
           searchValue={searchTerm}
           onSearchValueChange={setSearchTerm}
           placeholder='Search by email, name, or handle'
@@ -215,7 +225,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         />
       </DashboardHeaderActionGroup>
     ),
-    [searchTerm, sort]
+    [basePath, searchTerm, sort]
   );
 
   useEffect(() => {
@@ -490,7 +500,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     <QueryErrorBoundary fallback={TableErrorFallback}>
       <div className='flex h-full'>
         <div className='flex-1 min-w-0'>
-          <AdminTableShell
+          <TableShell
             testId='admin-users-content'
             className='rounded-none border-0'
             toolbar={
@@ -503,11 +513,11 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                 />
 
                 {/* Main toolbar (always visible) */}
-                <AdminTableHeader
+                <TableSurfaceHeader
                   title='Users'
                   subtitle='Review lifecycle state, profile completion, and suppression health.'
                 />
-                <AdminTableSubheader
+                <TableSurfaceToolbar
                   start={
                     <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
                       Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
@@ -613,7 +623,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                 />
               )
             }
-          </AdminTableShell>
+          </TableShell>
         </div>
         <AdminUserDetailDrawer
           user={selectedUser}
