@@ -1,6 +1,7 @@
 'use client';
 
 import { SimpleTooltip } from '@jovie/ui';
+import * as Sentry from '@sentry/nextjs';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
 import type {
@@ -49,13 +50,21 @@ function getLinkSection(link: PreviewPanelLink): LinkSection {
   if (fromCategory) return fromCategory;
 
   if (link.platformType) {
-    return link.platformType === 'websites'
-      ? 'custom'
-      : (link.platformType as LinkSection);
+    if (link.platformType === 'websites') return 'custom';
+    if (VALID_SECTIONS.has(link.platformType))
+      return link.platformType as LinkSection;
+    Sentry.addBreadcrumb({
+      category: 'links',
+      message: `Unknown platformType: ${link.platformType}`,
+      level: 'warning',
+    });
+    return 'custom';
   }
 
   const category = getPlatformCategory(link.platform);
-  return category === 'websites' ? 'custom' : (category as LinkSection);
+  if (category === 'websites') return 'custom';
+  if (VALID_SECTIONS.has(category)) return category as LinkSection;
+  return 'custom';
 }
 
 /**
@@ -71,6 +80,9 @@ function formatDisplayHost(url: string): string {
 }
 
 const SECTION_ORDER: LinkSection[] = ['social', 'dsp', 'earnings', 'custom'];
+
+/** Valid LinkSection values for runtime validation of free-text DB platformType */
+const VALID_SECTIONS: ReadonlySet<string> = new Set(SECTION_ORDER);
 
 const SECTION_LABELS: Record<LinkSection, string> = {
   social: 'Social',

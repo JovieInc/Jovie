@@ -449,6 +449,82 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
       expect(counts.custom).toBe(0);
       expect(counts.all).toBe(0);
     });
+
+    it('does not crash on unknown platformType values (regression: JOV-1690)', async () => {
+      const { getCategoryCounts } = await import(
+        '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
+      );
+
+      const links: PreviewPanelLink[] = [
+        createPreviewLink({
+          id: '1',
+          platform: 'some-unknown',
+          platformType: 'podcast' as PreviewPanelLink['platformType'],
+          url: 'https://example.com/podcast',
+        }),
+      ];
+
+      const counts = getCategoryCounts(links);
+
+      expect(counts.custom).toBe(1);
+      expect(counts.all).toBe(1);
+    });
+
+    it('maps "websites" platformType to custom', async () => {
+      const { getCategoryCounts } = await import(
+        '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
+      );
+
+      const links: PreviewPanelLink[] = [
+        createPreviewLink({
+          id: '1',
+          platform: 'linktree',
+          platformType: 'websites',
+          url: 'https://linktr.ee/artist',
+        }),
+      ];
+
+      const counts = getCategoryCounts(links);
+
+      expect(counts.custom).toBe(1);
+    });
+
+    it('falls through to platform categorization when platformType is undefined', async () => {
+      const { getCategoryCounts } = await import(
+        '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
+      );
+
+      const links: PreviewPanelLink[] = [
+        createPreviewLink({
+          id: '1',
+          platform: 'instagram',
+          url: 'https://instagram.com/artist',
+        }),
+      ];
+
+      const counts = getCategoryCounts(links);
+
+      expect(counts.social).toBe(1);
+    });
+
+    it('falls through to platform categorization when platformType is empty string', async () => {
+      const { getCategoryCounts } = await import(
+        '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
+      );
+
+      const links: PreviewPanelLink[] = [
+        createPreviewLink({
+          id: '1',
+          platform: 'spotify',
+          platformType: '' as PreviewPanelLink['platformType'],
+          url: 'https://open.spotify.com/artist/123',
+        }),
+      ];
+
+      const counts = getCategoryCounts(links);
+
+      expect(counts.dsp).toBe(1);
+    });
   });
 });
 

@@ -13,6 +13,22 @@ import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AvailableDSP } from '@/lib/dsp';
 import { getHometownFromSettings } from '@/types/db';
 
+const VALID_PLATFORM_TYPES = new Set([
+  'social',
+  'dsp',
+  'earnings',
+  'custom',
+  'websites',
+]);
+
+function toValidPlatformType(
+  raw: string | null | undefined
+): PreviewPanelLink['platformType'] {
+  if (raw && VALID_PLATFORM_TYPES.has(raw))
+    return raw as PreviewPanelLink['platformType'];
+  return undefined;
+}
+
 function convertSocialLinksToPreviewLinks(
   links: ProfileSocialLink[]
 ): PreviewPanelLink[] {
@@ -23,14 +39,7 @@ function convertSocialLinksToPreviewLinks(
       title: link.displayText || link.platform,
       url: link.url,
       platform: link.platform,
-      platformType:
-        (link.platformType as
-          | 'social'
-          | 'dsp'
-          | 'earnings'
-          | 'custom'
-          | 'websites'
-          | undefined) ?? undefined,
+      platformType: toValidPlatformType(link.platformType),
       isVisible: link.isActive !== false,
     }));
 }
