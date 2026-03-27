@@ -24,9 +24,9 @@ export async function applyVipBoost(
   limit: number
 ): Promise<SpotifyArtistResult[]> {
   try {
-    const vipMap = await getFeaturedCreatorsForSearch();
+    const vipLookup = await getFeaturedCreatorsForSearch();
     const normalizedQuery = query.toLowerCase().trim();
-    const vipArtist = vipMap.get(normalizedQuery);
+    const vipArtist = vipLookup[normalizedQuery];
 
     if (!vipArtist) {
       return results;

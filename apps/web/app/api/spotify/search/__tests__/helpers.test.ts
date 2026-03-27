@@ -72,7 +72,7 @@ afterEach(() => {
 
 describe('applyVipBoost', () => {
   it('returns results unchanged when no VIP match', async () => {
-    mockGetFeatured.mockResolvedValue(new Map());
+    mockGetFeatured.mockResolvedValue({});
 
     const results = [
       makeResult({ id: 'a1', name: 'Tim White', followers: 277 }),
@@ -84,19 +84,15 @@ describe('applyVipBoost', () => {
   });
 
   it('moves VIP artist to top when already in results', async () => {
-    const vipMap = new Map([
-      [
-        'tim white',
-        {
-          spotifyId: 'vip-id',
-          name: 'Tim White',
-          imageUrl: null,
-          followers: 9900,
-          popularity: 60,
-        },
-      ],
-    ]);
-    mockGetFeatured.mockResolvedValue(vipMap);
+    mockGetFeatured.mockResolvedValue({
+      'tim white': {
+        spotifyId: 'vip-id',
+        name: 'Tim White',
+        imageUrl: null,
+        followers: 9900,
+        popularity: 60,
+      },
+    });
 
     const results = [
       makeResult({ id: 'a1', name: 'Tim White', followers: 277 }),
@@ -115,19 +111,15 @@ describe('applyVipBoost', () => {
   });
 
   it('synthesizes VIP result when not in results and filters same-name', async () => {
-    const vipMap = new Map([
-      [
-        'tim white',
-        {
-          spotifyId: 'vip-id',
-          name: 'Tim White',
-          imageUrl: 'https://example.com/avatar.jpg',
-          followers: 9900,
-          popularity: 60,
-        },
-      ],
-    ]);
-    mockGetFeatured.mockResolvedValue(vipMap);
+    mockGetFeatured.mockResolvedValue({
+      'tim white': {
+        spotifyId: 'vip-id',
+        name: 'Tim White',
+        imageUrl: 'https://example.com/avatar.jpg',
+        followers: 9900,
+        popularity: 60,
+      },
+    });
 
     const results = [
       makeResult({ id: 'a1', name: 'Tim White', followers: 277 }),
@@ -150,19 +142,15 @@ describe('applyVipBoost', () => {
   });
 
   it('keeps non-matching names when VIP match found', async () => {
-    const vipMap = new Map([
-      [
-        'tim white',
-        {
-          spotifyId: 'vip-id',
-          name: 'Tim White',
-          imageUrl: null,
-          followers: 9900,
-          popularity: 60,
-        },
-      ],
-    ]);
-    mockGetFeatured.mockResolvedValue(vipMap);
+    mockGetFeatured.mockResolvedValue({
+      'tim white': {
+        spotifyId: 'vip-id',
+        name: 'Tim White',
+        imageUrl: null,
+        followers: 9900,
+        popularity: 60,
+      },
+    });
 
     const results = [
       makeResult({ id: 'a1', name: 'Jim White', followers: 26000 }),
@@ -188,19 +176,15 @@ describe('applyVipBoost', () => {
   });
 
   it('VIP at top with no same-name collisions returns unchanged order', async () => {
-    const vipMap = new Map([
-      [
-        'tim white',
-        {
-          spotifyId: 'vip-id',
-          name: 'Tim White',
-          imageUrl: null,
-          followers: 9900,
-          popularity: 60,
-        },
-      ],
-    ]);
-    mockGetFeatured.mockResolvedValue(vipMap);
+    mockGetFeatured.mockResolvedValue({
+      'tim white': {
+        spotifyId: 'vip-id',
+        name: 'Tim White',
+        imageUrl: null,
+        followers: 9900,
+        popularity: 60,
+      },
+    });
 
     const results = [
       makeResult({ id: 'vip-id', name: 'Tim White', followers: 9900 }),

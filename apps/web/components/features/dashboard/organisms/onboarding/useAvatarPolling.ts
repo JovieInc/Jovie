@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { getProfileAvatarUrl } from '@/app/onboarding/actions/update-profile';
+import { getProfileAvatarUrl } from '../../../../../app/onboarding/actions/update-profile';
 
 const AVATAR_POLL_INTERVAL_MS = 2000;
 const AVATAR_POLL_TIMEOUT_MS = 30_000;

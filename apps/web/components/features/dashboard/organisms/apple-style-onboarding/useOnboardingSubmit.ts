@@ -11,12 +11,6 @@ import {
   useState,
 } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
-import { connectOnboardingSpotifyArtist } from '@/app/onboarding/actions/connect-spotify';
-import {
-  type EnrichedProfileData,
-  enrichProfileFromDsp,
-} from '@/app/onboarding/actions/enrich-profile';
-import type { CompletionResult } from '@/app/onboarding/actions/types';
 import {
   getOnboardingCompletionMethod,
   toDurationMs,
@@ -30,6 +24,12 @@ import {
   SIGNUP_SPOTIFY_URL_KEY,
 } from '@/lib/auth/signup-claim-storage';
 import { captureError } from '@/lib/error-tracking';
+import { connectOnboardingSpotifyArtist } from '../../../../../app/onboarding/actions/connect-spotify';
+import {
+  type EnrichedProfileData,
+  enrichProfileFromDsp,
+} from '../../../../../app/onboarding/actions/enrich-profile';
+import type { CompletionResult } from '../../../../../app/onboarding/actions/types';
 import {
   extractErrorCode,
   getErrorMessage,

@@ -190,6 +190,11 @@ describe('GET /api/spotify/search', () => {
     await GET(new NextRequest('http://localhost/api/spotify/search?q=test'));
 
     expect(mockCacheQuery).toHaveBeenCalledWith(
+      'spotify:search:response:test:5',
+      expect.any(Function),
+      { ttlSeconds: 60, useRedis: true }
+    );
+    expect(mockCacheQuery).toHaveBeenCalledWith(
       'spotify:search:test:5',
       expect.any(Function),
       { ttlSeconds: 300, useRedis: true }
