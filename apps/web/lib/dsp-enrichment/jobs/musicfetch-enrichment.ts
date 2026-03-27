@@ -10,7 +10,7 @@
 
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { type DbOrTransaction, db as plainDb } from '@/lib/db';
@@ -281,6 +281,11 @@ async function seedPresenceFromMusicFetch(
 
     // Only seed streaming DSPs (not video, metadata, or social)
     if (!streamingDspKeySet.has(dspEntry.key)) continue;
+
+    // Spotify has a more reliable fallback path: derive the artist ID from the
+    // known Spotify URL when MusicFetch omits it from the service payload.
+    if (dspEntry.key === 'spotify' && !service.id) continue;
+
     if (seededProviderIds.has(dspEntry.key)) continue;
 
     try {
@@ -320,7 +325,11 @@ async function seedPresenceFromMusicFetch(
             dspArtistMatches.providerId,
           ],
           set: {
-            ...(service.id ? { externalArtistId: service.id } : {}),
+            ...(service.id
+              ? {
+                  externalArtistId: drizzleSql`COALESCE(${dspArtistMatches.externalArtistId}, excluded.external_artist_id)`,
+                }
+              : {}),
             externalArtistUrl: url,
             externalArtistName: artistData.name ?? null,
             externalArtistImageUrl: artistData.image?.url ?? null,
@@ -379,7 +388,11 @@ async function seedPresenceFromMusicFetch(
             dspArtistMatches.providerId,
           ],
           set: {
-            ...(spotifyId ? { externalArtistId: spotifyId } : {}),
+            ...(spotifyId
+              ? {
+                  externalArtistId: drizzleSql`COALESCE(${dspArtistMatches.externalArtistId}, excluded.external_artist_id)`,
+                }
+              : {}),
             externalArtistUrl: spotifyUrl,
             externalArtistName: artistData.name ?? null,
             externalArtistImageUrl: artistData.image?.url ?? null,

@@ -1,3 +1,5 @@
+import './auth-utilities.css';
+import Script from 'next/script';
 import { AuthClientProviders } from '@/components/providers/AuthClientProviders';
 import { shouldBypassClerk } from '@/components/providers/clerkAvailability';
 import {
@@ -26,6 +28,9 @@ export default async function AuthLayout({
   if (isClerkUnavailable) {
     return (
       <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
+        {/* Keep auth routes theme-aware without forcing the marketing homepage to
+            download the theme bootstrap on first paint. */}
+        <Script src='/theme-init.js' strategy='beforeInteractive' />
         <main id='main-content'>
           <AuthShellLayout
             formTitle='Auth unavailable'
@@ -42,6 +47,7 @@ export default async function AuthLayout({
   return (
     <AuthClientProviders publishableKey={publishableKey}>
       <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
+        <Script src='/theme-init.js' strategy='beforeInteractive' />
         <main id='main-content'>{children}</main>
       </FeatureFlagsProvider>
     </AuthClientProviders>
