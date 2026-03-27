@@ -12,7 +12,8 @@ import {
   HOMEPAGE_CITY_COOKIE,
   HOMEPAGE_REGION_COOKIE,
 } from '@/constants/app';
-import { HOSTNAME } from '@/constants/domains';
+import { BASE_URL, HOSTNAME } from '@/constants/domains';
+import { APP_ROUTES } from '@/constants/routes';
 import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
 import {
   type ClerkBypassPathInfo,
@@ -935,6 +936,13 @@ export default async function middleware(
   req: NextRequest,
   event: NextFetchEvent
 ) {
+  const hostInfo = analyzeHost(req.nextUrl.hostname);
+  if (hostInfo.isSupportHost) {
+    const targetUrl = new URL(APP_ROUTES.SUPPORT, BASE_URL);
+    targetUrl.search = req.nextUrl.search;
+    return NextResponse.redirect(targetUrl, 308);
+  }
+
   // ========================================================================
   // Investor portal: handle before Clerk (no auth needed)
   // /investor-portal uses token-based access, not Clerk sessions

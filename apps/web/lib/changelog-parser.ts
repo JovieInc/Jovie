@@ -69,16 +69,19 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
   const releases: ChangelogRelease[] = [];
   let current: ChangelogRelease | null = null;
   let currentSection: keyof ChangelogSection | null = null;
+  let summaryConsumed = false;
 
   for (const line of lines) {
     const result = processChangelogLine(
       line,
       current,
       currentSection,
+      summaryConsumed,
       releases
     );
     current = result.current;
     currentSection = result.currentSection;
+    summaryConsumed = result.summaryConsumed;
   }
 
   return releases.filter(hasPublicEntries);
@@ -87,6 +90,7 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
 type LineState = {
   current: ChangelogRelease | null;
   currentSection: keyof ChangelogSection | null;
+  summaryConsumed: boolean;
 };
 
 function tryParseVersion(
@@ -95,11 +99,15 @@ function tryParseVersion(
 ): LineState | null {
   const versionResult = parseVersionHeading(line);
   if (versionResult === 'unreleased') {
-    return { current: null, currentSection: null };
+    return { current: null, currentSection: null, summaryConsumed: false };
   }
   if (versionResult) {
     releases.push(versionResult);
-    return { current: versionResult, currentSection: null };
+    return {
+      current: versionResult,
+      currentSection: null,
+      summaryConsumed: false,
+    };
   }
   return null;
 }
@@ -107,14 +115,15 @@ function tryParseVersion(
 function tryParseSummary(
   line: string,
   current: ChangelogRelease,
-  currentSection: keyof ChangelogSection | null
+  currentSection: keyof ChangelogSection | null,
+  summaryConsumed: boolean
 ): LineState | null {
-  if (!currentSection && line.startsWith('> ') && !current.summary) {
+  if (!currentSection && line.startsWith('> ') && !summaryConsumed) {
     const summary = line.slice(2).trim();
     if (!INTERNAL_MARKER_RE.test(summary) && !isInternalEntry(summary)) {
       current.summary = summary;
     }
-    return { current, currentSection };
+    return { current, currentSection, summaryConsumed: true };
   }
   return null;
 }
@@ -128,6 +137,7 @@ function tryParseSection(
   return {
     current,
     currentSection: sMatch[1].toLowerCase() as keyof ChangelogSection,
+    summaryConsumed: true,
   };
 }
 
@@ -148,19 +158,25 @@ function processChangelogLine(
   line: string,
   current: ChangelogRelease | null,
   currentSection: keyof ChangelogSection | null,
+  summaryConsumed: boolean,
   releases: ChangelogRelease[]
 ): LineState {
   const versionState = tryParseVersion(line, releases);
   if (versionState) return versionState;
 
-  if (!current) return { current, currentSection };
+  if (!current) return { current, currentSection, summaryConsumed };
 
-  const summaryState = tryParseSummary(line, current, currentSection);
+  const summaryState = tryParseSummary(
+    line,
+    current,
+    currentSection,
+    summaryConsumed
+  );
   if (summaryState) return summaryState;
 
   const sectionState = tryParseSection(line, current);
   if (sectionState) return sectionState;
 
   tryParseBullet(line, current, currentSection);
-  return { current, currentSection };
+  return { current, currentSection, summaryConsumed };
 }

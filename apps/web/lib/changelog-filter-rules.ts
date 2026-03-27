@@ -25,7 +25,13 @@ const VENDOR_NAMES = [
   'Conductor',
 ];
 
-const VENDOR_TOKENS = new Set(VENDOR_NAMES.map(name => name.toLowerCase()));
+function escapeRegex(value: string): string {
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const VENDOR_PATTERNS = VENDOR_NAMES.map(
+  name => new RegExp(`\\b${escapeRegex(name)}\\b`)
+);
 
 /** Infrastructure, dev tooling, admin, and business-sensitive patterns. */
 const INTERNAL_PATTERNS = [
@@ -82,7 +88,6 @@ const INTERNAL_PATTERNS = [
   /\badmin panel\b/i,
   /\badmin table\b/i,
   /\badmin guard\b/i,
-  /\badmin\b/i,
   /\/app\/admin(?:\/|$)/i,
   /\/api\/admin(?:\/|$)/i,
   /\/api\/cron(?:\/|$)/i,
@@ -113,7 +118,7 @@ const INTERNAL_PATTERNS = [
   /\bcron control\b/i,
   /\bdeploy promotion\b/i,
   /\bserverfetch\(\)\b/i,
-  /\btoken\b/i,
+  /\b(?:bearer|verification|access|refresh)\s+token\b/i,
   /\bverification token\b/i,
   /\btrusted origin\b/i,
 ];
@@ -143,15 +148,12 @@ function hasDependencyVersionBump(entry: string): boolean {
   return false;
 }
 
-export function isInternalEntry(entry: string): boolean {
-  const normalizedTokens = entry
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean);
+function hasVendorLeak(entry: string): boolean {
+  return VENDOR_PATTERNS.some(pattern => pattern.test(entry));
+}
 
-  for (const token of normalizedTokens) {
-    if (VENDOR_TOKENS.has(token)) return true;
-  }
+export function isInternalEntry(entry: string): boolean {
+  if (hasVendorLeak(entry)) return true;
 
   for (const pattern of INTERNAL_PATTERNS) {
     if (pattern.test(entry)) return true;
