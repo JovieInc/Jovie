@@ -12,6 +12,8 @@ export interface WorkspaceTabOption<T extends string> {
   readonly label: string;
 }
 
+const PRIMARY_TAB_RESET_KEYS = ['page', 'pageSize', 'q', 'sort'] as const;
+
 interface WorkspaceTabsSurfaceProps<
   TPrimary extends string,
   TSecondary extends string = never,
@@ -52,7 +54,7 @@ export function WorkspaceTabsSurface<
   const selectedSecondaryValue = secondaryValue ?? undefined;
 
   const navigateWithParam = useCallback(
-    (param: string, value: string, resetKeys: string[]) => {
+    (param: string, value: string, resetKeys: readonly string[]) => {
       const nextParams = new URLSearchParams(searchParams.toString());
       nextParams.set(param, value);
 
@@ -109,6 +111,7 @@ export function WorkspaceTabsSurface<
               value={primaryValue}
               onValueChange={value =>
                 navigateWithParam(primaryParam, value, [
+                  ...PRIMARY_TAB_RESET_KEYS,
                   ...clearOnPrimaryChange,
                 ])
               }

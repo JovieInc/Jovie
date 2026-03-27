@@ -11,7 +11,6 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -40,6 +39,8 @@ const STATUS_OPTIONS = [
   { value: 'ingested', label: 'Ingested' },
   { value: 'rejected', label: 'Rejected' },
 ] as const;
+
+const LEADS_SEARCH_NAVIGATION_DEBOUNCE_MS = 300;
 
 const STATUS_VARIANT: Record<
   string,
@@ -244,8 +245,6 @@ export function LeadTable({
   initialSearch = '',
   basePath = APP_ROUTES.ADMIN_LEADS,
 }: Readonly<LeadTableProps>) {
-  const router = useRouter();
- 
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState(initialSearch);
@@ -287,12 +286,27 @@ export function LeadTable({
   }, [initialSearch]);
 
   useEffect(() => {
-    router.replace(
-      mergeHrefSearchParams(basePath, {
-        q: search.trim() || null,
-      })
-    );
-  }, [basePath, router, search]);
+    const nextSearch = search.trim() || null;
+    const currentSearch = initialSearch.trim() || null;
+
+    if (nextSearch === currentSearch) {
+      return;
+    }
+
+    const timeout = globalThis.setTimeout(() => {
+      globalThis.history.replaceState(
+        null,
+        '',
+        mergeHrefSearchParams(basePath, {
+          q: nextSearch,
+        })
+      );
+    }, LEADS_SEARCH_NAVIGATION_DEBOUNCE_MS);
+
+    return () => {
+      globalThis.clearTimeout(timeout);
+    };
+  }, [basePath, initialSearch, search]);
 
   useEffect(() => {
     if (refreshKey > 0) {

@@ -18,14 +18,16 @@ import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   TableBulkActionsToolbar,
-  TableShell,
-  TableSurfaceHeader,
-  TableSurfaceToolbar,
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import {
+  AdminTableHeader,
+  AdminTableSubheader,
+} from '@/features/admin/table/AdminTableHeader';
+import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
@@ -500,46 +502,41 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     <QueryErrorBoundary fallback={TableErrorFallback}>
       <div className='flex h-full'>
         <div className='flex-1 min-w-0'>
-          <TableShell
+          <AdminTableHeader
+            title='Users'
+            subtitle='Review lifecycle state, profile completion, and suppression health.'
+          />
+          <AdminTableSubheader
+            start={
+              <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+                Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                {total.toLocaleString()} users
+              </div>
+            }
+            end={
+              <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
+                <ExportCSVButton<AdminUserRow>
+                  getData={() => users}
+                  columns={usersCSVColumns}
+                  filename={USERS_CSV_FILENAME_PREFIX}
+                  disabled={users.length === 0}
+                  ariaLabel='Export users to CSV file'
+                  chrome='page-toolbar'
+                  iconOnly
+                  tooltipLabel='Export'
+                />
+              </div>
+            }
+          />
+          <AdminTableShell
             testId='admin-users-content'
             className='rounded-none border-0'
             toolbar={
-              <>
-                {/* Bulk actions toolbar (shows when rows selected) */}
-                <TableBulkActionsToolbar
-                  selectedCount={selectedCount}
-                  onClearSelection={clearSelection}
-                  actions={bulkActions}
-                />
-
-                {/* Main toolbar (always visible) */}
-                <TableSurfaceHeader
-                  title='Users'
-                  subtitle='Review lifecycle state, profile completion, and suppression health.'
-                />
-                <TableSurfaceToolbar
-                  start={
-                    <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-                      Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                      {total.toLocaleString()} users
-                    </div>
-                  }
-                  end={
-                    <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
-                      <ExportCSVButton<AdminUserRow>
-                        getData={() => users}
-                        columns={usersCSVColumns}
-                        filename={USERS_CSV_FILENAME_PREFIX}
-                        disabled={users.length === 0}
-                        ariaLabel='Export users to CSV file'
-                        chrome='page-toolbar'
-                        iconOnly
-                        tooltipLabel='Export'
-                      />
-                    </div>
-                  }
-                />
-              </>
+              <TableBulkActionsToolbar
+                selectedCount={selectedCount}
+                onClearSelection={clearSelection}
+                actions={bulkActions}
+              />
             }
           >
             {() =>
@@ -623,7 +620,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                 />
               )
             }
-          </TableShell>
+          </AdminTableShell>
         </div>
         <AdminUserDetailDrawer
           user={selectedUser}
