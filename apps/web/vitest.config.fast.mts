@@ -161,7 +161,7 @@ export default defineConfig({
       },
       {
         find: /^@\/app\//,
-        replacement: `${path.resolve(__dirname, './app/app')}/`,
+        replacement: `${path.resolve(__dirname, './app')}/`,
       },
       {
         find: /^@\/features\//,

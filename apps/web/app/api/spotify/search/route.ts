@@ -39,6 +39,9 @@ const MAX_QUERY_LENGTH = 60;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
 const SEARCH_CACHE_TTL_SECONDS = 300; // 5 minutes
+// NOTE: claimed-artist status is cached here for 60s on top of the 30s
+// unstable_cache inside getCachedClaimedSpotifyIds, so effective max staleness
+// for claimed badges is about 90 seconds.
 const SEARCH_RESPONSE_CACHE_TTL_SECONDS = 60; // 1 minute
 
 function validateSearchQuery(q: string | undefined): NextResponse | null {

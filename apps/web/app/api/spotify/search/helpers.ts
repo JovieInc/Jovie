@@ -26,7 +26,9 @@ export async function applyVipBoost(
   try {
     const vipLookup = await getFeaturedCreatorsForSearch();
     const normalizedQuery = query.toLowerCase().trim();
-    const vipArtist = vipLookup[normalizedQuery];
+    const vipArtist = Object.hasOwn(vipLookup, normalizedQuery)
+      ? vipLookup[normalizedQuery]
+      : undefined;
 
     if (!vipArtist) {
       return results;

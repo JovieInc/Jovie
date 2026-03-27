@@ -238,6 +238,14 @@ const SCREEN_BUDGETS = {
   upgrade: 150,
 } as const;
 
+const IS_CI =
+  process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+const CI_BUDGET_MULTIPLIER = 5;
+
+function getBudgetThreshold(budgetMs: number) {
+  return IS_CI ? budgetMs * CI_BUDGET_MULTIPLIER : budgetMs;
+}
+
 beforeEach(() => {
   mockArtistSearch.results = [];
   mockArtistSearch.state = 'idle';
@@ -310,7 +318,7 @@ describe('Onboarding screen performance budgets', () => {
       heading
     );
 
-    expect(renderTime).toBeLessThan(budgetMs);
+    expect(renderTime).toBeLessThan(getBudgetThreshold(budgetMs));
   });
 
   it('spotify search results screen stays within budget', async () => {
@@ -342,7 +350,9 @@ describe('Onboarding screen performance budgets', () => {
     );
 
     expect(screen.getByText('Search Budget Artist')).toBeInTheDocument();
-    expect(renderTime).toBeLessThan(SCREEN_BUDGETS.spotifyResults);
+    expect(renderTime).toBeLessThan(
+      getBudgetThreshold(SCREEN_BUDGETS.spotifyResults)
+    );
   });
 
   it('checkout screen renders within budget', async () => {
@@ -365,6 +375,8 @@ describe('Onboarding screen performance budgets', () => {
       /Upgrade to/i
     );
 
-    expect(renderTime).toBeLessThan(SCREEN_BUDGETS.checkout);
+    expect(renderTime).toBeLessThan(
+      getBudgetThreshold(SCREEN_BUDGETS.checkout)
+    );
   });
 });

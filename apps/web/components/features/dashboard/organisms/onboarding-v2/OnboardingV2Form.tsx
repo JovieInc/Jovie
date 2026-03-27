@@ -23,6 +23,8 @@ import {
   useRef,
   useState,
 } from 'react';
+import { connectOnboardingSpotifyArtist } from '@/app/onboarding/actions/connect-spotify';
+import { enrichProfileFromDsp } from '@/app/onboarding/actions/enrich-profile';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
@@ -42,8 +44,6 @@ import {
 import type { AvatarQuality } from '@/lib/profile/avatar-quality';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-import { connectOnboardingSpotifyArtist } from '../../../../../app/onboarding/actions/connect-spotify';
-import { enrichProfileFromDsp } from '../../../../../app/onboarding/actions/enrich-profile';
 
 const DISCOVERY_POLL_INTERVAL_MS = 1200;
 const DISCOVERY_STAGE_TIMEOUT_MS = 10000;

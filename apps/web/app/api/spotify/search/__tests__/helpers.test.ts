@@ -175,6 +175,15 @@ describe('applyVipBoost', () => {
     expect(boosted).toEqual(results);
   });
 
+  it('ignores inherited prototype keys in the VIP lookup object', async () => {
+    mockGetFeatured.mockResolvedValue({});
+
+    const results = [makeResult({ id: 'a1', name: 'Tim White' })];
+    const boosted = await applyVipBoost(results, 'constructor', 5);
+
+    expect(boosted).toEqual(results);
+  });
+
   it('VIP at top with no same-name collisions returns unchanged order', async () => {
     mockGetFeatured.mockResolvedValue({
       'tim white': {
