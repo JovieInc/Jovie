@@ -3,7 +3,7 @@
 import { Input } from '@jovie/ui';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { BASE_URL } from '@/constants/app';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
@@ -15,7 +15,7 @@ import type { SettingsProfileSectionProps } from './types';
 import { useSettingsProfile } from './useSettingsProfile';
 
 const PROFILE_INPUT_CLASS =
-  'block w-full rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
+  'block w-full rounded-[10px] border border-subtle bg-surface-0 px-3 py-2 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-focus focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/20';
 
 export function SettingsProfileSection({
   artist,
@@ -137,7 +137,7 @@ export function SettingsProfileSection({
             </p>
           </div>
           <div className='flex w-full rounded-md sm:max-w-[280px]'>
-            <span className='inline-flex select-none items-center rounded-l-[10px] border border-r-0 border-(--linear-app-frame-seam) bg-surface-0 px-3 text-[13px] text-secondary-token'>
+            <span className='inline-flex select-none items-center rounded-l-[10px] border border-r-0 border-subtle bg-surface-0 px-3 text-[13px] text-secondary-token'>
               {profileDomain}/
             </span>
             <Input

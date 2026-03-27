@@ -221,7 +221,10 @@ export function ChatMessage({
                   {isStreaming ? 'Writing reply…' : 'Reply'}
                 </span>
               </div>
-              <div className='rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-3.5 text-primary-token shadow-[var(--linear-app-card-shadow)]'>
+              <div
+                data-testid='chat-message-reply-bubble'
+                className='rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-3.5 text-primary-token shadow-[var(--linear-app-card-shadow)]'
+              >
                 <ChatMarkdown
                   content={messageText}
                   isStreaming={Boolean(isStreaming)}

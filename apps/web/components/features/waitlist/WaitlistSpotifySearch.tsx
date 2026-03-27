@@ -10,10 +10,10 @@ import {
   useRef,
   useState,
 } from 'react';
+import { AuthTextInput } from '@/components/atoms/AuthTextInput';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { AuthTextInput } from '@/features/auth';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';

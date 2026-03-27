@@ -13,10 +13,10 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { CampaignSettingsPanel } from '@/components/features/admin/campaigns/CampaignSettingsPanel';
 import { WaitlistSettingsPanel } from '@/components/features/admin/WaitlistSettingsPanel';
-import { SettingsActionRow } from '@/components/features/dashboard/molecules/SettingsActionRow';
-import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
+import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
+import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
 import { APP_ROUTES } from '@/constants/routes';
-import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
 
 const DEV_TOOLBAR_COOKIE = '__dev_toolbar';
 

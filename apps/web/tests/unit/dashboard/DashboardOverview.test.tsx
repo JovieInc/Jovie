@@ -193,8 +193,8 @@ describe('DashboardOverview', () => {
     });
     const btnClass = viewProfileLink.className;
 
-    expect(btnClass).toContain('h-(--linear-app-control-height-sm)');
-    expect(btnClass).toContain('w-(--linear-app-control-height-sm)');
+    expect(btnClass).toContain('h-app-control-sm');
+    expect(btnClass).toContain('w-app-control-sm');
     expect(btnClass).not.toContain('sm:h-11');
     expect(btnClass).not.toContain('sm:w-11');
   });

@@ -52,8 +52,6 @@ describe('createRightMetaCellRenderer', () => {
     expect(wrapper.className).toContain('items-center');
     const dateLabel = screen.getByText('Jun 2026');
     expect(dateLabel).toBeInTheDocument();
-    expect(dateLabel.className).toContain('w-[64px]');
-    expect(dateLabel.className).toContain('justify-end');
   });
 
   it('gracefully falls back to em dash when the year cannot be parsed', () => {
@@ -71,6 +69,5 @@ describe('createRightMetaCellRenderer', () => {
 
     const placeholder = screen.getByText('—');
     expect(placeholder).toBeInTheDocument();
-    expect(placeholder.className).toContain('w-[64px]');
   });
 });

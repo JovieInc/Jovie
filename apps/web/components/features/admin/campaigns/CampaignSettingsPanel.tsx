@@ -5,9 +5,9 @@ import { Loader2 } from 'lucide-react';
 import type { ChangeEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import {
   DEFAULT_THROTTLING,
   type ThrottlingConfig,

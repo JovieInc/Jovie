@@ -32,11 +32,15 @@ describe('share-menu-items', () => {
         .map(item => [item.id, item.icon])
     );
 
+    expect(iconById['utm-share-instagram-story']).toBeDefined();
     expect(React.isValidElement(iconById['utm-share-instagram-story'])).toBe(
       true
     );
+    expect(iconById['utm-share-tiktok-bio']).toBeDefined();
     expect(React.isValidElement(iconById['utm-share-tiktok-bio'])).toBe(true);
+    expect(iconById['utm-share-twitter-post']).toBeDefined();
     expect(React.isValidElement(iconById['utm-share-twitter-post'])).toBe(true);
+    expect(iconById['utm-share-newsletter']).toBeDefined();
     expect(React.isValidElement(iconById['utm-share-newsletter'])).toBe(true);
   });
 
@@ -54,11 +58,15 @@ describe('share-menu-items', () => {
       (submenu?.children ?? []).map(item => [item.id, item.icon])
     );
 
+    expect(iconById['utm-share-instagram-story']).toBeDefined();
     expect(React.isValidElement(iconById['utm-share-instagram-story'])).toBe(
       true
     );
+    expect(iconById['utm-share-tiktok-bio']).toBeDefined();
     expect(React.isValidElement(iconById['utm-share-tiktok-bio'])).toBe(true);
+    expect(iconById['utm-share-twitter-post']).toBeDefined();
     expect(React.isValidElement(iconById['utm-share-twitter-post'])).toBe(true);
+    expect(iconById['utm-share-newsletter']).toBeDefined();
     expect(React.isValidElement(iconById['utm-share-newsletter'])).toBe(true);
   });
 
@@ -75,11 +83,15 @@ describe('share-menu-items', () => {
       actionableItems.map(item => [item.id, item.icon])
     );
 
+    expect(iconById['utm-share-instagram-story']).toBeDefined();
     expect(React.isValidElement(iconById['utm-share-instagram-story'])).toBe(
       true
     );
+    expect(iconById['utm-share-tiktok-bio']).toBeDefined();
     expect(React.isValidElement(iconById['utm-share-tiktok-bio'])).toBe(true);
+    expect(iconById['utm-share-twitter-post']).toBeDefined();
     expect(React.isValidElement(iconById['utm-share-twitter-post'])).toBe(true);
+    expect(iconById['utm-share-newsletter']).toBeDefined();
     expect(React.isValidElement(iconById['utm-share-newsletter'])).toBe(true);
   });
 });

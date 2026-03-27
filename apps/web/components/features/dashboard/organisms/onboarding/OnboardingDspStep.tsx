@@ -1,5 +1,6 @@
 'use client';
 
+import { Search } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useReducer, useRef } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
@@ -131,19 +132,10 @@ export function OnboardingDspStep({
                   state.error && AUTH_SURFACE.fieldShellError
                 )}
               >
-                <svg
-                  viewBox='0 0 24 24'
-                  fill='none'
-                  stroke='currentColor'
-                  strokeWidth='2'
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
+                <Search
                   className='h-4 w-4 shrink-0 text-tertiary-token'
                   aria-hidden='true'
-                >
-                  <circle cx='11' cy='11' r='8' />
-                  <path d='m21 21-4.3-4.3' />
-                </svg>
+                />
                 <input
                   ref={inputRef}
                   type='text'
@@ -154,6 +146,11 @@ export function OnboardingDspStep({
                   autoCapitalize='none'
                   autoCorrect='off'
                   spellCheck={false}
+                  aria-label='Search for your artist or paste a Spotify link'
+                  aria-invalid={Boolean(state.error)}
+                  aria-describedby={
+                    state.error ? 'onboarding-dsp-search-error' : undefined
+                  }
                   className={AUTH_SURFACE.fieldInput}
                 />
                 {searchState === 'loading' && (
@@ -219,7 +216,11 @@ export function OnboardingDspStep({
             </div>
 
             {state.error && (
-              <p className='text-error text-[13px] text-center'>
+              <p
+                id='onboarding-dsp-search-error'
+                role='alert'
+                className='text-error text-[13px] text-center'
+              >
                 {state.error}
               </p>
             )}

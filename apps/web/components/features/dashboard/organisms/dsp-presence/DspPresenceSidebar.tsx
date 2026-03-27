@@ -8,7 +8,6 @@ import { Icon } from '@/components/atoms/Icon';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
-import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { ConfidenceBadge } from '@/features/dashboard/atoms/ConfidenceBadge';
 import {
   DspProviderIcon,
@@ -44,13 +43,6 @@ export function DspPresenceSidebar({ item, onClose }: DspPresenceSidebarProps) {
       title={label}
       onClose={onClose}
       headerMode='minimal'
-      headerActions={
-        <DrawerHeaderActions
-          primaryActions={[]}
-          overflowActions={[]}
-          onClose={onClose}
-        />
-      }
       isEmpty={!item}
       emptyMessage='Select a platform to view details.'
       entityHeader={item ? <SidebarEntityHeader item={item} /> : undefined}
@@ -65,14 +57,14 @@ function SidebarEntityHeader({ item }: { readonly item: DspPresenceItem }) {
 
   return (
     <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-      <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+      <div className='border-b border-subtle px-3 py-2'>
         <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
           DSP profile
         </p>
       </div>
       <div className='flex items-center gap-2 p-3.5'>
         {item.externalArtistImageUrl ? (
-          <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
+          <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-subtle bg-surface-0'>
             <Image
               src={item.externalArtistImageUrl}
               alt={item.externalArtistName ?? label}
@@ -83,7 +75,7 @@ function SidebarEntityHeader({ item }: { readonly item: DspPresenceItem }) {
             />
           </div>
         ) : (
-          <div className='flex h-9 w-9 items-center justify-center rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
+          <div className='flex h-9 w-9 items-center justify-center rounded-full border border-subtle bg-surface-0'>
             <DspProviderIcon provider={item.providerId} size='lg' />
           </div>
         )}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { AuthTextInput } from '@/features/auth';
+import { AuthTextInput } from '@/components/atoms/AuthTextInput';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { cn } from '@/lib/utils';
 import {
