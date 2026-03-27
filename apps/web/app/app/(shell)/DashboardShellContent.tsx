@@ -7,7 +7,10 @@ import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';
 import type { FeatureFlagsBootstrap } from '@/lib/feature-flags/shared';
 import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
-import { getDashboardData, setSidebarCollapsed } from './dashboard/actions';
+import {
+  getDashboardDataEssential,
+  setSidebarCollapsed,
+} from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
 import { ProfileCompletionRedirect } from './ProfileCompletionRedirect';
 
@@ -30,8 +33,12 @@ export async function DashboardShellContent({
 }) {
   const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
 
+  // Use the essential (fast-path) fetch: only user + profiles + settings.
+  // Skips tipping stats, social links, and avatar quality (~3 queries
+  // instead of ~6). Those fields get safe defaults — pages that need
+  // them call getDashboardData() themselves.
   const [dashboardData, featureFlagsBootstrap] = await Promise.all([
-    getDashboardData(),
+    getDashboardDataEssential(),
     isE2EClientRuntime
       ? Promise.resolve(EMPTY_FEATURE_FLAGS_BOOTSTRAP)
       : getFeatureFlagsBootstrap(userId),

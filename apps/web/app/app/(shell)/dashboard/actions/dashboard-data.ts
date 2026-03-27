@@ -731,6 +731,189 @@ async function resolveDashboardData(): Promise<DashboardData> {
 }
 
 /**
+ * Fast-path fetch for the dashboard shell.
+ *
+ * Returns ONLY the data needed to render the shell + chat input:
+ * user, profiles, selected profile, settings, and sidebar state.
+ *
+ * Skips slow queries (tipping stats, social links existence, avatar quality)
+ * that are only needed by secondary dashboard pages. Those fields get safe
+ * defaults so the DashboardData interface stays compatible.
+ *
+ * ~3 fast single-row queries vs ~6 sequential queries in the full fetch.
+ */
+async function fetchDashboardEssentialWithSession(
+  clerkUserId: string
+): Promise<CoreData> {
+  try {
+    return await withDbSessionTx(
+      async (tx, sessionUserId) => {
+        const [userData] = await dashboardQuery(
+          () =>
+            tx
+              .select({
+                id: users.id,
+                email: users.email,
+                activeProfileId: users.activeProfileId,
+              })
+              .from(users)
+              .where(eq(users.clerkId, sessionUserId))
+              .limit(1),
+          'User lookup query (essential)'
+        );
+
+        if (!userData?.id) {
+          return {
+            user: null,
+            creatorProfiles: [],
+            selectedProfile: null,
+            avatarQuality: UNKNOWN_AVATAR_QUALITY,
+            needsOnboarding: true,
+            sidebarCollapsed: false,
+            hasSocialLinks: false,
+            hasMusicLinks: false,
+            tippingStats: createEmptyTippingStats(),
+            profileCompletion: buildProfileCompletion(null, null, false),
+            isFirstSession: false,
+          };
+        }
+
+        const creatorData = await dashboardQuery(
+          () =>
+            tx
+              .select()
+              .from(creatorProfiles)
+              .where(eq(creatorProfiles.userId, userData.id))
+              .orderBy(asc(creatorProfiles.createdAt)),
+          'Creator profiles query (essential)'
+        ).catch((error: unknown) => {
+          const migrationResult = handleMigrationErrors(error, {
+            userId: userData.id,
+            operation: 'creator_profiles',
+          });
+          if (!migrationResult.shouldRetry) {
+            return migrationResult.fallbackData as CreatorProfile[];
+          }
+          Sentry.captureException(error, {
+            tags: { query: 'creator_profiles', context: 'dashboard_essential' },
+          });
+          throw error;
+        });
+
+        if (!creatorData || creatorData.length === 0) {
+          return {
+            user: userData,
+            creatorProfiles: [],
+            selectedProfile: null,
+            avatarQuality: UNKNOWN_AVATAR_QUALITY,
+            needsOnboarding: true,
+            sidebarCollapsed: false,
+            hasSocialLinks: false,
+            hasMusicLinks: false,
+            tippingStats: createEmptyTippingStats(),
+            profileCompletion: buildProfileCompletion(null, null, false),
+            isFirstSession: false,
+          };
+        }
+
+        const selected = userData.activeProfileId
+          ? (creatorData.find(p => p.id === userData.activeProfileId) ??
+            selectDashboardProfile(creatorData))
+          : selectDashboardProfile(creatorData);
+
+        const settings = await dashboardQuery(
+          () =>
+            tx
+              .select()
+              .from(userSettings)
+              .where(eq(userSettings.userId, userData.id))
+              .limit(1),
+          'User settings query (essential)'
+        )
+          .then(
+            result => result?.[0] as { sidebarCollapsed: boolean } | undefined
+          )
+          .catch(() => undefined);
+
+        // Skip slow queries (links, avatar, tipping) — use safe defaults.
+        // The shell + chat only need profile data to render.
+        return {
+          user: userData,
+          creatorProfiles: creatorData,
+          selectedProfile: selected,
+          avatarQuality: UNKNOWN_AVATAR_QUALITY,
+          needsOnboarding: !profileIsPublishable(selected),
+          sidebarCollapsed: settings?.sidebarCollapsed ?? false,
+          hasSocialLinks: false,
+          hasMusicLinks: false,
+          tippingStats: createEmptyTippingStats(),
+          profileCompletion: buildProfileCompletion(
+            selected,
+            userData.email,
+            false
+          ),
+          dashboardLoadError: undefined,
+          isFirstSession: deriveIsFirstSession(selected),
+        };
+      },
+      { clerkUserId }
+    );
+  } catch (error) {
+    const errorObj = error as
+      | Error
+      | { code?: string; message?: string; cause?: unknown };
+    const message =
+      (errorObj as Error).message ??
+      (errorObj as { message?: string }).message ??
+      'Unknown error';
+    const code =
+      (errorObj as { code?: string }).code ??
+      (errorObj as { cause?: { code?: string } }).cause?.code;
+    const errorType = errorObj?.constructor?.name ?? typeof errorObj;
+
+    logger.error('Error fetching essential dashboard data', {
+      message,
+      code,
+      errorType,
+    });
+
+    return {
+      user: null,
+      creatorProfiles: [],
+      selectedProfile: null,
+      avatarQuality: UNKNOWN_AVATAR_QUALITY,
+      needsOnboarding: true,
+      sidebarCollapsed: false,
+      hasSocialLinks: false,
+      hasMusicLinks: false,
+      tippingStats: createEmptyTippingStats(),
+      profileCompletion: buildProfileCompletion(null, null, false),
+      dashboardLoadError: {
+        stage: 'core_fetch',
+        message,
+        code: code ?? null,
+        errorType,
+      },
+      isFirstSession: false,
+    };
+  }
+}
+
+/**
+ * Cached essential dashboard data (fast path).
+ * Only user + profiles + settings. No tipping/links/avatar.
+ */
+const getCachedDashboardEssential = unstableCache(
+  async (clerkUserId: string) =>
+    fetchDashboardEssentialWithSession(clerkUserId),
+  ['dashboard-essential'],
+  {
+    revalidate: CACHE_TTL.MEDIUM,
+    tags: [CACHE_TAGS.DASHBOARD_DATA],
+  }
+);
+
+/**
  * Single consolidated cache for all dashboard core data.
  * Settings, link counts, and tipping stats are fetched sequentially
  * within fetchDashboardCoreWithSession to avoid pool exhaustion.
@@ -745,10 +928,67 @@ const getCachedDashboardCore = unstableCache(
 );
 
 /**
+ * Resolves essential dashboard data (fast path for shell rendering).
+ * Skips tipping stats, social links, and avatar quality.
+ */
+async function resolveDashboardDataEssential(): Promise<DashboardData> {
+  noStore();
+
+  const entitlements = await getCurrentUserEntitlements();
+  const isAdmin = entitlements.isAdmin;
+  const userId = entitlements.userId;
+
+  if (!userId) {
+    return {
+      user: null,
+      creatorProfiles: [],
+      selectedProfile: null,
+      avatarQuality: UNKNOWN_AVATAR_QUALITY,
+      needsOnboarding: true,
+      sidebarCollapsed: false,
+      hasSocialLinks: false,
+      hasMusicLinks: false,
+      isAdmin,
+      tippingStats: createEmptyTippingStats(),
+      profileCompletion: buildProfileCompletion(null, null, false),
+      isFirstSession: false,
+    };
+  }
+
+  try {
+    const coreData = await Sentry.startSpan(
+      { op: 'task', name: 'dashboard.getEssentialData' },
+      async () => getCachedDashboardEssential(userId)
+    );
+
+    return { ...coreData, isAdmin };
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { context: 'get_dashboard_data_essential' },
+    });
+
+    return {
+      user: null,
+      creatorProfiles: [],
+      selectedProfile: null,
+      needsOnboarding: true,
+      sidebarCollapsed: false,
+      hasSocialLinks: false,
+      hasMusicLinks: false,
+      isAdmin,
+      tippingStats: createEmptyTippingStats(),
+      profileCompletion: buildProfileCompletion(null, null, false),
+      isFirstSession: false,
+    };
+  }
+}
+
+/**
  * Cached loader for dashboard data.
  * Uses React's cache() for request-level deduplication.
  */
 const loadDashboardData = cache(resolveDashboardData);
+const loadDashboardDataEssential = cache(resolveDashboardDataEssential);
 
 /**
  * Prefetches dashboard data for the current request.
@@ -770,6 +1010,20 @@ export async function prefetchDashboardData(): Promise<void> {
  */
 export async function getDashboardData(): Promise<DashboardData> {
   return loadDashboardData();
+}
+
+/**
+ * Gets essential dashboard data (fast path).
+ *
+ * Returns user + profiles + settings with safe defaults for
+ * tipping stats, social links, and avatar quality. Use this
+ * when you need to render the shell fast and don't need the
+ * slow supplementary queries.
+ *
+ * @returns DashboardData with essential fields populated, others defaulted
+ */
+export async function getDashboardDataEssential(): Promise<DashboardData> {
+  return loadDashboardDataEssential();
 }
 
 /**

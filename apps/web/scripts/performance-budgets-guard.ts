@@ -547,6 +547,27 @@ const collectMetrics = async (
       logInfo(`  🔐 Injected ${cookies.length} auth cookies`);
     }
 
+    // Pre-warm authenticated routes: hit the URL once to populate
+    // unstable_cache and Neon connection pool. Without this, the first
+    // Playwright request measures DB cold start, not steady-state perf.
+    if (needsAuth) {
+      const warmupContext = await browser.newContext();
+      try {
+        if (cookies.length > 0) {
+          await warmupContext.addCookies(cookies);
+        }
+        const warmupPage = await warmupContext.newPage();
+        await warmupPage
+          .goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 })
+          .catch(() => undefined);
+        await warmupPage.waitForTimeout(2000);
+        await warmupPage.close().catch(() => undefined);
+      } finally {
+        await warmupContext.close().catch(() => undefined);
+      }
+      logInfo('  🔥 Pre-warmed server cache');
+    }
+
     let warmShellResponse = 0;
     if (shouldMeasureWarmShellResponse(url, needsAuth)) {
       const warmContext = await browser.newContext();

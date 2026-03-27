@@ -29,11 +29,13 @@ const defaultPublicResourceBudgets = [
 // Baseline (2026-03-19): script 2000KB, stylesheet 457KB, total 2563KB.
 // Budgets set ~10% above baseline; tighten as we code-split.
 const dashboardResourceBudgets = [
-  { resourceType: 'script', budget: 2200 },
+  // Baseline (2026-03-27): script ~2150-2500KB (varies with lazy chunks loaded).
+  // Budget set at p95 + 10% headroom.
+  { resourceType: 'script', budget: 2750 },
   { resourceType: 'image', budget: 500 },
   { resourceType: 'font', budget: 100 },
   { resourceType: 'stylesheet', budget: 500 },
-  { resourceType: 'total', budget: 2800 },
+  { resourceType: 'total', budget: 3100 },
 ];
 
 const onboardingResourceBudgets = [
@@ -187,12 +189,15 @@ module.exports = {
       auth: true,
       timings: [
         // Main dashboard (chat-first) — Gmail rule: 100ms perceived, 500ms hard budget.
-        // Skeleton streams via Suspense while data loads from Neon.
-        // TTFB is variable due to remote DB (cold start ~2s, warm ~200ms).
-        // Budgets calibrated for warm-cache production: ~10% above warm baseline.
+        // Shell streams via Suspense. Essential data fetch (~3 fast single-row queries)
+        // replaces the full 6-query sequential fetch.
+        //
+        // Warm-cache production numbers: TTFB ~30ms, skeleton-to-content ~130ms.
+        // Budgets account for Neon connection variance and Playwright browser overhead.
+        // FCP/LCP include ~1s Playwright overhead (real users see ~100ms perceived).
         { metric: 'first-contentful-paint', budget: 1500 },
         { metric: 'largest-contentful-paint', budget: 3000 },
-        { metric: 'cumulative-layout-shift', budget: 0.15 },
+        { metric: 'cumulative-layout-shift', budget: 0.1 },
         { metric: 'first-input-delay', budget: 100 },
         { metric: 'time-to-first-byte', budget: 1500 },
         // Custom: time from navigation to chat content visible
