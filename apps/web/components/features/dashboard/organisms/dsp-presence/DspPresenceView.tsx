@@ -33,10 +33,9 @@ function handleLinkClick(e: React.MouseEvent<HTMLAnchorElement>) {
   e.stopPropagation();
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: TanStack Table column defs require any for mixed accessor types
-type PresenceColumnDef = ColumnDef<DspPresenceItem, any>;
-
-function createPresenceColumns(): PresenceColumnDef[] {
+function createPresenceColumns() {
+  // TanStack Table requires ColumnDef<T, unknown>[] but mixed accessor types
+  // produce incompatible unions. Cast at the call site via useMemo instead.
   return [
     // Artist column (primary anchor)
     columnHelper.display({
@@ -46,7 +45,7 @@ function createPresenceColumns(): PresenceColumnDef[] {
         const item = row.original;
         const label = PROVIDER_LABELS[item.providerId];
         return (
-          <div className='flex items-center gap-2'>
+          <div className='flex min-w-0 items-center gap-2'>
             {item.externalArtistImageUrl ? (
               <div className='relative h-6 w-6 shrink-0 overflow-hidden rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
                 <Image
@@ -59,17 +58,18 @@ function createPresenceColumns(): PresenceColumnDef[] {
                 />
               </div>
             ) : (
-              <div className='flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
+              <div className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
                 <DspProviderIcon provider={item.providerId} size='sm' />
               </div>
             )}
-            <span className='truncate font-[510] text-primary-token'>
+            <span className='min-w-0 flex-1 truncate font-[510] text-primary-token'>
               {item.externalArtistName ?? 'Unknown Artist'}
             </span>
           </div>
         );
       },
       size: 200,
+      enableSorting: false,
     }),
 
     // Platform column
@@ -80,13 +80,14 @@ function createPresenceColumns(): PresenceColumnDef[] {
         const item = row.original;
         const label = PROVIDER_LABELS[item.providerId];
         return (
-          <div className='flex items-center gap-1.5 text-secondary-token'>
+          <div className='flex min-w-0 items-center gap-1.5 text-secondary-token'>
             <DspProviderIcon provider={item.providerId} size='sm' />
-            <span className='truncate'>{label}</span>
+            <span className='min-w-0 flex-1 truncate'>{label}</span>
           </div>
         );
       },
       size: 140,
+      enableSorting: false,
     }),
 
     // Status column
@@ -97,6 +98,7 @@ function createPresenceColumns(): PresenceColumnDef[] {
         <MatchStatusBadge status={row.original.status} size='sm' />
       ),
       size: 120,
+      enableSorting: false,
     }),
 
     // Confidence column (only for confirmed/auto_confirmed)
@@ -113,6 +115,7 @@ function createPresenceColumns(): PresenceColumnDef[] {
         return <ConfidenceBadge score={item.confidenceScore} size='sm' />;
       },
       size: 100,
+      enableSorting: false,
     }),
 
     // ISRCs column
@@ -127,6 +130,7 @@ function createPresenceColumns(): PresenceColumnDef[] {
         return <span className='text-secondary-token'>{count}</span>;
       },
       size: 80,
+      enableSorting: false,
     }),
 
     // External link column
@@ -152,6 +156,7 @@ function createPresenceColumns(): PresenceColumnDef[] {
         );
       },
       size: 48,
+      enableSorting: false,
     }),
   ];
 }
@@ -179,7 +184,10 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
   }, [selectedMatchId, selectedItem]);
 
   // Column definitions (stable reference)
-  const columns = useMemo(() => createPresenceColumns(), []);
+  const columns = useMemo(
+    () => createPresenceColumns() as ColumnDef<DspPresenceItem, unknown>[],
+    []
+  );
 
   // Shell integration: drawer toggle + right panel width
   const { setTableMeta } = useTableMeta();
@@ -200,6 +208,14 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
       toggle: data.items.length > 0 ? toggle : null,
       rightPanelWidth: isSidebarOpen ? SIDEBAR_WIDTH : 0,
     });
+
+    return () => {
+      setTableMeta({
+        rowCount: 0,
+        toggle: null,
+        rightPanelWidth: 0,
+      });
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
   }, [selectedMatchId, data.items.length, isSidebarOpen]);
 
@@ -214,9 +230,8 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
   );
 
   // Keyboard nav: only update selection when sidebar is already open.
-  // Safe to index data.items directly because this table has no client-side
-  // sorting — sort order is determined server-side in actions.ts. If client-side
-  // sorting is ever added, this must resolve the item from the table's row model.
+  // Sorting is disabled on all columns (sort order is server-side in actions.ts),
+  // so data.items index matches the visual row index.
   const handleFocusedRowChange = useCallback(
     (index: number) => {
       if (selectedMatchId !== null && data.items[index]) {

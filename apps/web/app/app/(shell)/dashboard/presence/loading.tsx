@@ -25,6 +25,9 @@ export default function PresenceLoading() {
           <LoadingSkeleton height='h-3' width='w-12' rounded='sm' />
           <LoadingSkeleton height='h-3' width='w-16' rounded='sm' />
           <LoadingSkeleton height='h-3' width='w-10' rounded='sm' />
+          <div className='ml-auto flex w-[48px] justify-end'>
+            <LoadingSkeleton height='h-3' width='w-4' rounded='sm' />
+          </div>
         </div>
 
         {/* Data rows */}
@@ -58,6 +61,9 @@ export default function PresenceLoading() {
               <LoadingSkeleton height='h-5' width='w-12' rounded='full' />
             </div>
             <LoadingSkeleton height='h-3' width='w-8' rounded='sm' />
+            <div className='ml-auto flex w-[48px] justify-end'>
+              <LoadingSkeleton height='h-4' width='w-4' rounded='sm' />
+            </div>
           </div>
         ))}
       </div>
