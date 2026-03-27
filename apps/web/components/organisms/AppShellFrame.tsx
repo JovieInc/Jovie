@@ -35,7 +35,7 @@ export const AppShellFrame = memo(function AppShellFrame({
   return (
     <div
       className={cn(
-        'flex h-[min(100svh,100%)] w-full overflow-hidden bg-(--linear-bg-page)',
+        'flex h-full w-full overflow-hidden bg-(--linear-bg-page)',
         /* PWA safe area: pad top for notch/Dynamic Island in standalone mode */
         'pt-[env(safe-area-inset-top)]',
         containerClassName
@@ -45,13 +45,13 @@ export const AppShellFrame = memo(function AppShellFrame({
 
       <main
         id='main-content'
-        className='flex min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-0 lg:mt-[8px] lg:mr-[8px] lg:ml-px lg:rounded-t-[12px] lg:border lg:border-b-0 lg:border-(--linear-app-shell-border) lg:border-l-(--linear-app-shell-sidebar-seam) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)] lg:peer-data-[state=open]:ml-0 lg:peer-data-[state=open]:rounded-tl-[10px] lg:peer-data-[state=open]:border-l-0 lg:peer-data-[state=open]:shadow-[-1px_0_0_0_var(--linear-app-frame-seam)_inset,var(--linear-app-shell-shadow)] lg:peer-data-[state=closed]:rounded-tl-[12px]'
+        className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:mt-[8px] lg:mr-[8px] lg:ml-px lg:rounded-t-[12px] lg:border lg:border-b-0 lg:border-(--linear-app-shell-border) lg:border-l-(--linear-app-shell-sidebar-seam) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)] lg:peer-data-[state=open]:ml-0 lg:peer-data-[state=open]:rounded-tl-[10px] lg:peer-data-[state=open]:border-l-0 lg:peer-data-[state=open]:shadow-[-1px_0_0_0_var(--linear-app-frame-seam)_inset,var(--linear-app-shell-shadow)] lg:peer-data-[state=closed]:rounded-tl-[12px]'
       >
-        <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>
-          {header}
+        {header}
+        <div className='flex flex-1 min-h-0 min-w-0 overflow-hidden'>
           <div
             className={cn(
-              'flex-1 min-h-0 min-w-0',
+              'flex flex-1 min-h-0 min-w-0 flex-col',
               isTableRoute
                 ? 'overflow-hidden overflow-x-auto overscroll-contain'
                 : 'overflow-y-auto overflow-x-hidden overscroll-contain',
@@ -60,8 +60,8 @@ export const AppShellFrame = memo(function AppShellFrame({
           >
             {main}
           </div>
+          {rightPanel}
         </div>
-        {rightPanel}
       </main>
 
       {mobileBottomNav}

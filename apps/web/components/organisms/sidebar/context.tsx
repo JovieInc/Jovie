@@ -93,7 +93,7 @@ export const SidebarProvider = React.forwardRef<
             } as React.CSSProperties
           }
           className={cn(
-            'group/sidebar-wrapper flex h-svh w-full overflow-x-hidden bg-base',
+            'group/sidebar-wrapper flex h-[min(100svh,100%)] w-full overflow-x-hidden bg-base',
             className
           )}
           ref={ref}
