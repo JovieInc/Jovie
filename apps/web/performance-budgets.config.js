@@ -17,6 +17,119 @@
  * - Stylesheet: ~52KB (Tailwind + custom styles)
  * - Total: ~1084KB
  */
+const defaultPublicResourceBudgets = [
+  { resourceType: 'script', budget: 1050 },
+  { resourceType: 'image', budget: 500 },
+  { resourceType: 'font', budget: 100 },
+  { resourceType: 'stylesheet', budget: 100 },
+  { resourceType: 'total', budget: 1200 },
+];
+
+const onboardingResourceBudgets = [
+  { resourceType: 'script', budget: 2600 },
+  { resourceType: 'image', budget: 700 },
+  { resourceType: 'font', budget: 100 },
+  { resourceType: 'stylesheet', budget: 550 },
+  { resourceType: 'total', budget: 3200 },
+];
+
+const onboardingStepBudgets = [
+  {
+    path: '/onboarding?resume=handle&handle=[username]',
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1700 },
+      { metric: 'largest-contentful-paint', budget: 2300 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1200 },
+    ],
+  },
+  {
+    path: '/onboarding?resume=spotify&handle=[username]',
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1800 },
+      { metric: 'largest-contentful-paint', budget: 2400 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1200 },
+    ],
+  },
+  {
+    path: '/onboarding?resume=artist-confirm&handle=[username]',
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1800 },
+      { metric: 'largest-contentful-paint', budget: 2400 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1200 },
+    ],
+  },
+  {
+    path: '/onboarding?resume=upgrade&handle=[username]',
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1800 },
+      { metric: 'largest-contentful-paint', budget: 2400 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1200 },
+    ],
+  },
+  {
+    path: '/onboarding?resume=dsp&handle=[username]',
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1900 },
+      { metric: 'largest-contentful-paint', budget: 2500 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1200 },
+    ],
+  },
+  {
+    path: '/onboarding?resume=social&handle=[username]',
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1900 },
+      { metric: 'largest-contentful-paint', budget: 2500 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1200 },
+    ],
+  },
+  {
+    path: '/onboarding?resume=releases&handle=[username]',
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1900 },
+      { metric: 'largest-contentful-paint', budget: 2500 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1200 },
+    ],
+  },
+  {
+    path: '/onboarding?resume=late-arrivals&handle=[username]',
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1900 },
+      { metric: 'largest-contentful-paint', budget: 2500 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1200 },
+    ],
+  },
+  {
+    path: '/onboarding?resume=profile-ready&handle=[username]',
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1900 },
+      { metric: 'largest-contentful-paint', budget: 2500 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1200 },
+    ],
+  },
+].map(entry => ({
+  ...entry,
+  auth: true,
+  resourceSizes: onboardingResourceBudgets,
+}));
+
 module.exports = {
   budgets: [
     {
@@ -31,13 +144,7 @@ module.exports = {
         // TTFB includes Playwright browser overhead, not just server response
         { metric: 'time-to-first-byte', budget: 1800 },
       ],
-      resourceSizes: [
-        { resourceType: 'script', budget: 1050 },
-        { resourceType: 'image', budget: 500 },
-        { resourceType: 'font', budget: 100 },
-        { resourceType: 'stylesheet', budget: 100 },
-        { resourceType: 'total', budget: 1200 },
-      ],
+      resourceSizes: defaultPublicResourceBudgets,
     },
     {
       path: '/[username]',
@@ -50,13 +157,19 @@ module.exports = {
         // Higher TTFB budget for dynamic pages (DB queries on cache miss)
         { metric: 'time-to-first-byte', budget: 2500 },
       ],
-      resourceSizes: [
-        { resourceType: 'script', budget: 1050 },
-        { resourceType: 'image', budget: 500 },
-        { resourceType: 'font', budget: 100 },
-        { resourceType: 'stylesheet', budget: 100 },
-        { resourceType: 'total', budget: 1200 },
+      resourceSizes: defaultPublicResourceBudgets,
+    },
+    {
+      path: '/onboarding/checkout',
+      auth: true,
+      timings: [
+        { metric: 'first-contentful-paint', budget: 2000 },
+        { metric: 'largest-contentful-paint', budget: 2600 },
+        { metric: 'cumulative-layout-shift', budget: 0.1 },
+        { metric: 'first-input-delay', budget: 100 },
+        { metric: 'time-to-first-byte', budget: 1400 },
       ],
+      resourceSizes: onboardingResourceBudgets,
     },
     {
       path: '/app/dashboard/releases',
@@ -82,5 +195,6 @@ module.exports = {
         { resourceType: 'total', budget: 2800 },
       ],
     },
+    ...onboardingStepBudgets,
   ],
 };
