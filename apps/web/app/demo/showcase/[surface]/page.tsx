@@ -1,19 +1,10 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import {
-  DemoShowcaseSurface,
+  DEMO_SHOWCASE_SURFACE_IDS,
   type DemoShowcaseSurfaceId,
-} from '@/features/demo/DemoShowcaseSurface';
-
-const VALID_SURFACES: readonly DemoShowcaseSurfaceId[] = [
-  'analytics',
-  'earnings',
-  'links',
-  'settings',
-  'onboarding-handle',
-  'onboarding-dsp',
-  'onboarding-profile-review',
-] as const;
+} from '@/components/features/demo/showcase-surfaces';
+import { DemoShowcaseSurface } from '@/features/demo/DemoShowcaseSurface';
 
 interface DemoShowcasePageProps {
   readonly params: Promise<{ surface: string }>;
@@ -29,7 +20,7 @@ export default async function DemoShowcasePage({
   params,
 }: Readonly<DemoShowcasePageProps>) {
   const { surface } = await params;
-  if (!VALID_SURFACES.includes(surface as DemoShowcaseSurfaceId)) {
+  if (!DEMO_SHOWCASE_SURFACE_IDS.includes(surface as DemoShowcaseSurfaceId)) {
     notFound();
   }
 

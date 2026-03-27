@@ -15,15 +15,7 @@ import { DashboardLinksDemo } from '@/features/home/demo/DashboardLinksDemo';
 import { ClerkSafeDefaultsProvider } from '@/hooks/useClerkSafe';
 import { DemoAuthShell } from './DemoAuthShell';
 import { DemoSettingsPanel } from './DemoSettingsPanel';
-
-export type DemoShowcaseSurfaceId =
-  | 'analytics'
-  | 'earnings'
-  | 'links'
-  | 'settings'
-  | 'onboarding-handle'
-  | 'onboarding-dsp'
-  | 'onboarding-profile-review';
+import type { DemoShowcaseSurfaceId } from './showcase-surfaces';
 
 interface DemoShowcaseSurfaceProps {
   readonly surface: DemoShowcaseSurfaceId;

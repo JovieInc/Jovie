@@ -9,7 +9,7 @@ export const SCREENSHOT_VIEWPORTS = {
   mobile: { width: 390, height: 844 },
 } as const;
 
-const GROUP_LABELS: Record<ScreenshotGroup, string> = {
+export const GROUP_LABELS: Record<ScreenshotGroup, string> = {
   marketing: 'Marketing',
   onboarding: 'Onboarding',
   dashboard: 'Dashboard',

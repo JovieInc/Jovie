@@ -31,13 +31,44 @@ function getPublicExportAbsolutePath(relativePath: string) {
   return join(PUBLIC_EXPORT_ROOT, relativePath);
 }
 
+function isScreenshotManifestEntry(
+  value: unknown
+): value is ScreenshotManifestEntry {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const entry = value as Partial<ScreenshotManifestEntry>;
+  return (
+    typeof entry.id === 'string' &&
+    typeof entry.title === 'string' &&
+    typeof entry.group === 'string' &&
+    typeof entry.groupLabel === 'string' &&
+    typeof entry.route === 'string' &&
+    typeof entry.viewport === 'string' &&
+    typeof entry.theme === 'string' &&
+    Array.isArray(entry.consumers) &&
+    typeof entry.capturedAt === 'string' &&
+    typeof entry.imagePath === 'string' &&
+    (typeof entry.gitSha === 'string' || entry.gitSha === null) &&
+    (typeof entry.publicExportPath === 'string' ||
+      typeof entry.publicExportPath === 'undefined')
+  );
+}
+
 async function readManifest(): Promise<readonly ScreenshotManifestEntry[]> {
   try {
     const manifestContents = await readFile(MANIFEST_PATH, 'utf8');
-    const parsed = JSON.parse(
-      manifestContents
-    ) as readonly ScreenshotManifestEntry[];
-    return parsed.filter(entry => SCREENSHOT_SCENARIO_IDS.has(entry.id));
+    const parsed = JSON.parse(manifestContents);
+    if (!Array.isArray(parsed)) {
+      void captureWarning('Screenshot catalog manifest is not an array', null);
+      return [];
+    }
+    return parsed.filter(
+      (entry): entry is ScreenshotManifestEntry =>
+        isScreenshotManifestEntry(entry) &&
+        SCREENSHOT_SCENARIO_IDS.has(entry.id)
+    );
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
       return [];
@@ -79,7 +110,7 @@ async function buildFallbackEntries(): Promise<
       viewport: scenario.viewport,
       theme: scenario.theme,
       consumers: scenario.consumers,
-      capturedAt: new Date().toISOString(),
+      capturedAt: '',
       gitSha: null,
       imagePath: `${scenario.id}.png`,
       publicExportPath: scenario.publicExportPath,

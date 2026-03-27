@@ -6,6 +6,7 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
 import type { ScreenshotInfo } from '@/lib/admin/screenshots';
+import { GROUP_LABELS } from '@/lib/screenshots/registry';
 import type {
   ScreenshotConsumer,
   ScreenshotGroup,
@@ -20,11 +21,10 @@ const GROUP_FILTERS: ReadonlyArray<{
   readonly label: string;
 }> = [
   { id: 'all', label: 'All' },
-  { id: 'marketing', label: 'Marketing' },
-  { id: 'onboarding', label: 'Onboarding' },
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'settings', label: 'Settings' },
-  { id: 'public-profile', label: 'Public Profile' },
+  ...Object.entries(GROUP_LABELS).map(([id, label]) => ({
+    id: id as ScreenshotGroup,
+    label,
+  })),
 ] as const;
 
 const CONSUMER_FILTERS: ReadonlyArray<{
@@ -52,14 +52,20 @@ function formatCaptureDate(value: string) {
   }).format(timestamp);
 }
 
-function formatConsumerLabel(consumer: ScreenshotConsumer) {
+type DisplayScreenshotConsumer = Exclude<ScreenshotConsumer, 'admin'>;
+
+function isDisplayConsumer(
+  consumer: ScreenshotConsumer
+): consumer is DisplayScreenshotConsumer {
+  return consumer !== 'admin';
+}
+
+function formatConsumerLabel(consumer: DisplayScreenshotConsumer) {
   switch (consumer) {
     case 'marketing-export':
       return 'Marketing Export';
     case 'investor-ready':
       return 'Investor Ready';
-    default:
-      return 'Admin';
   }
 }
 
@@ -220,7 +226,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                         </div>
                         <div className='mt-2 flex flex-wrap gap-1.5'>
                           {ss.consumers
-                            .filter(consumer => consumer !== 'admin')
+                            .filter(isDisplayConsumer)
                             .map(consumer => (
                               <span
                                 key={consumer}
