@@ -58,7 +58,6 @@ export function DrawerTabs<T extends string>({
           data-testid={`drawer-tab-${option.value}`}
           aria-selected={value === option.value}
           onClick={() => onValueChange(option.value)}
-          data-testid={`drawer-tab-${option.value}`}
           className={cn(
             DRAWER_TABS_TRIGGER_CLASSNAME,
             value === option.value && DRAWER_TABS_TRIGGER_ACTIVE_CLASSNAME,
