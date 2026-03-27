@@ -136,7 +136,7 @@ function createPresenceColumns() {
     // External link column
     columnHelper.display({
       id: 'link',
-      header: '',
+      header: () => <span className='sr-only'>External link</span>,
       cell: ({ row }) => {
         const url = row.original.externalArtistUrl;
         if (!url) return null;
@@ -148,7 +148,7 @@ function createPresenceColumns() {
               rel='noopener noreferrer'
               onClick={handleLinkClick}
               className='flex h-6 w-6 items-center justify-center rounded text-tertiary-token transition-colors hover:text-primary-token'
-              aria-label={`View on ${PROVIDER_LABELS[row.original.providerId]}`}
+              aria-label={`View ${row.original.externalArtistName ?? 'artist'} on ${PROVIDER_LABELS[row.original.providerId]}`}
             >
               <ExternalLink className='h-3.5 w-3.5' />
             </a>
@@ -234,11 +234,11 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
   // so data.items index matches the visual row index.
   const handleFocusedRowChange = useCallback(
     (index: number) => {
-      if (selectedMatchId !== null && data.items[index]) {
+      if (isSidebarOpen && data.items[index]) {
         setSelectedMatchId(data.items[index].matchId);
       }
     },
-    [selectedMatchId, data.items]
+    [isSidebarOpen, data.items]
   );
 
   // Selected row highlight
