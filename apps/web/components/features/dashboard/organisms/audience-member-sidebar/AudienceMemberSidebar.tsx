@@ -14,18 +14,11 @@ import {
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
-import { AudienceMemberHeader } from '@/features/dashboard/atoms/AudienceMemberHeader';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { AudienceMemberActivityFeed } from './AudienceMemberActivityFeed';
 import { AudienceMemberDetails } from './AudienceMemberDetails';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
 import type { AudienceMemberSidebarProps } from './types';
-import {
-  computeMemberAvatarName,
-  computeMemberAvatarSrc,
-  computeMemberSubtitle,
-  computeMemberTitle,
-} from './utils';
 
 type AudienceTab = 'details' | 'activity' | 'referrers';
 
@@ -42,10 +35,6 @@ export function AudienceMemberSidebar({
   contextMenuItems,
 }: AudienceMemberSidebarProps) {
   const [activeTab, setActiveTab] = useState<AudienceTab>('details');
-  const title = computeMemberTitle(member);
-  const subtitle = computeMemberSubtitle(member);
-  const avatarSrc = computeMemberAvatarSrc(member);
-  const avatarName = computeMemberAvatarName(member, title);
 
   return (
     <EntitySidebarShell
@@ -61,13 +50,6 @@ export function AudienceMemberSidebar({
     >
       {member && (
         <div className='flex min-h-full flex-col gap-2.5 pt-0.5'>
-          <AudienceMemberHeader
-            title={title}
-            subtitle={subtitle}
-            avatarName={avatarName}
-            avatarSrc={avatarSrc}
-          />
-
           <div className='flex min-h-0 flex-1 flex-col gap-2.5'>
             <DrawerTabs
               value={activeTab}
