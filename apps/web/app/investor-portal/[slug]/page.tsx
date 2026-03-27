@@ -47,7 +47,7 @@ async function requireInvestorAccess(): Promise<void> {
 
 /**
  * Dynamic memo pages for the investor portal.
- * Reads markdown from content/investors/ based on manifest.json.
+ * Reads markdown from investors/ based on manifest.json.
  * Beautiful prose styling with light/dark toggle and TOC.
  */
 export async function generateMetadata({
@@ -74,7 +74,7 @@ export default async function InvestorMemoPage({ params }: PageProps) {
     notFound();
   }
 
-  const doc = await getMarkdownDocument(`content/investors/${page.file}`);
+  const doc = await getMarkdownDocument(`investors/${page.file}`);
   const toc = doc.toc
     .filter(entry => entry.level === 2)
     .map(entry => ({ id: entry.id, title: entry.title }));

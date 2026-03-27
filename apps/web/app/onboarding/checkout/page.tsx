@@ -13,8 +13,6 @@ import {
   validatePlan,
 } from '@/lib/auth/plan-intent';
 import { PRICING } from '@/lib/config/pricing';
-import { checkGate } from '@/lib/feature-flags/server';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { isGrowthPlanEnabled } from '@/lib/stripe/config';
 import { OnboardingCheckoutClient } from './OnboardingCheckoutClient';
 
@@ -74,15 +72,6 @@ export default async function OnboardingCheckoutPage({
     authResult.state === CanonicalUserState.UNAUTHENTICATED
   ) {
     redirect(APP_ROUTES.SIGNIN);
-  }
-
-  // Enforce feature gate server-side (prevents direct URL access when flag is off)
-  const checkoutEnabled = await checkGate(
-    authResult.clerkUserId,
-    FEATURE_FLAG_KEYS.ONBOARDING_CHECKOUT_STEP
-  );
-  if (!checkoutEnabled) {
-    redirect(APP_ROUTES.DASHBOARD);
   }
 
   // Read plan intent from cookie, falling back to ?plan= query param

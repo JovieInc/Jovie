@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
+import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -10,6 +11,13 @@ import { HudDashboardClient } from './HudDashboardClient';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: { index: false, follow: false },
+  },
+};
 
 type SearchParams = Record<string, string | string[] | undefined>;
 

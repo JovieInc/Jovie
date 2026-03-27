@@ -216,7 +216,25 @@ jobs:
         with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run ESLint server boundary checks
-        run: pnpm --filter=@jovie/web run lint:server-boundaries
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            mapfile -t CHANGED_FILES < <(
+              git diff --diff-filter=d --name-only "origin/${{ github.base_ref }}" HEAD -- \
+                'apps/web/*.ts' \
+                'apps/web/*.tsx' \
+                'apps/web/**/*.ts' \
+                'apps/web/**/*.tsx'
+            )
+            if (( ${#CHANGED_FILES[@]} > 0 )); then
+              pnpm --filter=@jovie/web run lint:server-boundaries -- "${CHANGED_FILES[@]}"
+            else
+              echo "No server-boundary TypeScript files changed"
+            fi
+          else
+            pnpm --filter=@jovie/web run lint:server-boundaries
+          fi
 
   ci-knip:
     name: Knip (dead code)
@@ -260,7 +278,7 @@ jobs:
           path: |
             .cache/tsbuildinfo
             apps/web/.cache/tsbuildinfo
-          key: ${{ runner.os }}-tsc-${{ github.ref }}-${{ hashFiles('**/tsconfig.json', '**/pnpm-lock.yaml', '**/package.json') }}
+          key: ${{ runner.os }}-tsc-${{ github.ref }}-${{ hashFiles('**/tsconfig*.json', '**/pnpm-lock.yaml', '**/package.json') }}
           restore-keys: |
             ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-

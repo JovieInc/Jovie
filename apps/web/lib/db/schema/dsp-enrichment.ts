@@ -117,6 +117,7 @@ export const dspArtistMatches = pgTable(
     confirmedBy: uuid('confirmed_by'),
     rejectedAt: timestamp('rejected_at'),
     rejectionReason: text('rejection_reason'),
+    matchSource: text('match_source'), // 'musicfetch' | 'isrc_discovery' | 'backfill' | 'manual'
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },

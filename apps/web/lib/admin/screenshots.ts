@@ -56,29 +56,30 @@ export async function getScreenshots(): Promise<readonly ScreenshotInfo[]> {
   const results: ScreenshotInfo[] = [];
 
   for (const source of SCREENSHOT_SOURCES) {
-    const dirPath = source.directoryPath;
-
     try {
-      const files = await readdir(dirPath);
+      const files = await readdir(source.directoryPath);
       const pngFiles = files.filter(f => f.toLowerCase().endsWith('.png'));
+      const sourceEntries = await Promise.all(
+        pngFiles.map(async filename => {
+          const filePath = join(source.directoryPath, filename);
+          const fileStat = await stat(filePath);
+          const nameWithoutExt = basename(filename, '.png');
+          const displayName = nameWithoutExt.replaceAll(/[-_]/g, ' ');
+          const compositeFilename = `${source.key}--${filename}`;
 
-      for (const filename of pngFiles) {
-        const filePath = join(dirPath, filename);
-        const fileStat = await stat(filePath);
-        const nameWithoutExt = basename(filename, '.png');
-        const displayName = nameWithoutExt.replaceAll(/[-_]/g, ' ');
+          return {
+            id: `${source.key}--${nameWithoutExt}`,
+            name: displayName,
+            filename,
+            source: source.key,
+            sourceLabel: source.label,
+            sizeBytes: fileStat.size,
+            url: `/api/admin/screenshots/${encodeURIComponent(compositeFilename)}`,
+          } satisfies ScreenshotInfo;
+        })
+      );
 
-        const compositeFilename = `${source.key}--${filename}`;
-        results.push({
-          id: `${source.key}--${nameWithoutExt}`,
-          name: displayName,
-          filename,
-          source: source.key,
-          sourceLabel: source.label,
-          sizeBytes: fileStat.size,
-          url: `/api/admin/screenshots/${encodeURIComponent(compositeFilename)}`,
-        });
-      }
+      results.push(...sourceEntries);
     } catch (err: unknown) {
       // Directory may not exist in some environments; skip silently
       if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
