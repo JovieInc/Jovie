@@ -1,5 +1,6 @@
 'use client';
 
+import { AlertCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EnrichedProfileData } from '@/app/onboarding/actions/enrich-profile';
 import {
@@ -11,6 +12,7 @@ import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { AuthButton } from '@/features/auth';
 import { track } from '@/lib/analytics';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
+import type { AvatarQuality } from '@/lib/profile/avatar-quality';
 import { useUserAvatarMutation } from '@/lib/queries/useUserAvatarMutation';
 import {
   canProceedFromProfileReview,
@@ -25,6 +27,7 @@ interface OnboardingProfileReviewStepProps {
   readonly handle: string;
   readonly onGoToDashboard: () => void;
   readonly isEnriching: boolean;
+  readonly avatarQuality?: AvatarQuality | null;
   /** Existing avatar URL from a prior onboarding (step-resume users) */
   readonly existingAvatarUrl?: string | null;
   /** Existing bio from a prior onboarding (step-resume users) */
@@ -71,6 +74,7 @@ export function OnboardingProfileReviewStep({
   handle,
   onGoToDashboard,
   isEnriching,
+  avatarQuality = null,
   existingAvatarUrl = null,
   existingBio = null,
   existingGenres = null,
@@ -375,6 +379,20 @@ export function OnboardingProfileReviewStep({
                       Tap to add a profile photo
                     </p>
                   )}
+                  {avatarQuality?.status === 'low' ? (
+                    <div className='mt-2 flex max-w-[320px] items-start gap-2 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-left text-[12px] text-secondary-token'>
+                      <AlertCircle
+                        className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'
+                        aria-hidden='true'
+                      />
+                      <p>
+                        This photo is only {avatarQuality.width}x
+                        {avatarQuality.height}. Jovie profiles look best at
+                        512x512 or higher, so swap in a sharper image if you
+                        have one.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Editable Name + Handle */}

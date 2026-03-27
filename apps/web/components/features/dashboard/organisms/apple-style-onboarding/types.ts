@@ -1,3 +1,5 @@
+import type { AvatarQuality } from '@/lib/profile/avatar-quality';
+
 export interface AppleStyleOnboardingFormProps {
   readonly initialDisplayName?: string;
   readonly initialHandle?: string;
@@ -9,6 +11,8 @@ export interface AppleStyleOnboardingFormProps {
   readonly initialStepIndex?: number;
   /** Existing profile avatar URL for step-resume users */
   readonly existingAvatarUrl?: string | null;
+  /** Existing avatar quality metadata for step-resume users */
+  readonly existingAvatarQuality?: AvatarQuality | null;
   /** Existing profile bio for step-resume users */
   readonly existingBio?: string | null;
   /** Existing profile genres for step-resume users */

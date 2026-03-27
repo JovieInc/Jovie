@@ -64,7 +64,7 @@ function makeFullArtistResult(
       appleMusic: { url: 'https://music.apple.com/us/artist/test/123456' },
       youtube: { url: 'https://www.youtube.com/channel/UCabc' },
       youtubeMusic: { url: 'https://music.youtube.com/channel/UCabc' },
-      soundCloud: { url: 'https://soundcloud.com/testartist' },
+      soundcloud: { url: 'https://soundcloud.com/testartist' },
       deezer: { url: 'https://www.deezer.com/artist/789012' },
       tidal: { url: 'https://tidal.com/browse/artist/345678' },
       amazonMusic: { url: 'https://music.amazon.com/artists/B001TEST' },
@@ -182,20 +182,22 @@ describe('extractAllMusicFetchServices', () => {
     expect(platforms).not.toContain('spotify');
   });
 
-  it('deduplicates by platform key when multiple service keys map to the same platform', () => {
-    // soundCloud and soundcloud both map to 'soundcloud' in DSP registry
+  it('maps corrected canonical service keys such as soundcloud and netease', () => {
     const artistData = makeFullArtistResult({
       services: {
-        soundCloud: { url: 'https://soundcloud.com/testartist', id: 'sc1' },
-        soundcloud: { url: 'https://soundcloud.com/testartist2', id: 'sc2' },
+        soundcloud: { url: 'https://soundcloud.com/testartist', id: 'sc1' },
+        netease: { url: 'https://music.163.com/artist?id=123', id: 'ne1' },
       },
     });
 
-    const links = extractAllMusicFetchServices(artistData);
-    const scLinks = links.filter(l => l.platform === 'soundcloud');
+    const platforms = extractAllMusicFetchServices(artistData).map(
+      link => link.platform
+    );
 
-    // Only one soundcloud entry (first one wins)
-    expect(scLinks).toHaveLength(1);
+    expect(platforms).toContain('soundcloud');
+    expect(platforms).toContain('netease');
+    expect(platforms).not.toContain('soundCloud');
+    expect(platforms).not.toContain('netEase');
   });
 
   it('preserves raw payload for each service', () => {
@@ -237,7 +239,8 @@ describe('extractAllMusicFetchServices', () => {
         appleMusic: { url: 'https://music.apple.com/us/artist/test/123456' },
         youtubeMusic: { url: 'https://music.youtube.com/channel/UCabc' },
         amazonMusic: { url: 'https://music.amazon.com/artists/B001TEST' },
-        soundCloud: { url: 'https://soundcloud.com/testartist' },
+        soundcloud: { url: 'https://soundcloud.com/testartist' },
+        netease: { url: 'https://music.163.com/artist?id=123' },
       },
     });
 
@@ -249,12 +252,14 @@ describe('extractAllMusicFetchServices', () => {
     expect(platforms).toContain('youtube_music');
     expect(platforms).toContain('amazon_music');
     expect(platforms).toContain('soundcloud');
+    expect(platforms).toContain('netease');
 
     // Should NOT contain raw MusicFetch service names
     expect(platforms).not.toContain('appleMusic');
     expect(platforms).not.toContain('youtubeMusic');
     expect(platforms).not.toContain('amazonMusic');
     expect(platforms).not.toContain('soundCloud');
+    expect(platforms).not.toContain('netEase');
   });
 
   it('handles unknown service keys by using raw service key as platform', () => {
