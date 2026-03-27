@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.85] - 2026-03-27
+
+### Added
+
+- Performance budget for `/app` dashboard page with Gmail-rule thresholds (TTFB < 500ms, skeleton-to-content < 2s)
+- `getDashboardDataEssential()` fast-path fetch: 3 single-row queries instead of 6 sequential queries for shell rendering
+- Suspense streaming shell: `DashboardShellSkeleton` renders at first byte while data loads
+- Pre-warm request in performance budget guard for consistent warm-cache measurements
+- `data-testid="chat-content"` marker on JovieChat for skeleton-to-content measurement
+
+### Changed
+
+- Dashboard shell layout uses Suspense boundary with streaming fallback instead of blocking on full data fetch
+- Code-split `ProfileContactSidebar` via `next/dynamic` (sidebar panel, not critical path)
+- `generateMetadata()` on `/app` reuses `getDashboardDataEssential()` instead of separate DB call
+- Shared `dashboardResourceBudgets` const used by both `/app` and `/app/dashboard/releases` budgets
+- Performance budget guard supports `/app` skeleton-to-content measurement with chat-aware selectors
+
 ## [26.4.84] - 2026-03-27
 
 ### Changed
