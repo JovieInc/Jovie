@@ -1,12 +1,9 @@
 import type { Metadata } from 'next';
 import { type ReactNode, Suspense } from 'react';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const metadata: Metadata = {
-  robots: {
-    index: false,
-    follow: false,
-    googleBot: { index: false, follow: false },
-  },
+  robots: NOINDEX_ROBOTS,
 };
 
 export const revalidate = false;

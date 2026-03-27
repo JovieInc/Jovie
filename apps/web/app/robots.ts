@@ -14,19 +14,18 @@ import { env } from '@/lib/env-server';
 
 const isProduction = env.VERCEL_ENV === 'production';
 
-/** Paths blocked from indexing (app dashboard, APIs, investor portal, tracking params). */
+/**
+ * Paths blocked from indexing.
+ *
+ * Keep these to unambiguous namespaces only. Top-level prefixes like `/demo`
+ * or `/ui` can collide with public profile usernames because robots disallow
+ * matching is prefix-based.
+ */
 const DISALLOW_PATHS = [
   '/app/',
   '/api/',
   '/out/',
   '/investors/',
-  '/investor-portal',
-  '/demo',
-  '/sandbox',
-  '/spinner-test',
-  '/sentry-example-page',
-  '/ui',
-  '/hud',
   '/*?ref=*',
   '/*&ref=*',
   '/*?utm_*',

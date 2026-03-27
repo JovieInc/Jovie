@@ -34,6 +34,7 @@ export function parseChangelog(markdown) {
   };
   let currentBlock = null; // null | 'unreleased' | index into releases
   let currentSection = null;
+  let summaryConsumed = false;
 
   for (const line of lines) {
     const versionMatch = line.match(VERSION_HEADING_RE);
@@ -41,6 +42,7 @@ export function parseChangelog(markdown) {
     if (versionMatch) {
       const [, version, date] = versionMatch;
       currentSection = null;
+      summaryConsumed = false;
 
       if (version.toLowerCase() === 'unreleased') {
         currentBlock = 'unreleased';
@@ -64,7 +66,8 @@ export function parseChangelog(markdown) {
       currentBlock === 'unreleased' ? unreleased : releases[currentBlock];
 
     // Capture summary blockquote (first `> ` line before any section heading)
-    if (!currentSection && line.startsWith('> ') && !target.summary) {
+    if (!currentSection && line.startsWith('> ') && !summaryConsumed) {
+      summaryConsumed = true;
       const summary = line.slice(2).trim();
       if (!INTERNAL_MARKER_RE.test(summary) && !isInternalEntry(summary)) {
         target.summary = summary;
