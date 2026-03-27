@@ -94,6 +94,10 @@
   .home-legal-link:hover {
     color: var(--linear-text-primary);
   }
+
+  .animate-hero-phone-float {
+    animation: hero-phone-float 4s ease-in-out infinite;
+  }
 }
 
 @keyframes hero-phone-float {
@@ -105,10 +109,6 @@
   50% {
     transform: translateY(-8px);
   }
-}
-
-.animate-hero-phone-float {
-  animation: hero-phone-float 4s ease-in-out infinite;
 }
 
 @media (prefers-contrast: more) {

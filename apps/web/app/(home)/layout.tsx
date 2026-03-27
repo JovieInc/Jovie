@@ -1,3 +1,5 @@
+// The homepage intentionally reuses the trimmed root utility graph for now.
+// A dedicated home utilities entrypoint lands in the follow-up CSS split.
 import './home.css';
 import Link from 'next/link';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
