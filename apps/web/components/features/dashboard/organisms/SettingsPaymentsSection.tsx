@@ -14,6 +14,18 @@ interface StripeConnectStatus {
   email: string | null;
 }
 
+async function fetchJson(
+  url: string,
+  options?: RequestInit
+): Promise<
+  { ok: true; data: Record<string, unknown> } | { ok: false; error: string }
+> {
+  const res = await fetch(url, options);
+  const data = await res.json();
+  if (!res.ok) return { ok: false, error: data.error || 'Request failed' };
+  return { ok: true, data };
+}
+
 export function SettingsPaymentsSection() {
   const [status, setStatus] = useState<StripeConnectStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,14 +48,12 @@ export function SettingsPaymentsSection() {
     try {
       setIsLoading(true);
       setError(null);
-      const res = await fetch('/api/stripe-connect/status');
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || 'Failed to load payment status');
+      const result = await fetchJson('/api/stripe-connect/status');
+      if (!result.ok) {
+        setError(result.error || 'Failed to load payment status');
         return;
       }
-      const data = await res.json();
-      setStatus(data);
+      setStatus(result.data as unknown as StripeConnectStatus);
     } catch {
       setError('Failed to load payment status');
     } finally {
@@ -60,17 +70,17 @@ export function SettingsPaymentsSection() {
     setIsActionLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/stripe-connect/onboard', {
+      const result = await fetchJson('/api/stripe-connect/onboard', {
         method: 'POST',
       });
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || 'Failed to start onboarding');
+      if (!result.ok) {
+        setError(result.error || 'Failed to start onboarding');
         return;
       }
-      const data = await res.json();
-      if (data.url) {
-        globalThis.location.href = data.url;
+      if (typeof result.data.url === 'string') {
+        globalThis.location.href = result.data.url;
+      } else {
+        setError('Failed to start onboarding');
       }
     } catch {
       setError('Failed to start Stripe onboarding');
@@ -83,12 +93,11 @@ export function SettingsPaymentsSection() {
     setIsActionLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/stripe-connect/disconnect', {
+      const result = await fetchJson('/api/stripe-connect/disconnect', {
         method: 'POST',
       });
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || 'Failed to disconnect');
+      if (!result.ok) {
+        setError(result.error || 'Failed to disconnect');
         return;
       }
       await fetchStatus();
