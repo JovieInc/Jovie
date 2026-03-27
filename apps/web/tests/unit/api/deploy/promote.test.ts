@@ -114,7 +114,7 @@ describe('POST /api/deploy/promote', () => {
     );
   });
 
-  it('returns deployment data when the hook succeeds', async () => {
+  it('returns deployment data when the hook succeeds without retrying the deploy hook POST', async () => {
     mockServerFetch.mockResolvedValue(
       new Response(JSON.stringify({ id: 'job_123' }), {
         status: 200,
@@ -131,5 +131,13 @@ describe('POST /api/deploy/promote', () => {
       message: 'Production deploy triggered',
       job: { id: 'job_123' },
     });
+    expect(mockServerFetch).toHaveBeenCalledWith(
+      'https://example.com/hook',
+      expect.objectContaining({
+        method: 'POST',
+        timeoutMs: 30_000,
+      })
+    );
+    expect(mockServerFetch.mock.calls[0]?.[1]).not.toHaveProperty('retry');
   });
 });

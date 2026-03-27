@@ -108,6 +108,32 @@ export function isClerkTestEmail(email: string): boolean {
   return email.includes('+clerk_test');
 }
 
+export function isClerkHandshakeUrl(url: string): boolean {
+  return (
+    url.includes('clerk') &&
+    (url.includes('handshake') || url.includes('dev-browser'))
+  );
+}
+
+const CLERK_ORIGIN_MISMATCH_PATTERNS = [
+  /production keys are only allowed for domain/i,
+  /request http origin header must be equal to or a subdomain of the requesting url/i,
+];
+
+export function isClerkOriginMismatchMessage(message: string): boolean {
+  return CLERK_ORIGIN_MISMATCH_PATTERNS.some(pattern => pattern.test(message));
+}
+
+export function hasClerkOriginMismatchSignal(
+  errorMessage: string,
+  consoleMessages: readonly string[] = []
+): boolean {
+  return (
+    isClerkOriginMismatchMessage(errorMessage) ||
+    consoleMessages.some(isClerkOriginMismatchMessage)
+  );
+}
+
 /**
  * Creates or reuses a Clerk test user session for the given email.
  *
@@ -214,6 +240,17 @@ export async function signInUser(
   // This is required for the testing token to be included in Clerk's FAPI requests
   await setupClerkTestingToken({ page });
 
+  const clerkConsoleMessages: string[] = [];
+  const handleConsoleMessage = (message: {
+    type(): string;
+    text(): string;
+  }) => {
+    if (message.type() === 'error' || message.type() === 'warning') {
+      clerkConsoleMessages.push(message.text());
+    }
+  };
+  page.on('console', handleConsoleMessage);
+
   await primeVercelBypassCookie(
     page,
     process.env.BASE_URL,
@@ -230,6 +267,13 @@ export async function signInUser(
     timeout: 120_000,
     retries: 2,
   });
+
+  if (isClerkHandshakeUrl(page.url())) {
+    throw new ClerkTestError(
+      'Clerk redirected to a handshake flow on the current preview target.',
+      'CLERK_SETUP_FAILED'
+    );
+  }
 
   // Wait for Clerk JS to load from CDN before calling clerk.signIn()
   // The @clerk/testing library has a hard 30s timeout for window.Clerk.loaded.
@@ -288,11 +332,20 @@ export async function signInUser(
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
+    const sawOriginMismatch = hasClerkOriginMismatchSignal(
+      msg,
+      clerkConsoleMessages
+    );
 
     // Handle "already signed in" — testing token may auto-authenticate
     if (msg.includes('already signed in')) {
       console.log('  Already signed in via testing token, continuing...');
       // Continue to verification below
+    } else if (sawOriginMismatch) {
+      throw new ClerkTestError(
+        'Clerk rejected the current preview/local origin for the configured keys.',
+        'CLERK_SETUP_FAILED'
+      );
     } else {
       // Check if Clerk JS even loaded
       const clerkLoaded = await page
@@ -319,6 +372,8 @@ export async function signInUser(
       // Re-throw the original error if Clerk was loaded but signIn failed
       throw error;
     }
+  } finally {
+    page.off('console', handleConsoleMessage);
   }
 
   // After sign-in, navigate to a stable authenticated shell route to verify auth.
@@ -327,6 +382,13 @@ export async function signInUser(
     timeout: 120_000,
     retries: 2,
   });
+
+  if (isClerkHandshakeUrl(page.url())) {
+    throw new ClerkTestError(
+      'Clerk redirected to a handshake flow after sign-in on the current preview target.',
+      'CLERK_SETUP_FAILED'
+    );
+  }
 
   // Dismiss Next.js dev error overlay and wait for page to stabilize
   // Handles React hydration mismatches (nonce attr) and transient hooks errors
