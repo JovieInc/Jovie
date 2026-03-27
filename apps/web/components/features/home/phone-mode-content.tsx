@@ -15,8 +15,7 @@ import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderBut
 export const MOCK_ARTIST = {
   name: 'Tim White',
   handle: 'timwhite',
-  image:
-    'https://egojgbuon2z2yahy.public.blob.vercel-storage.com/avatars/users/user_38SPgR24re2YSaXT2hVoFtvvlVy/tim-white-profie-pic-e2f4672b-3555-4a63-9fe6-f0d5362218f6.avif',
+  image: '/images/avatars/tim-white.jpg',
   isVerified: true,
 } as const;
 
