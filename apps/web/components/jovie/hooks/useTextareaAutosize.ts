@@ -45,14 +45,27 @@ export function useTextareaAutosize({
   const containerRef = useRef<HTMLDivElement>(null);
   const hiddenDivRef = useRef<HTMLDivElement>(null);
 
-  // Remeasure height (extracted so it can be called from both value change and width change)
+  // Store current measurement inputs in refs so the ResizeObserver callback
+  // always reads the latest values (avoids stale closure on width change).
+  const valueRef = useRef(value);
+  const minHeightRef = useRef(minHeight);
+  const maxHeightRef = useRef(maxHeight);
+  useEffect(() => {
+    valueRef.current = value;
+    minHeightRef.current = minHeight;
+    maxHeightRef.current = maxHeight;
+  }, [value, minHeight, maxHeight]);
+
   const remeasure = () => {
     const hiddenDiv = hiddenDivRef.current;
     if (!hiddenDiv) return;
 
-    hiddenDiv.textContent = value + '\n';
+    hiddenDiv.textContent = valueRef.current + '\n';
     const scrollHeight = hiddenDiv.scrollHeight;
-    const clamped = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
+    const clamped = Math.max(
+      minHeightRef.current,
+      Math.min(scrollHeight, maxHeightRef.current)
+    );
     setMeasuredHeight(clamped);
   };
 
@@ -83,7 +96,6 @@ export function useTextareaAutosize({
     observer.observe(textarea);
 
     return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [textareaRef]);
 
   const isAtMaxHeight = measuredHeight >= maxHeight;
