@@ -167,6 +167,9 @@
   /* Inset divider shadow (used for section separators) */
   --shadow-divider: oklch(86% 0 283) 0px -0.5px 0px 0px inset;
 
+  /* Popover/dropdown shadow — the only floating surface with visible depth */
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.08);
+
   /* Button inset shadow */
   --shadow-button-inset:
     0px 4px 4px -1px oklch(0% 0 0 / 6%), 0px 1px 1px 0px oklch(0% 0 0 / 12%);
@@ -314,6 +317,9 @@
     rgba(0, 0, 0, 0.2) 0px 0px 12px 0px inset,
     rgba(0, 0, 0, 0.2) 0px 4px 24px 0px;
   --shadow-divider: rgba(255, 255, 255, 0.05) 0px -0.5px 0px 0px inset;
+  /* Popover/dropdown shadow — ring + deep depth for dark backgrounds */
+  --shadow-popover:
+    0 0 0 1px rgba(255, 255, 255, 0.06), 0 8px 24px rgba(0, 0, 0, 0.35);
   --shadow-button-inset:
     rgba(0, 0, 0, 0) 0px 8px 2px 0px,
     rgba(0, 0, 0, 0.01) 0px 5px 2px 0px,

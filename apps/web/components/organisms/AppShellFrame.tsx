@@ -35,7 +35,7 @@ export const AppShellFrame = memo(function AppShellFrame({
   return (
     <div
       className={cn(
-        'flex h-svh w-full overflow-hidden bg-(--linear-bg-page)',
+        'flex h-[min(100svh,100%)] w-full overflow-hidden bg-(--linear-bg-page)',
         /* PWA safe area: pad top for notch/Dynamic Island in standalone mode */
         'pt-[env(safe-area-inset-top)]',
         containerClassName

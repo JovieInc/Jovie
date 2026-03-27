@@ -244,7 +244,7 @@ export const LINEAR_SURFACE = {
 
   /** Popover container — the ONE surface that gets a shadow (floats above content). */
   popover:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-[0_8px_24px_rgba(0,0,0,0.08)]',
+    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-[var(--shadow-popover)]',
 } as const;
 
 export const LINEAR_SURFACE_TIER = {

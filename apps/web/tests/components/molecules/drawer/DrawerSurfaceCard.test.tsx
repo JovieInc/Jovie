@@ -1,7 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
-import { LINEAR_SURFACE_TIER } from '@/features/dashboard/tokens';
+import {
+  LINEAR_SURFACE,
+  LINEAR_SURFACE_TIER,
+} from '@/features/dashboard/tokens';
 
 describe('DrawerSurfaceCard', () => {
   it('defaults to the flat variant', () => {
@@ -35,6 +38,18 @@ describe('DrawerSurfaceCard', () => {
     expect(className).toContain('border-(--linear-app-frame-seam)');
     expect(className).toContain('bg-(--linear-app-content-surface)');
     expect(className).toContain('shadow-[var(--linear-app-card-shadow)]');
+  });
+
+  it('LINEAR_SURFACE tokens contain no hardcoded shadow values', () => {
+    for (const [key, value] of Object.entries(LINEAR_SURFACE)) {
+      expect(value, `LINEAR_SURFACE.${key} has hardcoded shadow`).not.toMatch(
+        /shadow-\[\d/
+      );
+      expect(
+        value,
+        `LINEAR_SURFACE.${key} has hardcoded rgba shadow`
+      ).not.toMatch(/shadow-\[rgba/);
+    }
   });
 
   it('keeps drawer and sidebar cards on a higher elevation tier than main content containers', () => {

@@ -42,7 +42,7 @@ export function DashboardHeader({
       )}
     >
       {/* Mobile: Large page title with action buttons + profile */}
-      <div className='flex items-center justify-between px-4 pb-2 pt-3 sm:hidden'>
+      <div className='hidden max-sm:flex items-center justify-between px-4 pb-2 pt-3'>
         <h1 className='text-[17px] font-[560] leading-tight tracking-[-0.018em] text-primary-token'>
           {currentLabel}
         </h1>

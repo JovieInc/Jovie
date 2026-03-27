@@ -26,6 +26,7 @@ import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -494,14 +495,27 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   const { setHeaderActions } = useSetHeaderActions();
 
+  const headerActions = useMemo(
+    () =>
+      canCreateManualReleases ? (
+        <DashboardHeaderActionButton
+          ariaLabel='Create a new release'
+          onClick={handleNewRelease}
+          icon={<Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />}
+          iconOnly
+          tooltipLabel='New Release'
+        />
+      ) : null,
+    [canCreateManualReleases, handleNewRelease]
+  );
+
   useEffect(() => {
-    setHeaderActions(null);
+    setHeaderActions(headerActions);
 
     return () => {
       setHeaderActions(null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderActions is a stable context setter
-  }, []);
+  }, [headerActions, setHeaderActions]);
 
   const releaseSidebarHandlers = useMemo(
     () => ({
