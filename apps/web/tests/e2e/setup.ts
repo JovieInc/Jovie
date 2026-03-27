@@ -1,9 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 import { test as base } from '@playwright/test';
-import {
-  isExpectedError,
-  isExpectedWarning,
-} from './utils/smoke-test-utils';
+import { isExpectedError, isExpectedWarning } from './utils/smoke-test-utils';
 
 declare global {
   interface Window {
