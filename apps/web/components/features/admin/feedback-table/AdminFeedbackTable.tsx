@@ -384,7 +384,7 @@ export function AdminFeedbackTable({
                             icon: XCircle,
                             disabled: isDismissPending(selected.id),
                             onClick: () => {
-                              void dismissRow(selected);
+                              dismissRow(selected);
                             },
                           } satisfies DrawerHeaderAction,
                         ]
@@ -394,7 +394,7 @@ export function AdminFeedbackTable({
                       label: 'Copy as Markdown',
                       icon: ClipboardCopy,
                       onClick: () => {
-                        void copyRowAsMarkdown(selected);
+                        copyRowAsMarkdown(selected);
                       },
                     } satisfies DrawerHeaderAction,
                   ] satisfies readonly DrawerHeaderAction[]

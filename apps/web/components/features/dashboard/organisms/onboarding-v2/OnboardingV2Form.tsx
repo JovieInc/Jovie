@@ -707,7 +707,7 @@ function PreviewPanel({
 
 export function OnboardingV2Form({
   existingAvatarUrl = null,
-  existingAvatarQuality = null,
+  existingAvatarQuality: _existingAvatarQuality = null,
   existingBio = null,
   existingGenres = null,
   initialDisplayName = '',
@@ -720,7 +720,7 @@ export function OnboardingV2Form({
   userId,
 }: Readonly<OnboardingV2FormProps>) {
   const router = useRouter();
-  void existingAvatarQuality;
+
   const searchParams = useSearchParams();
   const notifications = useNotifications();
   const normalizedInitialHandle = initialHandle.trim().toLowerCase();

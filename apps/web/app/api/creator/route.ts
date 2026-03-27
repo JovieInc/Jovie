@@ -43,7 +43,7 @@ export async function GET(
 
     const profile = await getCreatorProfileWithLinks(username);
 
-    if (!profile || !profile.isPublic) {
+    if (!profile?.isPublic) {
       return NextResponse.json(
         { error: 'Creator not found' },
         { status: 404, headers: NO_STORE_HEADERS }
