@@ -4,7 +4,7 @@ import React from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AuthButton } from '@/features/auth';
-import { FORM_LAYOUT } from '@/lib/auth/constants';
+import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { cn } from '@/lib/utils';
 
 interface HandleValidationState {
@@ -216,98 +216,100 @@ export function OnboardingHandleStep({
           ) : null}
         </div>
 
-        <form
-          className={cn(FORM_LAYOUT.formInner, 'space-y-2.5')}
-          onSubmit={onSubmit}
-        >
-          <div>
-            <div
-              className={[
-                'flex w-full items-center gap-2 rounded-md border bg-surface-1 px-4 py-2.5',
-                'focus-within:ring-2 focus-within:ring-(--linear-border-focus)/30 focus-within:ring-offset-1 focus-within:ring-offset-(--linear-app-content-surface)',
-                stateError || handleValidation.error
-                  ? 'border-error'
-                  : 'border-subtle',
-              ].join(' ')}
-            >
-              <span className='text-[13px] whitespace-nowrap text-tertiary-token'>
-                @
-              </span>
-              <input
-                id='handle-input'
-                ref={inputRef}
-                name='username'
-                aria-label='Enter your desired handle'
-                type='text'
-                value={handleInput}
-                onChange={e =>
-                  onHandleChange(
-                    e.target.value
-                      .toLowerCase()
-                      .replaceAll(/\s+/g, '')
-                      .replace(/^@+/, '')
-                  )
-                }
-                placeholder='yourhandle'
-                autoComplete='username'
-                autoCapitalize='none'
-                autoCorrect='off'
-                spellCheck={false}
-                aria-invalid={handleValidation.error ? 'true' : undefined}
-                className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus-visible:outline-none'
-              />
-              <div className='h-5 w-5 flex items-center justify-center'>
-                <ValidationIcon
-                  checking={handleValidation.checking}
-                  hasError={Boolean(stateError || handleValidation.error)}
-                  isValid={
-                    Boolean(handleInput) &&
-                    handleValidation.clientValid &&
-                    handleValidation.available
+        <ContentSurfaceCard className='p-4 sm:p-5'>
+          <form
+            className={cn(FORM_LAYOUT.formInner, 'space-y-2.5')}
+            onSubmit={onSubmit}
+          >
+            <div>
+              <div
+                className={cn(
+                  AUTH_SURFACE.fieldShell,
+                  (stateError || handleValidation.error) &&
+                    AUTH_SURFACE.fieldShellError
+                )}
+              >
+                <span className='text-[13px] whitespace-nowrap text-tertiary-token'>
+                  @
+                </span>
+                <input
+                  id='handle-input'
+                  ref={inputRef}
+                  name='username'
+                  aria-label='Enter your desired handle'
+                  type='text'
+                  value={handleInput}
+                  onChange={e =>
+                    onHandleChange(
+                      e.target.value
+                        .toLowerCase()
+                        .replaceAll(/\s+/g, '')
+                        .replace(/^@+/, '')
+                    )
                   }
+                  placeholder='yourhandle'
+                  autoComplete='username'
+                  autoCapitalize='none'
+                  autoCorrect='off'
+                  spellCheck={false}
+                  aria-invalid={handleValidation.error ? 'true' : undefined}
+                  className={AUTH_SURFACE.fieldInput}
                 />
+                <div className='h-5 w-5 flex items-center justify-center'>
+                  <ValidationIcon
+                    checking={handleValidation.checking}
+                    hasError={Boolean(stateError || handleValidation.error)}
+                    isValid={
+                      Boolean(handleInput) &&
+                      handleValidation.clientValid &&
+                      handleValidation.available
+                    }
+                  />
+                </div>
               </div>
+
+              <output className={FORM_LAYOUT.errorContainer} aria-live='polite'>
+                {renderValidationStatus()}
+              </output>
+
+              {handleValidation.suggestions.length > 0 && (
+                <div className='mt-1 flex flex-wrap justify-center gap-2'>
+                  {handleValidation.suggestions.map(suggestion => (
+                    <button
+                      key={suggestion}
+                      type='button'
+                      onClick={() =>
+                        onSuggestionClick
+                          ? onSuggestionClick(suggestion)
+                          : onHandleChange(suggestion)
+                      }
+                      className={AUTH_SURFACE.pillOption}
+                    >
+                      @{suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <output className={FORM_LAYOUT.errorContainer} aria-live='polite'>
-              {renderValidationStatus()}
-            </output>
-
-            {handleValidation.suggestions.length > 0 && (
-              <div className='mt-2 flex flex-wrap justify-center gap-2'>
-                {handleValidation.suggestions.map(suggestion => (
-                  <button
-                    key={suggestion}
-                    type='button'
-                    onClick={() =>
-                      onSuggestionClick
-                        ? onSuggestionClick(suggestion)
-                        : onHandleChange(suggestion)
-                    }
-                    className='rounded-full border border-subtle bg-surface-1 px-2.5 py-0.5 text-[11px] text-secondary-token'
-                  >
-                    @{suggestion}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <AuthButton
-            type='button'
-            disabled={Boolean(ctaDisabledReason) || isTransitioning}
-            aria-describedby={ctaDisabledReason ? disabledReasonId : undefined}
-            onClick={() => onSubmit()}
-            variant='primary'
-          >
-            <ButtonContent
-              isSubmitting={isSubmitting}
-              isPendingSubmit={isPendingSubmit}
-              isChecking={handleValidation.checking}
-              autoSubmitClaimed={autoSubmitClaimed}
-            />
-          </AuthButton>
-        </form>
+            <AuthButton
+              type='button'
+              disabled={Boolean(ctaDisabledReason) || isTransitioning}
+              aria-describedby={
+                ctaDisabledReason ? disabledReasonId : undefined
+              }
+              onClick={() => onSubmit()}
+              variant='primary'
+            >
+              <ButtonContent
+                isSubmitting={isSubmitting}
+                isPendingSubmit={isPendingSubmit}
+                isChecking={handleValidation.checking}
+                autoSubmitClaimed={autoSubmitClaimed}
+              />
+            </AuthButton>
+          </form>
+        </ContentSurfaceCard>
 
         <output
           className={cn(FORM_LAYOUT.footerHint, 'mt-4')}

@@ -57,16 +57,19 @@ vi.mock('@/lib/musicfetch/resilient-client', () => {
   class MusicfetchRequestError extends Error {
     statusCode?: number;
     retryAfterSeconds?: number;
+    details?: string;
 
     constructor(
       message: string,
       statusCode?: number,
-      retryAfterSeconds?: number
+      retryAfterSeconds?: number,
+      details?: string
     ) {
       super(message);
       this.name = 'MusicfetchRequestError';
       this.statusCode = statusCode;
       this.retryAfterSeconds = retryAfterSeconds;
+      this.details = details;
     }
   }
 
@@ -86,6 +89,13 @@ vi.mock('@/lib/musicfetch/resilient-client', () => {
 
   return {
     musicfetchRequest: (...args: unknown[]) => mockMusicfetchRequest(...args),
+    isMusicfetchInvalidServicesError: (
+      error: Partial<{ statusCode: number; details: string; message: string }>
+    ) =>
+      error.statusCode === 400 &&
+      (error.details ?? error.message ?? '').includes(
+        'services - Invalid value'
+      ),
     MusicfetchRequestError,
     MusicfetchBudgetExceededError,
   };
@@ -266,6 +276,41 @@ describe('musicfetch client', () => {
   });
 
   describe('fetchArtistBySpotifyUrl', () => {
+    it('requests MusicFetch with the corrected canonical service keys', async () => {
+      mockMusicfetchRequest.mockResolvedValue({
+        result: {
+          type: 'artist',
+          name: 'Test Artist',
+          services: {},
+        },
+      });
+
+      const { fetchArtistBySpotifyUrl } = await import(
+        '@/lib/dsp-enrichment/providers/musicfetch'
+      );
+
+      await fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123');
+
+      const params = mockMusicfetchRequest.mock.calls[0]?.[1] as
+        | URLSearchParams
+        | undefined;
+
+      expect(params).toBeInstanceOf(URLSearchParams);
+      expect(params?.get('services')).toBeTruthy();
+
+      const requestedServices = new Set(
+        params?.get('services')?.split(',').filter(Boolean)
+      );
+      expect(requestedServices.has('soundcloud')).toBe(true);
+      expect(requestedServices.has('netease')).toBe(true);
+      expect(requestedServices.has('telmoreMusik')).toBe(true);
+      expect(requestedServices.has('youseeMusik')).toBe(true);
+      expect(requestedServices.has('soundCloud')).toBe(false);
+      expect(requestedServices.has('netEase')).toBe(false);
+      expect(requestedServices.has('telmorMusik')).toBe(false);
+      expect(requestedServices.has('youSeeMusik')).toBe(false);
+    });
+
     it('returns null on a permanent 400 response', async () => {
       const { MusicfetchRequestError } = await import(
         '@/lib/musicfetch/resilient-client'
@@ -281,6 +326,29 @@ describe('musicfetch client', () => {
       await expect(
         fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123')
       ).resolves.toBeNull();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('rethrows invalid-service 400 responses instead of returning null', async () => {
+      const { MusicfetchRequestError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      mockMusicfetchRequest.mockRejectedValue(
+        new MusicfetchRequestError(
+          'MusicFetch API error: 400 - services - Invalid value "soundCloud"',
+          400,
+          undefined,
+          'services - Invalid value "soundCloud"'
+        )
+      );
+
+      const { fetchArtistBySpotifyUrl } = await import(
+        '@/lib/dsp-enrichment/providers/musicfetch'
+      );
+
+      await expect(
+        fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123')
+      ).rejects.toThrow('services - Invalid value');
       expect(mockCaptureException).not.toHaveBeenCalled();
     });
 

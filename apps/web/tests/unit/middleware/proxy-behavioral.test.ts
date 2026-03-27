@@ -43,6 +43,7 @@ const mocks = vi.hoisted(() => ({
   }),
   isStagingHost: vi.fn().mockReturnValue(false),
   shouldBypassClerkForRequest: vi.fn().mockReturnValue(true),
+  isTestAuthBypassEnabled: vi.fn().mockReturnValue(true),
   resolveTestBypassUserId: vi.fn().mockReturnValue(null),
   createBotResponse: vi.fn(),
   clerkMiddleware: vi.fn(),
@@ -87,6 +88,7 @@ vi.mock('@/lib/auth/clerk-middleware-bypass', () => ({
   shouldBypassClerkForRequest: mocks.shouldBypassClerkForRequest,
 }));
 vi.mock('@/lib/auth/test-mode', () => ({
+  isTestAuthBypassEnabled: mocks.isTestAuthBypassEnabled,
   TEST_AUTH_BYPASS_MODE: 'test-auth-bypass',
   TEST_MODE_HEADER: 'x-test-mode',
   resolveTestBypassUserId: mocks.resolveTestBypassUserId,
@@ -142,6 +144,7 @@ function createUnauthenticatedRequest(
   options: Parameters<typeof createTestRequest>[0] = {}
 ) {
   mocks.resolveTestBypassUserId.mockReturnValue(null);
+  mocks.isTestAuthBypassEnabled.mockReturnValue(true);
   return createTestRequest(options);
 }
 
@@ -385,6 +388,26 @@ describe('proxy.ts middleware', () => {
       expect(res.status).toBeGreaterThanOrEqual(300);
       expect(isRedirectTo(res, '/app')).toBe(true);
     });
+
+    it('lets active users continue onboarding when handle or resume is present', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.active);
+
+      const handleReq = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/onboarding',
+        searchParams: { handle: 'artist' },
+      });
+      const handleRes = await callMiddleware(handleReq);
+
+      expect(handleRes.status).toBeLessThan(300);
+
+      const resumeReq = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/onboarding',
+        searchParams: { resume: 'spotify' },
+      });
+      const resumeRes = await callMiddleware(resumeReq);
+
+      expect(resumeRes.status).toBeLessThan(300);
+    });
   });
 
   // ==========================================================================
@@ -554,6 +577,20 @@ describe('proxy.ts middleware', () => {
       const location = res.headers.get('location');
       expect(location).toContain('jov.ie');
       expect(location).toContain('/some-page');
+    });
+  });
+
+  describe('support.jov.ie redirect', () => {
+    it('308 redirects support.jov.ie to jov.ie/support', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/articles/649224-jovie-password-reset',
+        hostname: 'support.jov.ie',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(308);
+      const location = res.headers.get('location');
+      expect(location).toBe('https://jov.ie/support');
     });
   });
 });

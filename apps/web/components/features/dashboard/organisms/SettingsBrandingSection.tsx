@@ -2,9 +2,8 @@
 
 import { Sparkles } from 'lucide-react';
 import { useCallback } from 'react';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { useOptimisticToggle } from '@/features/dashboard/hooks/useOptimisticToggle';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
 import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
@@ -50,22 +49,16 @@ export function SettingsBrandingSection({
   });
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
+    <SettingsPanel
+      title='Branding'
+      description='Control whether Jovie branding appears on your public profile.'
+      actions={<SettingsStatusPill status={saveStatus} />}
     >
-      <ContentSectionHeader
-        title='Branding'
-        subtitle='Control whether Jovie branding appears on your profile page.'
-        className='min-h-0 px-4 py-3'
-        actions={<SettingsStatusPill status={saveStatus} />}
-        actionsClassName='w-auto shrink-0'
-      />
-      <div className='space-y-3 px-4 py-3'>
+      <div className='space-y-3 px-4 py-4 sm:px-5'>
         <SettingsToggleRow
-          title='Hide Jovie Branding'
-          description='Remove Jovie branding from your profile page for a fully custom experience.'
+          icon={<Sparkles className='h-4 w-4' aria-hidden />}
+          title='Hide Jovie branding'
+          description='Remove Jovie branding from your public profile for a more custom presentation.'
           checked={hideBranding}
           onCheckedChange={handleToggle}
           disabled={isPending}
@@ -85,6 +78,6 @@ export function SettingsBrandingSection({
           </ContentSurfaceCard>
         ) : null}
       </div>
-    </DashboardCard>
+    </SettingsPanel>
   );
 }

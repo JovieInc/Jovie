@@ -8,14 +8,51 @@ import { captureError } from '@/lib/error-tracking';
 let _redis: Redis | null = null;
 let _redisInitAttempted = false;
 let _redisLastAttempt = 0;
+let _redisMissingConfigWarned = false;
 const REDIS_RETRY_INTERVAL_MS = 30000; // 30 seconds between retry attempts
+
+export interface GetRedisOptions {
+  signal?: AbortSignal;
+}
+
+function captureMissingRedisConfigWarningOnce(): void {
+  if (env.NODE_ENV !== 'production' || _redis || _redisMissingConfigWarned) {
+    return;
+  }
+
+  Sentry.captureMessage(
+    'Redis not configured in production - rate limiting and caching disabled',
+    'warning'
+  );
+  _redisMissingConfigWarned = true;
+}
 
 /**
  * Get Redis client with lazy initialization and retry capability.
  * If Redis was unavailable during initial module load, this will retry
  * initialization periodically (every 30s) to recover from transient failures.
  */
-export function getRedis(): Redis | null {
+export function getRedis(options?: GetRedisOptions): Redis | null {
+  if (options?.signal) {
+    if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
+      captureMissingRedisConfigWarningOnce();
+      return null;
+    }
+
+    try {
+      return new Redis({
+        url: env.UPSTASH_REDIS_REST_URL,
+        token: env.UPSTASH_REDIS_REST_TOKEN,
+        signal: options.signal,
+      });
+    } catch (error) {
+      captureError('Redis initialization failed', error, {
+        context: 'redis_init',
+      });
+      return null;
+    }
+  }
+
   // Return cached client if available
   if (_redis) return _redis;
 
@@ -34,12 +71,7 @@ export function getRedis(): Redis | null {
 
   // Check if Redis is configured (both URL and token are required)
   if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
-    if (env.NODE_ENV === 'production' && !_redis) {
-      Sentry.captureMessage(
-        'Redis not configured in production - rate limiting and caching disabled',
-        'warning'
-      );
-    }
+    captureMissingRedisConfigWarningOnce();
     return null;
   }
 

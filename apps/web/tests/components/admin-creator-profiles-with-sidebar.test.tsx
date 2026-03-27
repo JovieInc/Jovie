@@ -302,7 +302,7 @@ describe('AdminCreatorProfilesWithSidebar', () => {
 
     // Close is now in the overflow dropdown menu
     await user.click(
-      within(sidebar).getByRole('button', { name: /more actions/i })
+      within(sidebar).getAllByRole('button', { name: /more actions/i })[0]
     );
     await user.click(screen.getByText('Close'));
 

@@ -38,18 +38,18 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const INTERNAL_PREFIX = '[internal]';
+const INTERNAL_MARKER_RE = /\[\s*internal\s*\]/i;
 
 function filterPublicEntries(entries) {
   if (!entries || entries.length === 0) return [];
-  return entries.filter(e => !e.startsWith(INTERNAL_PREFIX));
+  return entries.filter(e => !INTERNAL_MARKER_RE.test(e));
 }
 
 /**
  * Check if a summary is public (not tagged [internal]).
  */
 function isPublicSummary(summary) {
-  return summary && !summary.startsWith(INTERNAL_PREFIX);
+  return summary && !INTERNAL_MARKER_RE.test(summary);
 }
 
 function entriesToHtml(sections, summary) {

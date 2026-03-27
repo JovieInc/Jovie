@@ -65,6 +65,8 @@ function ContactTitle({
 interface UseContactHeaderResult {
   title: ReactNode;
   actions: ReactNode | undefined;
+  primaryActions: DrawerHeaderAction[];
+  overflowActions: DrawerHeaderAction[];
 }
 
 interface ContactSidebarHeaderProps {
@@ -179,5 +181,5 @@ export function useContactHeaderParts({
       />
     ) : undefined;
 
-  return { title, actions };
+  return { title, actions, primaryActions, overflowActions };
 }

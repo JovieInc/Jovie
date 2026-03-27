@@ -3,7 +3,7 @@
 import { Button, SimpleTooltip } from '@jovie/ui';
 import { AlertCircle, Check, Copy, RefreshCw } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   type PreviewPanelLink,
@@ -24,6 +24,10 @@ import { useClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { env } from '@/lib/env-client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import {
+  ONBOARDING_PREVIEW_SNAPSHOT_KEY,
+  ONBOARDING_WELCOME_REPLY_KEY,
+} from '@/lib/onboarding/session-keys';
 import { useDashboardSocialLinksQuery } from '@/lib/queries';
 import { addBreadcrumb, captureMessage } from '@/lib/sentry/client-lite';
 import { getHometownFromSettings } from '@/types/db';
@@ -33,6 +37,36 @@ interface ChatPageClientProps {
   readonly isFirstSession?: boolean;
   readonly appleMusicConnected?: boolean;
   readonly appleMusicArtistName?: string | null;
+}
+
+const WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS = [1500, 3000, 5000] as const;
+
+type WelcomeChatBootstrapState =
+  | 'idle'
+  | 'pending'
+  | 'scheduled'
+  | 'done'
+  | 'failed';
+
+export function shouldRetryWelcomeChatBootstrap(
+  status: number | null
+): boolean {
+  return (
+    status === null ||
+    status === 404 ||
+    status === 500 ||
+    status === 502 ||
+    status === 503 ||
+    status === 504
+  );
+}
+
+export function resetWelcomeChatBootstrapState(
+  stateRef: { current: WelcomeChatBootstrapState },
+  retryCountRef: { current: number }
+): void {
+  stateRef.current = 'idle';
+  retryCountRef.current = 0;
 }
 
 /**
@@ -72,6 +106,22 @@ export function ChatPageClient({
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
   const [autoRetryCount, setAutoRetryCount] = useState(0);
+  const [, setWelcomeChatBootstrapState] =
+    useState<WelcomeChatBootstrapState>('idle');
+  const welcomeChatBootstrapStateRef =
+    useRef<WelcomeChatBootstrapState>('idle');
+  const welcomeChatRetryCountRef = useRef(0);
+  const welcomeChatRetryTimeoutRef = useRef<ReturnType<
+    typeof globalThis.setTimeout
+  > | null>(null);
+
+  const setWelcomeChatBootstrapStatus = useCallback(
+    (nextState: WelcomeChatBootstrapState) => {
+      welcomeChatBootstrapStateRef.current = nextState;
+      setWelcomeChatBootstrapState(nextState);
+    },
+    []
+  );
 
   const hasProfilesButNoSelection =
     creatorProfiles.length > 0 && !selectedProfile && !needsOnboarding;
@@ -82,6 +132,15 @@ export function ChatPageClient({
     hasProfilesButNoSelection && !hasDashboardLoadFailure;
   const canAutoRetry = isProfileSetupRace && autoRetryCount < 3;
   const enablePreviewPanel = !env.IS_E2E;
+  const fromOnboarding = searchParams.get('from') === 'onboarding';
+
+  useEffect(() => {
+    return () => {
+      if (welcomeChatRetryTimeoutRef.current !== null) {
+        globalThis.clearTimeout(welcomeChatRetryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Register ProfileContactSidebar in the unified right panel system
   useRegisterRightPanel(
@@ -95,6 +154,24 @@ export function ChatPageClient({
   // Fetch social links for the selected profile
   const profileId = enablePreviewPanel ? (activeProfile?.id ?? '') : '';
   const { data: socialLinks } = useDashboardSocialLinksQuery(profileId);
+
+  useEffect(() => {
+    if (!enablePreviewPanel || !fromOnboarding) return;
+
+    try {
+      const rawSnapshot = globalThis.sessionStorage?.getItem(
+        ONBOARDING_PREVIEW_SNAPSHOT_KEY
+      );
+      if (!rawSnapshot) return;
+
+      const snapshot = JSON.parse(rawSnapshot) as Parameters<
+        typeof setPreviewData
+      >[0];
+      setPreviewData(snapshot);
+    } catch {
+      // sessionStorage may be unavailable or the payload may be malformed
+    }
+  }, [enablePreviewPanel, fromOnboarding, setPreviewData]);
 
   // Convert API links to preview panel format
   const previewLinks: PreviewPanelLink[] = useMemo(
@@ -252,6 +329,143 @@ export function ChatPageClient({
       setInitialQueryHandled(true);
     }
   }, [rawQuery, conversationId]);
+
+  useEffect(() => {
+    if (
+      !fromOnboarding ||
+      conversationId ||
+      !activeProfile ||
+      welcomeChatBootstrapStateRef.current !== 'idle'
+    ) {
+      return;
+    }
+
+    let isActive = true;
+    let controller: AbortController | null = null;
+
+    const clearRetryTimeout = () => {
+      if (welcomeChatRetryTimeoutRef.current !== null) {
+        globalThis.clearTimeout(welcomeChatRetryTimeoutRef.current);
+        welcomeChatRetryTimeoutRef.current = null;
+      }
+    };
+
+    const bootstrapWelcomeChat = async () => {
+      if (!isActive || welcomeChatBootstrapStateRef.current !== 'idle') {
+        return;
+      }
+
+      controller?.abort();
+      controller = new AbortController();
+      setWelcomeChatBootstrapStatus('pending');
+
+      let initialReply = '';
+      try {
+        initialReply =
+          globalThis.sessionStorage?.getItem(ONBOARDING_WELCOME_REPLY_KEY) ??
+          '';
+      } catch {
+        initialReply = '';
+      }
+
+      const response = await fetch('/api/onboarding/welcome-chat', {
+        body: JSON.stringify({ initialReply }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        if (!controller.signal.aborted && isActive) {
+          scheduleRetry(response.status);
+        }
+        return;
+      }
+
+      const payload = (await response.json()) as {
+        route?: string;
+      };
+      welcomeChatRetryCountRef.current = 0;
+      setWelcomeChatBootstrapStatus('done');
+
+      try {
+        globalThis.sessionStorage?.removeItem(ONBOARDING_WELCOME_REPLY_KEY);
+        globalThis.sessionStorage?.removeItem(ONBOARDING_PREVIEW_SNAPSHOT_KEY);
+      } catch {
+        // sessionStorage cleanup is non-critical
+      }
+
+      if (isActive && !controller.signal.aborted && payload.route) {
+        router.replace(payload.route, { scroll: false });
+      }
+    };
+
+    const scheduleRetry = (status: number | null) => {
+      if (!isActive) {
+        return;
+      }
+
+      if (
+        !shouldRetryWelcomeChatBootstrap(status) ||
+        welcomeChatRetryCountRef.current >=
+          WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS.length
+      ) {
+        setWelcomeChatBootstrapStatus('failed');
+        notifications.error(
+          'We could not start your onboarding chat. Refresh to try again.'
+        );
+        return;
+      }
+
+      const delay =
+        WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS[
+          welcomeChatRetryCountRef.current
+        ] ??
+        WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS[
+          WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS.length - 1
+        ];
+
+      welcomeChatRetryCountRef.current += 1;
+      setWelcomeChatBootstrapStatus('scheduled');
+      clearRetryTimeout();
+      welcomeChatRetryTimeoutRef.current = globalThis.setTimeout(() => {
+        if (!isActive) {
+          return;
+        }
+
+        clearRetryTimeout();
+        setWelcomeChatBootstrapStatus('idle');
+        bootstrapWelcomeChat().catch(() => {
+          if (!controller?.signal.aborted && isActive) {
+            scheduleRetry(null);
+          }
+        });
+      }, delay);
+    };
+
+    bootstrapWelcomeChat().catch(() => {
+      if (!controller?.signal.aborted && isActive) {
+        scheduleRetry(null);
+      }
+    });
+
+    return () => {
+      isActive = false;
+      controller?.abort();
+      clearRetryTimeout();
+      resetWelcomeChatBootstrapState(
+        welcomeChatBootstrapStateRef,
+        welcomeChatRetryCountRef
+      );
+    };
+  }, [
+    activeProfile,
+    conversationId,
+    fromOnboarding,
+    notifications,
+    router,
+    setWelcomeChatBootstrapStatus,
+  ]);
 
   // Profile unavailable — show actionable error instead of infinite spinner.
   // This happens when billing/entitlements fail or the DB query times out,

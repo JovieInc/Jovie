@@ -51,15 +51,26 @@ export function DrawerLinkSection({
   className,
   showHeading = true,
 }: DrawerLinkSectionProps) {
+  const showHeaderRow = showHeading || Boolean(headerActions) || Boolean(onAdd);
+
   return (
     <div className={cn('space-y-1.5', className)}>
       {/* Section header: title + action buttons */}
-      {showHeading && (
-        <div className='flex min-h-[32px] items-center justify-between gap-2 px-1 lg:min-h-0'>
-          <DrawerSectionHeading as='h4' className='min-w-0 flex-1 truncate'>
-            {title}
-          </DrawerSectionHeading>
-          <div className='flex shrink-0 items-center gap-0.5'>
+      {showHeaderRow && (
+        <div
+          className={cn(
+            'flex min-h-[32px] items-center gap-2 px-1 lg:min-h-0',
+            showHeading ? 'justify-between' : 'justify-end'
+          )}
+        >
+          {showHeading ? (
+            <DrawerSectionHeading as='h4' className='min-w-0 flex-1 truncate'>
+              {title}
+            </DrawerSectionHeading>
+          ) : (
+            <span className='sr-only'>{title}</span>
+          )}
+          <div className='ml-auto flex shrink-0 items-center gap-0.5'>
             {headerActions}
             {onAdd && (
               <button

@@ -19,6 +19,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
 import { type DbOrTransaction } from '@/lib/db';
+import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { userSettings, users } from '@/lib/db/schema/auth';
@@ -33,6 +34,10 @@ import {
 import { sqlAny } from '@/lib/db/sql-helpers';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
+import {
+  type AvatarQuality,
+  UNKNOWN_AVATAR_QUALITY,
+} from '@/lib/profile/avatar-quality';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { mapSocialLinkExistence } from './social-link-utils';
@@ -96,6 +101,8 @@ export interface DashboardData {
   creatorProfiles: CreatorProfile[];
   /** The currently selected/active creator profile */
   selectedProfile: CreatorProfile | null;
+  /** Derived avatar quality metadata for profile review surfaces */
+  avatarQuality?: AvatarQuality;
   /** Whether the user needs to complete onboarding */
   needsOnboarding: boolean;
   /** User preference for sidebar collapsed state */
@@ -276,6 +283,7 @@ async function fetchDashboardCoreWithSession(
             user: null,
             creatorProfiles: [],
             selectedProfile: null,
+            avatarQuality: UNKNOWN_AVATAR_QUALITY,
             needsOnboarding: true,
             sidebarCollapsed: false,
             hasSocialLinks: false,
@@ -317,6 +325,7 @@ async function fetchDashboardCoreWithSession(
             user: userData,
             creatorProfiles: [],
             selectedProfile: null,
+            avatarQuality: UNKNOWN_AVATAR_QUALITY,
             needsOnboarding: true,
             sidebarCollapsed: false,
             hasSocialLinks: false,
@@ -433,6 +442,20 @@ async function fetchDashboardCoreWithSession(
             return { hasLinks: false, hasMusicLinks: false };
           });
 
+        const avatarQuality = await getAvatarQualityForProfile(
+          selected.id,
+          tx
+        ).catch((error: unknown) => {
+          Sentry.captureException(error, {
+            level: 'warning',
+            tags: {
+              query: 'avatar_quality',
+              context: 'dashboard_data_settled',
+            },
+          });
+          return UNKNOWN_AVATAR_QUALITY;
+        });
+
         const tippingStats = await fetchTippingStatsWithSession(
           tx,
           selected.id
@@ -446,6 +469,7 @@ async function fetchDashboardCoreWithSession(
           user: userData,
           creatorProfiles: creatorData,
           selectedProfile: selected,
+          avatarQuality,
           needsOnboarding: !profileIsPublishable(selected),
           sidebarCollapsed: settings?.sidebarCollapsed ?? false,
           hasSocialLinks: hasLinks,
@@ -498,6 +522,7 @@ async function fetchDashboardCoreWithSession(
       user: null,
       creatorProfiles: [],
       selectedProfile: null,
+      avatarQuality: UNKNOWN_AVATAR_QUALITY,
       needsOnboarding: true,
       sidebarCollapsed: false,
       hasSocialLinks: false,
@@ -641,6 +666,7 @@ async function resolveDashboardData(): Promise<DashboardData> {
       user: null,
       creatorProfiles: [],
       selectedProfile: null,
+      avatarQuality: UNKNOWN_AVATAR_QUALITY,
       needsOnboarding: true,
       sidebarCollapsed: false,
       hasSocialLinks: false,

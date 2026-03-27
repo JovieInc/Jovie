@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { UNKNOWN_AVATAR_QUALITY } from '@/lib/profile/avatar-quality';
 import { useBillingStatusQuery } from '@/lib/queries';
 import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
@@ -26,6 +27,7 @@ export function useSettingsContext() {
   return {
     artist,
     setArtist,
+    avatarQuality: dashboardData.avatarQuality ?? UNKNOWN_AVATAR_QUALITY,
     isPro,
     isGrowth,
     isAdmin: dashboardData.isAdmin,

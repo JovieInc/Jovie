@@ -17,7 +17,17 @@
  */
 
 import { auth } from '@clerk/nextjs/server';
-import { and, count, desc, eq, isNotNull, or } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  sql as drizzleSql,
+  eq,
+  gte,
+  isNotNull,
+  isNull,
+  or,
+} from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
@@ -63,6 +73,9 @@ export interface SuggestionsStarterContext {
 // ============================================================================
 
 export async function GET(request: Request) {
+  const oneYearAgo = new Date();
+  oneYearAgo.setDate(oneYearAgo.getDate() - 365);
+
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -171,20 +184,33 @@ export async function GET(request: Request) {
             .limit(10),
 
       // Latest release for contextual starter prompts
+      // Use only recent releases so we don't suggest stale catalog items.
+      // Use releaseDate when available, with createdAt as fallback so manually
+      // entered releases without release dates still count as newest.
       db
-        .select({ title: discogReleases.title })
+        .select({
+          title: discogReleases.title,
+        })
         .from(discogReleases)
         .where(
           and(
             eq(discogReleases.creatorProfileId, profileId),
             or(
-              isNotNull(discogReleases.releaseDate),
-              isNotNull(discogReleases.createdAt)
+              and(
+                isNotNull(discogReleases.releaseDate),
+                gte(discogReleases.releaseDate, oneYearAgo)
+              ),
+              and(
+                isNull(discogReleases.releaseDate),
+                gte(discogReleases.createdAt, oneYearAgo)
+              )
             )
           )
         )
         .orderBy(
-          desc(discogReleases.releaseDate),
+          desc(
+            drizzleSql`COALESCE(${discogReleases.releaseDate}, ${discogReleases.createdAt})`
+          ),
           desc(discogReleases.createdAt)
         )
         .limit(1),

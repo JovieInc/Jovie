@@ -23,6 +23,7 @@ import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
 import { isStagingHost, resolveClerkKeys } from '@/lib/auth/staging-clerk-keys';
 import {
+  isTestAuthBypassEnabled,
   resolveTestBypassUserId,
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_HEADER,
@@ -50,6 +51,7 @@ import { createBotResponse } from '@/lib/utils/bot-detection';
 // ============================================================================
 // - jov.ie: Everything (marketing, auth, profiles, dashboard at /app/*)
 // - meetjovie.com: 301 redirects to jov.ie (legacy redirect domain)
+// - support.jov.ie: 308 redirects to jov.ie/support (retired help center)
 // ============================================================================
 
 // Pre-compiled regex for bot detection (O(1) vs O(n) array iteration)
@@ -156,6 +158,7 @@ interface HostInfo {
   isMainHost: boolean;
   isDevOrPreview: boolean;
   isMeetJovie: boolean;
+  isSupportHost: boolean;
   isInvestorPortal: boolean;
 }
 
@@ -179,10 +182,17 @@ function analyzeHost(hostname: string): HostInfo {
 
   const isMeetJovie =
     hostname === 'meetjovie.com' || hostname === 'www.meetjovie.com';
+  const isSupportHost = hostname === `support.${HOSTNAME}`;
 
   const isInvestorPortal = INVESTOR_HOSTNAMES.has(hostname);
 
-  return { isMainHost, isDevOrPreview, isMeetJovie, isInvestorPortal };
+  return {
+    isMainHost,
+    isDevOrPreview,
+    isMeetJovie,
+    isSupportHost,
+    isInvestorPortal,
+  };
 }
 
 /** Dashboard is always at /app in single-domain architecture */
@@ -490,6 +500,13 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       return NextResponse.redirect(targetUrl, 301);
     }
 
+    // 308 redirect retired support subdomain to the main support page
+    if (hostInfo.isSupportHost) {
+      const targetUrl = new URL('/support', 'https://jov.ie');
+      targetUrl.search = req.nextUrl.search;
+      return NextResponse.redirect(targetUrl, 308);
+    }
+
     // ========================================================================
     // Unauthenticated user handling (no getUserState call needed)
     // ========================================================================
@@ -552,6 +569,9 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     const isRSCPrefetch =
       req.headers.get('Next-Router-Prefetch') === '1' ||
       req.nextUrl.searchParams.has('_rsc');
+    const hasOnboardingContinuationSignal =
+      req.nextUrl.searchParams.has('handle') ||
+      req.nextUrl.searchParams.has('resume');
 
     // Fetch user state ONCE for all authenticated routing decisions
     let userState: ProxyUserState | null = null;
@@ -685,7 +705,8 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         !userState.needsOnboarding &&
         pathname === '/onboarding' &&
         isNavigationMethod &&
-        !isRSCPrefetch
+        !isRSCPrefetch &&
+        !hasOnboardingContinuationSignal
       ) {
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
       } else if (pathInfo.isAuthPath && isNavigationMethod && !isRSCPrefetch) {
@@ -924,10 +945,11 @@ export default async function middleware(
   const investorResponse = await handleInvestorRequest(req, event);
   if (investorResponse) return investorResponse;
 
-  if (process.env.NODE_ENV === 'test') {
+  if (isTestAuthBypassEnabled()) {
     const testMode = req.headers.get(TEST_MODE_HEADER)?.trim();
-    if (testMode === TEST_AUTH_BYPASS_MODE) {
-      return handleRequest(req, resolveTestBypassUserId(req.headers));
+    const testBypassUserId = resolveTestBypassUserId(req.headers, req.cookies);
+    if (testMode === TEST_AUTH_BYPASS_MODE || testBypassUserId) {
+      return handleRequest(req, testBypassUserId);
     }
   }
 

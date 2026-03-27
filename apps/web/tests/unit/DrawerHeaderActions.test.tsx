@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { Copy } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
 const tableActionMenuSpy = vi.fn();
@@ -34,6 +34,10 @@ vi.mock('@/components/atoms/table-action-menu', () => ({
 }));
 
 describe('DrawerHeaderActions', () => {
+  beforeEach(() => {
+    tableActionMenuSpy.mockClear();
+  });
+
   it('appends separator and close action to overflow menu when onClose is provided', () => {
     const onClose = vi.fn();
 
@@ -57,6 +61,23 @@ describe('DrawerHeaderActions', () => {
     expect(tableActionMenuSpy).toHaveBeenCalledWith([
       expect.objectContaining({ id: 'copy', label: 'Copy profile link' }),
       expect.objectContaining({ id: 'separator-close' }),
+      expect.objectContaining({ id: 'close-drawer', label: 'Close' }),
+    ]);
+  });
+
+  it('renders a close-only overflow menu for minimal chrome drawers', () => {
+    const onClose = vi.fn();
+
+    render(
+      <DrawerHeaderActions
+        primaryActions={[]}
+        overflowActions={[]}
+        onClose={onClose}
+      />
+    );
+
+    expect(screen.getByTestId('table-action-menu')).toBeInTheDocument();
+    expect(tableActionMenuSpy).toHaveBeenCalledWith([
       expect.objectContaining({ id: 'close-drawer', label: 'Close' }),
     ]);
   });

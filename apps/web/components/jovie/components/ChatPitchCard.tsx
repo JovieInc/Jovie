@@ -3,7 +3,7 @@
 import { Check, Copy, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { PLATFORM_LIMITS } from '@/lib/services/pitch';
+import { PLATFORM_LIMITS } from '@/lib/services/pitch/types';
 import { cn } from '@/lib/utils';
 
 const PLATFORM_CONFIG = [

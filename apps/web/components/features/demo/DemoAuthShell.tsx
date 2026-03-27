@@ -10,6 +10,10 @@
  * - DashboardDataProvider is fed with mock data (DEMO_DASHBOARD_DATA)
  * - AuthShellWrapper provides the real shell providers (TableMeta, RightPanel,
  *   PreviewPanel, HeaderActions, KeyboardShortcuts)
+ * - NuqsProvider mirrors the app-level URL state adapter used by /app
+ *   so release and audience tables can safely read query param state on /demo
+ * - TooltipProvider mirrors the app-level CoreProviders boundary used by /app
+ *   so the dashboard shell can render tooltip-bearing chrome on /demo routes
  * - ClerkSafeDefaultsProvider supplies no-auth Clerk values without mounting
  *   ClerkProvider, which keeps /demo fully local and avoids proxy noise
  * - Releases query is pre-seeded in the QueryClient cache so DashboardNav
