@@ -45,7 +45,7 @@ describe('dev test-auth routes', () => {
       value === 'admin' || value === 'creator' ? value : null
     );
     mockSanitizeDevTestAuthRedirectPath.mockImplementation(value =>
-      value?.startsWith('/') ? value : null
+      value?.startsWith('/') && !value.startsWith('//') ? value : null
     );
     mockEnsureDevTestAuthActor.mockResolvedValue({
       persona: 'creator',
@@ -194,6 +194,27 @@ describe('dev test-auth routes', () => {
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_persona=');
   });
 
+  it('rejects DELETE /session when the host is not trusted', async () => {
+    mockGetDevTestAuthAvailability.mockReturnValue({
+      enabled: true,
+      trustedHost: false,
+      reason: 'Only available on loopback and private dev hosts',
+    });
+
+    const { DELETE } = await import('@/app/api/dev/test-auth/session/route');
+    const response = await DELETE(
+      new NextRequest('https://preview.jov.ie/api/dev/test-auth/session', {
+        method: 'DELETE',
+      })
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Only available on loopback and private dev hosts',
+    });
+  });
+
   it('redirects through the local auth bootstrap entrypoint', async () => {
     const { GET } = await import('@/app/api/dev/test-auth/enter/route');
     const response = await GET(
@@ -216,6 +237,23 @@ describe('dev test-auth routes', () => {
     const response = await GET(
       new NextRequest(
         'http://localhost:3000/api/dev/test-auth/enter?redirect=https://evil.example'
+      )
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Redirect must be app-relative',
+    });
+  });
+
+  it('rejects protocol-relative redirect targets on the enter route', async () => {
+    mockSanitizeDevTestAuthRedirectPath.mockReturnValue(null);
+
+    const { GET } = await import('@/app/api/dev/test-auth/enter/route');
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/dev/test-auth/enter?redirect=//evil.example'
       )
     );
 

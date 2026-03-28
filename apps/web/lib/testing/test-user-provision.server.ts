@@ -11,6 +11,8 @@ export const DEFAULT_TEST_AVATAR_URL = '/avatars/default-user.png';
 
 const TEST_ACCOUNT_EMAIL_REGEX =
   /^(?:e2e(?:-[a-z0-9]+)?|browse(?:-[a-z0-9]+)?)(?:\+clerk_test)?@jov\.ie$/i;
+const PRIVILEGED_TEST_ACCOUNT_EMAIL_REGEX =
+  /^e2e(?:-[a-z0-9]+)?(?:\+clerk_test)?@jov\.ie$/i;
 
 type SeededUserValues = Pick<
   typeof users.$inferInsert,
@@ -109,6 +111,15 @@ export function isAllowlistedTestAccountEmail(
   );
 }
 
+export function isAllowlistedPrivilegedTestAccountEmail(
+  email: string | null | undefined
+): email is string {
+  return (
+    typeof email === 'string' &&
+    PRIVILEGED_TEST_ACCOUNT_EMAIL_REGEX.test(normalizeEmail(email))
+  );
+}
+
 function buildDeterministicClerkId(email: string): string {
   const normalizedEmail = normalizeEmail(email);
   const stableId = normalizedEmail.replace(/[^a-z0-9]+/gi, '_').slice(0, 48);
@@ -176,6 +187,10 @@ export async function resolveClerkTestUserId(
     return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
   }
 
+  if (!isAllowlistedTestAccountEmail(normalizedEmail)) {
+    return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+  }
+
   const clerk = createClerkClient({ secretKey });
   const existingUsers = await clerk.users.getUserList({
     emailAddress: [normalizedEmail],
@@ -200,6 +215,10 @@ export async function ensureClerkTestUser({
   const secretKey = process.env.CLERK_SECRET_KEY;
 
   if (!secretKey || !secretKey.startsWith('sk_test_')) {
+    return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+  }
+
+  if (!isAllowlistedTestAccountEmail(normalizedEmail)) {
     return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
   }
 
@@ -378,12 +397,10 @@ export async function ensureUserProfileClaim(
     .limit(1);
 
   if (existingClaim) {
-    if (existingClaim.userId !== userId) {
-      await database
-        .update(userProfileClaims)
-        .set({ userId, claimedAt: new Date() })
-        .where(eq(userProfileClaims.id, existingClaim.id));
-    }
+    await database
+      .update(userProfileClaims)
+      .set({ userId, role: 'owner', claimedAt: new Date() })
+      .where(eq(userProfileClaims.id, existingClaim.id));
     return;
   }
 
@@ -411,7 +428,7 @@ export async function ensureUserProfileClaim(
 
     await database
       .update(userProfileClaims)
-      .set({ userId, claimedAt: new Date() })
+      .set({ userId, role: 'owner', claimedAt: new Date() })
       .where(eq(userProfileClaims.id, racedClaim.id));
   }
 }

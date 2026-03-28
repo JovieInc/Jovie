@@ -20,15 +20,17 @@ export async function GET(request: NextRequest) {
 
   const personaParam = request.nextUrl.searchParams.get('persona');
   const redirectParam = request.nextUrl.searchParams.get('redirect');
-  const persona = parseDevTestAuthPersona(personaParam) ?? 'creator';
-  const redirectPath = sanitizeDevTestAuthRedirectPath(redirectParam);
+  const parsedPersona = parseDevTestAuthPersona(personaParam);
 
-  if (personaParam && !parseDevTestAuthPersona(personaParam)) {
+  if (personaParam && !parsedPersona) {
     return NextResponse.json(
       { success: false, error: 'Invalid persona' },
       { status: 400, headers: NO_STORE_HEADERS }
     );
   }
+
+  const persona = parsedPersona ?? 'creator';
+  const redirectPath = sanitizeDevTestAuthRedirectPath(redirectParam);
 
   if (!redirectPath) {
     return NextResponse.json(

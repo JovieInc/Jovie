@@ -31,6 +31,7 @@ import {
   setActiveProfileForUser,
 } from '@/lib/testing/test-user-provision.server';
 import { normalizeEmail } from '@/lib/utils/email';
+import { logger } from '@/lib/utils/logger';
 
 const DEV_TEST_AUTH_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 12;
 
@@ -247,7 +248,14 @@ export const getCachedDevTestAuthSession = cache(async () => {
     );
 
     return findDevTestAuthSession(clerkUserId, requestedPersona);
-  } catch {
+  } catch (error) {
+    logger.warn(
+      'Failed to resolve cached dev test auth session',
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'dev-test-auth'
+    );
     return null;
   }
 });
@@ -371,11 +379,24 @@ export async function ensureDevTestAuthActor(
     profilePath = `/${config.username}`;
   }
 
-  await invalidateTestUserCaches(
-    [previousClerkId, clerkUserId].filter(
-      (value): value is string => typeof value === 'string' && value.length > 0
-    )
-  );
+  try {
+    await invalidateTestUserCaches(
+      [previousClerkId, clerkUserId].filter(
+        (value): value is string =>
+          typeof value === 'string' && value.length > 0
+      )
+    );
+  } catch (error) {
+    logger.warn(
+      'Failed to invalidate dev test auth caches',
+      {
+        clerkUserId,
+        previousClerkId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'dev-test-auth'
+    );
+  }
 
   return {
     persona,

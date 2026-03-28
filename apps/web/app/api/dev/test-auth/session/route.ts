@@ -111,9 +111,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const persona = parseDevTestAuthPersona(requestedPersona) ?? 'creator';
+  const parsedPersona = parseDevTestAuthPersona(requestedPersona);
+  const persona = parsedPersona ?? 'creator';
 
-  if (requestedPersona && !parseDevTestAuthPersona(requestedPersona)) {
+  if (requestedPersona && !parsedPersona) {
     return NextResponse.json(
       { success: false, error: 'Invalid persona' },
       { status: 400, headers: NO_STORE_HEADERS }
@@ -137,6 +138,18 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const availability = getDevTestAuthAvailability(request.nextUrl.hostname);
+
+  if (!availability.enabled || !availability.trustedHost) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: availability.reason,
+      },
+      { status: 403, headers: NO_STORE_HEADERS }
+    );
+  }
+
   const response = NextResponse.json(
     { success: true },
     { headers: NO_STORE_HEADERS }

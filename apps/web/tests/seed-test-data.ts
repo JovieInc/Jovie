@@ -19,7 +19,7 @@ import {
   ensureCreatorProfileRecord as ensureCreatorProfile,
   ensureSocialLinkRecord as ensureSocialLink,
   ensureUserRecord as ensureUser,
-  isAllowlistedTestAccountEmail,
+  isAllowlistedPrivilegedTestAccountEmail,
   resolveClerkTestUserId as resolveSeedUserClerkId,
   setActiveProfileForUser as setActiveProfile,
 } from '@/lib/testing/test-user-provision.server';
@@ -141,7 +141,7 @@ function getSeedEnv() {
 function isAllowlistedE2ESeedEmail(
   email: string | null | undefined
 ): email is string {
-  return isAllowlistedTestAccountEmail(email);
+  return isAllowlistedPrivilegedTestAccountEmail(email);
 }
 
 /** Track template for seeding */

@@ -7,6 +7,7 @@ const {
   mockEnsureUserProfileClaim,
   mockEnsureUserRecord,
   mockInvalidateTestUserCaches,
+  mockLoggerWarn,
   mockSetActiveProfileForUser,
 } = vi.hoisted(() => ({
   mockEnsureClerkTestUser: vi.fn(),
@@ -15,6 +16,7 @@ const {
   mockEnsureUserProfileClaim: vi.fn(),
   mockEnsureUserRecord: vi.fn(),
   mockInvalidateTestUserCaches: vi.fn(),
+  mockLoggerWarn: vi.fn(),
   mockSetActiveProfileForUser: vi.fn(),
 }));
 
@@ -33,6 +35,12 @@ vi.mock('@/lib/testing/test-user-provision.server', () => ({
   setActiveProfileForUser: mockSetActiveProfileForUser,
 }));
 
+vi.mock('@/lib/utils/logger', () => ({
+  logger: {
+    warn: mockLoggerWarn,
+  },
+}));
+
 describe('dev-test-auth.server', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -46,6 +54,7 @@ describe('dev-test-auth.server', () => {
     });
     mockEnsureCreatorProfileRecord.mockResolvedValue('profile_1');
     mockInvalidateTestUserCaches.mockResolvedValue(undefined);
+    mockLoggerWarn.mockReset();
     mockEnsureUserProfileClaim.mockResolvedValue(undefined);
     mockSetActiveProfileForUser.mockResolvedValue(undefined);
     mockEnsureSocialLinkRecord.mockResolvedValue(undefined);
@@ -181,6 +190,33 @@ describe('dev-test-auth.server', () => {
         email: 'browse-admin+clerk_test@jov.ie',
         fallbackClerkId: 'user_admin_seed',
       })
+    );
+  });
+
+  it('does not fail bootstrap when cache invalidation fails', async () => {
+    mockInvalidateTestUserCaches.mockRejectedValue(
+      new Error('redis unavailable')
+    );
+
+    const { ensureDevTestAuthActor } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    await expect(ensureDevTestAuthActor('creator')).resolves.toEqual({
+      persona: 'creator',
+      clerkUserId: 'user_clerk',
+      email: 'browse+clerk_test@jov.ie',
+      username: 'browse-test-user',
+      fullName: 'Browse Test User',
+      isAdmin: false,
+      profilePath: '/browse-test-user',
+    });
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      'Failed to invalidate dev test auth caches',
+      expect.objectContaining({
+        clerkUserId: 'user_clerk',
+      }),
+      'dev-test-auth'
     );
   });
 

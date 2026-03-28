@@ -45,4 +45,39 @@ describe('test-user-provision.server', () => {
 
     expect(mockGetUserList).toHaveBeenCalledTimes(2);
   });
+
+  it('does not call Clerk for non-allowlisted emails', async () => {
+    const { ensureClerkTestUser } = await import(
+      '@/lib/testing/test-user-provision.server'
+    );
+
+    await expect(
+      ensureClerkTestUser({
+        email: 'person@example.com',
+        username: 'person',
+        firstName: 'Person',
+        lastName: 'Example',
+      })
+    ).resolves.toBe('user_dev_person_example_com');
+
+    expect(mockGetUserList).not.toHaveBeenCalled();
+    expect(mockCreateUser).not.toHaveBeenCalled();
+  });
+
+  it('keeps privileged seeding narrower than the generic browse allowlist', async () => {
+    const {
+      isAllowlistedPrivilegedTestAccountEmail,
+      isAllowlistedTestAccountEmail,
+    } = await import('@/lib/testing/test-user-provision.server');
+
+    expect(isAllowlistedTestAccountEmail('browse+clerk_test@jov.ie')).toBe(
+      true
+    );
+    expect(
+      isAllowlistedPrivilegedTestAccountEmail('browse+clerk_test@jov.ie')
+    ).toBe(false);
+    expect(
+      isAllowlistedPrivilegedTestAccountEmail('e2e+clerk_test@jov.ie')
+    ).toBe(true);
+  });
 });
