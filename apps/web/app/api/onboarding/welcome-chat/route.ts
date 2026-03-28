@@ -9,39 +9,10 @@ import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { buildWelcomeMessage } from '@/lib/services/onboarding/welcome-message';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const MAX_INITIAL_REPLY_LENGTH = 2000;
-
-function formatCount(value: number, singular: string, plural = `${singular}s`) {
-  return `${value} ${value === 1 ? singular : plural}`;
-}
-
-function buildWelcomeMessage({
-  displayName,
-  releaseCount,
-  trackCount,
-  dspCount,
-  socialCount,
-}: {
-  displayName: string;
-  releaseCount: number;
-  trackCount: number;
-  dspCount: number;
-  socialCount: number;
-}) {
-  const resolvedName = displayName.trim() || 'there';
-  const musicSummary =
-    trackCount > 0
-      ? formatCount(trackCount, 'track')
-      : formatCount(releaseCount, 'release');
-
-  return [
-    `Welcome to Jovie, ${resolvedName}.`,
-    `I can already see ${musicSummary}, ${formatCount(dspCount, 'connected DSP')}, and ${formatCount(socialCount, 'active social link')}.`,
-    'What do you want to improve first?',
-  ].join(' ');
-}
 
 function buildWelcomeChatRoute(conversationId: string): string {
   return `${APP_ROUTES.CHAT}/${conversationId}?panel=profile&from=onboarding`;
@@ -172,6 +143,7 @@ export async function POST(request: Request) {
             ),
           tx
             .select({
+              careerHighlights: creatorProfiles.careerHighlights,
               displayName: creatorProfiles.displayName,
               spotifyId: creatorProfiles.spotifyId,
               spotifyUrl: creatorProfiles.spotifyUrl,
@@ -199,6 +171,7 @@ export async function POST(request: Request) {
           trackCount,
           dspCount,
           socialCount,
+          careerHighlights: profileIdentity?.careerHighlights ?? null,
         });
 
         const now = new Date();
