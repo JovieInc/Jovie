@@ -499,10 +499,10 @@ describe('proxy.ts middleware', () => {
   });
 
   // ==========================================================================
-  // Banned User Redirect
+  // Banned User Rewrite
   // ==========================================================================
   describe('banned user handling', () => {
-    it('redirects banned user to /banned on non-/app paths', async () => {
+    it('rewrites banned user to /unavailable on non-/app paths', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.banned);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -510,19 +510,23 @@ describe('proxy.ts middleware', () => {
       });
       const res = await callMiddleware(req);
 
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(isRedirectTo(res, '/banned')).toBe(true);
+      // Rewrite, not redirect — URL bar stays on /pricing
+      const rewriteUrl = res.headers.get('x-middleware-rewrite');
+      expect(rewriteUrl).toBeTruthy();
+      expect(new URL(rewriteUrl!).pathname).toBe('/unavailable');
     });
 
-    it('does not redirect banned user already on /banned', async () => {
+    it('rewrites banned user on marketing pages', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.banned);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/banned',
+        pathname: '/about',
       });
       const res = await callMiddleware(req);
 
-      expect(res.status).toBeLessThan(300);
+      const rewriteUrl = res.headers.get('x-middleware-rewrite');
+      expect(rewriteUrl).toBeTruthy();
+      expect(new URL(rewriteUrl!).pathname).toBe('/unavailable');
     });
   });
 

@@ -321,13 +321,13 @@ describe('@critical gate.ts', () => {
       mockCheckUserStatus.mockReturnValue({
         isBlocked: true,
         blockedState: CanonicalUserState.BANNED,
-        redirectTo: '/banned',
+        redirectTo: '/unavailable',
       });
 
       const result = await resolveUserState();
 
       expect(result.state).toBe(CanonicalUserState.BANNED);
-      expect(result.redirectTo).toBe('/banned');
+      expect(result.redirectTo).toBe('/unavailable');
       expect(result.dbUserId).toBe('db-user-123');
     });
 
@@ -341,7 +341,7 @@ describe('@critical gate.ts', () => {
       mockCheckUserStatus.mockReturnValue({
         isBlocked: true,
         blockedState: CanonicalUserState.BANNED,
-        redirectTo: '/banned',
+        redirectTo: '/unavailable',
       });
 
       const result = await resolveUserState();
@@ -836,8 +836,10 @@ describe('@critical gate.ts', () => {
       );
     });
 
-    it('returns /banned for BANNED', () => {
-      expect(getRedirectForState(CanonicalUserState.BANNED)).toBe('/banned');
+    it('returns /unavailable for BANNED', () => {
+      expect(getRedirectForState(CanonicalUserState.BANNED)).toBe(
+        '/unavailable'
+      );
     });
 
     it('returns /error/user-creation-failed for USER_CREATION_FAILED', () => {

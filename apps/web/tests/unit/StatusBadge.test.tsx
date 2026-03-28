@@ -24,7 +24,7 @@ describe('StatusBadge', () => {
       const { container } = render(<StatusBadge>Default</StatusBadge>);
       const badge = container.querySelector('output');
 
-      expect(badge).toHaveClass('bg-info-subtle');
+      expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-info/20');
       expect(badge).toHaveClass('text-info');
     });
@@ -35,7 +35,8 @@ describe('StatusBadge', () => {
       );
       const badge = container.querySelector('output');
 
-      expect(badge).toHaveClass('bg-success-subtle');
+      expect(badge).toHaveClass('bg-surface-1');
+      expect(badge).toHaveClass('border-success/20');
       expect(badge).toHaveClass('text-success');
     });
 
@@ -45,7 +46,8 @@ describe('StatusBadge', () => {
       );
       const badge = container.querySelector('output');
 
-      expect(badge).toHaveClass('bg-accent-subtle');
+      expect(badge).toHaveClass('bg-surface-1');
+      expect(badge).toHaveClass('border-accent/20');
       expect(badge).toHaveClass('text-accent');
     });
 
@@ -55,7 +57,8 @@ describe('StatusBadge', () => {
       );
       const badge = container.querySelector('output');
 
-      expect(badge).toHaveClass('bg-warning-subtle');
+      expect(badge).toHaveClass('bg-surface-1');
+      expect(badge).toHaveClass('border-warning/20');
       expect(badge).toHaveClass('text-warning');
     });
 
@@ -65,7 +68,8 @@ describe('StatusBadge', () => {
       );
       const badge = container.querySelector('output');
 
-      expect(badge).toHaveClass('bg-error-subtle');
+      expect(badge).toHaveClass('bg-surface-1');
+      expect(badge).toHaveClass('border-error/20');
       expect(badge).toHaveClass('text-error');
     });
 
@@ -75,7 +79,8 @@ describe('StatusBadge', () => {
       );
       const badge = container.querySelector('output');
 
-      expect(badge).toHaveClass('bg-surface-2');
+      expect(badge).toHaveClass('bg-surface-1');
+      expect(badge).toHaveClass('border-subtle');
       expect(badge).toHaveClass('text-tertiary-token');
     });
   });
@@ -246,7 +251,9 @@ describe('StatusBadge', () => {
       );
 
       const badge = screen.getByRole('status');
-      expect(badge).toHaveClass('bg-success-subtle');
+      expect(badge).toHaveClass('bg-surface-1');
+      expect(badge).toHaveClass('border-success/20');
+      expect(badge).toHaveClass('text-success');
       expect(badge).toHaveClass('px-5');
       expect(badge).toHaveClass('text-base');
       expect(badge).toHaveClass('extra-class');

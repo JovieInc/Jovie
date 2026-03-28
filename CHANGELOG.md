@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.92] - 2026-03-28
+
+### Fixed
+
+- Homepage hero layout: text and phone mockup now display side-by-side on desktop instead of stacking vertically (Tailwind v4 specificity fix)
+
+## [26.4.91] - 2026-03-28
+
+### Fixed
+
+- Account deletion now invalidates profile ISR cache so deleted artist pages don't linger
+- Account deletion signs out the user via Clerk instead of a bare redirect, clearing stale session cookies
+- Right drawer entity header and tabs scroll with content in minimal mode instead of pinning to top (restores intended layout)
+- Release sidebar: entity header and analytics render inside scrollable content instead of pinned header area
+- Profile sidebar: smart link analytics render inside scrollable content instead of pinned header area
+
+### Removed
+
+- Algorithm Health Check admin page and Spotify FAL analysis API (deprecated experimental feature)
+- CI self-approval guard in agent pipeline (no longer needed)
+- Unreleased changelog entries for removed features
+
+## [26.4.89] - 2026-03-28
+
+### Added
+
+- User suspension system with admin UI (confirmation dialog with required reason)
+- Generic "service unavailable" page for suspended users (no account-specific language)
+- Ban check in dashboard layout to cover all `/app` routes
+- Admin audit trail for all suspension/restoration actions with Clerk metadata sync
+
+### Changed
+
+- Middleware uses URL rewrite instead of redirect for suspended users (URL bar stays on original page)
+
+### Removed
+
+- Deprecated `/autopilot`, `/orchestrate`, and `/swarm` agent-dispatch skills (replaced by Conductor workspaces)
+- `.claude/skills/parallel-agents.md` (duplicate of swarm)
+
 ## [26.4.88] - 2026-03-28
 
 ### Added

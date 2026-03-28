@@ -309,22 +309,22 @@ export function EarningsTab() {
             label='Total revenue'
             value={formatCents(stats?.totalRevenueCents ?? 0)}
             icon={DollarSign}
-            iconBg='bg-(--linear-bg-surface-0) border border-(--linear-border-subtle)'
-            iconColor='text-emerald-500 dark:text-emerald-400'
+            iconBg='bg-surface-1 border border-subtle'
+            iconColor='text-success'
           />
           <StatCard
             label='Tips received'
             value={String(stats?.totalTips ?? 0)}
             icon={Hash}
-            iconBg='bg-(--linear-bg-surface-0) border border-(--linear-border-subtle)'
-            iconColor='text-blue-500 dark:text-blue-400'
+            iconBg='bg-surface-1 border border-subtle'
+            iconColor='text-info'
           />
           <StatCard
             label='Average tip'
             value={formatCents(stats?.averageTipCents ?? 0)}
             icon={TrendingUp}
-            iconBg='bg-(--linear-bg-surface-0) border border-(--linear-border-subtle)'
-            iconColor='text-violet-500 dark:text-violet-400'
+            iconBg='bg-surface-1 border border-subtle'
+            iconColor='text-accent'
           />
         </dl>
       )}
@@ -359,10 +359,10 @@ export function EarningsTab() {
       <ContentSurfaceCard className='p-3 sm:p-4'>
         <div className='flex items-center gap-2 mb-4'>
           <div
-            className='flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'
+            className='flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-1'
             aria-hidden='true'
           >
-            <QrCode className='h-3.5 w-3.5 text-violet-500 dark:text-violet-400' />
+            <QrCode className='h-3.5 w-3.5 text-accent' />
           </div>
           <h2 className='text-[13px] font-[510] text-primary-token'>
             Tip QR Code

@@ -34,7 +34,7 @@ export function checkUserStatus(
     return {
       isBlocked: true,
       blockedState: CanonicalUserState.BANNED,
-      redirectTo: '/banned',
+      redirectTo: '/unavailable',
     };
   }
 
@@ -43,7 +43,7 @@ export function checkUserStatus(
     return {
       isBlocked: true,
       blockedState: CanonicalUserState.BANNED,
-      redirectTo: '/banned',
+      redirectTo: '/unavailable',
     };
   }
 

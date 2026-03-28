@@ -6,7 +6,7 @@ import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
-import { getDashboardData } from '../actions';
+import { getDashboardDataEssential } from '../actions';
 
 export const runtime = 'nodejs';
 
@@ -18,14 +18,14 @@ export const runtime = 'nodejs';
 /**
  * Lightweight onboarding guard that streams independently.
  *
- * getDashboardData() is request-deduped via React cache() and already
+ * getDashboardDataEssential() is request-deduped via React cache() and already
  * pre-fetched by the shell layout, so this resolves near-instantly.
  * Separated into its own boundary so the redirect fires without
  * blocking the content skeleton from being displayed.
  */
 async function InsightsOnboardingGuard() {
   try {
-    const dashboardData = await getDashboardData();
+    const dashboardData = await getDashboardDataEssential();
     if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
       redirect(APP_ROUTES.ONBOARDING);
     }
@@ -45,7 +45,7 @@ async function InsightsOnboardingGuard() {
  */
 async function InsightsContentSection() {
   try {
-    const dashboardData = await getDashboardData();
+    const dashboardData = await getDashboardDataEssential();
 
     if (dashboardData.dashboardLoadError) {
       void captureError(

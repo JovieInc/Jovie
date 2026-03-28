@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import { UNKNOWN_AVATAR_QUALITY } from '@/lib/profile/avatar-quality';
 import type { DashboardData } from './actions';
 
@@ -31,7 +31,7 @@ export function DashboardDataProvider({
   value,
   children,
 }: Readonly<DashboardDataProviderProps>) {
-  const normalizedValue = normalizeDashboardData(value);
+  const normalizedValue = useMemo(() => normalizeDashboardData(value), [value]);
 
   return (
     <DashboardDataContext.Provider value={normalizedValue}>

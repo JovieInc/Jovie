@@ -683,6 +683,38 @@ export function ReleaseSidebar({
       data-testid='release-sidebar'
       headerMode='minimal'
       hideMinimalHeaderBar
+      entityHeader={
+        !(selectedTrack && release) && release ? (
+          <>
+            <ReleaseEntityHeader
+              headerLabel={headerLabel}
+              release={release}
+              artistName={artistName}
+              canUploadArtwork={canUploadArtwork}
+              canRevertArtwork={canRevertArtwork}
+              onArtworkUpload={handleArtworkUpload}
+              onArtworkRevert={handleArtworkRevert}
+              allowDownloads={allowDownloads}
+              previewUrl={sidebarPreviewUrl}
+              isPlaying={isReleasePlaying}
+              onTogglePreview={handleToggleReleasePreview}
+              actionBar={
+                <DrawerCardActionBar
+                  primaryActions={[]}
+                  overflowActions={cardOverflowActions}
+                  overflowTriggerIcon='vertical'
+                  className='border-0 bg-transparent px-0 py-0'
+                />
+              }
+            />
+            <ReleaseSmartLinkAnalytics
+              release={release}
+              analyticsOverride={analyticsOverride}
+              artistName={artistName}
+            />
+          </>
+        ) : undefined
+      }
       tabs={
         !(selectedTrack && release) && release ? (
           <DrawerTabs
@@ -707,35 +739,7 @@ export function ReleaseSidebar({
         />
       )}
       {!(selectedTrack && release) && release && (
-        <div className='flex min-h-full flex-col gap-2.5 pt-0.5'>
-          <ReleaseEntityHeader
-            headerLabel={headerLabel}
-            release={release}
-            artistName={artistName}
-            canUploadArtwork={canUploadArtwork}
-            canRevertArtwork={canRevertArtwork}
-            onArtworkUpload={handleArtworkUpload}
-            onArtworkRevert={handleArtworkRevert}
-            allowDownloads={allowDownloads}
-            previewUrl={sidebarPreviewUrl}
-            isPlaying={isReleasePlaying}
-            onTogglePreview={handleToggleReleasePreview}
-            actionBar={
-              <DrawerCardActionBar
-                primaryActions={[]}
-                overflowActions={cardOverflowActions}
-                overflowTriggerIcon='vertical'
-                className='border-0 bg-transparent px-0 py-0'
-              />
-            }
-          />
-
-          <ReleaseSmartLinkAnalytics
-            release={release}
-            analyticsOverride={analyticsOverride}
-            artistName={artistName}
-          />
-
+        <div className='flex min-h-full flex-col'>
           <div className='min-h-0 flex-1'>
             {activeTab === 'tracklist' && (
               <DrawerSurfaceCard
