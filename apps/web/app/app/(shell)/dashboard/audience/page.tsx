@@ -16,7 +16,7 @@ import {
   trimTrailingSlashes,
 } from '@/lib/utils/string-utils';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
-import { getDashboardData } from '../actions';
+import { getDashboardDataEssential } from '../actions';
 import { loadUpcomingTourDates } from '../tour-dates/actions';
 import { getAudienceServerData } from './audience-data';
 
@@ -39,7 +39,7 @@ async function AudienceContent({
 
     const isE2E = process.env.NEXT_PUBLIC_E2E_MODE === '1';
 
-    const dashboardData = await getDashboardData();
+    const dashboardData = await getDashboardDataEssential();
 
     if (dashboardData.dashboardLoadError) {
       void captureError(
