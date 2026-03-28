@@ -438,17 +438,13 @@ export function useReleaseProviderMatrix({
       const release = rawRowsRef.current.find(r => r.id === releaseId);
       if (!release) return;
 
-      try {
-        const updated = await saveTargetPlaylistsMutation.mutateAsync({
-          profileId: release.profileId,
-          releaseId,
-          targetPlaylists,
-        });
-        updateRow(updated);
-        toast.success('Target playlists saved');
-      } catch {
-        toast.error('Failed to save target playlists');
-      }
+      const updated = await saveTargetPlaylistsMutation.mutateAsync({
+        profileId: release.profileId,
+        releaseId,
+        targetPlaylists,
+      });
+      updateRow(updated);
+      toast.success('Target playlists saved');
     },
     [saveTargetPlaylistsMutation, updateRow]
   );

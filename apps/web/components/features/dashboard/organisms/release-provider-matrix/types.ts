@@ -58,6 +58,10 @@ export interface ReleaseExperienceAdapter {
   ) => Promise<void>;
   readonly onRescanIsrc?: (releaseId: string) => void;
   readonly onSaveLyrics?: (releaseId: string, lyrics: string) => Promise<void>;
+  readonly onSaveTargetPlaylists?: (
+    releaseId: string,
+    targetPlaylists: string[]
+  ) => Promise<void>;
   readonly onFormatLyrics?: (
     releaseId: string,
     lyrics: string

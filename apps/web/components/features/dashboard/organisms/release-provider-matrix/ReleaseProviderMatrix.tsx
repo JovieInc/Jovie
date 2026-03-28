@@ -600,7 +600,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           onArtworkRevert={releaseSidebarHandlers.artworkRevert}
           onReleaseChange={handleReleaseChange}
           onSaveLyrics={experienceAdapter?.onSaveLyrics ?? handleSaveLyrics}
-          onSaveTargetPlaylists={handleSaveTargetPlaylists}
+          onSaveTargetPlaylists={
+            experienceAdapter?.onSaveTargetPlaylists ??
+            handleSaveTargetPlaylists
+          }
           onFormatLyrics={releaseSidebarHandlers.formatLyrics}
           isLyricsSaving={isLyricsSaving}
           isSaving={isSaving}
