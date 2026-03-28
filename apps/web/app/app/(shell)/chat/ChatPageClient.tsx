@@ -2,6 +2,7 @@
 
 import { Button, SimpleTooltip } from '@jovie/ui';
 import { AlertCircle, Check, Copy, RefreshCw } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -19,7 +20,6 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { PreviewToggleButton } from '@/features/dashboard/layout/PreviewToggleButton';
-import { ProfileContactSidebar } from '@/features/dashboard/organisms/profile-contact-sidebar';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { env } from '@/lib/env-client';
@@ -31,6 +31,16 @@ import {
 import { useDashboardSocialLinksQuery } from '@/lib/queries';
 import { addBreadcrumb, captureMessage } from '@/lib/sentry/client-lite';
 import { getHometownFromSettings } from '@/types/db';
+
+// Code-split ProfileContactSidebar — it's a sidebar panel with mutation hooks
+// and a tab system. Not on the critical path, doesn't need to load immediately.
+const ProfileContactSidebar = dynamic(
+  () =>
+    import('@/features/dashboard/organisms/profile-contact-sidebar').then(
+      mod => ({ default: mod.ProfileContactSidebar })
+    ),
+  { ssr: false }
+);
 
 interface ChatPageClientProps {
   readonly conversationId?: string;

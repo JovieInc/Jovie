@@ -106,6 +106,20 @@
       "when": 1774577343168,
       "tag": "0014_certain_natasha_romanoff",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1774843200000,
+      "tag": "0015_rename_pitch_context_to_career_highlights",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1774843200001,
+      "tag": "0016_open_strong_guy",
+      "breakpoints": true
     }
   ]
 }

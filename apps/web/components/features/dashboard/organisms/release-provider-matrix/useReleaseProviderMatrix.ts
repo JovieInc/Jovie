@@ -13,6 +13,7 @@ import {
   useSaveCanvasStatusMutation,
   useSaveProviderOverrideMutation,
   useSaveReleaseLyricsMutation,
+  useSaveReleaseTargetPlaylistsMutation,
   useSyncReleasesFromSpotifyMutation,
 } from '@/lib/queries';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
@@ -65,6 +66,8 @@ export function useReleaseProviderMatrix({
   const rescanIsrcMutation = useRescanIsrcLinksMutation(profileId);
   const saveCanvasStatusMutation = useSaveCanvasStatusMutation(profileId);
   const saveLyricsMutation = useSaveReleaseLyricsMutation(profileId);
+  const saveTargetPlaylistsMutation =
+    useSaveReleaseTargetPlaylistsMutation(profileId);
   const formatLyricsMutation = useFormatReleaseLyricsMutation(profileId);
 
   const isSaving =
@@ -430,6 +433,22 @@ export function useReleaseProviderMatrix({
     [saveLyricsMutation]
   );
 
+  const handleSaveTargetPlaylists = useCallback(
+    async (releaseId: string, targetPlaylists: string[]) => {
+      const release = rawRowsRef.current.find(r => r.id === releaseId);
+      if (!release) return;
+
+      const updated = await saveTargetPlaylistsMutation.mutateAsync({
+        profileId: release.profileId,
+        releaseId,
+        targetPlaylists,
+      });
+      updateRow(updated);
+      toast.success('Target playlists saved');
+    },
+    [saveTargetPlaylistsMutation, updateRow]
+  );
+
   const handleFormatLyrics = useCallback(
     async (
       releaseId: string,
@@ -492,6 +511,7 @@ export function useReleaseProviderMatrix({
     handleCanvasStatusUpdate,
     handleAddUrl,
     handleSaveLyrics,
+    handleSaveTargetPlaylists,
     handleFormatLyrics,
     isLyricsSaving,
     setDrafts,

@@ -21,8 +21,11 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
   ChatPageClient: () => null,
 }));
 
+const mockGetDashboardData = vi.fn().mockResolvedValue({
+  selectedProfile: null,
+});
 vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
-  getDashboardData: vi.fn().mockResolvedValue({}),
+  getDashboardData: (...args: unknown[]) => mockGetDashboardData(...args),
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
@@ -48,9 +51,8 @@ describe('dashboard metadata generation', () => {
   });
 
   it('uses display name for app root tab title when available', async () => {
-    mockGetSessionContext.mockResolvedValue({
-      user: { id: 'user-id' },
-      profile: { displayName: 'Ada' },
+    mockGetDashboardData.mockResolvedValue({
+      selectedProfile: { displayName: 'Ada' },
     });
 
     const { generateMetadata } = await import('@/app/app/(shell)/page');

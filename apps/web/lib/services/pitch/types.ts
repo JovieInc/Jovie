@@ -34,7 +34,7 @@ export interface PitchInput {
     activeSinceYear: number | null;
     spotifyFollowers: number | null;
     spotifyPopularity: number | null;
-    pitchContext: string | null;
+    careerHighlights: string | null;
     targetPlaylists: string[] | null;
   };
   release: {

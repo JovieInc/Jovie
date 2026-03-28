@@ -38,6 +38,7 @@ export async function buildPitchInput(
       totalTracks: discogReleases.totalTracks,
       label: discogReleases.label,
       distributor: discogReleases.distributor,
+      targetPlaylists: discogReleases.targetPlaylists,
     })
     .from(discogReleases)
     .where(
@@ -61,7 +62,7 @@ export async function buildPitchInput(
       activeSinceYear: creatorProfiles.activeSinceYear,
       spotifyFollowers: creatorProfiles.spotifyFollowers,
       spotifyPopularity: creatorProfiles.spotifyPopularity,
-      pitchContext: creatorProfiles.pitchContext,
+      careerHighlights: creatorProfiles.careerHighlights,
       targetPlaylists: creatorProfiles.targetPlaylists,
     })
     .from(creatorProfiles)
@@ -117,8 +118,10 @@ export async function buildPitchInput(
       activeSinceYear: artistProfile?.activeSinceYear ?? null,
       spotifyFollowers: artistProfile?.spotifyFollowers ?? null,
       spotifyPopularity: artistProfile?.spotifyPopularity ?? null,
-      pitchContext: artistProfile?.pitchContext ?? null,
-      targetPlaylists: artistProfile?.targetPlaylists ?? null,
+      careerHighlights: artistProfile?.careerHighlights ?? null,
+      targetPlaylists: release.targetPlaylists?.length
+        ? release.targetPlaylists
+        : (artistProfile?.targetPlaylists ?? null),
     },
     release: {
       title: release.title,

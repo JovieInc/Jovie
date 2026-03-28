@@ -56,7 +56,7 @@ interface ProfileUpdateData {
   username: string;
   location: string;
   hometown: string;
-  pitchContext: string;
+  careerHighlights: string;
   targetPlaylists: string;
 }
 
@@ -92,7 +92,7 @@ export function useSettingsProfile({
     displayName: identityFields.displayName,
     location: identityFields.location,
     hometown: identityFields.hometown,
-    pitchContext: identityFields.pitchContext,
+    careerHighlights: identityFields.careerHighlights,
     targetPlaylists: identityFields.targetPlaylists,
   });
 
@@ -106,7 +106,7 @@ export function useSettingsProfile({
     username: identityFields.username,
     location: identityFields.location,
     hometown: identityFields.hometown,
-    pitchContext: identityFields.pitchContext,
+    careerHighlights: identityFields.careerHighlights,
     targetPlaylists: identityFields.targetPlaylists,
   });
 
@@ -147,7 +147,7 @@ export function useSettingsProfile({
       const username = data.username?.trim() ?? '';
       const location = normalizePlace(data.location);
       const hometown = normalizePlace(data.hometown);
-      const pitchContext = data.pitchContext?.trim() ?? '';
+      const careerHighlights = data.careerHighlights?.trim() ?? '';
       const targetPlaylists = data.targetPlaylists?.trim() ?? '';
 
       if (!displayName || !username) {
@@ -173,7 +173,7 @@ export function useSettingsProfile({
         lastSaved?.username === username &&
         lastSaved?.location === (location ?? '') &&
         lastSaved?.hometown === (hometown ?? '') &&
-        lastSaved?.pitchContext === pitchContext &&
+        lastSaved?.careerHighlights === careerHighlights &&
         lastSaved?.targetPlaylists === targetPlaylists
       ) {
         return;
@@ -190,7 +190,7 @@ export function useSettingsProfile({
             displayName,
             location,
             hometown,
-            pitchContext: pitchContext || undefined,
+            careerHighlights,
             targetPlaylists: targetPlaylists
               ? targetPlaylists
                   .split(',')
@@ -213,7 +213,7 @@ export function useSettingsProfile({
         username,
         location: location ?? '',
         hometown: hometown ?? '',
-        pitchContext,
+        careerHighlights,
         targetPlaylists,
       };
 
@@ -347,7 +347,7 @@ export function useSettingsProfile({
       username: identityFields.username,
       location: identityFields.location,
       hometown: identityFields.hometown,
-      pitchContext: identityFields.pitchContext,
+      careerHighlights: identityFields.careerHighlights,
       targetPlaylists: identityFields.targetPlaylists,
     };
     setFormData({
@@ -355,7 +355,7 @@ export function useSettingsProfile({
       username: identityFields.username,
       location: identityFields.location,
       hometown: identityFields.hometown,
-      pitchContext: identityFields.pitchContext,
+      careerHighlights: identityFields.careerHighlights,
       targetPlaylists: identityFields.targetPlaylists,
     });
     setProfileSaveStatus(buildProfileSaveState());
@@ -364,7 +364,7 @@ export function useSettingsProfile({
     identityFields.hometown,
     identityFields.location,
     identityFields.username,
-    identityFields.pitchContext,
+    identityFields.careerHighlights,
     identityFields.targetPlaylists,
   ]);
 

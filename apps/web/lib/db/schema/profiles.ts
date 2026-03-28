@@ -120,7 +120,7 @@ export const creatorProfiles = pgTable(
     usernameNormalized: text('username_normalized').notNull(),
     displayName: text('display_name'),
     bio: text('bio'),
-    pitchContext: text('pitch_context'),
+    careerHighlights: text('career_highlights'),
     targetPlaylists: text('target_playlists').array(),
     venmoHandle: text('venmo_handle'),
     avatarUrl: text('avatar_url'),

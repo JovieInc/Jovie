@@ -47,7 +47,7 @@ export function SettingsProfileSection({
       | 'displayName'
       | 'location'
       | 'hometown'
-      | 'pitchContext'
+      | 'careerHighlights'
       | 'targetPlaylists',
     value: string
   ) => {
@@ -59,7 +59,7 @@ export function SettingsProfileSection({
         username: next.username,
         location: next.location,
         hometown: next.hometown,
-        pitchContext: next.pitchContext,
+        careerHighlights: next.careerHighlights,
         targetPlaylists: next.targetPlaylists,
       });
       return next;
@@ -206,23 +206,25 @@ export function SettingsProfileSection({
         <div className='flex flex-col gap-2 py-2'>
           <div className='shrink-0'>
             <label
-              htmlFor='pitchContext'
+              htmlFor='careerHighlights'
               className='text-[13px] text-primary-token'
             >
-              Pitch context
+              Career highlights
             </label>
             <p className='mt-0.5 text-[13px] text-secondary-token'>
-              Tell us about your streaming milestones, press coverage, radio
-              play, playlist history, and your artist story. This helps generate
-              better playlist pitches for your releases.
+              Share your streaming milestones, press coverage, radio play,
+              playlist history, and anything that makes your story unique. This
+              helps Jovie write better pitches and recommendations.
             </p>
           </div>
           <div className='relative'>
             <textarea
-              name='pitchContext'
-              id='pitchContext'
-              value={formData.pitchContext}
-              onChange={e => handleFieldChange('pitchContext', e.target.value)}
+              name='careerHighlights'
+              id='careerHighlights'
+              value={formData.careerHighlights}
+              onChange={e =>
+                handleFieldChange('careerHighlights', e.target.value)
+              }
               onBlur={() => flushSave()}
               placeholder='e.g. 500K+ monthly listeners on Spotify, featured on New Music Friday twice, recent radio play on KCRW...'
               rows={4}
@@ -230,7 +232,7 @@ export function SettingsProfileSection({
               className={`w-full resize-y ${PROFILE_INPUT_CLASS}`}
             />
             <span className='absolute bottom-2 right-3 text-[11px] text-tertiary-token'>
-              {formData.pitchContext.length}/2000
+              {formData.careerHighlights.length}/2000
             </span>
           </div>
         </div>
@@ -241,11 +243,11 @@ export function SettingsProfileSection({
               htmlFor='targetPlaylists'
               className='text-[13px] text-primary-token'
             >
-              Target playlists
+              Default target playlists
             </label>
             <p className='mt-0.5 text-[13px] text-secondary-token'>
-              Name specific Spotify playlists you&apos;re targeting. Leave blank
-              and we&apos;ll suggest based on your genre.
+              Default playlists for pitch generation. Override per-release in
+              the release sidebar.
             </p>
           </div>
           <Input
