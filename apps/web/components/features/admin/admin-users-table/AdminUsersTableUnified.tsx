@@ -1,6 +1,18 @@
 'use client';
 
-import { Badge, Button } from '@jovie/ui';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Badge,
+  Button,
+  Textarea,
+} from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, Users } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -261,6 +273,71 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const headerCheckboxStateRef = useRef(headerCheckboxState);
   headerCheckboxStateRef.current = headerCheckboxState;
 
+  // Ban dialog state
+  const [banTarget, setBanTarget] = useState<AdminUserRow | null>(null);
+  const [banReason, setBanReason] = useState('');
+  const [banPending, setBanPending] = useState(false);
+  const [unbanTarget, setUnbanTarget] = useState<AdminUserRow | null>(null);
+  const [unbanPending, setUnbanPending] = useState(false);
+
+  const handleBanConfirm = useCallback(async () => {
+    if (!banTarget || !banReason.trim()) return;
+    setBanPending(true);
+    try {
+      const res = await fetch(APP_ROUTES.ADMIN_USERS_BAN, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          userId: banTarget.id,
+          reason: banReason.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? 'Failed to suspend user');
+      }
+      toast.success('User suspended');
+      setBanTarget(null);
+      setBanReason('');
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to suspend user'
+      );
+    } finally {
+      setBanPending(false);
+    }
+  }, [banTarget, banReason]);
+
+  const handleUnbanConfirm = useCallback(async () => {
+    if (!unbanTarget) return;
+    setUnbanPending(true);
+    try {
+      const res = await fetch(APP_ROUTES.ADMIN_USERS_UNBAN, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ userId: unbanTarget.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? 'Failed to restore user');
+      }
+      toast.success('User restored');
+      setUnbanTarget(null);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to restore user'
+      );
+    } finally {
+      setUnbanPending(false);
+    }
+  }, [unbanTarget]);
+
   // Action callbacks — clipboard + toast logic lives here, builder is pure
   const actionCallbacks = useMemo<BuildAdminUserActionsCallbacks>(
     () => ({
@@ -296,6 +373,13 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
       onOpenInClerk: (u: AdminUserRow) => {
         const clerkConsoleUrl = `https://dashboard.clerk.com/apps/users/user_${encodeURIComponent(u.clerkId)}`;
         globalThis.open(clerkConsoleUrl, '_blank', 'noopener,noreferrer');
+      },
+      onBanUser: (u: AdminUserRow) => {
+        setBanTarget(u);
+        setBanReason('');
+      },
+      onUnbanUser: (u: AdminUserRow) => {
+        setUnbanTarget(u);
       },
     }),
     []
@@ -632,6 +716,83 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
           }
         />
       </div>
+
+      {/* Ban confirmation dialog with reason */}
+      <AlertDialog
+        open={banTarget !== null}
+        onOpenChange={open => {
+          if (!open) {
+            setBanTarget(null);
+            setBanReason('');
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Suspend user</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will immediately prevent{' '}
+              {banTarget?.name ?? banTarget?.email ?? 'this user'} from
+              accessing Jovie.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className='px-6 pb-2'>
+            <label
+              htmlFor='ban-reason'
+              className='text-sm font-medium text-primary-token mb-1.5 block'
+            >
+              Reason (required)
+            </label>
+            <Textarea
+              id='ban-reason'
+              placeholder='Why is this user being suspended?'
+              value={banReason}
+              onChange={e => setBanReason(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={banPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBanConfirm}
+              disabled={banPending || banReason.trim().length === 0}
+              variant='destructive'
+            >
+              {banPending ? 'Suspending...' : 'Suspend user'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unban confirmation dialog */}
+      <AlertDialog
+        open={unbanTarget !== null}
+        onOpenChange={open => {
+          if (!open) setUnbanTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restore user</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will restore access for{' '}
+              {unbanTarget?.name ?? unbanTarget?.email ?? 'this user'}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={unbanPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUnbanConfirm}
+              disabled={unbanPending}
+              variant='primary'
+            >
+              {unbanPending ? 'Restoring...' : 'Restore user'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </QueryErrorBoundary>
   );
 }
