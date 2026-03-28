@@ -50,7 +50,9 @@ export function useTextareaAutosize({
   const valueRef = useRef(value);
   const minHeightRef = useRef(minHeight);
   const maxHeightRef = useRef(maxHeight);
-  useEffect(() => {
+  // Sync refs in a layout effect so they're current before remeasure runs.
+  // useLayoutEffect fires before passive useEffect, same phase as remeasure.
+  useLayoutEffect(() => {
     valueRef.current = value;
     minHeightRef.current = minHeight;
     maxHeightRef.current = maxHeight;
