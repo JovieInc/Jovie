@@ -23,14 +23,21 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.89] - 2026-03-28
 
+### Added
+
+- User suspension system with admin UI (confirmation dialog with required reason)
+- Generic "service unavailable" page for suspended users (no account-specific language)
+- Ban check in dashboard layout to cover all `/app` routes
+- Admin audit trail for all suspension/restoration actions with Clerk metadata sync
+
+### Changed
+
+- Middleware uses URL rewrite instead of redirect for suspended users (URL bar stays on original page)
+
 ### Removed
 
 - Deprecated `/autopilot`, `/orchestrate`, and `/swarm` agent-dispatch skills (replaced by Conductor workspaces)
 - `.claude/skills/parallel-agents.md` (duplicate of swarm)
-
-### Changed
-
-- `/drain` Phase 3 rewritten to be self-contained instead of delegating to `/orchestrate`
 
 ## [26.4.88] - 2026-03-28
 

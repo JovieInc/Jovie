@@ -2,8 +2,10 @@ import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
+import { UnavailablePage } from '@/components/UnavailablePage';
 import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
+import { getUserBanStatus } from '@/lib/auth/ban-check';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { DashboardShellContent } from './DashboardShellContent';
@@ -25,6 +27,14 @@ export default async function AppShellLayout({
     if (!auth.userId) {
       const headerStore = await headers();
       redirect(buildAppShellSignInUrl(headerStore));
+    }
+
+    // Ban check — the proxy skips user state for /app/* routes (proxy.ts:581-585),
+    // so we check here. Renders the generic unavailable page inline to avoid
+    // layout tree mismatch issues with middleware rewrites on /app/* paths.
+    const banStatus = await getUserBanStatus(auth.userId);
+    if (banStatus.isBanned) {
+      return <UnavailablePage />;
     }
 
     // Stream the shell: the skeleton renders at first byte while

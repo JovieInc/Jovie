@@ -24,6 +24,7 @@ export const RESERVED_USERNAMES = [
   'dashboard',
   'onboarding',
   'settings',
+  'unavailable',
   'profile',
   'login',
   'signin',
