@@ -266,9 +266,10 @@ function parseMemberQueryParams(searchParams: SearchParams) {
  *
  * Pre-aggregates streaming clicks and tip click values per audience member
  * in a single pass, replacing per-row correlated subqueries that previously
- * executed N times (once per result row).
+ * executed N times (once per result row). Scoped to a single creator profile
+ * to avoid full-table aggregation.
  */
-function buildClickAggSubquery(tx: DbSessionTx) {
+function buildClickAggSubquery(tx: DbSessionTx, profileId: string) {
   return tx
     .select({
       audienceMemberId: clickEvents.audienceMemberId,
@@ -282,6 +283,7 @@ function buildClickAggSubquery(tx: DbSessionTx) {
         ),
     })
     .from(clickEvents)
+    .where(eq(clickEvents.creatorProfileId, profileId))
     .groupBy(clickEvents.audienceMemberId)
     .as('click_agg');
 }
@@ -436,7 +438,7 @@ async function fetchMembersData(
 
   // Pre-aggregate click events per audience member in a single pass,
   // avoiding per-row correlated subqueries (O(N) → O(1) subquery).
-  const clickAgg = buildClickAggSubquery(tx);
+  const clickAgg = buildClickAggSubquery(tx, selectedProfileId);
 
   const baseQuery = tx
     .select(buildMemberSelectFields(includeDetails, clickAgg))
