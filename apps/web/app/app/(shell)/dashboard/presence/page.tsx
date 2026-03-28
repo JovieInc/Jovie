@@ -6,7 +6,7 @@ import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
-import { getDashboardDataEssential } from '../actions';
+import { getDashboardData } from '../actions';
 import { loadDspPresence } from './actions';
 import PresenceLoading from './loading';
 
@@ -14,7 +14,7 @@ export const runtime = 'nodejs';
 
 async function PresenceContent() {
   try {
-    const dashboardData = await getDashboardDataEssential();
+    const dashboardData = await getDashboardData();
 
     if (dashboardData.dashboardLoadError) {
       void captureError(
