@@ -7,6 +7,7 @@ const mockSetupDbSession = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockCheckAccountDeleteRateLimit = vi.hoisted(() => vi.fn());
 const mockInvalidateHandleCache = vi.hoisted(() => vi.fn());
+const mockInvalidateProfileCache = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
@@ -28,6 +29,10 @@ vi.mock('@/lib/rate-limit', () => ({
 
 vi.mock('@/lib/onboarding/handle-availability-cache', () => ({
   invalidateHandleCache: mockInvalidateHandleCache,
+}));
+
+vi.mock('@/lib/cache/profile', () => ({
+  invalidateProfileCache: mockInvalidateProfileCache,
 }));
 
 vi.mock('@/lib/http/headers', () => ({
@@ -195,6 +200,9 @@ describe('POST /api/account/delete', () => {
 
     // Verify handle cache was invalidated
     expect(mockInvalidateHandleCache).toHaveBeenCalledWith('testartist');
+
+    // Verify profile ISR cache was invalidated
+    expect(mockInvalidateProfileCache).toHaveBeenCalledWith('testartist');
   });
 
   it('handles Clerk deletion failure gracefully', async () => {
