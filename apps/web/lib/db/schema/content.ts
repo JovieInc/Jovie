@@ -55,6 +55,7 @@ export const discogReleases = pgTable(
     totalTracks: integer('total_tracks').default(0).notNull(),
     isExplicit: boolean('is_explicit').default(false).notNull(),
     genres: text('genres').array(),
+    targetPlaylists: text('target_playlists').array(),
     copyrightLine: text('copyright_line'),
     distributor: text('distributor'),
     artworkUrl: text('artwork_url'),

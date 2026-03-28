@@ -93,6 +93,7 @@ vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   resetProviderOverride: vi.fn(),
   saveCanvasStatus: vi.fn(),
   saveReleaseLyrics: vi.fn(),
+  saveReleaseTargetPlaylists: vi.fn(),
   formatReleaseLyrics: vi.fn(),
   updateAllowArtworkDownloads: vi.fn(),
   syncFromSpotify: vi.fn(),

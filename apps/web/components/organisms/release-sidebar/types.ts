@@ -99,6 +99,11 @@ export interface ReleaseSidebarProps {
    * Whether an ISRC rescan is currently in progress
    */
   readonly isRescanningIsrc?: boolean;
+  /** Persist release target playlists */
+  readonly onSaveTargetPlaylists?: (
+    releaseId: string,
+    playlists: string[]
+  ) => Promise<void>;
   /** Persist release lyrics in metadata */
   readonly onSaveLyrics?: (releaseId: string, lyrics: string) => Promise<void>;
   /** Persist canvas status in metadata */

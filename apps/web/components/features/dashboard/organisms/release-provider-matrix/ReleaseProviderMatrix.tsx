@@ -126,6 +126,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleCanvasStatusUpdate,
     handleAddUrl,
     handleSaveLyrics,
+    handleSaveTargetPlaylists,
     handleFormatLyrics,
     isLyricsSaving,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
@@ -599,6 +600,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           onArtworkRevert={releaseSidebarHandlers.artworkRevert}
           onReleaseChange={handleReleaseChange}
           onSaveLyrics={experienceAdapter?.onSaveLyrics ?? handleSaveLyrics}
+          onSaveTargetPlaylists={
+            experienceAdapter?.onSaveTargetPlaylists ??
+            handleSaveTargetPlaylists
+          }
           onFormatLyrics={releaseSidebarHandlers.formatLyrics}
           isLyricsSaving={isLyricsSaving}
           isSaving={isSaving}
@@ -632,6 +637,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleArtworkUpload,
     handleReleaseChange,
     handleSaveLyrics,
+    handleSaveTargetPlaylists,
     isLyricsSaving,
     isSaving,
     allowArtworkDownloads,
