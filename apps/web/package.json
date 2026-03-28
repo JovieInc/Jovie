@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "NODE_OPTIONS=--max-old-space-size=8192 doppler run -- next dev",
     "dev:local": "next dev",
+    "dev:local:browse": "E2E_USE_TEST_AUTH_BYPASS=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 next dev",
     "dev:local:playwright": "next dev --webpack",
     "validate-env": "tsx scripts/validate-env.ts",
     "build": "NODE_OPTIONS=--max-old-space-size=8192 NEXT_IGNORE_TYPECHECK=1 next build --turbopack",

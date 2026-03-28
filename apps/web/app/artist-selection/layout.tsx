@@ -1,5 +1,4 @@
-import { ClientProviders } from '@/components/providers/ClientProviders';
-import { resolvePublishableKeyFromHeaders } from '@/lib/auth/staging-clerk-keys';
+import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,11 +7,5 @@ export default async function ArtistSelectionLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const publishableKey = await resolvePublishableKeyFromHeaders();
-
-  return (
-    <ClientProviders publishableKey={publishableKey}>
-      {children}
-    </ClientProviders>
-  );
+  return <ResolvedClientProviders>{children}</ResolvedClientProviders>;
 }

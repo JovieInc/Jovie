@@ -9,24 +9,24 @@
  */
 
 /* eslint-disable no-restricted-imports */
-import { createClerkClient } from '@clerk/backend';
 import { neon } from '@neondatabase/serverless';
 import { Redis } from '@upstash/redis';
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
+import {
+  DEFAULT_TEST_AVATAR_URL,
+  ensureCreatorProfileRecord as ensureCreatorProfile,
+  ensureSocialLinkRecord as ensureSocialLink,
+  ensureUserRecord as ensureUser,
+  isAllowlistedTestAccountEmail,
+  resolveClerkTestUserId as resolveSeedUserClerkId,
+  setActiveProfileForUser as setActiveProfile,
+} from '@/lib/testing/test-user-provision.server';
 import { normalizeEmail } from '@/lib/utils/email';
 
 // Use the same HTTP driver as the app for consistency
-const {
-  users,
-  creatorProfiles,
-  socialLinks,
-  discogReleases,
-  discogTracks,
-  providerLinks,
-  tourDates,
-} = schema;
+const { discogReleases, discogTracks, providerLinks, tourDates } = schema;
 
 interface TestProfile {
   username: string;
@@ -106,49 +106,6 @@ const TEST_PROFILES: TestProfile[] = [
   },
 ];
 
-const E2E_SEED_EMAIL_REGEX = /^e2e(?:-[a-z0-9]+)?(?:\+clerk_test)?@jov\.ie$/i;
-const E2E_TEST_AVATAR_URL = '/avatars/default-user.png';
-
-type SeededUserValues = Pick<
-  typeof users.$inferInsert,
-  'clerkId' | 'email' | 'name' | 'userStatus' | 'isAdmin'
->;
-
-type SeededCreatorProfileValues = Pick<
-  typeof creatorProfiles.$inferInsert,
-  | 'userId'
-  | 'creatorType'
-  | 'username'
-  | 'usernameNormalized'
-  | 'displayName'
-  | 'bio'
-  | 'avatarUrl'
-  | 'spotifyUrl'
-  | 'appleMusicUrl'
-  | 'appleMusicId'
-  | 'youtubeMusicId'
-  | 'deezerId'
-  | 'tidalId'
-  | 'soundcloudId'
-  | 'isPublic'
-  | 'isVerified'
-  | 'isClaimed'
-  | 'ingestionStatus'
-  | 'onboardingCompletedAt'
->;
-
-type SeededSocialLinkValues = Pick<
-  typeof socialLinks.$inferInsert,
-  | 'creatorProfileId'
-  | 'platform'
-  | 'platformType'
-  | 'url'
-  | 'displayText'
-  | 'isActive'
-  | 'sortOrder'
-  | 'state'
->;
-
 type SeededReleaseValues = Pick<
   typeof discogReleases.$inferInsert,
   | 'creatorProfileId'
@@ -184,292 +141,7 @@ function getSeedEnv() {
 function isAllowlistedE2ESeedEmail(
   email: string | null | undefined
 ): email is string {
-  return (
-    typeof email === 'string' &&
-    E2E_SEED_EMAIL_REGEX.test(normalizeEmail(email))
-  );
-}
-
-type MatchedSeedUser = {
-  readonly id: string;
-  readonly clerkId: string | null;
-  readonly email: string | null;
-};
-
-function resolveMatchedSeedUser(
-  matchedUsers: readonly MatchedSeedUser[],
-  values: SeededUserValues
-): MatchedSeedUser | undefined {
-  const normalizedEmail = values.email ? normalizeEmail(values.email) : null;
-  const clerkIdMatches = matchedUsers.filter(
-    matchedUser => matchedUser.clerkId === values.clerkId
-  );
-  const emailMatches = normalizedEmail
-    ? matchedUsers.filter(matchedUser => matchedUser.email === normalizedEmail)
-    : [];
-
-  if (clerkIdMatches.length > 1 || emailMatches.length > 1) {
-    throw new Error(
-      `Ambiguous E2E seed user: ${values.email ?? 'unknown email'} and ${values.clerkId} matched duplicate rows`
-    );
-  }
-
-  const clerkIdMatch = clerkIdMatches[0];
-  const emailMatch = emailMatches[0];
-
-  if (clerkIdMatch && emailMatch && clerkIdMatch.id !== emailMatch.id) {
-    throw new Error(
-      `Ambiguous E2E seed user: ${values.email ?? 'unknown email'} and ${values.clerkId} resolve to different rows`
-    );
-  }
-
-  return clerkIdMatch ?? emailMatch ?? matchedUsers[0];
-}
-
-function buildSeedUserLookupCondition(values: SeededUserValues) {
-  const normalizedEmail = values.email ? normalizeEmail(values.email) : null;
-  const emailAdoptionAllowed = isAllowlistedE2ESeedEmail(normalizedEmail);
-
-  const userLookupCondition =
-    emailAdoptionAllowed && normalizedEmail
-      ? or(eq(users.clerkId, values.clerkId), eq(users.email, normalizedEmail))
-      : eq(users.clerkId, values.clerkId);
-
-  return { emailAdoptionAllowed, normalizedEmail, userLookupCondition };
-}
-
-async function ensureUser(
-  db: ReturnType<typeof drizzle>,
-  values: SeededUserValues
-) {
-  const { emailAdoptionAllowed, normalizedEmail, userLookupCondition } =
-    buildSeedUserLookupCondition(values);
-
-  if (normalizedEmail && !emailAdoptionAllowed) {
-    console.warn(
-      `    ⚠ Refusing email-based adoption for non-allowlisted E2E email ${normalizedEmail}; Clerk ID match required`
-    );
-  }
-
-  const matchedUsers = await db
-    .select({ id: users.id, clerkId: users.clerkId, email: users.email })
-    .from(users)
-    .where(userLookupCondition);
-  const existingUser = resolveMatchedSeedUser(matchedUsers, values);
-
-  if (existingUser) {
-    await db
-      .update(users)
-      .set({ ...values, updatedAt: new Date() })
-      .where(eq(users.id, existingUser.id));
-    return {
-      id: existingUser.id,
-      previousClerkId:
-        existingUser.clerkId !== values.clerkId ? existingUser.clerkId : null,
-    };
-  }
-
-  try {
-    const [createdUser] = await db
-      .insert(users)
-      .values(values)
-      .returning({ id: users.id });
-    return {
-      id: createdUser.id,
-      previousClerkId: null,
-    };
-  } catch (error) {
-    if (!isDuplicateKeyError(error)) throw error;
-
-    const racedUsers = await db
-      .select({ id: users.id, clerkId: users.clerkId, email: users.email })
-      .from(users)
-      .where(userLookupCondition);
-    const racedUser = resolveMatchedSeedUser(racedUsers, values);
-
-    if (!racedUser) throw error;
-
-    await db
-      .update(users)
-      .set({ ...values, updatedAt: new Date() })
-      .where(eq(users.id, racedUser.id));
-
-    return {
-      id: racedUser.id,
-      previousClerkId:
-        racedUser.clerkId !== values.clerkId ? racedUser.clerkId : null,
-    };
-  }
-}
-
-async function resolveSeedUserClerkId(
-  email: string,
-  fallbackClerkId: string | undefined
-): Promise<string | null> {
-  const normalizedEmail = normalizeEmail(email);
-  const { CLERK_SECRET_KEY: secretKey } = getSeedEnv();
-
-  if (!normalizedEmail || !secretKey) {
-    return fallbackClerkId ?? null;
-  }
-
-  try {
-    const clerk = createClerkClient({ secretKey });
-    const existingUsers = await clerk.users.getUserList({
-      emailAddress: [normalizedEmail],
-    });
-
-    if (existingUsers.data.length > 1) {
-      console.warn(
-        `    ⚠ Multiple Clerk users found for ${normalizedEmail} (${existingUsers.data.length} total); using first match ${existingUsers.data[0]?.id ?? 'unknown'}`
-      );
-    }
-
-    const resolvedClerkId = existingUsers.data[0]?.id ?? null;
-
-    if (!resolvedClerkId) {
-      if (fallbackClerkId) {
-        console.warn(
-          `    ⚠ Clerk returned no users for ${normalizedEmail}; seeding with configured E2E_CLERK_USER_ID ${fallbackClerkId}, which may be stale`
-        );
-      } else {
-        console.warn(
-          `    ⚠ No Clerk user found for ${normalizedEmail}, and no configured E2E_CLERK_USER_ID fallback is available`
-        );
-      }
-    }
-
-    if (
-      resolvedClerkId &&
-      fallbackClerkId &&
-      resolvedClerkId !== fallbackClerkId
-    ) {
-      console.warn(
-        `    ⚠ E2E_CLERK_USER_ID is stale (${fallbackClerkId}); using Clerk user ${resolvedClerkId} for ${normalizedEmail}`
-      );
-    }
-
-    return resolvedClerkId ?? fallbackClerkId ?? null;
-  } catch (error) {
-    console.warn(
-      `    ⚠ Failed to resolve Clerk user for ${normalizedEmail}; falling back to configured E2E_CLERK_USER_ID`,
-      error
-    );
-    return fallbackClerkId ?? null;
-  }
-}
-
-async function setActiveProfile(
-  db: ReturnType<typeof drizzle>,
-  userId: string,
-  profileId: string
-) {
-  const [updatedUser] = await db
-    .update(users)
-    .set({
-      activeProfileId: profileId,
-      updatedAt: new Date(),
-    })
-    .where(eq(users.id, userId))
-    .returning({ id: users.id });
-
-  if (!updatedUser) {
-    throw new Error(
-      `Failed to set active profile ${profileId} for seeded user ${userId}`
-    );
-  }
-}
-
-async function ensureCreatorProfile(
-  db: ReturnType<typeof drizzle>,
-  values: SeededCreatorProfileValues
-) {
-  const [existingProfile] = await db
-    .select({ id: creatorProfiles.id })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
-    .limit(1);
-
-  if (existingProfile) {
-    await db
-      .update(creatorProfiles)
-      .set({ ...values, updatedAt: new Date() })
-      .where(eq(creatorProfiles.id, existingProfile.id));
-    return existingProfile.id;
-  }
-
-  try {
-    const [createdProfile] = await db
-      .insert(creatorProfiles)
-      .values(values)
-      .returning({ id: creatorProfiles.id });
-    return createdProfile.id;
-  } catch (error) {
-    if (!isDuplicateKeyError(error)) throw error;
-
-    const [racedProfile] = await db
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
-      .limit(1);
-
-    if (!racedProfile) throw error;
-
-    await db
-      .update(creatorProfiles)
-      .set({ ...values, updatedAt: new Date() })
-      .where(eq(creatorProfiles.id, racedProfile.id));
-
-    return racedProfile.id;
-  }
-}
-
-async function ensureSocialLink(
-  db: ReturnType<typeof drizzle>,
-  values: SeededSocialLinkValues
-) {
-  const [existingLink] = await db
-    .select({ id: socialLinks.id })
-    .from(socialLinks)
-    .where(
-      and(
-        eq(socialLinks.creatorProfileId, values.creatorProfileId),
-        eq(socialLinks.platform, values.platform)
-      )
-    )
-    .limit(1);
-
-  if (existingLink) {
-    await db
-      .update(socialLinks)
-      .set({ ...values, updatedAt: new Date() })
-      .where(eq(socialLinks.id, existingLink.id));
-    return;
-  }
-
-  try {
-    await db.insert(socialLinks).values(values);
-  } catch (error) {
-    if (!isDuplicateKeyError(error)) throw error;
-
-    const [racedLink] = await db
-      .select({ id: socialLinks.id })
-      .from(socialLinks)
-      .where(
-        and(
-          eq(socialLinks.creatorProfileId, values.creatorProfileId),
-          eq(socialLinks.platform, values.platform)
-        )
-      )
-      .limit(1);
-
-    if (!racedLink) throw error;
-
-    await db
-      .update(socialLinks)
-      .set({ ...values, updatedAt: new Date() })
-      .where(eq(socialLinks.id, racedLink.id));
-  }
+  return isAllowlistedTestAccountEmail(email);
 }
 
 /** Track template for seeding */
@@ -1189,7 +861,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
             usernameNormalized: E2E_USERNAME.toLowerCase(),
             displayName: 'E2E Test User',
             bio: 'Automated test user',
-            avatarUrl: E2E_TEST_AVATAR_URL,
+            avatarUrl: DEFAULT_TEST_AVATAR_URL,
             spotifyUrl: null,
             appleMusicUrl: null,
             appleMusicId: null,

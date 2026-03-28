@@ -178,21 +178,38 @@ doppler run -p jovie-web -c dev -- pnpm --filter web screenshots:seed
 
 Screenshots are saved to `apps/web/public/product-screenshots/` and used by homepage components (`ReleasesSection`, `PhoneProfileDemo`, `AudienceCRMSection`).
 
-### Creating Test Users via Clerk API
+### Local Browse Auth Bootstrap
 
-If the test user doesn't exist, the `browse-auth.ts` script creates one automatically:
+Local `/browse` and `/qa` runs should use the app's dev auth bootstrap, not manual Clerk login.
+
+Start the local browse-compatible server:
 
 ```bash
-# Authenticate headless browser for /browse QA
-doppler run -p jovie-web -c dev -- bun run scripts/browse-auth.ts [email]
+doppler run -- pnpm --filter web dev:local:browse
 ```
 
-Default email: `browse+clerk_test@jov.ie`. The script:
-1. Checks if user exists via Clerk Admin API
-2. Creates user if missing
-3. Gets a testing token
-4. Signs in via email + OTP `424242`
-5. Exports cookies to `/tmp/browse-clerk-cookies.json`
+Then authenticate the browse session with one route hit:
+
+```text
+/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings
+```
+
+Notes:
+1. `creator` is the default browse persona and is the normal choice for dashboard QA.
+2. `admin` is opt-in:
+   `/api/dev/test-auth/enter?persona=admin&redirect=/app/admin`
+3. This flow sets the bypass cookies directly and works without `NEXT_PUBLIC_E2E_MODE=1`.
+4. It auto-provisions the local browse persona if it is missing.
+
+### Fallback Helper For Non-Loopback Hosts
+
+If you need cookie export for staging or another non-loopback host, use:
+
+```bash
+doppler run -- pnpm tsx scripts/browse-auth.ts --base-url https://staging.jov.ie --persona creator
+```
+
+The helper now prefers the local dev auth route on loopback/private hosts and only uses the Clerk testing-token flow as fallback on non-loopback hosts.
 
 ### Common Auth Failures
 
@@ -204,7 +221,9 @@ Default email: `browse+clerk_test@jov.ie`. The script:
 | `audience-crm.png` missing | Auth guard skipped `audience.spec.ts` | Same as above — fix the auth guard |
 | `CLERK_SETUP_FAILED` | Real Clerk keys not in env | Run via Doppler, not bare `pnpm` |
 | `Failed to load Clerk JS` on localhost | Clerk proxy forces HTTPS, localhost has no SSL | The app now auto-disables the Clerk proxy on insecure local/private HTTP origins. If you are reusing an already-running dev server, restart it so the new runtime path is active. You can still force the old behavior with `NEXT_PUBLIC_CLERK_PROXY_DISABLED=1` when needed for test pipelines. |
-| OTP input not visible | Testing token not set before navigation | Check `setupClerkTestingToken()` runs in `auth.setup.ts` |
+| Local `/browse` still looks signed out | Dev server was not started in browse mode | Restart with `doppler run -- pnpm --filter web dev:local:browse` |
+| Local `/browse` hits `/signin` | Dev auth bootstrap route was not used | Open `/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings` first |
+| OTP input not visible | Testing token not set before navigation | Only relevant for non-loopback fallback; check `setupClerkTestingToken()` runs in `auth.setup.ts` |
 | `Couldn't find your account` on staging | Staging uses live Clerk instance, test user is in test instance | Always run screenshots against localhost (dev server), not staging |
 
 ## Troubleshooting

@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { DEV_TEST_AUTH_COOKIE_NAMES } from '@/lib/auth/dev-test-auth.server';
 
 export const runtime = 'nodejs';
 
@@ -22,6 +23,7 @@ const APP_COOKIES = new Set([
   'jovie_impersonate',
   'jovie_dsp',
   '__investor_token',
+  ...DEV_TEST_AUTH_COOKIE_NAMES,
 ]);
 
 /** Cookies to preserve (gates toolbar visibility in production) */
