@@ -9,6 +9,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Screenshot CI workflow now reuses a single PR instead of creating a new one each run, preventing stale screenshot PRs from piling up
 - Sitemap crash on Vercel: blog directory missing causes ENOENT, now returns empty list gracefully
 - Middleware redirect loop on `/monitoring` (Sentry tunnel): excluded from proxy matcher so Sentry events flow without hitting auth logic
 - Chat metadata crash: `generateMetadata` threw "User not found" when Clerk user had no DB record yet, now falls back to default titles
