@@ -1,10 +1,20 @@
 /**
+ * Next.js redirect errors use a semicolon-delimited digest string
+ * starting with this prefix. This avoids importing internal Next.js
+ * modules that break across versions.
+ */
+const NEXT_REDIRECT_DIGEST_PREFIX = 'NEXT_REDIRECT;';
+
+/**
  * Checks if an error is a Next.js redirect error.
- * These are thrown when using redirect() in server components
- * and should be re-thrown to work properly.
+ * Detects via the digest prefix format used by Next.js redirect().
  */
 export function isRedirectError(error: unknown): boolean {
-  return error instanceof Error && error.message === 'NEXT_REDIRECT';
+  if (!error || typeof error !== 'object') return false;
+  const digest = (error as { digest?: unknown }).digest;
+  return (
+    typeof digest === 'string' && digest.startsWith(NEXT_REDIRECT_DIGEST_PREFIX)
+  );
 }
 
 /**

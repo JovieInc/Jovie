@@ -105,6 +105,8 @@ export interface ReleaseViewModel {
   totalDurationMs?: number | null;
   primaryIsrc?: string | null;
   genres?: string[];
+  /** Per-release target playlists for pitch generation */
+  targetPlaylists?: string[];
   /** ℗ phonographic copyright line */
   copyrightLine?: string | null;
   /** © copyright / distributor line */

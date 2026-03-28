@@ -1,84 +1,43 @@
 import * as Sentry from '@sentry/nextjs';
-import { cookies, headers } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
+import { headers } from 'next/headers';
+import { redirect, unstable_rethrow } from 'next/navigation';
+import { Suspense } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
-import { OperatorBanner } from '@/features/admin/OperatorBanner';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
-import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';
-import type { FeatureFlagsBootstrap } from '@/lib/feature-flags/shared';
-import { HydrateClient } from '@/lib/queries';
-import { getDehydratedState } from '@/lib/queries/server';
-import { getDashboardData, setSidebarCollapsed } from './dashboard/actions';
-import { DashboardDataProvider } from './dashboard/DashboardDataContext';
-import { ProfileCompletionRedirect } from './ProfileCompletionRedirect';
+import { DashboardShellContent } from './DashboardShellContent';
+import { DashboardShellSkeleton } from './DashboardShellSkeleton';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-const EMPTY_FEATURE_FLAGS_BOOTSTRAP: FeatureFlagsBootstrap = { gates: {} };
 
 export default async function AppShellLayout({
   children,
 }: {
   readonly children: React.ReactNode;
 }) {
-  const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
-
   try {
-    // Get auth first (fast — reads from request headers, cached via React cache()).
-    // This lets us start feature flags in parallel with dashboard data,
-    // rather than waiting for the entire Promise.all to complete before starting flags.
+    // Auth check is fast — reads JWT from request headers, cached via React cache().
+    // Must run before Suspense so unauthenticated users redirect immediately
+    // instead of seeing a dashboard skeleton flash.
     const auth = await getCachedAuth();
-    // Defense in depth: the proxy should already block signed-out app access,
-    // but the shell must not render protected UI if auth resolution disagrees.
     if (!auth.userId) {
       const headerStore = await headers();
       redirect(buildAppShellSignInUrl(headerStore));
     }
 
-    // Parallelize dashboard data and feature flags.
-    // getDashboardData internally calls getCachedAuth() which is deduplicated.
-    // Feature flags now run in parallel instead of waiting for dashboard data.
-    const [dashboardData, featureFlagsBootstrap] = await Promise.all([
-      getDashboardData(),
-      isE2EClientRuntime
-        ? Promise.resolve(EMPTY_FEATURE_FLAGS_BOOTSTRAP)
-        : getFeatureFlagsBootstrap(auth.userId ?? null),
-    ]);
-
-    // Read sidebar cookie server-side so SSR matches client state (no flash)
-    const cookieStore = await cookies();
-    const sidebarCookie = cookieStore.get('sidebar:state');
-    const sidebarDefaultOpen = sidebarCookie?.value !== 'false';
-
+    // Stream the shell: the skeleton renders at first byte while
+    // DashboardShellContent resolves dashboard data + feature flags.
     return (
-      <HydrateClient state={getDehydratedState()}>
-        {/* ENG-004: Show environment issues to admins in non-production */}
-        <OperatorBanner isAdmin={dashboardData.isAdmin} />
-        <ImpersonationBannerWrapper />
-        <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
-          <DashboardDataProvider value={dashboardData}>
-            <ProfileCompletionRedirect />
-            <AuthShellWrapper
-              persistSidebarCollapsed={setSidebarCollapsed}
-              sidebarDefaultOpen={sidebarDefaultOpen}
-              previewPanelDefaultOpen
-            >
-              {children}
-            </AuthShellWrapper>
-          </DashboardDataProvider>
-        </FeatureFlagsProvider>
-      </HydrateClient>
+      <Suspense fallback={<DashboardShellSkeleton />}>
+        <DashboardShellContent userId={auth.userId}>
+          {children}
+        </DashboardShellContent>
+      </Suspense>
     );
   } catch (error) {
-    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
-      throw error;
-    }
+    unstable_rethrow(error);
 
     Sentry.captureException(error);
 

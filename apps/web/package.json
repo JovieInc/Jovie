@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.4.84",
+  "version": "26.4.88",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "NODE_OPTIONS=--max-old-space-size=8192 doppler run -- next dev",
     "dev:local": "next dev",
+    "dev:local:browse": "E2E_USE_TEST_AUTH_BYPASS=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 next dev",
     "dev:local:playwright": "next dev --webpack",
     "validate-env": "tsx scripts/validate-env.ts",
     "build": "NODE_OPTIONS=--max-old-space-size=8192 NEXT_IGNORE_TYPECHECK=1 next build --turbopack",
@@ -178,7 +179,6 @@
     "server-only": "^0.0.1",
     "sharp": "^0.34.5",
     "sonner": "^2.0.7",
-    "statsig-node": "^6.5.1",
     "streamdown": "^2.5.0",
     "stripe": "^20.4.1",
     "svix": "^1.89.0",

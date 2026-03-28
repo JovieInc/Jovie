@@ -103,6 +103,10 @@ vi.mock('@/lib/queries', () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
+  useSaveReleaseTargetPlaylistsMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
   useFormatReleaseLyricsMutation: () => ({
     mutateAsync: vi.fn(),
     isPending: false,
@@ -600,7 +604,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getByRole('button', { name: 'Create a new release' })
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
       );
 
       await waitFor(() => {
@@ -635,7 +639,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getByRole('button', { name: 'Create a new release' })
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
       );
 
       await waitFor(() => {
@@ -672,7 +676,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getByRole('button', { name: 'Create a new release' })
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
       );
 
       await waitFor(() => {

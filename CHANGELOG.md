@@ -5,18 +5,101 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.88] - 2026-03-28
+
+### Added
+
+- Tab overflow mechanism with collapse-to-dropdown behavior for drawer tabs, keeping all tabs accessible when space is constrained
+- `DashboardWorkspacePanel` shared wrapper component with toolbar slot for consistent page body structure across all 5 dashboard routes
+- `distribution` prop on TabBar and DrawerTabs to support fill-width tab distribution
+- Visual flag badge system: flagged UI regions show dashed outlines + clickable name chips when dev toolbar is active (Cmd+Shift+F to toggle)
+- `<Flagged>` wrapper component for marking feature-flagged UI regions
+- Flag badge toggle button in dev toolbar bottom bar
+
+### Changed
+
+- Converged all 5 core dashboard surfaces (Releases, Audience, Presence, Earnings, Chat/Profile) toward Linear visual parity
+- Unified right drawer structure across all sidebars: entity card first, no duplicate title rows, consistent elevation tokens (`LINEAR_SURFACE`)
+- Presence route now uses the shared global right drawer instead of a bespoke inline side panel
+- Earnings route uses toolbar pattern instead of bespoke hero/header chrome
+- Sidebar nav states driven by design tokens instead of opacity modifiers (`/78`, `/92` removed)
+- App shell and sidebar extended to bottom edge of viewport, eliminating dead space
+- Drawer tabs fill available width where appropriate instead of undersized intrinsic pills
+- All 16 Statsig gates consolidated into `FEATURE_FLAGS` as code-level booleans, toggleable via dev toolbar
+- `useFeatureGate` replaced with `useCodeFlag` across all consumers
+- `FeatureFlagsProvider` no longer requires server-side bootstrap prop
+- DevToolbar unified flag list shows all flags as "code" source (no more statsig/code split)
+
+### Fixed
+
+- Release enrichment jobs for Deezer were silently failing because the payload schema only accepted `apple_music`, causing Deezer links to never populate after DSP artist discovery
+- Per-release refresh button now triggers DSP artist discovery (Apple Music, Deezer, MusicBrainz) alongside MusicFetch enrichment, matching the full sync behavior
+- Admin bulk creator refresh now enqueues DSP artist discovery jobs in addition to MusicFetch enrichment
+- ISRC rescan now enriches both Apple Music and Deezer releases (previously Apple Music only)
+- Added error handling for Deezer ISRC batch lookups to prevent circuit breaker errors from killing the entire enrichment job
+- Duplicate drawer title rows above entity cards in all sidebars
+- Profile identity in Chat drawer now comes from entity card, not a generic header row
+- Audience sidebar layout aligned with release/profile drawer pattern
+- Sidebar visibility broken by Tailwind v4 cascade changes
+- Hidden/responsive display patterns swept for Tailwind v4 compatibility
+- DevToolbar spacing uses CSS variable instead of body padding
+- Earnings page missing `sr-only` H1 for accessibility
+- Bottom gap padding removed from earnings page body
+- Unused import in ReleaseTableSubheader test cleaned up
+
+### Removed
+
+- `statsig-node` dependency and all Statsig server SDK integration
+- `lib/feature-flags/server.ts` (Statsig init, gate evaluation, bootstrap)
+- `lib/feature-flags/stripe-connect.ts` (domain-specific Statsig wrapper)
+- Server-side feature flag bootstrap in shell, auth, and onboarding layouts
+
+## [26.4.87] - 2026-03-27
+
+### Added
+
+- Per-release target playlists field in the release sidebar, allowing artists to set playlist targets per release instead of only at the profile level
+- New `target_playlists` column on `discog_releases` table (additive migration, no data loss)
+- Pitch generation now prefers release-level target playlists over profile-level defaults
+
+### Changed
+
+- Artist settings "Target playlists" label updated to "Default target playlists" with copy explaining per-release override
+- Shared `targetPlaylistsSchema` validation extracted for reuse across profile and release actions
+
+### Fixed
+
+- Release target playlists component resets properly when switching between releases (key-based remount)
+- Error toast displayed when saving target playlists fails (previously swallowed)
+
 ## [26.4.86] - 2026-03-28
 
 ### Added
 
 - Welcome message now prompts new artists to share career highlights when the field is empty, improving pitch quality from the first interaction
 - Golden path E2E test suite covering post-onboarding flows: welcome message, core pages, settings persistence, and chat send/receive
+- Performance budget for `/app` dashboard page [internal]
+- Suspense streaming shell: skeleton renders at first byte while dashboard data resolves
+- `getDashboardDataEssential()` fast-path fetch for future use (not yet wired into the shell provider) [internal]
+- `fetchDashboardBaseWithSession()` shared helper eliminates duplication between full and essential data fetches [internal]
+- Pre-warm request in performance budget guard for consistent warm-cache measurements [internal]
+- `data-testid="chat-content"` marker on JovieChat for skeleton-to-content measurement [internal]
 
 ### Changed
 
 - Rename "Pitch Context" to "Career Highlights" across the entire stack: database column, API, validation, settings UI, pitch service, and all type interfaces
 - Extract `buildWelcomeMessage` to its own module (`lib/services/onboarding/welcome-message.ts`) for testability
 - Settings description updated to explain how career highlights improve pitches and recommendations
+- Dashboard shell layout uses Suspense boundary with streaming fallback instead of blocking on full data fetch
+- Code-split `ProfileContactSidebar` via `next/dynamic` (sidebar panel, not critical path) [internal]
+- `generateMetadata()` on `/app` reuses deduplicated dashboard data instead of a separate DB call [internal]
+- Feature flag bootstrap hardened with `.catch()` fallback to prevent shell crash on transient failures [internal]
+- Separate resource budgets per page type [internal]
+- Performance budget guard skeleton-to-content measurement uses `chat-content` testid [internal]
+
+### Fixed
+
+- Extracted nested ternary in `DashboardShellSkeleton` to lookup table [internal]
 
 ## [26.4.85] - 2026-03-27
 

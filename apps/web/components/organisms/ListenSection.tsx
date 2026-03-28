@@ -7,8 +7,7 @@ import { track } from '@/lib/analytics';
 import { getDSPDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
 import { type AvailableDSP, sortDSPsForDevice } from '@/lib/dsp';
 import { captureError } from '@/lib/error-tracking';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { useCodeFlag } from '@/lib/feature-flags/client';
 import { detectPlatformFromUA } from '@/lib/utils';
 
 export interface ListenSectionProps {
@@ -46,10 +45,7 @@ export function ListenSection({
   enableDeepLinks = true,
   enableTracking = true,
 }: Readonly<ListenSectionProps>) {
-  const enableDevicePriority = useFeatureGate(
-    FEATURE_FLAG_KEYS.IOS_APPLE_MUSIC_PRIORITY,
-    false
-  );
+  const enableDevicePriority = useCodeFlag('IOS_APPLE_MUSIC_PRIORITY');
 
   useEffect(() => {
     // Auto open preferred URL if provided

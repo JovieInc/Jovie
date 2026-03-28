@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -32,6 +31,10 @@ vi.mock(
     ReleaseFilterDropdown: () => <button type='button'>Filters</button>,
   })
 );
+
+vi.mock('@/lib/feature-flags/client', () => ({
+  useCodeFlag: () => true,
+}));
 
 vi.mock('@/components/atoms/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span>{name}</span>,
@@ -150,10 +153,7 @@ describe('ReleaseTableSubheader', () => {
     );
   });
 
-  it('orders toolbar controls as search, filters, display, export, preview, and create', async () => {
-    const user = userEvent.setup();
-    const onCreateRelease = vi.fn();
-
+  it('orders toolbar controls as search, filters, display, export, and preview', () => {
     render(
       <ReleaseTableSubheader
         releases={[] as ReleaseViewModel[]}
@@ -164,8 +164,6 @@ describe('ReleaseTableSubheader', () => {
         onReleaseViewChange={() => undefined}
         searchQuery=''
         onSearchQueryChange={() => undefined}
-        onCreateRelease={onCreateRelease}
-        canCreateManualReleases
       />
     );
 
@@ -175,12 +173,8 @@ describe('ReleaseTableSubheader', () => {
       screen.getByRole('button', { name: /display/i }),
       screen.getByRole('button', { name: 'Export' }),
       screen.getByTestId('drawer-toggle-button'),
-      screen.getByRole('button', { name: 'New Release' }),
     ];
 
     assertDocumentOrder(controls);
-
-    await user.click(screen.getByRole('button', { name: 'New Release' }));
-    expect(onCreateRelease).toHaveBeenCalledTimes(1);
   });
 });

@@ -10,7 +10,7 @@ import {
 } from '@/lib/images/config';
 import { cn } from '@/lib/utils';
 
-type EditingField = 'displayName' | 'username' | null;
+type EditingField = 'displayName' | null;
 
 export interface ProfileContactHeaderProps {
   readonly displayName: string;
@@ -24,6 +24,10 @@ export interface ProfileContactHeaderProps {
   readonly onUsernameChange?: (value: string) => void;
   /** Called when avatar file is selected */
   readonly onAvatarUpload?: (file: File) => Promise<string>;
+  /** Total number of releases for metadata display */
+  readonly releaseCount?: number;
+  /** Total number of links for metadata display */
+  readonly linkCount?: number;
 }
 
 export function ProfileContactHeader({
@@ -34,12 +38,12 @@ export function ProfileContactHeader({
   onDisplayNameChange,
   onUsernameChange,
   onAvatarUpload,
+  releaseCount,
+  linkCount,
 }: ProfileContactHeaderProps) {
   const [editingField, setEditingField] = useState<EditingField>(null);
   const [localDisplayName, setLocalDisplayName] = useState(displayName);
-  const [localUsername, setLocalUsername] = useState(username);
   const displayNameRef = useRef<HTMLInputElement | null>(null);
-  const usernameRef = useRef<HTMLInputElement | null>(null);
 
   // Sync local state when props change (e.g. from chat edit)
   useEffect(() => {
@@ -48,21 +52,11 @@ export function ProfileContactHeader({
     }
   }, [displayName, editingField]);
 
-  useEffect(() => {
-    if (editingField !== 'username') {
-      setLocalUsername(username);
-    }
-  }, [username, editingField]);
-
   // Focus input when entering edit mode
   useEffect(() => {
     if (editingField === 'displayName') {
       displayNameRef.current?.focus();
       displayNameRef.current?.select();
-    }
-    if (editingField === 'username') {
-      usernameRef.current?.focus();
-      usernameRef.current?.select();
     }
   }, [editingField]);
 
@@ -91,32 +85,17 @@ export function ProfileContactHeader({
     setEditingField(null);
   }, [localDisplayName, displayName, onDisplayNameChange]);
 
-  const handleUsernameKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        const trimmed = localUsername.trim();
-        if (trimmed) {
-          onUsernameChange?.(trimmed);
-        }
-        setEditingField(null);
-      }
-      if (e.key === 'Escape') {
-        setLocalUsername(username);
-        setEditingField(null);
-      }
-    },
-    [localUsername, username, onUsernameChange]
-  );
-
-  const handleUsernameBlur = useCallback(() => {
-    const trimmed = localUsername.trim();
-    if (trimmed && trimmed !== username) {
-      onUsernameChange?.(trimmed);
-    }
-    setEditingField(null);
-  }, [localUsername, username, onUsernameChange]);
-
   const avatarAlt = displayName ? `${displayName} avatar` : 'Profile avatar';
+
+  const metaParts: string[] = [];
+  if (releaseCount != null && releaseCount > 0) {
+    metaParts.push(
+      `${releaseCount} ${releaseCount === 1 ? 'release' : 'releases'}`
+    );
+  }
+  if (linkCount != null && linkCount > 0) {
+    metaParts.push(`${linkCount} ${linkCount === 1 ? 'link' : 'links'}`);
+  }
 
   return (
     <div className='flex items-start gap-2.5'>
@@ -140,18 +119,15 @@ export function ProfileContactHeader({
           onStartEdit={() => setEditingField('displayName')}
         />
 
-        <div className='flex flex-wrap items-center gap-2'>
-          <EditableUsername
-            editable={editable && Boolean(onUsernameChange)}
-            isEditing={editingField === 'username'}
-            inputRef={usernameRef}
-            value={localUsername}
-            onChange={setLocalUsername}
-            onKeyDown={handleUsernameKeyDown}
-            onBlur={handleUsernameBlur}
-            onStartEdit={() => setEditingField('username')}
-          />
+        <div className='truncate text-[11px] leading-[14px] tracking-[-0.005em] text-secondary-token'>
+          @{username || 'username'}
         </div>
+
+        {metaParts.length > 0 && (
+          <p className='text-[10.5px] leading-[14px] tracking-[0.01em] text-tertiary-token'>
+            {metaParts.join(' · ')}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -176,7 +152,8 @@ function ProfileAvatar({
         src={avatarUrl}
         alt={avatarAlt}
         name={displayName}
-        size='md'
+        size='2xl'
+        rounded='md'
         uploadable
         onUpload={onAvatarUpload}
         onError={message => {
@@ -194,7 +171,8 @@ function ProfileAvatar({
       src={avatarUrl}
       alt={avatarAlt}
       name={displayName}
-      size='lg'
+      size='2xl'
+      rounded='md'
     />
   );
 }
@@ -246,62 +224,6 @@ function EditableDisplayName({
       aria-label={editable ? 'Click to edit display name' : undefined}
     >
       {value || 'Add display name'}
-    </button>
-  );
-}
-
-function EditableUsername({
-  editable,
-  isEditing,
-  inputRef,
-  value,
-  onChange,
-  onKeyDown,
-  onBlur,
-  onStartEdit,
-}: {
-  readonly editable: boolean;
-  readonly isEditing: boolean;
-  readonly inputRef: React.RefObject<HTMLInputElement | null>;
-  readonly value: string;
-  readonly onChange: (value: string) => void;
-  readonly onKeyDown: (e: React.KeyboardEvent) => void;
-  readonly onBlur: () => void;
-  readonly onStartEdit: () => void;
-}) {
-  if (editable && isEditing) {
-    return (
-      <Input
-        ref={inputRef}
-        type='text'
-        aria-label='Username'
-        data-1p-ignore
-        autoComplete='off'
-        value={value}
-        onChange={e => {
-          const raw = e.target.value;
-          onChange(raw.startsWith('@') ? raw.slice(1) : raw);
-        }}
-        onKeyDown={onKeyDown}
-        onBlur={onBlur}
-        className='h-7 rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[11px]'
-      />
-    );
-  }
-
-  return (
-    <button
-      type='button'
-      className={cn(
-        'inline-flex max-w-full items-center truncate rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[11px] font-[510] text-secondary-token',
-        editable &&
-          'transition-colors hover:border-default hover:bg-surface-1 hover:text-primary-token cursor-text'
-      )}
-      onClick={editable ? onStartEdit : undefined}
-      disabled={!editable}
-      aria-label={editable ? 'Click to edit username' : undefined}
-    >
-      @{value || 'username'}
     </button>
   );
 }

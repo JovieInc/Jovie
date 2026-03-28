@@ -123,7 +123,7 @@ export function ProgressIndicator({
                   {step.title}
                 </div>
                 {step.description && isCurrent && (
-                  <div className='hidden sm:block text-xs text-tertiary-token mt-1 max-w-20 leading-tight'>
+                  <div className='max-sm:hidden text-xs text-tertiary-token mt-1 max-w-20 leading-tight'>
                     {step.description}
                   </div>
                 )}

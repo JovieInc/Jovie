@@ -1,28 +1,29 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
+  type PreviewPanelData,
   type PreviewPanelLink,
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import {
-  DrawerCardActionBar,
+  DrawerMediaThumb,
+  DrawerSurfaceCard,
   DrawerTabs,
+  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { BASE_URL } from '@/constants/domains';
-import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
-  useAvatarMutation,
   useDeletePressPhotoMutation,
   usePressPhotosQuery,
   usePressPhotoUploadMutation,
@@ -32,9 +33,8 @@ import {
 import { cn } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { ProfileAboutTab } from './ProfileAboutTab';
-import { ProfileAnalyticsSummary } from './ProfileAnalyticsSummary';
-import { ProfileContactHeader } from './ProfileContactHeader';
 import { type CategoryOption, ProfileLinkList } from './ProfileLinkList';
+import { ProfileSmartLinkAnalytics } from './ProfileSmartLinkAnalytics';
 import { SidebarLinkInput } from './SidebarLinkInput';
 
 /** Map a platform's category to a sidebar tab, returning null if no switch is needed. */
@@ -93,6 +93,77 @@ async function confirmLinkOnServer(
   return linkId;
 }
 
+function ProfileEntityHeader({
+  previewData,
+  onClose,
+  overflowActions,
+}: Readonly<{
+  previewData: PreviewPanelData;
+  onClose: () => void;
+  overflowActions: ReturnType<typeof useProfileHeaderParts>['overflowActions'];
+}>) {
+  const primaryLabel =
+    previewData.displayName?.trim() || `@${previewData.username}`;
+  const secondaryLabel =
+    previewData.displayName?.trim() &&
+    previewData.displayName !== previewData.username
+      ? `@${previewData.username}`
+      : previewData.profilePath;
+  const detailChips = [
+    previewData.location?.trim() || null,
+    `${previewData.links.length} link${previewData.links.length === 1 ? '' : 's'}`,
+  ].filter(Boolean);
+  const fallbackLabel = primaryLabel.replace(/^@/, '').charAt(0).toUpperCase();
+
+  return (
+    <DrawerSurfaceCard
+      className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
+      testId='profile-contact-header-card'
+    >
+      <div className='relative p-3.5'>
+        <div className='absolute right-2.5 top-2.5'>
+          <DrawerHeaderActions
+            primaryActions={[
+              {
+                id: 'close-profile-contact',
+                label: 'Close profile details',
+                icon: X,
+                onClick: onClose,
+              },
+            ]}
+            overflowActions={overflowActions}
+          />
+        </div>
+        <EntityHeaderCard
+          title={primaryLabel}
+          subtitle={secondaryLabel}
+          meta={
+            <div className='mt-1 flex flex-wrap items-center gap-2 text-[11px] text-tertiary-token'>
+              {detailChips.map(detail => (
+                <span key={detail}>{detail}</span>
+              ))}
+            </div>
+          }
+          image={
+            <DrawerMediaThumb
+              src={previewData.avatarUrl}
+              alt={primaryLabel}
+              sizeClassName='h-[60px] w-[60px] rounded-[14px]'
+              sizes='60px'
+              fallback={
+                <span className='text-[18px] font-[590] text-secondary-token'>
+                  {fallbackLabel}
+                </span>
+              }
+            />
+          }
+          className='pr-8'
+        />
+      </div>
+    </DrawerSurfaceCard>
+  );
+}
+
 export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
@@ -109,7 +180,6 @@ export function ProfileContactSidebar() {
 
   // Mutations for profile editing
   const profileMutation = useProfileSaveMutation();
-  const avatarMutation = useAvatarMutation();
   const pressPhotoUploadMutation = usePressPhotoUploadMutation(
     selectedProfile?.id
   );
@@ -147,53 +217,6 @@ export function ProfileContactSidebar() {
 
   const supportsAddAction = LINK_ACTION_CATEGORIES.has(
     resolvedCategory as CategoryOption
-  );
-
-  // Handle display name change — save to server and instantly update sidebar
-  const handleDisplayNameChange = useCallback(
-    (value: string) => {
-      if (!selectedProfile || !previewData) return;
-
-      // Instantly update sidebar
-      setPreviewData({
-        ...previewData,
-        displayName: value,
-      });
-
-      // Save to server
-      profileMutation.mutate(
-        { updates: { displayName: value } },
-        {
-          onError: () => {
-            // Revert on failure
-            setPreviewData({
-              ...previewData,
-              displayName: previewData.displayName,
-            });
-          },
-        }
-      );
-    },
-    [selectedProfile, previewData, setPreviewData, profileMutation]
-  );
-
-  // Handle avatar upload — save to server and instantly update sidebar
-  const handleAvatarUpload = useCallback(
-    async (file: File): Promise<string> => {
-      const url = await avatarMutation.mutateAsync(file);
-
-      // Instantly update sidebar
-      if (previewData) {
-        setPreviewData({
-          ...previewData,
-          avatarUrl: url,
-        });
-      }
-
-      toast.success('Profile photo updated');
-      return url;
-    },
-    [avatarMutation, previewData, setPreviewData]
   );
 
   const handlePressPhotoUpload = useCallback(
@@ -473,24 +496,12 @@ export function ProfileContactSidebar() {
   );
 
   // Header parts hook needs to be called unconditionally
-  const {
-    title: headerTitle,
-    primaryActions,
-    overflowActions,
-  } = useProfileHeaderParts({
+  const { overflowActions } = useProfileHeaderParts({
     username: previewData?.username ?? '',
     displayName: previewData?.displayName ?? '',
     profilePath: previewData?.profilePath ?? '',
     onClose: close,
   });
-
-  const closeOnlyHeaderActions = (
-    <DrawerHeaderActions
-      primaryActions={[]}
-      overflowActions={[]}
-      onClose={close}
-    />
-  );
 
   // Show skeleton sidebar until preview data loads (prevents CLS)
   if (!previewData) {
@@ -498,56 +509,46 @@ export function ProfileContactSidebar() {
       <EntitySidebarShell
         isOpen={isOpen}
         ariaLabel='Profile Contact'
-        title={<div className='h-4 w-24 rounded skeleton' />}
-        onClose={close}
         headerMode='minimal'
-        headerActions={closeOnlyHeaderActions}
-        entityHeader={
-          <div className='space-y-3'>
-            <div
-              className={cn(
-                LINEAR_SURFACE.sidebarCard,
-                'flex items-center gap-3 px-3.5 py-3'
-              )}
-            >
-              <div className='h-10 w-10 rounded-full skeleton' />
-              <div className='space-y-1.5'>
-                <div className='h-4 w-24 rounded skeleton' />
-                <div className='h-3 w-16 rounded skeleton' />
+        hideMinimalHeaderBar
+      >
+        <div className='flex min-h-full flex-col gap-2.5 pt-0.5'>
+          <div className={cn(LINEAR_SURFACE.sidebarCard, 'space-y-2.5 p-3')}>
+            <div className='grid grid-cols-2 gap-3'>
+              <div className='space-y-1'>
+                <div className='h-[9px] w-12 rounded skeleton' />
+                <div className='h-4 w-8 rounded skeleton' />
+              </div>
+              <div className='space-y-1'>
+                <div className='h-[9px] w-12 rounded skeleton' />
+                <div className='h-4 w-8 rounded skeleton' />
               </div>
             </div>
-            <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-2.5')}>
-              <div className='h-16 rounded-[8px] skeleton' />
-              <div className='h-10 rounded-[8px] skeleton' />
-            </div>
+            <div className='h-8 rounded-full skeleton' />
           </div>
-        }
-        tabs={
           <div className='flex items-center gap-1'>
-            <div className='h-9 flex-1 rounded-[8px] skeleton' />
-            <div className='h-[26px] w-[26px] rounded-[8px] skeleton' />
+            <div className='h-7 w-14 rounded-full skeleton' />
+            <div className='h-7 w-14 rounded-full skeleton' />
+            <div className='h-7 w-12 rounded-full skeleton' />
+            <div className='h-7 w-14 rounded-full skeleton' />
           </div>
-        }
-      >
-        <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-2')}>
-          {[1, 2, 3, 4, 5].map(i => (
-            <div
-              key={i}
-              className='flex items-center gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'
-            >
-              <div className='h-8 w-8 shrink-0 rounded-[8px] skeleton' />
-              <div className='flex-1 h-4 rounded skeleton' />
-            </div>
-          ))}
+          <div className={cn(LINEAR_SURFACE.drawerCardSm, 'space-y-2 p-2')}>
+            {[1, 2, 3, 4, 5].map(i => (
+              <div
+                key={i}
+                className='flex items-center gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'
+              >
+                <div className='h-8 w-8 shrink-0 rounded-[8px] skeleton' />
+                <div className='flex-1 h-4 rounded skeleton' />
+              </div>
+            ))}
+          </div>
         </div>
       </EntitySidebarShell>
     );
   }
 
   const {
-    username,
-    displayName,
-    avatarUrl,
     bio,
     genres,
     location,
@@ -568,48 +569,14 @@ export function ProfileContactSidebar() {
     <EntitySidebarShell
       isOpen={isOpen}
       ariaLabel='Profile Contact'
-      title={headerTitle}
       headerMode='minimal'
       hideMinimalHeaderBar
-      minimalTabsPlacement='header'
       entityHeader={
-        <div className='space-y-3'>
-          <div
-            className={cn(
-              LINEAR_SURFACE.sidebarCard,
-              'relative overflow-hidden px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
-            )}
-          >
-            <ProfileContactHeader
-              displayName={displayName}
-              username={username}
-              avatarUrl={avatarUrl}
-              editable
-              onDisplayNameChange={handleDisplayNameChange}
-              onAvatarUpload={handleAvatarUpload}
-            />
-            <DrawerCardActionBar
-              primaryActions={primaryActions}
-              overflowActions={overflowActions}
-              onClose={close}
-              overflowTriggerPlacement='card-top-right'
-              className='mx-[-14px] mt-3'
-            />
-          </div>
-
-          {/* Smart link URL */}
-          <div className='px-0.5'>
-            <CopyLinkInput
-              url={profileUrl}
-              size='md'
-              className='w-full'
-              inputClassName='h-7 rounded-full border-(--linear-app-frame-seam) bg-surface-0 px-3 py-1 text-[11px]'
-            />
-          </div>
-
-          {/* Analytics */}
-          <ProfileAnalyticsSummary />
-        </div>
+        <ProfileEntityHeader
+          previewData={previewData}
+          onClose={close}
+          overflowActions={overflowActions}
+        />
       }
       tabs={
         <DrawerTabs
@@ -632,54 +599,62 @@ export function ProfileContactSidebar() {
             ) : undefined
           }
           actionsClassName='h-[26px] w-[26px]'
+          overflowMode='scroll'
+          distribution='fill'
         />
       }
     >
-      {resolvedCategory === 'about' ? (
-        <ProfileAboutTab
-          bio={bio}
-          genres={genres}
-          location={location}
-          hometown={hometown}
-          activeSinceYear={activeSinceYear}
-          allowPhotoDownloads={allowPhotoDownloads}
-          pressPhotos={pressPhotos}
-          onBioChange={handleBioChange}
-          onLocationChange={handleLocationChange}
-          onHometownChange={handleHometownChange}
-          onGenresChange={handleGenresChange}
-          onPressPhotoUpload={handlePressPhotoUpload}
-          onPressPhotoDelete={handlePressPhotoDelete}
-        />
-      ) : (
-        <>
-          <ProfileLinkList
-            links={links}
-            selectedCategory={resolvedCategory as CategoryOption}
-            onAddLink={handleAddLink}
-            onRemoveLink={handleRemoveLink}
-            dspConnections={dspConnections}
-          />
+      <div className='flex min-h-full flex-col gap-2.5 pt-0.5'>
+        <ProfileSmartLinkAnalytics profileUrl={profileUrl} />
 
-          {isAddingLink && (
-            <div className='mt-2.5'>
-              <SidebarLinkInput
-                categoryFilter={
-                  resolvedCategory === 'social' ||
-                  resolvedCategory === 'dsp' ||
-                  resolvedCategory === 'earnings'
-                    ? resolvedCategory
-                    : 'social'
-                }
-                existingPlatforms={existingPlatformIds}
-                onAdd={handleSmartAddLink}
-                onCancel={() => setIsAddingLink(false)}
-                creatorName={previewData?.displayName}
+        <div className='min-h-0 flex-1'>
+          {resolvedCategory === 'about' ? (
+            <ProfileAboutTab
+              bio={bio}
+              genres={genres}
+              location={location}
+              hometown={hometown}
+              activeSinceYear={activeSinceYear}
+              allowPhotoDownloads={allowPhotoDownloads}
+              pressPhotos={pressPhotos}
+              onBioChange={handleBioChange}
+              onLocationChange={handleLocationChange}
+              onHometownChange={handleHometownChange}
+              onGenresChange={handleGenresChange}
+              onPressPhotoUpload={handlePressPhotoUpload}
+              onPressPhotoDelete={handlePressPhotoDelete}
+            />
+          ) : (
+            <>
+              <ProfileLinkList
+                links={links}
+                selectedCategory={resolvedCategory as CategoryOption}
+                onAddLink={handleAddLink}
+                onRemoveLink={handleRemoveLink}
+                dspConnections={dspConnections}
               />
-            </div>
+
+              {isAddingLink && (
+                <div className='mt-2.5'>
+                  <SidebarLinkInput
+                    categoryFilter={
+                      resolvedCategory === 'social' ||
+                      resolvedCategory === 'dsp' ||
+                      resolvedCategory === 'earnings'
+                        ? resolvedCategory
+                        : 'social'
+                    }
+                    existingPlatforms={existingPlatformIds}
+                    onAdd={handleSmartAddLink}
+                    onCancel={() => setIsAddingLink(false)}
+                    creatorName={previewData.displayName}
+                  />
+                </div>
+              )}
+            </>
           )}
-        </>
-      )}
+        </div>
+      </div>
     </EntitySidebarShell>
   );
 }

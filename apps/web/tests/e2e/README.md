@@ -95,16 +95,19 @@ Recommended checks:
 
 ### Signed-in app QA
 
-Use `/setup-browser-cookies` first, then reopen the app in `/browse`.
+Local signed-in QA should use the dev auth bootstrap route, not manual cookie import.
 
 Recommended flow:
 
-1. Sign in to Jovie in your normal browser.
-2. Run `/setup-browser-cookies`.
-3. Import the Jovie and Clerk-related domains into the browse session.
-4. Use `/browse` to verify `/app`, `/onboarding`, or other authenticated routes.
+1. Start the local browse server:
+   `doppler run -- pnpm --filter web dev:local:browse`
+2. In `/browse`, open:
+   `/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings`
+3. Use `persona=admin` only for admin flows:
+   `/api/dev/test-auth/enter?persona=admin&redirect=/app/admin`
+4. Verify `/app`, `/onboarding`, or other authenticated routes from that authenticated session.
 
-This is separate from the Playwright Clerk testing package. `/browse` uses your imported browser cookies, not Playwright's `tests/.auth/user.json`.
+Use `/setup-browser-cookies` only when you explicitly need to import a real human browser session. For non-loopback hosts, `scripts/browse-auth.ts` is the fallback helper for cookie export.
 
 ## Visual And Full-Suite Notes
 

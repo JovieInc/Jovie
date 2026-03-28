@@ -505,7 +505,7 @@ export function SpotifyConnectDialog({
             )}
 
             {shouldShowDropdown && (
-              <div className='absolute z-50 mt-1.5 w-full overflow-hidden rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[0_12px_24px_rgba(0,0,0,0.06)]'>
+              <div className='absolute z-50 mt-1.5 w-full overflow-hidden rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-popover'>
                 <select
                   id='spotify-connect-results'
                   className='sr-only'

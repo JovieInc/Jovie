@@ -6,6 +6,7 @@ import {
   useUser as useUserOriginal,
 } from '@clerk/nextjs';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
+import type { ClientAuthBootstrap } from '@/lib/auth/dev-test-auth-types';
 
 // Derive types from the actual hook return types
 type UseUserReturn = ReturnType<typeof useUserOriginal>;
@@ -50,6 +51,125 @@ const DEFAULT_SESSION_RETURN: UseSessionReturn = {
   isSignedIn: false,
   session: null,
 };
+
+function splitFullName(fullName: string) {
+  const [firstName = fullName, ...rest] = fullName.trim().split(/\s+/);
+  return {
+    firstName,
+    lastName: rest.join(' ').trim() || null,
+  };
+}
+
+function createBootstrapUserReturn(
+  bootstrap: ClientAuthBootstrap
+): UseUserReturn {
+  const { firstName, lastName } = splitFullName(bootstrap.fullName);
+
+  const user = {
+    id: bootstrap.userId,
+    username: bootstrap.username,
+    firstName,
+    lastName,
+    fullName: bootstrap.fullName,
+    imageUrl: '/avatars/default-user.png',
+    primaryEmailAddress: {
+      emailAddress: bootstrap.email,
+      verification: {
+        status: 'verified',
+      },
+    },
+    emailAddresses: [
+      {
+        emailAddress: bootstrap.email,
+        verification: {
+          status: 'verified',
+        },
+      },
+    ],
+    externalAccounts: [],
+    privateMetadata: {
+      isAdmin: bootstrap.isAdmin,
+      devTestAuthPersona: bootstrap.persona,
+    },
+  } as unknown as NonNullable<UseUserReturn['user']>;
+
+  return {
+    isLoaded: true,
+    isSignedIn: true,
+    user,
+  } as UseUserReturn;
+}
+
+function createBootstrapSessionReturn(
+  bootstrap: ClientAuthBootstrap
+): UseSessionReturn {
+  const session = {
+    id: `sess_dev_test_${bootstrap.persona}`,
+    user: {
+      id: bootstrap.userId,
+    },
+  } as unknown as NonNullable<UseSessionReturn['session']>;
+
+  return {
+    isLoaded: true,
+    isSignedIn: true,
+    session,
+  } as UseSessionReturn;
+}
+
+function getRedirectUrlFromSignOutOptions(options: unknown): string | null {
+  if (!options || typeof options !== 'object') {
+    return null;
+  }
+
+  if ('redirectUrl' in options && typeof options.redirectUrl === 'string') {
+    return options.redirectUrl;
+  }
+
+  return null;
+}
+
+function createBootstrapAuthReturn(
+  bootstrap: ClientAuthBootstrap
+): UseAuthReturn {
+  return {
+    isLoaded: true,
+    isSignedIn: true,
+    userId: bootstrap.userId,
+    sessionId: `sess_dev_test_${bootstrap.persona}`,
+    sessionClaims: {} as UseAuthReturn['sessionClaims'],
+    actor: null,
+    orgId: null,
+    orgRole: null,
+    orgSlug: null,
+    has: () => false,
+    signOut: async (options?: unknown) => {
+      const response = await fetch('/api/dev/test-auth/session', {
+        method: 'DELETE',
+        credentials: 'include',
+      }).catch(() => null);
+
+      if (!response?.ok) {
+        await fetch('/api/dev/clear-session', {
+          method: 'POST',
+          credentials: 'include',
+        }).catch(() => null);
+      }
+
+      const redirectUrl = getRedirectUrlFromSignOutOptions(options);
+
+      if (redirectUrl && typeof globalThis.location?.assign === 'function') {
+        globalThis.location.assign(redirectUrl);
+        return;
+      }
+
+      if (typeof globalThis.location?.reload === 'function') {
+        globalThis.location.reload();
+      }
+    },
+    getToken: async () => null,
+  } as unknown as UseAuthReturn;
+}
 
 // ============================================================================
 // Context-based Safe Hooks
@@ -104,6 +224,29 @@ export function ClerkSafeDefaultsProvider({
         session: DEFAULT_SESSION_RETURN,
       }}
     >
+      {children}
+    </ClerkSafeContext.Provider>
+  );
+}
+
+export function ClerkSafeBootstrapProvider({
+  bootstrap,
+  children,
+}: {
+  readonly bootstrap: ClientAuthBootstrap;
+  readonly children: ReactNode;
+}) {
+  const value = useMemo(
+    () => ({
+      user: createBootstrapUserReturn(bootstrap),
+      auth: createBootstrapAuthReturn(bootstrap),
+      session: createBootstrapSessionReturn(bootstrap),
+    }),
+    [bootstrap]
+  );
+
+  return (
+    <ClerkSafeContext.Provider value={value}>
       {children}
     </ClerkSafeContext.Provider>
   );

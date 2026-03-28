@@ -190,7 +190,7 @@ export function useSettingsProfile({
             displayName,
             location,
             hometown,
-            careerHighlights: careerHighlights || undefined,
+            careerHighlights,
             targetPlaylists: targetPlaylists
               ? targetPlaylists
                   .split(',')

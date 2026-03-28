@@ -11,7 +11,6 @@ import {
   CODE_FLAG_KEYS,
   type CodeFlagName,
   FEATURE_FLAGS,
-  type FeatureFlagsBootstrap,
   FF_OVERRIDES_KEY,
 } from './shared';
 
@@ -24,7 +23,7 @@ function readOverrides(): Record<string, boolean> {
   }
 }
 
-interface FeatureFlagOverridesContext {
+export interface FeatureFlagOverridesContext {
   overrides: Record<string, boolean>;
   setOverride: (key: string, value: boolean) => void;
   removeOverride: (key: string) => void;
@@ -36,24 +35,15 @@ const OverridesContext = createContext<FeatureFlagOverridesContext | null>(
 );
 
 /**
- * Client-side feature flags context
- * Hydrated from server-side evaluation, no client SDK needed
- */
-const FeatureFlagsContext = createContext<FeatureFlagsBootstrap | null>(null);
-
-interface FeatureFlagsProviderProps {
-  readonly bootstrap: FeatureFlagsBootstrap;
-  readonly children: React.ReactNode;
-}
-
-/**
- * FeatureFlagsProvider - Client component that provides server-evaluated flags.
- * Supports local overrides stored in localStorage for dev toolbar use.
+ * FeatureFlagsProvider — provides localStorage overrides for the dev toolbar.
+ * The `bootstrap` prop is accepted but ignored (Statsig removed).
  */
 export function FeatureFlagsProvider({
-  bootstrap,
   children,
-}: FeatureFlagsProviderProps) {
+}: {
+  readonly bootstrap?: { gates: Record<string, boolean> };
+  readonly children: React.ReactNode;
+}) {
   const [overrides, setOverrides] =
     useState<Record<string, boolean>>(readOverrides);
 
@@ -79,11 +69,6 @@ export function FeatureFlagsProvider({
     localStorage.removeItem(FF_OVERRIDES_KEY);
   }, []);
 
-  const merged = useMemo(
-    () => ({ gates: { ...bootstrap.gates, ...overrides } }),
-    [bootstrap.gates, overrides]
-  );
-
   const overridesValue = useMemo(
     () => ({ overrides, setOverride, removeOverride, clearOverrides }),
     [overrides, setOverride, removeOverride, clearOverrides]
@@ -91,19 +76,9 @@ export function FeatureFlagsProvider({
 
   return (
     <OverridesContext.Provider value={overridesValue}>
-      <FeatureFlagsContext.Provider value={merged}>
-        {children}
-      </FeatureFlagsContext.Provider>
+      {children}
     </OverridesContext.Provider>
   );
-}
-
-/**
- * Hook to access feature flags bootstrap
- * Returns null if used outside of /app routes (marketing pages don't have flags)
- */
-export function useFeatureFlagsBootstrap(): FeatureFlagsBootstrap | null {
-  return useContext(FeatureFlagsContext);
 }
 
 /**
@@ -111,16 +86,6 @@ export function useFeatureFlagsBootstrap(): FeatureFlagsBootstrap | null {
  */
 export function useFeatureFlagOverrides(): FeatureFlagOverridesContext | null {
   return useContext(OverridesContext);
-}
-
-/**
- * Check if a feature gate is enabled
- * Falls back to defaultValue if bootstrap is not available (marketing routes)
- */
-export function useFeatureGate(gateKey: string, defaultValue = false): boolean {
-  const bootstrap = useFeatureFlagsBootstrap();
-  if (!bootstrap) return defaultValue;
-  return bootstrap.gates[gateKey] ?? defaultValue;
 }
 
 /**
@@ -137,13 +102,12 @@ export function useCodeFlag(flagName: CodeFlagName): boolean {
 }
 
 /**
- * Hook with loading state for feature gates
- * In this implementation, loading is always false since flags are server-evaluated
+ * Hook with loading state (loading is always false).
  */
-export function useFeatureGateWithLoading(
-  gateKey: string,
-  defaultValue = false
-): { enabled: boolean; loading: boolean } {
-  const enabled = useFeatureGate(gateKey, defaultValue);
+export function useCodeFlagWithLoading(flagName: CodeFlagName): {
+  enabled: boolean;
+  loading: boolean;
+} {
+  const enabled = useCodeFlag(flagName);
   return { enabled, loading: false };
 }

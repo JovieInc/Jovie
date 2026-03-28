@@ -277,7 +277,7 @@ export function createRightMetaCellRenderer(
 
     return (
       <div className='flex items-center gap-2.5'>
-        <div className='hidden min-w-0 flex-1 lg:block'>
+        <div className='max-lg:hidden min-w-0 flex-1'>
           <SmartLinkCell
             release={release}
             locked={isSmartLinkLocked?.(release.id)}

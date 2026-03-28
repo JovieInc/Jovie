@@ -158,7 +158,7 @@ export const FeaturedCreatorsSection = memo(function FeaturedCreatorsSection({
         </SectionHeading>
 
         {/* Desktop: horizontal scroll with fade */}
-        <div className='hidden md:block relative'>
+        <div className='max-md:hidden relative'>
           {/* Left fade gradient - more subtle */}
           <div className='absolute left-0 top-0 bottom-4 w-6 bg-gradient-to-r from-base to-transparent z-10 pointer-events-none' />
 

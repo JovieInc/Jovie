@@ -44,11 +44,6 @@ export function useStickToBottom({
   const observerRef = useRef<ResizeObserver | null>(null);
   const isStuckRef = useRef(true);
 
-  // Keep ref in sync with state to avoid stale closures in ResizeObserver callback
-  useEffect(() => {
-    isStuckRef.current = isStuckToBottom;
-  }, [isStuckToBottom]);
-
   // Reset stuck state when message count changes (new message sent/received)
   useEffect(() => {
     if (messageCount > 0) {
@@ -94,6 +89,7 @@ export function useStickToBottom({
     }
 
     if (!node) return;
+    if (typeof ResizeObserver === 'undefined') return;
 
     const observer = new ResizeObserver(() => {
       if (!isStuckRef.current) return;

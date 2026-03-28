@@ -45,7 +45,7 @@ export function DashboardOverviewToolbar({
       />
 
       {rangeLabel ? (
-        <p className='hidden min-w-26 whitespace-nowrap text-right text-[12.5px] text-tertiary-token sm:block'>
+        <p className='max-sm:hidden min-w-26 whitespace-nowrap text-right text-[12.5px] text-tertiary-token'>
           {rangeLabel}
         </p>
       ) : null}

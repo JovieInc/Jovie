@@ -5,9 +5,11 @@ import { ui } from '@clerk/ui';
 import React from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  ClerkSafeBootstrapProvider,
   ClerkSafeDefaultsProvider,
   ClerkSafeValuesProvider,
 } from '@/hooks/useClerkSafe';
+import type { ClientAuthBootstrap } from '@/lib/auth/dev-test-auth-types';
 import { publicEnv } from '@/lib/env-public';
 import type { ThemeMode } from '@/types';
 import { CoreProviders } from './CoreProviders';
@@ -17,6 +19,7 @@ import { QueryProvider } from './QueryProvider';
 
 interface ClientProvidersProps {
   readonly children: React.ReactNode;
+  readonly authBootstrap?: ClientAuthBootstrap | null;
   readonly initialThemeMode?: ThemeMode;
   readonly publishableKey: string | undefined;
   readonly skipCoreProviders?: boolean;
@@ -47,6 +50,7 @@ function wrapWithCoreProviders({
 // Main export - wraps children with ClerkProvider
 export function ClientProviders({
   children,
+  authBootstrap = null,
   initialThemeMode = 'dark',
   publishableKey,
   skipCoreProviders = false,
@@ -57,17 +61,22 @@ export function ClientProviders({
   );
 
   if (shouldSkipClerk) {
-    // When Clerk is bypassed, wrap with ClerkSafeDefaultsProvider
-    // so that safe hooks (useUserSafe, useAuthSafe, etc.) return defaults
-    // instead of throwing "must be used within ClerkProvider" errors
+    const wrappedChildren = wrapWithCoreProviders({
+      children,
+      initialThemeMode,
+      skipCoreProviders,
+    });
+
+    if (authBootstrap?.isAuthenticated) {
+      return (
+        <ClerkSafeBootstrapProvider bootstrap={authBootstrap}>
+          {wrappedChildren}
+        </ClerkSafeBootstrapProvider>
+      );
+    }
+
     return (
-      <ClerkSafeDefaultsProvider>
-        {wrapWithCoreProviders({
-          children,
-          initialThemeMode,
-          skipCoreProviders,
-        })}
-      </ClerkSafeDefaultsProvider>
+      <ClerkSafeDefaultsProvider>{wrappedChildren}</ClerkSafeDefaultsProvider>
     );
   }
 

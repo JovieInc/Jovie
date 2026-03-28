@@ -8,9 +8,9 @@
  * for use within EntitySidebarShell.
  */
 
-import { Check, Copy, ExternalLink, IdCard, RefreshCw } from 'lucide-react';
+import { Check, ExternalLink, IdCard, RefreshCw } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -73,7 +73,6 @@ interface ContactSidebarHeaderProps {
   readonly contact: Contact | null;
   readonly hasContact: boolean;
   readonly onRefresh?: () => void;
-  readonly onCopyProfileUrl: () => void;
   readonly onClose?: () => void;
 }
 
@@ -85,29 +84,18 @@ export function useContactHeaderParts({
   contact,
   hasContact,
   onRefresh,
-  onCopyProfileUrl,
   onClose,
 }: ContactSidebarHeaderProps): UseContactHeaderResult {
   const notifications = useNotifications();
   const showActions = hasContact && contact?.username;
-  const [isCopied, setIsCopied] = useState(false);
   const [isClerkIdCopied, setIsClerkIdCopied] = useState(false);
-  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clerkIdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
-      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       if (clerkIdTimeoutRef.current) clearTimeout(clerkIdTimeoutRef.current);
     };
   }, []);
-
-  const handleCopyProfileUrl = useCallback(() => {
-    onCopyProfileUrl();
-    setIsCopied(true);
-    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-    copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
-  }, [onCopyProfileUrl]);
 
   const handleCopyClerkId = async () => {
     if (!contact?.clerkId) return;
@@ -129,16 +117,6 @@ export function useContactHeaderParts({
   const overflowActions: DrawerHeaderAction[] = [];
 
   if (showActions) {
-    // eslint-disable-next-line react-hooks/refs -- Lucide icons are forwardRef components, not React refs
-    primaryActions.push({
-      id: 'copy',
-      label: isCopied ? 'Copied!' : 'Copy profile link',
-      icon: Copy,
-      activeIcon: Check,
-      isActive: isCopied,
-      onClick: handleCopyProfileUrl,
-    });
-
     overflowActions.push(
       {
         id: 'refresh',

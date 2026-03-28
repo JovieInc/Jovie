@@ -59,18 +59,64 @@ One Clerk instance per env (keys in Doppler). Proxy path: `/__clerk`. Handled by
 
 ## E2E Test Authentication
 
-Test auth uses Clerk `+clerk_test` emails with magic OTP `424242`. **No password needed.**
+Local `/browse` auth is bypass-first, not Clerk-form-first.
 
-- Doppler: `jovie-web` project, `dev` config, binary at `/opt/homebrew/bin/doppler`
-- Test user: `E2E_CLERK_USER_USERNAME` in Doppler (format `*+clerk_test@jov.ie`)
-- Auth guard: `apps/web/tests/product-screenshots/helpers.ts` — `shouldSkipAuth()` skips if username missing or Clerk setup failed. `+clerk_test` emails bypass password requirement.
-- Screenshots: `doppler run -p jovie-web -c dev -- pnpm --filter web screenshots`
-- Browse auth: `doppler run -p jovie-web -c dev -- bun run scripts/browse-auth.ts`
-- Full docs: `apps/web/tests/TESTING.md` (E2E Authentication section)
+- Start local browse QA with: `doppler run -- pnpm --filter web dev:local:browse`
+- Local browse entrypoint: `/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings`
+- Use `persona=admin` only for admin QA
+- This path sets bypass cookies directly and does **not** require `NEXT_PUBLIC_E2E_MODE=1`
+- `scripts/browse-auth.ts` remains available as a fallback helper for non-loopback hosts
+- Full docs: `apps/web/tests/TESTING.md`
 
 ## Design System
 
 Always read `DESIGN.md` before making any visual or UI decisions. All font choices, colors, spacing, and aesthetic direction are defined there. Do not deviate without explicit user approval. In QA mode, flag any code that doesn't match `DESIGN.md`.
+
+## Merge Requirements — Bot Review Comments Are Blocking
+
+**Before merging any PR (including via `/land-and-deploy`), check for unaddressed bot review comments.** Unaddressed comments are a **BLOCKER** — do not merge until resolved.
+
+### Bots to check
+
+- `coderabbitai[bot]` (CodeRabbit)
+- `greptile-apps[bot]` (Greptile)
+
+### How to check
+
+```bash
+REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner')
+PR_NUMBER=$(gh pr view --json number --jq '.number')
+
+# Fetch all inline review comments on the PR
+gh api "repos/$REPO/pulls/$PR_NUMBER/comments" --paginate \
+  --jq '[.[] | {id, author: .user.login, path, line, body, html_url, in_reply_to_id, position}]'
+```
+
+### Classification
+
+For each **root** comment (where `in_reply_to_id` is null) from the bots above:
+
+1. **Outdated** — `position` is null (code was force-pushed past it) → skip
+2. **Addressed** — another comment exists with `in_reply_to_id` equal to this comment's `id`, from a non-bot author → skip
+3. **Nitpick** — body starts with `[nitpick]` or `**nitpick**` → warning only, not blocking
+4. **Unaddressed** — none of the above → **BLOCKER**
+
+### When blocked
+
+- List each unaddressed comment: `file:line` — first 80 chars of body — permalink
+- Recommend: "Run `/review` to triage bot comments, or reply to each comment on GitHub"
+- Do NOT merge with option C / "merge anyway" — this is a hard gate
+
+### In the readiness report
+
+Add a BOT REVIEWS section:
+```
+BOT REVIEWS
+├─ CodeRabbit:   PASS / N unaddressed (blocker)
+└─ Greptile:     PASS / N unaddressed (blocker)
+```
+
+---
 
 ## Deploy Configuration (configured by /setup-deploy)
 

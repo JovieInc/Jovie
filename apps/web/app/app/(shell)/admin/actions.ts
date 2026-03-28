@@ -10,8 +10,14 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { isAllowedAvatarHostname } from '@/lib/images/avatar-hosts';
-import { enqueueMusicFetchEnrichmentJob } from '@/lib/ingestion/jobs';
+import {
+  enqueueMusicFetchEnrichmentJob,
+  fireDspDiscovery,
+} from '@/lib/ingestion/jobs';
+import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
+import { logger } from '@/lib/utils/logger';
 import { sendVerificationApprovedEmail } from '@/lib/verification/notifications';
 
 function safeParseJsonArray(raw: string): unknown {
@@ -171,6 +177,28 @@ export async function bulkRerunCreatorIngestionAction(
 
         if (!spotifyUrl) {
           return null;
+        }
+
+        // Enqueue DSP artist discovery alongside MusicFetch enrichment
+        const spotifyArtistId =
+          (profile.spotifyId?.trim() || null) ??
+          (profile.spotifyUrl
+            ? extractSpotifyArtistId(profile.spotifyUrl)
+            : null);
+        if (spotifyArtistId) {
+          fireDspDiscovery({
+            creatorProfileId: profile.id,
+            spotifyArtistId,
+            onError: error =>
+              void captureError('DSP discovery enqueue failed', error, {
+                creatorProfileId: profile.id,
+              }),
+          });
+        } else if (profile.spotifyUrl) {
+          logger.debug('DSP discovery skipped: non-artist Spotify URL', {
+            creatorProfileId: profile.id,
+            spotifyUrl: profile.spotifyUrl,
+          });
         }
 
         return enqueueMusicFetchEnrichmentJob({

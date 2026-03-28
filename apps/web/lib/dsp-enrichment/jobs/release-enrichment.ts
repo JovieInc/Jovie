@@ -1,11 +1,11 @@
 /**
  * Release Enrichment Job Processor
  *
- * After an Apple Music artist match is confirmed (manually or auto),
- * this job populates Apple Music URLs for each release by:
+ * After a DSP artist match is confirmed (manually or auto),
+ * this job populates provider URLs for each release by:
  *
- * 1. UPC lookup  – most reliable, directly maps release to album
- * 2. ISRC lookup – finds a track on Apple Music, derives album URL
+ * 1. UPC lookup  -- most reliable, directly maps release to album (Apple Music)
+ * 2. ISRC lookup -- finds a track on the provider, derives album URL
  *
  * Uses existing provider link infrastructure (upsertProviderLink)
  * and respects manual overrides (won't overwrite source_type='manual').
@@ -31,6 +31,7 @@ import {
   lookupByUpc,
   MAX_ISRC_BATCH_SIZE,
 } from '../providers/apple-music';
+import { bulkLookupDeezerByIsrc, isDeezerAvailable } from '../providers/deezer';
 import type { DspTrackEnrichmentResult } from '../types';
 
 // ============================================================================
@@ -40,7 +41,7 @@ import type { DspTrackEnrichmentResult } from '../types';
 export const releaseEnrichmentPayloadSchema = z.object({
   creatorProfileId: z.string().uuid(),
   matchId: z.string(),
-  providerId: z.literal('apple_music'),
+  providerId: z.enum(['apple_music', 'deezer']),
   externalArtistId: z.string(),
 });
 
@@ -50,6 +51,15 @@ export const releaseEnrichmentPayloadSchema = z.object({
 
 /** Maximum releases to process in a single job run */
 const MAX_RELEASES_PER_RUN = 100;
+
+/** Provider availability checks and display labels */
+const PROVIDER_AVAILABILITY: Record<
+  string,
+  { check: () => boolean; label: string }
+> = {
+  apple_music: { check: isAppleMusicAvailable, label: 'Apple Music' },
+  deezer: { check: isDeezerAvailable, label: 'Deezer' },
+};
 
 // ============================================================================
 // Internal Types
@@ -65,11 +75,12 @@ interface LocalRelease {
 // ============================================================================
 
 /**
- * Fetch releases for the profile that don't already have an Apple Music link.
+ * Fetch releases for the profile that don't already have a link for the given provider.
  */
 async function fetchUnlinkedReleases(
   dbConn: DbOrTransaction,
-  creatorProfileId: string
+  creatorProfileId: string,
+  providerId: string = 'apple_music'
 ): Promise<LocalRelease[]> {
   // Get all releases for this profile
   const releases = await dbConn
@@ -85,10 +96,9 @@ async function fetchUnlinkedReleases(
 
   const releaseIds = releases.map(r => r.id);
 
-  // Find which releases already have a canonical Apple Music link.
-  // Search fallback URLs (e.g. "https://music.apple.com/us/search?term=...")
-  // are NOT considered "linked" — they should be upgraded to canonical URLs
-  // when the release enrichment job discovers a real match via UPC or ISRC.
+  // Find which releases already have a canonical link for this provider.
+  // Search fallback URLs are NOT considered "linked" -- they should be upgraded
+  // to canonical URLs when the release enrichment job discovers a real match.
   const existingLinks = await dbConn
     .select({
       releaseId: providerLinks.releaseId,
@@ -98,7 +108,7 @@ async function fetchUnlinkedReleases(
     .from(providerLinks)
     .where(
       and(
-        eq(providerLinks.providerId, 'apple_music'),
+        eq(providerLinks.providerId, providerId),
         eq(providerLinks.ownerType, 'release'),
         inArray(providerLinks.releaseId, releaseIds)
       )
@@ -109,7 +119,7 @@ async function fetchUnlinkedReleases(
       .filter(l => {
         // Manual overrides are always considered linked
         if (l.sourceType === 'manual') return true;
-        // Search fallbacks should be upgraded — don't count as linked
+        // Search fallbacks should be upgraded -- don't count as linked
         const meta = l.metadata as Record<string, unknown> | null;
         if (meta?.discoveredFrom === 'search_fallback') return false;
         return true;
@@ -169,11 +179,11 @@ async function fetchPrimaryIsrcsForReleases(
  *
  * 1. Album context (most common):
  *    https://music.apple.com/us/album/song-name/1234567890?i=1234567891
- *    → Strip query string to get album URL
+ *    -> Strip query string to get album URL
  *
  * 2. Direct song link:
  *    https://music.apple.com/us/song/song-name/1234567891
- *    → Cannot derive album URL (return null, fall through to album relationship)
+ *    -> Cannot derive album URL (return null, fall through to album relationship)
  */
 function deriveAlbumUrlFromSongUrl(songUrl: string): string | null {
   try {
@@ -190,11 +200,43 @@ function deriveAlbumUrlFromSongUrl(songUrl: string): string | null {
 }
 
 // ============================================================================
+// Shared ISRC Helpers
+// ============================================================================
+
+/**
+ * Build a reverse map from uppercase ISRC -> releaseId for ISRC-based lookups.
+ * Shared by both Apple Music and Deezer ISRC linking strategies.
+ */
+function buildIsrcToReleaseMap(
+  releaseIds: string[],
+  isrcByRelease: Map<string, string>
+): Map<string, string> {
+  const isrcToRelease = new Map<string, string>();
+  for (const releaseId of releaseIds) {
+    const isrc = isrcByRelease.get(releaseId);
+    if (isrc) {
+      isrcToRelease.set(isrc.toUpperCase(), releaseId);
+    }
+  }
+  return isrcToRelease;
+}
+
+/** Merge entries from source into target. */
+function mergeInto(
+  target: Map<string, string>,
+  source: Map<string, string>
+): void {
+  for (const [id, url] of source) {
+    target.set(id, url);
+  }
+}
+
+// ============================================================================
 // Linking Strategies
 // ============================================================================
 
 /**
- * Strategy 1: Link releases via UPC lookup.
+ * Strategy 1: Link releases via UPC lookup (Apple Music only).
  * Returns a map of releaseId -> Apple Music album URL.
  */
 async function linkViaUpc(
@@ -227,7 +269,7 @@ async function linkViaUpc(
  * Strategy order:
  * 2a. Derive album URL from song URL (works for /album/...?i= format)
  * 2b. Fetch album directly via relationship data (works for /song/ format
- *     when `include=albums` was requested in the ISRC lookup)
+ *     when include=albums was requested in the ISRC lookup)
  */
 async function resolveAlbumUrl(track: {
   attributes?: { url?: string };
@@ -241,7 +283,7 @@ async function resolveAlbumUrl(track: {
 
   // Strategy 2b: Fetch album directly if we have an album relationship
   // This handles /song/ URLs where we can't derive the album URL from the path.
-  // Requires `include=albums` in the ISRC lookup request.
+  // Requires include=albums in the ISRC lookup request.
   const albumId = track.relationships?.albums?.data?.[0]?.id;
   if (albumId) {
     try {
@@ -261,23 +303,15 @@ async function resolveAlbumUrl(track: {
 }
 
 /**
- * Strategy 2: Link releases via ISRC -> track -> album URL.
+ * Strategy 2: Link releases via ISRC -> track -> album URL (Apple Music).
  * Batches ISRC lookups for efficiency (25 per API request).
  */
-async function linkViaIsrc(
+async function linkViaAppleMusicIsrc(
   releaseIds: string[],
   isrcByRelease: Map<string, string>
 ): Promise<Map<string, string>> {
   const linked = new Map<string, string>();
-
-  // Collect ISRCs to look up, tracking which release each belongs to
-  const isrcToRelease = new Map<string, string>();
-  for (const releaseId of releaseIds) {
-    const isrc = isrcByRelease.get(releaseId);
-    if (isrc) {
-      isrcToRelease.set(isrc.toUpperCase(), releaseId);
-    }
-  }
+  const isrcToRelease = buildIsrcToReleaseMap(releaseIds, isrcByRelease);
 
   if (isrcToRelease.size === 0) return linked;
 
@@ -311,17 +345,55 @@ async function linkViaIsrc(
   return linked;
 }
 
+/**
+ * Link releases to Deezer via ISRC lookups.
+ * Deezer doesn't support UPC lookups, so we only use ISRC matching.
+ */
+async function linkViaDeezerIsrc(
+  releaseIds: string[],
+  isrcByRelease: Map<string, string>
+): Promise<Map<string, string>> {
+  const linked = new Map<string, string>();
+  const isrcToRelease = buildIsrcToReleaseMap(releaseIds, isrcByRelease);
+
+  if (isrcToRelease.size === 0) return linked;
+
+  const allIsrcs = Array.from(isrcToRelease.keys());
+
+  try {
+    const trackMap = await bulkLookupDeezerByIsrc(allIsrcs);
+
+    for (const [isrc, track] of trackMap) {
+      const releaseId = isrcToRelease.get(isrc);
+      if (!releaseId || linked.has(releaseId)) continue;
+
+      const url = track.album?.link ?? track.link;
+      if (url) {
+        linked.set(releaseId, url);
+      }
+    }
+  } catch (error) {
+    logger.warn('Deezer ISRC batch lookup failed', {
+      isrcCount: allIsrcs.length,
+      error,
+    });
+  }
+
+  return linked;
+}
+
 // ============================================================================
 // Provider Link Persistence
 // ============================================================================
 
 /**
- * Save Apple Music URLs as provider links for releases.
+ * Save provider URLs as provider links for releases.
  * Skips releases that already have manual overrides.
  */
 async function saveProviderLinks(
   dbConn: DbOrTransaction,
-  linkedReleases: Map<string, string>
+  linkedReleases: Map<string, string>,
+  providerId: string = 'apple_music'
 ): Promise<number> {
   let saved = 0;
 
@@ -331,7 +403,7 @@ async function saveProviderLinks(
       await dbConn
         .insert(providerLinks)
         .values({
-          providerId: 'apple_music',
+          providerId,
           ownerType: 'release',
           releaseId,
           trackId: null,
@@ -354,7 +426,7 @@ async function saveProviderLinks(
         });
       saved++;
     } catch (error) {
-      logger.warn('Failed to save Apple Music provider link', {
+      logger.warn(`Failed to save ${providerId} provider link`, {
         releaseId,
         url,
         error,
@@ -366,14 +438,61 @@ async function saveProviderLinks(
 }
 
 // ============================================================================
+// Provider-Specific Enrichment
+// ============================================================================
+
+/**
+ * Run Apple Music enrichment: UPC lookup first, then ISRC fallback.
+ */
+async function enrichAppleMusic(
+  dbConn: DbOrTransaction,
+  unlinkedReleases: LocalRelease[]
+): Promise<Map<string, string>> {
+  const allLinked = new Map<string, string>();
+
+  // UPC lookup (most reliable)
+  mergeInto(allLinked, await linkViaUpc(unlinkedReleases));
+
+  // ISRC fallback for remaining unlinked releases
+  const stillUnlinked = unlinkedReleases
+    .filter(r => !allLinked.has(r.id))
+    .map(r => r.id);
+
+  if (stillUnlinked.length > 0) {
+    const isrcByRelease = await fetchPrimaryIsrcsForReleases(
+      dbConn,
+      stillUnlinked
+    );
+    mergeInto(
+      allLinked,
+      await linkViaAppleMusicIsrc(stillUnlinked, isrcByRelease)
+    );
+  }
+
+  return allLinked;
+}
+
+/**
+ * Run Deezer enrichment: ISRC lookup only (no UPC support).
+ */
+async function enrichDeezer(
+  dbConn: DbOrTransaction,
+  unlinkedReleases: LocalRelease[]
+): Promise<Map<string, string>> {
+  const releaseIds = unlinkedReleases.map(r => r.id);
+  const isrcByRelease = await fetchPrimaryIsrcsForReleases(dbConn, releaseIds);
+  return linkViaDeezerIsrc(releaseIds, isrcByRelease);
+}
+
+// ============================================================================
 // Job Processor
 // ============================================================================
 
 /**
  * Process a release enrichment job.
  *
- * Finds Apple Music URLs for all unlinked releases in a creator's profile
- * using UPC and ISRC-based matching.
+ * Finds provider URLs for all unlinked releases in a creator's profile
+ * using UPC and ISRC-based matching strategies.
  */
 export async function processReleaseEnrichmentJob(
   dbConn: DbOrTransaction,
@@ -390,56 +509,38 @@ export async function processReleaseEnrichmentJob(
     errors: [],
   };
 
-  if (!isAppleMusicAvailable()) {
-    result.errors.push('Apple Music provider not available');
+  // Check provider availability
+  const config = PROVIDER_AVAILABILITY[providerId];
+  if (config && !config.check()) {
+    result.errors.push(`${config.label} provider not available`);
     return result;
   }
 
-  // 1. Fetch releases that need linking
+  // 1. Fetch releases that need linking for this provider
   const unlinkedReleases = await fetchUnlinkedReleases(
     dbConn,
-    creatorProfileId
+    creatorProfileId,
+    providerId
   );
 
   if (unlinkedReleases.length === 0) {
     return result; // Nothing to do
   }
 
-  const allLinked = new Map<string, string>();
+  // 2. Run provider-specific enrichment strategy
+  const enrichFn = providerId === 'deezer' ? enrichDeezer : enrichAppleMusic;
+  const allLinked = await enrichFn(dbConn, unlinkedReleases);
 
-  // 2. Strategy 1: UPC lookup (most reliable)
-  const upcLinked = await linkViaUpc(unlinkedReleases);
-  for (const [id, url] of upcLinked) {
-    allLinked.set(id, url);
-  }
-
-  // 3. Strategy 2: ISRC lookup (for remaining unlinked releases)
-  const stillUnlinked = unlinkedReleases
-    .filter(r => !allLinked.has(r.id))
-    .map(r => r.id);
-
-  if (stillUnlinked.length > 0) {
-    const isrcByRelease = await fetchPrimaryIsrcsForReleases(
-      dbConn,
-      stillUnlinked
-    );
-    const isrcLinked = await linkViaIsrc(stillUnlinked, isrcByRelease);
-    for (const [id, url] of isrcLinked) {
-      allLinked.set(id, url);
-    }
-  }
-
-  // 4. Save all discovered links
+  // 3. Save all discovered links
   if (allLinked.size > 0) {
-    const saved = await saveProviderLinks(dbConn, allLinked);
+    const saved = await saveProviderLinks(dbConn, allLinked, providerId);
     result.releasesEnriched = saved;
   }
 
   logger.info('Release enrichment completed', {
     creatorProfileId,
+    providerId,
     totalReleases: unlinkedReleases.length,
-    upcMatched: upcLinked.size,
-    isrcMatched: allLinked.size - upcLinked.size,
     totalLinked: allLinked.size,
   });
 
