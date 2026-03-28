@@ -5,6 +5,10 @@
  */
 
 import type { Page } from '@playwright/test';
+import {
+  getEndUserPerfRouteById,
+  getRouteTimingBudgets,
+} from '@/scripts/performance-route-manifest';
 import type {
   PerformanceBudget,
   PerformanceMetrics,
@@ -15,134 +19,92 @@ import type {
  *
  * Source: lib/monitoring/web-vitals.ts lines 97-105
  */
+function budgetFromRoute(
+  routeId: string,
+  extras?: Pick<
+    PerformanceBudget,
+    'apiResponseTime' | 'domContentLoaded' | 'loadTime'
+  >
+): PerformanceBudget {
+  const route = getEndUserPerfRouteById(routeId);
+  if (!route) {
+    throw new Error(`Missing performance route budget for ${routeId}`);
+  }
+
+  const timings = new Map(
+    getRouteTimingBudgets(route).map(entry => [entry.metric, entry.budget])
+  );
+
+  return {
+    apiResponseTime: extras?.apiResponseTime,
+    cls: timings.get('cumulative-layout-shift'),
+    domContentLoaded: extras?.domContentLoaded,
+    fcp: timings.get('first-contentful-paint'),
+    inp: timings.get('first-input-delay'),
+    lcp: timings.get('largest-contentful-paint'),
+    loadTime: extras?.loadTime,
+    ttfb: timings.get('time-to-first-byte'),
+  };
+}
+
 export const PERFORMANCE_BUDGETS = {
-  publicProfile: {
-    lcp: 2500, // <2.5s requirement (high-traffic revenue page)
-    fcp: 1800,
-    ttfb: 800,
-    cls: 0.1,
-    inp: 200,
+  publicProfile: budgetFromRoute('public-profile-main', {
     domContentLoaded: 3000,
     loadTime: 4000,
-  },
-  homepage: {
-    lcp: 5000, // <5s with featured artists
-    fcp: 2000,
-    ttfb: 1000,
-    cls: 0.1,
-    inp: 200,
+  }),
+  homepage: budgetFromRoute('home', {
     domContentLoaded: 5000,
     loadTime: 6000,
-  },
-  dashboard: {
-    lcp: 3000,
-    fcp: 2000,
-    ttfb: 1000,
-    cls: 0.1,
-    inp: 200,
+  }),
+  dashboard: budgetFromRoute('creator-releases', {
     domContentLoaded: 4000,
     loadTime: 5000,
-  },
-  onboarding: {
-    lcp: 2000,
-    fcp: 1500,
-    ttfb: 800,
-    cls: 0.1,
-    inp: 200,
+  }),
+  onboarding: budgetFromRoute('onboarding', {
+    apiResponseTime: 200,
     domContentLoaded: 2000,
     loadTime: 3000,
-    apiResponseTime: 200, // Handle validation
-  },
-  onboardingHandle: {
-    lcp: 2200,
-    fcp: 1600,
-    ttfb: 1000,
-    cls: 0.1,
-    inp: 200,
+  }),
+  onboardingHandle: budgetFromRoute('onboarding-resume-handle', {
     domContentLoaded: 2200,
     loadTime: 3200,
-  },
-  onboardingSpotify: {
-    lcp: 2300,
-    fcp: 1700,
-    ttfb: 1000,
-    cls: 0.1,
-    inp: 200,
+  }),
+  onboardingSpotify: budgetFromRoute('onboarding-resume-spotify', {
     domContentLoaded: 2400,
     loadTime: 3400,
-  },
-  onboardingArtistConfirm: {
-    lcp: 2200,
-    fcp: 1600,
-    ttfb: 1000,
-    cls: 0.1,
-    inp: 200,
+  }),
+  onboardingArtistConfirm: budgetFromRoute('onboarding-resume-artist-confirm', {
     domContentLoaded: 2200,
     loadTime: 3200,
-  },
-  onboardingUpgrade: {
-    lcp: 2200,
-    fcp: 1600,
-    ttfb: 1000,
-    cls: 0.1,
-    inp: 200,
+  }),
+  onboardingUpgrade: budgetFromRoute('onboarding-resume-upgrade', {
     domContentLoaded: 2200,
     loadTime: 3200,
-  },
-  onboardingDsp: {
-    lcp: 2400,
-    fcp: 1700,
-    ttfb: 1000,
-    cls: 0.1,
-    inp: 200,
+  }),
+  onboardingDsp: budgetFromRoute('onboarding-resume-dsp', {
     domContentLoaded: 2400,
     loadTime: 3400,
-  },
-  onboardingSocial: {
-    lcp: 2400,
-    fcp: 1700,
-    ttfb: 1000,
-    cls: 0.1,
-    inp: 200,
+  }),
+  onboardingSocial: budgetFromRoute('onboarding-resume-social', {
     domContentLoaded: 2400,
     loadTime: 3400,
-  },
-  onboardingReleases: {
-    lcp: 2400,
-    fcp: 1700,
-    ttfb: 1000,
-    cls: 0.1,
-    inp: 200,
+  }),
+  onboardingReleases: budgetFromRoute('onboarding-resume-releases', {
     domContentLoaded: 2400,
     loadTime: 3400,
-  },
-  onboardingLateArrivals: {
-    lcp: 2400,
-    fcp: 1700,
-    ttfb: 1000,
-    cls: 0.1,
-    inp: 200,
+  }),
+  onboardingLateArrivals: budgetFromRoute('onboarding-resume-late-arrivals', {
     domContentLoaded: 2400,
     loadTime: 3400,
-  },
-  onboardingProfileReady: {
-    lcp: 2400,
-    fcp: 1700,
-    ttfb: 1000,
-    cls: 0.1,
-    inp: 200,
+  }),
+  onboardingProfileReady: budgetFromRoute('onboarding-resume-profile-ready', {
     domContentLoaded: 2400,
     loadTime: 3400,
-  },
-  onboardingCheckout: {
-    lcp: 2600,
-    fcp: 1800,
-    ttfb: 1200,
-    cls: 0.1,
-    inp: 200,
+  }),
+  onboardingCheckout: budgetFromRoute('onboarding-checkout', {
     domContentLoaded: 2600,
     loadTime: 3600,
-  },
+  }),
   spotifySearchWarm: {
     apiResponseTime: 200,
   },

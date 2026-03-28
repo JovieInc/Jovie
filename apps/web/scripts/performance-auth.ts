@@ -1,0 +1,157 @@
+import { spawnSync } from 'node:child_process';
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+interface PerfAuthCliOptions {
+  readonly baseUrl: string;
+  readonly json: boolean;
+  readonly outPath: string;
+}
+
+interface StorageStateCookie {
+  readonly name: string;
+}
+
+interface StorageStateLike {
+  readonly cookies?: readonly StorageStateCookie[];
+}
+
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const webRoot = resolve(scriptDir, '..');
+const repoRoot = resolve(webRoot, '..', '..');
+const defaultBaseUrl = process.env.BASE_URL || 'http://localhost:3000';
+const authSetupOutputPath = resolve(webRoot, 'tests', '.auth', 'user.json');
+const defaultPerfAuthPath = resolve(
+  repoRoot,
+  '.context',
+  'perf',
+  'auth',
+  'user.json'
+);
+
+function parseCliArgs(args: readonly string[]): PerfAuthCliOptions {
+  let baseUrl = defaultBaseUrl;
+  let json = false;
+  let outPath = defaultPerfAuthPath;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--') {
+      continue;
+    }
+
+    if (arg === '--base-url') {
+      const value = args[index + 1];
+      if (!value) {
+        throw new TypeError('Missing value for --base-url');
+      }
+      baseUrl = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--out') {
+      const value = args[index + 1];
+      if (!value) {
+        throw new TypeError('Missing value for --out');
+      }
+      outPath = resolve(repoRoot, value);
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--json') {
+      json = true;
+      continue;
+    }
+
+    throw new TypeError(`Unknown argument: ${arg}`);
+  }
+
+  return {
+    baseUrl,
+    json,
+    outPath,
+  };
+}
+
+function readStorageState(filePath: string) {
+  return JSON.parse(readFileSync(filePath, 'utf8')) as StorageStateLike;
+}
+
+function hasUsableCookies(filePath: string) {
+  if (!existsSync(filePath)) {
+    return false;
+  }
+
+  return (readStorageState(filePath).cookies?.length ?? 0) > 0;
+}
+
+function runAuthSetup(baseUrl: string) {
+  return spawnSync(
+    'pnpm',
+    [
+      'exec',
+      'playwright',
+      'test',
+      '--project',
+      'auth-setup',
+      'tests/e2e/auth.setup.ts',
+    ],
+    {
+      cwd: webRoot,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        BASE_URL: baseUrl,
+        E2E_SKIP_WEB_SERVER: '1',
+      },
+      maxBuffer: 50 * 1024 * 1024,
+    }
+  );
+}
+
+function writeResult(options: PerfAuthCliOptions, output: object) {
+  const serialized = JSON.stringify(output, null, 2);
+  if (options.json) {
+    process.stdout.write(`${serialized}\n`);
+    return;
+  }
+
+  console.log(serialized);
+}
+
+function main() {
+  const options = parseCliArgs(process.argv.slice(2));
+  const setupResult = runAuthSetup(options.baseUrl);
+  if (setupResult.status !== 0) {
+    throw new Error(
+      [
+        'Playwright auth bootstrap failed.',
+        setupResult.stdout.trim(),
+        setupResult.stderr.trim(),
+      ]
+        .filter(Boolean)
+        .join('\n')
+    );
+  }
+
+  if (!hasUsableCookies(authSetupOutputPath)) {
+    throw new Error(
+      'Auth bootstrap completed without a usable storage state. Verify the Clerk test user or enable loopback test-auth bypass before rerunning perf:auth.'
+    );
+  }
+
+  mkdirSync(dirname(options.outPath), { recursive: true });
+  copyFileSync(authSetupOutputPath, options.outPath);
+
+  writeResult(options, {
+    authStatePath: options.outPath,
+    baseUrl: options.baseUrl,
+    cookieCount: readStorageState(options.outPath).cookies?.length ?? 0,
+    sourcePath: authSetupOutputPath,
+  });
+}
+
+main();
