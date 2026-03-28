@@ -66,7 +66,7 @@ export function DrawerPropertyRow({
     >
       <span
         className={cn(
-          'font-[500] text-tertiary-token',
+          'font-[500] text-quaternary-token',
           styles.label,
           labelClassName
         )}

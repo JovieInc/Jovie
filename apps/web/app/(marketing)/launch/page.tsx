@@ -1378,7 +1378,7 @@ export default function LaunchPage() {
           >
             {/* Sidebar */}
             <div
-              className='hidden md:block'
+              className='max-md:hidden'
               style={{
                 background: 'var(--linear-bg-surface-1)',
                 borderRight: '1px solid var(--linear-border-subtle)',

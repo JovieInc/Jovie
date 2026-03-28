@@ -278,7 +278,7 @@ export function PricingComparisonChart() {
 
       {/* Desktop comparison table */}
       <div
-        className='hidden md:block overflow-x-auto rounded-lg'
+        className='max-md:hidden overflow-x-auto rounded-lg'
         style={{
           border: '1px solid var(--linear-border-default)',
           backgroundColor: 'var(--linear-bg-surface-0)',

@@ -1,6 +1,6 @@
 'use client';
 
-import { Globe, Link2, MapPin } from 'lucide-react';
+import { Globe, Link2, MapPin, X } from 'lucide-react';
 import { type ComponentType, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import {
@@ -254,40 +254,41 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
       isOpen={isOpen}
       ariaLabel='Analytics'
       data-testid='analytics-sidebar'
-      title='Analytics'
-      onClose={onClose}
       headerMode='minimal'
-      headerActions={
-        <DrawerHeaderActions
-          primaryActions={[]}
-          overflowActions={[]}
-          onClose={onClose}
-        />
-      }
+      hideMinimalHeaderBar
       entityHeader={
         <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-          <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-            <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-              Analytics
-            </p>
-          </div>
-          <div className='flex items-start justify-between gap-3 p-3.5'>
-            <div className='space-y-0.5'>
-              <p className='text-[15px] font-[590] tracking-[-0.016em] text-primary-token'>
-                Audience funnel
-              </p>
-              <p className='text-[12px] leading-[16px] text-secondary-token'>
-                Views, clicks, and top traffic sources.
-              </p>
+          <div className='relative p-3.5'>
+            <div className='absolute right-2.5 top-2.5'>
+              <DrawerHeaderActions
+                primaryActions={[
+                  {
+                    id: 'close-analytics',
+                    label: 'Close analytics',
+                    icon: X,
+                    onClick: onClose,
+                  },
+                ]}
+              />
             </div>
-            <AppSegmentControl
-              value={range}
-              onValueChange={setRange}
-              options={RANGE_OPTIONS}
-              size='sm'
-              className='shrink-0'
-              aria-label='Analytics time range'
-            />
+            <div className='flex items-start justify-between gap-3 pr-8'>
+              <div className='space-y-0.5'>
+                <p className='text-[15px] font-[590] tracking-[-0.016em] text-primary-token'>
+                  Audience funnel
+                </p>
+                <p className='text-[12px] leading-[16px] text-secondary-token'>
+                  Views, clicks, and top traffic sources.
+                </p>
+              </div>
+              <AppSegmentControl
+                value={range}
+                onValueChange={setRange}
+                options={RANGE_OPTIONS}
+                size='sm'
+                className='shrink-0'
+                aria-label='Analytics time range'
+              />
+            </div>
           </div>
         </DrawerSurfaceCard>
       }
@@ -325,6 +326,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
               options={ANALYTICS_TAB_OPTIONS}
               className='w-full'
               ariaLabel='Analytics data tabs'
+              distribution='fill'
             />
           }
           contentClassName='pt-2'

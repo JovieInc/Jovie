@@ -98,7 +98,7 @@ export function HeaderNav({
 
           {/* Nav links - desktop only, right-aligned */}
           {hasNavLinks && (
-            <div className='hidden items-center gap-1 md:flex lg:gap-1.5'>
+            <div className='max-md:hidden items-center gap-1 md:flex lg:gap-1.5'>
               {navLinks?.map(link =>
                 link.href.startsWith('/') && !link.href.startsWith('#') ? (
                   <Link
@@ -120,7 +120,7 @@ export function HeaderNav({
           {/* Divider between nav and auth - desktop only */}
           {hasNavLinks ? (
             <div
-              className='mx-1.5 hidden h-4 w-px bg-(--linear-border-subtle) md:block'
+              className='mx-1.5 max-md:hidden h-4 w-px bg-(--linear-border-subtle)'
               aria-hidden='true'
             />
           ) : null}

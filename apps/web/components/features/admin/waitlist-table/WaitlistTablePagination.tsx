@@ -24,7 +24,7 @@ export function WaitlistTablePagination({
   return (
     <div className='flex items-center justify-between gap-2 border-t border-subtle px-4 py-3 text-xs text-secondary-token'>
       <div className='flex items-center gap-1'>
-        <span className='hidden sm:inline'>Page </span>
+        <span className='max-sm:hidden sm:inline'>Page </span>
         <span className='font-medium text-primary-token'>{page}</span>
         <span> / {totalPages}</span>
       </div>
@@ -38,7 +38,7 @@ export function WaitlistTablePagination({
           >
             <Link href={prevHref} aria-label='Previous page'>
               <ChevronLeft className='h-3.5 w-3.5 sm:hidden' />
-              <span className='hidden sm:inline'>Previous</span>
+              <span className='max-sm:hidden sm:inline'>Previous</span>
             </Link>
           </Button>
         ) : (
@@ -50,7 +50,7 @@ export function WaitlistTablePagination({
             aria-label='Previous page'
           >
             <ChevronLeft className='h-3.5 w-3.5 sm:hidden' />
-            <span className='hidden sm:inline'>Previous</span>
+            <span className='max-sm:hidden sm:inline'>Previous</span>
           </Button>
         )}
         {nextHref ? (
@@ -62,7 +62,7 @@ export function WaitlistTablePagination({
           >
             <Link href={nextHref} aria-label='Next page'>
               <ChevronRight className='h-3.5 w-3.5 sm:hidden' />
-              <span className='hidden sm:inline'>Next</span>
+              <span className='max-sm:hidden sm:inline'>Next</span>
             </Link>
           </Button>
         ) : (
@@ -74,7 +74,7 @@ export function WaitlistTablePagination({
             aria-label='Next page'
           >
             <ChevronRight className='h-3.5 w-3.5 sm:hidden' />
-            <span className='hidden sm:inline'>Next</span>
+            <span className='max-sm:hidden sm:inline'>Next</span>
           </Button>
         )}
       </div>

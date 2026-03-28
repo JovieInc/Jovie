@@ -17,6 +17,8 @@ import {
   PROVIDER_LABELS,
 } from '@/features/dashboard/atoms/DspProviderIcon';
 import { MatchStatusBadge } from '@/features/dashboard/atoms/MatchStatusBadge';
+import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { isExternalDspImage } from '@/lib/utils/dsp-images';
 import { DspPresenceEmptyState } from './DspPresenceEmptyState';
@@ -241,40 +243,60 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
     []
   );
 
-  if (data.items.length === 0) {
-    return <DspPresenceEmptyState />;
-  }
+  const sidebarPanel = useMemo(() => {
+    if (!selectedItem) {
+      return null;
+    }
 
-  return (
-    <div className='flex h-full min-h-0 flex-row bg-[color-mix(in_oklab,var(--linear-bg-page)_72%,var(--linear-bg-surface-1))]'>
-      {/* Main content */}
-      <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>
-        <DspPresenceSummary
-          confirmedCount={data.confirmedCount}
-          suggestedCount={data.suggestedCount}
-        />
-
-        <div className='flex-1 min-h-0 overflow-auto'>
-          <UnifiedTable<DspPresenceItem>
-            data={data.items}
-            columns={columns}
-            getRowId={item => item.matchId}
-            onRowClick={handleRowClick}
-            onFocusedRowChange={handleFocusedRowChange}
-            getRowClassName={getRowClassName}
-            getRowTestId={getRowTestId}
-            enableVirtualization={false}
-            minWidth={`${TABLE_MIN_WIDTHS.SMALL}px`}
-            skeletonRows={8}
-          />
-        </div>
-      </div>
-
-      {/* Detail sidebar */}
+    return (
       <DspPresenceSidebar
         item={selectedItem}
         onClose={() => setSelectedMatchId(null)}
       />
-    </div>
+    );
+  }, [selectedItem]);
+
+  useRegisterRightPanel(sidebarPanel);
+
+  const toolbar = (
+    <DspPresenceSummary
+      confirmedCount={data.confirmedCount}
+      suggestedCount={data.suggestedCount}
+    />
+  );
+
+  if (data.items.length === 0) {
+    return (
+      <DashboardWorkspacePanel
+        toolbar={toolbar}
+        surfaceClassName='bg-[color-mix(in_oklab,var(--linear-bg-page)_72%,var(--linear-bg-surface-1))]'
+        data-testid='dsp-presence-workspace'
+      >
+        <DspPresenceEmptyState />
+      </DashboardWorkspacePanel>
+    );
+  }
+
+  return (
+    <DashboardWorkspacePanel
+      toolbar={toolbar}
+      surfaceClassName='bg-[color-mix(in_oklab,var(--linear-bg-page)_72%,var(--linear-bg-surface-1))]'
+      data-testid='dsp-presence-workspace'
+    >
+      <div className='flex-1 min-h-0 overflow-auto'>
+        <UnifiedTable<DspPresenceItem>
+          data={data.items}
+          columns={columns}
+          getRowId={item => item.matchId}
+          onRowClick={handleRowClick}
+          onFocusedRowChange={handleFocusedRowChange}
+          getRowClassName={getRowClassName}
+          getRowTestId={getRowTestId}
+          enableVirtualization={false}
+          minWidth={`${TABLE_MIN_WIDTHS.SMALL}px`}
+          skeletonRows={8}
+        />
+      </div>
+    </DashboardWorkspacePanel>
   );
 }

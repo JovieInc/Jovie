@@ -20,8 +20,7 @@ import {
   getPlanIntent,
   isPaidIntent,
 } from '@/lib/auth/plan-intent';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { useCodeFlag } from '@/lib/feature-flags/client';
 import { getOnboardingDashboardInitialQuery } from './onboardingDashboardQuery';
 
 import type { AppleStyleOnboardingFormProps } from './types';
@@ -68,9 +67,7 @@ export function AppleStyleOnboardingForm({
 
   const [isDspEnriching, setIsDspEnriching] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
-  const checkoutStepEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.ONBOARDING_CHECKOUT_STEP
-  );
+  const checkoutStepEnabled = useCodeFlag('ONBOARDING_CHECKOUT_STEP');
 
   const {
     state,

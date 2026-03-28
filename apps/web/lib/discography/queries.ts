@@ -267,6 +267,7 @@ export async function getLatestReleaseByUsername(
       totalTracks: discogReleases.totalTracks,
       isExplicit: discogReleases.isExplicit,
       genres: discogReleases.genres,
+      targetPlaylists: discogReleases.targetPlaylists,
       copyrightLine: discogReleases.copyrightLine,
       distributor: discogReleases.distributor,
       artworkUrl: discogReleases.artworkUrl,
