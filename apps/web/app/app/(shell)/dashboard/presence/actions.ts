@@ -45,12 +45,12 @@ export async function loadDspPresence(): Promise<DspPresenceData> {
   const data = await getDashboardData();
 
   if (data.needsOnboarding && !data.dashboardLoadError) {
-    redirect('/onboarding');
+    redirect(APP_ROUTES.ONBOARDING);
   }
 
   const profile = data.selectedProfile;
   if (!profile) {
-    redirect('/onboarding');
+    redirect(APP_ROUTES.ONBOARDING);
   }
 
   try {
@@ -131,12 +131,12 @@ export async function addManualDspMatch(input: {
   const data = await getDashboardData();
 
   if (data.needsOnboarding && !data.dashboardLoadError) {
-    redirect('/onboarding');
+    redirect(APP_ROUTES.ONBOARDING);
   }
 
   const profile = data.selectedProfile;
   if (!profile) {
-    redirect('/onboarding');
+    redirect(APP_ROUTES.ONBOARDING);
   }
 
   // Normalize inputs
@@ -231,8 +231,8 @@ export async function addManualDspMatch(input: {
         matchSource: 'manual',
         confidenceScore: null,
         confirmedAt: new Date(),
-        externalArtistName: input.artistName,
-        externalArtistUrl: input.url,
+        externalArtistName: artistName,
+        externalArtistUrl: normalizedUrl,
       });
     }
 

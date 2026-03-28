@@ -2,6 +2,8 @@
 
 import { ExternalLink } from 'lucide-react';
 import Image from 'next/image';
+import { useTheme } from 'next-themes';
+import { useEffect, useMemo, useState } from 'react';
 import type { DspPresenceItem } from '@/app/app/(shell)/dashboard/presence/actions';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
@@ -11,6 +13,7 @@ import {
 } from '@/features/dashboard/atoms/DspProviderIcon';
 import { MatchStatusBadge } from '@/features/dashboard/atoms/MatchStatusBadge';
 import { cn } from '@/lib/utils';
+import { getContrastSafeIconColor } from '@/lib/utils/color';
 import { isExternalDspImage } from '@/lib/utils/dsp-images';
 
 interface DspPresenceCardProps {
@@ -29,6 +32,18 @@ export function DspPresenceCard({
   const label = PROVIDER_LABELS[item.providerId];
   const isManual = item.matchSource === 'manual';
 
+  // Match DspProviderIcon's contrast-safe color transform for dark mode
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const isDark = mounted ? resolvedTheme === 'dark' : false;
+  const borderColor = useMemo(
+    () => getContrastSafeIconColor(PROVIDER_COLORS[item.providerId], isDark),
+    [isDark, item.providerId]
+  );
+
   return (
     <ContentSurfaceCard
       className={cn(
@@ -36,7 +51,7 @@ export function DspPresenceCard({
         isSelected && 'ring-1 ring-[#7170ff]/50',
         'hover:bg-surface-1/50'
       )}
-      style={{ borderLeftColor: PROVIDER_COLORS[item.providerId] }}
+      style={{ borderLeftColor: borderColor }}
       data-testid={`presence-card-${item.matchId}`}
     >
       <div className='flex items-center'>

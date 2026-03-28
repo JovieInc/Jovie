@@ -16,7 +16,10 @@ export function DspPresenceEmptyState({
   const [dialogOpen, setDialogOpen] = useState(false);
 
   return (
-    <div className='flex h-full items-center justify-center p-8'>
+    <div
+      className='flex h-full items-center justify-center p-8'
+      data-testid='presence-empty-state'
+    >
       <EmptyState
         icon={<Radio className='h-12 w-12' />}
         heading='No DSP profiles found'
