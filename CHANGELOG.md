@@ -12,6 +12,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Tab overflow mechanism with collapse-to-dropdown behavior for drawer tabs, keeping all tabs accessible when space is constrained
 - `DashboardWorkspacePanel` shared wrapper component with toolbar slot for consistent page body structure across all 5 dashboard routes
 - `distribution` prop on TabBar and DrawerTabs to support fill-width tab distribution
+- Visual flag badge system: flagged UI regions show dashed outlines + clickable name chips when dev toolbar is active (Cmd+Shift+F to toggle)
+- `<Flagged>` wrapper component for marking feature-flagged UI regions
+- Flag badge toggle button in dev toolbar bottom bar
 
 ### Changed
 
@@ -22,6 +25,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Sidebar nav states driven by design tokens instead of opacity modifiers (`/78`, `/92` removed)
 - App shell and sidebar extended to bottom edge of viewport, eliminating dead space
 - Drawer tabs fill available width where appropriate instead of undersized intrinsic pills
+- All 16 Statsig gates consolidated into `FEATURE_FLAGS` as code-level booleans, toggleable via dev toolbar
+- `useFeatureGate` replaced with `useCodeFlag` across all consumers
+- `FeatureFlagsProvider` no longer requires server-side bootstrap prop
+- DevToolbar unified flag list shows all flags as "code" source (no more statsig/code split)
 
 ### Fixed
 
@@ -34,6 +41,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Earnings page missing `sr-only` H1 for accessibility
 - Bottom gap padding removed from earnings page body
 - Unused import in ReleaseTableSubheader test cleaned up
+
+### Removed
+
+- `statsig-node` dependency and all Statsig server SDK integration
+- `lib/feature-flags/server.ts` (Statsig init, gate evaluation, bootstrap)
+- `lib/feature-flags/stripe-connect.ts` (domain-specific Statsig wrapper)
+- Server-side feature flag bootstrap in shell, auth, and onboarding layouts
 
 ## [26.4.87] - 2026-03-27
 

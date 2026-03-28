@@ -1,4 +1,4 @@
-import { checkGate, FEATURE_FLAG_KEYS } from '@/lib/feature-flags/server';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import type { FeaturedCreator } from '@/lib/featured-creators';
 import {
   getCreatorByHandle,
@@ -20,19 +20,13 @@ const Separator = (
 );
 
 /**
- * "See it in action" section gated by Statsig.
- * When the gate is off, the section is hidden entirely.
+ * "See it in action" section gated by feature flag.
+ * When the flag is off, the section is hidden entirely.
  * When on, always fetches real profiles: tim pinned first,
  * remaining slots from featured creators.
  */
 export async function SeeItInActionSafe() {
-  const showSection = await checkGate(
-    null,
-    FEATURE_FLAG_KEYS.SHOW_SEE_IT_IN_ACTION,
-    false
-  );
-
-  if (!showSection) return null;
+  if (!FEATURE_FLAGS.SHOW_SEE_IT_IN_ACTION) return null;
 
   try {
     const [timProfile, dbCreators] = await Promise.all([

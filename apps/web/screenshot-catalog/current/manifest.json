@@ -63,8 +63,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-03-28T01:23:13.680Z",
-    "gitSha": "4145b9fb8a22498f13821e7b4c117770a38ad011",
+    "capturedAt": "2026-03-28T01:33:15.463Z",
+    "gitSha": "b4069bbf8a14cf372e7bda192f67a2e4b694591b",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },

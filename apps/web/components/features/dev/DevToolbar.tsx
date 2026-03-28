@@ -8,6 +8,7 @@ import {
   ChevronUp,
   Copy,
   ExternalLink,
+  Flag,
   Globe,
   Loader2,
   Monitor,
@@ -28,7 +29,6 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   CODE_FLAG_KEYS,
-  FEATURE_FLAG_KEYS,
   FEATURE_FLAGS,
   FF_OVERRIDES_KEY,
 } from '@/lib/feature-flags/shared';
@@ -37,6 +37,7 @@ import {
   SW_ENABLED_KEY,
   unregisterServiceWorker,
 } from '@/lib/service-worker/control';
+import { useFlagBadges } from './FlagBadgeContext';
 
 function useLocalOverrides() {
   const [overrides, setOverrides] = useState<Record<string, boolean>>(() => {
@@ -76,28 +77,18 @@ function useLocalOverrides() {
 type FlagEntry = {
   name: string;
   key: string;
-  source: 'statsig' | 'code';
+  source: 'code';
   serverDefault: boolean;
 };
 
-const ALL_FLAGS: FlagEntry[] = [
-  ...(Object.entries(FEATURE_FLAG_KEYS) as [string, string][]).map(
-    ([name, key]) => ({
-      name,
-      key,
-      source: 'statsig' as const,
-      serverDefault: false,
-    })
-  ),
-  ...(Object.entries(CODE_FLAG_KEYS) as [string, string][]).map(
-    ([name, key]) => ({
-      name,
-      key,
-      source: 'code' as const,
-      serverDefault: FEATURE_FLAGS[name as keyof typeof FEATURE_FLAGS],
-    })
-  ),
-];
+const ALL_FLAGS: FlagEntry[] = (
+  Object.entries(CODE_FLAG_KEYS) as [string, string][]
+).map(([name, key]) => ({
+  name,
+  key,
+  source: 'code' as const,
+  serverDefault: FEATURE_FLAGS[name as keyof typeof FEATURE_FLAGS],
+}));
 
 const BREAKPOINTS = [
   { name: '2xl', min: 1536 },
@@ -260,6 +251,7 @@ export function DevToolbar({
   } | null>(null);
   const { theme, setTheme } = useTheme();
   const overridesCtx = useLocalOverrides();
+  const flagBadgeCtx = useFlagBadges();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const breakpoint = useBreakpoint();
@@ -284,6 +276,14 @@ export function DevToolbar({
         localStorage.setItem(TOOLBAR_HIDDEN_KEY, nextHidden ? '1' : '0');
         return;
       }
+      // Cmd+Shift+F: toggle flag badges
+      const isBadgeShortcut =
+        e.shiftKey && (e.metaKey || e.ctrlKey) && e.key === 'f';
+      if (isBadgeShortcut) {
+        e.preventDefault();
+        flagBadgeCtx?.toggleBadges();
+        return;
+      }
       if (e.key === 'Escape' && open) {
         e.preventDefault();
         setOpen(false);
@@ -292,7 +292,7 @@ export function DevToolbar({
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [hidden, open]);
+  }, [hidden, open, flagBadgeCtx]);
 
   // Expose toolbar height as a CSS variable so scrollable content areas can
   // add their own bottom padding without shrinking the full-viewport app shell.
@@ -680,6 +680,23 @@ export function DevToolbar({
 
         {/* Quick actions */}
         <div className='flex items-center gap-0.5'>
+          {/* Flag badges toggle */}
+          <button
+            type='button'
+            onClick={() => flagBadgeCtx?.toggleBadges()}
+            title={`${flagBadgeCtx?.showBadges ? 'Hide' : 'Show'} flag badges (⌘⇧F)`}
+            className={`p-1.5 rounded transition-colors ${
+              flagBadgeCtx?.showBadges
+                ? 'text-[var(--color-accent)] bg-[var(--color-accent)]/10'
+                : 'text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)]'
+            }`}
+            aria-label='Toggle flag badges'
+          >
+            <Flag size={12} />
+          </button>
+
+          <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+
           {/* Theme picker */}
           {[
             { value: 'dark', icon: Moon, label: 'Dark theme' },

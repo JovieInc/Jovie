@@ -12,7 +12,7 @@ import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
-import { isStripeConnectEnabled } from '@/lib/feature-flags/stripe-connect';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
@@ -22,8 +22,7 @@ export async function POST() {
   if (error) return error;
 
   // Check feature flag
-  const enabled = await isStripeConnectEnabled(clerkUserId);
-  if (!enabled) {
+  if (!FEATURE_FLAGS.STRIPE_CONNECT_ENABLED) {
     return NextResponse.json(
       { error: 'Stripe Connect is not enabled' },
       { status: 403, headers: NO_STORE_HEADERS }

@@ -16,16 +16,17 @@ function setLocalOverrides(overrides: Record<string, boolean>) {
 
 vi.mock('@/lib/feature-flags/shared', () => ({
   FF_OVERRIDES_KEY: '__ff_overrides',
-  FEATURE_FLAG_KEYS: {
-    CLAIM_HANDLE: 'feature_claim_handle',
-    HERO_SPOTIFY: 'feature_hero_spotify',
-    BILLING_UPGRADE: 'billing.upgradeDirect',
-  },
   CODE_FLAG_KEYS: {
+    CLAIM_HANDLE: 'code:CLAIM_HANDLE',
+    HERO_SPOTIFY: 'code:HERO_SPOTIFY',
+    BILLING_UPGRADE: 'code:BILLING_UPGRADE',
     THREADS_ENABLED: 'code:THREADS_ENABLED',
     PWA_INSTALL_BANNER: 'code:PWA_INSTALL_BANNER',
   },
   FEATURE_FLAGS: {
+    CLAIM_HANDLE: false,
+    HERO_SPOTIFY: false,
+    BILLING_UPGRADE: false,
     THREADS_ENABLED: false,
     PWA_INSTALL_BANNER: false,
   },
@@ -294,7 +295,7 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      // Should show "5 of 5" initially (3 statsig + 2 code)
+      // Should show "5 of 5" initially (all 5 code flags)
       expect(screen.getByText('5 of 5')).toBeInTheDocument();
 
       const searchInput = screen.getByPlaceholderText('Search flags...');
@@ -329,7 +330,7 @@ describe('DevToolbar', () => {
   // ─── Unified Flag List ──────────────────────────────────────
 
   describe('unified flag list', () => {
-    it('shows both statsig and code flags in one list', () => {
+    it('shows all code flags in one list', () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
@@ -341,8 +342,8 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      const sourceLabels = screen.getAllByText(/^(statsig|code)$/);
-      expect(sourceLabels.length).toBe(5); // 3 statsig + 2 code
+      const sourceLabels = screen.getAllByText(/^code$/);
+      expect(sourceLabels.length).toBe(5); // all code flags
     });
   });
 
@@ -350,7 +351,7 @@ describe('DevToolbar', () => {
 
   describe('override sorting', () => {
     it('shows overrides group when flags are overridden', () => {
-      setLocalOverrides({ feature_claim_handle: true });
+      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
@@ -365,7 +366,7 @@ describe('DevToolbar', () => {
     });
 
     it('shows server default for overridden flags', () => {
-      setLocalOverrides({ feature_claim_handle: true });
+      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
@@ -373,7 +374,7 @@ describe('DevToolbar', () => {
     });
 
     it('shows clear all button in overrides group', () => {
-      setLocalOverrides({ feature_claim_handle: true });
+      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
@@ -381,7 +382,7 @@ describe('DevToolbar', () => {
     });
 
     it('clears all overrides when clear all is clicked', () => {
-      setLocalOverrides({ feature_claim_handle: true });
+      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
@@ -391,7 +392,7 @@ describe('DevToolbar', () => {
 
     it('shows correct override count for multiple overrides', () => {
       setLocalOverrides({
-        feature_claim_handle: true,
+        'code:CLAIM_HANDLE': true,
         'code:THREADS_ENABLED': true,
       });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
@@ -442,7 +443,7 @@ describe('DevToolbar', () => {
 
   describe('toggle flash feedback', () => {
     it('applies flash class when an already-overridden flag is toggled', () => {
-      setLocalOverrides({ feature_claim_handle: true });
+      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
@@ -460,7 +461,7 @@ describe('DevToolbar', () => {
 
   describe('override badge', () => {
     it('shows override count in collapsed bar when overrides exist', () => {
-      setLocalOverrides({ feature_claim_handle: true });
+      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
       renderToolbar();
 
       expect(screen.getByText('1 override')).toBeInTheDocument();
@@ -468,7 +469,7 @@ describe('DevToolbar', () => {
 
     it('uses plural for multiple overrides', () => {
       setLocalOverrides({
-        feature_claim_handle: true,
+        'code:CLAIM_HANDLE': true,
         'code:THREADS_ENABLED': true,
       });
       renderToolbar();
@@ -483,7 +484,7 @@ describe('DevToolbar', () => {
     });
 
     it('opens panel when badge is clicked and panel is collapsed', () => {
-      setLocalOverrides({ feature_claim_handle: true });
+      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
       renderToolbar();
 
       // Panel should be collapsed

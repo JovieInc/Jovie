@@ -142,11 +142,18 @@ export default async function RootLayout({
   const devVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? '';
 
   let devToolbar: React.ReactNode = null;
+  let FlagBadgeProvider: React.ComponentType<{
+    children: React.ReactNode;
+  }> | null = null;
 
   if (!(isE2EClientRuntime || devEnv === 'production')) {
     const { DevToolbarGate } = await import(
       '@/components/features/dev/DevToolbarGate'
     );
+    const flagBadgeMod = await import(
+      '@/components/features/dev/FlagBadgeContext'
+    );
+    FlagBadgeProvider = flagBadgeMod.FlagBadgeProvider;
 
     devToolbar = (
       <DevToolbarGate
@@ -159,6 +166,15 @@ export default async function RootLayout({
   }
 
   const bodyClassName = `${inter.variable} font-sans antialiased bg-base text-primary-token`;
+
+  const content = (
+    <>
+      {children}
+      {devToolbar}
+      <CookieBannerMount />
+    </>
+  );
+
   return (
     <html
       lang='en'
@@ -168,9 +184,11 @@ export default async function RootLayout({
     >
       <head />
       <body className={bodyClassName}>
-        {children}
-        {devToolbar}
-        <CookieBannerMount />
+        {FlagBadgeProvider ? (
+          <FlagBadgeProvider>{content}</FlagBadgeProvider>
+        ) : (
+          content
+        )}
       </body>
     </html>
   );
