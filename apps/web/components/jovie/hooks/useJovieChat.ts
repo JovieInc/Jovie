@@ -213,11 +213,15 @@ export function useJovieChat({
     hasHydratedRef.current = activeConversationId;
   }, [initialMessages, setMessages, status, activeConversationId]);
 
-  // Wrap stop to clear pending submission state so the composer re-enables
-  // immediately instead of waiting for the 30s safety timeout.
+  // Wrap stop to clear submission state so the composer re-enables immediately
+  // instead of waiting for the 30s safety timeout.
+  // NOTE: We intentionally do NOT clear pendingMessagesRef here. When the stream
+  // aborts, status will transition back to 'ready', and the persistence effect
+  // needs pendingMessagesRef to still be populated so it can save the user message
+  // (and any partial assistant response) to the database. Clearing it here would
+  // cause aborted turns to silently disappear on reload.
   const stop = useCallback(() => {
     rawStop();
-    pendingMessagesRef.current = null;
     setIsSubmitting(false);
   }, [rawStop]);
 
