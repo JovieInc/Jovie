@@ -92,12 +92,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          BRANCH="screenshots/auto-update"
+          BRANCH="screenshots/auto-update-${GITHUB_RUN_ID}"
           git checkout -b "$BRANCH"
           git add apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
           git commit -m "chore: update product screenshots [auto]"
-          git fetch origin "$BRANCH" 2>/dev/null || true
-          git push --force-with-lease origin "$BRANCH"
+          git push -u origin "$BRANCH"
 
           EXISTING_PR=$(gh pr list --head "$BRANCH" --json number \
             -q '.[0].number' 2>/dev/null || true)
