@@ -1,6 +1,6 @@
 'use server';
 
-import { eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -450,7 +450,7 @@ export async function deleteCreatorOrUserAction(
 }
 
 export async function banUserAction(formData: FormData): Promise<void> {
-  const adminUserId = await requireAdmin();
+  const adminClerkId = await requireAdmin();
 
   const userId = formData.get('userId');
   const reason = formData.get('reason');
@@ -463,8 +463,19 @@ export async function banUserAction(formData: FormData): Promise<void> {
     throw new TypeError('reason is required');
   }
 
-  // Self-ban guard
-  if (userId === adminUserId) {
+  // Resolve admin Clerk ID to DB UUID for audit log FK
+  const [adminUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, adminClerkId))
+    .limit(1);
+
+  if (!adminUser) {
+    throw new TypeError('Admin user not found in database');
+  }
+
+  // Self-ban guard (compare DB UUIDs)
+  if (userId === adminUser.id) {
     throw new TypeError('Cannot ban your own account');
   }
 
@@ -487,7 +498,7 @@ export async function banUserAction(formData: FormData): Promise<void> {
       .where(eq(users.id, userId));
 
     await tx.insert(adminAuditLog).values({
-      adminUserId,
+      adminUserId: adminUser.id,
       targetUserId: userId,
       action: 'ban_user',
       metadata: {
@@ -522,7 +533,7 @@ export async function banUserAction(formData: FormData): Promise<void> {
 }
 
 export async function unbanUserAction(formData: FormData): Promise<void> {
-  const adminUserId = await requireAdmin();
+  const adminClerkId = await requireAdmin();
 
   const userId = formData.get('userId');
 
@@ -530,9 +541,20 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
     throw new TypeError('userId is required');
   }
 
+  // Resolve admin Clerk ID to DB UUID for audit log FK
+  const [adminUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, adminClerkId))
+    .limit(1);
+
+  if (!adminUser) {
+    throw new TypeError('Admin user not found in database');
+  }
+
   // Atomic: restore to previous status + write audit log
-  // Look up the most recent ban audit entry to find what the user's status was
-  // before banning. Default to 'active' if no previous status recorded.
+  // Look up the most recent ban_user audit entry to find what the user's
+  // status was before banning. Default to 'active' if no record found.
   const result = await runLegacyDbTransaction(async tx => {
     const [user] = await tx
       .select({ clerkId: users.clerkId })
@@ -544,12 +566,17 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
       throw new TypeError('User not found');
     }
 
-    // Find the previous status from the ban audit log
+    // Find the previous status from the most recent ban audit entry
     const [banEntry] = await tx
       .select({ metadata: adminAuditLog.metadata })
       .from(adminAuditLog)
-      .where(eq(adminAuditLog.targetUserId, userId))
-      .orderBy(adminAuditLog.createdAt)
+      .where(
+        and(
+          eq(adminAuditLog.targetUserId, userId),
+          eq(adminAuditLog.action, 'ban_user')
+        )
+      )
+      .orderBy(desc(adminAuditLog.createdAt))
       .limit(1);
 
     const previousStatus = (
@@ -583,7 +610,7 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
       .where(eq(users.id, userId));
 
     await tx.insert(adminAuditLog).values({
-      adminUserId,
+      adminUserId: adminUser.id,
       targetUserId: userId,
       action: 'unban_user',
       metadata: { restoredTo: restoreStatus },
