@@ -425,15 +425,36 @@ const measureWarmShellResponse = async (
 
 /**
  * Measure skeleton-to-content time.
- * Waits for [data-testid="releases-loading"] to disappear and real content to render.
+ *
+ * For dashboard releases: waits for [data-testid="releases-loading"] to disappear.
+ * For /app (chat): waits for [data-testid="chat-content"] to appear (JovieChat mounted)
+ * or the dashboard nav to appear (shell + data loaded).
+ * Falls back to generic skeleton/content detection.
  */
 const measureSkeletonToContent = async (
   page: Awaited<
     ReturnType<Awaited<ReturnType<typeof chromium.launch>>['newPage']>
-  >
+  >,
+  pathname?: string
 ): Promise<number> => {
   const start = Date.now();
+  const isChatPage = pathname === '/app' || pathname === '/app/';
 
+  if (isChatPage) {
+    try {
+      // Wait for JovieChat to mount (data-testid="chat-content").
+      // This is the real content-ready signal — not the nav or shell skeleton.
+      await page.waitForSelector('[data-testid="chat-content"]', {
+        state: 'visible',
+        timeout: 15000,
+      });
+      return Date.now() - start;
+    } catch {
+      return Date.now() - start;
+    }
+  }
+
+  // Dashboard releases path
   try {
     await page.waitForSelector('[data-testid="releases-loading"]', {
       state: 'detached',
@@ -514,6 +535,27 @@ const collectMetrics = async (
       logInfo(`  🔐 Injected ${cookies.length} auth cookies`);
     }
 
+    // Pre-warm authenticated routes: hit the URL once to populate
+    // unstable_cache and Neon connection pool. Without this, the first
+    // Playwright request measures DB cold start, not steady-state perf.
+    if (needsAuth) {
+      const warmupContext = await browser.newContext();
+      try {
+        if (cookies.length > 0) {
+          await warmupContext.addCookies(cookies);
+        }
+        const warmupPage = await warmupContext.newPage();
+        await warmupPage
+          .goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 })
+          .catch(() => undefined);
+        await warmupPage.waitForTimeout(2000);
+        await warmupPage.close().catch(() => undefined);
+      } finally {
+        await warmupContext.close().catch(() => undefined);
+      }
+      logInfo('  🔥 Pre-warmed server cache');
+    }
+
     let warmShellResponse = 0;
     if (shouldMeasureWarmShellResponse(url, needsAuth)) {
       const warmContext = await browser.newContext();
@@ -535,7 +577,10 @@ const collectMetrics = async (
     await page.addInitScript(PERF_BUDGET_INIT_SCRIPT);
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    const skeletonToContentPromise = measureSkeletonToContent(page);
+    const skeletonToContentPromise = measureSkeletonToContent(
+      page,
+      new URL(url).pathname
+    );
 
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {
       logWarning(
