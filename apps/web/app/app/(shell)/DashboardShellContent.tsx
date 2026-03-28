@@ -1,13 +1,57 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
+import { APP_ROUTES } from '@/constants/routes';
 import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
 import { OperatorBanner } from '@/features/admin/OperatorBanner';
 import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
 import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
-import { getDashboardData, setSidebarCollapsed } from './dashboard/actions';
+import {
+  getDashboardData,
+  getDashboardDataEssential,
+  setSidebarCollapsed,
+} from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
 import { ProfileCompletionRedirect } from './ProfileCompletionRedirect';
+
+function resolveRequestPath(nextUrlHeader: string | null): string | null {
+  if (!nextUrlHeader) {
+    return null;
+  }
+
+  try {
+    return new URL(nextUrlHeader, 'https://jovie.local').pathname;
+  } catch {
+    return null;
+  }
+}
+
+function shouldUseEssentialShellData(pathname: string | null): boolean {
+  if (!pathname) {
+    return false;
+  }
+
+  return (
+    pathname === APP_ROUTES.DASHBOARD ||
+    pathname === APP_ROUTES.DASHBOARD_RELEASES ||
+    pathname === APP_ROUTES.CHAT ||
+    pathname.startsWith(`${APP_ROUTES.CHAT}/`)
+  );
+}
+
+function shouldRedirectToOnboarding(pathname: string | null): boolean {
+  if (!pathname) {
+    return false;
+  }
+
+  return (
+    pathname === APP_ROUTES.DASHBOARD ||
+    pathname === APP_ROUTES.DASHBOARD_RELEASES ||
+    pathname === APP_ROUTES.CHAT ||
+    pathname.startsWith(`${APP_ROUTES.CHAT}/`)
+  );
+}
 
 /**
  * Async server component that fetches dashboard data,
@@ -24,12 +68,22 @@ export async function DashboardShellContent({
 }: {
   readonly children: React.ReactNode;
 }) {
-  // Full dashboard data fetch — the provider wraps the entire (shell) tree
-  // and client components (DashboardTipping, ProfileCompletion, etc.) read
-  // tippingStats, hasSocialLinks, hasMusicLinks from context. Using the
-  // essential fetch here would return zeros for those fields.
-  // The Suspense boundary in the layout streams the skeleton while this resolves.
-  const dashboardData = await getDashboardData();
+  // Keep the shell fast on the chat-first landing path and releases.
+  // Other dashboard/settings routes still receive the full dashboard context
+  // because they rely on supplementary fields from the slower fetch.
+  const headerStore = await headers();
+  const pathname = resolveRequestPath(headerStore.get('next-url'));
+  const dashboardData = shouldUseEssentialShellData(pathname)
+    ? await getDashboardDataEssential()
+    : await getDashboardData();
+
+  if (
+    shouldRedirectToOnboarding(pathname) &&
+    dashboardData.needsOnboarding &&
+    !dashboardData.dashboardLoadError
+  ) {
+    redirect(APP_ROUTES.ONBOARDING);
+  }
 
   // Read sidebar cookie server-side so SSR matches client state (no flash)
   const cookieStore = await cookies();

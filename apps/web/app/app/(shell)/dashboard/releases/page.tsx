@@ -5,11 +5,10 @@ import { ReleasesExperience } from '@/features/dashboard/organisms/release-provi
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
-import { HydrateClient, queryKeys } from '@/lib/queries';
-import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
+import { HydrateClient } from '@/lib/queries';
+import { getDehydratedState } from '@/lib/queries/server';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
-import { getDashboardData } from '../actions';
-import type { DashboardData } from '../actions/dashboard-data';
+import { getDashboardDataEssential } from '../actions';
 import {
   checkAppleMusicConnection,
   checkSpotifyConnection,
@@ -36,7 +35,23 @@ export default async function ReleasesPage() {
     );
   }
 
-  const dashboardData = await getDashboardData();
+  return (
+    <HydrateClient state={getDehydratedState()}>
+      <ReleasesClientBoundary>
+        <Suspense fallback={<ReleaseTableSkeleton />}>
+          <ReleasesContent />
+        </Suspense>
+      </ReleasesClientBoundary>
+    </HydrateClient>
+  );
+}
+
+/**
+ * Async server component that fetches all release data in parallel.
+ * Wrapped in Suspense above so the skeleton shows instantly.
+ */
+async function ReleasesContent({}: Readonly<Record<never, never>>) {
+  const dashboardData = await getDashboardDataEssential();
 
   if (dashboardData.dashboardLoadError) {
     void captureError(
@@ -53,36 +68,6 @@ export default async function ReleasesPage() {
     redirect(APP_ROUTES.ONBOARDING);
   }
 
-  // Prefetch releases into TanStack Query for SPA navigation cache
-  const profileId = dashboardData.selectedProfile?.id;
-  if (profileId) {
-    const queryClient = getQueryClient();
-    await queryClient.prefetchQuery({
-      queryKey: queryKeys.releases.matrix(profileId),
-      queryFn: () => loadReleaseMatrix(profileId),
-    });
-  }
-
-  return (
-    <HydrateClient state={getDehydratedState()}>
-      <ReleasesClientBoundary>
-        <Suspense fallback={<ReleaseTableSkeleton />}>
-          <ReleasesContent dashboardData={dashboardData} />
-        </Suspense>
-      </ReleasesClientBoundary>
-    </HydrateClient>
-  );
-}
-
-/**
- * Async server component that fetches all release data in parallel.
- * Wrapped in Suspense above so the skeleton shows instantly.
- */
-async function ReleasesContent({
-  dashboardData,
-}: Readonly<{
-  dashboardData: DashboardData;
-}>) {
   // Fire all fetches in parallel — no sequential waterfall
   const [releasesResult, spotifyResult, appleMusicResult] =
     await Promise.allSettled([
