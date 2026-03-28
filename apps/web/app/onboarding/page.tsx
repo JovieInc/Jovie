@@ -39,7 +39,7 @@ export default async function OnboardingPage({
   // Gate blocked states — proxy normally prevents these from reaching here,
   // but the page must not render for banned/failed users regardless.
   if (authResult.state === CanonicalUserState.BANNED) {
-    redirect('/banned');
+    redirect('/unavailable');
   }
   if (authResult.state === CanonicalUserState.USER_CREATION_FAILED) {
     redirect('/error/user-creation-failed');

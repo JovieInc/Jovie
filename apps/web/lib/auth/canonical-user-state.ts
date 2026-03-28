@@ -149,7 +149,7 @@ const STATE_REDIRECT_MAP: Record<CanonicalUserState, string | null> = {
   [CanonicalUserState.NEEDS_WAITLIST_SUBMISSION]: '/waitlist',
   [CanonicalUserState.WAITLIST_PENDING]: '/waitlist',
   [CanonicalUserState.NEEDS_ONBOARDING]: '/onboarding?fresh_signup=true',
-  [CanonicalUserState.BANNED]: '/banned',
+  [CanonicalUserState.BANNED]: '/unavailable',
   [CanonicalUserState.USER_CREATION_FAILED]: '/error/user-creation-failed',
   [CanonicalUserState.ACTIVE]: null,
 };
