@@ -421,12 +421,13 @@ export function DashboardTipping() {
 
   return (
     <>
+      <h1 className='sr-only'>Earnings Dashboard</h1>
       <DashboardWorkspacePanel
         toolbar={toolbar}
         data-testid='dashboard-earnings-workspace'
       >
         <div className='flex-1 overflow-y-auto overflow-x-hidden'>
-          <div className='flex flex-col gap-5 px-3 py-3 pb-6 sm:px-4 sm:py-4'>
+          <div className='flex flex-col gap-5 px-3 py-3 sm:px-4 sm:py-4'>
             {!hasVenmoHandle && (
               <>
                 <ContentSurfaceCard className='px-6 py-12 sm:px-8 sm:py-14'>
