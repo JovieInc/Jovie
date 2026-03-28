@@ -297,9 +297,14 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
           reason: banReason.trim(),
         }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Failed to suspend user');
+      const contentType = res.headers.get('content-type') ?? '';
+      if (!res.ok || !contentType.includes('application/json')) {
+        const data = contentType.includes('application/json')
+          ? await res.json().catch(() => ({}))
+          : {};
+        throw new Error(
+          (data as { error?: string }).error ?? 'Failed to suspend user'
+        );
       }
       toast.success('User suspended');
       setBanTarget(null);
@@ -326,9 +331,14 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         },
         body: JSON.stringify({ userId: unbanTarget.id }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Failed to restore user');
+      const contentType = res.headers.get('content-type') ?? '';
+      if (!res.ok || !contentType.includes('application/json')) {
+        const data = contentType.includes('application/json')
+          ? await res.json().catch(() => ({}))
+          : {};
+        throw new Error(
+          (data as { error?: string }).error ?? 'Failed to restore user'
+        );
       }
       toast.success('User restored');
       setUnbanTarget(null);

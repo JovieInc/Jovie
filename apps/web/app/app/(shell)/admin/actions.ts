@@ -518,7 +518,7 @@ export async function banUserAction(formData: FormData): Promise<void> {
       throw new TypeError('User not found');
     }
 
-    if (current.userStatus === 'banned') {
+    if (current.userStatus === 'banned' || current.userStatus === 'suspended') {
       throw new TypeError('User is already suspended');
     }
 
@@ -636,7 +636,6 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
 
     const VALID_RESTORE_STATUSES = new Set([
       'active',
-      'suspended',
       'waitlist_pending',
       'waitlist_approved',
       'profile_claimed',
@@ -645,7 +644,6 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
 
     type RestoreStatus =
       | 'active'
-      | 'suspended'
       | 'waitlist_pending'
       | 'waitlist_approved'
       | 'profile_claimed'
