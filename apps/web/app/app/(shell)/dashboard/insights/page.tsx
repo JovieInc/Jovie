@@ -71,18 +71,83 @@ async function InsightsContentSection() {
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Section-specific skeleton fallbacks                                       */
+/* -------------------------------------------------------------------------- */
+
+const FILTER_SKELETON_KEYS = Array.from({ length: 5 }, (_, i) => `filter-${i}`);
+const SKELETON_KEYS = Array.from({ length: 4 }, (_, i) => `insight-${i}`);
+
+function InsightsHeaderSkeleton() {
+  return (
+    <div className='flex items-center justify-between'>
+      <div className='space-y-1.5'>
+        <div className='h-5 w-28 skeleton motion-reduce:animate-none rounded' />
+        <div className='h-3 w-48 skeleton motion-reduce:animate-none rounded' />
+      </div>
+      <div className='h-8 w-28 skeleton motion-reduce:animate-none rounded-lg' />
+    </div>
+  );
+}
+
+function InsightsFiltersSkeleton() {
+  return (
+    <div className='flex gap-1.5'>
+      {FILTER_SKELETON_KEYS.map(key => (
+        <div
+          key={key}
+          className='h-7 w-20 skeleton motion-reduce:animate-none rounded-full'
+        />
+      ))}
+    </div>
+  );
+}
+
+function InsightsCardsSkeleton() {
+  return (
+    <div className='space-y-3'>
+      {SKELETON_KEYS.map(key => (
+        <div
+          key={key}
+          className='h-28 skeleton motion-reduce:animate-none rounded-xl border border-subtle'
+        />
+      ))}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Page — sync shell with independent Suspense streaming boundaries          */
+/* -------------------------------------------------------------------------- */
+
 export default async function InsightsPage() {
   const { userId } = await getCachedAuth();
+
   if (!userId) {
     redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.INSIGHTS}`);
   }
 
   return (
     <>
+      {/* Guard: invisible, triggers onboarding redirect independently */}
       <Suspense fallback={null}>
         <InsightsOnboardingGuard />
       </Suspense>
-      <InsightsContentSection />
+
+      {/* Content: header, filter pills, priority-grouped insight cards.
+          The skeleton is split into visual sections so the page layout
+          remains stable while streaming. */}
+      <Suspense
+        fallback={
+          <div className='max-w-3xl space-y-6'>
+            <InsightsHeaderSkeleton />
+            <InsightsFiltersSkeleton />
+            <InsightsCardsSkeleton />
+          </div>
+        }
+      >
+        <InsightsContentSection />
+      </Suspense>
     </>
   );
 }
