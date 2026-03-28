@@ -535,6 +535,7 @@ export function convertArtistToCreatorProfile(
     apple_music_url: artist.apple_music_url,
     youtube_url: artist.youtube_url,
     spotify_id: artist.spotify_id,
+    career_highlights: artist.career_highlights ?? null,
     is_public: artist.published,
     is_verified: artist.is_verified,
     is_featured: artist.is_featured,
