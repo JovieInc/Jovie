@@ -190,11 +190,11 @@ export const profileUpdateSchema = z
     venmo_handle: venmoHandleSchema.optional(),
     /** Genre tags for the profile */
     genres: z.array(z.string().max(40).trim()).max(3).optional(),
-    /** Artist pitch context for AI-generated playlist pitches */
-    pitchContext: z
+    /** Career highlights for AI-generated playlist pitches */
+    careerHighlights: z
       .string()
       .trim()
-      .max(2000, 'Pitch context must be 2000 characters or fewer')
+      .max(2000, 'Career highlights must be 2000 characters or fewer')
       .optional(),
     /** Target Spotify playlists for pitch generation */
     targetPlaylists: targetPlaylistsSchema,

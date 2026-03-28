@@ -14,7 +14,7 @@ const FULL_INPUT: PitchInput = {
     activeSinceYear: 2018,
     spotifyFollowers: 15000,
     spotifyPopularity: 45,
-    pitchContext:
+    careerHighlights:
       '500K+ streams on Spotify. Featured on New Music Friday twice. Recent radio play on KCRW.',
     targetPlaylists: ['Pollen', 'mint'],
   },
@@ -45,7 +45,7 @@ const MINIMAL_INPUT: PitchInput = {
     activeSinceYear: null,
     spotifyFollowers: null,
     spotifyPopularity: null,
-    pitchContext: null,
+    careerHighlights: null,
     targetPlaylists: null,
   },
   release: {
@@ -114,7 +114,7 @@ describe('buildUserPrompt', () => {
     expect(prompt).toContain('2018');
   });
 
-  it('includes pitch context when provided', () => {
+  it('includes career highlights when provided', () => {
     const prompt = buildUserPrompt(FULL_INPUT);
     expect(prompt).toContain('500K+ streams');
     expect(prompt).toContain('New Music Friday');
@@ -156,8 +156,8 @@ describe('buildUserPrompt', () => {
     expect(prompt).not.toContain('null');
   });
 
-  it('does not include pitch context section when empty', () => {
+  it('does not include career highlights section when empty', () => {
     const prompt = buildUserPrompt(MINIMAL_INPUT);
-    expect(prompt).not.toContain('Artist-Provided Context');
+    expect(prompt).not.toContain('Career Highlights');
   });
 });

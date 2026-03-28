@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.86] - 2026-03-27
+## [26.4.87] - 2026-03-27
 
 ### Added
 
@@ -22,6 +22,19 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Release target playlists component resets properly when switching between releases (key-based remount)
 - Error toast displayed when saving target playlists fails (previously swallowed)
+
+## [26.4.86] - 2026-03-28
+
+### Added
+
+- Welcome message now prompts new artists to share career highlights when the field is empty, improving pitch quality from the first interaction
+- Golden path E2E test suite covering post-onboarding flows: welcome message, core pages, settings persistence, and chat send/receive
+
+### Changed
+
+- Rename "Pitch Context" to "Career Highlights" across the entire stack: database column, API, validation, settings UI, pitch service, and all type interfaces
+- Extract `buildWelcomeMessage` to its own module (`lib/services/onboarding/welcome-message.ts`) for testability
+- Settings description updated to explain how career highlights improve pitches and recommendations
 
 ## [26.4.85] - 2026-03-27
 
