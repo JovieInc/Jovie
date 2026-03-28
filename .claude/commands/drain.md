@@ -1,5 +1,5 @@
 ---
-description: Fix systemic CI blockers on main, rebase all PRs, then orchestrate to zero
+description: Fix systemic CI blockers on main, rebase all PRs, then process the queue to zero
 allowed-tools: Bash(gh:*), Bash(git:*), Bash(pnpm:*), Bash(jq:*), Bash(node:*), Bash(bash:*)
 ---
 
@@ -169,22 +169,43 @@ For each duplicate group, keep the **lowest-numbered PR** and close the rest:
 gh pr close <DUPLICATE_NUMBER> --comment "Closing duplicate — #<CANONICAL> is the canonical PR."
 ```
 
-## Phase 3: Run /orchestrate
+## Phase 3: Process Remaining PRs
 
-Now that main is fixed and all PRs are rebased, use the existing orchestrate workflow to process remaining failures:
+Now that main is fixed and all PRs are rebased, process the remaining queue:
 
-Execute the full `/orchestrate` command. It will:
-- Enable auto-merge on everything passing
-- Deduplicate overlapping PRs
-- Fix remaining CI failures (branch-specific, not systemic)
-- Address review comments
-- Resolve merge conflicts
-- Close stale/stuck PRs
-- Label truly stuck PRs as `needs-human`
+### Enable auto-merge on passing PRs
+
+```bash
+OPEN_PRS=$(gh pr list --state open --json number --jq '.[].number')
+
+for PR in $OPEN_PRS; do
+  FAILING=$(gh pr checks $PR 2>/dev/null | grep -v skipping | grep "fail" | grep -v "Preview Deploy")
+  if [ -z "$FAILING" ]; then
+    echo "PR #$PR passed CI — enabling auto-merge"
+    gh pr merge $PR --auto --squash
+  else
+    echo "PR #$PR still has failures"
+  fi
+done
+```
+
+### Fix branch-specific CI failures
+
+For each PR that still has failures after the rebase:
+1. Check out the branch
+2. Identify the failure (typecheck, lint, test, etc.)
+3. Fix it, commit, and push
+4. Wait for CI to go green, then enable auto-merge
+
+### Close stale or stuck PRs
+
+PRs that can't be fixed automatically:
+- Close with a comment explaining why
+- Label as `needs-human` if human intervention is required
 
 ## Phase 4: Report
 
-After orchestrate completes, produce a final summary:
+Produce a final summary:
 
 ```bash
 # Final state
@@ -213,13 +234,6 @@ OPEN=$(gh pr list --state open --json number,title,labels --limit 100)
 - <any patterns observed, e.g. "agents keep creating a11y issues — add pre-push axe check">
 - <any recurring failure patterns to address in AGENTS.md or CI>
 ```
-
-## Key Difference from /orchestrate
-
-`/drain` adds Phase 0 and Phase 1 — diagnosing and fixing **systemic** issues on main before touching individual PRs. This prevents the pattern where you fix 17 PRs individually for the same root cause.
-
-**Use `/orchestrate`** when main is healthy and you just need to process the queue.
-**Use `/drain`** when PRs are piling up and the same checks keep failing everywhere.
 
 ## Constraints
 
