@@ -380,7 +380,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 ? 'border-black/8 bg-surface-0 dark:border-white/10'
                 : 'border-black/6 dark:border-white/8'
           )}
-          style={{ borderRadius }}
+          style={reducedMotion ? { borderRadius, boxShadow } : { borderRadius }}
         >
           {/* Image previews */}
           {hasPendingImages && onRemoveImage && (
@@ -547,7 +547,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
                   <div className='flex items-center justify-end'>
                     <span className='text-[11px] text-tertiary-token'>
-                      ⌘↵ to send · Shift+Enter for newline
+                      ⏎ to send · Shift+Enter for newline
                     </span>
                   </div>
                 </div>

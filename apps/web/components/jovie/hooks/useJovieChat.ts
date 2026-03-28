@@ -144,7 +144,13 @@ export function useJovieChat({
     );
   }, [existingConversation]);
 
-  const { messages, sendMessage, status, setMessages, stop } = useChat({
+  const {
+    messages,
+    sendMessage,
+    status,
+    setMessages,
+    stop: rawStop,
+  } = useChat({
     transport,
     onError: error => {
       captureException(error, {
@@ -206,6 +212,14 @@ export function useJovieChat({
     setMessages(initialMessages);
     hasHydratedRef.current = activeConversationId;
   }, [initialMessages, setMessages, status, activeConversationId]);
+
+  // Wrap stop to clear pending submission state so the composer re-enables
+  // immediately instead of waiting for the 30s safety timeout.
+  const stop = useCallback(() => {
+    rawStop();
+    pendingMessagesRef.current = null;
+    setIsSubmitting(false);
+  }, [rawStop]);
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
@@ -464,11 +478,6 @@ export function useJovieChat({
 
         setInput('');
 
-        // Reset textarea height
-        if (inputRef.current) {
-          inputRef.current.style.height = 'auto';
-        }
-
         return true;
       } catch (err) {
         // Transient server errors (5xx, timeout, rate-limit) were already
@@ -523,13 +532,6 @@ export function useJovieChat({
     ]
   );
 
-  /** Reset textarea height to auto. */
-  const resetTextareaHeight = useCallback(() => {
-    if (inputRef.current) {
-      inputRef.current.style.height = 'auto';
-    }
-  }, []);
-
   /** Try to handle text as a deterministic command. Returns true if handled. */
   const tryHandleCommand = useCallback(
     (trimmedText: string): boolean => {
@@ -551,11 +553,10 @@ export function useJovieChat({
       };
       setMessages(prev => [...prev, userMsg, assistantMsg]);
       setInput('');
-      resetTextareaHeight();
       command.execute(commandCtx);
       return true;
     },
-    [username, router, setMessages, setInput, resetTextareaHeight]
+    [username, router, setMessages, setInput]
   );
 
   // Core submit logic
@@ -606,7 +607,6 @@ export function useJovieChat({
 
       sendMessage(payload);
       setInput('');
-      resetTextareaHeight();
     },
     [
       isLoading,
@@ -615,7 +615,6 @@ export function useJovieChat({
       activeConversationId,
       handleCreateConversation,
       tryHandleCommand,
-      resetTextareaHeight,
     ]
   );
 
