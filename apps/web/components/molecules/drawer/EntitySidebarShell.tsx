@@ -205,7 +205,7 @@ export function EntitySidebarShell({
             </div>
           </DrawerSurfaceCard>
 
-          {isMinimalHeader && entityHeader ? (
+          {isMinimalHeader && !isEmpty && entityHeader ? (
             <div
               data-testid='entity-sidebar-entity-header'
               className='space-y-2 lg:px-1.5 lg:pr-0.5'
@@ -214,7 +214,7 @@ export function EntitySidebarShell({
             </div>
           ) : null}
 
-          {isMinimalHeader && tabs && !renderMinimalTabsInHeader ? (
+          {isMinimalHeader && !isEmpty && tabs && !renderMinimalTabsInHeader ? (
             <DrawerSurfaceCard
               variant='card'
               className='overflow-hidden'
