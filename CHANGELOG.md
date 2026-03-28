@@ -5,12 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.86] - 2026-03-27
-
-> Dashboard now streams instantly via Suspense — skeleton appears at first byte while data loads in the background.
+## [26.4.86] - 2026-03-28
 
 ### Added
 
+- Welcome message now prompts new artists to share career highlights when the field is empty, improving pitch quality from the first interaction
+- Golden path E2E test suite covering post-onboarding flows: welcome message, core pages, settings persistence, and chat send/receive
 - Performance budget for `/app` dashboard page [internal]
 - Suspense streaming shell: skeleton renders at first byte while dashboard data resolves
 - `getDashboardDataEssential()` fast-path fetch for future use (not yet wired into the shell provider) [internal]
@@ -20,6 +20,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Rename "Pitch Context" to "Career Highlights" across the entire stack: database column, API, validation, settings UI, pitch service, and all type interfaces
+- Extract `buildWelcomeMessage` to its own module (`lib/services/onboarding/welcome-message.ts`) for testability
+- Settings description updated to explain how career highlights improve pitches and recommendations
 - Dashboard shell layout uses Suspense boundary with streaming fallback instead of blocking on full data fetch
 - Code-split `ProfileContactSidebar` via `next/dynamic` (sidebar panel, not critical path) [internal]
 - `generateMetadata()` on `/app` reuses deduplicated dashboard data instead of a separate DB call [internal]
