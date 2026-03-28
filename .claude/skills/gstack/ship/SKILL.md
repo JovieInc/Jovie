@@ -1530,4 +1530,19 @@ doc updates — the user runs `/ship` and documentation stays current without a 
 - **Use Greptile reply templates from greptile-triage.md.** Every reply includes evidence (inline diff, code references, re-rank suggestion). Never post vague replies.
 - **Never push without fresh verification evidence.** If code changed after Step 3 tests, re-run before pushing.
 - **Step 3.4 generates coverage tests.** They must pass before committing. Never commit failing tests.
-- **The goal is: user says `/ship`, next thing they see is the review + PR URL + auto-synced docs.**
+- **The goal is: user says `/ship`, next thing they see is the review + PR URL + auto-synced docs + merged and deployed.**
+
+---
+
+## Step 9: Auto-invoke /land-and-deploy
+
+After the PR is created and docs are synced, automatically land and deploy. Read the
+`land-and-deploy/SKILL.md` skill file (adjacent to this skill's directory) and
+execute its full workflow:
+
+1. Read the `/land-and-deploy` skill: `cat ${CLAUDE_SKILL_DIR}/../land-and-deploy/SKILL.md`
+2. Follow its instructions — it merges the PR, waits for CI and deploy, and verifies
+   production health via canary checks.
+
+This step is automatic. Do not ask the user for confirmation. The goal is zero-friction
+shipping — the user runs `/ship` and the code lands in production without a separate command.
