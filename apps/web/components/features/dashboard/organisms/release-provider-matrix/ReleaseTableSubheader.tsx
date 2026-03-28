@@ -23,11 +23,11 @@ import {
   PAGE_TOOLBAR_ICON_CLASS,
   PAGE_TOOLBAR_ICON_STROKE_WIDTH,
   PageToolbar,
-  PageToolbarActionButton,
 } from '@/components/organisms/table';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
+import { useCodeFlag } from '@/lib/feature-flags/client';
 import { GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
 import { useReleaseFilterCounts } from './hooks/useReleaseFilterCounts';
@@ -233,7 +233,7 @@ function LinearStyleDisplayMenu({
       </TooltipShortcut>
       <PopoverContent
         align='end'
-        className='w-[248px] rounded-[12px] border border-subtle bg-surface-1 p-0 shadow-[0_10px_20px_rgba(0,0,0,0.06)]'
+        className='w-[248px] rounded-[12px] border border-subtle bg-surface-1 p-0 shadow-popover'
       >
         {/* Header */}
         <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
@@ -298,6 +298,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts for displaying badges
   const counts = useReleaseFilterCounts(releases);
+  const showToolbarExtras = useCodeFlag('SHOW_RELEASE_TOOLBAR_EXTRAS');
 
   return (
     <PageToolbar
@@ -332,24 +333,28 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             tooltipLabel='Search'
             className='h-7 text-[12px] text-tertiary-token hover:text-primary-token'
           />
-          <ReleaseFilterDropdown
-            filters={filters}
-            onFiltersChange={onFiltersChange}
-            counts={counts}
-            buttonClassName={cn(
-              PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-              'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3'
-            )}
-            iconOnly
-          />
-          <LinearStyleDisplayMenu
-            groupByYear={groupByYear}
-            onGroupByYearChange={onGroupByYearChange}
-            releaseView={releaseView}
-            onReleaseViewChange={onReleaseViewChange}
-            triggerClassName={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
-            compact
-          />
+          {showToolbarExtras && (
+            <ReleaseFilterDropdown
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              counts={counts}
+              buttonClassName={cn(
+                PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+                'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3'
+              )}
+              iconOnly
+            />
+          )}
+          {showToolbarExtras && (
+            <LinearStyleDisplayMenu
+              groupByYear={groupByYear}
+              onGroupByYearChange={onGroupByYearChange}
+              releaseView={releaseView}
+              onReleaseViewChange={onReleaseViewChange}
+              triggerClassName={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
+              compact
+            />
+          )}
           <ExportCSVButton
             getData={() => getReleasesForExport(releases, selectedIds)}
             columns={RELEASES_CSV_COLUMNS}
@@ -369,19 +374,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             tooltipLabel='Preview'
             className='h-7 w-7 text-tertiary-token hover:text-primary-token'
           />
-          {canCreateManualReleases && onCreateRelease ? (
-            <PageToolbarActionButton
-              ariaLabel='Create a new release'
-              onClick={onCreateRelease}
-              label='New Release'
-              icon={
-                <Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />
-              }
-              iconOnly
-              tooltipLabel='New Release'
-              className='h-7 w-7 text-tertiary-token hover:text-primary-token'
-            />
-          ) : null}
         </div>
       }
     />

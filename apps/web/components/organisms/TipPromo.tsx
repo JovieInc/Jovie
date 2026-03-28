@@ -15,7 +15,7 @@ export default function TipPromo() {
       description={
         <>
           Fans tap once, you get paid. No sign-ups, no fees,{' '}
-          <br className='hidden sm:inline' />
+          <br className='max-sm:hidden sm:inline' />
           just pure support—directly in Venmo.
         </>
       }

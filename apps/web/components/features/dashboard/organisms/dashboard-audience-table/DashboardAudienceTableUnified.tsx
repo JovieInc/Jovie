@@ -27,6 +27,7 @@ import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/Dashboard
 import { AnalyticsSidebar } from '@/features/dashboard/organisms/AnalyticsSidebar';
 import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelContext';
 import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar';
+import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { queryKeys } from '@/lib/queries';
@@ -575,29 +576,29 @@ export const DashboardAudienceTableUnified = memo(
     return (
       <AudienceTableStableProvider value={stableContextValue}>
         <AudienceTableVolatileProvider value={volatileContextValue}>
-          <div
-            className='flex h-full min-h-0 flex-col overflow-hidden'
+          <DashboardWorkspacePanel
+            className='overflow-hidden'
             data-testid='dashboard-audience-table'
+            toolbar={
+              <AudienceTableSubheader
+                view={view}
+                onViewChange={onViewChange}
+                filters={filters}
+                onFiltersChange={onFiltersChange}
+                rows={rows}
+                selectedIds={selectedIds}
+                subscriberCount={subscriberCount}
+                totalAudienceCount={totalAudienceCount}
+                total={total}
+              />
+            }
           >
             <h1 className='sr-only'>
               {rows.length === 0 ? 'Audience' : 'Audience CRM'}
             </h1>
             <p className='sr-only'>{getSrDescription(rows.length === 0)}</p>
 
-            {/* Subheader with filter dropdown and export */}
-            <AudienceTableSubheader
-              view={view}
-              onViewChange={onViewChange}
-              filters={filters}
-              onFiltersChange={onFiltersChange}
-              rows={rows}
-              selectedIds={selectedIds}
-              subscriberCount={subscriberCount}
-              totalAudienceCount={totalAudienceCount}
-              total={total}
-            />
-
-            <div className='flex-1 min-h-0 flex flex-col bg-(--linear-app-content-surface)'>
+            <div className='flex-1 min-h-0 flex flex-col'>
               {/* Scrollable content area */}
               <div className='flex-1 min-h-0 overflow-auto'>
                 {rows.length === 0 ? (
@@ -619,7 +620,7 @@ export const DashboardAudienceTableUnified = memo(
                     />
 
                     {/* Desktop table */}
-                    <div className='hidden md:block h-full'>
+                    <div className='max-md:hidden h-full'>
                       <UnifiedTable
                         data={rows}
                         columns={columns}
@@ -659,7 +660,7 @@ export const DashboardAudienceTableUnified = memo(
               {selectedCount > 0 &&
                 `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
             </div>
-          </div>
+          </DashboardWorkspacePanel>
         </AudienceTableVolatileProvider>
       </AudienceTableStableProvider>
     );

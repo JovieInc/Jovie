@@ -52,7 +52,7 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
       </span>
 
       {/* Assignee badge */}
-      <div className='flex-shrink-0 hidden md:block'>
+      <div className='flex-shrink-0 max-md:hidden'>
         <ReleaseTaskAssigneeBadge assigneeType={task.assigneeType} />
       </div>
 

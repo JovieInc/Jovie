@@ -92,7 +92,7 @@ export function StickyPhoneTourClient() {
     <>
       <section
         ref={sectionRef}
-        className='relative hidden lg:block section-spacing-linear'
+        className='relative max-lg:hidden section-spacing-linear'
         style={{
           height: `${SLIDE_COUNT * VH_PER_SLIDE}vh`,
         }}

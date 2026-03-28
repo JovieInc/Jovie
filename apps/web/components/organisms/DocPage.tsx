@@ -28,7 +28,7 @@ export function DocPage({ doc, hero, aside, pdfTitle }: DocPageProps) {
       <div className='grid gap-12 lg:grid-cols-[220px_1fr] xl:grid-cols-[240px_1fr]'>
         <aside
           data-doc-sidebar
-          className='hidden lg:block lg:sticky lg:top-24 lg:self-start'
+          className='max-lg:hidden lg:sticky lg:top-24 lg:self-start'
         >
           <LegalSidebar toc={doc.toc} />
           {aside}

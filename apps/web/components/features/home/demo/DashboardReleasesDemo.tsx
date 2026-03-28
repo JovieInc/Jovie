@@ -85,7 +85,7 @@ export function DashboardReleasesDemo() {
               </div>
 
               {/* Provider dots — matches real ReleaseTable */}
-              <div className='hidden sm:flex items-center gap-1'>
+              <div className='max-sm:hidden sm:flex items-center gap-1'>
                 {PROVIDER_KEYS.map(key => {
                   const config = DSP_CONFIGS[key];
                   const isAvailable = release.platforms.some(

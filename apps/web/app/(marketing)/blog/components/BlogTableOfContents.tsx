@@ -69,7 +69,7 @@ export function BlogTableOfContents({ toc }: BlogTableOfContentsProps) {
   return (
     <nav
       aria-label='Table of contents'
-      className='hidden lg:block lg:sticky lg:top-24 lg:self-start'
+      className='max-lg:hidden lg:sticky lg:top-24 lg:self-start'
     >
       <p className='text-xs font-medium text-tertiary-token mb-3 uppercase tracking-wider'>
         On this page

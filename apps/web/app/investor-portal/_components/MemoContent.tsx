@@ -74,7 +74,7 @@ export function MemoContent({
           {/* TOC sidebar — desktop only */}
           {toc.length > 2 && (
             <nav
-              className='hidden w-48 flex-shrink-0 lg:block'
+              className='max-lg:hidden w-48 flex-shrink-0'
               aria-label='Table of contents'
             >
               <div className='sticky top-8'>

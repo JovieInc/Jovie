@@ -61,7 +61,7 @@ export function TableHeaderCell({
         // Width
         width,
         // Responsive hiding
-        hideOnMobile && 'hidden md:table-cell',
+        hideOnMobile && 'max-md:hidden md:table-cell',
         // Custom classes
         className
       )}
