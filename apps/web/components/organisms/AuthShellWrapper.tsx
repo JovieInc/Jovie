@@ -1,5 +1,6 @@
 'use client';
 
+import { TooltipProvider } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import {
   createContext,
@@ -212,17 +213,19 @@ export function AuthShellWrapper({
   children,
 }: Readonly<AuthShellWrapperProps>) {
   return (
-    <KeyboardShortcutsProvider>
-      <HeaderActionsProvider>
-        <AuthShellWrapperInner
-          persistSidebarCollapsed={persistSidebarCollapsed}
-          sidebarDefaultOpen={sidebarDefaultOpen}
-          previewPanelDefaultOpen={previewPanelDefaultOpen}
-        >
-          {children}
-        </AuthShellWrapperInner>
-        <KeyboardShortcutsHandler />
-      </HeaderActionsProvider>
-    </KeyboardShortcutsProvider>
+    <TooltipProvider delayDuration={1200}>
+      <KeyboardShortcutsProvider>
+        <HeaderActionsProvider>
+          <AuthShellWrapperInner
+            persistSidebarCollapsed={persistSidebarCollapsed}
+            sidebarDefaultOpen={sidebarDefaultOpen}
+            previewPanelDefaultOpen={previewPanelDefaultOpen}
+          >
+            {children}
+          </AuthShellWrapperInner>
+          <KeyboardShortcutsHandler />
+        </HeaderActionsProvider>
+      </KeyboardShortcutsProvider>
+    </TooltipProvider>
   );
 }

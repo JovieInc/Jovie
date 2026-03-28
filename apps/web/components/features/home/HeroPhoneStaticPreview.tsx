@@ -1,11 +1,12 @@
 import Image from 'next/image';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import { PhoneFrame } from './PhoneFrame';
 
 const ARTIST = {
-  avatarSrc: '/images/avatars/tim-white.jpg',
-  handle: 'timwhite',
-  name: 'Tim White',
+  avatarSrc: TIM_WHITE_PROFILE.avatarSrc,
+  handle: TIM_WHITE_PROFILE.handle,
+  name: TIM_WHITE_PROFILE.name,
 } as const;
 
 export function HeroPhoneStaticPreview() {
