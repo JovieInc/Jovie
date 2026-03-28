@@ -1,5 +1,6 @@
 import {
   Activity,
+  AudioWaveform,
   Banknote,
   Briefcase,
   CalendarDays,
@@ -170,6 +171,7 @@ const adminIconById = {
   activity: Activity,
   investors: Briefcase,
   screenshots: ImageIcon,
+  'algorithm-health': AudioWaveform,
 } as const;
 
 export const adminNavigation: NavItem[] = ADMIN_NAV_REGISTRY.map(item => ({
