@@ -256,133 +256,157 @@ function buildProfileCompletion(
  */
 type CoreData = Omit<DashboardData, 'isAdmin'>;
 
+/** Default empty CoreData used when user/profile is missing or on error. */
+function createEmptyCoreData(overrides?: Partial<CoreData>): CoreData {
+  return {
+    user: null,
+    creatorProfiles: [],
+    selectedProfile: null,
+    avatarQuality: UNKNOWN_AVATAR_QUALITY,
+    needsOnboarding: true,
+    sidebarCollapsed: false,
+    hasSocialLinks: false,
+    hasMusicLinks: false,
+    tippingStats: createEmptyTippingStats(),
+    profileCompletion: buildProfileCompletion(null, null, false),
+    isFirstSession: false,
+    ...overrides,
+  };
+}
+
+/**
+ * Fetches the essential dashboard data within a transaction: user, profiles, settings.
+ * This is the fast path (~3 single-row queries). Used directly by the shell layout
+ * and as the foundation for the full fetch which augments with slow queries.
+ */
+async function fetchDashboardBaseWithSession(
+  tx: DbOrTransaction,
+  sessionUserId: string
+): Promise<CoreData> {
+  const [userData] = await dashboardQuery(
+    () =>
+      tx
+        .select({
+          id: users.id,
+          email: users.email,
+          activeProfileId: users.activeProfileId,
+        })
+        .from(users)
+        .where(eq(users.clerkId, sessionUserId))
+        .limit(1),
+    'User lookup query'
+  );
+
+  if (!userData?.id) {
+    return createEmptyCoreData();
+  }
+
+  const creatorData = await dashboardQuery(
+    () =>
+      tx
+        .select()
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.userId, userData.id))
+        .orderBy(asc(creatorProfiles.createdAt)),
+    'Creator profiles query'
+  ).catch((error: unknown) => {
+    const migrationResult = handleMigrationErrors(error, {
+      userId: userData.id,
+      operation: 'creator_profiles',
+    });
+
+    if (!migrationResult.shouldRetry) {
+      return migrationResult.fallbackData as CreatorProfile[];
+    }
+
+    Sentry.captureException(error, {
+      tags: { query: 'creator_profiles', context: 'dashboard_data' },
+    });
+    throw error;
+  });
+
+  if (!creatorData || creatorData.length === 0) {
+    return createEmptyCoreData({ user: userData });
+  }
+
+  const selected = userData.activeProfileId
+    ? (creatorData.find(p => p.id === userData.activeProfileId) ??
+      selectDashboardProfile(creatorData))
+    : selectDashboardProfile(creatorData);
+
+  const settings = await dashboardQuery(
+    () =>
+      tx
+        .select()
+        .from(userSettings)
+        .where(eq(userSettings.userId, userData.id))
+        .limit(1),
+    'User settings query'
+  )
+    .then(result => result?.[0] as { sidebarCollapsed: boolean } | undefined)
+    .catch((error: unknown) => {
+      const migrationResult = handleMigrationErrors(error, {
+        userId: userData.id,
+        operation: 'user_settings',
+      });
+
+      if (!migrationResult.shouldRetry) {
+        return migrationResult.fallbackData as
+          | { sidebarCollapsed: boolean }
+          | undefined;
+      }
+
+      Sentry.captureException(error, {
+        level: 'warning',
+        tags: {
+          query: 'user_settings',
+          context: 'dashboard_data_settled',
+        },
+      });
+      return undefined;
+    });
+
+  return {
+    user: userData,
+    creatorProfiles: creatorData,
+    selectedProfile: selected,
+    avatarQuality: UNKNOWN_AVATAR_QUALITY,
+    needsOnboarding: !profileIsPublishable(selected),
+    sidebarCollapsed: settings?.sidebarCollapsed ?? false,
+    hasSocialLinks: false,
+    hasMusicLinks: false,
+    tippingStats: createEmptyTippingStats(),
+    profileCompletion: buildProfileCompletion(selected, userData.email, false),
+    dashboardLoadError: undefined,
+    isFirstSession: deriveIsFirstSession(selected),
+  };
+}
+
+/**
+ * Full dashboard data fetch. Calls the base fetch for user/profiles/settings,
+ * then augments with slow supplementary queries (links, avatar, tipping).
+ */
 async function fetchDashboardCoreWithSession(
   clerkUserId: string
 ): Promise<CoreData> {
   try {
     return await withDbSessionTx(
       async (tx, sessionUserId) => {
-        // First check if user exists in users table
-        const [userData] = await dashboardQuery(
-          () =>
-            tx
-              .select({
-                id: users.id,
-                email: users.email,
-                activeProfileId: users.activeProfileId,
-              })
-              .from(users)
-              .where(eq(users.clerkId, sessionUserId))
-              .limit(1),
-          'User lookup query'
-        );
+        const base = await fetchDashboardBaseWithSession(tx, sessionUserId);
 
-        if (!userData?.id) {
-          // No user row yet — send to onboarding to create user/artist
-          return {
-            user: null,
-            creatorProfiles: [],
-            selectedProfile: null,
-            avatarQuality: UNKNOWN_AVATAR_QUALITY,
-            needsOnboarding: true,
-            sidebarCollapsed: false,
-            hasSocialLinks: false,
-            hasMusicLinks: false,
-            tippingStats: createEmptyTippingStats(),
-            profileCompletion: buildProfileCompletion(null, null, false),
-            isFirstSession: false,
-          };
+        // If no profile resolved, return the base result (onboarding/error state)
+        if (!base.selectedProfile) {
+          return base;
         }
 
-        // Now that we know user exists, get creator profiles
-        const creatorData = await dashboardQuery(
-          () =>
-            tx
-              .select()
-              .from(creatorProfiles)
-              .where(eq(creatorProfiles.userId, userData.id))
-              .orderBy(asc(creatorProfiles.createdAt)),
-          'Creator profiles query'
-        ).catch((error: unknown) => {
-          const migrationResult = handleMigrationErrors(error, {
-            userId: userData.id,
-            operation: 'creator_profiles',
-          });
+        const selected = base.selectedProfile;
+        const userId = base.user?.id;
+        if (!userId) return base;
 
-          if (!migrationResult.shouldRetry) {
-            return migrationResult.fallbackData as CreatorProfile[];
-          }
-
-          Sentry.captureException(error, {
-            tags: { query: 'creator_profiles', context: 'dashboard_data' },
-          });
-          throw error;
-        });
-
-        if (!creatorData || creatorData.length === 0) {
-          // No creator profiles yet — onboarding
-          return {
-            user: userData,
-            creatorProfiles: [],
-            selectedProfile: null,
-            avatarQuality: UNKNOWN_AVATAR_QUALITY,
-            needsOnboarding: true,
-            sidebarCollapsed: false,
-            hasSocialLinks: false,
-            hasMusicLinks: false,
-            tippingStats: createEmptyTippingStats(),
-            profileCompletion: buildProfileCompletion(null, null, false),
-            isFirstSession: false,
-          };
-        }
-
-        // Respect explicit activeProfileId, fall back to heuristic
-        const selected = userData.activeProfileId
-          ? (creatorData.find(p => p.id === userData.activeProfileId) ??
-            selectDashboardProfile(creatorData))
-          : selectDashboardProfile(creatorData);
-
-        // Fetch settings, link counts, and tipping stats sequentially.
+        // Fetch supplementary data sequentially.
         // These share a single transaction connection (pg serializes queries
         // on one connection), so parallel dispatch would just queue them
-        // while starting all timeout timers simultaneously — making
-        // timeouts more likely, not less.
-        const settings = await dashboardQuery(
-          () =>
-            tx
-              .select()
-              .from(userSettings)
-              .where(eq(userSettings.userId, userData.id))
-              .limit(1),
-          'User settings query'
-        )
-          .then(
-            result => result?.[0] as { sidebarCollapsed: boolean } | undefined
-          )
-          .catch((error: unknown) => {
-            const migrationResult = handleMigrationErrors(error, {
-              userId: userData.id,
-              operation: 'user_settings',
-            });
-
-            if (!migrationResult.shouldRetry) {
-              return migrationResult.fallbackData as
-                | { sidebarCollapsed: boolean }
-                | undefined;
-            }
-
-            Sentry.captureException(error, {
-              level: 'warning',
-              tags: {
-                query: 'user_settings',
-                context: 'dashboard_data_settled',
-              },
-            });
-            return undefined;
-          });
-
-        // Optimized existence query for link booleans.
-        // Aggregate counts are scoped to the selected profile's active links.
+        // while starting all timeout timers simultaneously.
         const linkCounts = await dashboardQuery(
           () =>
             tx
@@ -415,16 +439,14 @@ async function fetchDashboardCoreWithSession(
               `,
               })
               .from(users)
-              .where(eq(users.id, userData.id))
+              .where(eq(users.id, userId))
               .limit(1),
           'Social links existence query'
         )
-          .then(result => {
-            return mapSocialLinkExistence(result?.[0]);
-          })
+          .then(result => mapSocialLinkExistence(result?.[0]))
           .catch((error: unknown) => {
             const migrationResult = handleMigrationErrors(error, {
-              userId: userData.id,
+              userId,
               operation: 'social_links_existence',
             });
 
@@ -461,38 +483,35 @@ async function fetchDashboardCoreWithSession(
           selected.id
         );
 
-        const hasLinks = linkCounts.hasLinks;
         const hasMusicLinks = linkCounts.hasMusicLinks;
 
-        // Return data with first profile selected by default
+        // base.user contains { id, email, activeProfileId } at runtime,
+        // but CoreData.user is typed as { id: string }. Cast to access email
+        // for profileCompletion without an extra DB query.
+        const userEmail =
+          (base.user as { id: string; email?: string | null } | null)?.email ??
+          null;
+
         return {
-          user: userData,
-          creatorProfiles: creatorData,
-          selectedProfile: selected,
+          ...base,
           avatarQuality,
-          needsOnboarding: !profileIsPublishable(selected),
-          sidebarCollapsed: settings?.sidebarCollapsed ?? false,
-          hasSocialLinks: hasLinks,
+          hasSocialLinks: linkCounts.hasLinks,
           hasMusicLinks,
           tippingStats,
           profileCompletion: buildProfileCompletion(
             selected,
-            userData.email,
+            userEmail,
             hasMusicLinks
           ),
-          dashboardLoadError: undefined,
-          isFirstSession: deriveIsFirstSession(selected),
         };
       },
       { clerkUserId }
     );
   } catch (error) {
-    // Handle both standard and non-standard error objects
     const errorObj = error as
       | Error
       | { code?: string; message?: string; cause?: unknown };
 
-    // Extract error details with multiple fallbacks
     const message =
       (errorObj as Error).message ??
       (errorObj as { message?: string }).message ??
@@ -504,7 +523,6 @@ async function fetchDashboardCoreWithSession(
 
     const errorType = errorObj?.constructor?.name ?? typeof errorObj;
 
-    // Log with full context for debugging - serialize everything to avoid empty objects
     logger.error('Error fetching dashboard data', {
       message,
       code,
@@ -514,29 +532,16 @@ async function fetchDashboardCoreWithSession(
       stack: (errorObj as Error).stack?.split('\n').slice(0, 3).join('\n'),
     });
 
-    // Also log the raw error for server-side debugging
     logger.error('Raw error object', { error });
 
-    // On error, treat as needs onboarding to be safe
-    return {
-      user: null,
-      creatorProfiles: [],
-      selectedProfile: null,
-      avatarQuality: UNKNOWN_AVATAR_QUALITY,
-      needsOnboarding: true,
-      sidebarCollapsed: false,
-      hasSocialLinks: false,
-      hasMusicLinks: false,
-      tippingStats: createEmptyTippingStats(),
-      profileCompletion: buildProfileCompletion(null, null, false),
+    return createEmptyCoreData({
       dashboardLoadError: {
         stage: 'core_fetch',
         message,
         code: code ?? null,
         errorType,
       },
-      isFirstSession: false,
-    };
+    });
   }
 }
 
@@ -642,55 +647,36 @@ async function fetchTippingStatsWithSession(
   }
 }
 
-/**
- * Resolves dashboard data for the current user.
- *
- * This function handles user entitlements lookup, session management,
- * and error handling. It wraps fetchDashboardDataWithSession with
- * Sentry tracing and proper error recovery.
- *
- * @returns Complete DashboardData including admin status
- */
+/** Resolves full dashboard data (all queries including slow supplementary). */
 async function resolveDashboardData(): Promise<DashboardData> {
-  // Prevent caching of user-specific data
-  noStore();
+  return resolveDashboardDataWith(
+    'dashboard.getCoreData',
+    getCachedDashboardCore,
+    'get_dashboard_data'
+  );
+}
 
-  // getCurrentUserEntitlements degrades gracefully on billing failure --
-  // it returns free-tier defaults with admin status preserved, never throws.
-  const entitlements = await getCurrentUserEntitlements();
-  const isAdmin = entitlements.isAdmin;
-  const userId = entitlements.userId;
-
-  if (!userId) {
-    return {
-      user: null,
-      creatorProfiles: [],
-      selectedProfile: null,
-      avatarQuality: UNKNOWN_AVATAR_QUALITY,
-      needsOnboarding: true,
-      sidebarCollapsed: false,
-      hasSocialLinks: false,
-      hasMusicLinks: false,
-      isAdmin,
-      tippingStats: createEmptyTippingStats(),
-      profileCompletion: buildProfileCompletion(null, null, false),
-      isFirstSession: false,
-    };
-  }
-
+/**
+ * Fast-path fetch for the dashboard shell.
+ *
+ * Returns ONLY the data needed to render the shell + chat input:
+ * user, profiles, selected profile, settings, and sidebar state.
+ *
+ * Skips slow queries (tipping stats, social links existence, avatar quality)
+ * that are only needed by secondary dashboard pages. Those fields get safe
+ * defaults so the DashboardData interface stays compatible.
+ *
+ * ~3 fast single-row queries vs ~6 sequential queries in the full fetch.
+ */
+async function fetchDashboardEssentialWithSession(
+  clerkUserId: string
+): Promise<CoreData> {
   try {
-    // Single cached fetch for all dashboard core data (profile, settings, links, tipping stats).
-    // Queries are sequenced within the core fetch to reduce connection pool pressure.
-    const coreData = await Sentry.startSpan(
-      { op: 'task', name: 'dashboard.getCoreData' },
-      async () => getCachedDashboardCore(userId)
+    return await withDbSessionTx(
+      async (tx, sessionUserId) =>
+        fetchDashboardBaseWithSession(tx, sessionUserId),
+      { clerkUserId }
     );
-
-    return {
-      ...coreData,
-      isAdmin,
-      dashboardLoadError: coreData.dashboardLoadError,
-    };
   } catch (error) {
     const errorObj = error as
       | Error
@@ -704,31 +690,36 @@ async function resolveDashboardData(): Promise<DashboardData> {
       (errorObj as { cause?: { code?: string } }).cause?.code;
     const errorType = errorObj?.constructor?.name ?? typeof errorObj;
 
-    Sentry.captureException(error, {
-      tags: { context: 'get_dashboard_data' },
+    logger.error('Error fetching essential dashboard data', {
+      message,
+      code,
+      errorType,
     });
 
-    return {
-      user: null,
-      creatorProfiles: [],
-      selectedProfile: null,
-      needsOnboarding: true,
-      sidebarCollapsed: false,
-      hasSocialLinks: false,
-      hasMusicLinks: false,
-      isAdmin,
-      tippingStats: createEmptyTippingStats(),
-      profileCompletion: buildProfileCompletion(null, null, false),
+    return createEmptyCoreData({
       dashboardLoadError: {
-        stage: 'core_cache',
+        stage: 'core_fetch',
         message,
         code: code ?? null,
         errorType,
       },
-      isFirstSession: false,
-    };
+    });
   }
 }
+
+/**
+ * Cached essential dashboard data (fast path).
+ * Only user + profiles + settings. No tipping/links/avatar.
+ */
+const getCachedDashboardEssential = unstableCache(
+  async (clerkUserId: string) =>
+    fetchDashboardEssentialWithSession(clerkUserId),
+  ['dashboard-essential'],
+  {
+    revalidate: CACHE_TTL.MEDIUM,
+    tags: [CACHE_TAGS.DASHBOARD_DATA],
+  }
+);
 
 /**
  * Single consolidated cache for all dashboard core data.
@@ -745,10 +736,67 @@ const getCachedDashboardCore = unstableCache(
 );
 
 /**
+ * Shared resolver: fetches entitlements, calls the provided cache function,
+ * and handles the no-userId / error fallback. Used by both full and essential paths.
+ */
+async function resolveDashboardDataWith(
+  spanName: string,
+  fetchFn: (userId: string) => Promise<CoreData>,
+  context: string
+): Promise<DashboardData> {
+  noStore();
+
+  const entitlements = await getCurrentUserEntitlements();
+  const isAdmin = entitlements.isAdmin;
+  const userId = entitlements.userId;
+
+  if (!userId) {
+    return { ...createEmptyCoreData(), isAdmin };
+  }
+
+  try {
+    const coreData = await Sentry.startSpan(
+      { op: 'task', name: spanName },
+      async () => fetchFn(userId)
+    );
+
+    return {
+      ...coreData,
+      isAdmin,
+      dashboardLoadError: coreData.dashboardLoadError,
+    };
+  } catch (error) {
+    Sentry.captureException(error, { tags: { context } });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {
+      ...createEmptyCoreData({
+        dashboardLoadError: {
+          stage: 'core_cache',
+          message: errorMessage,
+          code: null,
+          errorType: error?.constructor?.name ?? typeof error,
+        },
+      }),
+      isAdmin,
+    };
+  }
+}
+
+/** Resolves essential dashboard data (fast path for shell rendering). */
+async function resolveDashboardDataEssential(): Promise<DashboardData> {
+  return resolveDashboardDataWith(
+    'dashboard.getEssentialData',
+    getCachedDashboardEssential,
+    'get_dashboard_data_essential'
+  );
+}
+
+/**
  * Cached loader for dashboard data.
  * Uses React's cache() for request-level deduplication.
  */
 const loadDashboardData = cache(resolveDashboardData);
+const loadDashboardDataEssential = cache(resolveDashboardDataEssential);
 
 /**
  * Prefetches dashboard data for the current request.
@@ -770,6 +818,20 @@ export async function prefetchDashboardData(): Promise<void> {
  */
 export async function getDashboardData(): Promise<DashboardData> {
   return loadDashboardData();
+}
+
+/**
+ * Gets essential dashboard data (fast path).
+ *
+ * Returns user + profiles + settings with safe defaults for
+ * tipping stats, social links, and avatar quality. Use this
+ * when you need to render the shell fast and don't need the
+ * slow supplementary queries.
+ *
+ * @returns DashboardData with essential fields populated, others defaulted
+ */
+export async function getDashboardDataEssential(): Promise<DashboardData> {
+  return loadDashboardDataEssential();
 }
 
 /**
