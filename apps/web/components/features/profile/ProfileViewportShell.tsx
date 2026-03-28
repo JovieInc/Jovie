@@ -15,7 +15,7 @@ export function ProfileViewportShell({
 }: ProfileViewportShellProps) {
   return (
     <div className='relative min-h-[100dvh] overflow-hidden bg-base text-primary-token'>
-      <div className='absolute inset-0 hidden md:block' aria-hidden='true'>
+      <div className='absolute inset-0 max-md:hidden' aria-hidden='true'>
         <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_26%),linear-gradient(180deg,rgba(8,9,10,0.66)_0%,rgba(8,9,10,0.94)_68%)]' />
         <div className='absolute inset-[-8%]'>
           <ImageWithFallback

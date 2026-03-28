@@ -85,7 +85,7 @@ export function DashboardLinksDemo() {
               </div>
 
               {/* Click sparkline */}
-              <div className='hidden items-center gap-2 sm:flex'>
+              <div className='max-sm:hidden items-center gap-2 sm:flex'>
                 <div className='h-3 w-16 overflow-hidden rounded-full bg-surface-2'>
                   <div
                     className='h-full rounded-full'

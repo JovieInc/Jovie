@@ -221,7 +221,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
 
                   {showCta && (
                     <div
-                      className='hidden sm:block w-px bg-white/10'
+                      className='max-sm:hidden w-px bg-white/10'
                       aria-hidden='true'
                     />
                   )}

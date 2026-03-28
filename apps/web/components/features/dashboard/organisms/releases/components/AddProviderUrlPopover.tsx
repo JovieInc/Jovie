@@ -91,7 +91,7 @@ export function AddProviderUrlPopover({
       </PopoverTrigger>
       <PopoverContent
         align='start'
-        className='w-[280px] rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-[0_10px_20px_rgba(0,0,0,0.06)]'
+        className='w-[280px] rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover'
         onOpenAutoFocus={e => {
           e.preventDefault();
           inputRef.current?.focus();

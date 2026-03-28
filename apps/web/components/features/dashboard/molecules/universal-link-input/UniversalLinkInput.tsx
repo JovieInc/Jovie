@@ -141,7 +141,7 @@ function PlatformSuggestionItem({
       </span>
       {/* Only show Enter hint on active item */}
       {active && (
-        <span className='hidden text-[13px] text-tertiary-token sm:inline'>
+        <span className='max-sm:hidden text-[13px] text-tertiary-token sm:inline'>
           Enter
         </span>
       )}

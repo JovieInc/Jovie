@@ -149,7 +149,7 @@ export function ImpersonationBanner({
         {/* Timer and actions */}
         <div className='flex items-center gap-3'>
           {/* Time remaining */}
-          <div className='hidden items-center gap-1.5 text-sm font-medium sm:flex'>
+          <div className='max-sm:hidden items-center gap-1.5 text-sm font-medium sm:flex'>
             <Clock className='size-4' aria-hidden='true' />
             <span>{formatTimeRemaining(timeRemaining)}</span>
           </div>

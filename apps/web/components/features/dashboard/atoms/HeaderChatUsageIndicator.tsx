@@ -43,7 +43,7 @@ export const HeaderChatUsageIndicator = memo(
         }
       >
         <AlertTriangle className='h-3.5 w-3.5 shrink-0' />
-        <span className='hidden sm:inline'>Chat</span>
+        <span className='max-sm:hidden sm:inline'>Chat</span>
         <span className='tabular-nums'>{label}</span>
       </Link>
     );

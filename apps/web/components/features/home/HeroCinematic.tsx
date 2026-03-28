@@ -78,7 +78,7 @@ export function HeroCinematic({
         className='pointer-events-none absolute inset-0'
         style={{ background: 'var(--linear-hero-backdrop)' }}
       />
-      <div className='hero-glow pointer-events-none absolute inset-0 hidden lg:block' />
+      <div className='hero-glow pointer-events-none absolute inset-0 max-lg:hidden' />
 
       <div className='relative z-10 mx-auto w-full max-w-[var(--linear-content-max)] px-5 pb-10 pt-8 sm:px-6 sm:pb-12 sm:pt-10 lg:hidden'>
         <div className='max-w-[30rem] text-left'>
@@ -106,7 +106,7 @@ export function HeroCinematic({
         </div>
       </div>
 
-      <div className='relative z-10 hidden min-h-0 flex-1 items-center justify-center w-full lg:flex'>
+      <div className='relative z-10 max-lg:hidden min-h-0 flex-1 items-center justify-center w-full lg:flex'>
         <div className='mx-auto w-full max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0'>
           <div className='grid grid-cols-2 items-center gap-0'>
             <div className='max-w-[31rem] text-left'>
@@ -147,7 +147,7 @@ export function HeroCinematic({
       </div>
 
       <nav
-        className='relative z-10 hidden items-center justify-center gap-1 pb-5 lg:flex'
+        className='relative z-10 max-lg:hidden items-center justify-center gap-1 pb-5 lg:flex'
         aria-label='Phone mode tabs'
       >
         {['/profile', '/tour', '/tip', '/listen'].map((label, i) => (

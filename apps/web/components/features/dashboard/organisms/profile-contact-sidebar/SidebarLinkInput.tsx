@@ -75,7 +75,7 @@ function SidebarSuggestionItem({
       <span className='font-[510]'>{option.name}</span>
       <span className='text-xs text-tertiary-token'>{option.hint}</span>
       {active && (
-        <span className='ml-auto hidden text-xs text-tertiary-token sm:inline'>
+        <span className='ml-auto max-sm:hidden text-xs text-tertiary-token sm:inline'>
           Enter
         </span>
       )}
@@ -189,7 +189,7 @@ export function SidebarLinkInput({
           <div
             ref={refs.setFloating}
             style={floatingStyles}
-            className='z-100 max-h-60 overflow-y-auto overflow-x-hidden overscroll-contain rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) py-1 shadow-[0_8px_24px_rgba(0,0,0,0.10)]'
+            className='z-100 max-h-60 overflow-y-auto overflow-x-hidden overscroll-contain rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) py-1 shadow-popover'
             onMouseDown={e => e.preventDefault()}
             aria-hidden='true'
           >

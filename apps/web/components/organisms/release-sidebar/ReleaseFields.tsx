@@ -41,7 +41,7 @@ export function ReleaseFields({
       <p className='text-[11.5px] leading-[15px] text-secondary-token'>
         {releaseDate ? (
           <>
-            <span className='font-[500] text-tertiary-token'>Released</span>{' '}
+            <span className='font-[500] text-quaternary-token'>Released</span>{' '}
             {formatReleaseDate(releaseDate)}
           </>
         ) : (
@@ -49,7 +49,7 @@ export function ReleaseFields({
         )}
       </p>
       {parts.length > 0 && (
-        <p className='text-[10.5px] leading-[14px] tracking-[0.01em] text-tertiary-token'>
+        <p className='text-[10.5px] leading-[14px] tracking-[0.01em] text-quaternary-token'>
           {parts.join(' · ')}
         </p>
       )}

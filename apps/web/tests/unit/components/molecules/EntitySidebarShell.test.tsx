@@ -35,8 +35,8 @@ describe('EntitySidebarShell', () => {
       </EntitySidebarShell>
     );
 
-    expect(screen.getByText('Release details')).toHaveClass('sr-only');
-    expect(screen.queryByText('Release title')).not.toBeInTheDocument();
+    expect(screen.getByText('Release title')).toBeInTheDocument();
+    expect(screen.queryByText('Release details')).not.toBeInTheDocument();
     expect(
       screen.getByTestId('entity-sidebar-entity-header')
     ).toHaveTextContent('Entity header content');

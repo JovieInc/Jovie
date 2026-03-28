@@ -66,7 +66,11 @@ export function IngestProfileDropdown({
           )}
         >
           <Icon name='Plus' className='h-3.5 w-3.5' />
-          <span className={hideLabelOnMobile ? 'hidden sm:inline' : undefined}>
+          <span
+            className={
+              hideLabelOnMobile ? 'max-sm:hidden sm:inline' : undefined
+            }
+          >
             Ingest Profile
           </span>
         </Button>

@@ -76,7 +76,7 @@ export const HeaderProfileProgress = memo(function HeaderProfileProgress() {
           className='text-accent transition-[stroke-dashoffset,color] duration-500 group-hover:text-accent-hover'
         />
       </svg>
-      <span className='hidden sm:inline text-[11px] text-secondary-token'>
+      <span className='max-sm:hidden sm:inline text-[11px] text-secondary-token'>
         Profile
       </span>
       <span className='text-[11px] tabular-nums text-primary-token'>
