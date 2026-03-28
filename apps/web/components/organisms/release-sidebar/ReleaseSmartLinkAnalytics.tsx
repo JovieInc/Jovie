@@ -206,7 +206,6 @@ export function ReleaseSmartLinkAnalytics({
   const totalClicks = data?.totalClicks ?? 0;
   const last7DaysClicks = data?.last7DaysClicks ?? 0;
 
-  const showEmpty = !isLoading && !hasError && totalClicks === 0;
   const state = getReleaseAnalyticsState({ isLoading, hasError, data });
 
   return (
@@ -234,11 +233,7 @@ export function ReleaseSmartLinkAnalytics({
           <ReleaseSmartLinkControl
             release={release}
             artistName={artistName}
-            helperText={
-              showEmpty
-                ? 'Share your smart link to start tracking clicks.'
-                : undefined
-            }
+            helperText='Share your smart link to start tracking clicks.'
           />
         ) : undefined
       }

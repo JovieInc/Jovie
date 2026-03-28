@@ -135,7 +135,7 @@ export function ResponsiveActionsCell({
               {action.icon}
             </span>
           )}
-          <span className='hidden sm:inline'>{action.label}</span>
+          <span className='max-sm:hidden sm:inline'>{action.label}</span>
         </button>
       ))}
 

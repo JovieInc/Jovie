@@ -48,13 +48,13 @@ const METADATA_ROW_PROPS = {
   size: 'sm' as const,
 };
 const METADATA_TEXT_CLASSNAME =
-  'text-[12px] font-[460] leading-[16px] text-primary-token';
+  'text-[12px] font-[460] leading-[16px] text-secondary-token';
 const METADATA_MUTED_TEXT_CLASSNAME =
   'text-[11px] leading-[15px] text-tertiary-token';
 const METADATA_LABEL_CLASSNAME =
-  'text-[10px] font-[510] leading-[13px] tracking-[0.01em] text-tertiary-token';
+  'text-[10px] font-[500] leading-[13px] tracking-[0.01em] text-quaternary-token';
 const METADATA_VALUE_CLASSNAME =
-  'text-[12px] leading-[16px] text-primary-token';
+  'text-[12px] leading-[16px] text-secondary-token';
 const METADATA_BADGE_CLASSNAME =
   'h-5 rounded-full border border-subtle bg-surface-0 px-2 text-[9.5px] font-[510] tracking-[-0.01em] shadow-none';
 const METADATA_ROW_CLASSNAME = 'rounded-none px-0 py-1 first:pt-0 last:pb-0';

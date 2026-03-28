@@ -68,7 +68,9 @@ export function ActionBarButton({
       aria-label={label}
     >
       <span className='h-3.5 w-3.5'>{icon}</span>
-      <span className={cn(mobileIconOnly && 'hidden sm:inline')}>{label}</span>
+      <span className={cn(mobileIconOnly && 'max-sm:hidden sm:inline')}>
+        {label}
+      </span>
     </Button>
   );
 }

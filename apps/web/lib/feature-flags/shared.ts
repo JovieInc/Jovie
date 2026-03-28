@@ -94,6 +94,9 @@ export const FEATURE_FLAGS = {
   SHOW_FEATURE_SHOWCASE: false,
   /** Final CTA section on marketing homepage */
   SHOW_FINAL_CTA: true,
+
+  /** Filter and display toolbar buttons on the releases page. */
+  SHOW_RELEASE_TOOLBAR_EXTRAS: false,
 } as const;
 
 export type CodeFlagName = keyof typeof FEATURE_FLAGS;
@@ -126,4 +129,5 @@ export const CODE_FLAG_KEYS = {
   SHOW_LOGO_BAR: 'code:SHOW_LOGO_BAR',
   SHOW_FEATURE_SHOWCASE: 'code:SHOW_FEATURE_SHOWCASE',
   SHOW_FINAL_CTA: 'code:SHOW_FINAL_CTA',
+  SHOW_RELEASE_TOOLBAR_EXTRAS: 'code:SHOW_RELEASE_TOOLBAR_EXTRAS',
 } as const satisfies Record<CodeFlagName, string>;

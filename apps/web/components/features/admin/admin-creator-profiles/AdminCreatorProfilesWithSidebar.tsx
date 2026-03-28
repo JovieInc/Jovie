@@ -407,7 +407,7 @@ export function AdminCreatorProfilesWithSidebar({
                   subtitle='Manage creator profiles, verification, and feature status.'
                 />
                 <AdminTableSubheader>
-                  <div className='hidden text-[11px] text-secondary-token tabular-nums md:block'>
+                  <div className='max-md:hidden text-[11px] text-secondary-token tabular-nums'>
                     Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
                     {total.toLocaleString()} profiles
                   </div>

@@ -107,7 +107,7 @@ export function StarterEmptyState({
         </div>
 
         <Rocket
-          className='hidden h-5 w-5 text-tertiary-token sm:block'
+          className='max-sm:hidden h-5 w-5 text-tertiary-token'
           aria-hidden='true'
         />
       </div>

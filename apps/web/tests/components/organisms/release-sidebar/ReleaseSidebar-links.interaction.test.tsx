@@ -379,6 +379,13 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.getByTestId('task-checklist')).toBeInTheDocument();
   });
 
+  it('does not render the generic Releases title row above the entity card', () => {
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    expect(screen.queryByText(/^Releases$/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('release-header-card')).toBeInTheDocument();
+  });
+
   it('preserves active tab when release changes', async () => {
     const user = userEvent.setup();
     const { rerender } = render(

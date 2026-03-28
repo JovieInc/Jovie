@@ -80,12 +80,12 @@ export function AdminTablePagination({
       {/* Page info */}
       <div className='flex shrink-0 items-center gap-2'>
         <span className='tabular-nums'>
-          <span className='hidden sm:inline'>Page </span>
+          <span className='max-sm:hidden sm:inline'>Page </span>
           <span className='font-[560] text-primary-token'>{page}</span>
-          <span className='hidden sm:inline'> of</span>
+          <span className='max-sm:hidden sm:inline'> of</span>
           <span className='sm:hidden'> /</span> {totalPages}
         </span>
-        <span className='hidden tabular-nums text-tertiary-token sm:inline'>
+        <span className='max-sm:hidden tabular-nums text-tertiary-token sm:inline'>
           {from.toLocaleString()}–{to.toLocaleString()} of{' '}
           {total.toLocaleString()}
           {entityLabel ? ` ${entityLabel}` : ''}
@@ -95,7 +95,7 @@ export function AdminTablePagination({
       {/* Controls */}
       <div className='ml-auto flex shrink-0 items-center gap-3'>
         {showPageSizeSelector && (
-          <div className='hidden items-center gap-2 sm:flex'>
+          <div className='max-sm:hidden items-center gap-2 sm:flex'>
             <span>Rows per page</span>
             <Select
               value={String(pageSize)}
@@ -131,7 +131,7 @@ export function AdminTablePagination({
                     className='h-3.5 w-3.5 sm:hidden'
                     aria-hidden='true'
                   />
-                  <span className='hidden sm:inline'>Previous</span>
+                  <span className='max-sm:hidden sm:inline'>Previous</span>
                 </Button>
               );
             }
@@ -148,7 +148,7 @@ export function AdminTablePagination({
                       className='h-3.5 w-3.5 sm:hidden'
                       aria-hidden='true'
                     />
-                    <span className='hidden sm:inline'>Previous</span>
+                    <span className='max-sm:hidden sm:inline'>Previous</span>
                   </Link>
                 </Button>
               );
@@ -165,7 +165,7 @@ export function AdminTablePagination({
                   className='h-3.5 w-3.5 sm:hidden'
                   aria-hidden='true'
                 />
-                <span className='hidden sm:inline'>Previous</span>
+                <span className='max-sm:hidden sm:inline'>Previous</span>
               </Button>
             );
           })()}
@@ -185,7 +185,7 @@ export function AdminTablePagination({
                     className='h-3.5 w-3.5 sm:hidden'
                     aria-hidden='true'
                   />
-                  <span className='hidden sm:inline'>Next</span>
+                  <span className='max-sm:hidden sm:inline'>Next</span>
                 </Button>
               );
             }
@@ -202,7 +202,7 @@ export function AdminTablePagination({
                       className='h-3.5 w-3.5 sm:hidden'
                       aria-hidden='true'
                     />
-                    <span className='hidden sm:inline'>Next</span>
+                    <span className='max-sm:hidden sm:inline'>Next</span>
                   </Link>
                 </Button>
               );
@@ -219,7 +219,7 @@ export function AdminTablePagination({
                   className='h-3.5 w-3.5 sm:hidden'
                   aria-hidden='true'
                 />
-                <span className='hidden sm:inline'>Next</span>
+                <span className='max-sm:hidden sm:inline'>Next</span>
               </Button>
             );
           })()}

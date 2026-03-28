@@ -72,7 +72,7 @@ export const Sidebar = React.forwardRef<
         {!isMobile && (
           <div
             ref={ref}
-            className='group peer hidden shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:block data-[variant=sidebar]:lg:m-1.5 data-[variant=sidebar]:lg:mr-0'
+            className='group peer max-lg:hidden shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 data-[variant=sidebar]:lg:mt-[8px] data-[variant=sidebar]:lg:ml-1.5 data-[variant=sidebar]:lg:mr-0'
             data-state={state}
             data-collapsible={state === 'closed' ? collapsible : ''}
             data-variant={variant}
@@ -80,7 +80,7 @@ export const Sidebar = React.forwardRef<
           >
             <div
               className={cn(
-                'duration-normal relative h-[calc(100svh-1.25rem)] w-(--sidebar-width) overflow-hidden transition-[width,transform,opacity] ease-interactive motion-reduce:transition-none',
+                'duration-normal relative h-full w-(--sidebar-width) overflow-hidden transition-[width,transform,opacity] ease-interactive motion-reduce:transition-none',
                 'group-data-[collapsible=offcanvas]:w-0',
                 state === 'closed' &&
                   collapsible === 'offcanvas' &&

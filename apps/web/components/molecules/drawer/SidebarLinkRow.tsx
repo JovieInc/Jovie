@@ -188,7 +188,7 @@ export function SidebarLinkRow({
         </div>
 
         {/* Right: Kebab dropdown (desktop only — mobile uses swipe-to-reveal) */}
-        <div className='hidden shrink-0 items-center opacity-0 transition-opacity group-focus:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100 lg:flex'>
+        <div className='max-lg:hidden shrink-0 items-center opacity-0 transition-opacity group-focus:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100 lg:flex'>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

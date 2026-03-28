@@ -80,7 +80,7 @@ export function AudienceTableLoadingShell() {
             </div>
           </div>
 
-          <div className='hidden flex-1 min-h-0 overflow-auto sm:block'>
+          <div className='max-sm:hidden flex-1 min-h-0 overflow-auto'>
             <div className='px-4 py-4 sm:px-6'>
               <div className='overflow-hidden rounded-xl border border-subtle bg-(--linear-app-content-surface) shadow-subtle-bottom dark:shadow-inset-highlight'>
                 <div className='grid grid-cols-7 gap-4 border-b border-subtle px-4 py-3'>
@@ -121,7 +121,7 @@ export function AudienceTableLoadingShell() {
               height='h-4'
               width='w-48'
               rounded='md'
-              className='hidden sm:block'
+              className='max-sm:hidden'
             />
             <LoadingSkeleton
               height='h-4'
@@ -134,7 +134,7 @@ export function AudienceTableLoadingShell() {
                 height='h-8'
                 width='w-28'
                 rounded='md'
-                className='hidden sm:block'
+                className='max-sm:hidden'
               />
               <div className='flex gap-2'>
                 <LoadingSkeleton height='h-8' width='w-20' rounded='md' />

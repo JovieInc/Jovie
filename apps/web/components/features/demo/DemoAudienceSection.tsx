@@ -81,7 +81,7 @@ export default function DemoAudienceSection() {
               aria-label='Toggle analytics panel'
             >
               <BarChart3 className='h-3.5 w-3.5' aria-hidden='true' />
-              <span className='hidden sm:inline'>Analytics</span>
+              <span className='max-sm:hidden sm:inline'>Analytics</span>
             </button>
           </div>
 
