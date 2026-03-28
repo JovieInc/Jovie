@@ -309,7 +309,7 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 
 **Why:** Artists forget to pitch. An auto-generated pitch appearing in their task list with a "Review & Copy" action makes it part of their release workflow rather than a separate tool they have to remember to use.
 
-**Context:** The release task system already supports `ai_workflow` assignee types with "Automatic with Pro" badges. The `generatePitches()` service from `lib/services/pitch/` can be called from the task instantiation flow. Need to decide on trigger timing: on release creation, or X days before release date (editorial teams need 2-4 weeks lead time). Also need to handle the case where `pitchContext` is empty — still generate but note in the task that adding context will improve quality.
+**Context:** The release task system already supports `ai_workflow` assignee types with "Automatic with Pro" badges. The `generatePitches()` service from `lib/services/pitch/` can be called from the task instantiation flow. Need to decide on trigger timing: on release creation, or X days before release date (editorial teams need 2-4 weeks lead time). Also need to handle the case where `careerHighlights` is empty — still generate but note in the task that adding context will improve quality.
 
 **Effort:** S (human: ~1 day / CC: ~15 min)
 **Priority:** P2
