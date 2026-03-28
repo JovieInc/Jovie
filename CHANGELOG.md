@@ -50,6 +50,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- DSP Presence page converted from card grid to Linear-style table with sortable columns, external link icons, and keyboard navigation
+- Suggested DSP matches now sort first so actionable items appear at the top of the list
 - Conductor workspace archive script now cleans up `.claude/worktrees` (stale agent worktrees) alongside node_modules and build artifacts [internal]
 
 ## [26.4.82] - 2026-03-26

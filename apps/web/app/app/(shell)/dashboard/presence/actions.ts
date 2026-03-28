@@ -87,11 +87,11 @@ export async function loadDspPresence(): Promise<DspPresenceData> {
       confirmedAt: match.confirmedAt?.toISOString() ?? null,
     }));
 
-    // Sort: confirmed first, then auto_confirmed, then suggested
+    // Sort: suggested first (actionable), then auto_confirmed, then confirmed
     const statusOrder: Record<string, number> = {
-      confirmed: 0,
+      suggested: 0,
       auto_confirmed: 1,
-      suggested: 2,
+      confirmed: 2,
     };
     items.sort(
       (a, b) => (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3)
