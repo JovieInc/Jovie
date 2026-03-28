@@ -43,12 +43,11 @@ export const getUserBanStatus = cache(
       const { isBlocked } = checkUserStatus(user.userStatus, user.deletedAt);
       return { isBanned: isBlocked };
     } catch (error) {
-      // Fail closed: proxy.ts skips user-state checks for /app/* routes,
-      // so this is the only enforcement layer for dashboard pages.
-      // Showing "unavailable" on transient DB errors is safer than
-      // letting a banned user through.
+      // Fail open: a transient DB error should not lock out all
+      // authenticated users. A banned user slipping through briefly
+      // is far less impactful than denying the entire user base.
       captureError('Ban status check failed', error, { clerkUserId });
-      return { isBanned: true };
+      return { isBanned: false };
     }
   }
 );

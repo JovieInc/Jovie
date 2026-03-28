@@ -51,7 +51,7 @@
             "render-blocking-resources": "off",
             "render-blocking-insight": "off",
             "categories:performance": [
-              "warn",
+              "error",
               {
                 "minScore": 0.6
               }
