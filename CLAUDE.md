@@ -72,6 +72,52 @@ Local `/browse` auth is bypass-first, not Clerk-form-first.
 
 Always read `DESIGN.md` before making any visual or UI decisions. All font choices, colors, spacing, and aesthetic direction are defined there. Do not deviate without explicit user approval. In QA mode, flag any code that doesn't match `DESIGN.md`.
 
+## Merge Requirements — Bot Review Comments Are Blocking
+
+**Before merging any PR (including via `/land-and-deploy`), check for unaddressed bot review comments.** Unaddressed comments are a **BLOCKER** — do not merge until resolved.
+
+### Bots to check
+
+- `coderabbitai[bot]` (CodeRabbit)
+- `greptile-apps[bot]` (Greptile)
+
+### How to check
+
+```bash
+REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner')
+PR_NUMBER=$(gh pr view --json number --jq '.number')
+
+# Fetch all inline review comments on the PR
+gh api "repos/$REPO/pulls/$PR_NUMBER/comments" --paginate \
+  --jq '[.[] | {id, author: .user.login, path, line, body, html_url, in_reply_to_id, position}]'
+```
+
+### Classification
+
+For each **root** comment (where `in_reply_to_id` is null) from the bots above:
+
+1. **Outdated** — `position` is null (code was force-pushed past it) → skip
+2. **Addressed** — another comment exists with `in_reply_to_id` equal to this comment's `id`, from a non-bot author → skip
+3. **Nitpick** — body starts with `[nitpick]` or `**nitpick**` → warning only, not blocking
+4. **Unaddressed** — none of the above → **BLOCKER**
+
+### When blocked
+
+- List each unaddressed comment: `file:line` — first 80 chars of body — permalink
+- Recommend: "Run `/review` to triage bot comments, or reply to each comment on GitHub"
+- Do NOT merge with option C / "merge anyway" — this is a hard gate
+
+### In the readiness report
+
+Add a BOT REVIEWS section:
+```
+BOT REVIEWS
+├─ CodeRabbit:   PASS / N unaddressed (blocker)
+└─ Greptile:     PASS / N unaddressed (blocker)
+```
+
+---
+
 ## Deploy Configuration (configured by /setup-deploy)
 
 - Platform: Vercel
