@@ -6,8 +6,12 @@ import { APP_ROUTES } from '@/constants/routes';
 
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
+import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
+import { adminAuditLog } from '@/lib/db/schema/admin';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
@@ -443,4 +447,120 @@ export async function deleteCreatorOrUserAction(
 
   revalidatePath(APP_ROUTES.ADMIN);
   revalidatePath(APP_ROUTES.ADMIN_CREATORS);
+}
+
+export async function banUserAction(formData: FormData): Promise<void> {
+  const adminUserId = await requireAdmin();
+
+  const userId = formData.get('userId');
+  const reason = formData.get('reason');
+
+  if (typeof userId !== 'string' || userId.length === 0) {
+    throw new TypeError('userId is required');
+  }
+
+  if (typeof reason !== 'string' || reason.trim().length === 0) {
+    throw new TypeError('reason is required');
+  }
+
+  // Self-ban guard
+  if (userId === adminUserId) {
+    throw new TypeError('Cannot ban your own account');
+  }
+
+  // Atomic: update status + write audit log
+  const result = await runLegacyDbTransaction(async tx => {
+    const [user] = await tx
+      .update(users)
+      .set({ userStatus: 'banned' })
+      .where(eq(users.id, userId))
+      .returning({ clerkId: users.clerkId });
+
+    if (!user) {
+      throw new TypeError('User not found');
+    }
+
+    await tx.insert(adminAuditLog).values({
+      adminUserId,
+      targetUserId: userId,
+      action: 'ban_user',
+      metadata: { reason: reason.trim() },
+    });
+
+    return { clerkId: user.clerkId };
+  });
+
+  // Post-commit side effects (best-effort)
+  try {
+    await syncAllClerkMetadata(result.clerkId);
+  } catch (error) {
+    captureError('Failed to sync Clerk metadata after ban', error, {
+      userId,
+      clerkId: result.clerkId,
+    });
+  }
+
+  try {
+    await invalidateProxyUserStateCache(result.clerkId);
+  } catch (error) {
+    captureError('Failed to invalidate proxy cache after ban', error, {
+      userId,
+      clerkId: result.clerkId,
+    });
+  }
+
+  revalidatePath(APP_ROUTES.ADMIN);
+}
+
+export async function unbanUserAction(formData: FormData): Promise<void> {
+  const adminUserId = await requireAdmin();
+
+  const userId = formData.get('userId');
+
+  if (typeof userId !== 'string' || userId.length === 0) {
+    throw new TypeError('userId is required');
+  }
+
+  // Atomic: update status + write audit log
+  const result = await runLegacyDbTransaction(async tx => {
+    const [user] = await tx
+      .update(users)
+      .set({ userStatus: 'active' })
+      .where(eq(users.id, userId))
+      .returning({ clerkId: users.clerkId });
+
+    if (!user) {
+      throw new TypeError('User not found');
+    }
+
+    await tx.insert(adminAuditLog).values({
+      adminUserId,
+      targetUserId: userId,
+      action: 'unban_user',
+      metadata: {},
+    });
+
+    return { clerkId: user.clerkId };
+  });
+
+  // Post-commit side effects (best-effort)
+  try {
+    await syncAllClerkMetadata(result.clerkId);
+  } catch (error) {
+    captureError('Failed to sync Clerk metadata after unban', error, {
+      userId,
+      clerkId: result.clerkId,
+    });
+  }
+
+  try {
+    await invalidateProxyUserStateCache(result.clerkId);
+  } catch (error) {
+    captureError('Failed to invalidate proxy cache after unban', error, {
+      userId,
+      clerkId: result.clerkId,
+    });
+  }
+
+  revalidatePath(APP_ROUTES.ADMIN);
 }

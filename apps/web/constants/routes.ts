@@ -77,6 +77,8 @@ export const APP_ROUTES = {
   ADMIN_INGEST: '/app/admin/ingest',
   ADMIN_SCREENSHOTS: '/app/admin/screenshots',
   ADMIN_RELEASES: '/app/admin/releases',
+  ADMIN_USERS_BAN: '/app/admin/users/ban',
+  ADMIN_USERS_UNBAN: '/app/admin/users/unban',
 
   // Marketing
   DEMO: '/demo',
