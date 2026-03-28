@@ -85,18 +85,25 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (!gridRef.current) return;
       const cards = Array.from(
-        gridRef.current.querySelectorAll<HTMLElement>('[role="option"]')
+        gridRef.current.querySelectorAll<HTMLElement>('button[aria-pressed]')
       );
-      const currentIndex = cards.findIndex(
-        card => card === document.activeElement?.closest('[role="option"]')
-      );
+      const currentIndex = cards.indexOf(document.activeElement as HTMLElement);
       if (currentIndex === -1) return;
 
+      // Compute column count from rendered grid to make vertical nav correct
+      const cols =
+        window.getComputedStyle(gridRef.current).gridTemplateColumns.split(' ')
+          .length || 1;
+
       let nextIndex: number;
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      if (e.key === 'ArrowRight') {
         nextIndex = Math.min(currentIndex + 1, cards.length - 1);
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      } else if (e.key === 'ArrowLeft') {
         nextIndex = Math.max(currentIndex - 1, 0);
+      } else if (e.key === 'ArrowDown') {
+        nextIndex = Math.min(currentIndex + cols, cards.length - 1);
+      } else if (e.key === 'ArrowUp') {
+        nextIndex = Math.max(currentIndex - cols, 0);
       } else {
         return;
       }
@@ -157,11 +164,11 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
       data-testid='dsp-presence-workspace'
     >
       <div className='flex-1 min-h-0 overflow-auto'>
+        {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: keyboard events delegate from focused card buttons */}
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: keyboard events delegate from focused card buttons */}
         <div
           ref={gridRef}
           className='grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3'
-          role='listbox'
-          aria-label='DSP presence profiles'
           onKeyDown={handleGridKeyDown}
         >
           {data.items.map(item => (

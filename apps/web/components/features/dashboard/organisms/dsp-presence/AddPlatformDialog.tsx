@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { useState, useTransition } from 'react';
+import { useId, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { addManualDspMatch } from '@/app/app/(shell)/dashboard/presence/actions';
 import { Dialog, DialogTitle } from '@/components/organisms/Dialog';
@@ -51,6 +51,8 @@ export function AddPlatformDialog({
   const [artistName, setArtistName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const nameId = useId();
+  const urlId = useId();
 
   const availableProviders = ALL_PROVIDERS.filter(
     id => !existingProviderIds.includes(id)
@@ -68,23 +70,28 @@ export function AddPlatformDialog({
     onClose();
   }
 
-  function handleSubmit() {
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     if (!selectedProvider || !url || !artistName) return;
 
     setError(null);
     startTransition(async () => {
-      const result = await addManualDspMatch({
-        providerId: selectedProvider,
-        url,
-        artistName,
-      });
+      try {
+        const result = await addManualDspMatch({
+          providerId: selectedProvider,
+          url,
+          artistName,
+        });
 
-      if (result.success) {
-        toast.success('Platform added');
-        resetForm();
-        onClose();
-      } else {
-        setError(result.error ?? 'Something went wrong');
+        if (result.success) {
+          toast.success('Platform added');
+          resetForm();
+          onClose();
+        } else {
+          setError(result.error ?? 'Something went wrong');
+        }
+      } catch {
+        setError('Something went wrong. Please try again.');
       }
     });
   }
@@ -93,7 +100,7 @@ export function AddPlatformDialog({
     <Dialog open={open} onClose={handleClose} size='sm'>
       <DialogTitle>Add Platform</DialogTitle>
 
-      <div className='mt-5 space-y-4'>
+      <form onSubmit={handleSubmit} className='mt-5 space-y-4'>
         {/* Provider picker */}
         {availableProviders.length === 0 ? (
           <p className='text-[13px] text-tertiary-token text-center py-4'>
@@ -105,6 +112,7 @@ export function AddPlatformDialog({
               <button
                 key={id}
                 type='button'
+                aria-pressed={selectedProvider === id}
                 onClick={() => {
                   setSelectedProvider(id);
                   setError(null);
@@ -126,32 +134,48 @@ export function AddPlatformDialog({
         {/* Form fields (shown when provider selected) */}
         {selectedProvider && (
           <>
-            <input
-              type='text'
-              value={artistName}
-              onChange={e => setArtistName(e.target.value)}
-              placeholder='Artist name on this platform'
-              className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-[13px] text-primary-token placeholder:text-quaternary-token focus:outline-none focus:ring-1 focus:ring-[#7170ff]/50'
-            />
-            <input
-              type='text'
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-              placeholder={PROVIDER_PLACEHOLDERS[selectedProvider]}
-              className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-[13px] text-primary-token placeholder:text-quaternary-token focus:outline-none focus:ring-1 focus:ring-[#7170ff]/50'
-            />
-            {error && <p className='text-[12px] text-red-500'>{error}</p>}
+            <div>
+              <label htmlFor={nameId} className='sr-only'>
+                Artist name
+              </label>
+              <input
+                id={nameId}
+                type='text'
+                value={artistName}
+                onChange={e => setArtistName(e.target.value)}
+                placeholder='Artist name on this platform'
+                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-[13px] text-primary-token placeholder:text-quaternary-token focus:outline-none focus:ring-1 focus:ring-[#7170ff]/50'
+              />
+            </div>
+            <div>
+              <label htmlFor={urlId} className='sr-only'>
+                Profile URL
+              </label>
+              <input
+                id={urlId}
+                type='url'
+                value={url}
+                onChange={e => setUrl(e.target.value)}
+                placeholder={PROVIDER_PLACEHOLDERS[selectedProvider]}
+                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-[13px] text-primary-token placeholder:text-quaternary-token focus:outline-none focus:ring-1 focus:ring-[#7170ff]/50'
+              />
+            </div>
+            {error && (
+              <p className='text-[12px] text-red-500' role='alert'>
+                {error}
+              </p>
+            )}
             <Button
+              type='submit'
               variant='primary'
               size='sm'
               disabled={!url || !artistName || isPending}
-              onClick={handleSubmit}
             >
               {isPending ? 'Adding...' : 'Add Platform'}
             </Button>
           </>
         )}
-      </div>
+      </form>
     </Dialog>
   );
 }

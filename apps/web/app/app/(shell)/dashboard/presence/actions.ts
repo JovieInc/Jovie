@@ -195,13 +195,21 @@ export async function addManualDspMatch(input: {
         };
       }
 
-      // Update existing match
+      // Update existing match — clear stale discovery/rejection fields
       await db
         .update(dspArtistMatches)
         .set({
           status: 'confirmed',
           matchSource: 'manual',
           confidenceScore: null,
+          confidenceBreakdown: null,
+          matchingIsrcCount: 0,
+          matchingUpcCount: 0,
+          totalTracksChecked: 0,
+          externalArtistId: null,
+          externalArtistImageUrl: null,
+          rejectedAt: null,
+          rejectionReason: null,
           confirmedAt: new Date(),
           externalArtistName: input.artistName,
           externalArtistUrl: input.url,
