@@ -31,6 +31,16 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Extracted nested ternary in `DashboardShellSkeleton` to lookup table [internal]
 
+## [26.4.85] - 2026-03-27
+
+### Changed
+
+- Build validation now runs on every PR and blocks merge if the build fails, catching broken builds before they reach main [internal]
+- Lighthouse performance checks, accessibility audits, and layout guard now run on all PRs without the `testing` label (informational, non-blocking) [internal]
+- Agent workflow updated: draft PR first, commit often, let CI catch issues early, then `/ship` to finalize [internal]
+- `/ship` now detects existing draft PRs and updates them instead of creating duplicates [internal]
+- Agent pre-push gate replaced with gstack skill pipeline (`/qa` → `/review` → `/ship` → `/land-and-deploy`) [internal]
+
 ## [26.4.84] - 2026-03-27
 
 ### Changed
