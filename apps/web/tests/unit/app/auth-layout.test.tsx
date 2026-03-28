@@ -20,10 +20,6 @@ async function renderAuthRouteLayout({
     },
   }));
 
-  vi.doMock('@/lib/feature-flags/server', () => ({
-    getFeatureFlagsBootstrap: vi.fn().mockResolvedValue({}),
-  }));
-
   vi.doMock('@/lib/feature-flags/client', () => ({
     FeatureFlagsProvider: ({ children }: { children: ReactNode }) => (
       <>{children}</>
