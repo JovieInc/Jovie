@@ -1,10 +1,13 @@
 export const variantClasses = {
-  blue: 'bg-info-subtle border-info/20 text-info',
-  green: 'bg-success-subtle border-success/20 text-success',
-  purple: 'bg-accent-subtle border-accent/20 text-accent',
-  orange: 'bg-warning-subtle border-warning/20 text-warning',
-  red: 'bg-error-subtle border-error/20 text-error',
-  gray: 'bg-surface-2 border-subtle text-tertiary-token',
+  blue: 'bg-(--linear-bg-surface-0) border-(--linear-border-subtle) text-blue-600 dark:text-blue-400',
+  green:
+    'bg-(--linear-bg-surface-0) border-(--linear-border-subtle) text-emerald-600 dark:text-emerald-400',
+  purple:
+    'bg-(--linear-bg-surface-0) border-(--linear-border-subtle) text-violet-600 dark:text-violet-400',
+  orange:
+    'bg-(--linear-bg-surface-0) border-(--linear-border-subtle) text-amber-600 dark:text-amber-400',
+  red: 'bg-(--linear-bg-surface-0) border-(--linear-border-subtle) text-red-600 dark:text-red-400',
+  gray: 'bg-(--linear-bg-surface-0) border-(--linear-border-subtle) text-tertiary-token',
 } as const;
 
 export const sizeClasses = {

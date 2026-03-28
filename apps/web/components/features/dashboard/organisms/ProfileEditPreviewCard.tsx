@@ -100,7 +100,7 @@ export function ProfileEditPreviewCard({
               Updated successfully
             </p>
           </div>
-          <span className='inline-flex shrink-0 items-center gap-1 rounded-md bg-success-subtle px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-success'>
+          <span className='inline-flex shrink-0 items-center gap-1 rounded-md border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-emerald-600 dark:text-emerald-400'>
             <Check className='h-3.5 w-3.5' />
             Applied
           </span>

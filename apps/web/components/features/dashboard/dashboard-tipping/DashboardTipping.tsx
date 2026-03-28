@@ -285,7 +285,7 @@ const VenmoConnectDialog = memo(function VenmoConnectDialog({
           </div>
           {saveSuccess && (
             <output
-              className='flex items-center gap-2 rounded-lg bg-success-subtle px-3 py-2 text-[13px] font-[510] text-success'
+              className='flex items-center gap-2 rounded-lg border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2 text-[13px] font-[510] text-emerald-600 dark:text-emerald-400'
               aria-live='polite'
             >
               <Check className='h-3.5 w-3.5' />
@@ -313,10 +313,10 @@ const TipLinkSection = memo(function TipLinkSection({
     <ContentSurfaceCard className='p-4 sm:p-5'>
       <div className='flex items-center gap-2 mb-3'>
         <div
-          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border border-info/20 bg-info-subtle'
+          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'
           aria-hidden='true'
         >
-          <Link2 className='h-3.5 w-3.5 text-info' />
+          <Link2 className='h-3.5 w-3.5 text-blue-500 dark:text-blue-400' />
         </div>
         <h3 className='text-[13px] font-[510] text-primary-token'>Tip link</h3>
       </div>
@@ -476,24 +476,24 @@ export function DashboardTipping() {
                       value={qrTipClicks}
                       description='Fans who scanned your QR'
                       icon={ScanLine}
-                      iconChipClassName='bg-success-subtle'
-                      iconClassName='text-success'
+                      iconChipClassName='bg-(--linear-bg-surface-0) border border-(--linear-border-subtle)'
+                      iconClassName='text-emerald-500 dark:text-emerald-400'
                     />
                     <StatCard
                       label='Link clicks'
                       value={linkTipClicks}
                       description='Fans who clicked your link'
                       icon={MousePointerClick}
-                      iconChipClassName='bg-info-subtle'
-                      iconClassName='text-info'
+                      iconChipClassName='bg-(--linear-bg-surface-0) border border-(--linear-border-subtle)'
+                      iconClassName='text-blue-500 dark:text-blue-400'
                     />
                     <StatCard
                       label='Total visits'
                       value={tipClicks}
                       description='QR + link combined'
                       icon={BarChart3}
-                      iconChipClassName='bg-accent-subtle'
-                      iconClassName='text-accent-token'
+                      iconChipClassName='bg-(--linear-bg-surface-0) border border-(--linear-border-subtle)'
+                      iconClassName='text-violet-500 dark:text-violet-400'
                     />
                   </div>
                 </ContentSurfaceCard>
