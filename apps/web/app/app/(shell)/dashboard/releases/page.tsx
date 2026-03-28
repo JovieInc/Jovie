@@ -8,7 +8,7 @@ import { captureError } from '@/lib/error-tracking';
 import { HydrateClient, queryKeys } from '@/lib/queries';
 import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
-import { getDashboardDataEssential } from '../actions';
+import { getDashboardData } from '../actions';
 import type { DashboardData } from '../actions/dashboard-data';
 import {
   checkAppleMusicConnection,
@@ -36,7 +36,7 @@ export default async function ReleasesPage() {
     );
   }
 
-  const dashboardData = await getDashboardDataEssential();
+  const dashboardData = await getDashboardData();
 
   if (dashboardData.dashboardLoadError) {
     void captureError(
