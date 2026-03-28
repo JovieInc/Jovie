@@ -27,10 +27,10 @@ type SlideDirection = 'left' | 'right' | null;
 
 function confidenceBadgeClass(confidence: number): string {
   if (confidence >= 0.8)
-    return 'bg-(--linear-bg-surface-0) border border-(--linear-border-subtle) text-emerald-600 dark:text-emerald-400';
+    return 'bg-surface-1 border border-subtle text-success';
   if (confidence >= 0.5)
-    return 'bg-(--linear-bg-surface-0) border border-(--linear-border-subtle) text-amber-600 dark:text-amber-400';
-  return 'bg-(--linear-bg-surface-0) border border-(--linear-border-subtle) text-red-500 dark:text-red-400';
+    return 'bg-surface-1 border border-subtle text-warning';
+  return 'bg-surface-1 border border-subtle text-error';
 }
 
 const ICON_PLATFORM_MAP: Record<string, string> = {

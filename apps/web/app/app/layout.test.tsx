@@ -10,7 +10,6 @@ vi.mock('next/script', () => ({
     readonly src: string;
     readonly strategy?: string;
   }) => (
-    // Use div instead of script to avoid @next/next/no-sync-scripts lint rule
     <div
       data-testid='theme-init-script'
       data-strategy={strategy}
@@ -31,7 +30,7 @@ afterEach(() => {
 
 describe('app route layout', () => {
   it('wraps app routes with resolved client providers and theme init script', async () => {
-    const { default: AppLayout } = await import('@/app/app/layout');
+    const { default: AppLayout } = await import('./layout');
 
     render(
       await AppLayout({

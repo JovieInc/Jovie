@@ -15,27 +15,23 @@ const STATUS_STYLES: Record<
 > = {
   suggested: {
     label: 'Suggested',
-    className:
-      'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-blue-500 dark:text-blue-400',
-    dotClassName: 'bg-blue-500 dark:bg-blue-400',
+    className: 'border-info/20 bg-surface-1 text-info',
+    dotClassName: 'bg-info',
   },
   confirmed: {
     label: 'Confirmed',
-    className:
-      'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-emerald-600 dark:text-emerald-400',
-    dotClassName: 'bg-emerald-500 dark:bg-emerald-400',
+    className: 'border-success/20 bg-surface-1 text-success',
+    dotClassName: 'bg-success',
   },
   auto_confirmed: {
     label: 'Auto-confirmed',
-    className:
-      'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-emerald-600 dark:text-emerald-400',
-    dotClassName: 'bg-emerald-500 dark:bg-emerald-400',
+    className: 'border-success/20 bg-surface-1 text-success',
+    dotClassName: 'bg-success',
   },
   rejected: {
     label: 'Rejected',
-    className:
-      'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-tertiary-token',
-    dotClassName: 'bg-(--linear-text-tertiary)',
+    className: 'border-subtle bg-surface-1 text-tertiary-token',
+    dotClassName: 'bg-tertiary-token',
   },
 };
 

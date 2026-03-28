@@ -24,9 +24,9 @@ describe('StatusBadge', () => {
       const { container } = render(<StatusBadge>Default</StatusBadge>);
       const badge = container.querySelector('output');
 
-      expect(badge).toHaveClass('bg-(--linear-bg-surface-0)');
-      expect(badge).toHaveClass('border-(--linear-border-subtle)');
-      expect(badge).toHaveClass('text-blue-600');
+      expect(badge).toHaveClass('bg-surface-1');
+      expect(badge).toHaveClass('border-info/20');
+      expect(badge).toHaveClass('text-info');
     });
 
     it('renders green variant', () => {
@@ -35,9 +35,9 @@ describe('StatusBadge', () => {
       );
       const badge = container.querySelector('output');
 
-      expect(badge).toHaveClass('bg-(--linear-bg-surface-0)');
-      expect(badge).toHaveClass('border-(--linear-border-subtle)');
-      expect(badge).toHaveClass('text-emerald-600');
+      expect(badge).toHaveClass('bg-surface-1');
+      expect(badge).toHaveClass('border-success/20');
+      expect(badge).toHaveClass('text-success');
     });
 
     it('renders purple variant', () => {
@@ -46,9 +46,9 @@ describe('StatusBadge', () => {
       );
       const badge = container.querySelector('output');
 
-      expect(badge).toHaveClass('bg-(--linear-bg-surface-0)');
-      expect(badge).toHaveClass('border-(--linear-border-subtle)');
-      expect(badge).toHaveClass('text-violet-600');
+      expect(badge).toHaveClass('bg-surface-1');
+      expect(badge).toHaveClass('border-accent/20');
+      expect(badge).toHaveClass('text-accent');
     });
 
     it('renders orange variant', () => {
@@ -57,9 +57,9 @@ describe('StatusBadge', () => {
       );
       const badge = container.querySelector('output');
 
-      expect(badge).toHaveClass('bg-(--linear-bg-surface-0)');
-      expect(badge).toHaveClass('border-(--linear-border-subtle)');
-      expect(badge).toHaveClass('text-amber-600');
+      expect(badge).toHaveClass('bg-surface-1');
+      expect(badge).toHaveClass('border-warning/20');
+      expect(badge).toHaveClass('text-warning');
     });
 
     it('renders red variant', () => {
@@ -68,9 +68,9 @@ describe('StatusBadge', () => {
       );
       const badge = container.querySelector('output');
 
-      expect(badge).toHaveClass('bg-(--linear-bg-surface-0)');
-      expect(badge).toHaveClass('border-(--linear-border-subtle)');
-      expect(badge).toHaveClass('text-red-600');
+      expect(badge).toHaveClass('bg-surface-1');
+      expect(badge).toHaveClass('border-error/20');
+      expect(badge).toHaveClass('text-error');
     });
 
     it('renders gray variant', () => {
@@ -79,8 +79,8 @@ describe('StatusBadge', () => {
       );
       const badge = container.querySelector('output');
 
-      expect(badge).toHaveClass('bg-(--linear-bg-surface-0)');
-      expect(badge).toHaveClass('border-(--linear-border-subtle)');
+      expect(badge).toHaveClass('bg-surface-1');
+      expect(badge).toHaveClass('border-subtle');
       expect(badge).toHaveClass('text-tertiary-token');
     });
   });
@@ -251,9 +251,9 @@ describe('StatusBadge', () => {
       );
 
       const badge = screen.getByRole('status');
-      expect(badge).toHaveClass('bg-(--linear-bg-surface-0)');
-      expect(badge).toHaveClass('border-(--linear-border-subtle)');
-      expect(badge).toHaveClass('text-emerald-600');
+      expect(badge).toHaveClass('bg-surface-1');
+      expect(badge).toHaveClass('border-success/20');
+      expect(badge).toHaveClass('text-success');
       expect(badge).toHaveClass('px-5');
       expect(badge).toHaveClass('text-base');
       expect(badge).toHaveClass('extra-class');

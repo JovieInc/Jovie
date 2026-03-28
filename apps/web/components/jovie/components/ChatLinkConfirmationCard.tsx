@@ -118,8 +118,8 @@ export function ChatLinkConfirmationCard({
 
   if (state === 'added') {
     return (
-      <ContentSurfaceCard className='border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-4'>
-        <div className='flex items-center gap-2 text-emerald-600 dark:text-emerald-400'>
+      <ContentSurfaceCard className='border-subtle bg-surface-1 p-4'>
+        <div className='flex items-center gap-2 text-success'>
           <Check className='h-4 w-4' />
           <span className='text-sm font-medium'>
             {platform.name} link added
