@@ -105,7 +105,7 @@ export function buildProfileIdentityFields(
     hideBranding: Boolean(artist.settings?.hide_branding),
     location: artist.location ?? '',
     hometown: artist.hometown ?? '',
-    pitchContext: artist.pitch_context ?? '',
+    careerHighlights: artist.career_highlights ?? '',
     targetPlaylists: artist.target_playlists?.join(', ') ?? '',
     profilePath: `/${artist.handle}`,
   };
