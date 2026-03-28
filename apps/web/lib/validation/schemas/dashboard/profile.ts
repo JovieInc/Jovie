@@ -8,6 +8,18 @@ import { z } from 'zod';
 import { isContentClean } from '../../content-filter';
 import { httpUrlSchema, safeHttpUrlSchema } from '../base';
 
+/** Shared target playlists validation, used by both profile and release actions */
+export const targetPlaylistsSchema = z
+  .array(
+    z
+      .string()
+      .trim()
+      .min(1, 'Playlist name cannot be empty')
+      .max(60, 'Playlist name must be 60 characters or fewer')
+  )
+  .max(5, 'Maximum 5 target playlists')
+  .optional();
+
 const profilePlaceSchema = z
   .preprocess(
     value => (typeof value === 'string' ? value.trim() : value),
@@ -185,16 +197,7 @@ export const profileUpdateSchema = z
       .max(2000, 'Pitch context must be 2000 characters or fewer')
       .optional(),
     /** Target Spotify playlists for pitch generation */
-    targetPlaylists: z
-      .array(
-        z
-          .string()
-          .trim()
-          .min(1, 'Playlist name cannot be empty')
-          .max(60, 'Playlist name must be 60 characters or fewer')
-      )
-      .max(5, 'Maximum 5 target playlists')
-      .optional(),
+    targetPlaylists: targetPlaylistsSchema,
   })
   .superRefine((data, ctx) => {
     if (

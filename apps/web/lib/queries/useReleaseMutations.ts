@@ -10,6 +10,7 @@ import {
   saveCanvasStatus,
   saveProviderOverride,
   saveReleaseLyrics,
+  saveReleaseTargetPlaylists,
   syncFromSpotify,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -299,6 +300,25 @@ export function useSaveReleaseLyricsMutation(profileId: string) {
 
   return useMutation({
     mutationFn: saveReleaseLyrics,
+    onSuccess: async updated => {
+      const current = queryClient.getQueryData<ReleaseViewModel[]>(
+        queryKeys.releases.matrix(profileId)
+      );
+      if (current) {
+        queryClient.setQueryData(
+          queryKeys.releases.matrix(profileId),
+          current.map(r => (r.id === updated.id ? updated : r))
+        );
+      }
+    },
+  });
+}
+
+export function useSaveReleaseTargetPlaylistsMutation(profileId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: saveReleaseTargetPlaylists,
     onSuccess: async updated => {
       const current = queryClient.getQueryData<ReleaseViewModel[]>(
         queryKeys.releases.matrix(profileId)

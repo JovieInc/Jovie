@@ -209,6 +209,7 @@ function mapReleaseToViewModel(
       release.genres && release.genres.length > 0
         ? release.genres
         : extractGenres(release.metadata),
+    targetPlaylists: release.targetPlaylists ?? [],
     copyrightLine: release.copyrightLine ?? null,
     distributor: release.distributor ?? null,
     canvasStatus: getCanvasStatusFromMetadata(release.metadata),
@@ -462,6 +463,63 @@ export async function saveReleaseLyrics(params: {
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   // Skip revalidatePath — the mutation hook handles cache updates via TanStack
   // Query, and a path revalidation resets client-side state (closing the sidebar).
+
+  return mapReleaseToViewModel(
+    updated,
+    buildProviderLabels(),
+    profile.id,
+    profile.handle
+  );
+}
+
+export async function saveReleaseTargetPlaylists(params: {
+  profileId: string;
+  releaseId: string;
+  targetPlaylists: string[];
+}): Promise<ReleaseViewModel> {
+  noStore();
+
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+  if (profile.id !== params.profileId) {
+    throw new TypeError('Profile mismatch');
+  }
+
+  const release = await getReleaseById(params.releaseId);
+  if (release?.creatorProfileId !== profile.id) {
+    throw new TypeError('Release not found');
+  }
+
+  // Validate and normalize input
+  const validated = (params.targetPlaylists ?? [])
+    .map(s => s.trim())
+    .filter(Boolean)
+    .slice(0, 5);
+
+  await db
+    .update(discogReleases)
+    .set({
+      targetPlaylists: validated.length > 0 ? validated : null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(discogReleases.id, params.releaseId),
+        eq(discogReleases.creatorProfileId, profile.id)
+      )
+    );
+
+  const updated = await getReleaseById(params.releaseId);
+  if (!updated) {
+    throw new TypeError('Release not found');
+  }
+
+  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
 
   return mapReleaseToViewModel(
     updated,

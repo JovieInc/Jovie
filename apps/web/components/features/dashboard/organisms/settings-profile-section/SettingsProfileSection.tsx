@@ -241,11 +241,11 @@ export function SettingsProfileSection({
               htmlFor='targetPlaylists'
               className='text-[13px] text-primary-token'
             >
-              Target playlists
+              Default target playlists
             </label>
             <p className='mt-0.5 text-[13px] text-secondary-token'>
-              Name specific Spotify playlists you&apos;re targeting. Leave blank
-              and we&apos;ll suggest based on your genre.
+              Default playlists for pitch generation. Override per-release in
+              the release sidebar.
             </p>
           </div>
           <Input
