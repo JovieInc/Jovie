@@ -696,7 +696,8 @@ jobs:
           echo "All gates passed. Auto-approving PR #$PR_NUMBER as '$APPROVER'"
 
           # Submit approval review
-          gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
+          APPROVAL_ERROR_LOG=$(mktemp)
+          if ! gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
             --method POST \
             -f event="APPROVE" \
             -f body="## Auto-Approved by Agent Pipeline
@@ -710,7 +711,16 @@ jobs:
           This PR was auto-approved because it meets all criteria for low-risk agent changes.
           It will now enter the merge queue for final validation.
 
-          > If this approval is incorrect, dismiss it and add the \`needs-human\` label."
+          > If this approval is incorrect, dismiss it and add the \`needs-human\` label." \
+            2>"$APPROVAL_ERROR_LOG"; then
+            if rg -q "Resource not accessible by integration" "$APPROVAL_ERROR_LOG"; then
+              echo "Skipping auto-approval for PR #$PR_NUMBER because the GitHub App token lacks review permission."
+              exit 0
+            fi
+
+            cat "$APPROVAL_ERROR_LOG"
+            exit 1
+          fi
 
           echo "PR #$PR_NUMBER approved"
 
