@@ -1,16 +1,23 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
+  type PreviewPanelData,
   type PreviewPanelLink,
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
-import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
+import {
+  DrawerMediaThumb,
+  DrawerSurfaceCard,
+  DrawerTabs,
+  EntityHeaderCard,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { BASE_URL } from '@/constants/domains';
@@ -84,6 +91,77 @@ async function confirmLinkOnServer(
   if (!response.ok) throw new Error('Failed to add link');
   const { linkId } = (await response.json()) as { linkId: string };
   return linkId;
+}
+
+function ProfileEntityHeader({
+  previewData,
+  onClose,
+  overflowActions,
+}: Readonly<{
+  previewData: PreviewPanelData;
+  onClose: () => void;
+  overflowActions: ReturnType<typeof useProfileHeaderParts>['overflowActions'];
+}>) {
+  const primaryLabel =
+    previewData.displayName?.trim() || `@${previewData.username}`;
+  const secondaryLabel =
+    previewData.displayName?.trim() &&
+    previewData.displayName !== previewData.username
+      ? `@${previewData.username}`
+      : previewData.profilePath;
+  const detailChips = [
+    previewData.location?.trim() || null,
+    `${previewData.links.length} link${previewData.links.length === 1 ? '' : 's'}`,
+  ].filter(Boolean);
+  const fallbackLabel = primaryLabel.replace(/^@/, '').charAt(0).toUpperCase();
+
+  return (
+    <DrawerSurfaceCard
+      className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
+      testId='profile-contact-header-card'
+    >
+      <div className='relative p-3.5'>
+        <div className='absolute right-2.5 top-2.5'>
+          <DrawerHeaderActions
+            primaryActions={[
+              {
+                id: 'close-profile-contact',
+                label: 'Close profile details',
+                icon: X,
+                onClick: onClose,
+              },
+            ]}
+            overflowActions={overflowActions}
+          />
+        </div>
+        <EntityHeaderCard
+          title={primaryLabel}
+          subtitle={secondaryLabel}
+          meta={
+            <div className='mt-1 flex flex-wrap items-center gap-2 text-[11px] text-tertiary-token'>
+              {detailChips.map(detail => (
+                <span key={detail}>{detail}</span>
+              ))}
+            </div>
+          }
+          image={
+            <DrawerMediaThumb
+              src={previewData.avatarUrl}
+              alt={primaryLabel}
+              sizeClassName='h-[60px] w-[60px] rounded-[14px]'
+              sizes='60px'
+              fallback={
+                <span className='text-[18px] font-[590] text-secondary-token'>
+                  {fallbackLabel}
+                </span>
+              }
+            />
+          }
+          className='pr-8'
+        />
+      </div>
+    </DrawerSurfaceCard>
+  );
 }
 
 export function ProfileContactSidebar() {
@@ -425,23 +503,14 @@ export function ProfileContactSidebar() {
     onClose: close,
   });
 
-  const closeOnlyHeaderActions = (
-    <DrawerHeaderActions
-      primaryActions={[]}
-      overflowActions={[]}
-      onClose={close}
-    />
-  );
-
   // Show skeleton sidebar until preview data loads (prevents CLS)
   if (!previewData) {
     return (
       <EntitySidebarShell
         isOpen={isOpen}
         ariaLabel='Profile Contact'
-        title='Profile'
         headerMode='minimal'
-        headerActions={closeOnlyHeaderActions}
+        hideMinimalHeaderBar
       >
         <div className='flex min-h-full flex-col gap-2.5 pt-0.5'>
           <div className={cn(LINEAR_SURFACE.sidebarCard, 'space-y-2.5 p-3')}>
@@ -500,90 +569,90 @@ export function ProfileContactSidebar() {
     <EntitySidebarShell
       isOpen={isOpen}
       ariaLabel='Profile Contact'
-      title='Profile'
       headerMode='minimal'
-      headerActions={
-        <DrawerHeaderActions
-          primaryActions={[]}
-          overflowActions={overflowActions}
+      hideMinimalHeaderBar
+      entityHeader={
+        <ProfileEntityHeader
+          previewData={previewData}
           onClose={close}
+          overflowActions={overflowActions}
+        />
+      }
+      tabs={
+        <DrawerTabs
+          value={resolvedCategory}
+          onValueChange={value =>
+            setSelectedCategory(value as CategoryOption | 'about')
+          }
+          options={PROFILE_TAB_OPTIONS}
+          ariaLabel='Profile sidebar view'
+          actions={
+            supportsAddAction ? (
+              <AppIconButton
+                type='button'
+                onClick={() => handleAddLink(resolvedCategory)}
+                className='h-[26px] w-[26px] rounded-full border-0 bg-transparent text-tertiary-token shadow-none hover:bg-surface-0 hover:text-primary-token'
+                ariaLabel={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
+              >
+                <Plus className='h-3.5 w-3.5' />
+              </AppIconButton>
+            ) : undefined
+          }
+          actionsClassName='h-[26px] w-[26px]'
+          overflowMode='scroll'
+          distribution='fill'
         />
       }
     >
       <div className='flex min-h-full flex-col gap-2.5 pt-0.5'>
         <ProfileSmartLinkAnalytics profileUrl={profileUrl} />
 
-        <div className='flex min-h-0 flex-1 flex-col gap-2.5'>
-          <DrawerTabs
-            value={resolvedCategory}
-            onValueChange={value =>
-              setSelectedCategory(value as CategoryOption | 'about')
-            }
-            options={PROFILE_TAB_OPTIONS}
-            ariaLabel='Profile sidebar view'
-            actions={
-              supportsAddAction ? (
-                <AppIconButton
-                  type='button'
-                  onClick={() => handleAddLink(resolvedCategory)}
-                  className='h-[26px] w-[26px] rounded-full border-0 bg-transparent text-tertiary-token shadow-none hover:bg-surface-0 hover:text-primary-token'
-                  ariaLabel={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
-                >
-                  <Plus className='h-3.5 w-3.5' />
-                </AppIconButton>
-              ) : undefined
-            }
-            actionsClassName='h-[26px] w-[26px]'
-            overflowMode='scroll'
-          />
-
-          <div className='min-h-0 flex-1'>
-            {resolvedCategory === 'about' ? (
-              <ProfileAboutTab
-                bio={bio}
-                genres={genres}
-                location={location}
-                hometown={hometown}
-                activeSinceYear={activeSinceYear}
-                allowPhotoDownloads={allowPhotoDownloads}
-                pressPhotos={pressPhotos}
-                onBioChange={handleBioChange}
-                onLocationChange={handleLocationChange}
-                onHometownChange={handleHometownChange}
-                onGenresChange={handleGenresChange}
-                onPressPhotoUpload={handlePressPhotoUpload}
-                onPressPhotoDelete={handlePressPhotoDelete}
+        <div className='min-h-0 flex-1'>
+          {resolvedCategory === 'about' ? (
+            <ProfileAboutTab
+              bio={bio}
+              genres={genres}
+              location={location}
+              hometown={hometown}
+              activeSinceYear={activeSinceYear}
+              allowPhotoDownloads={allowPhotoDownloads}
+              pressPhotos={pressPhotos}
+              onBioChange={handleBioChange}
+              onLocationChange={handleLocationChange}
+              onHometownChange={handleHometownChange}
+              onGenresChange={handleGenresChange}
+              onPressPhotoUpload={handlePressPhotoUpload}
+              onPressPhotoDelete={handlePressPhotoDelete}
+            />
+          ) : (
+            <>
+              <ProfileLinkList
+                links={links}
+                selectedCategory={resolvedCategory as CategoryOption}
+                onAddLink={handleAddLink}
+                onRemoveLink={handleRemoveLink}
+                dspConnections={dspConnections}
               />
-            ) : (
-              <>
-                <ProfileLinkList
-                  links={links}
-                  selectedCategory={resolvedCategory as CategoryOption}
-                  onAddLink={handleAddLink}
-                  onRemoveLink={handleRemoveLink}
-                  dspConnections={dspConnections}
-                />
 
-                {isAddingLink && (
-                  <div className='mt-2.5'>
-                    <SidebarLinkInput
-                      categoryFilter={
-                        resolvedCategory === 'social' ||
-                        resolvedCategory === 'dsp' ||
-                        resolvedCategory === 'earnings'
-                          ? resolvedCategory
-                          : 'social'
-                      }
-                      existingPlatforms={existingPlatformIds}
-                      onAdd={handleSmartAddLink}
-                      onCancel={() => setIsAddingLink(false)}
-                      creatorName={previewData?.displayName}
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+              {isAddingLink && (
+                <div className='mt-2.5'>
+                  <SidebarLinkInput
+                    categoryFilter={
+                      resolvedCategory === 'social' ||
+                      resolvedCategory === 'dsp' ||
+                      resolvedCategory === 'earnings'
+                        ? resolvedCategory
+                        : 'social'
+                    }
+                    existingPlatforms={existingPlatformIds}
+                    onAdd={handleSmartAddLink}
+                    onCancel={() => setIsAddingLink(false)}
+                    creatorName={previewData.displayName}
+                  />
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </EntitySidebarShell>

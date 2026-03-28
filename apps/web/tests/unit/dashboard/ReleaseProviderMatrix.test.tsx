@@ -600,7 +600,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getByRole('button', { name: 'Create a new release' })
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
       );
 
       await waitFor(() => {
@@ -635,7 +635,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getByRole('button', { name: 'Create a new release' })
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
       );
 
       await waitFor(() => {
@@ -672,7 +672,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getByRole('button', { name: 'Create a new release' })
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
       );
 
       await waitFor(() => {

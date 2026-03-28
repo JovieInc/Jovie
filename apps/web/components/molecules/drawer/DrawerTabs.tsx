@@ -28,6 +28,7 @@ export interface DrawerTabsProps<T extends string> {
   readonly actionsClassName?: string;
   readonly triggerClassName?: string;
   readonly overflowMode?: 'collapse' | 'wrap' | 'scroll';
+  readonly distribution?: 'intrinsic' | 'fill';
 }
 
 /**

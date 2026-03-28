@@ -37,7 +37,7 @@ export function DashboardHeader({
     <header
       data-testid='dashboard-header'
       className={cn(
-        'z-20 bg-(--linear-app-content-surface) backdrop-blur-[12px]',
+        'z-20 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) backdrop-blur-[12px]',
         className
       )}
     >
@@ -57,7 +57,7 @@ export function DashboardHeader({
         </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}
-      <div className='relative max-sm:hidden h-(--linear-app-header-height-compact) w-full items-center gap-2 px-(--linear-app-header-padding-x) sm:flex'>
+      <div className='relative max-sm:hidden h-(--linear-app-header-height-compact) w-full items-center gap-2 px-2.5 sm:flex'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
@@ -96,9 +96,7 @@ export function DashboardHeader({
           )}
         </div>
         {action ? (
-          <div className='ml-auto flex items-center gap-(--linear-app-toolbar-gap)'>
-            {action}
-          </div>
+          <div className='ml-auto flex items-center gap-1.5'>{action}</div>
         ) : null}
       </div>
     </header>

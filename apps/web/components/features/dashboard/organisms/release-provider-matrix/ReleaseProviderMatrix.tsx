@@ -27,6 +27,7 @@ import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkele
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -689,11 +690,14 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             />
           )}
         {showEmptyState && (
-          <div className='mx-3 lg:mx-4'>
+          <DashboardWorkspacePanel
+            className='mx-3 lg:mx-4'
+            data-testid='release-table-shell'
+          >
             <ReleasesEmptyState
               onConnectSpotify={() => setSpotifySearchOpen(true)}
             />
-          </div>
+          </DashboardWorkspacePanel>
         )}
 
         {/* Soft-cap banner: request higher limit when over 100 smart links */}
@@ -721,24 +725,25 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         {/* Table — fills edge-to-edge within the app shell */}
         {showReleasesTable && (
           <QueryErrorBoundary>
-            <div
-              className='flex flex-1 min-h-0 flex-col'
+            <DashboardWorkspacePanel
               data-testid='release-table-shell'
+              toolbar={
+                <ReleaseTableSubheader
+                  releases={filteredRows}
+                  selectedIds={selectedIds}
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  groupByYear={groupByYear}
+                  onGroupByYearChange={onGroupByYearChange}
+                  releaseView={releaseView}
+                  onReleaseViewChange={setReleaseView}
+                  searchQuery={searchQuery}
+                  onSearchQueryChange={setSearchQuery}
+                  onCreateRelease={handleNewRelease}
+                  canCreateManualReleases={canCreateManualReleases}
+                />
+              }
             >
-              <ReleaseTableSubheader
-                releases={filteredRows}
-                selectedIds={selectedIds}
-                filters={filters}
-                onFiltersChange={setFilters}
-                groupByYear={groupByYear}
-                onGroupByYearChange={onGroupByYearChange}
-                releaseView={releaseView}
-                onReleaseViewChange={setReleaseView}
-                searchQuery={searchQuery}
-                onSearchQueryChange={setSearchQuery}
-                onCreateRelease={handleNewRelease}
-                canCreateManualReleases={canCreateManualReleases}
-              />
               <ReleaseTable
                 releases={filteredRows}
                 providerConfig={providerConfig}
@@ -756,17 +761,20 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 getSmartLinkLockReason={getSmartLinkLockReason}
                 onTrackClick={openTrackDrawer}
               />
-            </div>
+            </DashboardWorkspacePanel>
           </QueryErrorBoundary>
         )}
 
         {/* Show "No releases" state when connected but no releases and not importing */}
         {isConnected && rows.length === 0 && !isImporting && (
-          <div className='mx-3 lg:mx-4 mt-2.5 flex flex-1'>
+          <DashboardWorkspacePanel
+            className='mx-3 lg:mx-4 mt-2.5'
+            data-testid='release-table-shell'
+          >
             <div
               className={cn(
                 LINEAR_SURFACE.contentContainer,
-                'flex min-h-[260px] w-full flex-col items-center justify-center px-4 py-12 text-center'
+                'flex min-h-[260px] w-full flex-1 flex-col items-center justify-center px-4 py-12 text-center'
               )}
             >
               <div className='flex h-12 w-12 items-center justify-center rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-1'>
@@ -814,7 +822,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 )}
               </div>
             </div>
-          </div>
+          </DashboardWorkspacePanel>
         )}
       </div>
 

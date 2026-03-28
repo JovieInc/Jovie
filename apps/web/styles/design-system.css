@@ -872,6 +872,8 @@
   --sidebar-primary-foreground: 255 255 255;
   --sidebar-accent: 242 243 245;
   /* Linear: --linear-app-sidebar-accent-rgb */
+  --sidebar-accent-active: 236 238 241;
+  /* Linear: --linear-app-sidebar-accent-active-rgb */
   --sidebar-accent-foreground: 18 18 20;
   --sidebar-border: 0 0 0 / 0.06;
   /* Linear: --linear-app-sidebar-border-rgb */
@@ -902,8 +904,10 @@
   /* Linear: --linear-app-sidebar-foreground-rgb */
   --sidebar-primary: 227 228 229;
   --sidebar-primary-foreground: 12 12 12;
-  --sidebar-accent: 255 255 255 / 0.04;
+  --sidebar-accent: 255 255 255 / 0.03;
   /* Linear: --linear-app-sidebar-accent-rgb */
+  --sidebar-accent-active: 255 255 255 / 0.05;
+  /* Linear: --linear-app-sidebar-accent-active-rgb */
   --sidebar-accent-foreground: 227 228 229;
   --sidebar-border: 255 255 255 / 0.06;
   /* Linear: --linear-app-sidebar-border-rgb */
@@ -917,9 +921,9 @@
   /* Matches sidebar accent */
   --sidebar-input-background: 255 255 255 / 0.06;
   --sidebar-input-border: 255 255 255 / 0.06;
-  --sidebar-item-foreground: 220 223 229;
+  --sidebar-item-foreground: 214 218 226;
   /* Linear: --linear-app-sidebar-item-foreground-rgb */
-  --sidebar-item-icon: 125 129 137;
+  --sidebar-item-icon: 116 120 128;
   /* Linear: --linear-app-sidebar-item-icon-rgb */
   --sidebar-accent-active: 255 255 255 / 0.06;
   /* Linear: --linear-app-sidebar-accent-active-rgb */

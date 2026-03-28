@@ -39,6 +39,7 @@ export interface TabBarProps<T extends string> {
   readonly options: readonly SegmentControlOption<T>[];
   readonly ariaLabel: string;
   readonly overflowMode?: 'collapse' | 'scroll' | 'wrap';
+  readonly distribution?: 'intrinsic' | 'fill';
   readonly actions?: ReactNode;
   readonly variant?: 'drawer' | 'segment';
   readonly className?: string;
@@ -52,6 +53,7 @@ export function TabBar<T extends string>({
   options,
   ariaLabel,
   overflowMode = 'collapse',
+  distribution = 'intrinsic',
   actions,
   variant = 'drawer',
   className,
@@ -118,6 +120,7 @@ export function TabBar<T extends string>({
         triggerClassName={triggerClassName}
         actionsClassName={actionsClassName}
         overflowMode={overflowMode}
+        distribution={distribution}
       />
     );
   }
@@ -125,6 +128,7 @@ export function TabBar<T extends string>({
   // Collapse mode: visible tabs + More dropdown
   const displayOptions = hasMeasured ? visibleOptions : options;
   const showOverflow = hasMeasured && hasOverflow;
+  const usesFillDistribution = distribution === 'fill';
 
   return (
     <div
@@ -145,7 +149,11 @@ export function TabBar<T extends string>({
           <div
             role='tablist'
             aria-label={ariaLabel}
-            className={cn(TAB_BAR_RAIL_CLASSNAME, className)}
+            className={cn(
+              TAB_BAR_RAIL_CLASSNAME,
+              usesFillDistribution && 'w-full',
+              className
+            )}
           >
             {displayOptions.map(option => (
               <button
@@ -159,6 +167,7 @@ export function TabBar<T extends string>({
                 onClick={() => onValueChange(option.value)}
                 className={cn(
                   triggerClass,
+                  usesFillDistribution && 'min-w-[72px] flex-1',
                   value === option.value && activeClass,
                   option.disabled && 'opacity-45 pointer-events-none',
                   triggerClassName
@@ -264,6 +273,7 @@ function LegacyTabBar<T extends string>({
   triggerClassName,
   actionsClassName,
   overflowMode,
+  distribution,
 }: {
   value: T;
   onValueChange: (value: T) => void;
@@ -277,14 +287,22 @@ function LegacyTabBar<T extends string>({
   triggerClassName?: string;
   actionsClassName?: string;
   overflowMode: string;
+  distribution: 'intrinsic' | 'fill';
 }) {
+  const usesFillDistribution = distribution === 'fill';
   const tabs = (
     <div
       role='tablist'
       aria-label={ariaLabel}
       className={cn(
         TAB_BAR_RAIL_CLASSNAME,
-        isScrollMode ? 'min-w-max flex-nowrap' : 'w-full flex-wrap',
+        isScrollMode
+          ? cn(
+              'flex-nowrap',
+              usesFillDistribution ? 'min-w-full w-full' : 'min-w-max'
+            )
+          : 'w-full flex-wrap',
+        usesFillDistribution && 'w-full',
         isScrollMode &&
           'scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         className
@@ -301,6 +319,7 @@ function LegacyTabBar<T extends string>({
           onClick={() => onValueChange(option.value)}
           className={cn(
             triggerClass,
+            usesFillDistribution && 'min-w-[72px] flex-1',
             value === option.value && activeClass,
             option.disabled && 'opacity-45 pointer-events-none',
             triggerClassName
