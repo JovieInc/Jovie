@@ -7,7 +7,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
-import { checkGate, FEATURE_FLAG_KEYS } from '@/lib/feature-flags/server';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   createRateLimitHeaders,
@@ -130,14 +130,7 @@ export async function POST(req: NextRequest) {
     };
 
     // Check if Stripe Connect direct transfers should be used
-    // This is a future feature gated behind a feature flag
-    const connectEnabled = await checkGate(
-      null,
-      FEATURE_FLAG_KEYS.STRIPE_CONNECT_ENABLED,
-      false
-    );
-
-    if (connectEnabled) {
+    if (FEATURE_FLAGS.STRIPE_CONNECT_ENABLED) {
       // Future: look up stripe_account_id from profile and add transfer_data
       // sessionParams.payment_intent_data.transfer_data = {
       //   destination: stripeAccountId,
