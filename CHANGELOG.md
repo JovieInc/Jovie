@@ -32,6 +32,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Release enrichment jobs for Deezer were silently failing because the payload schema only accepted `apple_music`, causing Deezer links to never populate after DSP artist discovery
+- Per-release refresh button now triggers DSP artist discovery (Apple Music, Deezer, MusicBrainz) alongside MusicFetch enrichment, matching the full sync behavior
+- Admin bulk creator refresh now enqueues DSP artist discovery jobs in addition to MusicFetch enrichment
+- ISRC rescan now enriches both Apple Music and Deezer releases (previously Apple Music only)
+- Added error handling for Deezer ISRC batch lookups to prevent circuit breaker errors from killing the entire enrichment job
 - Duplicate drawer title rows above entity cards in all sidebars
 - Profile identity in Chat drawer now comes from entity card, not a generic header row
 - Audience sidebar layout aligned with release/profile drawer pattern

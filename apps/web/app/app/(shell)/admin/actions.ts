@@ -11,7 +11,10 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { isAllowedAvatarHostname } from '@/lib/images/avatar-hosts';
-import { enqueueMusicFetchEnrichmentJob } from '@/lib/ingestion/jobs';
+import {
+  enqueueMusicFetchEnrichmentJob,
+  fireDspDiscovery,
+} from '@/lib/ingestion/jobs';
 import { sendVerificationApprovedEmail } from '@/lib/verification/notifications';
 
 function safeParseJsonArray(raw: string): unknown {
@@ -171,6 +174,14 @@ export async function bulkRerunCreatorIngestionAction(
 
         if (!spotifyUrl) {
           return null;
+        }
+
+        // Enqueue DSP artist discovery alongside MusicFetch enrichment
+        if (profile.spotifyId) {
+          fireDspDiscovery({
+            creatorProfileId: profile.id,
+            spotifyArtistId: profile.spotifyId,
+          });
         }
 
         return enqueueMusicFetchEnrichmentJob({

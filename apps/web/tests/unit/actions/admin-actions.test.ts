@@ -12,6 +12,7 @@ const {
   mockRevalidatePath,
   mockInvalidateProfileCache,
   mockEnqueueMusicFetchEnrichmentJob,
+  mockEnqueueDspArtistDiscoveryJob,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
   mockIsAdmin: vi.fn(),
@@ -21,6 +22,7 @@ const {
   mockRevalidatePath: vi.fn(),
   mockInvalidateProfileCache: vi.fn(),
   mockEnqueueMusicFetchEnrichmentJob: vi.fn(),
+  mockEnqueueDspArtistDiscoveryJob: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -44,6 +46,17 @@ vi.mock('next/cache', () => ({
 
 vi.mock('@/lib/ingestion/jobs', () => ({
   enqueueMusicFetchEnrichmentJob: mockEnqueueMusicFetchEnrichmentJob,
+  enqueueDspArtistDiscoveryJob: mockEnqueueDspArtistDiscoveryJob,
+  fireDspDiscovery: (params: {
+    creatorProfileId: string;
+    spotifyArtistId: string;
+  }) => {
+    void mockEnqueueDspArtistDiscoveryJob({
+      creatorProfileId: params.creatorProfileId,
+      spotifyArtistId: params.spotifyArtistId,
+      targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
+    }).catch(() => {});
+  },
 }));
 
 vi.mock('@/constants/routes', () => ({
@@ -290,6 +303,7 @@ describe('admin/actions.ts', () => {
       createSelectChain(profiles);
 
       mockEnqueueMusicFetchEnrichmentJob.mockResolvedValue('job-id');
+      mockEnqueueDspArtistDiscoveryJob.mockResolvedValue('discovery-job-id');
 
       const { bulkRerunCreatorIngestionAction } = await import(
         '@/app/app/(shell)/admin/actions'
@@ -303,6 +317,7 @@ describe('admin/actions.ts', () => {
 
       expect(result).toEqual({ queuedCount: 2 });
       expect(mockEnqueueMusicFetchEnrichmentJob).toHaveBeenCalledTimes(2);
+      expect(mockEnqueueDspArtistDiscoveryJob).toHaveBeenCalledTimes(2);
       expect(mockRevalidatePath).toHaveBeenCalledWith('/admin');
     });
 
