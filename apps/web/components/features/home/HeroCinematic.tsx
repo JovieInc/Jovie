@@ -25,8 +25,8 @@ export function HeroCinematic({
         <Container size='homepage'>
           <div className='mx-auto max-w-[1120px]'>
             <div className='hero-stagger'>
-              <div className='flex flex-col items-center gap-10 lg:flex-row lg:items-center lg:gap-16'>
-                <div className='max-w-[44rem] text-center lg:flex-1 lg:text-left'>
+              <div className='flex max-lg:flex-col items-center gap-10 lg:flex-row lg:items-center lg:gap-16'>
+                <div className='max-w-[44rem] max-lg:text-center lg:flex-1 lg:text-left'>
                   <p className='homepage-section-eyebrow'>
                     Built for independent artists
                   </p>
@@ -35,12 +35,12 @@ export function HeroCinematic({
                     The link your music deserves.
                   </h1>
 
-                  <p className='marketing-lead-linear mx-auto mt-4 max-w-[31rem] text-secondary-token md:mt-5 lg:mx-0'>
+                  <p className='marketing-lead-linear max-lg:mx-auto mt-4 max-w-[31rem] text-secondary-token md:mt-5 lg:mx-0'>
                     Smart links, release automation, and fan insight that keep
                     every launch moving.
                   </p>
 
-                  <div className='mx-auto mt-6 w-full max-w-[27rem] md:mt-7 lg:mx-0'>
+                  <div className='max-lg:mx-auto mt-6 w-full max-w-[27rem] md:mt-7 lg:mx-0'>
                     <HeroClaimHandle submitButtonTestId='homepage-primary-cta' />
                   </div>
 
