@@ -6,27 +6,9 @@ import { describe, expect, it, vi } from 'vitest';
  * clicking the same release again should close the editor (toggle pattern).
  */
 
-const stableMutate = vi.fn();
+import { makeMockMutation } from './release-mutation-mocks';
 
-function makeMockMutation(mutateFn: ReturnType<typeof vi.fn>) {
-  return {
-    mutate: mutateFn,
-    mutateAsync: vi.fn(),
-    isPending: false,
-    isIdle: true,
-    isSuccess: false,
-    isError: false,
-    data: undefined,
-    error: null,
-    reset: vi.fn(),
-    status: 'idle' as const,
-    variables: undefined,
-    failureCount: 0,
-    failureReason: null,
-    submittedAt: 0,
-    context: undefined,
-  };
-}
+const stableMutate = vi.fn();
 
 vi.mock('@/lib/queries', () => ({
   useSaveProviderOverrideMutation: () => makeMockMutation(stableMutate),

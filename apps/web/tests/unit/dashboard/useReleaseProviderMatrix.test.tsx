@@ -9,6 +9,8 @@ import type { ProviderKey } from '@/lib/discography/types';
  * unstable dependencies), state management, and mutation forwarding.
  */
 
+import { makeMockMutation } from './release-mutation-mocks';
+
 // ── Stable mock mutation factories ──
 
 const stableMutate = vi.fn();
@@ -19,26 +21,6 @@ const stableRescan = vi.fn();
 const stableSaveLyricsAsync = vi.fn();
 const stableFormatLyricsAsync = vi.fn();
 const stableSaveCanvasStatusAsync = vi.fn();
-
-function makeMockMutation(mutateFn: ReturnType<typeof vi.fn>) {
-  return {
-    mutate: mutateFn,
-    mutateAsync: vi.fn(),
-    isPending: false,
-    isIdle: true,
-    isSuccess: false,
-    isError: false,
-    data: undefined,
-    error: null,
-    reset: vi.fn(),
-    status: 'idle' as const,
-    variables: undefined,
-    failureCount: 0,
-    failureReason: null,
-    submittedAt: 0,
-    context: undefined,
-  };
-}
 
 vi.mock('@/lib/queries', () => ({
   useSaveProviderOverrideMutation: () => makeMockMutation(stableMutate),

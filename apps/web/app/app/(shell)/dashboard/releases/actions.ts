@@ -456,6 +456,23 @@ async function mutateRelease(
   );
 }
 
+/** Update columns on a release row, scoped to owner. */
+async function updateReleaseColumns(
+  releaseId: string,
+  profileId: string,
+  values: Partial<typeof discogReleases.$inferInsert>
+) {
+  await db
+    .update(discogReleases)
+    .set({ ...values, updatedAt: new Date() })
+    .where(
+      and(
+        eq(discogReleases.id, releaseId),
+        eq(discogReleases.creatorProfileId, profileId)
+      )
+    );
+}
+
 export async function saveReleaseLyrics(params: {
   profileId: string;
   releaseId: string;
@@ -465,18 +482,9 @@ export async function saveReleaseLyrics(params: {
     const release = await getReleaseById(releaseId);
     const metadata =
       (release?.metadata as Record<string, unknown> | null) ?? {};
-    await db
-      .update(discogReleases)
-      .set({
-        metadata: { ...metadata, lyrics: params.lyrics },
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(discogReleases.id, releaseId),
-          eq(discogReleases.creatorProfileId, profileId)
-        )
-      );
+    await updateReleaseColumns(releaseId, profileId, {
+      metadata: { ...metadata, lyrics: params.lyrics },
+    });
   });
 }
 
@@ -490,18 +498,9 @@ export async function saveReleaseTargetPlaylists(params: {
       .map(s => s.trim())
       .filter(Boolean)
       .slice(0, 5);
-    await db
-      .update(discogReleases)
-      .set({
-        targetPlaylists: validated.length > 0 ? validated : null,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(discogReleases.id, releaseId),
-          eq(discogReleases.creatorProfileId, profileId)
-        )
-      );
+    await updateReleaseColumns(releaseId, profileId, {
+      targetPlaylists: validated.length > 0 ? validated : null,
+    });
   });
 }
 
@@ -523,18 +522,9 @@ export async function saveCanvasStatus(params: {
       delete nextMetadata.canvasVideoUrl;
     }
 
-    await db
-      .update(discogReleases)
-      .set({
-        metadata: nextMetadata,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(discogReleases.id, releaseId),
-          eq(discogReleases.creatorProfileId, profileId)
-        )
-      );
+    await updateReleaseColumns(releaseId, profileId, {
+      metadata: nextMetadata,
+    });
   });
 }
 
