@@ -1,40 +1,16 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
-import { APP_ROUTES } from '@/constants/routes';
-import { getSessionContext } from '@/lib/auth/session';
-import { getDashboardData } from '../dashboard/actions';
 import { checkAppleMusicConnection } from '../dashboard/releases/actions';
 import { ChatPageClient } from './ChatPageClient';
 
 const CHAT_DESCRIPTION = 'Start a new thread with Jovie AI';
 
-const getDashboardTitle = async () => {
-  try {
-    const { profile } = await getSessionContext({
-      requireUser: false,
-      requireProfile: false,
-    });
-    const displayName = profile?.displayName?.trim();
-    return displayName ? `${displayName} | Jovie` : 'Home | Jovie';
-  } catch {
-    return 'Home | Jovie';
-  }
+export const metadata: Metadata = {
+  title: 'Home | Jovie',
+  description: CHAT_DESCRIPTION,
 };
 
-export async function generateMetadata(): Promise<Metadata> {
-  return {
-    title: await getDashboardTitle(),
-    description: CHAT_DESCRIPTION,
-  };
-}
-
 export default async function ChatPage() {
-  const dashboardData = await getDashboardData();
   const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
-
-  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-    redirect(APP_ROUTES.ONBOARDING);
-  }
 
   const appleMusicResult = isE2EClientRuntime
     ? {
@@ -50,7 +26,6 @@ export default async function ChatPage() {
 
   return (
     <ChatPageClient
-      isFirstSession={dashboardData.isFirstSession}
       appleMusicConnected={appleMusicResult.connected}
       appleMusicArtistName={appleMusicResult.artistName}
     />

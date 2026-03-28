@@ -515,7 +515,7 @@ const CREATOR_SHELL_ROUTES = [
       { metric: 'cumulative-layout-shift', budget: 0.1 },
       { metric: 'first-input-delay', budget: 100 },
       { metric: 'time-to-first-byte', budget: 1500 },
-      { metric: 'skeleton-to-content', budget: 300 },
+      { metric: 'skeleton-to-content', budget: 100 },
     ],
     resourceSizes: CHAT_RESOURCE_BUDGETS,
     priority: 1,
@@ -688,6 +688,7 @@ const CREATOR_SHELL_ROUTES = [
         `a[href="${APP_ROUTES.RELEASES}"]`,
         `a[href="${APP_ROUTES.DASHBOARD_RELEASES}"]`,
       ],
+      redirectDestinations: [APP_ROUTES.RELEASES],
     },
     timings: [
       { metric: 'first-contentful-paint', budget: 1500 },
