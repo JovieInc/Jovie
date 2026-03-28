@@ -416,11 +416,11 @@ export async function resetProviderOverride(params: {
   }
 }
 
-export async function saveReleaseLyrics(params: {
-  profileId: string;
-  releaseId: string;
-  lyrics: string;
-}): Promise<ReleaseViewModel> {
+/** Shared auth/ownership check, DB update, cache invalidation, and view-model return for release mutations. */
+async function mutateRelease(
+  params: { profileId: string; releaseId: string },
+  applyUpdate: (releaseId: string, profileId: string) => Promise<void>
+): Promise<ReleaseViewModel> {
   noStore();
 
   const { userId } = await getCachedAuth();
@@ -438,20 +438,7 @@ export async function saveReleaseLyrics(params: {
     throw new TypeError('Release not found');
   }
 
-  const metadata = (release.metadata as Record<string, unknown> | null) ?? {};
-
-  await db
-    .update(discogReleases)
-    .set({
-      metadata: { ...metadata, lyrics: params.lyrics },
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(discogReleases.id, params.releaseId),
-        eq(discogReleases.creatorProfileId, profile.id)
-      )
-    );
+  await applyUpdate(params.releaseId, profile.id);
 
   const updated = await getReleaseById(params.releaseId);
   if (!updated) {
@@ -459,10 +446,7 @@ export async function saveReleaseLyrics(params: {
   }
 
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
-  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
-  // Query, and a path revalidation resets client-side state (closing the sidebar).
 
   return mapReleaseToViewModel(
     updated,
@@ -470,6 +454,30 @@ export async function saveReleaseLyrics(params: {
     profile.id,
     profile.handle
   );
+}
+
+export async function saveReleaseLyrics(params: {
+  profileId: string;
+  releaseId: string;
+  lyrics: string;
+}): Promise<ReleaseViewModel> {
+  return mutateRelease(params, async (releaseId, profileId) => {
+    const release = await getReleaseById(releaseId);
+    const metadata =
+      (release?.metadata as Record<string, unknown> | null) ?? {};
+    await db
+      .update(discogReleases)
+      .set({
+        metadata: { ...metadata, lyrics: params.lyrics },
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(discogReleases.id, releaseId),
+          eq(discogReleases.creatorProfileId, profileId)
+        )
+      );
+  });
 }
 
 export async function saveReleaseTargetPlaylists(params: {
@@ -477,56 +485,24 @@ export async function saveReleaseTargetPlaylists(params: {
   releaseId: string;
   targetPlaylists: string[];
 }): Promise<ReleaseViewModel> {
-  noStore();
-
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
-
-  const profile = await requireProfile();
-  if (profile.id !== params.profileId) {
-    throw new TypeError('Profile mismatch');
-  }
-
-  const release = await getReleaseById(params.releaseId);
-  if (release?.creatorProfileId !== profile.id) {
-    throw new TypeError('Release not found');
-  }
-
-  // Validate and normalize input
-  const validated = (params.targetPlaylists ?? [])
-    .map(s => s.trim())
-    .filter(Boolean)
-    .slice(0, 5);
-
-  await db
-    .update(discogReleases)
-    .set({
-      targetPlaylists: validated.length > 0 ? validated : null,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(discogReleases.id, params.releaseId),
-        eq(discogReleases.creatorProfileId, profile.id)
-      )
-    );
-
-  const updated = await getReleaseById(params.releaseId);
-  if (!updated) {
-    throw new TypeError('Release not found');
-  }
-
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
-
-  return mapReleaseToViewModel(
-    updated,
-    buildProviderLabels(),
-    profile.id,
-    profile.handle
-  );
+  return mutateRelease(params, async (releaseId, profileId) => {
+    const validated = (params.targetPlaylists ?? [])
+      .map(s => s.trim())
+      .filter(Boolean)
+      .slice(0, 5);
+    await db
+      .update(discogReleases)
+      .set({
+        targetPlaylists: validated.length > 0 ? validated : null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(discogReleases.id, releaseId),
+          eq(discogReleases.creatorProfileId, profileId)
+        )
+      );
+  });
 }
 
 export async function saveCanvasStatus(params: {
@@ -534,63 +510,32 @@ export async function saveCanvasStatus(params: {
   releaseId: string;
   status: CanvasStatus;
 }): Promise<ReleaseViewModel> {
-  noStore();
+  return mutateRelease(params, async (releaseId, profileId) => {
+    const release = await getReleaseById(releaseId);
+    const metadata =
+      (release?.metadata as Record<string, unknown> | null) ?? {};
+    const nextMetadata: Record<string, unknown> = {
+      ...metadata,
+      ...buildCanvasMetadata(params.status),
+    };
 
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
+    if (params.status === 'not_set') {
+      delete nextMetadata.canvasVideoUrl;
+    }
 
-  const profile = await requireProfile();
-  if (profile.id !== params.profileId) {
-    throw new TypeError('Profile mismatch');
-  }
-
-  const release = await getReleaseById(params.releaseId);
-  if (release?.creatorProfileId !== profile.id) {
-    throw new TypeError('Release not found');
-  }
-
-  const metadata = (release.metadata as Record<string, unknown> | null) ?? {};
-  const nextMetadata: Record<string, unknown> = {
-    ...metadata,
-    ...buildCanvasMetadata(params.status),
-  };
-
-  if (params.status === 'not_set') {
-    delete nextMetadata.canvasVideoUrl;
-  }
-
-  await db
-    .update(discogReleases)
-    .set({
-      metadata: nextMetadata,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(discogReleases.id, params.releaseId),
-        eq(discogReleases.creatorProfileId, profile.id)
-      )
-    );
-
-  const updated = await getReleaseById(params.releaseId);
-  if (!updated) {
-    throw new TypeError('Release not found');
-  }
-
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-
-  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
-  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
-  // Query, and a path revalidation resets client-side state (closing the sidebar).
-
-  return mapReleaseToViewModel(
-    updated,
-    buildProviderLabels(),
-    profile.id,
-    profile.handle
-  );
+    await db
+      .update(discogReleases)
+      .set({
+        metadata: nextMetadata,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(discogReleases.id, releaseId),
+          eq(discogReleases.creatorProfileId, profileId)
+        )
+      );
+  });
 }
 
 export async function formatReleaseLyrics(params: {

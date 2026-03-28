@@ -295,11 +295,15 @@ export function useDeleteReleaseMutation(profileId: string) {
   });
 }
 
-export function useSaveReleaseLyricsMutation(profileId: string) {
+/** Factory for release mutations that optimistically update the matrix cache. */
+function useReleaseMutation<T>(
+  profileId: string,
+  mutationFn: (params: T) => Promise<ReleaseViewModel>
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: saveReleaseLyrics,
+    mutationFn,
     onSuccess: async updated => {
       const current = queryClient.getQueryData<ReleaseViewModel[]>(
         queryKeys.releases.matrix(profileId)
@@ -312,44 +316,18 @@ export function useSaveReleaseLyricsMutation(profileId: string) {
       }
     },
   });
+}
+
+export function useSaveReleaseLyricsMutation(profileId: string) {
+  return useReleaseMutation(profileId, saveReleaseLyrics);
 }
 
 export function useSaveReleaseTargetPlaylistsMutation(profileId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: saveReleaseTargetPlaylists,
-    onSuccess: async updated => {
-      const current = queryClient.getQueryData<ReleaseViewModel[]>(
-        queryKeys.releases.matrix(profileId)
-      );
-      if (current) {
-        queryClient.setQueryData(
-          queryKeys.releases.matrix(profileId),
-          current.map(r => (r.id === updated.id ? updated : r))
-        );
-      }
-    },
-  });
+  return useReleaseMutation(profileId, saveReleaseTargetPlaylists);
 }
 
 export function useSaveCanvasStatusMutation(profileId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: saveCanvasStatus,
-    onSuccess: async updated => {
-      const current = queryClient.getQueryData<ReleaseViewModel[]>(
-        queryKeys.releases.matrix(profileId)
-      );
-      if (current) {
-        queryClient.setQueryData(
-          queryKeys.releases.matrix(profileId),
-          current.map(r => (r.id === updated.id ? updated : r))
-        );
-      }
-    },
-  });
+  return useReleaseMutation(profileId, saveCanvasStatus);
 }
 
 export function useFormatReleaseLyricsMutation(profileId: string) {
