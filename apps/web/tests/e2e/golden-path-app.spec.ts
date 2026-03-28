@@ -160,8 +160,11 @@ test.describe('Golden Path: Welcome Message', () => {
       timeout: 30_000,
     });
 
-    // Look for the welcome message that contains the career highlights prompt
-    const welcomeMessage = page.getByText(/career highlights/i).first();
+    // Verify the career highlights prompt appears inside a chat message, not sidebar/labels
+    const welcomeMessage = page
+      .locator('[data-role="assistant"]')
+      .filter({ hasText: /career highlights/i })
+      .first();
     await expect(welcomeMessage).toBeVisible({ timeout: 30_000 });
   });
 });
@@ -297,16 +300,20 @@ test.describe('Golden Path: Chat', { tag: '@golden-path' }, () => {
       .or(page.locator('textarea').first());
     await expect(chatInput).toBeVisible({ timeout: 15_000 });
 
+    // Count existing assistant messages before sending
+    const assistantLocator = page
+      .locator('[data-role="assistant"]')
+      .or(page.locator('.assistant-message'));
+    const countBefore = await assistantLocator.count();
+
     // Send a test message
     await chatInput.fill('Hello, can you help me?');
     await chatInput.press('Enter');
 
-    // Wait for an assistant response (30s timeout, assert presence not content)
-    const assistantResponse = page
-      .locator('[data-role="assistant"]')
-      .or(page.locator('.assistant-message'))
-      .last();
-    await expect(assistantResponse).toBeVisible({ timeout: 30_000 });
+    // Wait for a NEW assistant response (count must increase)
+    await expect
+      .poll(async () => assistantLocator.count(), { timeout: 30_000 })
+      .toBeGreaterThan(countBefore);
   });
 
   test('audio dictation toggle is present', async ({ page }) => {
