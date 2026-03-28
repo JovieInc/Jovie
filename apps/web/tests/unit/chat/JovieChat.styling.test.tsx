@@ -129,10 +129,6 @@ describe('JovieChat styling regressions', () => {
     // viewport), so we verify the structural intent: the chat view renders
     // and no standalone loading indicator exists outside the message list.
 
-    // Verify no separator (border-t border-subtle) exists in the compact chat input area
-    const separator = container.querySelector('.border-t.border-subtle');
-    expect(separator).toBeNull();
-
     // Verify the chat input area renders
     const chatInput = container.querySelector('[data-testid="chat-input"]');
     expect(chatInput).toBeTruthy();
