@@ -151,7 +151,7 @@ describe('checkUserStatus', () => {
     const result = checkUserStatus('banned', null);
     expect(result.isBlocked).toBe(true);
     expect(result.blockedState).toBe(CanonicalUserState.BANNED);
-    expect(result.redirectTo).toBe('/banned');
+    expect(result.redirectTo).toBe('/unavailable');
   });
 
   it('blocks suspended users', () => {
@@ -658,8 +658,10 @@ describe('gate.ts utility functions', () => {
       expect(redirect).toContain('/onboarding');
     });
 
-    it('returns /banned for BANNED state', () => {
-      expect(getRedirectForState(CanonicalUserState.BANNED)).toBe('/banned');
+    it('returns /unavailable for BANNED state', () => {
+      expect(getRedirectForState(CanonicalUserState.BANNED)).toBe(
+        '/unavailable'
+      );
     });
 
     it('returns error page for USER_CREATION_FAILED', () => {

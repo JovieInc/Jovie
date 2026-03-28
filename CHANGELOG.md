@@ -5,31 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.92] - 2026-03-28
+
+### Fixed
+
+- Homepage hero layout: text and phone mockup now display side-by-side on desktop instead of stacking vertically (Tailwind v4 specificity fix)
+
+## [26.4.91] - 2026-03-28
+
+### Fixed
+
+- Auth page text invisible in light mode: Clerk footer ("Don't have an account?"), branding badge, and card elements used theme-dependent CSS tokens on a hardcoded dark background. Migrated all auth-scoped Clerk styling to fixed dark-theme `--clerk-color-*` CSS variables using Clerk v7's CSS custom property API.
+- Error page (`/error/user-creation-failed`) text invisible in light mode: same root cause, fixed with hardcoded light text values.
+
 ## [26.4.90] - 2026-03-28
 
 ### Fixed
 
-- Right drawer entity header and tabs now pin to top (sticky) in minimal mode instead of scrolling away with content
-- Release sidebar: entity header card and analytics render above tabs instead of below (was completely inverted)
-- Profile sidebar: smart link analytics render above tabs instead of in scrollable content below
-- Empty drawer state no longer shows orphaned tabs/header above the "Select an item" message
+- Account deletion now invalidates profile ISR cache so deleted artist pages don't linger
+- Account deletion signs out the user via Clerk instead of a bare redirect, clearing stale session cookies
+- Right drawer entity header and tabs scroll with content in minimal mode instead of pinning to top (restores intended layout)
+- Release sidebar: entity header and analytics render inside scrollable content instead of pinned header area
+- Profile sidebar: smart link analytics render inside scrollable content instead of pinned header area
+
+### Removed
+
+- Algorithm Health Check admin page and Spotify FAL analysis API (deprecated experimental feature)
+- CI self-approval guard in agent pipeline (no longer needed)
+- Unreleased changelog entries for removed features
 
 ## [26.4.89] - 2026-03-28
 
 ### Added
 
-- Algorithm Health Check admin page: diagnose Spotify "Fans Also Like" algorithmic positioning with neighbour scoring, size comparison, genre overlap, and bot detection heuristics
-- Spotify FAL analysis API endpoint with HTML scraping, search resolution, and 10-minute caching
-- Authenticity scoring for FAL neighbours: flags suspect artists using follower/popularity ratio, genre assignment, and engagement signals
+- User suspension system with admin UI (confirmation dialog with required reason)
+- Generic "service unavailable" page for suspended users (no account-specific language)
+- Ban check in dashboard layout to cover all `/app` routes
+- Admin audit trail for all suspension/restoration actions with Clerk metadata sync
+
+### Changed
+
+- Middleware uses URL rewrite instead of redirect for suspended users (URL bar stays on original page)
 
 ### Removed
 
 - Deprecated `/autopilot`, `/orchestrate`, and `/swarm` agent-dispatch skills (replaced by Conductor workspaces)
 - `.claude/skills/parallel-agents.md` (duplicate of swarm)
-
-### Changed
-
-- `/drain` Phase 3 rewritten to be self-contained instead of delegating to `/orchestrate`
 
 ## [26.4.88] - 2026-03-28
 
