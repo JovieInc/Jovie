@@ -50,7 +50,7 @@ function createPresenceColumns(): PresenceColumnDef[] {
         return (
           <div className='flex items-center gap-2'>
             {item.externalArtistImageUrl ? (
-              <div className='relative h-6 w-6 shrink-0 overflow-hidden rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
+              <div className='relative h-6 w-6 shrink-0 overflow-hidden rounded-full border border-subtle bg-surface-1'>
                 <Image
                   src={item.externalArtistImageUrl}
                   alt={item.externalArtistName ?? label}
@@ -61,7 +61,7 @@ function createPresenceColumns(): PresenceColumnDef[] {
                 />
               </div>
             ) : (
-              <div className='flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
+              <div className='flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-surface-1'>
                 <DspProviderIcon provider={item.providerId} size='sm' />
               </div>
             )}

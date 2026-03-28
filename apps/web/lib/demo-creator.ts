@@ -1,6 +1,7 @@
 import { unstable_cache } from 'next/cache';
 import type { FeaturedCreator } from '@/lib/featured-creators';
 import { getFeaturedCreators } from '@/lib/featured-creators';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 /**
  * Static fallback when no featured creators are in the DB.
@@ -8,9 +9,9 @@ import { getFeaturedCreators } from '@/lib/featured-creators';
  */
 const TIM_WHITE_FALLBACK: FeaturedCreator = {
   id: 'demo-tim-white',
-  handle: 'timwhite',
-  name: 'Tim White',
-  src: '/images/avatars/tim-white.jpg',
+  handle: TIM_WHITE_PROFILE.handle,
+  name: TIM_WHITE_PROFILE.name,
+  src: TIM_WHITE_PROFILE.avatarSrc,
   tagline: 'Artist',
   genres: ['Electronic', 'Dance'],
   latestReleaseTitle: 'Midnight Drive',

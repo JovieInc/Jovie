@@ -26,9 +26,11 @@ import type { UseSuggestedProfilesReturn } from '../hooks/useSuggestedProfiles';
 type SlideDirection = 'left' | 'right' | null;
 
 function confidenceBadgeClass(confidence: number): string {
-  if (confidence >= 0.8) return 'bg-success-subtle text-success';
-  if (confidence >= 0.5) return 'bg-warning-subtle text-warning';
-  return 'bg-error-subtle text-error';
+  if (confidence >= 0.8)
+    return 'bg-surface-1 border border-subtle text-success';
+  if (confidence >= 0.5)
+    return 'bg-surface-1 border border-subtle text-warning';
+  return 'bg-surface-1 border border-subtle text-error';
 }
 
 const ICON_PLATFORM_MAP: Record<string, string> = {

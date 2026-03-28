@@ -285,7 +285,7 @@ const VenmoConnectDialog = memo(function VenmoConnectDialog({
           </div>
           {saveSuccess && (
             <output
-              className='flex items-center gap-2 rounded-lg bg-success-subtle px-3 py-2 text-[13px] font-[510] text-success'
+              className='flex items-center gap-2 rounded-lg border border-subtle bg-surface-1 px-3 py-2 text-[13px] font-[510] text-success'
               aria-live='polite'
             >
               <Check className='h-3.5 w-3.5' />
@@ -313,7 +313,7 @@ const TipLinkSection = memo(function TipLinkSection({
     <ContentSurfaceCard className='p-4 sm:p-5'>
       <div className='flex items-center gap-2 mb-3'>
         <div
-          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border border-info/20 bg-info-subtle'
+          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border border-subtle bg-surface-1'
           aria-hidden='true'
         >
           <Link2 className='h-3.5 w-3.5 text-info' />
@@ -476,7 +476,7 @@ export function DashboardTipping() {
                       value={qrTipClicks}
                       description='Fans who scanned your QR'
                       icon={ScanLine}
-                      iconChipClassName='bg-success-subtle'
+                      iconChipClassName='border border-subtle bg-surface-1'
                       iconClassName='text-success'
                     />
                     <StatCard
@@ -484,7 +484,7 @@ export function DashboardTipping() {
                       value={linkTipClicks}
                       description='Fans who clicked your link'
                       icon={MousePointerClick}
-                      iconChipClassName='bg-info-subtle'
+                      iconChipClassName='border border-subtle bg-surface-1'
                       iconClassName='text-info'
                     />
                     <StatCard
@@ -492,8 +492,8 @@ export function DashboardTipping() {
                       value={tipClicks}
                       description='QR + link combined'
                       icon={BarChart3}
-                      iconChipClassName='bg-accent-subtle'
-                      iconClassName='text-accent-token'
+                      iconChipClassName='border border-subtle bg-surface-1'
+                      iconClassName='text-accent'
                     />
                   </div>
                 </ContentSurfaceCard>

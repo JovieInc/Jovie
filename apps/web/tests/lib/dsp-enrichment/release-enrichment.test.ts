@@ -285,7 +285,7 @@ describe('release-enrichment', () => {
       );
 
       expect(mockLookupByUpc).toHaveBeenCalledWith('00602445790128');
-      expect(result.releasesEnriched).toBeGreaterThanOrEqual(0);
+      expect(result.releasesEnriched).toBe(1);
     });
   });
 
