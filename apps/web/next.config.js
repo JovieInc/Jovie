@@ -3,6 +3,7 @@ const path = require('path');
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 });
+const { APP_ROUTES } = require('./constants/routes');
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
 
@@ -235,18 +236,18 @@ const nextConfig = {
         source: '/app/dashboard/links',
         destination: '/app/chat?panel=profile',
       },
-      { source: '/app/dashboard/tipping', destination: '/app/earnings' },
+      { source: APP_ROUTES.DASHBOARD_TIPPING, destination: '/app/earnings' },
       {
         source: '/app/dashboard/profile',
         destination: '/app/chat?panel=profile',
       },
       { source: '/app/dashboard/chat', destination: '/app/chat' },
       {
-        source: '/app/dashboard/contacts',
+        source: APP_ROUTES.DASHBOARD_CONTACTS,
         destination: '/app/settings/contacts',
       },
       {
-        source: '/app/dashboard/tour-dates',
+        source: APP_ROUTES.DASHBOARD_TOUR_DATES,
         destination: '/app/settings/touring',
       },
       { source: '/app/settings', destination: '/app/settings/account' },

@@ -1,183 +1,118 @@
-#!/usr/bin/env tsx
-/**
- * Performance Budgets Guard
- *
- * Validates page performance against budgets defined in performance-budgets.config.js.
- * Runs against BASE_URL (defaults to http://localhost:3000).
- *
- * For authenticated routes (auth: true in config), reads Clerk session cookies
- * from CLERK_SESSION_COOKIE env var or falls back to apps/web/.auth/session.json.
- *
- * Flags:
- *   --json         Emit machine-readable JSON to stdout
- *   --path <path>  Restrict to one or more configured budget paths
- *   --auth-path     Override the Clerk storage state path for auth routes
- */
-
-import { chromium } from '@playwright/test';
-import { existsSync, readFileSync } from 'fs';
-import { createRequire } from 'module';
-import { resolve } from 'path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, isAbsolute, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { type Browser, chromium, type Page } from '@playwright/test';
 import { APP_ROUTES } from '../constants/routes';
+import {
+  END_USER_PERF_ROUTE_MANIFEST,
+  getPrimaryTimingMetricName,
+  getRouteResourceBudgets,
+  getRouteTimingBudgets,
+  type PerfResourceMetricName,
+  type PerfRouteDefinition,
+  type PerfTimingMetricName,
+} from './performance-route-manifest';
 
-const require = createRequire(import.meta.url);
+type SameSiteValue = 'Lax' | 'None' | 'Strict';
 
-type TimingMetricName =
-  | 'first-contentful-paint'
-  | 'largest-contentful-paint'
-  | 'cumulative-layout-shift'
-  | 'first-input-delay'
-  | 'interactive-shell-ready'
-  | 'time-to-first-byte'
-  | 'skeleton-to-content'
-  | 'warm-shell-response';
+interface AuthCookie {
+  readonly name: string;
+  readonly value: string;
+  readonly domain?: string;
+  readonly path: string;
+  readonly url?: string;
+  readonly expires?: number;
+  readonly httpOnly?: boolean;
+  readonly secure?: boolean;
+  readonly sameSite?: SameSiteValue;
+}
 
-type ResourceMetricName = 'script' | 'image' | 'font' | 'stylesheet' | 'total';
+interface StorageStateFile {
+  readonly cookies?: readonly AuthCookie[];
+}
 
-type TimingBudget = {
-  metric: TimingMetricName;
-  budget: number;
-};
+export interface GuardCliOptions {
+  readonly authPath?: string;
+  readonly baseUrl: string;
+  readonly groupIds: readonly string[];
+  readonly json: boolean;
+  readonly manifestPath?: string;
+  readonly paths: readonly string[];
+  readonly routeIds: readonly string[];
+  readonly runs: number;
+}
 
-type ResourceBudget = {
-  resourceType: ResourceMetricName;
-  budget: number;
-};
+interface GuardSample {
+  readonly finalUrl: string;
+  readonly resolvedPath: string;
+  readonly timingValues: Record<PerfTimingMetricName, number>;
+  readonly resourceValues: Record<PerfResourceMetricName, number>;
+}
 
-type BudgetEntry = {
-  path: string;
-  auth?: boolean;
-  timings: TimingBudget[];
-  resourceSizes: ResourceBudget[];
-};
+interface MetricResult {
+  readonly name: string;
+  readonly measured: number;
+  readonly budget: number;
+  readonly unit: '' | 'ms' | 'KB';
+  readonly passed: boolean;
+  readonly overshootPct: number;
+}
 
-type BudgetConfig = {
-  budgets: BudgetEntry[];
-};
+interface ViolationResult extends MetricResult {
+  readonly kind: 'timing' | 'resource';
+}
 
-type PageMetrics = {
-  timings: Record<TimingMetricName, number>;
-  resourceSizes: Record<ResourceMetricName, number>;
-};
+export interface PageResult {
+  readonly auth: boolean;
+  readonly configuredPath: string;
+  readonly group: string;
+  readonly id: string;
+  readonly primaryMetric: PerfTimingMetricName;
+  readonly resolvedPath: string;
+  readonly resourceSizes: readonly MetricResult[];
+  readonly routeSurface: string;
+  readonly samples: readonly GuardSample[];
+  readonly timings: readonly MetricResult[];
+  readonly url: string;
+  readonly violations: readonly ViolationResult[];
+  readonly rawResourceSizes: Record<PerfResourceMetricName, number>;
+  readonly rawTimings: Record<PerfTimingMetricName, number>;
+}
 
-type CliOptions = {
-  authPath?: string;
-  json: boolean;
-  paths: string[];
-};
+export interface GuardSummary {
+  readonly baseUrl: string;
+  readonly checkedAt: string;
+  readonly pages: readonly PageResult[];
+  readonly status: 'fail' | 'pass';
+  readonly violationCount: number;
+}
 
-type MetricResult = {
-  name: string;
-  measured: number;
-  budget: number;
-  unit: '' | 'ms' | 'KB';
-  passed: boolean;
-  overshootPct: number;
-};
-
-type ViolationResult = MetricResult & {
-  kind: 'timing' | 'resource';
-};
-
-type PageResult = {
-  configuredPath: string;
-  resolvedPath: string;
-  url: string;
-  auth: boolean;
-  timings: MetricResult[];
-  resourceSizes: MetricResult[];
-  rawTimings: Record<TimingMetricName, number>;
-  rawResourceSizes: Record<ResourceMetricName, number>;
-  violations: ViolationResult[];
-};
-
-type GuardSummary = {
-  baseUrl: string;
-  status: 'pass' | 'fail';
-  checkedAt: string;
-  violationCount: number;
-  pages: PageResult[];
-};
-
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
-const DEFAULT_PARAMS: Record<string, string> = {
-  username: process.env.PERF_BUDGET_USERNAME || 'tim',
-};
-
-const AUTH_STORAGE_PATH = resolve(
-  import.meta.dirname ?? __dirname,
-  '../.auth/session.json'
-);
-const DASHBOARD_WARM_SHELL_START_PATH = APP_ROUTES.DASHBOARD;
-const DASHBOARD_RELEASES_PATHS = [
-  APP_ROUTES.RELEASES,
-  APP_ROUTES.DASHBOARD_RELEASES,
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const webRoot = resolve(scriptDir, '..');
+const repoRoot = resolve(webRoot, '..', '..');
+const DEFAULT_BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const DEFAULT_AUTH_STATE_PATHS = [
+  resolve(repoRoot, '.context', 'perf', 'auth', 'user.json'),
+  resolve(webRoot, 'tests', '.auth', 'user.json'),
+  resolve(webRoot, '.auth', 'session.json'),
 ] as const;
-const DASHBOARD_RELEASES_LINK_SELECTOR = DASHBOARD_RELEASES_PATHS.map(
-  path => `a[href="${path}"]`
-).join(', ');
-const DASHBOARD_RELEASES_READY_SELECTOR =
-  '[data-testid="releases-loading"], [data-testid="releases-matrix"]';
-const HOMEPAGE_SHELL_SELECTOR = '[data-testid="homepage-shell"]';
-const HOMEPAGE_PRIMARY_CTA_SELECTOR = '[data-testid="homepage-primary-cta"]';
-const PERF_BUDGET_INIT_SCRIPT = `
+const DEFAULT_RUNS = 3;
+const NAVIGATION_TIMEOUT_MS = 60_000;
+const READY_TIMEOUT_MS = 15_000;
+const PERF_INIT_SCRIPT = `
 (() => {
   const metrics = {
-    lcp: 0,
     cls: 0,
     fid: 0,
-    interactiveShellReady: 0,
+    lcp: 0,
   };
 
   window.__perfBudgetMetrics = metrics;
 
-  const isVisible = element => {
-    if (!(element instanceof HTMLElement)) {
-      return false;
-    }
-
-    const style = globalThis.getComputedStyle(element);
-    if (style.display === 'none' || style.visibility === 'hidden') {
-      return false;
-    }
-
-    const rect = element.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
-  };
-
-  const sampleInteractiveShellReady = () => {
-    if (metrics.interactiveShellReady > 0) {
-      return;
-    }
-
-    const shell =
-      Array.from(document.querySelectorAll(${JSON.stringify(HOMEPAGE_SHELL_SELECTOR)})).find(element =>
-        isVisible(element)
-      ) ?? null;
-    const cta =
-      Array.from(document.querySelectorAll(${JSON.stringify(HOMEPAGE_PRIMARY_CTA_SELECTOR)})).find(element =>
-        isVisible(element)
-      ) ?? null;
-
-    if (
-      shell &&
-      cta &&
-      shell.getAttribute('aria-busy') !== 'true' &&
-      cta.getAttribute('aria-busy') !== 'true'
-    ) {
-      metrics.interactiveShellReady = performance.now();
-      return;
-    }
-
-    globalThis.requestAnimationFrame(sampleInteractiveShellReady);
-  };
-
-  globalThis.requestAnimationFrame(sampleInteractiveShellReady);
-
   new PerformanceObserver(list => {
     const entries = list.getEntries();
     const last = entries[entries.length - 1];
-    if (last && last.startTime) {
+    if (last?.startTime) {
       metrics.lcp = last.startTime;
     }
   }).observe({ type: 'largest-contentful-paint', buffered: true });
@@ -191,7 +126,7 @@ const PERF_BUDGET_INIT_SCRIPT = `
   }).observe({ type: 'layout-shift', buffered: true });
 
   new PerformanceObserver(list => {
-    const entry = list.getEntries()[0] ?? null;
+    const entry = list.getEntries()[0];
     if (entry) {
       metrics.fid = (entry.processingStart ?? 0) - entry.startTime;
     }
@@ -199,19 +134,39 @@ const PERF_BUDGET_INIT_SCRIPT = `
 })();
 `;
 
-const config = require('../performance-budgets.config.js') as BudgetConfig;
+function writeStderr(message: string) {
+  process.stderr.write(`${message}\n`);
+}
 
-const parseCliArgs = (args: string[]): CliOptions => {
-  const options: CliOptions = { json: false, paths: [] };
+function parsePositiveOddInteger(value: string | undefined, label: string) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed % 2 === 0) {
+    throw new TypeError(`Expected a positive odd integer for ${label}`);
+  }
+  return parsed;
+}
 
-  for (let index = 0; index < args.length; index++) {
+export function parseGuardCliArgs(
+  args: readonly string[],
+  defaultBaseUrl = DEFAULT_BASE_URL
+): GuardCliOptions {
+  const groupIds: string[] = [];
+  const paths: string[] = [];
+  const routeIds: string[] = [];
+  let authPath: string | undefined;
+  let baseUrl = defaultBaseUrl;
+  let json = false;
+  let manifestPath: string | undefined;
+  let runs = DEFAULT_RUNS;
+
+  for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === '--') {
       continue;
     }
 
     if (arg === '--json') {
-      options.json = true;
+      json = true;
       continue;
     }
 
@@ -220,7 +175,27 @@ const parseCliArgs = (args: string[]): CliOptions => {
       if (!value) {
         throw new TypeError('Missing value for --path');
       }
-      options.paths.push(value);
+      paths.push(value);
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--group') {
+      const value = args[index + 1];
+      if (!value) {
+        throw new TypeError('Missing value for --group');
+      }
+      groupIds.push(value);
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--route-id') {
+      const value = args[index + 1];
+      if (!value) {
+        throw new TypeError('Missing value for --route-id');
+      }
+      routeIds.push(value);
       index += 1;
       continue;
     }
@@ -230,7 +205,33 @@ const parseCliArgs = (args: string[]): CliOptions => {
       if (!value) {
         throw new TypeError('Missing value for --auth-path');
       }
-      options.authPath = value;
+      authPath = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--base-url') {
+      const value = args[index + 1];
+      if (!value) {
+        throw new TypeError('Missing value for --base-url');
+      }
+      baseUrl = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--manifest') {
+      const value = args[index + 1];
+      if (!value) {
+        throw new TypeError('Missing value for --manifest');
+      }
+      manifestPath = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--runs') {
+      runs = parsePositiveOddInteger(args[index + 1], '--runs');
       index += 1;
       continue;
     }
@@ -238,602 +239,817 @@ const parseCliArgs = (args: string[]): CliOptions => {
     throw new TypeError(`Unknown argument: ${arg}`);
   }
 
-  return options;
-};
+  return {
+    authPath,
+    baseUrl,
+    groupIds,
+    json,
+    manifestPath,
+    paths,
+    routeIds,
+    runs,
+  };
+}
 
-const CLI_OPTIONS = parseCliArgs(process.argv.slice(2));
-
-const toKilobytes = (bytes: number) => bytes / 1024;
-
-const writeStderr = (message: string) => {
-  process.stderr.write(`${message}\n`);
-};
-
-const logInfo = (message: string) => {
-  if (!CLI_OPTIONS.json) {
+function logInfo(message: string, options: GuardCliOptions) {
+  if (!options.json) {
     console.log(message);
   }
-};
+}
 
-const logWarning = (message: string) => {
-  if (CLI_OPTIONS.json) {
-    writeStderr(message);
-    return;
+function normalizeSameSite(
+  sameSite: string | undefined
+): SameSiteValue | undefined {
+  if (sameSite === 'Lax' || sameSite === 'None' || sameSite === 'Strict') {
+    return sameSite;
   }
-  console.warn(message);
-};
 
-const resolvePath = (path: string) =>
-  path.replaceAll(/\[([^\]]+)\]/g, (_match, key: string) => {
-    const normalizedKey = key.toLowerCase();
-    const envKey = `PERF_BUDGET_${normalizedKey.toUpperCase()}`;
-    const value = process.env[envKey] || DEFAULT_PARAMS[normalizedKey];
-    if (!value) {
-      throw new TypeError(
-        `Missing route param value for [${key}]. Set ${envKey}.`
-      );
-    }
-    return value;
-  });
+  return undefined;
+}
 
-const formatMetric = (value: number, unit: string) =>
-  `${value.toFixed(1)}${unit}`;
+function resolveAuthStatePath(authPath?: string) {
+  if (authPath) {
+    return isAbsolute(authPath) ? authPath : resolve(repoRoot, authPath);
+  }
 
-const matchesRoute = (pathname: string, route: string) =>
-  pathname === route || pathname.startsWith(`${route}/`);
+  return DEFAULT_AUTH_STATE_PATHS.find(path => existsSync(path));
+}
 
-const matchesDashboardReleasesPath = (pathname: string) =>
-  DASHBOARD_RELEASES_PATHS.some(route => matchesRoute(pathname, route));
+function loadAuthCookies(baseUrl: string, authPath?: string) {
+  const cookieValue = process.env.CLERK_SESSION_COOKIE?.trim();
+  if (cookieValue) {
+    return [
+      {
+        domain: new URL(baseUrl).hostname,
+        name: '__session',
+        path: '/',
+        value: cookieValue,
+      },
+    ] satisfies readonly AuthCookie[];
+  }
 
-const isHomepagePath = (pathname: string) => pathname === '/';
+  const storageStatePath = resolveAuthStatePath(authPath);
+  if (!storageStatePath || !existsSync(storageStatePath)) {
+    return [] as const satisfies readonly AuthCookie[];
+  }
 
-const calculateOvershootPct = (measured: number, budget: number) => {
+  const parsed = JSON.parse(
+    readFileSync(storageStatePath, 'utf8')
+  ) as StorageStateFile;
+
+  return (parsed.cookies ?? []).map(cookie => ({
+    ...cookie,
+    path: cookie.path || '/',
+    sameSite: normalizeSameSite(cookie.sameSite),
+  }));
+}
+
+function resolveRouteUrl(baseUrl: string, path: string) {
+  return new URL(path, baseUrl.replace(/\/$/, '') + '/').toString();
+}
+
+function formatMetric(value: number, unit: '' | 'KB' | 'ms') {
+  return `${value.toFixed(1)}${unit}`;
+}
+
+function calculateOvershootPct(measured: number, budget: number) {
   if (measured <= budget || budget === 0) {
     return 0;
   }
-  return Number((((measured - budget) / budget) * 100).toFixed(2));
-};
 
-const formatMetricResult = (
+  return Number((((measured - budget) / budget) * 100).toFixed(2));
+}
+
+function buildMetricResult(
   name: string,
   measured: number,
   budget: number,
-  unit: '' | 'ms' | 'KB'
-): MetricResult => ({
-  name,
-  measured,
-  budget,
-  unit,
-  passed: measured <= budget,
-  overshootPct: calculateOvershootPct(measured, budget),
-});
+  unit: '' | 'KB' | 'ms'
+): MetricResult {
+  return {
+    budget,
+    measured,
+    name,
+    overshootPct: calculateOvershootPct(measured, budget),
+    passed: measured <= budget,
+    unit,
+  };
+}
 
-const selectBudgetEntries = (
-  budgets: BudgetEntry[],
-  paths: string[]
-): BudgetEntry[] => {
-  if (paths.length === 0) {
-    return budgets;
+function hasTimingBudget(
+  route: PerfRouteDefinition,
+  metric: PerfTimingMetricName
+) {
+  return getRouteTimingBudgets(route).some(entry => entry.metric === metric);
+}
+
+function expectedRoutePaths(route: PerfRouteDefinition, resolvedPath: string) {
+  const expected = new Set<string>([
+    resolvedPath,
+    ...((route.readySelectors.redirectDestinations ?? []) as readonly string[]),
+  ]);
+  return [...expected];
+}
+
+function normalizePathWithQuery(input: string) {
+  if (input.startsWith('http://') || input.startsWith('https://')) {
+    const parsed = new URL(input);
+    return `${parsed.pathname}${parsed.search}`;
   }
 
-  const selected = budgets.filter(entry => paths.includes(entry.path));
-  if (selected.length === 0) {
-    throw new TypeError(
-      `No budget entries matched --path. Available paths: ${budgets
-        .map(entry => entry.path)
-        .join(', ')}`
-    );
-  }
-  return selected;
-};
+  return input;
+}
 
-/**
- * Load Clerk session cookies for authenticated routes.
- * Priority: CLERK_SESSION_COOKIE env -> .auth/session.json file.
- */
-const loadAuthCookies = (
-  baseUrl: string
-): Array<{
-  name: string;
-  value: string;
-  domain: string;
-  path: string;
-}> => {
-  const authStoragePath =
-    CLI_OPTIONS.authPath ||
-    process.env.PERF_BUDGET_AUTH_PATH ||
-    AUTH_STORAGE_PATH;
-  const cookieValue = process.env.CLERK_SESSION_COOKIE;
-  if (cookieValue) {
-    const domain = new URL(baseUrl).hostname;
-    // Only inject __session; __clerk_db_jwt is a separate JWT and cannot be derived
-    // from the session cookie value. Use .auth/session.json for full cookie fidelity.
-    return [{ name: '__session', value: cookieValue, domain, path: '/' }];
+function matchesExpectedPath(actualUrl: URL, expectedPath: string) {
+  const normalizedExpected = normalizePathWithQuery(expectedPath);
+  const actualPath = `${actualUrl.pathname}${actualUrl.search}`;
+
+  if (normalizedExpected.includes('?')) {
+    return actualPath === normalizedExpected;
   }
 
-  if (existsSync(authStoragePath)) {
-    try {
-      const raw = readFileSync(authStoragePath, 'utf-8');
-      const data = JSON.parse(raw);
-      if (Array.isArray(data.cookies)) {
-        return data.cookies;
-      }
-    } catch {
-      logWarning('  ⚠ Could not parse auth session file, skipping auth');
-    }
+  return actualUrl.pathname === normalizedExpected;
+}
+
+async function waitForExpectedUrl(
+  page: Page,
+  expectedPaths: readonly string[],
+  timeoutMs = READY_TIMEOUT_MS
+) {
+  if (expectedPaths.length === 0) {
+    return;
   }
 
-  return [];
-};
+  await page.waitForURL(
+    currentUrl =>
+      expectedPaths.some(expectedPath =>
+        matchesExpectedPath(currentUrl, expectedPath)
+      ),
+    { timeout: timeoutMs }
+  );
+}
 
-const shouldMeasureWarmShellResponse = (url: string, needsAuth: boolean) => {
-  if (!needsAuth) {
-    return false;
+async function waitForAnyVisible(
+  page: Page,
+  selectors: readonly string[] | undefined,
+  timeoutMs = READY_TIMEOUT_MS
+) {
+  if (!selectors || selectors.length === 0) {
+    return null;
   }
 
-  const pathname = new URL(url).pathname;
-  return matchesDashboardReleasesPath(pathname);
-};
-
-/**
- * Measure in-app navigation time from a warm authenticated dashboard shell
- * to the first visible releases shell state.
- */
-const measureWarmShellResponse = async (
-  page: Awaited<
-    ReturnType<Awaited<ReturnType<typeof chromium.launch>>['newPage']>
-  >,
-  baseUrl: string
-): Promise<number> => {
-  const start = Date.now();
-  const appRootUrl = `${baseUrl.replace(/\/$/, '')}${DASHBOARD_WARM_SHELL_START_PATH}`;
-
-  try {
-    await page.goto(appRootUrl, {
-      waitUntil: 'domcontentloaded',
-      timeout: 60000,
-    });
-    await page.waitForSelector('nav[aria-label="Dashboard navigation"]', {
-      state: 'visible',
-      timeout: 15000,
-    });
-
-    const releasesLink = page.locator(DASHBOARD_RELEASES_LINK_SELECTOR).first();
-    await releasesLink.waitFor({ state: 'visible', timeout: 15000 });
-    await releasesLink.hover().catch(() => undefined);
-    await page.waitForTimeout(250);
-
-    await Promise.all([
-      page.waitForURL(url => matchesDashboardReleasesPath(url.pathname), {
-        timeout: 15000,
-      }),
-      releasesLink.click(),
-    ]);
-    await page.waitForSelector(DASHBOARD_RELEASES_READY_SELECTOR, {
-      state: 'visible',
-      timeout: 15000,
-    });
-
-    return Date.now() - start;
-  } catch {
-    logWarning(
-      `  ⚠ Warm shell response measurement failed for ${appRootUrl}, continuing without it`
-    );
-    return 0;
-  }
-};
-
-/**
- * Measure skeleton-to-content time.
- *
- * For dashboard releases: waits for [data-testid="releases-loading"] to disappear.
- * For /app (chat): waits for [data-testid="chat-content"] to appear (JovieChat mounted)
- * or the dashboard nav to appear (shell + data loaded).
- * Falls back to generic skeleton/content detection.
- */
-const measureSkeletonToContent = async (
-  page: Awaited<
-    ReturnType<Awaited<ReturnType<typeof chromium.launch>>['newPage']>
-  >,
-  pathname?: string
-): Promise<number> => {
-  const start = Date.now();
-  const isChatPage = pathname === '/app' || pathname === '/app/';
-
-  if (isChatPage) {
-    try {
-      // Wait for JovieChat to mount (data-testid="chat-content").
-      // This is the real content-ready signal — not the nav or shell skeleton.
-      await page.waitForSelector('[data-testid="chat-content"]', {
+  const waitedSelector = await Promise.any(
+    selectors.map(async selector => {
+      await page.locator(selector).first().waitFor({
         state: 'visible',
-        timeout: 15000,
+        timeout: timeoutMs,
       });
-      return Date.now() - start;
-    } catch {
-      return Date.now() - start;
-    }
-  }
-
-  // Dashboard releases path
-  try {
-    await page.waitForSelector('[data-testid="releases-loading"]', {
-      state: 'detached',
-      timeout: 10000,
-    });
-    return Date.now() - start;
-  } catch {
-    try {
-      await page.waitForSelector(
-        'table tbody tr, [data-testid="releases-content"]',
-        {
-          state: 'visible',
-          timeout: 5000,
-        }
-      );
-      return Date.now() - start;
-    } catch {
-      return Date.now() - start;
-    }
-  }
-};
-
-const measureInteractiveShellReady = async (
-  page: Awaited<
-    ReturnType<Awaited<ReturnType<typeof chromium.launch>>['newPage']>
-  >,
-  pathname: string
-): Promise<number> => {
-  if (!isHomepagePath(pathname)) {
-    return 0;
-  }
-
-  try {
-    await page.waitForFunction(
-      'window.__perfBudgetMetrics?.interactiveShellReady > 0',
-      undefined,
-      { timeout: 5000 }
-    );
-    const measured = await page.evaluate(() => {
-      const metrics = (
-        window as Window & {
-          __perfBudgetMetrics?: { interactiveShellReady?: number };
-        }
-      ).__perfBudgetMetrics;
-      return metrics?.interactiveShellReady ?? 0;
-    });
-    return typeof measured === 'number' && measured > 0 ? measured : 60000;
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Unknown Playwright error';
-    logWarning(
-      `  ⚠ interactive shell measurement failed for ${pathname}: ${message}`
-    );
-    return 60000;
-  }
-};
-
-const collectMetrics = async (
-  url: string,
-  needsAuth: boolean
-): Promise<PageMetrics> => {
-  const browser = await chromium.launch();
-  let context: Awaited<ReturnType<typeof browser.newContext>> | null = null;
-  let page: Awaited<ReturnType<typeof browser.newPage>> | null = null;
-
-  try {
-    const cookies = needsAuth ? loadAuthCookies(BASE_URL) : [];
-
-    context = await browser.newContext();
-
-    if (needsAuth) {
-      if (cookies.length === 0) {
-        throw new Error(
-          `No auth cookies found for authenticated route. Set CLERK_SESSION_COOKIE or provide ${CLI_OPTIONS.authPath || process.env.PERF_BUDGET_AUTH_PATH || AUTH_STORAGE_PATH}.`
-        );
-      }
-      await context.addCookies(cookies);
-      logInfo(`  🔐 Injected ${cookies.length} auth cookies`);
-    }
-
-    // Pre-warm authenticated routes: hit the URL once to populate
-    // unstable_cache and Neon connection pool. Without this, the first
-    // Playwright request measures DB cold start, not steady-state perf.
-    if (needsAuth) {
-      const warmupContext = await browser.newContext();
-      try {
-        if (cookies.length > 0) {
-          await warmupContext.addCookies(cookies);
-        }
-        const warmupPage = await warmupContext.newPage();
-        await warmupPage
-          .goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 })
-          .catch(() => undefined);
-        await warmupPage.waitForTimeout(2000);
-        await warmupPage.close().catch(() => undefined);
-      } finally {
-        await warmupContext.close().catch(() => undefined);
-      }
-      logInfo('  🔥 Pre-warmed server cache');
-    }
-
-    let warmShellResponse = 0;
-    if (shouldMeasureWarmShellResponse(url, needsAuth)) {
-      const warmContext = await browser.newContext();
-      let warmPage: Awaited<ReturnType<typeof browser.newPage>> | null = null;
-      try {
-        if (cookies.length > 0) {
-          await warmContext.addCookies(cookies);
-        }
-        warmPage = await warmContext.newPage();
-        warmShellResponse = await measureWarmShellResponse(warmPage, BASE_URL);
-      } finally {
-        await warmPage?.close().catch(() => undefined);
-        await warmContext.close().catch(() => undefined);
-      }
-    }
-
-    page = await context.newPage();
-
-    await page.addInitScript(PERF_BUDGET_INIT_SCRIPT);
-
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    const skeletonToContentPromise = measureSkeletonToContent(
-      page,
-      new URL(url).pathname
-    );
-
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {
-      logWarning(
-        `  ⚠ networkidle timeout for ${url}, continuing with load state`
-      );
-    });
-
-    try {
-      await page.mouse.click(8, 8);
-    } catch {
-      // Ignore input errors; FID will remain 0.
-    }
-
-    const skeletonToContent = await skeletonToContentPromise;
-    const interactiveShellReady = await measureInteractiveShellReady(
-      page,
-      new URL(url).pathname
-    );
-
-    await page.waitForTimeout(2000);
-
-    const metrics = await page.evaluate(() => {
-      const paintEntries = performance.getEntriesByType('paint');
-      const fcp = paintEntries.find(
-        entry => entry.name === 'first-contentful-paint'
-      );
-      const navEntry = performance.getEntriesByType(
-        'navigation'
-      )[0] as PerformanceNavigationTiming;
-      const ttfb = navEntry ? navEntry.responseStart : 0;
-
-      const resourceEntries = performance.getEntriesByType(
-        'resource'
-      ) as PerformanceResourceTiming[];
-
-      const resourceTotals = {
-        script: 0,
-        image: 0,
-        font: 0,
-        stylesheet: 0,
-        total: 0,
-      };
-
-      const fontExtensions = ['.woff2', '.woff', '.ttf', '.otf'];
-
-      for (const entry of resourceEntries) {
-        const size = entry.transferSize || entry.encodedBodySize || 0;
-        const lowerName = entry.name.toLowerCase();
-        const isFont =
-          entry.initiatorType === 'font' ||
-          fontExtensions.some(ext => lowerName.includes(ext));
-        const isStylesheet =
-          entry.initiatorType === 'css' ||
-          (entry.initiatorType === 'link' && lowerName.includes('.css'));
-
-        if (entry.initiatorType === 'script') {
-          resourceTotals.script += size;
-        }
-        if (entry.initiatorType === 'img') {
-          resourceTotals.image += size;
-        }
-        if (isFont) {
-          resourceTotals.font += size;
-        }
-        if (isStylesheet) {
-          resourceTotals.stylesheet += size;
-        }
-
-        resourceTotals.total += size;
-      }
-
-      const metrics = (
-        window as Window & {
-          __perfBudgetMetrics?: {
-            lcp: number;
-            cls: number;
-            fid: number;
-            interactiveShellReady: number;
-          };
-        }
-      ).__perfBudgetMetrics;
-
-      return {
-        timings: {
-          'first-contentful-paint': fcp?.startTime || 0,
-          'largest-contentful-paint': metrics?.lcp || 0,
-          'cumulative-layout-shift': metrics?.cls || 0,
-          'first-input-delay': metrics?.fid || 0,
-          'time-to-first-byte': ttfb,
-        },
-        resourceSizes: resourceTotals,
-      };
-    });
-
-    return {
-      timings: {
-        'first-contentful-paint': metrics.timings['first-contentful-paint'],
-        'largest-contentful-paint': metrics.timings['largest-contentful-paint'],
-        'cumulative-layout-shift': metrics.timings['cumulative-layout-shift'],
-        'first-input-delay': metrics.timings['first-input-delay'],
-        'interactive-shell-ready': interactiveShellReady,
-        'time-to-first-byte': metrics.timings['time-to-first-byte'],
-        'skeleton-to-content': skeletonToContent,
-        'warm-shell-response': warmShellResponse,
-      },
-      resourceSizes: {
-        script: toKilobytes(metrics.resourceSizes.script),
-        image: toKilobytes(metrics.resourceSizes.image),
-        font: toKilobytes(metrics.resourceSizes.font),
-        stylesheet: toKilobytes(metrics.resourceSizes.stylesheet),
-        total: toKilobytes(metrics.resourceSizes.total),
-      },
-    };
-  } finally {
-    await page?.close().catch(() => undefined);
-    await context?.close().catch(() => undefined);
-    await browser.close().catch(() => undefined);
-  }
-};
-
-const buildPageResult = (
-  budgetEntry: BudgetEntry,
-  resolvedPath: string,
-  url: string,
-  metrics: PageMetrics
-): PageResult => {
-  const timingResults = budgetEntry.timings.map(timing =>
-    formatMetricResult(
-      timing.metric,
-      metrics.timings[timing.metric],
-      timing.budget,
-      timing.metric === 'cumulative-layout-shift' ? '' : 'ms'
-    )
+      return selector;
+    })
   );
 
-  const resourceResults = budgetEntry.resourceSizes.map(resource =>
-    formatMetricResult(
-      resource.resourceType,
-      metrics.resourceSizes[resource.resourceType],
-      resource.budget,
+  return waitedSelector;
+}
+
+async function waitForAllHidden(
+  page: Page,
+  selectors: readonly string[] | undefined,
+  timeoutMs = READY_TIMEOUT_MS
+) {
+  if (!selectors || selectors.length === 0) {
+    return;
+  }
+
+  await Promise.all(
+    selectors.map(async selector => {
+      const locator = page.locator(selector).first();
+      const count = await locator.count().catch(() => 0);
+      if (count === 0) {
+        return;
+      }
+
+      await locator
+        .waitFor({ state: 'hidden', timeout: timeoutMs })
+        .catch(async () => {
+          await locator.waitFor({ state: 'detached', timeout: timeoutMs });
+        });
+    })
+  );
+}
+
+async function waitForContentReady(
+  page: Page,
+  route: PerfRouteDefinition,
+  startedAt: number
+) {
+  const loadingSelectors = route.readySelectors.loading;
+  const contentSelectors =
+    route.readySelectors.content ?? route.readySelectors.shell;
+
+  if (loadingSelectors?.length) {
+    await waitForAnyVisible(page, [
+      ...loadingSelectors,
+      ...(contentSelectors ?? []),
+    ]).catch(() => null);
+    await waitForAllHidden(page, loadingSelectors).catch(() => undefined);
+  }
+
+  await waitForAnyVisible(page, contentSelectors);
+  return Date.now() - startedAt;
+}
+
+async function waitForWarmShellReady(
+  page: Page,
+  route: PerfRouteDefinition,
+  startedAt: number
+) {
+  const selectors = [
+    ...(route.readySelectors.loading ?? []),
+    ...(route.readySelectors.content ?? []),
+    ...(route.readySelectors.shell ?? []),
+  ];
+  await waitForAnyVisible(page, selectors.length > 0 ? selectors : undefined);
+  return Date.now() - startedAt;
+}
+
+async function measureWarmNavigationRoute(
+  page: Page,
+  route: PerfRouteDefinition,
+  baseUrl: string,
+  url: string
+) {
+  await page.goto(resolveRouteUrl(baseUrl, APP_ROUTES.DASHBOARD), {
+    timeout: NAVIGATION_TIMEOUT_MS,
+    waitUntil: 'domcontentloaded',
+  });
+  const visibleTrigger = await waitForAnyVisible(
+    page,
+    route.readySelectors.navTrigger
+  );
+
+  const startedAt = Date.now();
+  const parsedUrl = new URL(url);
+  const expectedPaths = expectedRoutePaths(
+    route,
+    `${parsedUrl.pathname}${parsedUrl.search}`
+  );
+  const navTrigger = visibleTrigger ?? route.readySelectors.navTrigger?.[0];
+  if (navTrigger) {
+    await Promise.all([
+      waitForExpectedUrl(page, expectedPaths),
+      page.locator(navTrigger).first().click(),
+    ]);
+  } else {
+    await page.goto(url, {
+      timeout: NAVIGATION_TIMEOUT_MS,
+      waitUntil: 'domcontentloaded',
+    });
+    await waitForExpectedUrl(page, expectedPaths);
+  }
+
+  const warmShellResponse = await waitForWarmShellReady(page, route, startedAt);
+  const skeletonToContent = hasTimingBudget(route, 'skeleton-to-content')
+    ? await waitForContentReady(page, route, startedAt)
+    : 0;
+
+  return {
+    skeletonToContent,
+    warmShellResponse,
+  };
+}
+
+async function collectBrowserMetrics(page: Page) {
+  await page
+    .waitForLoadState('networkidle', { timeout: 10_000 })
+    .catch(() => undefined);
+
+  await page.mouse.click(8, 8).catch(() => undefined);
+  await page.waitForTimeout(200);
+
+  return page.evaluate(() => {
+    const metrics =
+      (
+        window as Window & {
+          __perfBudgetMetrics?: {
+            cls?: number;
+            fid?: number;
+            lcp?: number;
+          };
+        }
+      ).__perfBudgetMetrics ?? {};
+    const navigationEntry = performance.getEntriesByType('navigation')[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+    const paintEntries = performance.getEntriesByType('paint');
+    const firstContentfulPaint =
+      paintEntries.find(entry => entry.name === 'first-contentful-paint')
+        ?.startTime ?? 0;
+    const resourceEntries = performance.getEntriesByType(
+      'resource'
+    ) as PerformanceResourceTiming[];
+
+    const resourceValues = {
+      font: 0,
+      image: 0,
+      script: 0,
+      stylesheet: 0,
+      total: 0,
+    };
+
+    for (const entry of resourceEntries) {
+      const size = entry.transferSize || entry.encodedBodySize || 0;
+      const resourceName = entry.name.toLowerCase();
+      resourceValues.total += size;
+
+      if (entry.initiatorType === 'script' || resourceName.includes('.js')) {
+        resourceValues.script += size;
+        continue;
+      }
+
+      if (
+        entry.initiatorType === 'img' ||
+        entry.initiatorType === 'image' ||
+        /\.(avif|gif|jpe?g|png|svg|webp)(\?|$)/.test(resourceName)
+      ) {
+        resourceValues.image += size;
+        continue;
+      }
+
+      if (entry.initiatorType === 'css' || resourceName.includes('.css')) {
+        resourceValues.stylesheet += size;
+        continue;
+      }
+
+      if (
+        /\.(eot|otf|ttf|woff2?)(\?|$)/.test(resourceName) ||
+        entry.initiatorType === 'font'
+      ) {
+        resourceValues.font += size;
+      }
+    }
+
+    return {
+      finalUrl: window.location.href,
+      resourceValues: {
+        font: resourceValues.font / 1024,
+        image: resourceValues.image / 1024,
+        script: resourceValues.script / 1024,
+        stylesheet: resourceValues.stylesheet / 1024,
+        total: resourceValues.total / 1024,
+      },
+      timingValues: {
+        'cumulative-layout-shift': metrics.cls ?? 0,
+        'first-contentful-paint': firstContentfulPaint,
+        'first-input-delay': metrics.fid ?? 0,
+        'interactive-shell-ready': 0,
+        'largest-contentful-paint': metrics.lcp ?? 0,
+        'redirect-complete': 0,
+        'skeleton-to-content': 0,
+        'time-to-first-byte': navigationEntry?.responseStart ?? 0,
+        'warm-shell-response': 0,
+      },
+    };
+  });
+}
+
+function medianSampleByMetric(
+  samples: readonly GuardSample[],
+  metric: PerfTimingMetricName
+) {
+  const ordered = [...samples].sort(
+    (left, right) => left.timingValues[metric] - right.timingValues[metric]
+  );
+  return ordered[Math.floor(ordered.length / 2)] as GuardSample;
+}
+
+function createContextOptions(
+  route: PerfRouteDefinition,
+  cookies: readonly AuthCookie[]
+) {
+  const hasCookies = route.requiresAuth && cookies.length > 0;
+  return {
+    storageState: hasCookies
+      ? {
+          cookies: [...cookies],
+          origins: [],
+        }
+      : undefined,
+  };
+}
+
+async function createContext(
+  browser: Browser,
+  route: PerfRouteDefinition,
+  cookies: readonly AuthCookie[]
+) {
+  const options = createContextOptions(route, cookies);
+  const context = await browser.newContext(options);
+  return context;
+}
+
+async function warmRoute(
+  browser: Browser,
+  route: PerfRouteDefinition,
+  baseUrl: string,
+  url: string,
+  cookies: readonly AuthCookie[]
+) {
+  if (route.warmupStrategy === 'none') {
+    return;
+  }
+
+  const context = await createContext(browser, route, cookies);
+  try {
+    const page = await context.newPage();
+    if (route.warmupStrategy === 'authenticated-shell') {
+      await page.goto(resolveRouteUrl(baseUrl, APP_ROUTES.DASHBOARD), {
+        timeout: NAVIGATION_TIMEOUT_MS,
+        waitUntil: 'domcontentloaded',
+      });
+      await waitForAnyVisible(
+        page,
+        route.readySelectors.navTrigger ?? [
+          'nav[aria-label="Dashboard navigation"]',
+        ]
+      ).catch(() => undefined);
+    }
+
+    await page.goto(url, {
+      timeout: NAVIGATION_TIMEOUT_MS,
+      waitUntil: 'domcontentloaded',
+    });
+    await waitForAnyVisible(page, route.readySelectors.content).catch(
+      () => undefined
+    );
+  } finally {
+    await context.close();
+  }
+}
+
+async function measureRouteSample(
+  browser: Browser,
+  route: PerfRouteDefinition,
+  baseUrl: string,
+  url: string,
+  resolvedPath: string,
+  cookies: readonly AuthCookie[]
+): Promise<GuardSample> {
+  const context = await createContext(browser, route, cookies);
+  try {
+    const page = await context.newPage();
+    await page.addInitScript(PERF_INIT_SCRIPT);
+
+    const timingValues: Record<PerfTimingMetricName, number> = {
+      'cumulative-layout-shift': 0,
+      'first-contentful-paint': 0,
+      'first-input-delay': 0,
+      'interactive-shell-ready': 0,
+      'largest-contentful-paint': 0,
+      'redirect-complete': 0,
+      'skeleton-to-content': 0,
+      'time-to-first-byte': 0,
+      'warm-shell-response': 0,
+    };
+
+    if (route.measureMode === 'warm-navigation') {
+      const warmNavigation = await measureWarmNavigationRoute(
+        page,
+        route,
+        baseUrl,
+        url
+      );
+      timingValues['warm-shell-response'] = warmNavigation.warmShellResponse;
+      timingValues['skeleton-to-content'] = warmNavigation.skeletonToContent;
+    } else {
+      const startedAt = Date.now();
+      await page.goto(url, {
+        timeout: NAVIGATION_TIMEOUT_MS,
+        waitUntil: 'domcontentloaded',
+      });
+
+      if (
+        route.measureMode === 'redirect' ||
+        hasTimingBudget(route, 'redirect-complete')
+      ) {
+        await waitForExpectedUrl(page, expectedRoutePaths(route, resolvedPath));
+        timingValues['redirect-complete'] = Date.now() - startedAt;
+      }
+
+      if (
+        route.measureMode === 'interactive-shell' ||
+        hasTimingBudget(route, 'interactive-shell-ready')
+      ) {
+        await waitForAnyVisible(page, route.readySelectors.shell);
+        await waitForAnyVisible(
+          page,
+          route.readySelectors.content ?? route.readySelectors.shell
+        );
+        timingValues['interactive-shell-ready'] = Date.now() - startedAt;
+      } else if (route.readySelectors.content?.length) {
+        await waitForAnyVisible(page, route.readySelectors.content).catch(
+          () => undefined
+        );
+      }
+
+      if (hasTimingBudget(route, 'skeleton-to-content')) {
+        timingValues['skeleton-to-content'] = await waitForContentReady(
+          page,
+          route,
+          startedAt
+        );
+      }
+    }
+
+    const browserMetrics = await collectBrowserMetrics(page);
+    timingValues['cumulative-layout-shift'] =
+      browserMetrics.timingValues['cumulative-layout-shift'];
+    timingValues['first-contentful-paint'] =
+      browserMetrics.timingValues['first-contentful-paint'];
+    timingValues['first-input-delay'] =
+      browserMetrics.timingValues['first-input-delay'];
+    timingValues['largest-contentful-paint'] =
+      browserMetrics.timingValues['largest-contentful-paint'];
+    timingValues['time-to-first-byte'] =
+      browserMetrics.timingValues['time-to-first-byte'];
+
+    return {
+      finalUrl: browserMetrics.finalUrl,
+      resolvedPath,
+      resourceValues: browserMetrics.resourceValues,
+      timingValues,
+    };
+  } finally {
+    await context.close();
+  }
+}
+
+function createPageResult(
+  route: PerfRouteDefinition,
+  resolvedPath: string,
+  samples: readonly GuardSample[]
+): PageResult {
+  const primaryMetric = getPrimaryTimingMetricName(route);
+  const medianSample = medianSampleByMetric(samples, primaryMetric);
+
+  const timings = getRouteTimingBudgets(route).map(budget =>
+    buildMetricResult(
+      budget.metric,
+      medianSample.timingValues[budget.metric],
+      budget.budget,
+      budget.metric === 'cumulative-layout-shift' ? '' : 'ms'
+    )
+  );
+  const resourceSizes = getRouteResourceBudgets(route).map(budget =>
+    buildMetricResult(
+      budget.resourceType,
+      medianSample.resourceValues[budget.resourceType],
+      budget.budget,
       'KB'
     )
   );
 
+  const violations: ViolationResult[] = [
+    ...timings
+      .filter(metric => !metric.passed)
+      .map(metric => ({ ...metric, kind: 'timing' as const })),
+    ...resourceSizes
+      .filter(metric => !metric.passed)
+      .map(metric => ({ ...metric, kind: 'resource' as const })),
+  ];
+
   return {
-    configuredPath: budgetEntry.path,
+    auth: route.requiresAuth,
+    configuredPath: route.path,
+    group: route.group,
+    id: route.id,
+    primaryMetric,
+    rawResourceSizes: medianSample.resourceValues,
+    rawTimings: medianSample.timingValues,
     resolvedPath,
-    url,
-    auth: budgetEntry.auth === true,
-    timings: timingResults,
-    resourceSizes: resourceResults,
-    rawTimings: metrics.timings,
-    rawResourceSizes: metrics.resourceSizes,
-    violations: [
-      ...timingResults
-        .filter(result => !result.passed)
-        .map(result => ({ ...result, kind: 'timing' as const })),
-      ...resourceResults
-        .filter(result => !result.passed)
-        .map(result => ({ ...result, kind: 'resource' as const })),
-    ],
+    resourceSizes,
+    routeSurface: route.surface,
+    samples,
+    timings,
+    url: medianSample.finalUrl,
+    violations,
   };
-};
+}
 
-const renderHumanReadablePage = (page: PageResult) => {
-  logInfo(
-    `\n🔎 Checking ${page.configuredPath} (${page.url})${page.auth ? ' [auth]' : ''}`
-  );
-
-  for (const result of page.timings) {
-    const status = result.passed ? '✅' : '❌';
-    logInfo(
-      ` ${status} ${result.name}: ${formatMetric(result.measured, result.unit)} (budget ${formatMetric(result.budget, result.unit)})`
-    );
-  }
-
-  for (const result of page.resourceSizes) {
-    const status = result.passed ? '✅' : '❌';
-    logInfo(
-      ` ${status} ${result.name}: ${formatMetric(result.measured, result.unit)} (budget ${formatMetric(result.budget, result.unit)})`
-    );
-  }
-};
-
-const emitJson = (summary: GuardSummary) => {
-  process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
-};
-
-const runBudgetGuard = async (): Promise<GuardSummary> => {
-  const pages: PageResult[] = [];
-  const budgetEntries = selectBudgetEntries(config.budgets, CLI_OPTIONS.paths);
-
-  logInfo('📊 Running performance budget guard...');
-  logInfo(`Base URL: ${BASE_URL}`);
-
-  for (const budgetEntry of budgetEntries) {
-    const resolvedPath = resolvePath(budgetEntry.path);
-    const url = `${BASE_URL.replace(/\/$/, '')}${resolvedPath}`;
-
-    let metrics!: PageMetrics;
-    const maxRetries = 2;
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        metrics = await collectMetrics(url, budgetEntry.auth === true);
-        break;
-      } catch (error) {
-        if (attempt === maxRetries) {
-          throw error;
-        }
-        logWarning(`  ⚠ Attempt ${attempt} failed for ${url}, retrying...`);
-        await new Promise(resolvePromise => setTimeout(resolvePromise, 2000));
-      }
+function sortRoutesForExecution(routes: readonly PerfRouteDefinition[]) {
+  return [...routes].sort((left, right) => {
+    if (left.priority !== right.priority) {
+      return left.priority - right.priority;
     }
 
-    const pageResult = buildPageResult(budgetEntry, resolvedPath, url, metrics);
-    pages.push(pageResult);
-    renderHumanReadablePage(pageResult);
+    return left.id.localeCompare(right.id);
+  });
+}
+
+function normalizeLoadedRoute(route: PerfRouteDefinition): PerfRouteDefinition {
+  return {
+    ...route,
+    resourceBudgets: getRouteResourceBudgets(route),
+    timingBudgets: getRouteTimingBudgets(route),
+  };
+}
+
+export async function loadGuardManifestRoutes(manifestPath?: string) {
+  if (!manifestPath) {
+    return END_USER_PERF_ROUTE_MANIFEST.map(route =>
+      normalizeLoadedRoute(route)
+    );
   }
 
+  const resolvedManifestPath = isAbsolute(manifestPath)
+    ? manifestPath
+    : resolve(repoRoot, manifestPath);
+  const loadedModule = await import(pathToFileURL(resolvedManifestPath).href);
+  const loadedManifest = (
+    typeof loadedModule.getEndUserPerfRouteManifest === 'function'
+      ? loadedModule.getEndUserPerfRouteManifest()
+      : (loadedModule.END_USER_PERF_ROUTE_MANIFEST ?? loadedModule.default)
+  ) as readonly PerfRouteDefinition[] | undefined;
+
+  if (!Array.isArray(loadedManifest)) {
+    throw new TypeError(
+      `Manifest ${resolvedManifestPath} does not export a route array.`
+    );
+  }
+
+  return loadedManifest.map(route => normalizeLoadedRoute(route));
+}
+
+export function selectGuardRoutes(
+  routes: readonly PerfRouteDefinition[],
+  options: GuardCliOptions
+) {
+  const groupIds = new Set(options.groupIds);
+  const paths = new Set(options.paths);
+  const routeIds = new Set(options.routeIds);
+  const hasGroupFilter = groupIds.size > 0;
+  const hasPathFilter = paths.size > 0;
+  const hasRouteFilter = routeIds.size > 0;
+
+  const selected = routes.filter(route => {
+    if (hasRouteFilter && routeIds.has(route.id)) {
+      return true;
+    }
+
+    if (hasPathFilter && paths.has(route.path)) {
+      return true;
+    }
+
+    if (hasGroupFilter && groupIds.has(route.group)) {
+      return true;
+    }
+
+    return !hasGroupFilter && !hasPathFilter && !hasRouteFilter;
+  });
+
+  if (
+    (hasGroupFilter || hasPathFilter || hasRouteFilter) &&
+    selected.length === 0
+  ) {
+    throw new TypeError(
+      `No performance routes matched selection. Available ids: ${routes
+        .map(route => route.id)
+        .join(', ')}`
+    );
+  }
+
+  return sortRoutesForExecution(selected);
+}
+
+async function resolvePathForRoute(
+  route: PerfRouteDefinition,
+  baseUrl: string,
+  authCookies: readonly AuthCookie[]
+) {
+  if (!route.resolvePath) {
+    return route.path;
+  }
+
+  return route.resolvePath(route, {
+    authCookies,
+    baseUrl,
+  });
+}
+
+async function measureRoutesAgainstBudgets(
+  routes: readonly PerfRouteDefinition[],
+  options: GuardCliOptions
+) {
+  const browser = await chromium.launch();
+  try {
+    const authCookies = loadAuthCookies(options.baseUrl, options.authPath);
+    const results: PageResult[] = [];
+
+    for (const route of routes) {
+      if (route.requiresAuth && authCookies.length === 0) {
+        throw new Error(
+          `Route ${route.id} requires auth, but no storage state was found. Pass --auth-path or run perf:auth first.`
+        );
+      }
+
+      const resolvedPath = await resolvePathForRoute(
+        route,
+        options.baseUrl,
+        authCookies
+      );
+      const url = resolveRouteUrl(options.baseUrl, resolvedPath);
+      logInfo(`Checking ${route.id} -> ${resolvedPath}`, options);
+
+      await warmRoute(browser, route, options.baseUrl, url, authCookies);
+
+      const samples: GuardSample[] = [];
+      for (let index = 0; index < options.runs; index += 1) {
+        const sample = await measureRouteSample(
+          browser,
+          route,
+          options.baseUrl,
+          url,
+          resolvedPath,
+          authCookies
+        );
+        samples.push(sample);
+        logInfo(
+          `  sample ${index + 1}/${options.runs}: ${formatMetric(sample.timingValues[getPrimaryTimingMetricName(route)], 'ms')}`,
+          options
+        );
+      }
+
+      results.push(createPageResult(route, resolvedPath, samples));
+    }
+
+    return results;
+  } finally {
+    await browser.close();
+  }
+}
+
+function printHumanSummary(summary: GuardSummary) {
+  console.log(`Performance budgets: ${summary.status.toUpperCase()}`);
+
+  for (const page of summary.pages) {
+    console.log(
+      `${page.id} (${page.resolvedPath}) primary=${page.primaryMetric}=${formatMetric(
+        page.rawTimings[page.primaryMetric],
+        page.primaryMetric === 'cumulative-layout-shift' ? '' : 'ms'
+      )}`
+    );
+
+    for (const metric of [...page.timings, ...page.resourceSizes]) {
+      const status = metric.passed ? 'PASS' : 'FAIL';
+      console.log(
+        `  ${status} ${metric.name}: ${formatMetric(metric.measured, metric.unit)} / ${formatMetric(metric.budget, metric.unit)}`
+      );
+    }
+  }
+}
+
+export async function runPerformanceBudgetsGuard(
+  options: GuardCliOptions
+): Promise<GuardSummary> {
+  const manifestRoutes = await loadGuardManifestRoutes(options.manifestPath);
+  const selectedRoutes = selectGuardRoutes(manifestRoutes, options);
+  const pages = await measureRoutesAgainstBudgets(selectedRoutes, options);
   const violationCount = pages.reduce(
     (total, page) => total + page.violations.length,
     0
   );
 
   return {
-    baseUrl: BASE_URL,
-    status: violationCount > 0 ? 'fail' : 'pass',
+    baseUrl: options.baseUrl,
     checkedAt: new Date().toISOString(),
-    violationCount,
     pages,
+    status: violationCount > 0 ? 'fail' : 'pass',
+    violationCount,
   };
-};
+}
 
-runBudgetGuard()
-  .then(summary => {
-    if (CLI_OPTIONS.json) {
-      emitJson(summary);
-    } else if (summary.violationCount > 0) {
-      console.error('\n🚨 Performance budget violations detected:');
-      for (const page of summary.pages) {
-        for (const violation of page.violations) {
-          console.error(
-            ` - ${page.configuredPath} ${violation.name} ${violation.measured.toFixed(1)}${violation.unit} exceeds ${violation.budget}${violation.unit}`
-          );
-        }
-      }
-    } else {
-      console.log('\n✅ All performance budgets are within limits.');
-    }
+async function main() {
+  const options = parseGuardCliArgs(process.argv.slice(2));
+  const summary = await runPerformanceBudgetsGuard(options);
 
-    process.exit(summary.violationCount > 0 ? 1 : 0);
-  })
-  .catch(error => {
-    console.error('❌ Performance budget guard failed:', error);
+  if (options.json) {
+    process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+  } else {
+    printHumanSummary(summary);
+  }
+
+  if (summary.status === 'fail') {
+    process.exitCode = 1;
+  }
+}
+
+const isEntrypoint =
+  process.argv[1] !== undefined &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isEntrypoint) {
+  main().catch(error => {
+    const message = error instanceof Error ? error.message : String(error);
+    writeStderr(message);
     process.exit(1);
   });
+}
