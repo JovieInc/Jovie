@@ -1,8 +1,7 @@
-import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { ClientProviders } from '@/components/providers/ClientProviders';
+import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
 import { APP_ROUTES } from '@/constants/routes';
-import { resolvePublishableKeyFromHeaders } from '@/lib/auth/staging-clerk-keys';
+import { getCachedAuth } from '@/lib/auth/cached';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,20 +11,18 @@ export default async function AccountLayout({
   children: React.ReactNode;
 }>) {
   // Ensure user is authenticated
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     redirect(APP_ROUTES.SIGNIN);
   }
 
-  const publishableKey = await resolvePublishableKeyFromHeaders();
-
   return (
-    <ClientProviders publishableKey={publishableKey}>
+    <ResolvedClientProviders>
       <div className='min-h-screen bg-background text-foreground'>
         <div className='mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8'>
           <div className='mx-auto max-w-4xl'>{children}</div>
         </div>
       </div>
-    </ClientProviders>
+    </ResolvedClientProviders>
   );
 }

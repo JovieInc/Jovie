@@ -1,7 +1,6 @@
 import '../(auth)/auth-utilities.css';
 import Script from 'next/script';
-import { ClientProviders } from '@/components/providers/ClientProviders';
-import { resolvePublishableKeyFromHeaders } from '@/lib/auth/staging-clerk-keys';
+import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,12 +16,10 @@ export default async function WaitlistLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const publishableKey = await resolvePublishableKeyFromHeaders();
-
   return (
-    <ClientProviders publishableKey={publishableKey}>
+    <ResolvedClientProviders>
       <Script src='/theme-init.js' strategy='beforeInteractive' />
       {children}
-    </ClientProviders>
+    </ResolvedClientProviders>
   );
 }

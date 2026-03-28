@@ -59,14 +59,14 @@ One Clerk instance per env (keys in Doppler). Proxy path: `/__clerk`. Handled by
 
 ## E2E Test Authentication
 
-Test auth uses Clerk `+clerk_test` emails with magic OTP `424242`. **No password needed.**
+Local `/browse` auth is bypass-first, not Clerk-form-first.
 
-- Doppler: `jovie-web` project, `dev` config, binary at `/opt/homebrew/bin/doppler`
-- Test user: `E2E_CLERK_USER_USERNAME` in Doppler (format `*+clerk_test@jov.ie`)
-- Auth guard: `apps/web/tests/product-screenshots/helpers.ts` — `shouldSkipAuth()` skips if username missing or Clerk setup failed. `+clerk_test` emails bypass password requirement.
-- Screenshots: `doppler run -p jovie-web -c dev -- pnpm --filter web screenshots`
-- Browse auth: `doppler run -p jovie-web -c dev -- bun run scripts/browse-auth.ts`
-- Full docs: `apps/web/tests/TESTING.md` (E2E Authentication section)
+- Start local browse QA with: `doppler run -- pnpm --filter web dev:local:browse`
+- Local browse entrypoint: `/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings`
+- Use `persona=admin` only for admin QA
+- This path sets bypass cookies directly and does **not** require `NEXT_PUBLIC_E2E_MODE=1`
+- `scripts/browse-auth.ts` remains available as a fallback helper for non-loopback hosts
+- Full docs: `apps/web/tests/TESTING.md`
 
 ## Design System
 
