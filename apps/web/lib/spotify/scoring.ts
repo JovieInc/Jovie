@@ -125,18 +125,15 @@ export function assessAuthenticity(artist: SanitizedArtist): AuthenticityFlag {
     reasons.push('No genres despite significant followers');
   }
 
-  // Flag 3: Extreme follower/popularity ratio
+  // Flag 3: Extreme follower/popularity ratio (only when popularity >= 5
+  // to avoid double-counting with Flag 1's near-zero popularity check)
   // Normal ratio: ~500-2000 followers per popularity point
   // Botted: 5000+ followers per popularity point
-  const ratio =
-    artist.popularity > 0
-      ? artist.followerCount / artist.popularity
-      : artist.followerCount > 0
-        ? Number.POSITIVE_INFINITY
-        : 0;
-
-  if (ratio > 5000 && artist.followerCount > 2000) {
-    reasons.push('Follower count vastly exceeds popularity signal');
+  if (artist.popularity >= 5) {
+    const ratio = artist.followerCount / artist.popularity;
+    if (ratio > 5000 && artist.followerCount > 2000) {
+      reasons.push('Follower count vastly exceeds popularity signal');
+    }
   }
 
   if (reasons.length >= 2) return { level: 'SUSPECT', reasons };

@@ -3,6 +3,8 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { cacheQuery } from '@/lib/db/cache';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureError, captureWarning } from '@/lib/error-tracking';
+import { serverFetch } from '@/lib/http/server-fetch';
 import {
   getSpotifyArtist,
   isSpotifyAvailable,
@@ -10,6 +12,7 @@ import {
 } from '@/lib/spotify/client';
 import type { SanitizedArtist } from '@/lib/spotify/sanitize';
 import { generateHealthReport } from '@/lib/spotify/scoring';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
@@ -69,6 +72,12 @@ export async function GET(request: NextRequest) {
 
         // 2. Scrape FAL names from Spotify profile page
         const falNames = await scrapeFansAlsoLike(artistId);
+
+        // null means scraper failed (not "no FAL data") — don't cache
+        if (falNames === null) {
+          throw new Error('FAL scrape failed');
+        }
+
         if (falNames.length === 0) {
           return generateHealthReport(targetArtist, []);
         }
@@ -93,7 +102,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.error('[FAL Analysis] Error:', message);
+    if (message === 'FAL scrape failed') {
+      return NextResponse.json(
+        {
+          error:
+            'Could not retrieve FAL data from Spotify. The scraper may be blocked or the page structure changed.',
+        },
+        { status: 502 }
+      );
+    }
+
+    await captureError('[FAL Analysis] Error', error, {
+      component: 'fal-analysis',
+      artistId,
+    });
     return NextResponse.json(
       { error: 'Failed to analyze artist' },
       { status: 502 }
@@ -103,11 +125,11 @@ export async function GET(request: NextRequest) {
 
 /**
  * Scrape "Fans Also Like" artist names from the Spotify profile page.
- * Fetches the /artist/{id}/related page and extracts artist names from HTML.
+ * Returns null on failure (as distinct from empty array = no FAL artists).
  */
-async function scrapeFansAlsoLike(artistId: string): Promise<string[]> {
+async function scrapeFansAlsoLike(artistId: string): Promise<string[] | null> {
   try {
-    const response = await fetch(
+    const response = await serverFetch(
       `https://open.spotify.com/artist/${artistId}/related`,
       {
         headers: {
@@ -115,27 +137,23 @@ async function scrapeFansAlsoLike(artistId: string): Promise<string[]> {
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
           Accept: 'text/html',
         },
-        signal: AbortSignal.timeout(10_000),
+        timeoutMs: 10_000,
+        context: 'fal-scrape',
       }
     );
 
     if (!response.ok) {
-      console.warn(
-        `[FAL Scrape] Failed to fetch profile page: ${response.status}`
+      await captureWarning(
+        `[FAL Scrape] Failed to fetch profile page: ${response.status}`,
+        undefined,
+        { component: 'fal-scrape', artistId }
       );
-      return [];
+      return null;
     }
 
     const html = await response.text();
 
-    // Extract artist names from the page content.
-    // The Spotify profile page renders artist cards with names in the HTML.
-    // We look for patterns in the server-rendered HTML.
     const names: string[] = [];
-
-    // Pattern: artist names appear in meta content or structured data
-    // The page title is "Spotify – Artists Fans of {Name} also like"
-    // Artist names appear as link text in the page
 
     // Try extracting from JSON-LD or embedded data
     const artistNamePattern =
@@ -146,10 +164,8 @@ async function scrapeFansAlsoLike(artistId: string): Promise<string[]> {
       match = artistNamePattern.exec(html);
     }
 
-    // Fallback: extract from meta tags or og data
+    // Fallback: extract from embedded script data
     if (names.length === 0) {
-      // Try a simpler pattern: artist card links contain artist names
-      // Spotify's SSR includes artist data in script tags
       const dataPattern = /"artists":\s*\[([^\]]*)\]/g;
       let dataMatch = dataPattern.exec(html);
       while (dataMatch) {
@@ -163,9 +179,8 @@ async function scrapeFansAlsoLike(artistId: string): Promise<string[]> {
       }
     }
 
-    // Final fallback: extract from title/heading patterns
+    // Final fallback: extract from test ID patterns
     if (names.length === 0) {
-      // The HTML often contains artist names as text content after "Artist" labels
       const simplePattern = /data-testid="artist-link"[^>]*>([^<]+)</g;
       let simpleMatch = simplePattern.exec(html);
       while (simpleMatch) {
@@ -179,14 +194,17 @@ async function scrapeFansAlsoLike(artistId: string): Promise<string[]> {
 
     return names;
   } catch (error) {
-    console.error('[FAL Scrape] Error:', error);
-    return [];
+    await captureError('[FAL Scrape] Error', error, {
+      component: 'fal-scrape',
+      artistId,
+    });
+    return null;
   }
 }
 
 /**
  * Resolve FAL artist names to full SanitizedArtist objects via Spotify search.
- * Searches each name and takes the top result.
+ * Verifies name match to avoid wrong-artist substitution.
  */
 async function resolveFalArtists(names: string[]): Promise<SanitizedArtist[]> {
   const resolved: SanitizedArtist[] = [];
@@ -199,7 +217,15 @@ async function resolveFalArtists(names: string[]): Promise<SanitizedArtist[]> {
       batch.map(async name => {
         const searchResults = await searchSpotifyArtists(name, 1);
         if (searchResults.length > 0) {
-          // Search results are SearchArtistResult, need full artist data
+          // Verify name match to avoid wrong-artist substitution
+          if (searchResults[0].name.toLowerCase() !== name.toLowerCase()) {
+            logger.warn(
+              `[FAL Resolve] Name mismatch: searched "${name}", got "${searchResults[0].name}" — skipping`,
+              undefined,
+              'fal-analysis'
+            );
+            return null;
+          }
           const fullArtist = await getSpotifyArtist(searchResults[0].spotifyId);
           return fullArtist;
         }

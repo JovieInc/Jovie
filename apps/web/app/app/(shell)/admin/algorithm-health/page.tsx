@@ -3,16 +3,18 @@
 import Image from 'next/image';
 import { useState } from 'react';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
-import { TIM_WHITE_SPOTIFY_ID } from '@/lib/spotify/blacklist';
 import type {
   AlgorithmHealthReport,
   AuthenticityLevel,
   NeighbourSize,
   ScoredNeighbour,
 } from '@/lib/spotify/scoring';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 export default function AlgorithmHealthPage() {
-  const [artistId, setArtistId] = useState(TIM_WHITE_SPOTIFY_ID);
+  const [artistId, setArtistId] = useState<string>(
+    TIM_WHITE_PROFILE.spotifyArtistId
+  );
   const [report, setReport] = useState<AlgorithmHealthReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +104,7 @@ export default function AlgorithmHealthPage() {
 
 // ─── Sub-components ──────────────────────────────────────
 
-function HealthReport({ report }: { report: AlgorithmHealthReport }) {
+function HealthReport({ report }: { readonly report: AlgorithmHealthReport }) {
   const { targetArtist, neighbours, healthScore, summary } = report;
 
   return (
@@ -178,7 +180,7 @@ function HealthReport({ report }: { report: AlgorithmHealthReport }) {
   );
 }
 
-function NeighbourRow({ neighbour }: { neighbour: ScoredNeighbour }) {
+function NeighbourRow({ neighbour }: { readonly neighbour: ScoredNeighbour }) {
   const {
     artist,
     size,
@@ -243,7 +245,7 @@ function NeighbourRow({ neighbour }: { neighbour: ScoredNeighbour }) {
   );
 }
 
-function AuthenticityBadge({ level }: { level: AuthenticityLevel }) {
+function AuthenticityBadge({ level }: { readonly level: AuthenticityLevel }) {
   const config: Record<
     Exclude<AuthenticityLevel, 'CLEAN'>,
     { bg: string; text: string; label: string }
@@ -268,7 +270,7 @@ function AuthenticityBadge({ level }: { level: AuthenticityLevel }) {
   );
 }
 
-function SizeTag({ size }: { size: NeighbourSize }) {
+function SizeTag({ size }: { readonly size: NeighbourSize }) {
   const config: Record<NeighbourSize, { bg: string; text: string }> = {
     BIGGER: { bg: 'bg-green-500/20', text: 'text-green-400' },
     SIMILAR: { bg: 'bg-yellow-500/20', text: 'text-yellow-400' },

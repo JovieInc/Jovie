@@ -179,6 +179,36 @@ describe('assessAuthenticity', () => {
     expect(result.level).toBe('CLEAN');
   });
 
+  it('does not double-count Flag 1 and Flag 3 at near-zero popularity', () => {
+    // Regression: popularity=1, followers=6000 should only trigger Flag 1
+    // (near-zero popularity), NOT also Flag 3 (ratio check).
+    // Before fix, both flags fired → SUSPECT. Correct: CAUTION (1 flag).
+    const artist = makeArtist({
+      popularity: 1,
+      followerCount: 6000,
+      genres: ['electronic'],
+    });
+    const result = assessAuthenticity(artist);
+    expect(result.level).toBe('CAUTION');
+    expect(result.reasons).toHaveLength(1);
+    expect(result.reasons).toContain('High followers but near-zero popularity');
+  });
+
+  it('Flag 3 fires independently when popularity >= 5', () => {
+    // popularity=5, followers=30000 → ratio = 6000 > 5000 threshold
+    // Flag 1 should NOT fire (popularity >= 5), Flag 3 should fire
+    const artist = makeArtist({
+      popularity: 5,
+      followerCount: 30000,
+      genres: ['pop'],
+    });
+    const result = assessAuthenticity(artist);
+    expect(result.level).toBe('CAUTION');
+    expect(result.reasons).toContain(
+      'Follower count vastly exceeds popularity signal'
+    );
+  });
+
   it('does not flag small artists with no genres', () => {
     // Under 1000 followers, missing genres is normal for tiny artists
     const artist = makeArtist({
