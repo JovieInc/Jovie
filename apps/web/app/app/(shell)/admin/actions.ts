@@ -15,6 +15,8 @@ import {
   enqueueMusicFetchEnrichmentJob,
   fireDspDiscovery,
 } from '@/lib/ingestion/jobs';
+import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
+import { logger } from '@/lib/utils/logger';
 import { sendVerificationApprovedEmail } from '@/lib/verification/notifications';
 
 function safeParseJsonArray(raw: string): unknown {
@@ -177,10 +179,20 @@ export async function bulkRerunCreatorIngestionAction(
         }
 
         // Enqueue DSP artist discovery alongside MusicFetch enrichment
-        if (profile.spotifyId) {
+        const spotifyArtistId =
+          profile.spotifyId ??
+          (profile.spotifyUrl
+            ? extractSpotifyArtistId(profile.spotifyUrl)
+            : null);
+        if (spotifyArtistId) {
           fireDspDiscovery({
             creatorProfileId: profile.id,
-            spotifyArtistId: profile.spotifyId,
+            spotifyArtistId,
+            onError: error =>
+              logger.warn('DSP discovery enqueue failed', {
+                creatorProfileId: profile.id,
+                error,
+              }),
           });
         }
 
