@@ -572,11 +572,14 @@ export function ProfileContactSidebar() {
       headerMode='minimal'
       hideMinimalHeaderBar
       entityHeader={
-        <ProfileEntityHeader
-          previewData={previewData}
-          onClose={close}
-          overflowActions={overflowActions}
-        />
+        <>
+          <ProfileEntityHeader
+            previewData={previewData}
+            onClose={close}
+            overflowActions={overflowActions}
+          />
+          <ProfileSmartLinkAnalytics profileUrl={profileUrl} />
+        </>
       }
       tabs={
         <DrawerTabs
@@ -604,9 +607,7 @@ export function ProfileContactSidebar() {
         />
       }
     >
-      <div className='flex min-h-full flex-col gap-2.5 pt-0.5'>
-        <ProfileSmartLinkAnalytics profileUrl={profileUrl} />
-
+      <div className='flex min-h-full flex-col'>
         <div className='min-h-0 flex-1'>
           {resolvedCategory === 'about' ? (
             <ProfileAboutTab
