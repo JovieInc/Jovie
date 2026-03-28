@@ -714,7 +714,10 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
   let linksFound = 0;
 
   for (const match of dspMatches) {
-    if (match.status === 'confirmed' || match.status === 'auto_confirmed') {
+    if (
+      (match.status === 'confirmed' || match.status === 'auto_confirmed') &&
+      match.externalArtistId
+    ) {
       const result = await processReleaseEnrichmentJobStandalone({
         creatorProfileId: profile.id,
         matchId: match.id,

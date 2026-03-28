@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
@@ -37,13 +37,7 @@ export default async function AppShellLayout({
       </Suspense>
     );
   } catch (error) {
-    // In Next.js 14+, redirect() throws with the tag on error.digest, not error.message
-    if (
-      error instanceof Error &&
-      (error as Error & { digest?: string }).digest === 'NEXT_REDIRECT'
-    ) {
-      throw error;
-    }
+    unstable_rethrow(error);
 
     Sentry.captureException(error);
 
