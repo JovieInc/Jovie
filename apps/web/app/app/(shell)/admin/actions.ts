@@ -8,6 +8,7 @@ import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
+import { checkUserStatus } from '@/lib/auth/status-checker';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
@@ -73,6 +74,29 @@ async function requireAdmin(): Promise<string> {
   const adminStatus = await checkAdminRole(userId);
 
   if (!adminStatus) {
+    throw new AdminUnauthorizedError();
+  }
+
+  // Proxy skips ban checks for /app/* routes, so verify the acting
+  // admin is not banned/suspended/deleted before allowing any action.
+  const [adminUser] = await db
+    .select({
+      userStatus: users.userStatus,
+      deletedAt: users.deletedAt,
+    })
+    .from(users)
+    .where(eq(users.clerkId, userId))
+    .limit(1);
+
+  if (!adminUser) {
+    throw new AdminUnauthorizedError();
+  }
+
+  const { isBlocked } = checkUserStatus(
+    adminUser.userStatus,
+    adminUser.deletedAt
+  );
+  if (isBlocked) {
     throw new AdminUnauthorizedError();
   }
 
