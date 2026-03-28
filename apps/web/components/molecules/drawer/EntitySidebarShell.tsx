@@ -36,7 +36,11 @@ export interface EntitySidebarShellProps {
   /** Hide the utility-only top bar in minimal mode. */
   readonly hideMinimalHeaderBar?: boolean;
 
-  /** Entity header slot — image + name area below the header bar */
+  /**
+   * Persistent pre-tab region — pinned above tabs in both standard and minimal modes.
+   * Typically contains the entity identity card (image + name). Can accept a fragment
+   * with multiple elements (e.g., entity card + analytics) — they stack with space-y-2.
+   */
   readonly entityHeader?: ReactNode;
   /** When true, header actions render inside the entity header card instead of the title bar */
   readonly actionsInEntityHeader?: boolean;
@@ -66,15 +70,18 @@ export interface EntitySidebarShellProps {
  * Profile, and other detail sidebars with standardized spacing
  * and scroll behavior.
  *
- * Layout (top to bottom):
+ * Layout rule: persistent content → tabs → tab content.
+ * Entity header and tabs are ALWAYS pinned (shrink-0) in both modes.
+ * Only tab-specific children scroll.
+ *
  *  ┌─────────────────────────┐
  *  │ DrawerHeader (title +   │  shrink-0
  *  │ actions + close)        │
  *  ├─────────────────────────┤
- *  │ Entity header (image +  │  shrink-0  (optional)
+ *  │ Entity header (image +  │  shrink-0  (optional, pinned)
  *  │ name / metadata)        │
  *  ├─────────────────────────┤
- *  │ Tabs (SegmentControl)   │  shrink-0  (optional)
+ *  │ Tabs (SegmentControl)   │  shrink-0  (optional, pinned)
  *  ├─────────────────────────┤
  *  │ Scrollable content      │  flex-1 overflow
  *  │                         │
@@ -139,7 +146,7 @@ export function EntitySidebarShell({
       data-testid={testId}
     >
       <div className='flex h-full min-h-0 flex-col gap-1.5 px-1.5 py-1.5 lg:px-0 lg:py-0'>
-        <div className='shrink-0'>
+        <div className='shrink-0 space-y-1.5'>
           <DrawerSurfaceCard
             variant='card'
             className='overflow-hidden lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none'
@@ -197,6 +204,32 @@ export function EntitySidebarShell({
               ) : null}
             </div>
           </DrawerSurfaceCard>
+
+          {isMinimalHeader && !isEmpty && entityHeader ? (
+            <div
+              data-testid='entity-sidebar-entity-header'
+              className='space-y-2 lg:px-1.5 lg:pr-0.5'
+            >
+              {entityHeader}
+            </div>
+          ) : null}
+
+          {isMinimalHeader && !isEmpty && tabs && !renderMinimalTabsInHeader ? (
+            <DrawerSurfaceCard
+              variant='card'
+              className='overflow-hidden'
+              testId='entity-sidebar-tabs-card'
+            >
+              <div
+                className={cn(
+                  'px-2.5 py-2 [&>*]:w-full',
+                  tabsContainerClassName
+                )}
+              >
+                {tabs}
+              </div>
+            </DrawerSurfaceCard>
+          ) : null}
         </div>
 
         {isEmpty ? (
@@ -208,30 +241,7 @@ export function EntitySidebarShell({
         ) : (
           <>
             <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5 lg:pr-0.5'>
-              <div className='space-y-2'>
-                {isMinimalHeader && entityHeader ? (
-                  <div data-testid='entity-sidebar-entity-header'>
-                    {entityHeader}
-                  </div>
-                ) : null}
-                {isMinimalHeader && tabs && !renderMinimalTabsInHeader ? (
-                  <DrawerSurfaceCard
-                    variant='card'
-                    className='overflow-hidden'
-                    testId='entity-sidebar-tabs-card'
-                  >
-                    <div
-                      className={cn(
-                        'px-2.5 py-2 [&>*]:w-full',
-                        tabsContainerClassName
-                      )}
-                    >
-                      {tabs}
-                    </div>
-                  </DrawerSurfaceCard>
-                ) : null}
-                {children}
-              </div>
+              <div className='space-y-2'>{children}</div>
             </div>
 
             {footer ? (
