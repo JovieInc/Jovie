@@ -40,7 +40,7 @@ export function ReleaseTargetPlaylistsSection({
   const handleBlur = useCallback(async () => {
     if (!onSave || readOnly) return;
 
-    const parsed = parsePlaylistInput(value);
+    const parsed = parsePlaylistInput(value).slice(0, 5);
     const currentJoined = parsed.join(', ');
 
     // Dirty check: don't save if unchanged
@@ -49,6 +49,7 @@ export function ReleaseTargetPlaylistsSection({
     setIsSaving(true);
     try {
       await onSave(releaseId, parsed);
+      setValue(currentJoined);
       lastSavedRef.current = currentJoined;
     } catch {
       toast.error('Failed to save target playlists');
