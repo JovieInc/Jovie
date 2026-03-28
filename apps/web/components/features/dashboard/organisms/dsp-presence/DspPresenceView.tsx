@@ -92,7 +92,7 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
       );
       if (currentIndex === -1) return;
 
-      let nextIndex = currentIndex;
+      let nextIndex: number;
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         nextIndex = Math.min(currentIndex + 1, cards.length - 1);
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
@@ -102,9 +102,7 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
       }
 
       e.preventDefault();
-      const nextCard =
-        cards[nextIndex]?.querySelector<HTMLElement>('[tabindex="0"]');
-      nextCard?.focus();
+      cards[nextIndex]?.focus();
 
       // Update sidebar selection if open
       if (selectedMatchId !== null && data.items[nextIndex]) {

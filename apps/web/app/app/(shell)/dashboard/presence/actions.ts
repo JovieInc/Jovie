@@ -27,6 +27,7 @@ export interface DspPresenceItem {
   readonly confidenceBreakdown: DspMatchConfidenceBreakdown | null;
   readonly matchingIsrcCount: number;
   readonly status: DspMatchStatus;
+  readonly matchSource: string | null;
   readonly confirmedAt: string | null;
 }
 
@@ -67,6 +68,7 @@ export async function loadDspPresence(): Promise<DspPresenceData> {
             confidenceBreakdown: dspArtistMatches.confidenceBreakdown,
             matchingIsrcCount: dspArtistMatches.matchingIsrcCount,
             status: dspArtistMatches.status,
+            matchSource: dspArtistMatches.matchSource,
             confirmedAt: dspArtistMatches.confirmedAt,
           })
           .from(dspArtistMatches)
@@ -88,6 +90,7 @@ export async function loadDspPresence(): Promise<DspPresenceData> {
       confidenceBreakdown: match.confidenceBreakdown,
       matchingIsrcCount: match.matchingIsrcCount,
       status: match.status as DspMatchStatus,
+      matchSource: match.matchSource,
       confirmedAt: match.confirmedAt?.toISOString() ?? null,
     }));
 

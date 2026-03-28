@@ -144,7 +144,7 @@ export function AddPlatformDialog({
             <Button
               variant='primary'
               size='sm'
-              disabled={!selectedProvider || !url || !artistName || isPending}
+              disabled={!url || !artistName || isPending}
               onClick={handleSubmit}
             >
               {isPending ? 'Adding...' : 'Add Platform'}

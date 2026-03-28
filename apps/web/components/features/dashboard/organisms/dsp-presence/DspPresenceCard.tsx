@@ -25,7 +25,7 @@ export function DspPresenceCard({
   onClick,
 }: DspPresenceCardProps) {
   const label = PROVIDER_LABELS[item.providerId];
-  const isManual = item.confidenceScore === null;
+  const isManual = item.matchSource === 'manual';
 
   return (
     <ContentSurfaceCard

@@ -10,7 +10,7 @@
 
 import 'server-only';
 
-import { and, sql as drizzleSql, eq, ne } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, isNull, ne, or } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { type DbOrTransaction, db } from '@/lib/db';
@@ -159,7 +159,7 @@ async function storeMatch(
   providerId: DspProviderId,
   match: ScoredArtistMatch,
   status: DspMatchStatus
-): Promise<string> {
+): Promise<string | null> {
   const now = new Date();
 
   const [result] = await tx
@@ -213,11 +213,14 @@ async function storeMatch(
         matchSource: 'isrc_discovery',
         updatedAt: now,
       },
-      where: ne(dspArtistMatches.matchSource, 'manual'),
+      where: or(
+        isNull(dspArtistMatches.matchSource),
+        ne(dspArtistMatches.matchSource, 'manual')
+      ),
     })
     .returning({ id: dspArtistMatches.id });
 
-  return result.id;
+  return result?.id ?? null;
 }
 
 // ============================================================================
@@ -374,8 +377,9 @@ async function discoverAppleMusicMatch(
     status
   );
 
-  // If auto-confirmed, update the creator profile and enqueue release enrichment
-  if (status === 'auto_confirmed') {
+  // If auto-confirmed and upsert succeeded (not blocked by manual match),
+  // update the creator profile and enqueue release enrichment
+  if (status === 'auto_confirmed' && matchId) {
     await tx
       .update(creatorProfiles)
       .set({ appleMusicId: matchingResult.bestMatch.externalArtistId })
@@ -497,7 +501,7 @@ async function discoverDeezerMatch(
     matchingResult.bestMatch,
     status
   );
-  if (status === 'auto_confirmed') {
+  if (status === 'auto_confirmed' && matchId) {
     await tx
       .update(creatorProfiles)
       .set({ deezerId: matchingResult.bestMatch.externalArtistId })

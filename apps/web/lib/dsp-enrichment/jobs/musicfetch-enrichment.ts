@@ -10,7 +10,7 @@
 
 import 'server-only';
 
-import { sql as drizzleSql, eq, ne } from 'drizzle-orm';
+import { sql as drizzleSql, eq, isNull, ne, or } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { type DbOrTransaction, db as plainDb } from '@/lib/db';
@@ -335,7 +335,10 @@ async function seedPresenceFromMusicFetch(
             externalArtistImageUrl: artistData.image?.url ?? null,
             updatedAt: now,
           },
-          where: ne(dspArtistMatches.matchSource, 'manual'),
+          where: or(
+            isNull(dspArtistMatches.matchSource),
+            ne(dspArtistMatches.matchSource, 'manual')
+          ),
         });
       seeded++;
       seededProviderIds.add(dspEntry.key);
@@ -399,7 +402,10 @@ async function seedPresenceFromMusicFetch(
             externalArtistImageUrl: artistData.image?.url ?? null,
             updatedAt: now,
           },
-          where: ne(dspArtistMatches.matchSource, 'manual'),
+          where: or(
+            isNull(dspArtistMatches.matchSource),
+            ne(dspArtistMatches.matchSource, 'manual')
+          ),
         });
       seeded++;
     } catch (error) {
