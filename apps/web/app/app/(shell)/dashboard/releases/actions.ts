@@ -74,6 +74,7 @@ import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { slugify } from '@/lib/utils';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
+import { targetPlaylistsSchema } from '@/lib/validation/schemas/dashboard/profile';
 import { getDashboardData } from '../actions';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
@@ -209,6 +210,7 @@ function mapReleaseToViewModel(
       release.genres && release.genres.length > 0
         ? release.genres
         : extractGenres(release.metadata),
+    targetPlaylists: release.targetPlaylists ?? [],
     copyrightLine: release.copyrightLine ?? null,
     distributor: release.distributor ?? null,
     canvasStatus: getCanvasStatusFromMetadata(release.metadata),
@@ -415,11 +417,11 @@ export async function resetProviderOverride(params: {
   }
 }
 
-export async function saveReleaseLyrics(params: {
-  profileId: string;
-  releaseId: string;
-  lyrics: string;
-}): Promise<ReleaseViewModel> {
+/** Shared auth/ownership check, DB update, cache invalidation, and view-model return for release mutations. */
+async function mutateRelease(
+  params: { profileId: string; releaseId: string },
+  applyUpdate: (releaseId: string, profileId: string) => Promise<void>
+): Promise<ReleaseViewModel> {
   noStore();
 
   const { userId } = await getCachedAuth();
@@ -437,20 +439,7 @@ export async function saveReleaseLyrics(params: {
     throw new TypeError('Release not found');
   }
 
-  const metadata = (release.metadata as Record<string, unknown> | null) ?? {};
-
-  await db
-    .update(discogReleases)
-    .set({
-      metadata: { ...metadata, lyrics: params.lyrics },
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(discogReleases.id, params.releaseId),
-        eq(discogReleases.creatorProfileId, profile.id)
-      )
-    );
+  await applyUpdate(params.releaseId, profile.id);
 
   const updated = await getReleaseById(params.releaseId);
   if (!updated) {
@@ -458,10 +447,7 @@ export async function saveReleaseLyrics(params: {
   }
 
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
-  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
-  // Query, and a path revalidation resets client-side state (closing the sidebar).
 
   return mapReleaseToViewModel(
     updated,
@@ -471,68 +457,74 @@ export async function saveReleaseLyrics(params: {
   );
 }
 
+/** Update columns on a release row, scoped to owner. */
+async function updateReleaseColumns(
+  releaseId: string,
+  profileId: string,
+  values: Partial<typeof discogReleases.$inferInsert>
+) {
+  await db
+    .update(discogReleases)
+    .set({ ...values, updatedAt: new Date() })
+    .where(
+      and(
+        eq(discogReleases.id, releaseId),
+        eq(discogReleases.creatorProfileId, profileId)
+      )
+    );
+}
+
+export async function saveReleaseLyrics(params: {
+  profileId: string;
+  releaseId: string;
+  lyrics: string;
+}): Promise<ReleaseViewModel> {
+  return mutateRelease(params, async (releaseId, profileId) => {
+    const release = await getReleaseById(releaseId);
+    const metadata =
+      (release?.metadata as Record<string, unknown> | null) ?? {};
+    await updateReleaseColumns(releaseId, profileId, {
+      metadata: { ...metadata, lyrics: params.lyrics },
+    });
+  });
+}
+
+export async function saveReleaseTargetPlaylists(params: {
+  profileId: string;
+  releaseId: string;
+  targetPlaylists: string[];
+}): Promise<ReleaseViewModel> {
+  return mutateRelease(params, async (releaseId, profileId) => {
+    const parsed = targetPlaylistsSchema.parse(params.targetPlaylists);
+    const validated = parsed ?? [];
+    await updateReleaseColumns(releaseId, profileId, {
+      targetPlaylists: validated.length > 0 ? validated : null,
+    });
+  });
+}
+
 export async function saveCanvasStatus(params: {
   profileId: string;
   releaseId: string;
   status: CanvasStatus;
 }): Promise<ReleaseViewModel> {
-  noStore();
+  return mutateRelease(params, async (releaseId, profileId) => {
+    const release = await getReleaseById(releaseId);
+    const metadata =
+      (release?.metadata as Record<string, unknown> | null) ?? {};
+    const nextMetadata: Record<string, unknown> = {
+      ...metadata,
+      ...buildCanvasMetadata(params.status),
+    };
 
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
+    if (params.status === 'not_set') {
+      delete nextMetadata.canvasVideoUrl;
+    }
 
-  const profile = await requireProfile();
-  if (profile.id !== params.profileId) {
-    throw new TypeError('Profile mismatch');
-  }
-
-  const release = await getReleaseById(params.releaseId);
-  if (release?.creatorProfileId !== profile.id) {
-    throw new TypeError('Release not found');
-  }
-
-  const metadata = (release.metadata as Record<string, unknown> | null) ?? {};
-  const nextMetadata: Record<string, unknown> = {
-    ...metadata,
-    ...buildCanvasMetadata(params.status),
-  };
-
-  if (params.status === 'not_set') {
-    delete nextMetadata.canvasVideoUrl;
-  }
-
-  await db
-    .update(discogReleases)
-    .set({
+    await updateReleaseColumns(releaseId, profileId, {
       metadata: nextMetadata,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(discogReleases.id, params.releaseId),
-        eq(discogReleases.creatorProfileId, profile.id)
-      )
-    );
-
-  const updated = await getReleaseById(params.releaseId);
-  if (!updated) {
-    throw new TypeError('Release not found');
-  }
-
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-
-  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
-  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
-  // Query, and a path revalidation resets client-side state (closing the sidebar).
-
-  return mapReleaseToViewModel(
-    updated,
-    buildProviderLabels(),
-    profile.id,
-    profile.handle
-  );
+    });
+  });
 }
 
 export async function formatReleaseLyrics(params: {

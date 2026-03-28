@@ -103,6 +103,10 @@ vi.mock('@/lib/queries', () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
+  useSaveReleaseTargetPlaylistsMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
   useFormatReleaseLyricsMutation: () => ({
     mutateAsync: vi.fn(),
     isPending: false,

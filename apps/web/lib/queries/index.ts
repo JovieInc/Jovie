@@ -451,6 +451,7 @@ export {
   useSaveCanvasStatusMutation,
   useSaveProviderOverrideMutation,
   useSaveReleaseLyricsMutation,
+  useSaveReleaseTargetPlaylistsMutation,
   useSyncReleasesFromSpotifyMutation,
 } from './useReleaseMutations';
 // Release queries and mutations

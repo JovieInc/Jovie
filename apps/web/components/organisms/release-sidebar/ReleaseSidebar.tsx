@@ -61,6 +61,7 @@ import { ReleaseMetadata } from './ReleaseMetadata';
 import { ReleasePitchSection } from './ReleasePitchSection';
 import { useReleaseHeaderParts } from './ReleaseSidebarHeader';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
+import { ReleaseTargetPlaylistsSection } from './ReleaseTargetPlaylistsSection';
 import { ReleaseTrackList } from './ReleaseTrackList';
 import { TrackDetailPanel, type TrackForDetail } from './TrackDetailPanel';
 import type { Release, ReleaseSidebarProps } from './types';
@@ -390,6 +391,7 @@ export function ReleaseSidebar({
   onRemoveDspLink,
   onRescanIsrc,
   isRescanningIsrc = false,
+  onSaveTargetPlaylists,
   onSaveLyrics,
   onFormatLyrics,
   isLyricsSaving = false,
@@ -747,6 +749,25 @@ export function ReleaseSidebar({
                     tracksOverride={tracksOverride}
                     showHeading={false}
                   />
+                  {isEditable && (
+                    <ReleaseSettingsCard
+                      allowDownloads={allowDownloads}
+                      onToggleArtworkDownloads={onToggleArtworkDownloads}
+                    />
+                  )}
+                  <ReleaseTargetPlaylistsSection
+                    key={release.id}
+                    releaseId={release.id}
+                    targetPlaylists={release.targetPlaylists}
+                    onSave={readOnly ? undefined : onSaveTargetPlaylists}
+                    readOnly={readOnly}
+                  />
+                  {!readOnly && (
+                    <ReleasePitchSection
+                      releaseId={release.id}
+                      existingPitches={release.generatedPitches}
+                    />
+                  )}
                 </div>
               </DrawerSurfaceCard>
             )}
