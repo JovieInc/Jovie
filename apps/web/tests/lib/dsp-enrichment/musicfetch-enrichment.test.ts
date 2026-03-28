@@ -181,6 +181,7 @@ vi.mock('@/lib/db/schema/profiles', () => ({
 
 vi.mock('drizzle-orm', () => ({
   eq: vi.fn((...args: unknown[]) => ({ type: 'eq', args })),
+  ne: vi.fn((...args: unknown[]) => ({ type: 'ne', args })),
   sql: Object.assign(
     (strings: TemplateStringsArray, ...values: unknown[]) => ({
       strings,

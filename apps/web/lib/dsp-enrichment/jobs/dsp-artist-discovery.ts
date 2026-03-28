@@ -10,7 +10,7 @@
 
 import 'server-only';
 
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, ne } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { type DbOrTransaction, db } from '@/lib/db';
@@ -213,6 +213,7 @@ async function storeMatch(
         matchSource: 'isrc_discovery',
         updatedAt: now,
       },
+      where: ne(dspArtistMatches.matchSource, 'manual'),
     })
     .returning({ id: dspArtistMatches.id });
 
