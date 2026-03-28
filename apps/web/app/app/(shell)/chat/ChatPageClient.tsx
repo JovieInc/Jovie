@@ -107,6 +107,7 @@ export function ChatPageClient({
     creatorProfiles,
     needsOnboarding,
     dashboardLoadError,
+    isFirstSession: dashboardIsFirstSession,
   } = useDashboardData();
   const { setPreviewData } = usePreviewPanelData();
   const { open: openPreviewPanel } = usePreviewPanelState();
@@ -628,7 +629,7 @@ export function ChatPageClient({
           displayName={activeProfile.displayName ?? undefined}
           avatarUrl={activeProfile.avatarUrl}
           username={activeProfile.username ?? undefined}
-          isFirstSession={isFirstSession}
+          isFirstSession={isFirstSession || dashboardIsFirstSession || false}
         />
       </ChatWorkspaceSurface>
     </ErrorBoundary>

@@ -492,7 +492,7 @@ jobs:
     name: PR Ready
     # Single merge gate for PRs and merge queue.
     # Gates on fast checks (typecheck, lint, guardrails), unit tests, and public-route build.
-    needs: [ci-fast, ci-unit-tests, ci-build-public]
+    needs: [ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -502,9 +502,11 @@ jobs:
           FAST_RESULT="${{ needs.ci-fast.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_RESULT="${{ needs.ci-build-public.result }}"
+          DASHBOARD_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-dashboard-pr.result }}"
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
+          echo "ci-lighthouse-dashboard-pr: $DASHBOARD_LIGHTHOUSE_RESULT"
 
           # ci-fast must succeed (or be skipped when path-gated with no app files changed)
           if [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
@@ -521,6 +523,11 @@ jobs:
           # Build must succeed. Only skipped for fork PRs (no secrets).
           if [[ "$BUILD_RESULT" != "success" && "$BUILD_RESULT" != "skipped" ]]; then
             echo "❌ ci-build-public did not pass (result: $BUILD_RESULT)"
+            exit 1
+          fi
+
+          if [[ "$DASHBOARD_LIGHTHOUSE_RESULT" != "success" && "$DASHBOARD_LIGHTHOUSE_RESULT" != "skipped" ]]; then
+            echo "❌ ci-lighthouse-dashboard-pr did not pass (result: $DASHBOARD_LIGHTHOUSE_RESULT)"
             exit 1
           fi
 
@@ -724,6 +731,105 @@ jobs:
           kill $SERVER_PID 2>/dev/null || true
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+
+  ci-lighthouse-dashboard-pr:
+    name: Lighthouse (dashboard PR)
+    needs: [ci-fast, ci-path-changes]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Check for relevant changes
+        id: check_changes
+        shell: bash
+        run: |
+          RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
+          RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
+          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]]; then
+            echo "run_full_ci=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_full_ci=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true'
+        run: echo "Skipping dashboard Lighthouse — no dashboard-relevant paths changed."
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+
+      - name: Cache Playwright Browsers
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+
+      - name: Build app for dashboard Lighthouse
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web run build
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+      - name: Run authenticated dashboard Lighthouse
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          cd apps/web
+
+          if [ -n "${E2E_CLERK_USER_ID:-}" ]; then
+            export E2E_USE_TEST_AUTH_BYPASS=1
+            export NEXT_PUBLIC_CLERK_MOCK=1
+            export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
+          fi
+
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "Standalone server not found — dashboard Lighthouse cannot start."
+            exit 1
+          fi
+
+          node .next/standalone/apps/web/server.js &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+
+          echo "Waiting for standalone server..."
+          SERVER_READY=false
+          for i in {1..30}; do
+            if curl -s http://localhost:3000 > /dev/null; then
+              SERVER_READY=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$SERVER_READY" = "false" ]; then
+            echo "Server failed to start within 30s."
+            exit 1
+          fi
+
+          pnpm run test:lighthouse:dashboard:pr
+        env:
+          BASE_URL: http://localhost:3000
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          URL_ENCRYPTION_KEY: ${{ secrets.URL_ENCRYPTION_KEY }}
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
 
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
@@ -2029,6 +2135,7 @@ jobs:
       - ci-build-public
       - ci-layout-guard
       - ci-lighthouse-pr
+      - ci-lighthouse-dashboard-pr
       - ci-a11y
     runs-on: ubuntu-latest
     timeout-minutes: 5
