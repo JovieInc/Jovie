@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.89] - 2026-03-28
+
+### Removed
+
+- Deprecated `/autopilot`, `/orchestrate`, and `/swarm` agent-dispatch skills (replaced by Conductor workspaces)
+- `.claude/skills/parallel-agents.md` (duplicate of swarm)
+
+### Changed
+
+- `/drain` Phase 3 rewritten to be self-contained instead of delegating to `/orchestrate`
+
 ## [26.4.88] - 2026-03-28
 
 ### Added
