@@ -155,8 +155,9 @@ export const getBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
   let entries: Dirent[];
   try {
     entries = await fs.readdir(BLOG_DIRECTORY, { withFileTypes: true });
-  } catch {
-    return [];
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
   }
 
   const slugs = entries
@@ -195,8 +196,9 @@ export const getBlogPostSlugs = cache(async (): Promise<string[]> => {
   let entries: Dirent[];
   try {
     entries = await fs.readdir(BLOG_DIRECTORY, { withFileTypes: true });
-  } catch {
-    return [];
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
   }
   return entries
     .filter(entry => entry.isFile() && entry.name.endsWith('.md'))

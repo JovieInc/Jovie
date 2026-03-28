@@ -74,8 +74,14 @@ export async function GET() {
   let userId: string | null;
   try {
     ({ userId } = await auth());
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  } catch (error) {
+    // Clerk throws when middleware didn't run (e.g., matcher misconfiguration).
+    // Return 401 for that case, but let unexpected errors propagate to Sentry.
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('clerkMiddleware')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    throw error;
   }
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
