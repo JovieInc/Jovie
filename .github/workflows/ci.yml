@@ -90,7 +90,7 @@ jobs:
           echo "has_code_changes=true" >> $GITHUB_OUTPUT
 
           # Build paths
-          BUILD_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|package.*\.json|turbo\.json)'
+          BUILD_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|apps/web/instrumentation.*\.ts|apps/web/sentry\..*\.config\.ts|apps/web/middleware\.ts|package.*\.json|turbo\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$BUILD_PATTERN"; then
             echo "run_build=true" >> $GITHUB_OUTPUT
           else
@@ -696,7 +696,7 @@ jobs:
 
           if [ ! -f .next/standalone/apps/web/server.js ]; then
             echo "Standalone server not found — build may not have produced standalone output"
-            exit 0
+            exit 1
           fi
 
           node .next/standalone/apps/web/server.js &
@@ -716,10 +716,10 @@ jobs:
           if [ "$SERVER_READY" = "false" ]; then
             echo "Server failed to start within 30s. Skipping Lighthouse."
             kill $SERVER_PID 2>/dev/null || true
-            exit 0
+            exit 1
           fi
 
-          pnpm exec lhci autorun --config=.lighthouserc.pr.json || echo "Lighthouse thresholds not met (informational)"
+          pnpm exec lhci autorun --config=.lighthouserc.pr.json
 
           kill $SERVER_PID 2>/dev/null || true
         env:

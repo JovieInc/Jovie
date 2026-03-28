@@ -498,9 +498,9 @@ The gstack skill pipeline handles verification. The standard agent workflow is:
 
 ### Branch Hygiene
 
-- Always rebase on develop before pushing (not merge)
-- Follow the branch strategy: `feature/* -> develop -> preview -> production`
-- If a PR has been open >24h without progress, close it and re-create from fresh develop
+- Always rebase on main before pushing (not merge)
+- Follow the branch strategy: `feature/* -> main` (CI deploys to staging, then promotes to production)
+- If a PR has been open >24h without progress, close it and re-create from fresh main
 
 ### Incremental Shipping (Ship Fast, Fail Fast)
 
@@ -840,7 +840,7 @@ All API routes run on **Node.js runtime** (the Next.js default). Do not use Edge
 **Typecheck Gate (Mandatory):**
 - **ALWAYS** run `pnpm turbo typecheck` before pushing any branch or creating a PR
 - If typecheck fails, fix all errors before pushing — do not push with known type errors
-- Use `/verify` or `/ship` commands which include typecheck as part of their validation
+- Use `/ship` which includes typecheck as part of its validation
 - The CI pipeline will block merges on type errors, but catching them locally is faster and prevents wasted CI cycles
 
 **Null Safety for String Methods:**

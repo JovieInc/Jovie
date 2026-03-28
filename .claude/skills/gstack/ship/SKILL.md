@@ -1428,7 +1428,10 @@ First, check if a PR already exists for this branch:
 gh pr view --json number,state,isDraft,url 2>/dev/null
 ```
 
-**If a draft PR exists** (isDraft == true):
+**If the PR is CLOSED or MERGED** (state == "CLOSED" or state == "MERGED"):
+Treat this as "no PR exists" — create a new PR (see below).
+
+**If a draft PR exists** (state == "OPEN" and isDraft == true):
 1. Update the PR title and body with the standard ship template (see body format below).
 2. Mark it ready for review:
    ```bash
@@ -1437,7 +1440,7 @@ gh pr view --json number,state,isDraft,url 2>/dev/null
    ```
 3. Output the PR URL.
 
-**If a non-draft PR already exists** (isDraft == false):
+**If a non-draft PR already exists** (state == "OPEN" and isDraft == false):
 1. Update the body if needed:
    ```bash
    gh pr edit <number> --body "<standard body below>"
@@ -1453,7 +1456,7 @@ gh pr view --json number,state,isDraft,url 2>/dev/null
 
 **Standard PR body format** (used for both create and edit):
 
-```
+```markdown
 ## Summary
 <bullet points from CHANGELOG>
 
