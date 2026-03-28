@@ -125,6 +125,7 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 vi.mock('@/lib/ingestion/jobs', () => ({
+  fireDspDiscovery: vi.fn(),
   enqueueDspArtistDiscoveryJob: vi.fn(),
   enqueueDspTrackEnrichmentJob: vi.fn(),
   enqueueMusicFetchEnrichmentJob: vi.fn(),

@@ -12,8 +12,8 @@ import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { isAllowedAvatarHostname } from '@/lib/images/avatar-hosts';
 import {
-  enqueueDspArtistDiscoveryJob,
   enqueueMusicFetchEnrichmentJob,
+  fireDspDiscovery,
 } from '@/lib/ingestion/jobs';
 import { sendVerificationApprovedEmail } from '@/lib/verification/notifications';
 
@@ -178,13 +178,9 @@ export async function bulkRerunCreatorIngestionAction(
 
         // Enqueue DSP artist discovery alongside MusicFetch enrichment
         if (profile.spotifyId) {
-          void enqueueDspArtistDiscoveryJob({
+          fireDspDiscovery({
             creatorProfileId: profile.id,
             spotifyArtistId: profile.spotifyId,
-            targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
-          }).catch(_error => {
-            // Fire-and-forget: MusicFetch is the primary job;
-            // discovery failures here are non-critical for the bulk operation.
           });
         }
 

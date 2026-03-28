@@ -47,6 +47,16 @@ vi.mock('next/cache', () => ({
 vi.mock('@/lib/ingestion/jobs', () => ({
   enqueueMusicFetchEnrichmentJob: mockEnqueueMusicFetchEnrichmentJob,
   enqueueDspArtistDiscoveryJob: mockEnqueueDspArtistDiscoveryJob,
+  fireDspDiscovery: (params: {
+    creatorProfileId: string;
+    spotifyArtistId: string;
+  }) => {
+    void mockEnqueueDspArtistDiscoveryJob({
+      creatorProfileId: params.creatorProfileId,
+      spotifyArtistId: params.spotifyArtistId,
+      targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
+    }).catch(() => {});
+  },
 }));
 
 vi.mock('@/constants/routes', () => ({

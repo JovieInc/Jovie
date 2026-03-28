@@ -53,9 +53,9 @@ import { processReleaseEnrichmentJobStandalone } from '@/lib/dsp-enrichment/jobs
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import {
-  enqueueDspArtistDiscoveryJob,
   enqueueDspTrackEnrichmentJob,
   enqueueMusicFetchEnrichmentJob,
+  fireDspDiscovery,
 } from '@/lib/ingestion/jobs';
 import type { LyricsFormat } from '@/lib/lyrics';
 import { formatLyrics } from '@/lib/lyrics';
@@ -621,20 +621,19 @@ export async function refreshRelease(params: { releaseId: string }): Promise<{
     });
 
     // Re-trigger DSP artist discovery to pick up new ISRCs from the sync
-    void enqueueDspArtistDiscoveryJob({
+    fireDspDiscovery({
       creatorProfileId: profile.id,
       spotifyArtistId: profile.spotifyId,
-      targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
-    }).catch(error => {
-      void captureError(
-        'DSP artist discovery enqueue failed on refresh',
-        error,
-        {
-          action: 'refreshRelease',
-          creatorProfileId: profile.id,
-          releaseId: params.releaseId,
-        }
-      );
+      onError: error =>
+        void captureError(
+          'DSP artist discovery enqueue failed on refresh',
+          error,
+          {
+            action: 'refreshRelease',
+            creatorProfileId: profile.id,
+            releaseId: params.releaseId,
+          }
+        ),
     });
   }
 
@@ -908,15 +907,15 @@ export async function syncFromSpotify(): Promise<{
     });
 
     // Re-trigger DSP artist discovery on resync to pick up new ISRCs
-    void enqueueDspArtistDiscoveryJob({
+    fireDspDiscovery({
       creatorProfileId: profile.id,
       spotifyArtistId: profile.spotifyId,
-      targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
-    }).catch(error => {
-      void captureError('DSP artist discovery enqueue failed on sync', error, {
-        action: 'syncFromSpotify',
-        creatorProfileId: profile.id,
-      });
+      onError: error =>
+        void captureError(
+          'DSP artist discovery enqueue failed on sync',
+          error,
+          { action: 'syncFromSpotify', creatorProfileId: profile.id }
+        ),
     });
 
     // Re-trigger MusicFetch enrichment to discover cross-platform DSP profiles
@@ -1295,16 +1294,15 @@ export async function connectSpotifyArtist(params: {
       });
 
       // Auto-trigger DSP artist discovery
-      void enqueueDspArtistDiscoveryJob({
+      fireDspDiscovery({
         creatorProfileId: profile.id,
         spotifyArtistId: params.spotifyArtistId,
-        targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
-      }).catch(err => {
-        void captureError(
-          'DSP artist discovery enqueue failed on connect',
-          err,
-          { action: 'connectSpotifyArtist', creatorProfileId: profile.id }
-        );
+        onError: err =>
+          void captureError(
+            'DSP artist discovery enqueue failed on connect',
+            err,
+            { action: 'connectSpotifyArtist', creatorProfileId: profile.id }
+          ),
       });
 
       // Auto-trigger MusicFetch enrichment
