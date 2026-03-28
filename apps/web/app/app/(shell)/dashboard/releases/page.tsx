@@ -5,8 +5,6 @@ import { ReleasesExperience } from '@/features/dashboard/organisms/release-provi
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
-import { HydrateClient } from '@/lib/queries';
-import { getDehydratedState } from '@/lib/queries/server';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardDataEssential } from '../actions';
 import {
@@ -36,13 +34,11 @@ export default async function ReleasesPage() {
   }
 
   return (
-    <HydrateClient state={getDehydratedState()}>
-      <ReleasesClientBoundary>
-        <Suspense fallback={<ReleaseTableSkeleton />}>
-          <ReleasesContent />
-        </Suspense>
-      </ReleasesClientBoundary>
-    </HydrateClient>
+    <ReleasesClientBoundary>
+      <Suspense fallback={<ReleaseTableSkeleton />}>
+        <ReleasesContent />
+      </Suspense>
+    </ReleasesClientBoundary>
   );
 }
 

@@ -8,8 +8,15 @@ import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { getUserBanStatus } from '@/lib/auth/ban-check';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
+import ChatLoading from './chat/loading';
 import { DashboardShellContent } from './DashboardShellContent';
 import { DashboardShellSkeleton } from './DashboardShellSkeleton';
+import { ReleaseTableSkeleton } from './dashboard/releases/loading';
+import {
+  isChatShellRoute,
+  isReleasesShellRoute,
+  resolveAppShellRequestPath,
+} from './shell-route-matches';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -28,6 +35,15 @@ export default async function AppShellLayout({
       const headerStore = await headers();
       redirect(buildAppShellSignInUrl(headerStore));
     }
+    const headerStore = await headers();
+    const pathname = resolveAppShellRequestPath(headerStore.get('next-url'));
+    const shellFallback = isChatShellRoute(pathname) ? (
+      <ChatLoading />
+    ) : isReleasesShellRoute(pathname) ? (
+      <ReleaseTableSkeleton />
+    ) : (
+      <DashboardShellSkeleton />
+    );
 
     // Ban check — the proxy skips user state for /app/* routes (proxy.ts:581-585),
     // so we check here. Renders the generic unavailable page inline to avoid
@@ -37,10 +53,10 @@ export default async function AppShellLayout({
       return <UnavailablePage />;
     }
 
-    // Stream the shell: the skeleton renders at first byte while
+    // Stream the shell: the route-aware skeleton renders at first byte while
     // DashboardShellContent resolves dashboard data + feature flags.
     return (
-      <Suspense fallback={<DashboardShellSkeleton />}>
+      <Suspense fallback={shellFallback}>
         <DashboardShellContent userId={auth.userId}>
           {children}
         </DashboardShellContent>
