@@ -685,8 +685,15 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+          PR_AUTHOR=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER --jq '.user.login')
+          APPROVER=$(gh api user --jq '.login')
 
-          echo "All gates passed. Auto-approving PR #$PR_NUMBER"
+          if [[ "$PR_AUTHOR" == "$APPROVER" ]]; then
+            echo "Skipping auto-approval for PR #$PR_NUMBER because approver '$APPROVER' matches PR author."
+            exit 0
+          fi
+
+          echo "All gates passed. Auto-approving PR #$PR_NUMBER as '$APPROVER'"
 
           # Submit approval review
           gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
