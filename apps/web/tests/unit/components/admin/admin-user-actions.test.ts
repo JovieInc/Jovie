@@ -36,11 +36,13 @@ function makeCallbacks(): BuildAdminUserActionsCallbacks {
     onCopyEmail: vi.fn(),
     onCopyUserId: vi.fn(),
     onOpenInClerk: vi.fn(),
+    onBanUser: vi.fn(),
+    onUnbanUser: vi.fn(),
   };
 }
 
 describe('buildAdminUserActions', () => {
-  it('returns copy actions for a user with email and clerkId', () => {
+  it('returns copy actions, external link, and moderation for active user', () => {
     const user = makeUser();
     const callbacks = makeCallbacks();
     const items = buildAdminUserActions(user, callbacks);
@@ -48,13 +50,42 @@ describe('buildAdminUserActions', () => {
     const actionItems = items.filter(
       item => 'id' in item && item.id !== undefined
     );
-    expect(actionItems).toHaveLength(4);
     expect(actionItems.map(i => ('id' in i ? i.id : null))).toEqual([
       'copy-clerk-id',
       'copy-email',
       'copy-user-id',
       'open-in-clerk',
+      'suspend-user',
     ]);
+  });
+
+  it('shows restore action for banned user', () => {
+    const user = makeUser({ userStatus: 'banned' });
+    const callbacks = makeCallbacks();
+    const items = buildAdminUserActions(user, callbacks);
+
+    const actionItems = items.filter(
+      item => 'id' in item && item.id !== undefined
+    );
+    expect(actionItems.map(i => ('id' in i ? i.id : null))).toContain(
+      'restore-user'
+    );
+    expect(actionItems.map(i => ('id' in i ? i.id : null))).not.toContain(
+      'suspend-user'
+    );
+  });
+
+  it('shows restore action for suspended user', () => {
+    const user = makeUser({ userStatus: 'suspended' });
+    const callbacks = makeCallbacks();
+    const items = buildAdminUserActions(user, callbacks);
+
+    const actionItems = items.filter(
+      item => 'id' in item && item.id !== undefined
+    );
+    expect(actionItems.map(i => ('id' in i ? i.id : null))).toContain(
+      'restore-user'
+    );
   });
 
   it('disables copy email when user has no email', () => {
@@ -69,7 +100,7 @@ describe('buildAdminUserActions', () => {
     expect('disabled' in copyEmail! && copyEmail.disabled).toBe(true);
   });
 
-  it('omits Open in Clerk when clerkId is empty', () => {
+  it('omits Open in Clerk when clerkId is empty but keeps moderation', () => {
     const user = makeUser({ clerkId: '' });
     const callbacks = makeCallbacks();
     const items = buildAdminUserActions(user, callbacks);
@@ -79,14 +110,14 @@ describe('buildAdminUserActions', () => {
     );
     expect(openInClerk).toBeUndefined();
 
-    // Should also have no separator
+    // Should have one separator (before moderation group)
     const separators = items.filter(
       item => 'type' in item && item.type === 'separator'
     );
-    expect(separators).toHaveLength(0);
+    expect(separators).toHaveLength(1);
   });
 
-  it('includes separator before Open in Clerk when clerkId is present', () => {
+  it('includes two separators when clerkId is present', () => {
     const user = makeUser({ clerkId: 'clerk_abc' });
     const callbacks = makeCallbacks();
     const items = buildAdminUserActions(user, callbacks);
@@ -94,7 +125,7 @@ describe('buildAdminUserActions', () => {
     const separators = items.filter(
       item => 'type' in item && item.type === 'separator'
     );
-    expect(separators).toHaveLength(1);
+    expect(separators).toHaveLength(2);
   });
 
   it('invokes the correct callback when onClick is called', () => {
@@ -128,5 +159,28 @@ describe('buildAdminUserActions', () => {
       openInClerk.onClick?.();
     }
     expect(callbacks.onOpenInClerk).toHaveBeenCalledWith(user);
+
+    // Find and invoke suspend-user
+    const suspendUser = items.find(
+      item => 'id' in item && item.id === 'suspend-user'
+    );
+    if (suspendUser && 'onClick' in suspendUser) {
+      suspendUser.onClick?.();
+    }
+    expect(callbacks.onBanUser).toHaveBeenCalledWith(user);
+  });
+
+  it('invokes onUnbanUser callback for banned user', () => {
+    const user = makeUser({ userStatus: 'banned' });
+    const callbacks = makeCallbacks();
+    const items = buildAdminUserActions(user, callbacks);
+
+    const restoreUser = items.find(
+      item => 'id' in item && item.id === 'restore-user'
+    );
+    if (restoreUser && 'onClick' in restoreUser) {
+      restoreUser.onClick?.();
+    }
+    expect(callbacks.onUnbanUser).toHaveBeenCalledWith(user);
   });
 });

@@ -147,7 +147,7 @@ describe('gate.ts', () => {
       const result = await resolveUserState();
 
       expect(result.state).toBe(CanonicalUserState.BANNED);
-      expect(result.redirectTo).toBe('/banned');
+      expect(result.redirectTo).toBe('/unavailable');
     });
 
     it('returns BANNED for banned status', async () => {
@@ -173,7 +173,7 @@ describe('gate.ts', () => {
       const result = await resolveUserState();
 
       expect(result.state).toBe(CanonicalUserState.BANNED);
-      expect(result.redirectTo).toBe('/banned');
+      expect(result.redirectTo).toBe('/unavailable');
     });
 
     it('returns BANNED for suspended status', async () => {
@@ -199,7 +199,7 @@ describe('gate.ts', () => {
       const result = await resolveUserState();
 
       expect(result.state).toBe(CanonicalUserState.BANNED);
-      expect(result.redirectTo).toBe('/banned');
+      expect(result.redirectTo).toBe('/unavailable');
     });
 
     it('returns NEEDS_ONBOARDING when user has no profile', async () => {
@@ -380,7 +380,9 @@ describe('gate.ts', () => {
       expect(getRedirectForState(CanonicalUserState.NEEDS_ONBOARDING)).toBe(
         '/onboarding?fresh_signup=true'
       );
-      expect(getRedirectForState(CanonicalUserState.BANNED)).toBe('/banned');
+      expect(getRedirectForState(CanonicalUserState.BANNED)).toBe(
+        '/unavailable'
+      );
       expect(getRedirectForState(CanonicalUserState.USER_CREATION_FAILED)).toBe(
         '/error/user-creation-failed'
       );
