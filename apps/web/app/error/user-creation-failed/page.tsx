@@ -8,7 +8,7 @@ export const runtime = 'nodejs';
 
 export default function UserCreationFailedPage() {
   return (
-    <div className='fixed inset-0 isolate flex flex-col items-center bg-page text-primary-token overflow-y-auto overflow-x-clip [color-scheme:dark] px-4 sm:px-6 pt-10 pb-10 sm:pt-14 sm:pb-12'>
+    <div className='fixed inset-0 isolate flex flex-col items-center bg-page text-white overflow-y-auto overflow-x-clip [color-scheme:dark] px-4 sm:px-6 pt-10 pb-10 sm:pt-14 sm:pb-12'>
       {/* Background effects — matches AuthLayout */}
       <div
         aria-hidden='true'
@@ -32,7 +32,7 @@ export default function UserCreationFailedPage() {
         </div>
 
         {/* Title */}
-        <h1 className='text-[18px] leading-[22px] font-medium text-primary-token text-center mb-6'>
+        <h1 className='text-[18px] leading-[22px] font-medium text-white text-center mb-6'>
           Account setup error
         </h1>
 
@@ -45,7 +45,7 @@ export default function UserCreationFailedPage() {
             />
           </div>
 
-          <p className='text-[13px] leading-5 text-secondary-token'>
+          <p className='text-[13px] leading-5 text-[lch(90.65%_1.35_282)]'>
             We&apos;re having trouble setting up your account. This is usually
             temporary. Our team has been notified and is working to resolve this
             issue. Please try again in a few minutes.
@@ -62,7 +62,7 @@ export default function UserCreationFailedPage() {
             </Button>
           </div>
 
-          <p className='text-[11px] uppercase tracking-[0.14em] text-tertiary-token'>
+          <p className='text-[11px] uppercase tracking-[0.14em] text-[lch(68%_1.35_282)]'>
             Error code: USER_CREATION_FAILED
           </p>
         </div>

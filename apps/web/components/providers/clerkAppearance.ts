@@ -83,6 +83,31 @@ export const clerkAppearanceBase = {
   elements: clerkBaseElements,
 } satisfies ClerkAppearance;
 
+/*
+ * Auth pages always render on a dark background (hardcoded gradient overlay).
+ * Use fixed dark-theme values so Clerk components display correctly regardless
+ * of the user's system light/dark mode. CSS custom properties in theme.css
+ * (--clerk-color-*) provide the same values for element-level overrides.
+ */
+const authClerkVariables = {
+  colorPrimary: 'var(--color-accent)',
+  colorPrimaryForeground: '#ffffff',
+  colorForeground: '#ffffff',
+  colorMutedForeground: '#e3e4e6',
+  colorBackground: '#0f1011',
+  colorInput: '#191b1f',
+  colorInputForeground: '#ffffff',
+  colorMuted: '#17171a',
+  colorBorder: 'rgba(255, 255, 255, 0.05)',
+  colorShadow: 'rgb(0 0 0 / 0.35)',
+  colorDanger: 'var(--linear-error)',
+  colorSuccess: 'var(--linear-success)',
+  colorRing: 'rgb(113 112 255 / 0.28)',
+  colorModalBackdrop: 'rgb(8 9 10 / 0.72)',
+  fontFamily: 'var(--font-sans)',
+  borderRadius: 'var(--radius-xl)',
+} as const;
+
 export const authClerkAppearance = {
   ...clerkAppearanceBase,
   theme: 'simple',
@@ -90,10 +115,6 @@ export const authClerkAppearance = {
     socialButtonsPlacement: 'top',
     socialButtonsVariant: 'blockButton',
   },
-  variables: {
-    ...clerkAppearanceVariables,
-    colorBackground: 'var(--color-bg-surface-0)',
-    colorInput: 'var(--color-bg-input)',
-  },
+  variables: authClerkVariables,
   elements: authClerkElements,
 } satisfies ClerkAppearance;
