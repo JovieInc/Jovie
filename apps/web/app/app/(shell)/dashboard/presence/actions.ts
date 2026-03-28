@@ -139,10 +139,16 @@ export async function addManualDspMatch(input: {
     redirect('/onboarding');
   }
 
+  // Normalize inputs
+  const artistName = input.artistName.trim();
+  if (!artistName) {
+    return { success: false, error: 'Artist name is required' };
+  }
+
   // Validate URL
   let parsedUrl: URL;
   try {
-    parsedUrl = new URL(input.url);
+    parsedUrl = new URL(input.url.trim());
   } catch {
     return { success: false, error: 'Invalid URL' };
   }
@@ -151,13 +157,11 @@ export async function addManualDspMatch(input: {
     return { success: false, error: 'URL must use HTTPS' };
   }
 
-  const allowedDomains = PROVIDER_DOMAINS[input.providerId];
   if (
-    !allowedDomains ||
-    !allowedDomains.some(
+    !PROVIDER_DOMAINS[input.providerId]?.some(
       domain =>
         parsedUrl.hostname === domain ||
-        parsedUrl.hostname.endsWith('.' + domain)
+        parsedUrl.hostname.endsWith(`.${domain}`)
     )
   ) {
     return {
@@ -165,6 +169,8 @@ export async function addManualDspMatch(input: {
       error: 'URL does not match the selected platform',
     };
   }
+
+  const normalizedUrl = parsedUrl.toString();
 
   try {
     // Check for existing match
@@ -211,8 +217,8 @@ export async function addManualDspMatch(input: {
           rejectedAt: null,
           rejectionReason: null,
           confirmedAt: new Date(),
-          externalArtistName: input.artistName,
-          externalArtistUrl: input.url,
+          externalArtistName: artistName,
+          externalArtistUrl: normalizedUrl,
           updatedAt: new Date(),
         })
         .where(eq(dspArtistMatches.id, existing.id));

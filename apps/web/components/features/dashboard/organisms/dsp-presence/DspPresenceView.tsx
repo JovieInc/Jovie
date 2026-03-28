@@ -81,19 +81,20 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
   // Keyboard navigation for card grid
   const gridRef = useRef<HTMLDivElement>(null);
 
-  const handleGridKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleCardKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>) => {
       if (!gridRef.current) return;
       const cards = Array.from(
         gridRef.current.querySelectorAll<HTMLElement>('button[aria-pressed]')
       );
-      const currentIndex = cards.indexOf(document.activeElement as HTMLElement);
+      const currentIndex = cards.indexOf(e.currentTarget);
       if (currentIndex === -1) return;
 
       // Compute column count from rendered grid to make vertical nav correct
       const cols =
-        window.getComputedStyle(gridRef.current).gridTemplateColumns.split(' ')
-          .length || 1;
+        globalThis
+          .getComputedStyle(gridRef.current)
+          .gridTemplateColumns.split(' ').length || 1;
 
       let nextIndex: number;
       if (e.key === 'ArrowRight') {
@@ -164,12 +165,9 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
       data-testid='dsp-presence-workspace'
     >
       <div className='flex-1 min-h-0 overflow-auto'>
-        {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: keyboard events delegate from focused card buttons */}
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: keyboard events delegate from focused card buttons */}
         <div
           ref={gridRef}
           className='grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3'
-          onKeyDown={handleGridKeyDown}
         >
           {data.items.map(item => (
             <DspPresenceCard
@@ -177,6 +175,7 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
               item={item}
               isSelected={selectedMatchId === item.matchId}
               onClick={() => handleCardClick(item)}
+              onKeyDown={handleCardKeyDown}
             />
           ))}
         </div>

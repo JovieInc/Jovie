@@ -118,7 +118,7 @@ const creatorRoutes = [
     kind: 'render',
     surface: 'creator',
     authRole: 'user',
-    contentSelector: '[data-testid^="presence-row-"]',
+    contentSelector: '[data-testid^="presence-card-"]',
     contentFallbackSelector: ':text-matches("no dsp profiles found", "i")',
     requiresUserButton: true,
     performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,

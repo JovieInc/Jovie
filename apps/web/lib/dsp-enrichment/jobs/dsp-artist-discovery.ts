@@ -624,7 +624,7 @@ async function discoverMusicBrainzMatch(
     creatorProfileId,
     status,
   });
-  if (status === 'auto_confirmed') {
+  if (status === 'auto_confirmed' && matchId) {
     await tx
       .update(creatorProfiles)
       .set({ musicbrainzId: matchingResult.bestMatch.externalArtistId })

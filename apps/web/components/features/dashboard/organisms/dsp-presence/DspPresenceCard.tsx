@@ -17,12 +17,14 @@ interface DspPresenceCardProps {
   readonly item: DspPresenceItem;
   readonly isSelected: boolean;
   readonly onClick: () => void;
+  readonly onKeyDown?: (e: React.KeyboardEvent<HTMLButtonElement>) => void;
 }
 
 export function DspPresenceCard({
   item,
   isSelected,
   onClick,
+  onKeyDown,
 }: DspPresenceCardProps) {
   const label = PROVIDER_LABELS[item.providerId];
   const isManual = item.matchSource === 'manual';
@@ -42,6 +44,7 @@ export function DspPresenceCard({
           type='button'
           className='flex-1 p-3 text-left cursor-pointer min-w-0'
           onClick={onClick}
+          onKeyDown={onKeyDown}
           aria-pressed={isSelected}
           tabIndex={0}
         >
