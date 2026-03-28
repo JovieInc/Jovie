@@ -81,6 +81,7 @@ export const APP_ROUTES = {
   ADMIN_INGEST: '/app/admin/ingest',
   ADMIN_SCREENSHOTS: '/app/admin/screenshots',
   ADMIN_RELEASES: '/app/admin/releases',
+  ADMIN_ALGORITHM_HEALTH: '/app/admin/algorithm-health',
 
   // Marketing
   DEMO: '/demo',
