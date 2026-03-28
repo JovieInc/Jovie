@@ -7,15 +7,16 @@
 
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
 export const MOCK_ARTIST = {
-  name: 'Tim White',
-  handle: 'timwhite',
-  image: '/images/avatars/tim-white.jpg',
+  name: TIM_WHITE_PROFILE.name,
+  handle: TIM_WHITE_PROFILE.handle,
+  image: TIM_WHITE_PROFILE.avatarSrc,
   isVerified: true,
 } as const;
 
