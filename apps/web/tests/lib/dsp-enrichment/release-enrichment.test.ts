@@ -379,7 +379,7 @@ describe('release-enrichment', () => {
       );
 
       expect(mockBulkLookupDeezerByIsrc).toHaveBeenCalledWith(['USRC12345678']);
-      expect(result.releasesEnriched).toBeGreaterThanOrEqual(0);
+      expect(result.releasesEnriched).toBe(1);
     });
   });
 
