@@ -66,7 +66,7 @@ export function DashboardHeaderActionButton({
         )}
       >
         {icon}
-        <span className={cn(hideLabelOnMobile && 'hidden sm:inline')}>
+        <span className={cn(hideLabelOnMobile && 'max-sm:hidden sm:inline')}>
           {label}
         </span>
       </Button>

@@ -55,8 +55,8 @@ export function DemoAudiencePanel() {
         <div className='flex items-center gap-3 border-b border-(--linear-app-frame-seam) bg-surface-0 px-4 py-1.5 text-2xs font-medium text-tertiary-token'>
           <span className='flex-1'>Name</span>
           <span className='w-14 text-center'>Intent</span>
-          <span className='hidden w-20 sm:block'>Source</span>
-          <span className='hidden w-32 md:block'>Last action</span>
+          <span className='max-sm:hidden w-20'>Source</span>
+          <span className='max-md:hidden w-32'>Last action</span>
           <span className='w-10 text-right'>Score</span>
         </div>
 
@@ -78,10 +78,10 @@ export function DemoAudiencePanel() {
                   className='mx-auto'
                 />
               </span>
-              <span className='hidden w-20 truncate text-2xs text-tertiary-token sm:block'>
+              <span className='max-sm:hidden w-20 truncate text-2xs text-tertiary-token'>
                 {member.source}
               </span>
-              <span className='hidden w-32 truncate text-2xs text-tertiary-token md:block'>
+              <span className='max-md:hidden w-32 truncate text-2xs text-tertiary-token'>
                 {member.lastAction}
               </span>
               <span className='w-10 text-right text-2xs text-secondary-token'>

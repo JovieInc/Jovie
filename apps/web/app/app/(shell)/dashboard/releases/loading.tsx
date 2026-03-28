@@ -62,7 +62,7 @@ export function ReleaseTableSkeleton() {
       </div>
 
       {/* Desktop: table layout (hidden below sm) */}
-      <div className='hidden flex-1 min-h-0 overflow-auto sm:block'>
+      <div className='max-sm:hidden flex-1 min-h-0 overflow-auto'>
         <table className='w-full border-collapse'>
           <thead className='sticky top-0 z-10 bg-(--linear-app-content-surface) shadow-inset-divider'>
             <tr className='border-b border-subtle'>
@@ -139,7 +139,7 @@ export function ReleaseTableSkeleton() {
           <LoadingSkeleton
             height='h-4'
             width='w-32'
-            className='hidden sm:block'
+            className='max-sm:hidden'
           />
           <LoadingSkeleton height='h-8' width='w-20' rounded='md' />
           <LoadingSkeleton height='h-8' width='w-8' rounded='md' />

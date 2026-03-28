@@ -111,7 +111,7 @@ export function PageHeader({
       }
       subtitle={
         description ? (
-          <span className='hidden truncate sm:block'>{description}</span>
+          <span className='max-sm:hidden truncate'>{description}</span>
         ) : undefined
       }
       actions={action}

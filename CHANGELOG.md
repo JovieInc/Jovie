@@ -5,16 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.88] - 2026-03-27
+## [26.4.88] - 2026-03-28
 
 ### Added
 
+- Tab overflow mechanism with collapse-to-dropdown behavior for drawer tabs, keeping all tabs accessible when space is constrained
+- `DashboardWorkspacePanel` shared wrapper component with toolbar slot for consistent page body structure across all 5 dashboard routes
+- `distribution` prop on TabBar and DrawerTabs to support fill-width tab distribution
 - Visual flag badge system: flagged UI regions show dashed outlines + clickable name chips when dev toolbar is active (Cmd+Shift+F to toggle)
 - `<Flagged>` wrapper component for marking feature-flagged UI regions
 - Flag badge toggle button in dev toolbar bottom bar
 
 ### Changed
 
+- Converged all 5 core dashboard surfaces (Releases, Audience, Presence, Earnings, Chat/Profile) toward Linear visual parity
+- Unified right drawer structure across all sidebars: entity card first, no duplicate title rows, consistent elevation tokens (`LINEAR_SURFACE`)
+- Presence route now uses the shared global right drawer instead of a bespoke inline side panel
+- Earnings route uses toolbar pattern instead of bespoke hero/header chrome
+- Sidebar nav states driven by design tokens instead of opacity modifiers (`/78`, `/92` removed)
+- App shell and sidebar extended to bottom edge of viewport, eliminating dead space
+- Drawer tabs fill available width where appropriate instead of undersized intrinsic pills
 - All 16 Statsig gates consolidated into `FEATURE_FLAGS` as code-level booleans, toggleable via dev toolbar
 - `useFeatureGate` replaced with `useCodeFlag` across all consumers
 - `FeatureFlagsProvider` no longer requires server-side bootstrap prop
@@ -27,6 +37,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Admin bulk creator refresh now enqueues DSP artist discovery jobs in addition to MusicFetch enrichment
 - ISRC rescan now enriches both Apple Music and Deezer releases (previously Apple Music only)
 - Added error handling for Deezer ISRC batch lookups to prevent circuit breaker errors from killing the entire enrichment job
+- Duplicate drawer title rows above entity cards in all sidebars
+- Profile identity in Chat drawer now comes from entity card, not a generic header row
+- Audience sidebar layout aligned with release/profile drawer pattern
+- Sidebar visibility broken by Tailwind v4 cascade changes
+- Hidden/responsive display patterns swept for Tailwind v4 compatibility
+- DevToolbar spacing uses CSS variable instead of body padding
+- Earnings page missing `sr-only` H1 for accessibility
+- Bottom gap padding removed from earnings page body
+- Unused import in ReleaseTableSubheader test cleaned up
 
 ### Removed
 

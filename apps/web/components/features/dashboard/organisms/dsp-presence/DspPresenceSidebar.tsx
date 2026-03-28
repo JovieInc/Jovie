@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { X } from 'lucide-react';
 import Image from 'next/image';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import type { DspPresenceItem } from '@/app/app/(shell)/dashboard/presence/actions';
@@ -8,6 +9,7 @@ import { Icon } from '@/components/atoms/Icon';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { ConfidenceBadge } from '@/features/dashboard/atoms/ConfidenceBadge';
 import {
   DspProviderIcon,
@@ -40,52 +42,69 @@ export function DspPresenceSidebar({ item, onClose }: DspPresenceSidebarProps) {
     <EntitySidebarShell
       isOpen={isOpen}
       ariaLabel={`${label} profile details`}
-      title={label}
       onClose={onClose}
       headerMode='minimal'
+      hideMinimalHeaderBar
       isEmpty={!item}
       emptyMessage='Select a platform to view details.'
-      entityHeader={item ? <SidebarEntityHeader item={item} /> : undefined}
+      entityHeader={
+        item ? <SidebarEntityHeader item={item} onClose={onClose} /> : undefined
+      }
     >
       {item && <SidebarContent item={item} />}
     </EntitySidebarShell>
   );
 }
 
-function SidebarEntityHeader({ item }: { readonly item: DspPresenceItem }) {
+function SidebarEntityHeader({
+  item,
+  onClose,
+}: {
+  readonly item: DspPresenceItem;
+  readonly onClose: () => void;
+}) {
   const label = PROVIDER_LABELS[item.providerId];
 
   return (
     <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-      <div className='border-b border-subtle px-3 py-2'>
-        <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-          DSP profile
-        </p>
-      </div>
-      <div className='flex items-center gap-2 p-3.5'>
-        {item.externalArtistImageUrl ? (
-          <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-subtle bg-surface-0'>
-            <Image
-              src={item.externalArtistImageUrl}
-              alt={item.externalArtistName ?? label}
-              fill
-              sizes='36px'
-              className='object-cover'
-              unoptimized={isExternalDspImage(item.externalArtistImageUrl)}
-            />
-          </div>
-        ) : (
-          <div className='flex h-9 w-9 items-center justify-center rounded-full border border-subtle bg-surface-0'>
-            <DspProviderIcon provider={item.providerId} size='lg' />
-          </div>
-        )}
-        <div className='min-w-0 flex-1'>
-          <div className='truncate text-[14px] font-[590] text-primary-token'>
-            {item.externalArtistName ?? 'Unknown Artist'}
-          </div>
-          <div className='mt-0.5 flex items-center gap-1.5 text-[12px] text-tertiary-token'>
-            <DspProviderIcon provider={item.providerId} size='sm' />
-            <span>{label}</span>
+      <div className='relative p-3.5'>
+        <div className='absolute right-2.5 top-2.5'>
+          <DrawerHeaderActions
+            primaryActions={[
+              {
+                id: 'close-dsp-presence',
+                label: 'Close details',
+                icon: X,
+                onClick: onClose,
+              },
+            ]}
+          />
+        </div>
+        <div className='flex items-center gap-2 pr-8'>
+          {item.externalArtistImageUrl ? (
+            <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-subtle bg-surface-0'>
+              <Image
+                src={item.externalArtistImageUrl}
+                alt={item.externalArtistName ?? label}
+                fill
+                sizes='40px'
+                className='object-cover'
+                unoptimized={isExternalDspImage(item.externalArtistImageUrl)}
+              />
+            </div>
+          ) : (
+            <div className='flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-surface-0'>
+              <DspProviderIcon provider={item.providerId} size='lg' />
+            </div>
+          )}
+          <div className='min-w-0 flex-1'>
+            <div className='truncate text-[14px] font-[590] text-primary-token'>
+              {item.externalArtistName ?? 'Unknown Artist'}
+            </div>
+            <div className='mt-0.5 flex items-center gap-1.5 text-[12px] text-tertiary-token'>
+              <DspProviderIcon provider={item.providerId} size='sm' />
+              <span>{label}</span>
+            </div>
           </div>
         </div>
       </div>

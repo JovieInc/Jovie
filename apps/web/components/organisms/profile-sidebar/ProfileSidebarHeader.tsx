@@ -1,15 +1,13 @@
 'use client';
 
-import { Check, Contact, Copy, ExternalLink, QrCode } from 'lucide-react';
+import { Contact, ExternalLink, QrCode } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { BASE_URL } from '@/constants/domains';
 import { getProfileModePath } from '@/features/profile/registry';
-import { copyToClipboard } from '@/hooks/useClipboard';
 import { downloadBlob } from '@/lib/utils/download';
 
 interface UseProfileHeaderResult {
@@ -55,33 +53,11 @@ export function useProfileHeaderParts({
   profilePath,
   onClose,
 }: Readonly<UseProfileHeaderPartsProps>): UseProfileHeaderResult {
-  const [isCopied, setIsCopied] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
-
   const resolvedProfilePath =
     profilePath.trim().length > 0
       ? profilePath
       : getProfileModePath(username, 'profile');
   const profileUrl = `${BASE_URL}${resolvedProfilePath}`;
-
-  const handleCopyUrl = async () => {
-    const copied = await copyToClipboard(profileUrl);
-    if (!copied) {
-      toast.error('Failed to copy');
-      return;
-    }
-
-    setIsCopied(true);
-    toast.success('Profile URL copied');
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
-  };
 
   const handleOpenProfile = () => {
     globalThis.open(profileUrl, '_blank', 'noopener,noreferrer');
@@ -112,18 +88,7 @@ export function useProfileHeaderParts({
     }
   };
 
-  const primaryActions: DrawerHeaderAction[] = [
-    {
-      id: 'copy',
-      label: isCopied ? 'Copied!' : 'Copy profile link',
-      icon: Copy,
-      activeIcon: Check,
-      isActive: isCopied,
-      onClick: () => {
-        void handleCopyUrl();
-      },
-    },
-  ];
+  const primaryActions: DrawerHeaderAction[] = [];
 
   const overflowActions: DrawerHeaderAction[] = [
     {

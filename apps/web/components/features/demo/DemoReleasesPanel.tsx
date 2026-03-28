@@ -181,7 +181,7 @@ export function DemoReleasesPanel({
                     )}
 
                     {/* Release ID */}
-                    <span className='hidden w-[54px] shrink-0 font-mono text-[12px] text-quaternary-token sm:block'>
+                    <span className='max-sm:hidden w-[54px] shrink-0 font-mono text-[12px] text-quaternary-token'>
                       {release.displayId}
                     </span>
 
@@ -199,7 +199,7 @@ export function DemoReleasesPanel({
                     </div>
 
                     {/* Labels */}
-                    <div className='hidden items-center gap-1 sm:flex'>
+                    <div className='max-sm:hidden items-center gap-1 sm:flex'>
                       {release.labels.slice(0, 2).map(label => (
                         <span
                           key={label.id}
@@ -215,7 +215,7 @@ export function DemoReleasesPanel({
                     </div>
 
                     {/* Type badge */}
-                    <span className='hidden shrink-0 text-2xs text-quaternary-token lg:block'>
+                    <span className='max-lg:hidden shrink-0 text-2xs text-quaternary-token'>
                       {release.type}
                     </span>
 
@@ -223,7 +223,7 @@ export function DemoReleasesPanel({
                     <DemoAvatar assignee={release.assignee} size={16} />
 
                     {/* Date */}
-                    <span className='hidden w-16 shrink-0 text-right text-[12px] text-quaternary-token xl:block'>
+                    <span className='max-xl:hidden w-16 shrink-0 text-right text-[12px] text-quaternary-token'>
                       {release.releaseDate}
                     </span>
                   </div>

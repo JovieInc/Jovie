@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DrawerTabs } from '@/components/molecules/drawer/DrawerTabs';
 
 describe('DrawerTabs', () => {
-  it('renders the tab rail as a horizontal scroller by default', () => {
+  it('renders the tab rail with collapse overflow by default', () => {
     render(
       <DrawerTabs
         value='details'
@@ -17,11 +17,9 @@ describe('DrawerTabs', () => {
     );
 
     const drawerTabs = screen.getByTestId('drawer-tabs');
-    const scroller = screen.getByTestId('drawer-tabs-scroll');
     const tablist = screen.getByRole('tablist', { name: 'Drawer tabs' });
 
-    expect(drawerTabs).toHaveAttribute('data-overflow-mode', 'scroll');
-    expect(scroller).toContainElement(tablist);
+    expect(drawerTabs).toHaveAttribute('data-overflow-mode', 'collapse');
     expect(tablist).toBeInTheDocument();
     expect(tablist).toHaveAttribute('aria-label', 'Drawer tabs');
   });
@@ -51,7 +49,7 @@ describe('DrawerTabs', () => {
     expect(onValueChange).toHaveBeenCalledWith('activity');
   });
 
-  it('renders optional tab actions outside the tablist rail', () => {
+  it('renders optional tab actions outside the tablist', () => {
     render(
       <DrawerTabs
         value='details'
@@ -65,9 +63,6 @@ describe('DrawerTabs', () => {
       />
     );
 
-    expect(screen.getByTestId('drawer-tabs-scroll')).not.toContainElement(
-      screen.getByRole('button', { name: 'Add platform' })
-    );
     expect(
       screen.getByRole('button', { name: 'Add platform' })
     ).toBeInTheDocument();
@@ -76,7 +71,7 @@ describe('DrawerTabs', () => {
     ).toContainElement(screen.getByRole('tab', { name: 'Details' }));
   });
 
-  it('keeps tabs on a single horizontal rail when labels are long', () => {
+  it('keeps tabs accessible when there are many options', () => {
     render(
       <DrawerTabs
         value='details'
@@ -93,16 +88,13 @@ describe('DrawerTabs', () => {
       />
     );
 
-    const scroller = screen.getByTestId('drawer-tabs-scroll');
     const tablist = screen.getByRole('tablist', {
       name: 'Release drawer tabs',
     });
     const actionsButton = screen.getByRole('button', { name: 'Add platform' });
-    const tasksTab = screen.getByTestId('drawer-tab-tasks');
 
-    expect(scroller).toContainElement(tablist);
-    expect(scroller).not.toContainElement(actionsButton);
-    expect(tasksTab).toHaveAttribute('aria-selected', 'false');
+    expect(tablist).toBeInTheDocument();
+    expect(actionsButton).toBeInTheDocument();
   });
 
   it('supports wrap mode for consumers that opt out of horizontal scrolling', () => {
