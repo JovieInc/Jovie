@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.86] - 2026-03-27
+
+### Added
+
+- Per-release target playlists field in the release sidebar, allowing artists to set playlist targets per release instead of only at the profile level
+- New `target_playlists` column on `discog_releases` table (additive migration, no data loss)
+- Pitch generation now prefers release-level target playlists over profile-level defaults
+
+### Changed
+
+- Artist settings "Target playlists" label updated to "Default target playlists" with copy explaining per-release override
+- Shared `targetPlaylistsSchema` validation extracted for reuse across profile and release actions
+
+### Fixed
+
+- Release target playlists component resets properly when switching between releases (key-based remount)
+- Error toast displayed when saving target playlists fails (previously swallowed)
+
 ## [26.4.84] - 2026-03-27
 
 ### Changed
