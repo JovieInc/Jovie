@@ -24,7 +24,7 @@ const DEFAULT_DEMO_PROFILE: CreatorProfile = {
   usernameNormalized: 'timwhite',
   displayName: 'Tim White',
   bio: 'Artist',
-  pitchContext: null,
+  careerHighlights: null,
   targetPlaylists: null,
   venmoHandle: null,
   avatarUrl: '/images/avatars/tim-white.jpg',

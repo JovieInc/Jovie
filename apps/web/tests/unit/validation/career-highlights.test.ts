@@ -1,48 +1,48 @@
 import { describe, expect, it } from 'vitest';
 import { profileUpdateSchema } from '@/lib/validation/schemas/dashboard/profile';
 
-describe('pitchContext validation', () => {
+describe('careerHighlights validation', () => {
   const validBase = {
     displayName: 'Test Artist',
     username: 'testartist',
   };
 
-  it('accepts pitchContext up to 2000 characters', () => {
+  it('accepts careerHighlights up to 2000 characters', () => {
     const result = profileUpdateSchema.safeParse({
       ...validBase,
-      pitchContext: 'a'.repeat(2000),
+      careerHighlights: 'a'.repeat(2000),
     });
     expect(result.success).toBe(true);
   });
 
-  it('rejects pitchContext over 2000 characters', () => {
+  it('rejects careerHighlights over 2000 characters', () => {
     const result = profileUpdateSchema.safeParse({
       ...validBase,
-      pitchContext: 'a'.repeat(2001),
+      careerHighlights: 'a'.repeat(2001),
     });
     expect(result.success).toBe(false);
   });
 
-  it('accepts undefined pitchContext', () => {
+  it('accepts undefined careerHighlights', () => {
     const result = profileUpdateSchema.safeParse(validBase);
     expect(result.success).toBe(true);
   });
 
-  it('trims whitespace from pitchContext', () => {
+  it('trims whitespace from careerHighlights', () => {
     const result = profileUpdateSchema.safeParse({
       ...validBase,
-      pitchContext: '  some context  ',
+      careerHighlights: '  some context  ',
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.pitchContext).toBe('some context');
+      expect(result.data.careerHighlights).toBe('some context');
     }
   });
 
-  it('accepts empty string pitchContext', () => {
+  it('accepts empty string careerHighlights', () => {
     const result = profileUpdateSchema.safeParse({
       ...validBase,
-      pitchContext: '',
+      careerHighlights: '',
     });
     expect(result.success).toBe(true);
   });

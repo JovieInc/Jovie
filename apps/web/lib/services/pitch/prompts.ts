@@ -54,8 +54,8 @@ function buildArtistSection(artist: PitchInput['artist']): string[] {
     );
   if (artist.spotifyPopularity != null)
     lines.push(`Spotify popularity score: ${artist.spotifyPopularity}/100`);
-  if (artist.pitchContext) {
-    lines.push(`\n## Artist-Provided Context`, artist.pitchContext);
+  if (artist.careerHighlights) {
+    lines.push(`\n## Career Highlights`, artist.careerHighlights);
   }
   if (artist.targetPlaylists?.length) {
     lines.push(`\n## Target Playlists`, artist.targetPlaylists.join(', '));
