@@ -8,8 +8,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-03-28T01:21:32.813Z",
-    "gitSha": "4145b9fb8a22498f13821e7b4c117770a38ad011",
+    "capturedAt": "2026-03-28T19:41:24.887Z",
+    "gitSha": "07fb32df443dc03215c60c3fd2cfd473654cb9e7",
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -63,8 +63,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-03-28T02:52:21.132Z",
-    "gitSha": "91f0d054195e67757f2a215f5647cca571bb5a06",
+    "capturedAt": "2026-03-28T19:43:05.619Z",
+    "gitSha": "07fb32df443dc03215c60c3fd2cfd473654cb9e7",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
@@ -116,8 +116,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-03-28T02:53:56.993Z",
-    "gitSha": "91f0d054195e67757f2a215f5647cca571bb5a06",
+    "capturedAt": "2026-03-28T19:44:41.142Z",
+    "gitSha": "07fb32df443dc03215c60c3fd2cfd473654cb9e7",
     "imagePath": "settings-links-desktop.png"
   },
   {
@@ -168,8 +168,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-03-28T01:25:45.525Z",
-    "gitSha": "4145b9fb8a22498f13821e7b4c117770a38ad011",
+    "capturedAt": "2026-03-28T19:45:37.504Z",
+    "gitSha": "07fb32df443dc03215c60c3fd2cfd473654cb9e7",
     "imagePath": "public-profile-desktop.png",
     "publicExportPath": "profile-desktop.png"
   },
@@ -182,8 +182,8 @@
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-03-28T01:25:49.539Z",
-    "gitSha": "4145b9fb8a22498f13821e7b4c117770a38ad011",
+    "capturedAt": "2026-03-28T19:45:41.263Z",
+    "gitSha": "07fb32df443dc03215c60c3fd2cfd473654cb9e7",
     "imagePath": "public-profile-mobile.png",
     "publicExportPath": "profile-phone.png"
   }
