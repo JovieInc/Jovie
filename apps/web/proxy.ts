@@ -645,12 +645,10 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         !isRSCPrefetch &&
         pathname !== APP_ROUTES.UNAVAILABLE
       ) {
-        return NextResponse.rewrite(new URL(APP_ROUTES.UNAVAILABLE, req.url), {
+        res = NextResponse.rewrite(new URL(APP_ROUTES.UNAVAILABLE, req.url), {
           request: { headers: requestHeaders },
         });
-      }
-
-      if (
+      } else if (
         userState.needsWaitlist &&
         pathname !== '/waitlist' &&
         !pathname.startsWith('/api/') &&

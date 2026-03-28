@@ -17,6 +17,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Changed
 
 - Middleware uses URL rewrite instead of redirect for suspended users (URL bar stays on original page)
+- `/drain` Phase 3 rewritten to be self-contained instead of delegating to `/orchestrate`
+
+### Removed
+
+- Deprecated `/autopilot`, `/orchestrate`, and `/swarm` agent-dispatch skills (replaced by Conductor workspaces)
+- `.claude/skills/parallel-agents.md` (duplicate of swarm)
 
 ## [26.4.88] - 2026-03-28
 

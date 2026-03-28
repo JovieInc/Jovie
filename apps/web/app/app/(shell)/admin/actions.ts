@@ -570,7 +570,11 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
   // inconsistent state (e.g. status restored but no audit trail).
   const result = await runLegacyDbTransaction(async tx => {
     const [user] = await tx
-      .select({ clerkId: users.clerkId, deletedAt: users.deletedAt })
+      .select({
+        clerkId: users.clerkId,
+        deletedAt: users.deletedAt,
+        userStatus: users.userStatus,
+      })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
@@ -582,6 +586,11 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
     // Reject restore for soft-deleted users — deletedAt takes precedence
     if (user.deletedAt) {
       throw new TypeError('Cannot restore a deleted account');
+    }
+
+    // Only allow restore for users who are actually banned
+    if (user.userStatus !== 'banned') {
+      throw new TypeError('User is not currently suspended');
     }
 
     // Find the previous status from the most recent ban audit entry
@@ -603,6 +612,7 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
 
     const VALID_RESTORE_STATUSES = new Set([
       'active',
+      'suspended',
       'waitlist_pending',
       'waitlist_approved',
       'profile_claimed',
@@ -611,6 +621,7 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
 
     type RestoreStatus =
       | 'active'
+      | 'suspended'
       | 'waitlist_pending'
       | 'waitlist_approved'
       | 'profile_claimed'
