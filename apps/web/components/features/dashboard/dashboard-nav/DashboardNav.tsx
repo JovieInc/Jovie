@@ -18,8 +18,6 @@ import { APP_ROUTES } from '@/constants/routes';
 import { env } from '@/lib/env-client';
 import { useCodeFlag } from '@/lib/feature-flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
-import { useReleasesQuery } from '@/lib/queries';
-import { prefetchForRoute } from '@/lib/queries/prefetch-dashboard';
 import {
   adminNavigationSections,
   artistSettingsNavigation,
@@ -43,7 +41,14 @@ const RecentChats = dynamic(
 );
 
 function isItemActive(pathname: string, item: NavItem): boolean {
-  if (pathname === item.href) {
+  const normalizedPathname =
+    pathname === APP_ROUTES.RELEASES
+      ? APP_ROUTES.DASHBOARD_RELEASES
+      : pathname === APP_ROUTES.AUDIENCE
+        ? APP_ROUTES.DASHBOARD_AUDIENCE
+        : pathname;
+
+  if (normalizedPathname === item.href) {
     return true;
   }
 
@@ -52,7 +57,7 @@ function isItemActive(pathname: string, item: NavItem): boolean {
     return false;
   }
 
-  return pathname.startsWith(`${item.href}/`);
+  return normalizedPathname.startsWith(`${item.href}/`);
 }
 
 export function DashboardNav(_: DashboardNavProps) {
@@ -80,17 +85,6 @@ export function DashboardNav(_: DashboardNavProps) {
   // Replace "Profile" label with artist display name when available
   const artistName = selectedProfile?.displayName;
   const profileId = selectedProfile?.id ?? '';
-  const { data: releases } = useReleasesQuery(profileId);
-  const releaseCount = releases?.length ?? 0;
-
-  const primaryItems = useMemo(() => {
-    return primaryNavigation.map(item => {
-      if (item.id === 'releases' && releaseCount > 0) {
-        return { ...item, badge: releaseCount };
-      }
-      return item;
-    });
-  }, [releaseCount]);
 
   const isDemo = pathname === APP_ROUTES.DEMO;
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
@@ -100,8 +94,8 @@ export function DashboardNav(_: DashboardNavProps) {
 
   // Memoize nav sections for dashboard (non-settings) mode
   const navSections = useMemo(
-    () => [{ key: 'primary', items: primaryItems }],
-    [primaryItems]
+    () => [{ key: 'primary', items: primaryNavigation }],
+    []
   );
 
   // Profile nav item opens the preview drawer instead of navigating to a separate page.
@@ -128,7 +122,11 @@ export function DashboardNav(_: DashboardNavProps) {
     (itemId: string) => {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
       prefetchTimerRef.current = setTimeout(() => {
-        prefetchForRoute(itemId, queryClient, profileId || undefined);
+        void import('@/lib/queries/prefetch-dashboard').then(
+          ({ prefetchForRoute }) => {
+            prefetchForRoute(itemId, queryClient, profileId || undefined);
+          }
+        );
       }, 150);
     },
     [queryClient, profileId]

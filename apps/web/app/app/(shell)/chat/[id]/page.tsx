@@ -7,7 +7,7 @@ import { db } from '@/lib/db';
 import { chatConversations } from '@/lib/db/schema/chat';
 import { getDashboardData } from '../../dashboard/actions';
 import { checkAppleMusicConnection } from '../../dashboard/releases/actions';
-import { ChatPageClient } from '../ChatPageClient';
+import { DeferredChatPageClient } from '../DeferredChatPageClient';
 
 interface Props {
   readonly params: Promise<{
@@ -60,7 +60,7 @@ export default async function ChatConversationPage({ params }: Props) {
 
   const { id } = await params;
   return (
-    <ChatPageClient
+    <DeferredChatPageClient
       conversationId={id}
       isFirstSession={dashboardData.isFirstSession}
       appleMusicConnected={appleMusicResult.connected}

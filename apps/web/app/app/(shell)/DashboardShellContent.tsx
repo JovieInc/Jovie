@@ -14,44 +14,11 @@ import {
 } from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
 import { ProfileCompletionRedirect } from './ProfileCompletionRedirect';
-
-function resolveRequestPath(nextUrlHeader: string | null): string | null {
-  if (!nextUrlHeader) {
-    return null;
-  }
-
-  try {
-    return new URL(nextUrlHeader, 'https://jovie.local').pathname;
-  } catch {
-    return null;
-  }
-}
-
-function shouldUseEssentialShellData(pathname: string | null): boolean {
-  if (!pathname) {
-    return false;
-  }
-
-  return (
-    pathname === APP_ROUTES.DASHBOARD ||
-    pathname === APP_ROUTES.DASHBOARD_RELEASES ||
-    pathname === APP_ROUTES.CHAT ||
-    pathname.startsWith(`${APP_ROUTES.CHAT}/`)
-  );
-}
-
-function shouldRedirectToOnboarding(pathname: string | null): boolean {
-  if (!pathname) {
-    return false;
-  }
-
-  return (
-    pathname === APP_ROUTES.DASHBOARD ||
-    pathname === APP_ROUTES.DASHBOARD_RELEASES ||
-    pathname === APP_ROUTES.CHAT ||
-    pathname.startsWith(`${APP_ROUTES.CHAT}/`)
-  );
-}
+import {
+  resolveAppShellRequestPath,
+  shouldRedirectToOnboarding,
+  shouldUseEssentialShellData,
+} from './shell-route-matches';
 
 /**
  * Async server component that fetches dashboard data,
@@ -73,7 +40,7 @@ export async function DashboardShellContent({
   // Other dashboard/settings routes still receive the full dashboard context
   // because they rely on supplementary fields from the slower fetch.
   const headerStore = await headers();
-  const pathname = resolveRequestPath(headerStore.get('next-url'));
+  const pathname = resolveAppShellRequestPath(headerStore.get('next-url'));
   const dashboardData = shouldUseEssentialShellData(pathname)
     ? await getDashboardDataEssential()
     : await getDashboardData();
@@ -102,7 +69,7 @@ export async function DashboardShellContent({
           <AuthShellWrapper
             persistSidebarCollapsed={setSidebarCollapsed}
             sidebarDefaultOpen={sidebarDefaultOpen}
-            previewPanelDefaultOpen
+            previewPanelDefaultOpen={!shouldUseEssentialShellData(pathname)}
           >
             {children}
           </AuthShellWrapper>

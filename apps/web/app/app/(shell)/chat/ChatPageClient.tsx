@@ -110,7 +110,8 @@ export function ChatPageClient({
     isFirstSession: dashboardIsFirstSession,
   } = useDashboardData();
   const { setPreviewData } = usePreviewPanelData();
-  const { open: openPreviewPanel } = usePreviewPanelState();
+  const { isOpen: isPreviewPanelOpen, open: openPreviewPanel } =
+    usePreviewPanelState();
   const router = useRouter();
   const searchParams = useSearchParams();
   const notifications = useNotifications();
@@ -144,6 +145,8 @@ export function ChatPageClient({
   const canAutoRetry = isProfileSetupRace && autoRetryCount < 3;
   const enablePreviewPanel = !env.IS_E2E;
   const fromOnboarding = searchParams.get('from') === 'onboarding';
+  const shouldHydratePreviewPanel =
+    enablePreviewPanel && (isPreviewPanelOpen || fromOnboarding);
 
   useEffect(() => {
     return () => {
@@ -155,7 +158,7 @@ export function ChatPageClient({
 
   // Register ProfileContactSidebar in the unified right panel system
   useRegisterRightPanel(
-    enablePreviewPanel ? (
+    shouldHydratePreviewPanel ? (
       <ErrorBoundary fallback={null}>
         <ProfileContactSidebar />
       </ErrorBoundary>
@@ -163,11 +166,11 @@ export function ChatPageClient({
   );
 
   // Fetch social links for the selected profile
-  const profileId = enablePreviewPanel ? (activeProfile?.id ?? '') : '';
+  const profileId = shouldHydratePreviewPanel ? (activeProfile?.id ?? '') : '';
   const { data: socialLinks } = useDashboardSocialLinksQuery(profileId);
 
   useEffect(() => {
-    if (!enablePreviewPanel || !fromOnboarding) return;
+    if (!shouldHydratePreviewPanel || !fromOnboarding) return;
 
     try {
       const rawSnapshot = globalThis.sessionStorage?.getItem(
@@ -182,7 +185,7 @@ export function ChatPageClient({
     } catch {
       // sessionStorage may be unavailable or the payload may be malformed
     }
-  }, [enablePreviewPanel, fromOnboarding, setPreviewData]);
+  }, [fromOnboarding, setPreviewData, shouldHydratePreviewPanel]);
 
   // Convert API links to preview panel format
   const previewLinks: PreviewPanelLink[] = useMemo(
@@ -199,7 +202,7 @@ export function ChatPageClient({
 
   // Hydrate preview panel with profile data and links
   useEffect(() => {
-    if (!enablePreviewPanel || !activeProfile) return;
+    if (!shouldHydratePreviewPanel || !activeProfile) return;
     const profileSettings = activeProfile.settings as Record<
       string,
       unknown
@@ -232,11 +235,11 @@ export function ChatPageClient({
     });
   }, [
     activeProfile,
-    enablePreviewPanel,
     previewLinks,
     setPreviewData,
     appleMusicConnected,
     appleMusicArtistName,
+    shouldHydratePreviewPanel,
   ]);
 
   const { copy: copySessionId, isSuccess: sessionIdCopied } = useClipboard({
