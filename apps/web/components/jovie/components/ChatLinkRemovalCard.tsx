@@ -93,8 +93,8 @@ export function ChatLinkRemovalCard({
 
   if (state === 'removed') {
     return (
-      <ContentSurfaceCard className='border-success/20 bg-[color-mix(in_oklab,var(--color-success)_8%,var(--linear-app-content-surface))] p-4'>
-        <div className='flex items-center gap-2 text-success'>
+      <ContentSurfaceCard className='border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-4'>
+        <div className='flex items-center gap-2 text-emerald-600 dark:text-emerald-400'>
           <Check className='h-4 w-4' />
           <span className='text-sm font-medium'>{platform} link removed</span>
         </div>

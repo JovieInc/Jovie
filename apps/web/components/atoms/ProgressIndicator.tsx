@@ -62,7 +62,7 @@ export function ProgressIndicator({
         </div>
         <div className='w-full bg-surface-2 rounded-full h-2 overflow-hidden'>
           <div
-            className='bg-gradient-to-r from-blue-500 to-purple-500 h-full rounded-full transition-all duration-300 ease-out'
+            className='bg-gradient-to-r from-blue-600/60 to-violet-600/60 dark:from-blue-400/50 dark:to-violet-400/50 h-full rounded-full transition-all duration-300 ease-out'
             style={{ width: `${progressPercentage}%` }}
           />
         </div>
@@ -80,8 +80,10 @@ export function ProgressIndicator({
               className={(() => {
                 const baseClasses =
                   'flex flex-col items-center space-y-1 transition-all duration-200 flex-1';
-                if (isCompleted) return `${baseClasses} text-success`;
-                if (isCurrent) return `${baseClasses} text-accent`;
+                if (isCompleted)
+                  return `${baseClasses} text-emerald-600 dark:text-emerald-400`;
+                if (isCurrent)
+                  return `${baseClasses} text-blue-600 dark:text-blue-400`;
                 return `${baseClasses} text-quaternary-token`;
               })()}
             >
@@ -91,9 +93,9 @@ export function ProgressIndicator({
                   const baseClasses =
                     'w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-200';
                   if (isCompleted)
-                    return `${baseClasses} bg-green-500 border-green-500 text-white`;
+                    return `${baseClasses} bg-emerald-600/20 border-emerald-600/30 text-emerald-600 dark:bg-emerald-400/20 dark:border-emerald-400/30 dark:text-emerald-400`;
                   if (isCurrent)
-                    return `${baseClasses} bg-blue-500 border-blue-500 text-white`;
+                    return `${baseClasses} bg-blue-600/20 border-blue-600/30 text-blue-600 dark:bg-blue-400/20 dark:border-blue-400/30 dark:text-blue-400`;
                   return `${baseClasses} bg-surface-1 border-default text-tertiary-token`;
                 })()}
               >
