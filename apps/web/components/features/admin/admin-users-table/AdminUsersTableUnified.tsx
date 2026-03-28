@@ -15,6 +15,7 @@ import {
 } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, Users } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
@@ -156,6 +157,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     sort,
     basePath = APP_ROUTES.ADMIN_USERS,
   } = props;
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState(search);
 
   useEffect(() => {
@@ -302,6 +304,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
       toast.success('User suspended');
       setBanTarget(null);
       setBanReason('');
+      router.refresh();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to suspend user'
@@ -309,7 +312,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     } finally {
       setBanPending(false);
     }
-  }, [banTarget, banReason]);
+  }, [banTarget, banReason, router]);
 
   const handleUnbanConfirm = useCallback(async () => {
     if (!unbanTarget) return;
@@ -329,6 +332,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
       }
       toast.success('User restored');
       setUnbanTarget(null);
+      router.refresh();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to restore user'
@@ -336,7 +340,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     } finally {
       setUnbanPending(false);
     }
-  }, [unbanTarget]);
+  }, [unbanTarget, router]);
 
   // Action callbacks — clipboard + toast logic lives here, builder is pure
   const actionCallbacks = useMemo<BuildAdminUserActionsCallbacks>(

@@ -468,26 +468,35 @@ export async function banUserAction(formData: FormData): Promise<void> {
     throw new TypeError('Cannot ban your own account');
   }
 
-  // Atomic: update status + write audit log
+  // Atomic: update status + write audit log (store previous status for restore)
   const result = await runLegacyDbTransaction(async tx => {
-    const [user] = await tx
-      .update(users)
-      .set({ userStatus: 'banned' })
+    // Read current status before updating
+    const [current] = await tx
+      .select({ userStatus: users.userStatus, clerkId: users.clerkId })
+      .from(users)
       .where(eq(users.id, userId))
-      .returning({ clerkId: users.clerkId });
+      .limit(1);
 
-    if (!user) {
+    if (!current) {
       throw new TypeError('User not found');
     }
+
+    await tx
+      .update(users)
+      .set({ userStatus: 'banned' })
+      .where(eq(users.id, userId));
 
     await tx.insert(adminAuditLog).values({
       adminUserId,
       targetUserId: userId,
       action: 'ban_user',
-      metadata: { reason: reason.trim() },
+      metadata: {
+        reason: reason.trim(),
+        previousStatus: current.userStatus,
+      },
     });
 
-    return { clerkId: user.clerkId };
+    return { clerkId: current.clerkId };
   });
 
   // Post-commit side effects (best-effort)
@@ -521,23 +530,63 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
     throw new TypeError('userId is required');
   }
 
-  // Atomic: update status + write audit log
+  // Atomic: restore to previous status + write audit log
+  // Look up the most recent ban audit entry to find what the user's status was
+  // before banning. Default to 'active' if no previous status recorded.
   const result = await runLegacyDbTransaction(async tx => {
     const [user] = await tx
-      .update(users)
-      .set({ userStatus: 'active' })
+      .select({ clerkId: users.clerkId })
+      .from(users)
       .where(eq(users.id, userId))
-      .returning({ clerkId: users.clerkId });
+      .limit(1);
 
     if (!user) {
       throw new TypeError('User not found');
     }
 
+    // Find the previous status from the ban audit log
+    const [banEntry] = await tx
+      .select({ metadata: adminAuditLog.metadata })
+      .from(adminAuditLog)
+      .where(eq(adminAuditLog.targetUserId, userId))
+      .orderBy(adminAuditLog.createdAt)
+      .limit(1);
+
+    const previousStatus = (
+      banEntry?.metadata as Record<string, unknown> | null
+    )?.previousStatus as string | undefined;
+
+    const VALID_RESTORE_STATUSES = new Set([
+      'active',
+      'waitlist_pending',
+      'waitlist_approved',
+      'profile_claimed',
+      'onboarding_incomplete',
+    ] as const);
+
+    type RestoreStatus =
+      | 'active'
+      | 'waitlist_pending'
+      | 'waitlist_approved'
+      | 'profile_claimed'
+      | 'onboarding_incomplete';
+
+    const restoreStatus: RestoreStatus =
+      previousStatus &&
+      VALID_RESTORE_STATUSES.has(previousStatus as RestoreStatus)
+        ? (previousStatus as RestoreStatus)
+        : 'active';
+
+    await tx
+      .update(users)
+      .set({ userStatus: restoreStatus })
+      .where(eq(users.id, userId));
+
     await tx.insert(adminAuditLog).values({
       adminUserId,
       targetUserId: userId,
       action: 'unban_user',
-      metadata: {},
+      metadata: { restoredTo: restoreStatus },
     });
 
     return { clerkId: user.clerkId };

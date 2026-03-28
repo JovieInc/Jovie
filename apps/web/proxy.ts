@@ -639,7 +639,12 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       // they were visiting — no dedicated path to discover.
       // Note: /app/* routes are handled by the shell layout ban check,
       // not here (proxy skips getUserState for /app/* paths).
-      if (userState.isBanned && isNavigationMethod && !isRSCPrefetch) {
+      if (
+        userState.isBanned &&
+        isNavigationMethod &&
+        !isRSCPrefetch &&
+        pathname !== '/unavailable'
+      ) {
         return NextResponse.rewrite(new URL('/unavailable', req.url), {
           request: { headers: requestHeaders },
         });

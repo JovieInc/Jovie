@@ -2,8 +2,10 @@ import 'server-only';
 
 import { eq } from 'drizzle-orm';
 import { cache } from 'react';
+import { checkUserStatus } from '@/lib/auth/status-checker';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { captureError } from '@/lib/error-tracking';
 
 interface BanStatus {
   isBanned: boolean;
@@ -16,11 +18,14 @@ interface BanStatus {
  * (proxy.ts:581-585), so the middleware-level ban check never fires
  * for dashboard pages. This function fills that gap.
  *
+ * Note: accepts a Clerk user ID (from getCachedAuth().userId) and
+ * queries by users.clerkId, not users.id.
+ *
  * Wrapped in React cache() so it's deduplicated per request when
  * called from both the layout and child components.
  */
 export const getUserBanStatus = cache(
-  async (userId: string): Promise<BanStatus> => {
+  async (clerkUserId: string): Promise<BanStatus> => {
     try {
       const [user] = await db
         .select({
@@ -28,22 +33,19 @@ export const getUserBanStatus = cache(
           deletedAt: users.deletedAt,
         })
         .from(users)
-        .where(eq(users.id, userId))
+        .where(eq(users.clerkId, clerkUserId))
         .limit(1);
 
       if (!user) {
         return { isBanned: false };
       }
 
-      const isBanned =
-        user.deletedAt !== null ||
-        user.userStatus === 'banned' ||
-        user.userStatus === 'suspended';
-
-      return { isBanned };
-    } catch {
+      const { isBlocked } = checkUserStatus(user.userStatus, user.deletedAt);
+      return { isBanned: isBlocked };
+    } catch (error) {
       // On DB failure, don't block the user. The proxy-level check
       // (for non-/app paths) is the primary enforcement layer.
+      captureError('Ban status check failed', error, { clerkUserId });
       return { isBanned: false };
     }
   }

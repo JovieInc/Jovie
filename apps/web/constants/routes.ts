@@ -80,6 +80,9 @@ export const APP_ROUTES = {
   ADMIN_USERS_BAN: '/app/admin/users/ban',
   ADMIN_USERS_UNBAN: '/app/admin/users/unban',
 
+  // System
+  UNAVAILABLE: '/unavailable',
+
   // Marketing
   DEMO: '/demo',
   PRICING: '/pricing',

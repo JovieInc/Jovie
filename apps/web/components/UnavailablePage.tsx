@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 
 /**
@@ -10,6 +9,7 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
  *
  * Intentionally minimal. No error codes, no support links,
  * no language that indicates account-level enforcement.
+ * Logo is non-interactive to avoid redirect loops for banned users.
  */
 export function UnavailablePage() {
   return (
@@ -24,14 +24,8 @@ export function UnavailablePage() {
       </div>
 
       <div className='w-full max-w-[420px] relative z-10 flex flex-col items-center'>
-        <div className='mb-6 sm:mb-8'>
-          <Link
-            href='/'
-            className='block focus-ring-themed rounded-md'
-            aria-label='Go to homepage'
-          >
-            <BrandLogo size={32} tone='auto' />
-          </Link>
+        <div className='mb-6 sm:mb-8' aria-hidden='true'>
+          <BrandLogo size={32} tone='auto' />
         </div>
 
         <h1 className='text-[18px] leading-[22px] font-medium text-primary-token text-center mb-4'>
