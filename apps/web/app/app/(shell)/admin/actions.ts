@@ -10,6 +10,7 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { isAllowedAvatarHostname } from '@/lib/images/avatar-hosts';
 import {
   enqueueMusicFetchEnrichmentJob,
@@ -180,7 +181,7 @@ export async function bulkRerunCreatorIngestionAction(
 
         // Enqueue DSP artist discovery alongside MusicFetch enrichment
         const spotifyArtistId =
-          profile.spotifyId ??
+          (profile.spotifyId?.trim() || null) ??
           (profile.spotifyUrl
             ? extractSpotifyArtistId(profile.spotifyUrl)
             : null);
@@ -189,10 +190,14 @@ export async function bulkRerunCreatorIngestionAction(
             creatorProfileId: profile.id,
             spotifyArtistId,
             onError: error =>
-              logger.warn('DSP discovery enqueue failed', {
+              void captureError('DSP discovery enqueue failed', error, {
                 creatorProfileId: profile.id,
-                error,
               }),
+          });
+        } else if (profile.spotifyUrl) {
+          logger.debug('DSP discovery skipped: non-artist Spotify URL', {
+            creatorProfileId: profile.id,
+            spotifyUrl: profile.spotifyUrl,
           });
         }
 
