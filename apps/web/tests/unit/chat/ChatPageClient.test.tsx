@@ -24,6 +24,20 @@ const { mockSentryAddBreadcrumb, mockSentryCaptureMessage } = vi.hoisted(
 
 let mockSearchParams = new URLSearchParams();
 
+// Mock next/dynamic for ProfileContactSidebar (ssr:false doesn't render in jsdom)
+vi.mock('next/dynamic', () => ({
+  default: (loader: () => Promise<{ default: React.ComponentType }>) => {
+    let Component: React.ComponentType | null = null;
+    loader().then(mod => {
+      Component = mod.default;
+    });
+    return function DynamicWrapper(props: Record<string, unknown>) {
+      if (Component) return React.createElement(Component, props);
+      return null;
+    };
+  },
+}));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: vi.fn(),

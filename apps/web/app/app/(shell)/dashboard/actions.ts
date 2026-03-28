@@ -28,6 +28,7 @@ export type { DashboardData } from './actions/dashboard-data';
 export {
   getDashboardData,
   getDashboardDataCached,
+  getDashboardDataEssential,
   getDashboardDataFresh,
   getProfileSocialLinks,
   prefetchDashboardData,

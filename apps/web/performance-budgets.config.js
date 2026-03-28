@@ -25,6 +25,27 @@ const defaultPublicResourceBudgets = [
   { resourceType: 'total', budget: 1200 },
 ];
 
+// /app chat page: lighter payload (no TanStack table, no row virtualisation).
+// Baseline (2026-03-27): script ~2150-2500KB (varies with lazy chunks loaded).
+const chatResourceBudgets = [
+  { resourceType: 'script', budget: 2750 },
+  { resourceType: 'image', budget: 500 },
+  { resourceType: 'font', budget: 100 },
+  { resourceType: 'stylesheet', budget: 500 },
+  { resourceType: 'total', budget: 3100 },
+];
+
+// /app/dashboard/releases: heavier payload (TanStack table + row virtualisation).
+// Baseline (2026-03-19): script 2000KB, stylesheet 457KB, total 2563KB.
+// Budgets set ~10% above baseline; tighten as we code-split.
+const releasesResourceBudgets = [
+  { resourceType: 'script', budget: 2200 },
+  { resourceType: 'image', budget: 500 },
+  { resourceType: 'font', budget: 100 },
+  { resourceType: 'stylesheet', budget: 500 },
+  { resourceType: 'total', budget: 2800 },
+];
+
 const onboardingResourceBudgets = [
   { resourceType: 'script', budget: 2600 },
   { resourceType: 'image', budget: 700 },
@@ -172,6 +193,26 @@ module.exports = {
       resourceSizes: onboardingResourceBudgets,
     },
     {
+      path: '/app',
+      auth: true,
+      timings: [
+        // Main dashboard (chat-first). Shell streams via Suspense while
+        // getDashboardData() resolves. Warm-cache production: TTFB ~30ms,
+        // skeleton-to-content ~130ms. Neon cold starts add ~1-2s variance.
+        // FCP/LCP include ~1s Playwright browser overhead.
+        { metric: 'first-contentful-paint', budget: 1500 },
+        { metric: 'largest-contentful-paint', budget: 3000 },
+        { metric: 'cumulative-layout-shift', budget: 0.1 },
+        { metric: 'first-input-delay', budget: 100 },
+        { metric: 'time-to-first-byte', budget: 1500 },
+        // Time from navigation to chat content visible.
+        // Warm cache: ~130ms. Starting threshold at 2000ms to accommodate
+        // Neon cold starts; tighten toward 500ms as infra stabilizes.
+        { metric: 'skeleton-to-content', budget: 2000 },
+      ],
+      resourceSizes: chatResourceBudgets,
+    },
+    {
       path: '/app/dashboard/releases',
       auth: true,
       timings: [
@@ -184,16 +225,7 @@ module.exports = {
         // Custom: time from navigation to skeleton disappearing / real content visible
         { metric: 'skeleton-to-content', budget: 500 },
       ],
-      resourceSizes: [
-        // Dashboard pages carry TanStack table + Radix UI + Clerk auth overhead.
-        // Baseline (2026-03-19): script 2000KB, stylesheet 457KB, total 2563KB.
-        // Budgets set ~10% above baseline; tighten as we code-split.
-        { resourceType: 'script', budget: 2200 },
-        { resourceType: 'image', budget: 500 },
-        { resourceType: 'font', budget: 100 },
-        { resourceType: 'stylesheet', budget: 500 },
-        { resourceType: 'total', budget: 2800 },
-      ],
+      resourceSizes: releasesResourceBudgets,
     },
     ...onboardingStepBudgets,
   ],

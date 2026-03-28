@@ -11,12 +11,28 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Welcome message now prompts new artists to share career highlights when the field is empty, improving pitch quality from the first interaction
 - Golden path E2E test suite covering post-onboarding flows: welcome message, core pages, settings persistence, and chat send/receive
+- Performance budget for `/app` dashboard page [internal]
+- Suspense streaming shell: skeleton renders at first byte while dashboard data resolves
+- `getDashboardDataEssential()` fast-path fetch for future use (not yet wired into the shell provider) [internal]
+- `fetchDashboardBaseWithSession()` shared helper eliminates duplication between full and essential data fetches [internal]
+- Pre-warm request in performance budget guard for consistent warm-cache measurements [internal]
+- `data-testid="chat-content"` marker on JovieChat for skeleton-to-content measurement [internal]
 
 ### Changed
 
 - Rename "Pitch Context" to "Career Highlights" across the entire stack: database column, API, validation, settings UI, pitch service, and all type interfaces
 - Extract `buildWelcomeMessage` to its own module (`lib/services/onboarding/welcome-message.ts`) for testability
 - Settings description updated to explain how career highlights improve pitches and recommendations
+- Dashboard shell layout uses Suspense boundary with streaming fallback instead of blocking on full data fetch
+- Code-split `ProfileContactSidebar` via `next/dynamic` (sidebar panel, not critical path) [internal]
+- `generateMetadata()` on `/app` reuses deduplicated dashboard data instead of a separate DB call [internal]
+- Feature flag bootstrap hardened with `.catch()` fallback to prevent shell crash on transient failures [internal]
+- Separate resource budgets per page type [internal]
+- Performance budget guard skeleton-to-content measurement uses `chat-content` testid [internal]
+
+### Fixed
+
+- Extracted nested ternary in `DashboardShellSkeleton` to lookup table [internal]
 
 ## [26.4.85] - 2026-03-27
 
