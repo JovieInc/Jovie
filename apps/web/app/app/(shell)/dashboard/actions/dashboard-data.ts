@@ -767,7 +767,18 @@ async function resolveDashboardDataWith(
     };
   } catch (error) {
     Sentry.captureException(error, { tags: { context } });
-    return { ...createEmptyCoreData(), isAdmin };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {
+      ...createEmptyCoreData({
+        dashboardLoadError: {
+          stage: 'core_cache',
+          message: errorMessage,
+          code: null,
+          errorType: error?.constructor?.name ?? typeof error,
+        },
+      }),
+      isAdmin,
+    };
   }
 }
 

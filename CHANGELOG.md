@@ -7,27 +7,29 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.86] - 2026-03-27
 
+> Dashboard now streams instantly via Suspense — skeleton appears at first byte while data loads in the background.
+
 ### Added
 
-- Performance budget for `/app` dashboard page (FCP 1500ms, LCP 3000ms, TTFB 1500ms, skeleton-to-content 2000ms)
-- Suspense streaming shell: `DashboardShellSkeleton` renders at first byte while `getDashboardData()` resolves
-- `getDashboardDataEssential()` fast-path fetch for future use (3 queries vs 6, not used in shell provider to preserve context correctness)
-- `fetchDashboardBaseWithSession()` shared helper eliminates duplication between full and essential data fetches
-- Pre-warm request in performance budget guard for consistent warm-cache measurements
-- `data-testid="chat-content"` marker on JovieChat for skeleton-to-content measurement
+- Performance budget for `/app` dashboard page [internal]
+- Suspense streaming shell: skeleton renders at first byte while dashboard data resolves
+- `getDashboardDataEssential()` fast-path fetch for future use (not yet wired into the shell provider) [internal]
+- `fetchDashboardBaseWithSession()` shared helper eliminates duplication between full and essential data fetches [internal]
+- Pre-warm request in performance budget guard for consistent warm-cache measurements [internal]
+- `data-testid="chat-content"` marker on JovieChat for skeleton-to-content measurement [internal]
 
 ### Changed
 
 - Dashboard shell layout uses Suspense boundary with streaming fallback instead of blocking on full data fetch
-- Code-split `ProfileContactSidebar` via `next/dynamic` (sidebar panel, not critical path)
-- `generateMetadata()` on `/app` reuses deduplicated `getDashboardData()` instead of separate `getSessionContext()` DB call
-- Feature flag bootstrap hardened with `.catch()` fallback to prevent shell crash on transient failures
-- Separate resource budgets per page: `chatResourceBudgets` (2750KB) and `releasesResourceBudgets` (2200KB, preserving original limit)
-- Performance budget guard skeleton-to-content measurement uses only `chat-content` testid (removed false-positive nav selector)
+- Code-split `ProfileContactSidebar` via `next/dynamic` (sidebar panel, not critical path) [internal]
+- `generateMetadata()` on `/app` reuses deduplicated dashboard data instead of a separate DB call [internal]
+- Feature flag bootstrap hardened with `.catch()` fallback to prevent shell crash on transient failures [internal]
+- Separate resource budgets per page type [internal]
+- Performance budget guard skeleton-to-content measurement uses `chat-content` testid [internal]
 
 ### Fixed
 
-- Extracted nested ternary in `DashboardShellSkeleton` to `navLabelWidths` lookup (SonarCloud)
+- Extracted nested ternary in `DashboardShellSkeleton` to lookup table [internal]
 
 ## [26.4.84] - 2026-03-27
 

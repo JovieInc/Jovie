@@ -206,7 +206,8 @@ module.exports = {
         { metric: 'first-input-delay', budget: 100 },
         { metric: 'time-to-first-byte', budget: 1500 },
         // Time from navigation to chat content visible.
-        // Warm cache: ~130ms. Budget includes Neon cold start headroom.
+        // Warm cache: ~130ms. Starting threshold at 2000ms to accommodate
+        // Neon cold starts; tighten toward 500ms as infra stabilizes.
         { metric: 'skeleton-to-content', budget: 2000 },
       ],
       resourceSizes: chatResourceBudgets,

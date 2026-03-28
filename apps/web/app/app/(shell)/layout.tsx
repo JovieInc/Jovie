@@ -37,7 +37,11 @@ export default async function AppShellLayout({
       </Suspense>
     );
   } catch (error) {
-    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
+    // In Next.js 14+, redirect() throws with the tag on error.digest, not error.message
+    if (
+      error instanceof Error &&
+      (error as Error & { digest?: string }).digest === 'NEXT_REDIRECT'
+    ) {
       throw error;
     }
 
