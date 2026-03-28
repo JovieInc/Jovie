@@ -22,18 +22,21 @@ const CONFIDENCE_STYLES: Record<
 > = {
   high: {
     label: 'High',
-    className: 'border-success/25 bg-success-subtle text-success',
-    dotClassName: 'bg-success',
+    className:
+      'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-emerald-600 dark:text-emerald-400',
+    dotClassName: 'bg-emerald-500 dark:bg-emerald-400',
   },
   medium: {
     label: 'Medium',
-    className: 'border-warning/25 bg-warning-subtle text-warning',
-    dotClassName: 'bg-warning',
+    className:
+      'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-amber-600 dark:text-amber-400',
+    dotClassName: 'bg-amber-500 dark:bg-amber-400',
   },
   low: {
     label: 'Low',
-    className: 'border-error/25 bg-error-subtle text-error',
-    dotClassName: 'bg-error',
+    className:
+      'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-red-600 dark:text-red-400',
+    dotClassName: 'bg-red-500 dark:bg-red-400',
   },
 };
 
