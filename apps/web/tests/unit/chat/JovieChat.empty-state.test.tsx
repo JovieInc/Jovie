@@ -54,6 +54,7 @@ const mockChatState = {
   submitMessage: vi.fn(),
   setChatError: vi.fn(),
   isRateLimited: false,
+  stop: vi.fn(),
 };
 
 const mockInsightsSummaryState: {
@@ -85,6 +86,13 @@ vi.mock('@/components/jovie/hooks', () => ({
     clearImages: vi.fn(),
     toFileUIParts: () => [],
     dropZoneRef: { current: null },
+  }),
+  useStickToBottom: () => ({
+    isStuckToBottom: true,
+    setStuckToBottom: vi.fn(),
+    onScroll: vi.fn(),
+    totalSizeRef: vi.fn(),
+    scrollContainerRef: { current: null },
   }),
 }));
 

@@ -148,6 +148,8 @@ interface ChatMessageProps {
   readonly parts: MessagePart[];
   /** Whether this message is actively being streamed from the AI. */
   readonly isStreaming?: boolean;
+  /** Whether this is a synthetic thinking placeholder (bouncing dots). */
+  readonly isThinking?: boolean;
   /** Avatar URL for user messages. */
   readonly avatarUrl?: string | null;
   /** Profile ID for interactive tool cards (avatar upload, link confirmation). */
@@ -159,6 +161,7 @@ export function ChatMessage({
   role,
   parts,
   isStreaming,
+  isThinking,
   avatarUrl,
   profileId,
 }: ChatMessageProps) {
@@ -228,7 +231,42 @@ export function ChatMessage({
         </div>
       ) : (
         <div className='flex max-w-[78%] flex-col'>
-          {messageText && (
+          {/* Thinking indicator — bouncing dots inside the virtualizer */}
+          {isThinking && (
+            <div className='space-y-2'>
+              <div className='flex items-center gap-2 pl-0.5'>
+                <span
+                  data-testid='chat-loading-avatar'
+                  className='flex h-5.5 w-5.5 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'
+                >
+                  <BrandLogo size={10} tone='auto' rounded={false} />
+                </span>
+                <span className='text-[11px] font-[560] tracking-[-0.01em] text-secondary-token'>
+                  Jovie
+                </span>
+                <span className='text-[11px] text-tertiary-token'>
+                  Writing reply…
+                </span>
+              </div>
+              <div
+                data-testid='chat-loading-bubble'
+                className='rounded-[18px] border border-subtle bg-surface-1 px-4 py-3.5 shadow-card'
+              >
+                <div className='flex items-center gap-1.5'>
+                  <span className='flex items-center gap-1' aria-hidden='true'>
+                    <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce [animation-delay:-0.3s] motion-reduce:animate-none' />
+                    <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce [animation-delay:-0.15s] motion-reduce:animate-none' />
+                    <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce motion-reduce:animate-none' />
+                  </span>
+                </div>
+              </div>
+              <span className='sr-only' aria-live='polite'>
+                Jovie is writing a reply
+              </span>
+            </div>
+          )}
+
+          {!isThinking && messageText && (
             <div className='space-y-2'>
               <div className='flex items-center gap-2 pl-0.5'>
                 <span className='flex h-5.5 w-5.5 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
