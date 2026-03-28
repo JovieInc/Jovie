@@ -4,18 +4,12 @@ import type { CommonDropdownItem } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 
-import {
-  DrawerCardActionBar,
-  DrawerSurfaceCard,
-  DrawerTabs,
-  EntitySidebarShell,
-} from '@/components/molecules/drawer';
+import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
 import {
   type ContextMenuItemType,
   convertToCommonDropdownItems,
 } from '@/components/organisms/table';
 
-import { ContactAvatar } from './ContactAvatar';
 import { ContactFields } from './ContactFields';
 import { useContactHeaderParts } from './ContactSidebarHeader';
 import { ContactSocialLinks } from './ContactSocialLinks';
@@ -50,8 +44,6 @@ export const ContactSidebar = memo(function ContactSidebar({
     hasContact,
     fullName,
     displayName,
-    canUploadAvatar,
-    handleAvatarUpload,
     handleCopyProfileUrl,
     handleNameChange,
     handleUsernameChange,
@@ -67,17 +59,10 @@ export const ContactSidebar = memo(function ContactSidebar({
     onAvatarUpload,
   });
 
-  const {
-    title: headerTitle,
-    primaryActions,
-    overflowActions,
-  } = useContactHeaderParts({
+  const { title: headerTitle, actions: headerActions } = useContactHeaderParts({
     contact,
     hasContact,
     onRefresh,
-    onCopyProfileUrl: () => {
-      handleCopyProfileUrl();
-    },
     onClose,
   });
 
@@ -148,38 +133,9 @@ export const ContactSidebar = memo(function ContactSidebar({
       title={headerTitle}
       onClose={contact ? undefined : onClose}
       headerMode='minimal'
+      headerActions={headerActions}
       isEmpty={!contact}
       emptyMessage='Select a row in the table to view contact details.'
-      entityHeader={
-        contact ? (
-          <DrawerSurfaceCard
-            variant='card'
-            className='relative overflow-hidden'
-          >
-            <div className='border-b border-subtle px-3 py-2'>
-              <div className='min-w-0'>{headerTitle}</div>
-            </div>
-            <div className='p-3.5'>
-              <ContactAvatar
-                avatarUrl={contact.avatarUrl ?? null}
-                fullName={fullName}
-                username={contact.username}
-                isVerified={contact.isVerified}
-                canUploadAvatar={canUploadAvatar}
-                onAvatarUpload={
-                  canUploadAvatar ? handleAvatarUpload : undefined
-                }
-              />
-            </div>
-            <DrawerCardActionBar
-              primaryActions={primaryActions}
-              overflowActions={overflowActions}
-              onClose={onClose}
-              overflowTriggerPlacement='card-top-right'
-            />
-          </DrawerSurfaceCard>
-        ) : undefined
-      }
       tabs={
         contact ? (
           <DrawerTabs

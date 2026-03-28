@@ -175,7 +175,7 @@ export function DeckViewer({ slides }: DeckViewerProps) {
           className={deckButtonClass}
         >
           <ChevronLeft className='h-4 w-4' aria-hidden='true' />
-          <span className='hidden sm:inline'>Prev</span>
+          <span className='max-sm:hidden sm:inline'>Prev</span>
         </button>
 
         {/* Center: dots + counter */}
@@ -195,7 +195,7 @@ export function DeckViewer({ slides }: DeckViewerProps) {
             className={deckButtonClass}
           >
             <Download className='h-4 w-4' aria-hidden='true' />
-            <span className='hidden sm:inline'>PDF</span>
+            <span className='max-sm:hidden sm:inline'>PDF</span>
           </button>
 
           <button
@@ -218,7 +218,7 @@ export function DeckViewer({ slides }: DeckViewerProps) {
             aria-label='Next slide'
             className={deckButtonClass}
           >
-            <span className='hidden sm:inline'>Next</span>
+            <span className='max-sm:hidden sm:inline'>Next</span>
             <ChevronRight className='h-4 w-4' aria-hidden='true' />
           </button>
         </div>

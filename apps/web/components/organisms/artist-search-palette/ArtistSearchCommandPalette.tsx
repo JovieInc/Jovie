@@ -231,7 +231,7 @@ export function ArtistSearchCommandPalette({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className='overflow-hidden rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-[0_20px_48px_rgba(0,0,0,0.12)] sm:max-w-[500px]'
+        className='overflow-hidden rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover sm:max-w-[500px]'
         hideClose
       >
         <DialogPrimitive.Title className='sr-only'>

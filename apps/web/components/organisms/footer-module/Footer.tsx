@@ -123,7 +123,7 @@ export function Footer({
           />
         </div>
 
-        <div className='hidden md:block fixed bottom-4 left-4 z-10'>
+        <div className='max-md:hidden fixed bottom-4 left-4 z-10'>
           <FooterNavigation
             variant={config.colorVariant}
             ariaLabel='Legal'
@@ -308,7 +308,7 @@ export function Footer({
                       variant='linear'
                     />
                   </div>
-                  <div className='hidden md:flex items-center'>
+                  <div className='max-md:hidden md:flex items-center'>
                     <ThemeToggle
                       appearance={config.themeAppearance}
                       shortcutKey={themeShortcutKey}

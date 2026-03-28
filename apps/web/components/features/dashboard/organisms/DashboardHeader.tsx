@@ -37,12 +37,12 @@ export function DashboardHeader({
     <header
       data-testid='dashboard-header'
       className={cn(
-        'z-20 bg-(--linear-app-content-surface) backdrop-blur-[12px]',
+        'z-20 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) backdrop-blur-[12px]',
         className
       )}
     >
       {/* Mobile: Large page title with action buttons + profile */}
-      <div className='flex items-center justify-between px-4 pb-2 pt-3 sm:hidden'>
+      <div className='hidden max-sm:flex items-center justify-between px-4 pb-2 pt-3'>
         <h1 className='text-[17px] font-[560] leading-tight tracking-[-0.018em] text-primary-token'>
           {currentLabel}
         </h1>
@@ -57,15 +57,17 @@ export function DashboardHeader({
         </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}
-      <div className='relative hidden h-(--linear-app-header-height-compact) w-full items-center gap-2 px-(--linear-app-header-padding-x) sm:flex'>
+      <div className='relative max-sm:hidden h-(--linear-app-header-height-compact) w-full items-center gap-2 px-2.5 sm:flex'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
-          <div className='hidden items-center lg:flex'>{sidebarTrigger}</div>
+          <div className='max-lg:hidden items-center lg:flex'>
+            {sidebarTrigger}
+          </div>
         ) : null}
         {/* Conditional vertical separator between sidebar trigger and actions */}
         {showDivider && sidebarTrigger && action ? (
-          <div className='hidden lg:flex items-center'>
+          <div className='max-lg:hidden lg:flex items-center'>
             <VerticalDivider />
           </div>
         ) : null}
@@ -94,9 +96,7 @@ export function DashboardHeader({
           )}
         </div>
         {action ? (
-          <div className='ml-auto flex items-center gap-(--linear-app-toolbar-gap)'>
-            {action}
-          </div>
+          <div className='ml-auto flex items-center gap-1.5'>{action}</div>
         ) : null}
       </div>
     </header>

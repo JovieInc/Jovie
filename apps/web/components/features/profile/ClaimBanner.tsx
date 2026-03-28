@@ -55,7 +55,7 @@ export function ClaimBanner({ profileHandle, displayName }: ClaimBannerProps) {
           {/* Banner text */}
           <div className='flex items-center gap-2 text-center sm:text-left max-w-xs sm:max-w-sm'>
             <Sparkles
-              className='h-4 w-4 shrink-0 hidden sm:block'
+              className='h-4 w-4 shrink-0 max-sm:hidden'
               aria-hidden='true'
             />
             <p className='text-xs sm:text-sm font-semibold leading-tight tracking-tight'>
