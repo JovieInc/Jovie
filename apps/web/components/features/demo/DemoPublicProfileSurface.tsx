@@ -1,5 +1,6 @@
 import { buildDemoProfile } from '@/features/demo/mock-dashboard-data';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import { DemoClientProviders } from './DemoClientProviders';
 
@@ -8,7 +9,8 @@ const DEMO_PUBLIC_ARTIST: Artist = {
   id: DEMO_PUBLIC_PROFILE.id,
   owner_user_id: DEMO_PUBLIC_PROFILE.userId ?? 'demo-user-001',
   handle: DEMO_PUBLIC_PROFILE.username,
-  spotify_id: DEMO_PUBLIC_PROFILE.spotifyId ?? '4u',
+  spotify_id:
+    DEMO_PUBLIC_PROFILE.spotifyId ?? TIM_WHITE_PROFILE.spotifyArtistId,
   name: DEMO_PUBLIC_PROFILE.displayName ?? 'Tim White',
   image_url: DEMO_PUBLIC_PROFILE.avatarUrl ?? undefined,
   tagline: DEMO_PUBLIC_PROFILE.bio ?? undefined,
@@ -41,7 +43,7 @@ const DEMO_PUBLIC_SOCIAL_LINKS: readonly LegacySocialLink[] = [
     id: 'demo-social-spotify',
     artist_id: DEMO_PUBLIC_ARTIST.id,
     platform: 'spotify',
-    url: 'https://open.spotify.com/artist/4u',
+    url: DEMO_PUBLIC_ARTIST.spotify_url ?? TIM_WHITE_PROFILE.spotifyUrl,
     clicks: 1432,
     created_at: DEMO_PUBLIC_ARTIST.created_at,
   },
