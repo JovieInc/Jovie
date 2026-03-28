@@ -74,6 +74,7 @@ import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { slugify } from '@/lib/utils';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
+import { targetPlaylistsSchema } from '@/lib/validation/schemas/dashboard/profile';
 import { getDashboardData } from '../actions';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
@@ -494,10 +495,8 @@ export async function saveReleaseTargetPlaylists(params: {
   targetPlaylists: string[];
 }): Promise<ReleaseViewModel> {
   return mutateRelease(params, async (releaseId, profileId) => {
-    const validated = (params.targetPlaylists ?? [])
-      .map(s => s.trim())
-      .filter(Boolean)
-      .slice(0, 5);
+    const parsed = targetPlaylistsSchema.parse(params.targetPlaylists);
+    const validated = parsed ?? [];
     await updateReleaseColumns(releaseId, profileId, {
       targetPlaylists: validated.length > 0 ? validated : null,
     });
