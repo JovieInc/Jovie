@@ -1,6 +1,6 @@
 'use server';
 
-import { and, count, eq, ne } from 'drizzle-orm';
+import { and, count, eq, inArray, ne } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -619,6 +619,23 @@ export async function refreshRelease(params: { releaseId: string }): Promise<{
         }
       );
     });
+
+    // Re-trigger DSP artist discovery to pick up new ISRCs from the sync
+    void enqueueDspArtistDiscoveryJob({
+      creatorProfileId: profile.id,
+      spotifyArtistId: profile.spotifyId,
+      targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
+    }).catch(error => {
+      void captureError(
+        'DSP artist discovery enqueue failed on refresh',
+        error,
+        {
+          action: 'refreshRelease',
+          creatorProfileId: profile.id,
+          releaseId: params.releaseId,
+        }
+      );
+    });
   }
 
   const refreshedRelease = await getReleaseById(params.releaseId);
@@ -679,10 +696,11 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
     };
   }
 
-  // Look up the Apple Music match for this profile
-  const [match] = await db
+  // Look up confirmed DSP matches for this profile (Apple Music + Deezer)
+  const dspMatches = await db
     .select({
       id: dspArtistMatches.id,
+      providerId: dspArtistMatches.providerId,
       externalArtistId: dspArtistMatches.externalArtistId,
       status: dspArtistMatches.status,
     })
@@ -690,25 +708,22 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
     .where(
       and(
         eq(dspArtistMatches.creatorProfileId, profile.id),
-        eq(dspArtistMatches.providerId, 'apple_music')
+        inArray(dspArtistMatches.providerId, ['apple_music', 'deezer'])
       )
-    )
-    .limit(1);
+    );
 
   let linksFound = 0;
 
-  if (
-    match &&
-    (match.status === 'confirmed' || match.status === 'auto_confirmed')
-  ) {
-    // Run enrichment for all unlinked releases (including this one)
-    const result = await processReleaseEnrichmentJobStandalone({
-      creatorProfileId: profile.id,
-      matchId: match.id,
-      providerId: 'apple_music',
-      externalArtistId: match.externalArtistId,
-    });
-    linksFound = result.releasesEnriched;
+  for (const match of dspMatches) {
+    if (match.status === 'confirmed' || match.status === 'auto_confirmed') {
+      const result = await processReleaseEnrichmentJobStandalone({
+        creatorProfileId: profile.id,
+        matchId: match.id,
+        providerId: match.providerId as 'apple_music' | 'deezer',
+        externalArtistId: match.externalArtistId,
+      });
+      linksFound += result.releasesEnriched;
+    }
   }
 
   // Re-fetch the release to get updated provider links
