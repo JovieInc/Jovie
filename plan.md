@@ -105,10 +105,7 @@ ln -s ../.agent/skills .windsurf/skills
 
 ### Phase 3: Keep tool-specific content where it belongs
 
-**Stay in `.claude/commands/`** (15 commands — Claude-specific or infrastructure):
-- `autopilot.md` — Claude Agent Teams orchestrator
-- `orchestrate.md` — PR processing with agent assignment
-- `swarm.md` — Parallel agent dispatch (uses Claude Task tool)
+**Stay in `.claude/commands/`** (12 commands — Claude-specific or infrastructure):
 - `session-start-hook.md` — Claude Code SessionStart hook
 - `check-migrations.md` — DB migration status check
 - `generate-migration.md` — Drizzle migration generation
@@ -126,11 +123,7 @@ ln -s ../.agent/skills .windsurf/skills
 
 **Stay in `.coderabbit.yaml`** (CodeRabbit-specific config)
 
-### Phase 4: Remove `.claude/skills/parallel-agents.md`
-
-This skill is Claude-specific (references Task tool, bypassPermissions mode). Keep the equivalent content in `.claude/commands/swarm.md` which already covers this use case.
-
-### Phase 5: Update `.windsurf/workflows/`
+### Phase 4: Update `.windsurf/workflows/`
 
 Remove Windsurf workflow files that are now covered by `.agent/skills/`:
 - `clean.md` → covered by `.agent/skills/clean/SKILL.md`
