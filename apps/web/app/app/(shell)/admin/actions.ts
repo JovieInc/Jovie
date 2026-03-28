@@ -10,6 +10,7 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { isAllowedAvatarHostname } from '@/lib/images/avatar-hosts';
 import {
   enqueueDspArtistDiscoveryJob,
@@ -182,9 +183,15 @@ export async function bulkRerunCreatorIngestionAction(
             creatorProfileId: profile.id,
             spotifyArtistId: profile.spotifyId,
             targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
-          }).catch(_error => {
-            // Fire-and-forget: MusicFetch is the primary job;
-            // discovery failures here are non-critical for the bulk operation.
+          }).catch(error => {
+            void captureError(
+              'DSP artist discovery enqueue failed on bulk refresh',
+              error,
+              {
+                action: 'bulkRerunCreatorIngestionAction',
+                creatorProfileId: profile.id,
+              }
+            );
           });
         }
 

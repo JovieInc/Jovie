@@ -44,6 +44,10 @@ vi.mock('next/cache', () => ({
   revalidatePath: mockRevalidatePath,
 }));
 
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: vi.fn(),
+}));
+
 vi.mock('@/lib/ingestion/jobs', () => ({
   enqueueMusicFetchEnrichmentJob: mockEnqueueMusicFetchEnrichmentJob,
   enqueueDspArtistDiscoveryJob: mockEnqueueDspArtistDiscoveryJob,
