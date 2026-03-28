@@ -9,10 +9,16 @@ import { ChatPageClient } from './ChatPageClient';
 const CHAT_DESCRIPTION = 'Start a new thread with Jovie AI';
 
 const getDashboardTitle = async () => {
-  const { profile } = await getSessionContext({ requireProfile: false });
-  const displayName = profile?.displayName?.trim();
-
-  return displayName ? `${displayName} | Jovie` : 'Home | Jovie';
+  try {
+    const { profile } = await getSessionContext({
+      requireUser: false,
+      requireProfile: false,
+    });
+    const displayName = profile?.displayName?.trim();
+    return displayName ? `${displayName} | Jovie` : 'Home | Jovie';
+  } catch {
+    return 'Home | Jovie';
+  }
 };
 
 export async function generateMetadata(): Promise<Metadata> {

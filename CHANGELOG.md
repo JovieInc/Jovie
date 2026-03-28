@@ -10,6 +10,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - Screenshot CI workflow now reuses a single PR instead of creating a new one each run, preventing stale screenshot PRs from piling up
+- Sitemap crash on Vercel: blog directory missing causes ENOENT, now returns empty list gracefully
+- Middleware redirect loop on `/monitoring` (Sentry tunnel): excluded from proxy matcher so Sentry events flow without hitting auth logic
+- Chat metadata crash: `generateMetadata` threw "User not found" when Clerk user had no DB record yet, now falls back to default titles
+- CSP blocking Clerk JS from `clerk.jov.ie`: added the Clerk proxy CNAME to `script-src` and `connect-src` directives
+- Chat usage API: narrowed `auth()` error handling to only catch Clerk middleware-detection errors, re-throws real infrastructure failures
 
 ## [26.4.92] - 2026-03-28
 
@@ -18,6 +23,24 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Homepage hero layout: text and phone mockup now display side-by-side on desktop instead of stacking vertically (Tailwind v4 specificity fix)
 
 ## [26.4.91] - 2026-03-28
+
+### Added
+
+- Manual DSP platform linking: artists can add streaming platform profiles by name and URL
+- Add Platform dialog with provider picker grid and URL validation against DSP_REGISTRY domains
+- Admin-only Refresh button to trigger DSP discovery re-scan from presence page
+- Card grid layout replacing table view on presence page with provider-colored borders
+- "Manual" badge for user-added matches (distinct from auto-discovered confidence scores)
+- Discovery overwrite protection: manual matches preserved when auto-discovery runs
+
+### Changed
+
+- Presence page uses responsive card grid (1/2/3 columns) instead of data table
+- Empty state updated with actionable "Add Platform" CTA
+- Loading skeleton matches new card grid layout
+- Sidebar guards null confidence for manual matches
+
+## [26.4.90] - 2026-03-28
 
 ### Fixed
 
