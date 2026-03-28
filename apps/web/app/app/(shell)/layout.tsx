@@ -9,8 +9,6 @@ import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
-import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';
-import type { FeatureFlagsBootstrap } from '@/lib/feature-flags/shared';
 import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
 import { getDashboardData, setSidebarCollapsed } from './dashboard/actions';
@@ -20,15 +18,11 @@ import { ProfileCompletionRedirect } from './ProfileCompletionRedirect';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const EMPTY_FEATURE_FLAGS_BOOTSTRAP: FeatureFlagsBootstrap = { gates: {} };
-
 export default async function AppShellLayout({
   children,
 }: {
   readonly children: React.ReactNode;
 }) {
-  const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
-
   try {
     // Get auth first (fast — reads from request headers, cached via React cache()).
     // This lets us start feature flags in parallel with dashboard data,
@@ -42,14 +36,8 @@ export default async function AppShellLayout({
     }
 
     // Parallelize dashboard data and feature flags.
-    // getDashboardData internally calls getCachedAuth() which is deduplicated.
-    // Feature flags now run in parallel instead of waiting for dashboard data.
-    const [dashboardData, featureFlagsBootstrap] = await Promise.all([
-      getDashboardData(),
-      isE2EClientRuntime
-        ? Promise.resolve(EMPTY_FEATURE_FLAGS_BOOTSTRAP)
-        : getFeatureFlagsBootstrap(auth.userId ?? null),
-    ]);
+    // Feature flags are now code-level (no Statsig), so no async bootstrap needed.
+    const dashboardData = await getDashboardData();
 
     // Read sidebar cookie server-side so SSR matches client state (no flash)
     const cookieStore = await cookies();
@@ -61,7 +49,7 @@ export default async function AppShellLayout({
         {/* ENG-004: Show environment issues to admins in non-production */}
         <OperatorBanner isAdmin={dashboardData.isAdmin} />
         <ImpersonationBannerWrapper />
-        <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
+        <FeatureFlagsProvider>
           <DashboardDataProvider value={dashboardData}>
             <ProfileCompletionRedirect />
             <AuthShellWrapper
