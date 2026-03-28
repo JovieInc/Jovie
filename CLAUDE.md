@@ -83,23 +83,42 @@ Always read `DESIGN.md` before making any visual or UI decisions. All font choic
 
 ### How to check
 
+Use the GraphQL API to get review threads with resolution state:
+
 ```bash
 REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner')
+OWNER=$(echo "$REPO" | cut -d/ -f1)
+NAME=$(echo "$REPO" | cut -d/ -f2)
 PR_NUMBER=$(gh pr view --json number --jq '.number')
 
-# Fetch all inline review comments on the PR
-gh api "repos/$REPO/pulls/$PR_NUMBER/comments" --paginate \
-  --jq '[.[] | {id, author: .user.login, path, line, body, html_url, in_reply_to_id, position}]'
+gh api graphql -f query='
+  query($owner: String!, $name: String!, $number: Int!) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
+        reviewThreads(first: 100) {
+          nodes {
+            isResolved
+            isOutdated
+            comments(first: 10) {
+              nodes { author { login } body }
+            }
+          }
+        }
+      }
+    }
+  }
+' -f owner="$OWNER" -f name="$NAME" -F number="$PR_NUMBER"
 ```
 
 ### Classification
 
-For each **root** comment (where `in_reply_to_id` is null) from the bots above:
+For each review thread where the first comment's author is one of the bots above:
 
-1. **Outdated** — `position` is null (code was force-pushed past it) → skip
-2. **Addressed** — another comment exists with `in_reply_to_id` equal to this comment's `id`, from a non-bot author → skip
-3. **Nitpick** — body starts with `[nitpick]` or `**nitpick**` → warning only, not blocking
-4. **Unaddressed** — none of the above → **BLOCKER**
+1. **Resolved** — `isResolved` is true → skip
+2. **Outdated** — `isOutdated` is true → skip
+3. **Addressed** — a reply exists in the thread from an author whose login does NOT end in `[bot]` → skip
+4. **Nitpick** — first comment body starts with `[nitpick]` or `**nitpick**` → warning only, not blocking
+5. **Unaddressed** — none of the above → **BLOCKER**
 
 ### When blocked
 
