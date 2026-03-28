@@ -46,8 +46,8 @@ export interface ProfileUpdateInput {
     youtubeUrl?: string | null;
     // Genre tags
     genres?: string[];
-    // Pitch context for AI-generated playlist pitches
-    pitchContext?: string;
+    // Career highlights for AI-generated playlist pitches
+    careerHighlights?: string;
     // Target Spotify playlists for pitch generation
     targetPlaylists?: string[];
     // Settings object for feature flags

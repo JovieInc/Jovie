@@ -61,7 +61,7 @@ export async function buildPitchInput(
       activeSinceYear: creatorProfiles.activeSinceYear,
       spotifyFollowers: creatorProfiles.spotifyFollowers,
       spotifyPopularity: creatorProfiles.spotifyPopularity,
-      pitchContext: creatorProfiles.pitchContext,
+      careerHighlights: creatorProfiles.careerHighlights,
       targetPlaylists: creatorProfiles.targetPlaylists,
     })
     .from(creatorProfiles)
@@ -117,7 +117,7 @@ export async function buildPitchInput(
       activeSinceYear: artistProfile?.activeSinceYear ?? null,
       spotifyFollowers: artistProfile?.spotifyFollowers ?? null,
       spotifyPopularity: artistProfile?.spotifyPopularity ?? null,
-      pitchContext: artistProfile?.pitchContext ?? null,
+      careerHighlights: artistProfile?.careerHighlights ?? null,
       targetPlaylists: artistProfile?.targetPlaylists ?? null,
     },
     release: {
