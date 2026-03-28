@@ -34,7 +34,8 @@ export type AdminWorkspaceId =
   | 'growth'
   | 'activity'
   | 'investors'
-  | 'screenshots';
+  | 'screenshots'
+  | 'algorithm-health';
 
 export type AdminNavigationSection = 'workspaces' | 'utilities';
 
@@ -87,6 +88,13 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Screenshots',
     href: APP_ROUTES.ADMIN_SCREENSHOTS,
     description: 'Generated docs and QA screenshots',
+    section: 'utilities',
+  },
+  {
+    id: 'algorithm-health',
+    label: 'Algorithm Health',
+    href: APP_ROUTES.ADMIN_ALGORITHM_HEALTH,
+    description: 'Spotify FAL diagnosis and algorithmic positioning audit',
     section: 'utilities',
   },
 ] as const;

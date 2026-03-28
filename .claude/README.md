@@ -24,7 +24,6 @@ All files in this directory are checked into the repo and shared across the team
 | `/review` | Pre-landing diff review with a built-in simplify pass and fix-first workflow |
 | `/simplify` | Refactor recently modified code for clarity |
 | `/pr` | Auto commit, push, and create PR |
-| `/orchestrate` | Review and process all open PRs |
 | `/check-migrations` | Check pending migration status |
 | `/generate-migration` | Generate a new Drizzle migration |
 | `/migrate-main` | Run migrations on main/staging |
