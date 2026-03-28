@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.91] - 2026-03-28
+
+### Fixed
+
+- Auth page text invisible in light mode: Clerk footer ("Don't have an account?"), branding badge, and card elements used theme-dependent CSS tokens on a hardcoded dark background. Migrated all auth-scoped Clerk styling to fixed dark-theme `--clerk-color-*` CSS variables using Clerk v7's CSS custom property API.
+- Error page (`/error/user-creation-failed`) text invisible in light mode: same root cause, fixed with hardcoded light text values.
+
 ## [26.4.90] - 2026-03-28
 
 ### Fixed
