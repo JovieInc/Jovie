@@ -1,8 +1,18 @@
+import { isIPv4 } from 'node:net';
+
 export const TEST_MODE_HEADER = 'x-test-mode';
 export const TEST_USER_ID_HEADER = 'x-test-user-id';
 export const TEST_AUTH_BYPASS_MODE = 'bypass-auth';
 export const TEST_MODE_COOKIE = '__e2e_test_mode';
 export const TEST_USER_ID_COOKIE = '__e2e_test_user_id';
+export const TEST_PERSONA_COOKIE = '__e2e_test_persona';
+
+const PRIVATE_IPV4_BLOCKS = [
+  /^10\./,
+  /^127\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2\d|3[0-1])\./,
+] as const;
 
 export function isTestAuthBypassEnabled(): boolean {
   return process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
@@ -37,24 +47,38 @@ function extractHostname(value: string | null): string | null {
   return normalized.replace(/:\d+$/, '').toLowerCase();
 }
 
-function isLoopbackHost(hostname: string | null): boolean {
+function isPrivateIpv4Literal(hostname: string | null): boolean {
+  if (!hostname || !isIPv4(hostname)) {
+    return false;
+  }
+
+  return PRIVATE_IPV4_BLOCKS.some(pattern => pattern.test(hostname));
+}
+
+export function isTrustedTestBypassHostname(hostname: string | null): boolean {
+  const normalizedHostname = hostname?.trim().toLowerCase() ?? null;
+
   return (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname === '::1' ||
-    hostname === '[::1]' ||
-    Boolean(hostname?.endsWith('.localhost'))
+    normalizedHostname === 'localhost' ||
+    normalizedHostname === '127.0.0.1' ||
+    normalizedHostname === '::1' ||
+    normalizedHostname === '[::1]' ||
+    Boolean(normalizedHostname?.endsWith('.localhost')) ||
+    Boolean(normalizedHostname?.endsWith('.local')) ||
+    isPrivateIpv4Literal(normalizedHostname)
   );
 }
 
-function isTrustedTestBypassRequest(headerReader: HeaderReader): boolean {
+export function isTrustedTestBypassRequest(
+  headerReader: HeaderReader
+): boolean {
   const hostname =
     extractHostname(headerReader.get('x-forwarded-host')) ??
     extractHostname(headerReader.get('host')) ??
     extractHostname(headerReader.get('origin')) ??
     extractHostname(headerReader.get('referer'));
 
-  return isLoopbackHost(hostname);
+  return isTrustedTestBypassHostname(hostname);
 }
 function getCookieValueFromHeader(
   headerReader: HeaderReader,

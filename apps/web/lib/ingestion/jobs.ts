@@ -552,6 +552,26 @@ export async function enqueueDspArtistDiscoveryJob(params: {
 }
 
 /**
+ * Fire-and-forget DSP artist discovery for all providers.
+ *
+ * Consolidates the repeated pattern of enqueuing discovery with error
+ * swallowing used in refresh, sync, connect, and admin bulk operations.
+ */
+export function fireDspDiscovery(params: {
+  creatorProfileId: string;
+  spotifyArtistId: string;
+  onError?: (error: unknown) => void;
+}): void {
+  void enqueueDspArtistDiscoveryJob({
+    creatorProfileId: params.creatorProfileId,
+    spotifyArtistId: params.spotifyArtistId,
+    targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
+  }).catch(error => {
+    params.onError?.(error);
+  });
+}
+
+/**
  * Enqueue a DSP track enrichment job.
  *
  * Called after a DSP artist match is confirmed to enrich tracks with

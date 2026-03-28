@@ -84,6 +84,27 @@ describe('test-mode auth bypass', () => {
     ).toBe('user_cookie_header');
   });
 
+  it('allows bypass markers on private development hosts', () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+
+    expect(
+      resolveTestBypassUserId({
+        get: (name: string) => {
+          if (name === 'host') {
+            return '192.168.1.10:3000';
+          }
+          if (name === TEST_MODE_HEADER) {
+            return TEST_AUTH_BYPASS_MODE;
+          }
+          if (name === TEST_USER_ID_HEADER) {
+            return 'user_private_host';
+          }
+          return null;
+        },
+      })
+    ).toBe('user_private_host');
+  });
+
   it('prefers request headers over cookies when both are present', () => {
     vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
     expect(
@@ -147,6 +168,27 @@ describe('test-mode auth bypass', () => {
         get: (name: string) => {
           if (name === 'host') {
             return 'preview.jov.ie';
+          }
+          if (name === TEST_MODE_HEADER) {
+            return TEST_AUTH_BYPASS_MODE;
+          }
+          if (name === TEST_USER_ID_HEADER) {
+            return 'user_header';
+          }
+          return null;
+        },
+      })
+    ).toBeNull();
+  });
+
+  it('rejects hostnames that only look like private IPv4 prefixes', () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+
+    expect(
+      resolveTestBypassUserId({
+        get: (name: string) => {
+          if (name === 'host') {
+            return '10.attacker.example';
           }
           if (name === TEST_MODE_HEADER) {
             return TEST_AUTH_BYPASS_MODE;

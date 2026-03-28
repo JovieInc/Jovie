@@ -1521,47 +1521,46 @@ Or use `/gstack-upgrade` from within Claude Code.
 
 ### QA & Browse Authentication (Jovie-Specific)
 
-When running `/qa` or `/browse` against Jovie (localhost or staging), agents **MUST** handle authentication automatically using the project's E2E test credentials from Doppler. **Do NOT prompt the user for credentials.**
+When running `/qa` or `/browse` against local Jovie, agents **MUST** use the built-in dev auth bootstrap. **Do NOT prompt the user for credentials. Do NOT ask for cookie import help.**
 
-**Why this is different from Playwright E2E auth:** The browse binary runs a standalone Playwright browser session, NOT the Playwright test runner. Clerk testing tokens (`setupClerkTestingToken`) are NOT available. Instead, sign in by filling the login form directly.
+**Local default flow (`localhost`, `127.0.0.1`, private dev IPs):**
 
-**Steps:**
+1. Start the browse-compatible dev server:
 
-1. Get credentials from environment (requires `doppler run --` prefix on the parent command):
-   - Email: `$E2E_CLERK_USER_USERNAME` (contains `+clerk_test` suffix)
-   - OTP code: `424242` (Clerk auto-accepts this for `+clerk_test` emails in test mode)
-
-2. Check if already authenticated:
    ```bash
-   $B goto <base-url>/signin
-   $B snapshot -D
-   ```
-   If the URL redirected to `/app` (dashboard), authentication is already active — **skip the rest and proceed to QA**.
-
-3. If on the sign-in page, fill the login form:
-   ```bash
-   $B snapshot -i                    # identify email input element
-   $B fill <email-element> "$E2E_CLERK_USER_USERNAME"
-   $B click <submit-button>          # click "Continue" or submit
-   $B snapshot -i                    # identify OTP code input
-   $B fill <otp-element> "424242"
-   $B click <verify-button>          # submit OTP
-   $B snapshot -D                    # verify redirect to dashboard
+   doppler run -- pnpm --filter web dev:local:browse
    ```
 
-4. Verify authentication succeeded:
-   - URL should contain `/app` (not `/signin` or `/sign-in`)
-   - Dashboard navigation should be visible
+2. Authenticate the browse session by opening:
+
+   ```text
+   /api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings
+   ```
+
+3. Use `persona=admin` only when you intentionally need admin QA:
+
+   ```text
+   /api/dev/test-auth/enter?persona=admin&redirect=/app/admin
+   ```
+
+**What this does:**
+- sets the local auth-bypass cookies automatically
+- provisions a stable creator browse persona by default
+- avoids Clerk sign-in, OTP entry, and cookie handoff
+- works without `NEXT_PUBLIC_E2E_MODE=1`
+
+**Agent rules:**
+- `/browse` on local Jovie means: use the dev auth bootstrap route above
+- default persona is `creator`; `admin` is opt-in
+- if auth is needed on local browse QA, solve it yourself with this flow
+- only use `scripts/browse-auth.ts` as a fallback helper for non-loopback hosts
+- only use `/setup-browser-cookies` for importing a real human session when a human explicitly wants that path
 
 **Do NOT:**
-- Prompt the user for credentials — use Doppler env vars
-- Use `/setup-browser-cookies` for automated QA runs — that is for importing human browser sessions
-- Hardcode the test email address — always read from `$E2E_CLERK_USER_USERNAME`
-
-**After QA/browse sessions that create test accounts**, run cleanup:
-```bash
-doppler run -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --force
-```
+- prompt the user for credentials
+- fill the Clerk sign-in form manually for local QA
+- claim auth is blocked on local `/browse` without trying `/api/dev/test-auth/enter?...`
+- enable `NEXT_PUBLIC_E2E_MODE=1` just to make browse auth work
 
 ---
 
