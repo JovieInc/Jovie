@@ -15,6 +15,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Auth page text invisible in light mode: Clerk footer ("Don't have an account?"), branding badge, and card elements used theme-dependent CSS tokens on a hardcoded dark background. Migrated all auth-scoped Clerk styling to fixed dark-theme `--clerk-color-*` CSS variables using Clerk v7's CSS custom property API.
+- Error page (`/error/user-creation-failed`) text invisible in light mode: same root cause, fixed with hardcoded light text values.
+
+## [26.4.90] - 2026-03-28
+
+### Fixed
+
 - Account deletion now invalidates profile ISR cache so deleted artist pages don't linger
 - Account deletion signs out the user via Clerk instead of a bare redirect, clearing stale session cookies
 - Right drawer entity header and tabs scroll with content in minimal mode instead of pinning to top (restores intended layout)
