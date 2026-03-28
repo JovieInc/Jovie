@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.88] - 2026-03-27
+
+### Fixed
+
+- Release enrichment jobs for Deezer were silently failing because the payload schema only accepted `apple_music`, causing Deezer links to never populate after DSP artist discovery
+- Per-release refresh button now triggers DSP artist discovery (Apple Music, Deezer, MusicBrainz) alongside MusicFetch enrichment, matching the full sync behavior
+- Admin bulk creator refresh now enqueues DSP artist discovery jobs in addition to MusicFetch enrichment
+- ISRC rescan now enriches both Apple Music and Deezer releases (previously Apple Music only)
+- Added error handling for Deezer ISRC batch lookups to prevent circuit breaker errors from killing the entire enrichment job
+
 ## [26.4.87] - 2026-03-27
 
 ### Added
