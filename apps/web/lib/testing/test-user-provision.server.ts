@@ -1,5 +1,3 @@
-import 'server-only';
-
 import { createClerkClient } from '@clerk/backend';
 import { Redis } from '@upstash/redis';
 import { and, eq, or } from 'drizzle-orm';
