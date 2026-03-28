@@ -480,6 +480,8 @@ export async function banUserAction(formData: FormData): Promise<void> {
   }
 
   // Atomic: update status + write audit log (store previous status for restore)
+  // ACID requirement: status update + audit log must be atomic to prevent
+  // inconsistent state (e.g. user banned but no audit trail).
   const result = await runLegacyDbTransaction(async tx => {
     // Read current status before updating
     const [current] = await tx
@@ -490,6 +492,10 @@ export async function banUserAction(formData: FormData): Promise<void> {
 
     if (!current) {
       throw new TypeError('User not found');
+    }
+
+    if (current.userStatus === 'banned') {
+      throw new TypeError('User is already suspended');
     }
 
     await tx
@@ -552,18 +558,30 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
     throw new TypeError('Admin user not found in database');
   }
 
+  // Self-unban guard (compare DB UUIDs)
+  if (userId === adminUser.id) {
+    throw new TypeError('Cannot restore your own account');
+  }
+
   // Atomic: restore to previous status + write audit log
   // Look up the most recent ban_user audit entry to find what the user's
   // status was before banning. Default to 'active' if no record found.
+  // ACID requirement: status update + audit log must be atomic to prevent
+  // inconsistent state (e.g. status restored but no audit trail).
   const result = await runLegacyDbTransaction(async tx => {
     const [user] = await tx
-      .select({ clerkId: users.clerkId })
+      .select({ clerkId: users.clerkId, deletedAt: users.deletedAt })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
 
     if (!user) {
       throw new TypeError('User not found');
+    }
+
+    // Reject restore for soft-deleted users — deletedAt takes precedence
+    if (user.deletedAt) {
+      throw new TypeError('Cannot restore a deleted account');
     }
 
     // Find the previous status from the most recent ban audit entry

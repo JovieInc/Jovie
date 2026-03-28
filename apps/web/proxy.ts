@@ -643,9 +643,9 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         userState.isBanned &&
         isNavigationMethod &&
         !isRSCPrefetch &&
-        pathname !== '/unavailable'
+        pathname !== APP_ROUTES.UNAVAILABLE
       ) {
-        return NextResponse.rewrite(new URL('/unavailable', req.url), {
+        return NextResponse.rewrite(new URL(APP_ROUTES.UNAVAILABLE, req.url), {
           request: { headers: requestHeaders },
         });
       }
