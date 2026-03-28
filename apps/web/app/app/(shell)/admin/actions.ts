@@ -588,8 +588,8 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
       throw new TypeError('Cannot restore a deleted account');
     }
 
-    // Only allow restore for users who are actually banned
-    if (user.userStatus !== 'banned') {
+    // Only allow restore for users who are actually blocked
+    if (user.userStatus !== 'banned' && user.userStatus !== 'suspended') {
       throw new TypeError('User is not currently suspended');
     }
 
