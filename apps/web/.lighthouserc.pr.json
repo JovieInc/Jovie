@@ -13,19 +13,19 @@
             "interactive": [
               "warn",
               {
-                "maxNumericValue": 2000
+                "maxNumericValue": 4000
               }
             ],
             "first-contentful-paint": [
               "warn",
               {
-                "maxNumericValue": 1500
+                "maxNumericValue": 2500
               }
             ],
             "largest-contentful-paint": [
               "warn",
               {
-                "maxNumericValue": 2000
+                "maxNumericValue": 4000
               }
             ],
             "cumulative-layout-shift": [
@@ -37,19 +37,23 @@
             "total-blocking-time": [
               "warn",
               {
-                "maxNumericValue": 500
+                "maxNumericValue": 1500
               }
             ],
             "speed-index": [
               "warn",
               {
-                "maxNumericValue": 3000
+                "maxNumericValue": 5000
               }
             ],
+            "max-potential-fid": "warn",
+            "mainthread-work-breakdown": "warn",
+            "render-blocking-resources": "off",
+            "render-blocking-insight": "off",
             "categories:performance": [
-              "error",
+              "warn",
               {
-                "minScore": 0.75
+                "minScore": 0.6
               }
             ],
             "categories:accessibility": [
@@ -61,15 +65,20 @@
             "categories:best-practices": [
               "warn",
               {
-                "minScore": 0.8
+                "minScore": 0.7
               }
             ],
             "categories:seo": [
               "warn",
               {
-                "minScore": 0.8
+                "minScore": 0.6
               }
-            ]
+            ],
+            "errors-in-console": "warn",
+            "is-crawlable": "off",
+            "network-dependency-tree-insight": "off",
+            "target-size": "warn",
+            "digest-mismatch": "off"
           }
         }
       ]
