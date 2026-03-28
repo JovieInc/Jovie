@@ -20,6 +20,6 @@ export type ProfileFormData = Pick<
   | 'displayName'
   | 'location'
   | 'hometown'
-  | 'pitchContext'
+  | 'careerHighlights'
   | 'targetPlaylists'
 >;

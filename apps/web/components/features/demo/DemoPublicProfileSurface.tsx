@@ -27,7 +27,7 @@ const DEMO_PUBLIC_ARTIST: Artist = {
   hometown: null,
   active_since_year: DEMO_PUBLIC_PROFILE.activeSinceYear ?? null,
   genres: DEMO_PUBLIC_PROFILE.genres ?? null,
-  pitch_context: DEMO_PUBLIC_PROFILE.pitchContext ?? null,
+  career_highlights: DEMO_PUBLIC_PROFILE.careerHighlights ?? null,
   target_playlists: DEMO_PUBLIC_PROFILE.targetPlaylists ?? null,
   published: Boolean(DEMO_PUBLIC_PROFILE.isPublic),
   is_verified: Boolean(DEMO_PUBLIC_PROFILE.isVerified),
