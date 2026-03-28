@@ -1,4 +1,4 @@
-import { promises as fs } from 'node:fs';
+import { type Dirent, promises as fs } from 'node:fs';
 import { cache } from 'react';
 import { createMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
 import { parseMarkdownFrontmatter } from '@/lib/docs/parseMarkdownFrontmatter';
@@ -152,7 +152,12 @@ export const getBlogPost = cache(async (slug: string) => {
 });
 
 export const getBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
-  const entries = await fs.readdir(BLOG_DIRECTORY, { withFileTypes: true });
+  let entries: Dirent[];
+  try {
+    entries = await fs.readdir(BLOG_DIRECTORY, { withFileTypes: true });
+  } catch {
+    return [];
+  }
 
   const slugs = entries
     .filter(entry => entry.isFile() && entry.name.endsWith('.md'))
@@ -187,7 +192,12 @@ export const getBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
 });
 
 export const getBlogPostSlugs = cache(async (): Promise<string[]> => {
-  const entries = await fs.readdir(BLOG_DIRECTORY, { withFileTypes: true });
+  let entries: Dirent[];
+  try {
+    entries = await fs.readdir(BLOG_DIRECTORY, { withFileTypes: true });
+  } catch {
+    return [];
+  }
   return entries
     .filter(entry => entry.isFile() && entry.name.endsWith('.md'))
     .map(entry => entry.name.replace(/\.md$/, ''));

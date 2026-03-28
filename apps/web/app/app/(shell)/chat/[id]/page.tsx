@@ -18,7 +18,12 @@ interface Props {
 const CONVERSATION_DESCRIPTION = 'Thread with Jovie AI';
 
 const getConversationTitle = async (conversationId: string) => {
-  const { user } = await getSessionContext({ requireProfile: false });
+  const { user } = await getSessionContext({
+    requireUser: false,
+    requireProfile: false,
+  });
+
+  if (!user) return 'Thread | Jovie';
 
   const [conversation] = await db
     .select({ title: chatConversations.title })

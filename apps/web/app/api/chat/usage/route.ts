@@ -71,7 +71,12 @@ const CACHE_HEADERS = {
 } as const;
 
 export async function GET() {
-  const { userId } = await auth();
+  let userId: string | null;
+  try {
+    ({ userId } = await auth());
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
