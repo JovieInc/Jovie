@@ -144,15 +144,17 @@ function createBootstrapAuthReturn(
     orgSlug: null,
     has: () => false,
     signOut: async (options?: unknown) => {
-      await fetch('/api/dev/test-auth/session', {
+      const response = await fetch('/api/dev/test-auth/session', {
         method: 'DELETE',
         credentials: 'include',
-      }).catch(() =>
-        fetch('/api/dev/clear-session', {
+      }).catch(() => null);
+
+      if (!response?.ok) {
+        await fetch('/api/dev/clear-session', {
           method: 'POST',
           credentials: 'include',
-        })
-      );
+        }).catch(() => null);
+      }
 
       const redirectUrl = getRedirectUrlFromSignOutOptions(options);
 

@@ -180,4 +180,25 @@ describe('test-mode auth bypass', () => {
       })
     ).toBeNull();
   });
+
+  it('rejects hostnames that only look like private IPv4 prefixes', () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+
+    expect(
+      resolveTestBypassUserId({
+        get: (name: string) => {
+          if (name === 'host') {
+            return '10.attacker.example';
+          }
+          if (name === TEST_MODE_HEADER) {
+            return TEST_AUTH_BYPASS_MODE;
+          }
+          if (name === TEST_USER_ID_HEADER) {
+            return 'user_header';
+          }
+          return null;
+        },
+      })
+    ).toBeNull();
+  });
 });

@@ -73,6 +73,33 @@ function isDuplicateKeyError(error: unknown): boolean {
   return message.includes('duplicate key value');
 }
 
+function isClerkIdentificationExistsError(error: unknown): boolean {
+  if (
+    error instanceof Error &&
+    error.message.includes('IdentificationExists')
+  ) {
+    return true;
+  }
+
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const candidate = error as {
+    readonly status?: number;
+    readonly errors?: ReadonlyArray<{ readonly code?: string }>;
+  };
+
+  return (
+    candidate.status === 422 ||
+    Boolean(
+      candidate.errors?.some(
+        ({ code }) => typeof code === 'string' && code.includes('identifier')
+      )
+    )
+  );
+}
+
 export function isAllowlistedTestAccountEmail(
   email: string | null | undefined
 ): email is string {
@@ -186,16 +213,33 @@ export async function ensureClerkTestUser({
     return existingUser.id;
   }
 
-  const createdUser = await clerk.users.createUser({
-    username,
-    emailAddress: [normalizedEmail],
-    firstName,
-    lastName,
-    publicMetadata: metadata,
-    skipPasswordRequirement: true,
-  });
+  try {
+    const createdUser = await clerk.users.createUser({
+      username,
+      emailAddress: [normalizedEmail],
+      firstName,
+      lastName,
+      publicMetadata: metadata,
+      skipPasswordRequirement: true,
+    });
 
-  return createdUser.id;
+    return createdUser.id;
+  } catch (error) {
+    if (!isClerkIdentificationExistsError(error)) {
+      throw error;
+    }
+
+    const racedUsers = await clerk.users.getUserList({
+      emailAddress: [normalizedEmail],
+    });
+    const racedUser = racedUsers.data[0];
+
+    if (!racedUser) {
+      throw error;
+    }
+
+    return racedUser.id;
+  }
 }
 
 export async function ensureUserRecord(

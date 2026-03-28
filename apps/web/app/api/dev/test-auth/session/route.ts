@@ -11,6 +11,18 @@ import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
 
+function readPersonaFromBody(body: unknown): string | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return null;
+  }
+
+  if (!('persona' in body)) {
+    return null;
+  }
+
+  return typeof body.persona === 'string' ? body.persona : '';
+}
+
 function applyNoStore(response: NextResponse): NextResponse {
   response.headers.set('Cache-Control', NO_STORE_HEADERS['Cache-Control']);
   return response;
@@ -89,12 +101,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = (await request.json().catch(() => ({}))) as {
-    persona?: string;
-  };
-  const persona = parseDevTestAuthPersona(body.persona ?? null) ?? 'creator';
+  const rawBody = await request.json().catch(() => null);
+  const requestedPersona = readPersonaFromBody(rawBody);
 
-  if (body.persona && !parseDevTestAuthPersona(body.persona)) {
+  if (requestedPersona === '') {
+    return NextResponse.json(
+      { success: false, error: 'Invalid persona' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  const persona = parseDevTestAuthPersona(requestedPersona) ?? 'creator';
+
+  if (requestedPersona && !parseDevTestAuthPersona(requestedPersona)) {
     return NextResponse.json(
       { success: false, error: 'Invalid persona' },
       { status: 400, headers: NO_STORE_HEADERS }

@@ -1526,14 +1526,19 @@ When running `/qa` or `/browse` against local Jovie, agents **MUST** use the bui
 **Local default flow (`localhost`, `127.0.0.1`, private dev IPs):**
 
 1. Start the browse-compatible dev server:
+
    ```bash
    doppler run -- pnpm --filter web dev:local:browse
    ```
+
 2. Authenticate the browse session by opening:
+
    ```text
    /api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings
    ```
+
 3. Use `persona=admin` only when you intentionally need admin QA:
+
    ```text
    /api/dev/test-auth/enter?persona=admin&redirect=/app/admin
    ```

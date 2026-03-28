@@ -86,9 +86,7 @@ function resolvePersonaSeedConfig(
 ): PersonaSeedConfig {
   if (persona === 'admin') {
     const email = normalizeEmail(
-      process.env.E2E_CLERK_ADMIN_USERNAME ??
-        process.env.E2E_CLERK_USER_USERNAME ??
-        DEFAULT_ADMIN_EMAIL
+      process.env.E2E_CLERK_ADMIN_USERNAME ?? DEFAULT_ADMIN_EMAIL
     );
     const fullName = DEFAULT_ADMIN_FULL_NAME;
     const { firstName, lastName } = splitFullName(fullName);
@@ -309,7 +307,7 @@ export async function ensureDevTestAuthActor(
 ): Promise<DevTestAuthActor> {
   const config = resolvePersonaSeedConfig(persona);
   const fallbackClerkId =
-    persona === 'admin' ? process.env.E2E_CLERK_USER_ID : undefined;
+    persona === 'admin' ? process.env.E2E_CLERK_ADMIN_ID : undefined;
   const clerkUserId = await ensureClerkTestUser({
     email: config.email,
     username: config.username,

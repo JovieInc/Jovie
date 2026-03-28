@@ -10,6 +10,11 @@ import {
 } from '@/hooks/useClerkSafe';
 import type { ClientAuthBootstrap } from '@/lib/auth/dev-test-auth-types';
 
+const originalLocationDescriptor = Object.getOwnPropertyDescriptor(
+  globalThis,
+  'location'
+);
+
 function renderWithWrapper(
   wrapper: (props: { readonly children: ReactNode }) => ReactNode
 ) {
@@ -25,6 +30,10 @@ function renderWithWrapper(
 
 afterEach(() => {
   vi.restoreAllMocks();
+
+  if (originalLocationDescriptor) {
+    Object.defineProperty(globalThis, 'location', originalLocationDescriptor);
+  }
 });
 
 describe('useClerkSafe', () => {
@@ -107,5 +116,46 @@ describe('useClerkSafe', () => {
       credentials: 'include',
     });
     expect(assignMock).toHaveBeenCalledWith('/signin');
+  });
+
+  it('falls back to /api/dev/clear-session when DELETE responds with an error', async () => {
+    const bootstrap: ClientAuthBootstrap = {
+      isAuthenticated: true,
+      userId: 'user_admin',
+      email: 'admin+clerk_test@jov.ie',
+      username: 'browse-admin-user',
+      fullName: 'Browse Admin',
+      isAdmin: true,
+      persona: 'admin',
+    };
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(null, { status: 500 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+
+    Object.defineProperty(globalThis, 'location', {
+      configurable: true,
+      value: {
+        assign: vi.fn(),
+        reload: vi.fn(),
+      },
+    });
+
+    const { result } = renderWithWrapper(({ children }) => (
+      <ClerkSafeBootstrapProvider bootstrap={bootstrap}>
+        {children}
+      </ClerkSafeBootstrapProvider>
+    ));
+
+    await result.current.auth.signOut();
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/dev/test-auth/session', {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/dev/clear-session', {
+      method: 'POST',
+      credentials: 'include',
+    });
   });
 });

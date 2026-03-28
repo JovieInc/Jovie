@@ -101,13 +101,9 @@ function parseFrontendApi(pk: string): string {
   return decoded.replace(/\$$/, '');
 }
 
-function getPersonaEmail(persona: BrowseAuthPersona): string {
+export function getPersonaEmail(persona: BrowseAuthPersona): string {
   if (persona === 'admin') {
-    return (
-      process.env.E2E_CLERK_ADMIN_USERNAME ??
-      process.env.E2E_CLERK_USER_USERNAME ??
-      DEFAULT_ADMIN_EMAIL
-    );
+    return process.env.E2E_CLERK_ADMIN_USERNAME ?? DEFAULT_ADMIN_EMAIL;
   }
 
   return DEFAULT_CREATOR_EMAIL;

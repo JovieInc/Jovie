@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getPersonaEmail,
   parseBrowseAuthArgs,
   parseSetCookieHeaders,
 } from '../../../../../scripts/browse-auth';
@@ -49,5 +50,13 @@ describe('scripts/browse-auth.ts', () => {
         sameSite: 'Lax',
       }),
     ]);
+  });
+
+  it('keeps the admin fallback email distinct from creator credentials', () => {
+    process.env.E2E_CLERK_USER_USERNAME = 'creator+clerk_test@jov.ie';
+    delete process.env.E2E_CLERK_ADMIN_USERNAME;
+
+    expect(getPersonaEmail('admin')).toBe('browse-admin+clerk_test@jov.ie');
+    expect(getPersonaEmail('creator')).toBe('browse+clerk_test@jov.ie');
   });
 });

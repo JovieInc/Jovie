@@ -163,6 +163,25 @@ describe('dev test-auth routes', () => {
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_persona');
   });
 
+  it('rejects non-string persona values on POST /session', async () => {
+    const { POST } = await import('@/app/api/dev/test-auth/session/route');
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/dev/test-auth/session', {
+        method: 'POST',
+        body: JSON.stringify({ persona: 123 }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Invalid persona',
+    });
+  });
+
   it('clears bypass cookies on DELETE /session', async () => {
     const { DELETE } = await import('@/app/api/dev/test-auth/session/route');
     const response = await DELETE(

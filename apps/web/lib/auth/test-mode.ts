@@ -1,3 +1,5 @@
+import { isIPv4 } from 'node:net';
+
 export const TEST_MODE_HEADER = 'x-test-mode';
 export const TEST_USER_ID_HEADER = 'x-test-user-id';
 export const TEST_AUTH_BYPASS_MODE = 'bypass-auth';
@@ -45,6 +47,14 @@ function extractHostname(value: string | null): string | null {
   return normalized.replace(/:\d+$/, '').toLowerCase();
 }
 
+function isPrivateIpv4Literal(hostname: string | null): boolean {
+  if (!hostname || !isIPv4(hostname)) {
+    return false;
+  }
+
+  return PRIVATE_IPV4_BLOCKS.some(pattern => pattern.test(hostname));
+}
+
 export function isTrustedTestBypassHostname(hostname: string | null): boolean {
   const normalizedHostname = hostname?.trim().toLowerCase() ?? null;
 
@@ -55,7 +65,7 @@ export function isTrustedTestBypassHostname(hostname: string | null): boolean {
     normalizedHostname === '[::1]' ||
     Boolean(normalizedHostname?.endsWith('.localhost')) ||
     Boolean(normalizedHostname?.endsWith('.local')) ||
-    PRIVATE_IPV4_BLOCKS.some(pattern => pattern.test(normalizedHostname ?? ''))
+    isPrivateIpv4Literal(normalizedHostname)
   );
 }
 

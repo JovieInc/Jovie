@@ -8,8 +8,6 @@ import {
 } from '@/lib/auth/dev-test-auth.server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
-export const runtime = 'nodejs';
-
 export async function GET(request: NextRequest) {
   const availability = getDevTestAuthAvailability(request.nextUrl.hostname);
 

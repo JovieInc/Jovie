@@ -203,13 +203,13 @@ Notes:
 
 ### Fallback Helper For Non-Loopback Hosts
 
-If you need cookie export for staging or another non-loopback host, use:
+If you need cookie export for a non-loopback preview host that already has a real Clerk test user configured, use:
 
 ```bash
-doppler run -- pnpm tsx scripts/browse-auth.ts --base-url https://staging.jov.ie --persona creator
+doppler run -- pnpm tsx scripts/browse-auth.ts --base-url https://<preview-host> --persona creator
 ```
 
-The helper now prefers the local dev auth route on loopback/private hosts and only uses the Clerk testing-token flow as fallback on non-loopback hosts.
+The helper now prefers the local dev auth route on loopback/private hosts and only uses the Clerk testing-token flow as fallback on non-loopback hosts. That fallback requires real `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, and `E2E_CLERK_USER_USERNAME` values plus a matching live Clerk test account. In practice, localhost with `/api/dev/test-auth/enter?...` is the normal browse path; staging usually uses the live Clerk instance and is not the default flow for this bootstrap.
 
 ### Common Auth Failures
 

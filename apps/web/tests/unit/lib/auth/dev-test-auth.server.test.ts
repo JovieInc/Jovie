@@ -167,6 +167,23 @@ describe('dev-test-auth.server', () => {
     });
   });
 
+  it('keeps the admin persona distinct from creator env defaults', async () => {
+    vi.stubEnv('E2E_CLERK_USER_USERNAME', 'creator+clerk_test@jov.ie');
+    vi.stubEnv('E2E_CLERK_ADMIN_ID', 'user_admin_seed');
+    const { ensureDevTestAuthActor } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    await ensureDevTestAuthActor('admin');
+
+    expect(mockEnsureClerkTestUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'browse-admin+clerk_test@jov.ie',
+        fallbackClerkId: 'user_admin_seed',
+      })
+    );
+  });
+
   it('rejects unsafe redirect targets and preserves app-relative ones', async () => {
     const { sanitizeDevTestAuthRedirectPath } = await import(
       '@/lib/auth/dev-test-auth.server'
