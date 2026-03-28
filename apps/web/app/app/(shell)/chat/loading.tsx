@@ -9,7 +9,12 @@ import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 export default function ChatLoading() {
   return (
     <ChatWorkspaceSurface>
-      <div className='flex h-full flex-col' aria-busy='true' aria-live='polite'>
+      <div
+        className='flex h-full flex-col'
+        aria-busy='true'
+        aria-live='polite'
+        data-testid='chat-loading'
+      >
         <div className='flex-1'>
           <ChatMessageSkeleton />
         </div>

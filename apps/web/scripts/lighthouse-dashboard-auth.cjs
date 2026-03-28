@@ -165,7 +165,6 @@ async function seedDashboardAuth(browser, { url }) {
     } else {
       await page.setCookie(...authCookies);
     }
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
     await page.close();
     return;
   }
@@ -191,7 +190,6 @@ async function seedDashboardAuth(browser, { url }) {
   } else {
     await page.setCookie(...cookies);
   }
-  await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.close();
 }
 
