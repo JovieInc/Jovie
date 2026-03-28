@@ -262,9 +262,37 @@ function parseMemberQueryParams(searchParams: SearchParams) {
 }
 
 /**
+ * Build the click-events aggregation subquery.
+ *
+ * Pre-aggregates streaming clicks and tip click values per audience member
+ * in a single pass, replacing per-row correlated subqueries that previously
+ * executed N times (once per result row).
+ */
+function buildClickAggSubquery(tx: DbSessionTx) {
+  return tx
+    .select({
+      audienceMemberId: clickEvents.audienceMemberId,
+      streamingClicks:
+        drizzleSql<number>`COALESCE(COUNT(*) FILTER (WHERE ${clickEvents.linkType} = 'listen' AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)), 0)`.as(
+          'streaming_clicks'
+        ),
+      tipClickValueCents:
+        drizzleSql<number>`COALESCE(SUM(CASE WHEN ${clickEvents.linkType} = 'tip' AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL) THEN COALESCE((NULLIF(${clickEvents.metadata} ->> 'tipAmountCents', '')::integer), 500) ELSE 0 END), 0)`.as(
+          'tip_click_value_cents'
+        ),
+    })
+    .from(clickEvents)
+    .groupBy(clickEvents.audienceMemberId)
+    .as('click_agg');
+}
+
+/**
  * Build select fields for member query
  */
-function buildMemberSelectFields(includeDetails: boolean) {
+function buildMemberSelectFields(
+  includeDetails: boolean,
+  clickAgg: ReturnType<typeof buildClickAggSubquery>
+) {
   return {
     id: audienceMembers.id,
     type: audienceMembers.type,
@@ -293,27 +321,14 @@ function buildMemberSelectFields(includeDetails: boolean) {
     tipCount: drizzleSql<number>`COALESCE(${tipAudience.tipCount}, 0)`.as(
       'tip_count'
     ),
-    ltvStreamingClicks: drizzleSql<number>`(
-      SELECT COALESCE(COUNT(*), 0)
-      FROM ${clickEvents}
-      WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
-        AND ${clickEvents.linkType} = 'listen'
-        AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
-    )`.as('ltv_streaming_clicks'),
-    ltvTipClickValueCents: drizzleSql<number>`(
-      SELECT COALESCE(
-        SUM(
-          CASE
-            WHEN ${clickEvents.linkType} = 'tip' AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
-              THEN COALESCE((NULLIF(${clickEvents.metadata} ->> 'tipAmountCents', '')::integer), 500)
-            ELSE 0
-          END
-        ),
-        0
-      )
-      FROM ${clickEvents}
-      WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
-    )`.as('ltv_tip_click_value_cents'),
+    ltvStreamingClicks:
+      drizzleSql<number>`COALESCE(${clickAgg.streamingClicks}, 0)`.as(
+        'ltv_streaming_clicks'
+      ),
+    ltvTipClickValueCents:
+      drizzleSql<number>`COALESCE(${clickAgg.tipClickValueCents}, 0)`.as(
+        'ltv_tip_click_value_cents'
+      ),
     ltvMerchSalesCents: drizzleSql<number>`0`.as('ltv_merch_sales_cents'),
     ltvTicketSalesCents: drizzleSql<number>`0`.as('ltv_ticket_sales_cents'),
     tags: audienceMembers.tags,
@@ -419,8 +434,12 @@ async function fetchMembersData(
     cursorCondition
   );
 
+  // Pre-aggregate click events per audience member in a single pass,
+  // avoiding per-row correlated subqueries (O(N) → O(1) subquery).
+  const clickAgg = buildClickAggSubquery(tx);
+
   const baseQuery = tx
-    .select(buildMemberSelectFields(includeDetails))
+    .select(buildMemberSelectFields(includeDetails, clickAgg))
     .from(audienceMembers)
     .innerJoin(
       creatorProfiles,
@@ -434,6 +453,7 @@ async function fetchMembersData(
         eq(tipAudience.email, audienceMembers.email)
       )
     )
+    .leftJoin(clickAgg, eq(clickAgg.audienceMemberId, audienceMembers.id))
     .where(whereClause);
 
   // Fetch pageSize+1 to detect hasMore without COUNT(*) (JOV-1260).
