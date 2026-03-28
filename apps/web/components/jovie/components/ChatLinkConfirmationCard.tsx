@@ -118,7 +118,7 @@ export function ChatLinkConfirmationCard({
 
   if (state === 'added') {
     return (
-      <ContentSurfaceCard className='border-success/20 bg-[color-mix(in_oklab,var(--color-success)_8%,var(--linear-app-content-surface))] p-4'>
+      <ContentSurfaceCard className='border-subtle bg-surface-1 p-4'>
         <div className='flex items-center gap-2 text-success'>
           <Check className='h-4 w-4' />
           <span className='text-sm font-medium'>

@@ -8,6 +8,8 @@
 
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import type { CreatorProfile } from '@/lib/db/schema/profiles';
+import { TIM_WHITE_SPOTIFY_ID } from '@/lib/spotify/blacklist';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 const now = new Date();
 
@@ -20,18 +22,18 @@ const DEFAULT_DEMO_PROFILE: CreatorProfile = {
   userId: 'demo-user-001',
   waitlistEntryId: null,
   creatorType: 'artist',
-  username: 'timwhite',
-  usernameNormalized: 'timwhite',
-  displayName: 'Tim White',
+  username: TIM_WHITE_PROFILE.handle,
+  usernameNormalized: TIM_WHITE_PROFILE.handle,
+  displayName: TIM_WHITE_PROFILE.name,
   bio: 'Artist',
   careerHighlights: null,
   targetPlaylists: null,
   venmoHandle: null,
-  avatarUrl: '/images/avatars/tim-white.jpg',
-  spotifyUrl: 'https://open.spotify.com/artist/demo',
+  avatarUrl: TIM_WHITE_PROFILE.avatarSrc,
+  spotifyUrl: TIM_WHITE_PROFILE.spotifyUrl,
   appleMusicUrl: null,
   youtubeUrl: null,
-  spotifyId: null,
+  spotifyId: TIM_WHITE_SPOTIFY_ID,
   appleMusicId: null,
   youtubeMusicId: null,
   deezerId: null,

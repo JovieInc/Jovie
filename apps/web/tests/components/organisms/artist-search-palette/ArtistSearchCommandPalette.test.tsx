@@ -114,10 +114,11 @@ vi.mock('@/lib/queries', () => ({
 }));
 
 describe('ArtistSearchCommandPalette', () => {
-  it('creates a synthetic Apple Music artist from a pasted url', async () => {
+  it('creates a synthetic Apple Music artist from a manual url', async () => {
     const user = userEvent.setup();
     const onArtistSelect = vi.fn();
     const onOpenChange = vi.fn();
+    const artistUrl = 'https://music.apple.com/us/artist/jovie-artist/12345';
 
     render(
       <ArtistSearchCommandPalette
@@ -128,17 +129,21 @@ describe('ArtistSearchCommandPalette', () => {
       />
     );
 
+    await waitFor(() => {
+      expect(
+        screen.getByPlaceholderText('Search Apple Music artists...')
+      ).toHaveFocus();
+    });
+
     const manualInput = screen.getByTestId(
       'artist-search-manual-input'
     ) as HTMLInputElement;
 
     await user.click(manualInput);
-    await user.paste('https://music.apple.com/us/artist/jovie-artist/12345');
+    await user.type(manualInput, artistUrl);
 
     await waitFor(() => {
-      expect(manualInput.value).toBe(
-        'https://music.apple.com/us/artist/jovie-artist/12345'
-      );
+      expect(manualInput.value).toBe(artistUrl);
     });
 
     const connectButton = screen.getByTestId('artist-search-manual-submit');
@@ -152,7 +157,7 @@ describe('ArtistSearchCommandPalette', () => {
       expect(onArtistSelect).toHaveBeenCalledWith({
         id: '12345',
         name: 'jovie artist',
-        url: 'https://music.apple.com/us/artist/jovie-artist/12345',
+        url: artistUrl,
       });
     });
     expect(onOpenChange).toHaveBeenCalledWith(false);

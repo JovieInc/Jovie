@@ -309,22 +309,22 @@ export function EarningsTab() {
             label='Total revenue'
             value={formatCents(stats?.totalRevenueCents ?? 0)}
             icon={DollarSign}
-            iconBg='bg-success-subtle'
+            iconBg='bg-surface-1 border border-subtle'
             iconColor='text-success'
           />
           <StatCard
             label='Tips received'
             value={String(stats?.totalTips ?? 0)}
             icon={Hash}
-            iconBg='bg-info-subtle'
+            iconBg='bg-surface-1 border border-subtle'
             iconColor='text-info'
           />
           <StatCard
             label='Average tip'
             value={formatCents(stats?.averageTipCents ?? 0)}
             icon={TrendingUp}
-            iconBg='bg-accent-subtle'
-            iconColor='text-accent-token'
+            iconBg='bg-surface-1 border border-subtle'
+            iconColor='text-accent'
           />
         </dl>
       )}
@@ -359,10 +359,10 @@ export function EarningsTab() {
       <ContentSurfaceCard className='p-3 sm:p-4'>
         <div className='flex items-center gap-2 mb-4'>
           <div
-            className='flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-subtle'
+            className='flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-1'
             aria-hidden='true'
           >
-            <QrCode className='h-3.5 w-3.5 text-accent-token' />
+            <QrCode className='h-3.5 w-3.5 text-accent' />
           </div>
           <h2 className='text-[13px] font-[510] text-primary-token'>
             Tip QR Code
