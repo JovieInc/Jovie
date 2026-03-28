@@ -95,9 +95,8 @@ function runAuthSetup(baseUrl: string) {
       'exec',
       'playwright',
       'test',
-      '--project',
-      'auth-setup',
       'tests/e2e/auth.setup.ts',
+      '--project=auth-setup',
     ],
     {
       cwd: webRoot,
