@@ -1,16 +1,17 @@
 import './app-utilities.css';
-import Script from 'next/script';
-import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
+import { ClientProviders } from '@/components/providers/ClientProviders';
+import { publicEnv } from '@/lib/env-public';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AppLayout({
+export default function AppLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
   return (
-    <ResolvedClientProviders>
-      <Script src='/theme-init.js' strategy='beforeInteractive' />
+    <ClientProviders publishableKey={publishableKey} skipCoreProviders>
       {children}
-    </ResolvedClientProviders>
+    </ClientProviders>
   );
 }
