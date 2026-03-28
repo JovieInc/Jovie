@@ -62,11 +62,11 @@ export function ProfileSwitcher() {
               size='xs'
               className='size-[18px] shrink-0 rounded-full'
             />
-            <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground/78 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+            <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
               {selectedProfile?.displayName || 'Select profile'}
             </span>
             <ChevronDown
-              className='size-2.5 shrink-0 text-sidebar-item-icon/55 group-data-[collapsible=icon]:hidden'
+              className='size-2.5 shrink-0 text-sidebar-item-icon group-data-[collapsible=icon]:hidden'
               aria-hidden='true'
             />
           </button>

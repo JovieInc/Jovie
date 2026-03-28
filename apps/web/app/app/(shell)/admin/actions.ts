@@ -13,9 +13,10 @@ import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { isAllowedAvatarHostname } from '@/lib/images/avatar-hosts';
 import {
-  enqueueDspArtistDiscoveryJob,
   enqueueMusicFetchEnrichmentJob,
+  fireDspDiscovery,
 } from '@/lib/ingestion/jobs';
+import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import { sendVerificationApprovedEmail } from '@/lib/verification/notifications';
 
 function safeParseJsonArray(raw: string): unknown {
@@ -178,20 +179,24 @@ export async function bulkRerunCreatorIngestionAction(
         }
 
         // Enqueue DSP artist discovery alongside MusicFetch enrichment
-        if (profile.spotifyId) {
-          void enqueueDspArtistDiscoveryJob({
+        const spotifyArtistId =
+          profile.spotifyId ??
+          (profile.spotifyUrl
+            ? extractSpotifyArtistId(profile.spotifyUrl)
+            : null);
+        if (spotifyArtistId) {
+          fireDspDiscovery({
             creatorProfileId: profile.id,
-            spotifyArtistId: profile.spotifyId,
-            targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
-          }).catch(error => {
-            void captureError(
-              'DSP artist discovery enqueue failed on bulk refresh',
-              error,
-              {
-                action: 'bulkRerunCreatorIngestionAction',
-                creatorProfileId: profile.id,
-              }
-            );
+            spotifyArtistId,
+            onError: error =>
+              void captureError(
+                'DSP artist discovery enqueue failed on bulk refresh',
+                error,
+                {
+                  action: 'bulkRerunCreatorIngestionAction',
+                  creatorProfileId: profile.id,
+                }
+              ),
           });
         }
 

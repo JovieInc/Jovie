@@ -225,7 +225,7 @@ export function ReleaseTable({
       ),
       size: 260,
       minSize: 100,
-      meta: { className: 'hidden pl-2 pr-4 sm:table-cell' },
+      meta: { className: 'max-sm:hidden pl-2 pr-4 sm:table-cell' },
     });
 
     return [releaseColumn, rightMetaColumn];

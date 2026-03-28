@@ -572,6 +572,13 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       req.nextUrl.searchParams.has('handle') ||
       req.nextUrl.searchParams.has('resume');
 
+    // Authenticated users on homepage → redirect to dashboard at the edge.
+    // Skips the client-side AuthRedirectHandler overlay (black flash) entirely.
+    // No getUserState needed — /app handles waitlist/onboarding gating in its layout.
+    if (pathname === '/' && isNavigationMethod && !isRSCPrefetch) {
+      return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
+    }
+
     // Fetch user state ONCE for all authenticated routing decisions
     let userState: ProxyUserState | null = null;
 

@@ -38,8 +38,7 @@ import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { useCodeFlag } from '@/lib/feature-flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import { ProfileSwitcher } from './ProfileSwitcher';
@@ -118,9 +117,7 @@ function SettingsNavigation({
   section: string;
 }) {
   const { selectedProfile, isAdmin } = useDashboardData();
-  const isStripeConnectEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.STRIPE_CONNECT_ENABLED
-  );
+  const isStripeConnectEnabled = useCodeFlag('STRIPE_CONNECT_ENABLED');
   // Prefer the TanStack Query cache (updated by profile mutations) over
   // the server-rendered context so the sidebar reflects name edits immediately.
   const { data: cachedProfileData } = useDashboardProfileQuery();
@@ -166,20 +163,20 @@ function SettingsNavigation({
       className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
     >
       <div>
-        <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+        <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
           Account
         </span>
         <SettingsNavGroup items={userItems} pathname={pathname} />
       </div>
       <div>
-        <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+        <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
           Workspace
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />
       </div>
       {isAdmin && (
         <div>
-          <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+          <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
             Administration
           </span>
           <SettingsNavGroup
@@ -218,12 +215,12 @@ function SidebarHeaderNav({
                 href={APP_ROUTES.DASHBOARD}
                 aria-label='Back to app'
                 className={cn(
-                  'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-app tracking-tight text-sidebar-item-foreground/75 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground/95 [font-weight:var(--font-weight-nav)]',
+                  'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-app tracking-tight text-sidebar-item-foreground transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
                   'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
                 )}
               >
                 <ArrowLeft
-                  className='size-3 text-sidebar-item-icon/70'
+                  className='size-3 text-sidebar-item-icon'
                   aria-hidden='true'
                 />
                 <span className='truncate group-data-[collapsible=icon]:hidden'>
@@ -247,7 +244,7 @@ function SidebarHeaderNav({
                 rounded={false}
                 className='rounded-sm shrink-0'
               />
-              <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground/78 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+              <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
                 Demo
               </span>
             </div>
@@ -275,11 +272,11 @@ function SidebarHeaderNav({
                   rounded={false}
                   className='rounded-sm shrink-0'
                 />
-                <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground/78 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+                <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
                   {isAdmin ? 'Admin' : 'Jovie'}
                 </span>
                 <ChevronDown
-                  className='size-2.5 shrink-0 text-sidebar-item-icon/55 group-data-[collapsible=icon]:hidden'
+                  className='size-2.5 shrink-0 text-sidebar-item-icon group-data-[collapsible=icon]:hidden'
                   aria-hidden='true'
                 />
               </button>
@@ -292,7 +289,7 @@ function SidebarHeaderNav({
         <Link
           href={APP_ROUTES.CHAT}
           aria-label='New thread'
-          className='ml-auto flex size-7 shrink-0 items-center justify-center rounded-full bg-transparent text-sidebar-item-icon/58 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground/95 group-data-[collapsible=icon]:hidden'
+          className='ml-auto flex size-7 shrink-0 items-center justify-center rounded-full bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground group-data-[collapsible=icon]:hidden'
         >
           <SquarePen className='size-3' />
         </Link>
@@ -368,7 +365,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
 
           {isUserAdmin && (
             <div className='pl-2 pr-3.5 pb-2 pt-1'>
-              <span className='text-2xs text-sidebar-muted/80 select-none'>
+              <span className='text-2xs text-sidebar-muted select-none'>
                 v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
                 {process.env.NEXT_PUBLIC_BUILD_SHA
                   ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`

@@ -99,6 +99,7 @@ describe('POST /api/dev/clear-session', () => {
       { name: 'jovie_onboarding_complete', value: '3' },
       { name: 'jovie_impersonate', value: '4' },
       { name: '__investor_token', value: '5' },
+      { name: '__e2e_test_persona', value: 'creator' },
     ];
 
     await POST();
@@ -109,6 +110,7 @@ describe('POST /api/dev/clear-session', () => {
         'jovie_onboarding_complete',
         'jovie_impersonate',
         '__investor_token',
+        '__e2e_test_persona',
       ])
     );
   });

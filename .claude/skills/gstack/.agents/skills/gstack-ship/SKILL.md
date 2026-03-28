@@ -1265,7 +1265,10 @@ First, check if a PR already exists for this branch:
 gh pr view --json number,state,isDraft,url 2>/dev/null
 ```
 
-**If a draft PR exists** (isDraft == true):
+**If the PR is CLOSED or MERGED** (state == "CLOSED" or state == "MERGED"):
+Treat this as "no PR exists" — create a new PR (see below).
+
+**If a draft PR exists** (state == "OPEN" and isDraft == true):
 1. Update the PR title and body with the standard ship template (see body format below).
 2. Mark it ready for review:
    ```bash
@@ -1274,7 +1277,7 @@ gh pr view --json number,state,isDraft,url 2>/dev/null
    ```
 3. Output the PR URL.
 
-**If a non-draft PR already exists** (isDraft == false):
+**If a non-draft PR already exists** (state == "OPEN" and isDraft == false):
 1. Update the body if needed:
    ```bash
    gh pr edit <number> --body "<standard body below>"
@@ -1290,7 +1293,7 @@ gh pr view --json number,state,isDraft,url 2>/dev/null
 
 **Standard PR body format** (used for both create and edit):
 
-```
+```markdown
 ## Summary
 <bullet points from CHANGELOG>
 
@@ -1364,4 +1367,19 @@ doc updates — the user runs `/ship` and documentation stays current without a 
 - **Use Greptile reply templates from greptile-triage.md.** Every reply includes evidence (inline diff, code references, re-rank suggestion). Never post vague replies.
 - **Never push without fresh verification evidence.** If code changed after Step 3 tests, re-run before pushing.
 - **Step 3.4 generates coverage tests.** They must pass before committing. Never commit failing tests.
-- **The goal is: user says `/ship`, next thing they see is the review + PR URL + auto-synced docs.**
+- **The goal is: user says `/ship`, next thing they see is the review + PR URL + auto-synced docs + merged and deployed.**
+
+---
+
+## Step 9: Auto-invoke /land-and-deploy
+
+After the PR is created and docs are synced, automatically land and deploy. Read the
+`land-and-deploy/SKILL.md` skill file (adjacent to this skill's directory) and
+execute its full workflow:
+
+1. Read the `/land-and-deploy` skill: `cat ${CLAUDE_SKILL_DIR}/../land-and-deploy/SKILL.md`
+2. Follow its instructions — it merges the PR, waits for CI and deploy, and verifies
+   production health via canary checks.
+
+This step is automatic. Do not ask the user for confirmation. The goal is zero-friction
+shipping — the user runs `/ship` and the code lands in production without a separate command.

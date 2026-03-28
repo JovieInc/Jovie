@@ -154,6 +154,7 @@ vi.mock('@/lib/ingestion/jobs', () => ({
   enqueueDspArtistDiscoveryJob: vi.fn(),
   enqueueDspTrackEnrichmentJob: mockEnqueueDspTrackEnrichmentJob,
   enqueueMusicFetchEnrichmentJob: vi.fn(),
+  fireDspDiscovery: vi.fn(),
 }));
 
 vi.mock('@/lib/rate-limit', () => ({

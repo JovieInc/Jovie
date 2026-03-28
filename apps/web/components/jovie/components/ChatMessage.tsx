@@ -185,6 +185,7 @@ export function ChatMessage({
   return (
     <motion.div
       data-message-id={id}
+      data-role={role}
       className={cn('flex gap-3.5', isUser ? 'justify-end' : 'justify-start')}
       initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}

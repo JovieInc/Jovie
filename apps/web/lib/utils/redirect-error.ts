@@ -1,10 +1,11 @@
+import { isRedirectError as nextIsRedirectError } from 'next/dist/client/components/redirect-error';
+
 /**
  * Checks if an error is a Next.js redirect error.
- * These are thrown when using redirect() in server components
- * and should be re-thrown to work properly.
+ * Uses Next.js's internal utility which correctly checks the digest format.
  */
 export function isRedirectError(error: unknown): boolean {
-  return error instanceof Error && error.message === 'NEXT_REDIRECT';
+  return nextIsRedirectError(error);
 }
 
 /**

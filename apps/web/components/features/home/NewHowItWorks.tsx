@@ -57,7 +57,7 @@ export function NewHowItWorks() {
                 >
                   {/* Connector line (desktop only) */}
                   {index < steps.length - 1 && (
-                    <div className='hidden md:block absolute top-6 left-[calc(50%+24px)] w-[calc(100%-48px)] h-px bg-surface-3' />
+                    <div className='max-md:hidden absolute top-6 left-[calc(50%+24px)] w-[calc(100%-48px)] h-px bg-surface-3' />
                   )}
 
                   {/* Step number */}
