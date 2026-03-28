@@ -12,14 +12,14 @@ import {
   Input,
 } from '@jovie/ui';
 import { Download, Trash2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { SettingsActionRow } from '@/components/features/dashboard/molecules/SettingsActionRow';
 import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useDeleteAccountMutation, useExportDataMutation } from '@/lib/queries';
 
 export function DataPrivacySection() {
-  const router = useRouter();
+  const { signOut } = useAuthSafe();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
 
@@ -37,12 +37,12 @@ export function DataPrivacySection() {
       {
         onSuccess: () => {
           setDeleteDialogOpen(false);
-          // Redirect to home after deletion
-          router.push('/');
+          // Sign out to clear session cookies, then redirect to home
+          signOut({ redirectUrl: '/' });
         },
       }
     );
-  }, [confirmText, deleteMutation, router]);
+  }, [confirmText, deleteMutation, signOut]);
 
   return (
     <div className='space-y-4'>
