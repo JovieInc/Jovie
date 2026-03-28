@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { checkAppleMusicConnection } from '../dashboard/releases/actions';
-import { ChatPageClient } from './ChatPageClient';
+import { DeferredChatPageClient } from './DeferredChatPageClient';
 
 const CHAT_DESCRIPTION = 'Start a new thread with Jovie AI';
 
@@ -25,7 +25,7 @@ export default async function ChatPage() {
       }));
 
   return (
-    <ChatPageClient
+    <DeferredChatPageClient
       appleMusicConnected={appleMusicResult.connected}
       appleMusicArtistName={appleMusicResult.artistName}
     />
