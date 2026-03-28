@@ -4,7 +4,7 @@ import { Button, type ButtonProps } from '@jovie/ui';
 import { Rocket } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { FEATURE_FLAGS, track, useFeatureFlag } from '@/lib/analytics';
+import { track, useFeatureFlag } from '@/lib/analytics';
 import { useCheckoutMutation } from '@/lib/queries';
 
 interface UpgradeButtonProps {
@@ -26,10 +26,7 @@ export function UpgradeButton({
   const checkoutMutation = useCheckoutMutation();
 
   // Check if direct upgrade is enabled
-  const directUpgradeEnabled = useFeatureFlag(
-    FEATURE_FLAGS.BILLING_UPGRADE_DIRECT,
-    false
-  );
+  const directUpgradeEnabled = useFeatureFlag('BILLING_UPGRADE_DIRECT');
 
   const handleClick = () => {
     // Track upgrade button click

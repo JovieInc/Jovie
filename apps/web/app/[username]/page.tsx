@@ -24,10 +24,9 @@ import type {
 } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
 import {
-  checkGate,
-  FEATURE_FLAG_KEYS,
-  getSubscribeCTAVariant,
-} from '@/lib/feature-flags/server';
+  FEATURE_FLAGS,
+  type SubscribeCTAVariant,
+} from '@/lib/feature-flags/shared';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { getProfileOgImageUrl } from '@/lib/profile/og-image';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
@@ -374,37 +373,17 @@ const getProfileAndLinks = cache(async (username: string) => {
   return getCachedProfileAndLinks(username.toLowerCase());
 });
 
-const PROFILE_FLAG_CACHE_TTL_SECONDS = 5 * 60;
+function getLatestReleaseGate(): boolean {
+  return FEATURE_FLAGS.LATEST_RELEASE_CARD;
+}
 
-const getCachedLatestReleaseGate = unstable_cache(
-  async () => {
-    return checkGate(null, FEATURE_FLAG_KEYS.LATEST_RELEASE_CARD, false);
-  },
-  ['public-profile-latest-release-gate'],
-  {
-    revalidate: PROFILE_FLAG_CACHE_TTL_SECONDS,
-  }
-);
+function getProfileV2Gate(): boolean {
+  return FEATURE_FLAGS.PROFILE_V2;
+}
 
-const getCachedProfileV2Gate = unstable_cache(
-  async () => {
-    return checkGate(null, FEATURE_FLAG_KEYS.PROFILE_V2, false);
-  },
-  ['public-profile-v2-gate'],
-  {
-    revalidate: PROFILE_FLAG_CACHE_TTL_SECONDS,
-  }
-);
-
-const getCachedSubscribeCTAVariant = unstable_cache(
-  async (profileId: string) => {
-    return getSubscribeCTAVariant(profileId);
-  },
-  ['public-profile-subscribe-cta-variant'],
-  {
-    revalidate: PROFILE_FLAG_CACHE_TTL_SECONDS,
-  }
-);
+function getSubscribeCTAVariant(): SubscribeCTAVariant {
+  return 'two_step';
+}
 
 interface Props {
   readonly params: Promise<{
@@ -629,7 +608,7 @@ export default async function ArtistPage({
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
   const profileV2Enabled = isDevProfileV2OverrideEnabled(resolvedSearchParams)
     ? true
-    : await getCachedProfileV2Gate();
+    : getProfileV2Gate();
 
   // NOTE: Cookie access removed from server component to enable static optimization.
   // User-specific behavior (isIdentified, spotifyPreferred) is now handled client-side
@@ -697,17 +676,12 @@ export default async function ArtistPage({
     // Secret not configured — visit tracking will proceed without token auth
   }
 
-  // Cache Statsig decisions for public profile traffic to avoid per-request latency.
-  // Tour dates are parallelized with statsig to eliminate sequential waterfall.
-  const [showLatestRelease, subscribeCTAVariant, tourDates] = await Promise.all(
-    [
-      getCachedLatestReleaseGate(),
-      getCachedSubscribeCTAVariant(profile.id),
-      profileV2Enabled || mode === 'tour'
-        ? getPublicTourDates(profile.id)
-        : Promise.resolve([] as TourDateViewModel[]),
-    ]
-  );
+  // Tour dates are parallelized. Flags are now synchronous code-level reads.
+  const showLatestRelease = getLatestReleaseGate();
+  const subscribeCTAVariant = getSubscribeCTAVariant();
+  const tourDates = await (profileV2Enabled || mode === 'tour'
+    ? getPublicTourDates(profile.id)
+    : Promise.resolve([] as TourDateViewModel[]));
 
   const latestRelease = showLatestRelease ? fetchedLatestRelease : null;
   const subscribeTwoStep = subscribeCTAVariant === 'two_step';
@@ -944,7 +918,7 @@ export async function generateMetadata({
   const { username } = await params;
   const resolvedSearchParams = await searchParams;
   const mode = getProfileMode(resolvedSearchParams?.mode);
-  const profileV2Enabled = await getCachedProfileV2Gate();
+  const profileV2Enabled = getProfileV2Gate();
 
   if (mode === 'listen' && !profileV2Enabled) {
     const lightweightProfile = await getLightweightProfile(username);
