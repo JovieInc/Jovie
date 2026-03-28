@@ -13,6 +13,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Generic "service unavailable" page for suspended users (no account-specific language)
 - Ban check in dashboard layout to cover all `/app` routes
 - Admin audit trail for all suspension/restoration actions with Clerk metadata sync
+- Algorithm Health Check admin page: diagnose Spotify "Fans Also Like" algorithmic positioning with neighbour scoring, size comparison, genre overlap, and bot detection heuristics
+- Spotify FAL analysis API endpoint with HTML scraping, search resolution, and 10-minute caching
+- Authenticity scoring for FAL neighbours: flags suspect artists using follower/popularity ratio, genre assignment, and engagement signals
 
 ### Changed
 
