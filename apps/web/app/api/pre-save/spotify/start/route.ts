@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { providerLinks } from '@/lib/db/schema/content';
-import { checkGate, FEATURE_FLAG_KEYS } from '@/lib/feature-flags/server';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { buildSpotifyAuthorizeUrl } from '@/lib/pre-save/spotify';
 import { encodeSpotifyPreSaveState } from '@/lib/pre-save/state';
 
@@ -20,13 +20,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const isEnabled = await checkGate(
-    null,
-    FEATURE_FLAG_KEYS.SMARTLINK_PRE_SAVE,
-    true
-  );
-
-  if (!isEnabled) {
+  if (!FEATURE_FLAGS.SMARTLINK_PRE_SAVE) {
     return NextResponse.json(
       { error: 'Pre-save is not enabled' },
       { status: 403 }

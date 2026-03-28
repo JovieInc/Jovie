@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { Flagged } from '@/components/features/dev/Flagged';
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -213,9 +214,11 @@ export function DashboardNav(_: DashboardNavProps) {
       )}
 
       {!isInSettings && threadsEnabled && !env.IS_E2E && (
-        <div className='mt-3.5'>
-          <RecentChats />
-        </div>
+        <Flagged name='THREADS_ENABLED'>
+          <div className='mt-3.5'>
+            <RecentChats />
+          </div>
+        </Flagged>
       )}
 
       {isAdmin && !isInSettings && (
