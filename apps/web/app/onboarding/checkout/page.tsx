@@ -13,7 +13,7 @@ import {
   validatePlan,
 } from '@/lib/auth/plan-intent';
 import { PRICING } from '@/lib/config/pricing';
-import { isGrowthPlanEnabled } from '@/lib/stripe/config';
+import { isMaxPlanEnabled } from '@/lib/stripe/config';
 import { OnboardingCheckoutClient } from './OnboardingCheckoutClient';
 
 /**
@@ -41,12 +41,12 @@ function resolvePriceIds(plan: PlanIntentTier): {
         monthlyAmount: PRICING.pro.monthly.amount,
         annualAmount: PRICING.pro.annual.amount,
       };
-    case 'growth':
+    case 'max':
       return {
-        monthlyPriceId: PRICING.growth.monthly.priceId || '',
-        annualPriceId: PRICING.growth.annual.priceId || null,
-        monthlyAmount: PRICING.growth.monthly.amount,
-        annualAmount: PRICING.growth.annual.amount,
+        monthlyPriceId: PRICING.max.monthly.priceId || '',
+        annualPriceId: PRICING.max.annual.priceId || null,
+        monthlyAmount: PRICING.max.monthly.amount,
+        annualAmount: PRICING.max.annual.amount,
       };
     default:
       return {
@@ -132,13 +132,13 @@ export default async function OnboardingCheckoutPage({
 
   // Smart plan recommendation only for organic users with no expressed paid intent.
   // If the user has a paid-intent cookie (e.g., founding), preserve it — don't override
-  // with recommendPlan. Also fall back to pro if Growth plan is disabled.
+  // with recommendPlan. Also fall back to pro if Max plan is disabled.
   const hadPaidIntentFromCookie = isPaidIntent(
     getPlanIntentFromCookies(cookieHeader)
   );
   if (isDefaultUpsell && !hadPaidIntentFromCookie) {
     let recommended = recommendPlan(profileData.spotifyFollowers);
-    if (recommended === 'growth' && !isGrowthPlanEnabled()) {
+    if (recommended === 'max' && !isMaxPlanEnabled()) {
       recommended = DEFAULT_UPSELL_PLAN;
     }
     planIntent = recommended;

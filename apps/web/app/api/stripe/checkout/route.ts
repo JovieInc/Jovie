@@ -22,8 +22,8 @@ import { createCheckoutSession } from '@/lib/stripe/client';
 import {
   getActivePriceIds,
   getPriceMappingDetails,
-  isGrowthPlanEnabled,
-  isGrowthPriceId,
+  isMaxPlanEnabled,
+  isMaxPriceId,
 } from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
 import {
@@ -154,8 +154,8 @@ export async function POST(request: NextRequest) {
     const priceError = await validatePriceId(priceId);
     if (priceError) return priceError;
 
-    if (!isGrowthPlanEnabled() && isGrowthPriceId(priceId)) {
-      return jsonError('Growth plan is not currently available', 403);
+    if (!isMaxPlanEnabled() && isMaxPriceId(priceId)) {
+      return jsonError('Max plan is not currently available', 403);
     }
 
     const priceDetails = getPriceMappingDetails(priceId);

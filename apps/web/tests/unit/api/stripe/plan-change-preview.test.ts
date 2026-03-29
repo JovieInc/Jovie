@@ -5,8 +5,8 @@ const mockAuth = vi.hoisted(() => vi.fn());
 const mockEnsureStripeCustomer = vi.hoisted(() => vi.fn());
 const mockPreviewPlanChange = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
-const mockIsGrowthPlanEnabled = vi.hoisted(() => vi.fn());
-const mockIsGrowthPriceId = vi.hoisted(() => vi.fn());
+const mockIsMaxPlanEnabled = vi.hoisted(() => vi.fn());
+const mockIsMaxPriceId = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({ auth: mockAuth }));
 
@@ -23,8 +23,8 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 vi.mock('@/lib/stripe/config', () => ({
-  isGrowthPlanEnabled: mockIsGrowthPlanEnabled,
-  isGrowthPriceId: mockIsGrowthPriceId,
+  isMaxPlanEnabled: mockIsMaxPlanEnabled,
+  isMaxPriceId: mockIsMaxPriceId,
 }));
 
 vi.mock('@/lib/utils/logger', () => ({
@@ -38,8 +38,8 @@ describe('/api/stripe/plan-change/preview route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-    mockIsGrowthPlanEnabled.mockReturnValue(true);
-    mockIsGrowthPriceId.mockReturnValue(false);
+    mockIsMaxPlanEnabled.mockReturnValue(true);
+    mockIsMaxPriceId.mockReturnValue(false);
   });
 
   it('returns 405 for GET requests', async () => {
@@ -52,24 +52,24 @@ describe('/api/stripe/plan-change/preview route', () => {
     });
   });
 
-  it('returns 403 when growth plan is disabled', async () => {
+  it('returns 403 when max plan is disabled', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockIsGrowthPlanEnabled.mockReturnValue(false);
-    mockIsGrowthPriceId.mockReturnValue(true);
+    mockIsMaxPlanEnabled.mockReturnValue(false);
+    mockIsMaxPriceId.mockReturnValue(true);
 
     const { POST } = await import('@/app/api/stripe/plan-change/preview/route');
     const request = new NextRequest(
       'http://localhost/api/stripe/plan-change/preview',
       {
         method: 'POST',
-        body: JSON.stringify({ priceId: 'price_growth_monthly' }),
+        body: JSON.stringify({ priceId: 'price_max_monthly' }),
       }
     );
 
     const response = await POST(request);
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
-      error: 'Growth plan is not currently available',
+      error: 'Max plan is not currently available',
     });
   });
 
@@ -82,7 +82,7 @@ describe('/api/stripe/plan-change/preview route', () => {
       'http://localhost/api/stripe/plan-change/preview',
       {
         method: 'POST',
-        body: JSON.stringify({ priceId: 'price_growth_monthly' }),
+        body: JSON.stringify({ priceId: 'price_max_monthly' }),
       }
     );
 
@@ -106,7 +106,7 @@ describe('/api/stripe/plan-change/preview route', () => {
       currency: 'usd',
       effectiveDate: new Date('2026-03-01T00:00:00.000Z'),
       currentPlan: 'pro',
-      newPlan: 'growth',
+      newPlan: 'max',
     });
 
     const { POST } = await import('@/app/api/stripe/plan-change/preview/route');
@@ -114,7 +114,7 @@ describe('/api/stripe/plan-change/preview route', () => {
       'http://localhost/api/stripe/plan-change/preview',
       {
         method: 'POST',
-        body: JSON.stringify({ priceId: 'price_growth_monthly' }),
+        body: JSON.stringify({ priceId: 'price_max_monthly' }),
       }
     );
 
@@ -128,12 +128,12 @@ describe('/api/stripe/plan-change/preview route', () => {
       currency: 'usd',
       effectiveDate: '2026-03-01T00:00:00.000Z',
       currentPlan: 'pro',
-      newPlan: 'growth',
+      newPlan: 'max',
       formattedAmount: '$5.99',
     });
     expect(mockPreviewPlanChange).toHaveBeenCalledWith({
       customerId: 'cus_123',
-      newPriceId: 'price_growth_monthly',
+      newPriceId: 'price_max_monthly',
     });
   });
 });

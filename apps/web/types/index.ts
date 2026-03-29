@@ -285,7 +285,7 @@ export function getSocialPlatformLabel(platform: SocialPlatform): string {
   );
 }
 
-export type UserPlan = 'free' | 'founding' | 'pro' | 'growth';
+export type UserPlan = 'free' | 'founding' | 'pro' | 'max';
 
 export interface UserEntitlements {
   userId: string | null;
@@ -294,8 +294,8 @@ export interface UserEntitlements {
   isAdmin: boolean;
   // Plan info
   plan: UserPlan;
-  isPro: boolean; // true for founding, pro, or growth
-  hasAdvancedFeatures: boolean; // true for growth only
+  isPro: boolean; // true for founding, pro, or max
+  hasAdvancedFeatures: boolean; // true for max only
   // Feature gates
   canRemoveBranding: boolean;
   canExportContacts: boolean;
@@ -308,9 +308,21 @@ export interface UserEntitlements {
   canAccessFutureReleases: boolean;
   canSendNotifications: boolean;
   canEditSmartLinks: boolean;
+  canAccessPreSave: boolean;
+  canAccessTipping: boolean;
+  canAccessUrlEncryption: boolean;
+  canAccessStripeConnect: boolean;
+  canAccessFanSubscriptions: boolean;
+  canAccessEmailCampaigns: boolean;
+  canAccessApiKeys: boolean;
+  canAccessTeamManagement: boolean;
+  canAccessWebhooks: boolean;
+  canAccessWhiteLabel: boolean;
+  canAccessAbTesting: boolean;
   // Limits
-  analyticsRetentionDays: number;
+  analyticsRetentionDays: number | null; // null = unlimited (Max tier)
   contactsLimit: number | null; // null = unlimited
   smartLinksLimit: number | null; // null = unlimited, 25 for free tier
   aiDailyMessageLimit: number;
+  aiPitchGenPerRelease: number | null;
 }

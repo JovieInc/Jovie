@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.95] - 2026-03-28
+
+### Added
+
+- Automated YC demo video recording pipeline via Playwright (`doppler run -- pnpm --filter web demo:record`)
+- Video-first `/demo/video` investor page with autoplay, loading states, and screenshot carousel fallback
+- Caption overlay injection in demo recording for silent video context
+- Production environment guard in demo spec to prevent accidental prod user creation
+- Download proxy API route at `/api/demo/download` for cross-origin video downloads
+- WebVTT captions file for accessibility on the demo page
+- `DemoVideoPlayer` component with loading/error/fallback states
+- `BrowserFrame` decorative browser chrome wrapper
+- `DEMO_REUSE_SERVER` option in `playwright.config.demo.ts` to use an existing dev server
+
+### Changed
+
+- Relaxed multi-DSP enrichment assertions in demo spec to best-effort (don't fail recording if enrichment is slow)
+- Simplified onboarding form detection in demo spec to match current UI selectors
+- Presence page converted from card grid to table layout, matching the Releases page pattern with row selection and sidebar integration
+- Insights page wrapped in DashboardWorkspacePanel with PageToolbar, matching all other dashboard pages
+- Right drawer card widths normalized by fixing asymmetric padding that caused cards to be narrower on the right side
+- Drawer tabs card padding aligned with entity header padding for visual consistency
+- Dashboard header action button gap tightened from 6px to 4px for more cohesive grouping
+
+### Removed
+
+- DspPresenceCard component (replaced by DspPresenceTable rows)
+
 ## [26.4.94] - 2026-03-28
 
 ### Added
@@ -12,6 +40,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Audio preview player on release smart link pages: compact player card with play/pause, seek bar, and disabled state when no preview URL is available
 - Preview URL fetching from Spotify full track endpoint during import, carried through `mergeFullTrackMetadata`
 - Parallel database query for primary track preview URL on release page load
+
+### Changed
+
+- Chat empty state content is now vertically centered instead of bottom-anchored, creating a more balanced layout when no conversation is active
 
 ## [26.4.93] - 2026-03-28
 

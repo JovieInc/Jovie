@@ -186,11 +186,11 @@ vi.mock('@/lib/rate-limit/config', () => ({
       window: '1 d',
       prefix: 'ai:chat:daily:pro',
     },
-    aiChatDailyGrowth: {
-      name: 'AI Chat Daily (Growth)',
+    aiChatDailyMax: {
+      name: 'AI Chat Daily (Max)',
       limit: 200,
       window: '1 d',
-      prefix: 'ai:chat:daily:growth',
+      prefix: 'ai:chat:daily:max',
     },
     bandsintownSync: {
       name: 'Bandsintown Sync',
@@ -585,13 +585,13 @@ describe('limiters.ts', () => {
       expect(mockLimit).toHaveBeenCalledTimes(2);
     });
 
-    it('returns success for growth plan', async () => {
+    it('returns success for max plan', async () => {
       mockLimit.mockResolvedValue(makeAllowedResult());
 
       const { checkAiChatRateLimitForPlan } = await import(
         '@/lib/rate-limit/limiters'
       );
-      const result = await checkAiChatRateLimitForPlan('user-1', 'growth');
+      const result = await checkAiChatRateLimitForPlan('user-1', 'max');
 
       expect(result.success).toBe(true);
       expect(mockLimit).toHaveBeenCalledTimes(2);
@@ -643,7 +643,7 @@ describe('limiters.ts', () => {
       );
     });
 
-    it('returns daily quota failure without upgrade message for growth plan', async () => {
+    it('returns daily quota failure without upgrade message for max plan', async () => {
       mockLimit
         .mockResolvedValueOnce(makeAllowedResult())
         .mockResolvedValueOnce(makeDeniedResult());
@@ -651,7 +651,7 @@ describe('limiters.ts', () => {
       const { checkAiChatRateLimitForPlan } = await import(
         '@/lib/rate-limit/limiters'
       );
-      const result = await checkAiChatRateLimitForPlan('user-1', 'growth');
+      const result = await checkAiChatRateLimitForPlan('user-1', 'max');
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe(
@@ -879,16 +879,13 @@ describe('limiters.ts', () => {
       expect(mockLimit).toHaveBeenCalledWith('profile-1');
     });
 
-    it('returns success when under limit for growth plan', async () => {
+    it('returns success when under limit for max plan', async () => {
       mockLimit.mockResolvedValue(makeAllowedResult());
 
       const { checkAppleMusicRescanRateLimit } = await import(
         '@/lib/rate-limit/limiters'
       );
-      const result = await checkAppleMusicRescanRateLimit(
-        'profile-1',
-        'growth'
-      );
+      const result = await checkAppleMusicRescanRateLimit('profile-1', 'max');
 
       expect(result.success).toBe(true);
       expect(mockLimit).toHaveBeenCalledWith('profile-1');
@@ -935,16 +932,13 @@ describe('limiters.ts', () => {
       expect(result.reason).not.toContain('Upgrade');
     });
 
-    it('returns failure without upgrade message for growth plan', async () => {
+    it('returns failure without upgrade message for max plan', async () => {
       mockLimit.mockResolvedValue(makeDeniedResult());
 
       const { checkAppleMusicRescanRateLimit } = await import(
         '@/lib/rate-limit/limiters'
       );
-      const result = await checkAppleMusicRescanRateLimit(
-        'profile-1',
-        'growth'
-      );
+      const result = await checkAppleMusicRescanRateLimit('profile-1', 'max');
 
       expect(result.success).toBe(false);
       expect(result.reason).toContain('1 hour');
@@ -997,13 +991,13 @@ describe('limiters.ts', () => {
       expect(mockLimit).toHaveBeenCalledWith('release-1');
     });
 
-    it('returns success when under limit for growth plan', async () => {
+    it('returns success when under limit for max plan', async () => {
       mockLimit.mockResolvedValue(makeAllowedResult());
 
       const { checkReleaseRefreshRateLimit } = await import(
         '@/lib/rate-limit/limiters'
       );
-      const result = await checkReleaseRefreshRateLimit('release-1', 'growth');
+      const result = await checkReleaseRefreshRateLimit('release-1', 'max');
 
       expect(result.success).toBe(true);
       expect(mockLimit).toHaveBeenCalledWith('release-1');
@@ -1050,13 +1044,13 @@ describe('limiters.ts', () => {
       expect(result.reason).not.toContain('Upgrade');
     });
 
-    it('returns failure without upgrade message for growth plan', async () => {
+    it('returns failure without upgrade message for max plan', async () => {
       mockLimit.mockResolvedValue(makeDeniedResult());
 
       const { checkReleaseRefreshRateLimit } = await import(
         '@/lib/rate-limit/limiters'
       );
-      const result = await checkReleaseRefreshRateLimit('release-1', 'growth');
+      const result = await checkReleaseRefreshRateLimit('release-1', 'max');
 
       expect(result.success).toBe(false);
       expect(result.reason).toContain('1 hour');

@@ -472,12 +472,12 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
-  /** AI Chat daily quota (Growth): derived from ENTITLEMENT_REGISTRY */
-  aiChatDailyGrowth: {
-    name: 'AI Chat Daily (Growth)',
-    limit: ENTITLEMENT_REGISTRY.growth.limits.aiDailyMessageLimit,
+  /** AI Chat daily quota (Max): derived from ENTITLEMENT_REGISTRY */
+  aiChatDailyMax: {
+    name: 'AI Chat Daily (Max)',
+    limit: ENTITLEMENT_REGISTRY.max.limits.aiDailyMessageLimit,
     window: '1 d',
-    prefix: 'ai:chat:daily:growth',
+    prefix: 'ai:chat:daily:max',
     analytics: true,
   } satisfies RateLimitConfig,
 

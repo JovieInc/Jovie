@@ -20,7 +20,7 @@ async function submitGrowthAccessRequest(
   input: GrowthAccessRequestInput
 ): Promise<GrowthAccessRequestResponse> {
   return fetchWithTimeout<GrowthAccessRequestResponse>(
-    '/api/growth-access-request',
+    '/api/max-access-request',
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

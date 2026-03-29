@@ -30,7 +30,7 @@ export interface PlanGateEntitlements {
   isLoading: boolean;
   /** Whether the billing lookup failed (503, network error, etc.) */
   isError: boolean;
-  /** Whether the user has any paid plan (pro or growth) */
+  /** Whether the user has any paid plan (pro or max) */
   isPro: boolean;
   /** User's current plan */
   plan: string | null;
@@ -46,7 +46,7 @@ export interface PlanGateEntitlements {
   canExportContacts: boolean;
   /** Pro: can be verified */
   canBeVerified: boolean;
-  /** AI: can use tools (pro/growth) */
+  /** AI: can use tools (pro/max) */
   aiCanUseTools: boolean;
   /** Pro: can create releases manually (not just auto-sync) */
   canCreateManualReleases: boolean;
@@ -56,14 +56,38 @@ export interface PlanGateEntitlements {
   canSendNotifications: boolean;
   /** Pro: can edit smartlink content (artwork, links, slugs) */
   canEditSmartLinks: boolean;
+  /** Max: can access pre-save campaigns */
+  canAccessPreSave: boolean;
+  /** Max: can access fan tipping */
+  canAccessTipping: boolean;
+  /** Max: can access URL encryption */
+  canAccessUrlEncryption: boolean;
+  /** Max: can access Stripe Connect payouts */
+  canAccessStripeConnect: boolean;
+  /** Max: can access fan subscriptions */
+  canAccessFanSubscriptions: boolean;
+  /** Max: can access email campaigns */
+  canAccessEmailCampaigns: boolean;
+  /** Max: can access API keys */
+  canAccessApiKeys: boolean;
+  /** Max: can access team management */
+  canAccessTeamManagement: boolean;
+  /** Max: can access webhooks */
+  canAccessWebhooks: boolean;
+  /** Max: can access white-label features */
+  canAccessWhiteLabel: boolean;
+  /** Max: can access A/B testing */
+  canAccessAbTesting: boolean;
   /** Analytics retention days based on plan */
-  analyticsRetentionDays: number;
+  analyticsRetentionDays: number | null;
   /** Contact limit based on plan (null = unlimited) */
   contactsLimit: number | null;
   /** Smart link limit based on plan (null = unlimited) */
   smartLinksLimit: number | null;
   /** AI daily message limit based on plan */
   aiDailyMessageLimit: number;
+  /** AI pitch generations per release based on plan (null = unlimited) */
+  aiPitchGenPerRelease: number | null;
 }
 
 /**
@@ -82,12 +106,10 @@ export function usePlanGate(): PlanGateEntitlements {
   const plan = data?.plan ?? null;
 
   let planKey: PlanId;
-  if (plan === 'growth') {
-    planKey = 'growth';
-  } else if (plan === 'pro') {
+  if (plan === 'max' || plan === 'growth') {
+    planKey = 'max';
+  } else if (plan === 'pro' || plan === 'founding') {
     planKey = 'pro';
-  } else if (plan === 'founding') {
-    planKey = 'founding';
   } else {
     planKey = 'free';
   }
