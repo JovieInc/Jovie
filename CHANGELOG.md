@@ -11,6 +11,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - "New Release" button on dashboard did nothing when clicked — AddReleaseSidebar was rendered inline inside an `overflow-hidden` container instead of through the right panel system
 - Zombie drawer: add-release form would reappear after closing a release or track sidebar because `addReleaseOpen` state was never cleared when opening other sidebars
+- Consolidated suggested identity cards into single unified card (was two separate cards with header split from content)
+- Profile image cropping on DSP match suggestions (64px fixed height → responsive 3:1 aspect ratio)
+- Purple accent buttons in suggested identity carousel replaced with grayscale design system primary buttons
+- Dismiss button in profile-ready card now disabled during action to prevent double-dismiss
 
 ## [26.4.97] - 2026-03-28
 
