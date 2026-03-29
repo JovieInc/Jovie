@@ -113,7 +113,7 @@ function FunnelStage({
         <div
           className={cn(
             'h-full rounded-full transition-[width] duration-300 ease-out',
-            BAR_OPACITY[barIndex] ?? BAR_OPACITY[BAR_OPACITY.length - 1]
+            BAR_OPACITY[barIndex] ?? BAR_OPACITY.at(-1)
           )}
           style={{ width: `${Math.max(barPercent, 2)}%` }}
         />
