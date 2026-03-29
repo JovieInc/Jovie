@@ -1,6 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { discogReleases } from '@/lib/db/schema/content';
@@ -99,7 +99,7 @@ export interface ArtworkUploadResult {
 }
 
 export async function POST(request: NextRequest) {
-  const { userId: clerkUserId } = await auth();
+  const { userId: clerkUserId } = await getCachedAuth();
   if (!clerkUserId) {
     return errorResponse(
       'Please sign in to upload artwork.',

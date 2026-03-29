@@ -1,8 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-
 import { requireAdmin } from '@/lib/admin';
 import {
   endImpersonation,
@@ -11,6 +9,7 @@ import {
   isImpersonationEnabled,
   startImpersonation,
 } from '@/lib/admin/impersonation';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureCriticalError } from '@/lib/error-tracking';
 import {
   adminImpersonateLimiter,
@@ -36,7 +35,7 @@ export async function GET() {
   if (authError) return authError;
 
   // Apply rate limiting (5 attempts per hour per admin)
-  const { userId: adminClerkId } = await auth();
+  const { userId: adminClerkId } = await getCachedAuth();
   if (!adminClerkId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
@@ -116,7 +115,7 @@ export async function POST(request: Request) {
   if (authError) return authError;
 
   // Apply rate limiting (5 attempts per hour per admin)
-  const { userId: adminClerkId } = await auth();
+  const { userId: adminClerkId } = await getCachedAuth();
   const clientIp = getClientIP(request);
   const rateLimitKey = adminClerkId ?? `ip:${clientIp}`;
   const rateLimitResult = await adminImpersonateLimiter.limit(rateLimitKey);
@@ -215,7 +214,7 @@ export async function DELETE() {
   if (authError) return authError;
 
   // Apply rate limiting (5 attempts per hour per admin)
-  const { userId: adminClerkId } = await auth();
+  const { userId: adminClerkId } = await getCachedAuth();
   if (!adminClerkId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }

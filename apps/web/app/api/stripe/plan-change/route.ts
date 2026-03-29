@@ -18,8 +18,8 @@
  *   - Cancel a scheduled plan change (downgrade)
  */
 
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { isGrowthPlanEnabled, isGrowthPriceId } from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
@@ -40,7 +40,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
  */
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET() {
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -207,7 +207,7 @@ export async function GET() {
  */
 export async function DELETE() {
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
