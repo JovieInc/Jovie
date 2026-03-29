@@ -392,7 +392,28 @@ function parseJsonOutput(output: string, message: string) {
   if (!trimmed) {
     throw new Error(message);
   }
-  return JSON.parse(trimmed) as unknown;
+  // The output may contain non-JSON preamble (Doppler warnings, pnpm noise).
+  // Find the first '{' and extract JSON from there.
+  const jsonStart = trimmed.indexOf('{');
+  if (jsonStart === -1) {
+    throw new Error(message);
+  }
+  // Find matching closing brace by parsing from jsonStart
+  const jsonCandidate = trimmed.slice(jsonStart);
+  let depth = 0;
+  let jsonEnd = -1;
+  for (let i = 0; i < jsonCandidate.length; i++) {
+    if (jsonCandidate[i] === '{') depth++;
+    else if (jsonCandidate[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        jsonEnd = i + 1;
+        break;
+      }
+    }
+  }
+  const jsonStr = jsonEnd > 0 ? jsonCandidate.slice(0, jsonEnd) : jsonCandidate;
+  return JSON.parse(jsonStr) as unknown;
 }
 
 function measureDashboardSample(baseUrl: string, authPath?: string) {
