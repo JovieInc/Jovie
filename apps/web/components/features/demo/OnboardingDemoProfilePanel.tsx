@@ -2,7 +2,7 @@
 
 import { Disc3 } from 'lucide-react';
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Avatar } from '@/components/molecules/Avatar';
 import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
@@ -94,6 +94,13 @@ export function OnboardingDemoProfilePanel({
     activeLinks.length,
     snapshot.releases.length,
   ]);
+
+  // Reset to 'about' when the active tab is no longer available (e.g. navigating backward)
+  useEffect(() => {
+    if (!tabOptions.some(t => t.value === activeTab)) {
+      setActiveTab('about');
+    }
+  }, [tabOptions, activeTab]);
 
   const tabContent = (() => {
     switch (activeTab) {
