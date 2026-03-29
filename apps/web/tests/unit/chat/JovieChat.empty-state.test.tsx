@@ -169,13 +169,11 @@ describe('JovieChat empty state', () => {
 
     expect(getByText('Welcome back')).toBeTruthy();
     expect(
-      getByText(
-        'Welcome back, Tim. Your subscribers jumped 23% in LA this week.'
-      )
+      getByText('Your subscribers jumped 23% in LA this week.')
     ).toBeTruthy();
-    expect(getByText('Preview my profile')).toBeTruthy();
-    expect(getByText('Change profile photo')).toBeTruthy();
-    expect(getByText('Set up a release link')).toBeTruthy();
+    expect(getByText('Preview profile')).toBeTruthy();
+    expect(getByText('Change photo')).toBeTruthy();
+    expect(getByText('Release link')).toBeTruthy();
     expect(
       queryByRole('button', {
         name: 'Your subscribers jumped 23% in LA this week',
@@ -191,9 +189,7 @@ describe('JovieChat empty state', () => {
     );
 
     expect(
-      getByText(
-        "Welcome back, Tim. You've received 2 tips since you last checked in."
-      )
+      getByText("You've received 2 tips since your last check-in.")
     ).toBeTruthy();
   });
 

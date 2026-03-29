@@ -14,7 +14,9 @@ import {
 } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { BASE_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
+import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { HandleStatusIcon } from './HandleStatusIcon';
 import type { ClaimHandleFormProps } from './types';
@@ -200,7 +202,9 @@ export function ClaimHandleForm({
       e.preventDefault();
       setFormSubmitted(true);
 
-      if (!handle.trim()) {
+      const normalizedHandle = handle.toLowerCase().trim();
+
+      if (!normalizedHandle) {
         inputRef.current?.focus();
         return;
       }
@@ -208,11 +212,20 @@ export function ClaimHandleForm({
       try {
         sessionStorage.setItem(
           'pendingClaim',
-          JSON.stringify({ handle: handle.toLowerCase(), ts: Date.now() })
+          JSON.stringify({ handle: normalizedHandle, ts: Date.now() })
         );
       } catch {}
 
-      const target = `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`;
+      const currentPath =
+        globalThis.location?.pathname.replace(/\/+$/, '') ?? '';
+      if (currentPath === APP_ROUTES.LANDING_NEW) {
+        track('landing_cta_claim_handle', {
+          section: 'final_cta',
+          handle: normalizedHandle,
+        });
+      }
+
+      const target = `/onboarding?handle=${encodeURIComponent(normalizedHandle)}`;
 
       setNavigating(true);
 
