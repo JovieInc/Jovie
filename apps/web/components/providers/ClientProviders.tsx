@@ -2,6 +2,7 @@
 
 import { ClerkProvider } from '@clerk/nextjs';
 import { ui } from '@clerk/ui';
+import { TooltipProvider } from '@jovie/ui';
 import React from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -38,7 +39,9 @@ function wrapWithCoreProviders({
   skipCoreProviders,
 }: WrappedProvidersOptions) {
   const content = skipCoreProviders ? (
-    <QueryProvider>{children}</QueryProvider>
+    <QueryProvider>
+      <TooltipProvider delayDuration={1200}>{children}</TooltipProvider>
+    </QueryProvider>
   ) : (
     <CoreProviders initialThemeMode={initialThemeMode}>
       {children}
