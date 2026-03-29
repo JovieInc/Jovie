@@ -9,9 +9,15 @@ export function buildPillLabel(link: DetectedLink): string {
   ).trim();
   const suggested = (link.suggestedTitle || '').trim();
 
-  // Strip " on Platform" suffix from suggested titles (e.g., "@timwhite on YouTube")
+  // Strip auto-generated title patterns:
+  //   "@timwhite on YouTube" → "@timwhite"
+  //   "TikTok (@username)"  → "@username"
   const cleanSuggested = (() => {
     if (!suggested) return '';
+    // "Platform (@handle)" pattern (TikTok, etc.)
+    const parenMatch = suggested.match(/\(@([^)]+)\)/);
+    if (parenMatch) return `@${parenMatch[1]}`;
+    // "Handle on Platform" pattern
     const onIdx = suggested.toLowerCase().indexOf(' on ');
     if (onIdx !== -1) {
       return suggested.slice(0, onIdx).trim();

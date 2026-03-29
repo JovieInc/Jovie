@@ -83,6 +83,8 @@ export interface FitScoreBreakdown {
   hasContactEmail?: number;
   /** Has paid verification on social platforms (Twitter/X, Instagram, Facebook, Threads) - max 10 points */
   paidVerification?: number;
+  /** SoundCloud Pro/Pro Unlimited/Next Pro subscription (music-specific paid, stronger signal) - max 10 points */
+  soundcloudPro?: number;
   /** Has tracking pixels on link-in-bio (Facebook, TikTok, Google) - max 5 points */
   hasTrackingPixels?: number;
   /** Metadata about the scoring */
@@ -95,6 +97,7 @@ export interface FitScoreBreakdown {
     alternativeDspPlatforms?: string[];
     dspPlatformCount?: number;
     paidVerificationPlatforms?: string[];
+    soundcloudProTier?: string;
   };
 }
 

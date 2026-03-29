@@ -221,6 +221,53 @@ describe('link-display-utils', () => {
       });
     });
 
+    describe('SoundCloud reserved routes', () => {
+      it('should return host for /discover, /stream, etc.', () => {
+        for (const route of [
+          'discover',
+          'stream',
+          'charts',
+          'search',
+          'upload',
+          'you',
+          'settings',
+        ]) {
+          expect(
+            compactUrlDisplay('soundcloud', `https://soundcloud.com/${route}`)
+          ).toBe('soundcloud.com');
+        }
+      });
+
+      it('should still extract handles for real usernames', () => {
+        expect(
+          compactUrlDisplay('soundcloud', 'https://soundcloud.com/djsnake')
+        ).toBe('@djsnake');
+      });
+    });
+
+    describe('Twitch reserved routes', () => {
+      it('should return host for /directory, /settings, etc.', () => {
+        for (const route of [
+          'directory',
+          'settings',
+          'wallet',
+          'drops',
+          'subscriptions',
+          'search',
+        ]) {
+          expect(
+            compactUrlDisplay('twitch', `https://twitch.tv/${route}`)
+          ).toBe('twitch.tv');
+        }
+      });
+
+      it('should still extract handles for real usernames', () => {
+        expect(compactUrlDisplay('twitch', 'https://twitch.tv/ninja')).toBe(
+          '@ninja'
+        );
+      });
+    });
+
     describe('edge cases', () => {
       it('should return empty string for empty URL', () => {
         expect(compactUrlDisplay('instagram', '')).toBe('');

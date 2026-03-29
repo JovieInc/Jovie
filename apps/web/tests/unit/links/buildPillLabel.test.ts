@@ -79,6 +79,22 @@ describe('buildPillLabel', () => {
       });
       expect(buildPillLabel(link)).toBe('@testuser');
     });
+
+    it('should extract handle from "Platform (@handle)" auto-generated titles', () => {
+      const link = createLink({
+        platform: {
+          id: 'tiktok',
+          name: 'TikTok',
+          category: 'social',
+          icon: 'tiktok',
+          color: '#000000',
+          placeholder: 'https://www.tiktok.com/@',
+        },
+        suggestedTitle: 'TikTok (@itstimwhite)',
+        normalizedUrl: 'https://www.tiktok.com/@itstimwhite',
+      });
+      expect(buildPillLabel(link)).toBe('@itstimwhite');
+    });
   });
 
   describe('YouTube channel ID handling', () => {

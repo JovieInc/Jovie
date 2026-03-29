@@ -135,6 +135,20 @@ export const PLATFORM_DISPLAY_HANDLERS: PlatformDisplayHandler[] = [
     match: id => id === 'soundcloud',
     format: ({ host, first }) => {
       if (!first) return host;
+      if (
+        [
+          'discover',
+          'stream',
+          'charts',
+          'search',
+          'upload',
+          'you',
+          'settings',
+          'messages',
+          'stations',
+        ].includes(first)
+      )
+        return host;
       return formatAsHandle(first);
     },
   },
@@ -164,6 +178,20 @@ export const PLATFORM_DISPLAY_HANDLERS: PlatformDisplayHandler[] = [
     match: id => id === 'twitch',
     format: ({ host, first }) => {
       if (!first) return host;
+      if (
+        [
+          'directory',
+          'settings',
+          'wallet',
+          'drops',
+          'subscriptions',
+          'search',
+          'downloads',
+          'videos',
+          'p',
+        ].includes(first)
+      )
+        return host;
       return formatAsHandle(first);
     },
   },
