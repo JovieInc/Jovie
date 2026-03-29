@@ -73,7 +73,8 @@ export interface MockDiscoverySnapshot {
 
 export const DEMO_SELECTED_ARTIST: MockSelectedArtist = {
   id: '4NHQUGzhtTLFvgF5SZesLK',
-  imageUrl: 'https://i.scdn.co/image/ab6761610000e5eb4293385bf5c9f34c02966e7a',
+  imageUrl:
+    'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop',
   name: 'Tove Lo',
   url: 'https://open.spotify.com/artist/4NHQUGzhtTLFvgF5SZesLK',
 };
@@ -135,7 +136,7 @@ export const DEMO_DISCOVERY_SNAPSHOT: MockDiscoverySnapshot = {
     activeSinceYear: 2012,
     appleMusicConnected: true,
     avatarUrl:
-      'https://i.scdn.co/image/ab6761610000e5eb4293385bf5c9f34c02966e7a',
+      'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop',
     bio: 'Swedish singer-songwriter known for dark pop anthems and genre-bending production.',
     displayName: 'Tove Lo',
     genres: ['Dark Pop', 'Electropop', 'Swedish Pop', 'Dance Pop'],
@@ -150,7 +151,7 @@ export const DEMO_DISCOVERY_SNAPSHOT: MockDiscoverySnapshot = {
       id: 'rel-1',
       title: 'Dirt Femme',
       artworkUrl:
-        'https://i.scdn.co/image/ab67616d0000b27399760620b5e8a1b49db3b399',
+        'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&h=300&fit=crop',
       releaseDate: '2022-10-14',
       spotifyPopularity: 54,
     },
@@ -158,7 +159,7 @@ export const DEMO_DISCOVERY_SNAPSHOT: MockDiscoverySnapshot = {
       id: 'rel-2',
       title: 'Sunshine Kitty',
       artworkUrl:
-        'https://i.scdn.co/image/ab67616d0000b273e7c28c0e20e1b3455e0c81fc',
+        'https://images.unsplash.com/photo-1501612780327-45045538702b?w=300&h=300&fit=crop',
       releaseDate: '2019-09-20',
       spotifyPopularity: 48,
     },
@@ -166,7 +167,7 @@ export const DEMO_DISCOVERY_SNAPSHOT: MockDiscoverySnapshot = {
       id: 'rel-3',
       title: 'Blue Lips',
       artworkUrl:
-        'https://i.scdn.co/image/ab67616d0000b2731d33ef44ae0dfae76a6e2141',
+        'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&h=300&fit=crop',
       releaseDate: '2017-11-17',
       spotifyPopularity: 42,
     },
@@ -174,7 +175,7 @@ export const DEMO_DISCOVERY_SNAPSHOT: MockDiscoverySnapshot = {
       id: 'rel-4',
       title: 'Lady Wood',
       artworkUrl:
-        'https://i.scdn.co/image/ab67616d0000b2737dbcafa65e3159fd9b3c3685',
+        'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&h=300&fit=crop',
       releaseDate: '2016-10-28',
       spotifyPopularity: 40,
     },
@@ -182,7 +183,7 @@ export const DEMO_DISCOVERY_SNAPSHOT: MockDiscoverySnapshot = {
       id: 'rel-5',
       title: 'Queen of the Clouds',
       artworkUrl:
-        'https://i.scdn.co/image/ab67616d0000b2735a015a8cc39e0c83e99e5eec',
+        'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=300&h=300&fit=crop',
       releaseDate: '2014-09-30',
       spotifyPopularity: 50,
     },
@@ -268,7 +269,7 @@ export const DEMO_SPOTIFY_SEARCH_RESULTS: MockSpotifySearchResult[] = [
     id: '4NHQUGzhtTLFvgF5SZesLK',
     name: 'Tove Lo',
     imageUrl:
-      'https://i.scdn.co/image/ab6761610000e5eb4293385bf5c9f34c02966e7a',
+      'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop',
     followers: 4_200_000,
     url: 'https://open.spotify.com/artist/4NHQUGzhtTLFvgF5SZesLK',
   },
