@@ -1,5 +1,5 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
 import { captureError } from '@/lib/error-tracking';
 
@@ -141,7 +141,7 @@ function validateSearchQuery(q: string | undefined): NextResponse | null {
  * - Data sanitization
  */
 export async function GET(request: NextRequest) {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   const { searchParams } = request.nextUrl;
   const q = searchParams.get('q')?.trim();
   const limitParam = searchParams.get('limit');
