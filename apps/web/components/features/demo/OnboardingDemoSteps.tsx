@@ -55,7 +55,7 @@ interface StepFrameProps {
 
 function StepFrame({ actions, children, prompt, title }: StepFrameProps) {
   return (
-    <div className='mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 pt-[20vh] pb-8 sm:px-6'>
+    <div className='flex w-full flex-col gap-6 pt-[20vh] pb-8'>
       <div className='space-y-2'>
         <h1 className='text-2xl font-[620] tracking-[-0.04em] text-primary-token sm:text-3xl'>
           {title}
