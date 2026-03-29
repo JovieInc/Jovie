@@ -37,7 +37,7 @@ export function DashboardHeader({
     <header
       data-testid='dashboard-header'
       className={cn(
-        'z-20 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) backdrop-blur-[12px]',
+        'z-20 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
         className
       )}
     >
