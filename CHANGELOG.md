@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.97] - 2026-03-28
+
+### Added
+
+- SoundCloud Pro badge detection via SC API v2 as independent fit score signal (+10 points)
+- New scoring criterion `soundcloudPro` in fit scoring system (stacks independently with social paid verification)
+- SoundCloud strategy module with config, detection, and storage (`ingestion/strategies/soundcloud/`)
+- Negative detection support: clears stale Pro flags when subscription lapses
+- Immediate fit score recalculation after Pro status detection
+- Non-blocking SC Pro detection hook in MusicFetch enrichment pipeline
+
+### Changed
+
+- Fit score version bumped from 4 to 5 (new SoundCloud Pro signal)
+- Fit score theoretical max increased from 125 to 135 (still capped at 100)
+
 ## [26.4.96] - 2026-03-28
 
 ### Added
