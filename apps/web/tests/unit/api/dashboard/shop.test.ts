@@ -111,7 +111,7 @@ describe('GET /api/dashboard/shop', () => {
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.shopifyUrl).toBeDefined();
+    expect(body.shopifyUrl).toBe('https://mystore.myshopify.com');
   });
 
   it('returns 404 when profile not found', async () => {
@@ -153,6 +153,48 @@ describe('PUT /api/dashboard/shop', () => {
     const response = await PUT(request);
 
     expect(response.status).toBe(401);
+  });
+
+  it('saves valid shopify URL and invalidates cache', async () => {
+    hoisted.withDbSessionMock.mockImplementation(async (callback: Function) => {
+      return callback('clerk_123');
+    });
+
+    // Mock the DB query chain for profile lookup
+    hoisted.selectLimitMock.mockResolvedValue([
+      {
+        id: 'profile_1',
+        username: 'artist',
+        usernameNormalized: 'artist',
+        settings: {},
+      },
+    ]);
+    hoisted.selectWhereMock.mockReturnValue({ limit: hoisted.selectLimitMock });
+    hoisted.selectInnerJoinMock.mockReturnValue({
+      where: hoisted.selectWhereMock,
+    });
+    hoisted.selectFromMock.mockReturnValue({
+      innerJoin: hoisted.selectInnerJoinMock,
+    });
+    hoisted.selectMock.mockReturnValue({ from: hoisted.selectFromMock });
+
+    // Mock update chain
+    hoisted.updateWhereMock.mockResolvedValue(undefined);
+    hoisted.updateSetMock.mockReturnValue({ where: hoisted.updateWhereMock });
+    hoisted.updateMock.mockReturnValue({ set: hoisted.updateSetMock });
+    hoisted.invalidateProfileCacheMock.mockResolvedValue(undefined);
+
+    const { PUT } = await import('@/app/api/dashboard/shop/route');
+    const request = new Request('http://localhost/api/dashboard/shop', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shopifyUrl: 'https://test.myshopify.com' }),
+    });
+    const response = await PUT(request);
+
+    expect(response.status).toBe(200);
+    expect(hoisted.updateMock).toHaveBeenCalled();
+    expect(hoisted.invalidateProfileCacheMock).toHaveBeenCalled();
   });
 
   it('returns 500 on unexpected error', async () => {

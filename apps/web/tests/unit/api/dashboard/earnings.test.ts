@@ -133,14 +133,15 @@ describe('GET /api/dashboard/earnings', () => {
     expect(body.tippers).toHaveLength(1);
   });
 
-  it('returns 500 when auth fails (withDbSessionTx rejects)', async () => {
+  it('returns 401 when auth fails', async () => {
     hoisted.withDbSessionTxMock.mockRejectedValue(new Error('Unauthorized'));
 
     const { GET } = await import('@/app/api/dashboard/earnings/route');
     const response = await GET();
 
-    expect(response.status).toBe(500);
-    expect(hoisted.captureErrorMock).toHaveBeenCalled();
+    expect(response.status).toBe(401);
+    // Unauthorized errors should NOT be reported to Sentry
+    expect(hoisted.captureErrorMock).not.toHaveBeenCalled();
   });
 
   it('returns 500 on error and reports to Sentry', async () => {

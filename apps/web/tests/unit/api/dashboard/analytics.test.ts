@@ -82,8 +82,11 @@ describe('GET /api/dashboard/analytics', () => {
 
   it('returns zeroed stats when profile not found', async () => {
     hoisted.requireAuthMock.mockResolvedValue('user_123');
-    // Profile-not-found error comes from the data layer, not auth
-    hoisted.cacheQueryMock.mockRejectedValue(
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
+      analyticsRetentionDays: 30,
+    });
+    // Profile-not-found error comes from the analytics data layer, not auth
+    hoisted.getUserDashboardAnalyticsMock.mockRejectedValue(
       new Error('Creator profile not found for user')
     );
 
