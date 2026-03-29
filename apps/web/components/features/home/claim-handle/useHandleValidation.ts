@@ -97,7 +97,7 @@ export function useHandleValidation(handle: string): HandleValidationResult {
   const handleError = useMemo(() => {
     if (!handle) return null;
     if (handle.length < 3) return 'Handle must be at least 3 characters';
-    if (handle.length > 30) return 'Handle must be less than 30 characters';
+    if (handle.length > 24) return 'Handle must be no more than 24 characters';
     if (!hasOnlyLowercaseLettersNumbersAndHyphens(handle))
       return 'Handle can only contain lowercase letters, numbers, and hyphens';
     if (handle.startsWith('-') || handle.endsWith('-'))

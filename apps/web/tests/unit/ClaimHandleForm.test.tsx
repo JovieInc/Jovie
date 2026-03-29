@@ -100,6 +100,17 @@ describe('ClaimHandleForm', () => {
     ).toBeInTheDocument();
   });
 
+  test('shows validation message for handles longer than 24 characters', () => {
+    render(<ClaimHandleForm />);
+
+    const input = screen.getByRole('textbox', { name: /choose your handle/i });
+    fireEvent.change(input, { target: { value: 'a'.repeat(25) } });
+
+    expect(
+      screen.getByText(/Handle must be no more than 24 characters/i)
+    ).toBeInTheDocument();
+  });
+
   test('does not inject inline animation styles (moved to globals.css)', () => {
     render(<ClaimHandleForm />);
 
