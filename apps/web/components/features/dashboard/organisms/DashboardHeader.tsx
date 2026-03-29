@@ -96,7 +96,7 @@ export function DashboardHeader({
           )}
         </div>
         {action ? (
-          <div className='ml-auto flex items-center gap-1.5'>{action}</div>
+          <div className='ml-auto flex items-center gap-1'>{action}</div>
         ) : null}
       </div>
     </header>
