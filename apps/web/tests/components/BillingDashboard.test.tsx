@@ -211,17 +211,16 @@ describe('BillingDashboard', () => {
       expect(screen.getByText('Compare Plans')).toBeInTheDocument();
     });
 
-    const growthEnabled =
-      process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+    const maxEnabled = process.env.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
 
     expect(screen.getByText('Free')).toBeInTheDocument();
     expect(screen.getByText('Pro')).toBeInTheDocument();
 
-    // Growth plan is gated behind NEXT_PUBLIC_FEATURE_GROWTH_PLAN flag
-    if (growthEnabled) {
-      expect(screen.getByText('Growth')).toBeInTheDocument();
+    // Max plan is gated behind NEXT_PUBLIC_FEATURE_MAX_PLAN flag
+    if (maxEnabled) {
+      expect(screen.getByText('Max')).toBeInTheDocument();
     } else {
-      expect(screen.queryByText('Growth')).not.toBeInTheDocument();
+      expect(screen.queryByText('Max')).not.toBeInTheDocument();
     }
   });
 

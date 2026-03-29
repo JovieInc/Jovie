@@ -146,7 +146,7 @@ export async function GET(request: Request) {
           INNER JOIN ${users} u ON u.id = cp.user_id
           WHERE cp.is_claimed = true
             AND cp.user_id IS NOT NULL
-            AND (u.plan IN ('pro', 'founding', 'growth') OR u.is_pro = true)
+            AND (u.plan IN ('pro', 'founding', 'max') OR u.is_pro = true)
             AND NOT EXISTS (
               SELECT 1 FROM ${insightGenerationRuns} igr
               WHERE igr.creator_profile_id = cp.id

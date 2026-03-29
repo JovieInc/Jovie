@@ -7,8 +7,8 @@ const mockCreateBillingPortalSession = vi.hoisted(() => vi.fn());
 const mockEnsureStripeCustomer = vi.hoisted(() => vi.fn());
 const mockGetActivePriceIds = vi.hoisted(() => vi.fn());
 const mockGetPriceMappingDetails = vi.hoisted(() => vi.fn());
-const mockIsGrowthPlanEnabled = vi.hoisted(() => vi.fn());
-const mockIsGrowthPriceId = vi.hoisted(() => vi.fn());
+const mockIsMaxPlanEnabled = vi.hoisted(() => vi.fn());
+const mockIsMaxPriceId = vi.hoisted(() => vi.fn());
 const mockStripeSubscriptionsList = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -32,8 +32,8 @@ vi.mock('@/lib/stripe/customer-sync', () => ({
 vi.mock('@/lib/stripe/config', () => ({
   getActivePriceIds: mockGetActivePriceIds,
   getPriceMappingDetails: mockGetPriceMappingDetails,
-  isGrowthPlanEnabled: mockIsGrowthPlanEnabled,
-  isGrowthPriceId: mockIsGrowthPriceId,
+  isMaxPlanEnabled: mockIsMaxPlanEnabled,
+  isMaxPriceId: mockIsMaxPriceId,
   PRICE_MAPPINGS: {
     price_123: {
       priceId: 'price_123',
@@ -50,8 +50,8 @@ describe('POST /api/stripe/checkout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-    mockIsGrowthPlanEnabled.mockReturnValue(true);
-    mockIsGrowthPriceId.mockReturnValue(false);
+    mockIsMaxPlanEnabled.mockReturnValue(true);
+    mockIsMaxPriceId.mockReturnValue(false);
     mockGetActivePriceIds.mockReturnValue(['price_123']);
     mockGetPriceMappingDetails.mockReturnValue({
       priceId: 'price_123',
@@ -85,23 +85,23 @@ describe('POST /api/stripe/checkout', () => {
     expect(data.error).toBe('Unauthorized');
   });
 
-  it('returns 403 when growth plan is disabled', async () => {
+  it('returns 403 when max plan is disabled', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockGetActivePriceIds.mockReturnValue(['price_growth']);
-    mockIsGrowthPlanEnabled.mockReturnValue(false);
-    mockIsGrowthPriceId.mockReturnValue(true);
+    mockGetActivePriceIds.mockReturnValue(['price_max']);
+    mockIsMaxPlanEnabled.mockReturnValue(false);
+    mockIsMaxPriceId.mockReturnValue(true);
 
     const { POST } = await import('@/app/api/stripe/checkout/route');
     const request = new NextRequest('http://localhost/api/stripe/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ priceId: 'price_growth' }),
+      body: JSON.stringify({ priceId: 'price_max' }),
     });
 
     const response = await POST(request);
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
-      error: 'Growth plan is not currently available',
+      error: 'Max plan is not currently available',
     });
   });
 

@@ -21,7 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureCriticalError } from '@/lib/error-tracking';
-import { isGrowthPlanEnabled, isGrowthPriceId } from '@/lib/stripe/config';
+import { isMaxPlanEnabled, isMaxPriceId } from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
 import {
   cancelScheduledPlanChange,
@@ -58,9 +58,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!isGrowthPlanEnabled() && isGrowthPriceId(priceId)) {
+    if (!isMaxPlanEnabled() && isMaxPriceId(priceId)) {
       return NextResponse.json(
-        { error: 'Growth plan is not currently available' },
+        { error: 'Max plan is not currently available' },
         { status: 403, headers: NO_STORE_HEADERS }
       );
     }
@@ -176,9 +176,9 @@ export async function GET() {
     }
 
     const hasScheduledChange = !!subscription?.schedule;
-    const availableChanges = isGrowthPlanEnabled()
+    const availableChanges = isMaxPlanEnabled()
       ? planOptions.availableChanges
-      : planOptions.availableChanges.filter(change => change.plan !== 'growth');
+      : planOptions.availableChanges.filter(change => change.plan !== 'max');
 
     return NextResponse.json(
       {

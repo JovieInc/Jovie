@@ -10,7 +10,7 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 
 type ChatUsageSnapshot = {
-  plan: 'free' | 'pro' | 'growth';
+  plan: 'free' | 'pro' | 'max';
   dailyLimit: number;
   used: number;
   remaining: number;
@@ -26,11 +26,12 @@ type StaleChatUsageSnapshot = ChatUsageSnapshot & {
 const CHAT_USAGE_CACHE_KEY_PREFIX = 'chat:usage:v1:';
 const CHAT_USAGE_CACHE_TTL_SECONDS = 60 * 60; // 1 hour
 
-function resolvePlan(
-  plan: string | null | undefined
-): 'free' | 'pro' | 'growth' {
-  if (plan === 'pro' || plan === 'growth') {
-    return plan;
+function resolvePlan(plan: string | null | undefined): 'free' | 'pro' | 'max' {
+  if (plan === 'max' || plan === 'growth') {
+    return 'max';
+  }
+  if (plan === 'pro') {
+    return 'pro';
   }
   return 'free';
 }

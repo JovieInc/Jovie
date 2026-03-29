@@ -24,8 +24,8 @@ export function SettingsBillingSection() {
   const hasStripeCustomer = billingData?.hasStripeCustomer ?? false;
   const isStale = billingData?.stale ?? false;
   const planLabel =
-    billingData?.plan === 'growth'
-      ? 'Growth'
+    billingData?.plan === 'max' || billingData?.plan === 'growth'
+      ? 'Max'
       : billingData?.plan === 'pro'
         ? 'Pro'
         : 'Free';

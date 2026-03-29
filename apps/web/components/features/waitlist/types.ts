@@ -6,7 +6,7 @@ export interface FormErrors {
 
 export type SocialPlatform = 'instagram' | 'tiktok' | 'youtube' | 'other';
 
-export const ALLOWED_PLANS = new Set(['free', 'branding', 'pro', 'growth']);
+export const ALLOWED_PLANS = new Set(['free', 'branding', 'pro', 'max']);
 
 export const WAITLIST_STORAGE_KEYS = {
   step: 'waitlist_step',

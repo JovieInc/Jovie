@@ -84,18 +84,11 @@ const proConfig: RateLimitConfig = {
   prefix: 'test:pro',
 };
 
-const growthConfig: RateLimitConfig = {
-  name: 'test-growth',
+const maxConfig: RateLimitConfig = {
+  name: 'test-max',
   limit: 500,
   window: '1 d',
-  prefix: 'test:growth',
-};
-
-const foundingConfig: RateLimitConfig = {
-  name: 'test-founding',
-  limit: 150,
-  window: '1 d',
-  prefix: 'test:founding',
+  prefix: 'test:max',
 };
 
 // ---------------------------------------------------------------------------
@@ -175,7 +168,7 @@ describe('plan-aware-limiter.ts', () => {
       expect(mockLimit).toHaveBeenCalledWith('user-1');
     });
 
-    it('uses growth config for growth plan', async () => {
+    it('uses max config for max plan', async () => {
       mockLimit.mockResolvedValue(makeAllowedResult({ limit: 500 }));
 
       const { createPlanAwareRateLimiter } = await import(
@@ -186,18 +179,18 @@ describe('plan-aware-limiter.ts', () => {
         configs: {
           free: freeConfig,
           pro: proConfig,
-          growth: growthConfig,
+          max: maxConfig,
         },
       });
 
-      const result = await limiter.limit('user-1', 'growth');
+      const result = await limiter.limit('user-1', 'max');
 
       expect(result.success).toBe(true);
       expect(mockLimit).toHaveBeenCalledWith('user-1');
     });
 
-    it('uses founding config when explicitly defined', async () => {
-      mockLimit.mockResolvedValue(makeAllowedResult({ limit: 150 }));
+    it('normalizes founding to pro config', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult({ limit: 100 }));
 
       const { createPlanAwareRateLimiter } = await import(
         '@/lib/rate-limit/plan-aware-limiter'
@@ -207,7 +200,6 @@ describe('plan-aware-limiter.ts', () => {
         configs: {
           free: freeConfig,
           pro: proConfig,
-          founding: foundingConfig,
         },
       });
 
@@ -333,7 +325,7 @@ describe('plan-aware-limiter.ts', () => {
       expect(result.success).toBe(true);
     });
 
-    it('uses founding config when explicitly defined (not pro)', async () => {
+    it('always normalizes founding to pro even if founding config provided', async () => {
       const { createPlanAwareRateLimiter } = await import(
         '@/lib/rate-limit/plan-aware-limiter'
       );
@@ -342,13 +334,11 @@ describe('plan-aware-limiter.ts', () => {
         configs: {
           free: freeConfig,
           pro: proConfig,
-          founding: foundingConfig,
         },
       });
 
       const config = limiter.getConfigForPlan('founding');
-      expect(config).toEqual(foundingConfig);
-      expect(config).not.toEqual(proConfig);
+      expect(config).toEqual(proConfig);
     });
 
     it('uses free config for founding when neither founding nor pro defined', async () => {
@@ -582,15 +572,15 @@ describe('plan-aware-limiter.ts', () => {
         configs: {
           free: freeConfig,
           pro: proConfig,
-          growth: growthConfig,
-          founding: foundingConfig,
+          max: maxConfig,
         },
       });
 
       expect(limiter.getConfigForPlan('free')).toEqual(freeConfig);
       expect(limiter.getConfigForPlan('pro')).toEqual(proConfig);
-      expect(limiter.getConfigForPlan('growth')).toEqual(growthConfig);
-      expect(limiter.getConfigForPlan('founding')).toEqual(foundingConfig);
+      expect(limiter.getConfigForPlan('max')).toEqual(maxConfig);
+      // founding normalizes to pro
+      expect(limiter.getConfigForPlan('founding')).toEqual(proConfig);
     });
 
     it('returns free config for undefined configs', async () => {
@@ -605,7 +595,7 @@ describe('plan-aware-limiter.ts', () => {
         },
       });
 
-      expect(limiter.getConfigForPlan('growth')).toEqual(freeConfig);
+      expect(limiter.getConfigForPlan('max')).toEqual(freeConfig);
     });
   });
 

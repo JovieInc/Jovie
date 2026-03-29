@@ -42,7 +42,7 @@ export {
   adminFitScoresLimiter,
   adminImpersonateLimiter,
   aiChatDailyFreeLimiter,
-  aiChatDailyGrowthLimiter,
+  aiChatDailyMaxLimiter,
   aiChatDailyPlanAwareLimiter,
   aiChatDailyProLimiter,
   aiChatLimiter,

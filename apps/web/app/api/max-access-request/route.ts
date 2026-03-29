@@ -1,7 +1,7 @@
 /**
- * Growth Plan Early Access Request API
+ * Max Plan Early Access Request API
  *
- * Allows authenticated users to request early access to the Growth plan.
+ * Allows authenticated users to request early access to the Max plan.
  * Stores the request on the user record and sends a Slack notification.
  */
 
@@ -16,7 +16,7 @@ import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { notifySlackGrowthRequest } from '@/lib/notifications/providers/slack';
 import { logger } from '@/lib/utils/logger';
 
-const growthAccessSchema = z.object({
+const maxAccessSchema = z.object({
   reason: z
     .string()
     .trim()
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const parsed = growthAccessSchema.safeParse(body);
+    const parsed = maxAccessSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
@@ -61,10 +61,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if already on Growth plan
-    if (user.plan === 'growth') {
+    // Check if already on Max plan (or legacy Growth plan)
+    if (user.plan === 'max' || user.plan === 'growth') {
       return NextResponse.json(
-        { error: 'You already have the Growth plan' },
+        { error: 'You already have the Max plan' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     // Check if already requested
     if (user.growthAccessRequestedAt) {
       return NextResponse.json(
-        { error: 'You have already requested Growth access' },
+        { error: 'You have already requested Max access' },
         { status: 409, headers: NO_STORE_HEADERS }
       );
     }
@@ -94,19 +94,19 @@ export async function POST(request: Request) {
       user.plan ?? 'free',
       reason
     ).catch(err => {
-      logger.error('[growth-access] Failed to send Slack notification', err);
+      logger.error('[max-access] Failed to send Slack notification', err);
     });
 
-    logger.info('[growth-access] Request submitted', {
+    logger.info('[max-access] Request submitted', {
       userId: user.id,
       plan: user.plan,
     });
 
     return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
   } catch (err) {
-    logger.error('[growth-access] Request failed', err);
-    captureError('Growth access request failed', err, {
-      route: '/api/growth-access-request',
+    logger.error('[max-access] Request failed', err);
+    captureError('Max access request failed', err, {
+      route: '/api/max-access-request',
     });
     return NextResponse.json(
       { error: 'Failed to submit request' },

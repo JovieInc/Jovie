@@ -29,7 +29,7 @@ vi.mock('@/lib/stripe/config', () => ({
     .mockReturnValue([
       'price_pro_monthly',
       'price_pro_yearly',
-      'price_growth_monthly',
+      'price_max_monthly',
     ]),
   getPriceMappingDetails: vi.fn().mockImplementation((priceId: string) => {
     const mapping: Record<string, any> = {
@@ -37,19 +37,19 @@ vi.mock('@/lib/stripe/config', () => ({
         plan: 'pro',
         interval: 'month',
         description: 'Pro Monthly',
-        amount: 3900,
+        amount: 2000,
       },
       price_pro_yearly: {
         plan: 'pro',
         interval: 'year',
         description: 'Pro Yearly',
-        amount: 34800,
+        amount: 19200,
       },
-      price_growth_monthly: {
-        plan: 'growth',
+      price_max_monthly: {
+        plan: 'max',
         interval: 'month',
-        description: 'Growth Monthly',
-        amount: 9900,
+        description: 'Max Monthly',
+        amount: 20000,
       },
     };
     return mapping[priceId] ?? null;
@@ -59,22 +59,22 @@ vi.mock('@/lib/stripe/config', () => ({
       priceId: 'price_pro_monthly',
       plan: 'pro',
       interval: 'month',
-      amount: 3900,
+      amount: 2000,
       description: 'Pro Monthly',
     },
     price_pro_yearly: {
       priceId: 'price_pro_yearly',
       plan: 'pro',
       interval: 'year',
-      amount: 34800,
+      amount: 19200,
       description: 'Pro Yearly',
     },
-    price_growth_monthly: {
-      priceId: 'price_growth_monthly',
-      plan: 'growth',
+    price_max_monthly: {
+      priceId: 'price_max_monthly',
+      plan: 'max',
       interval: 'month',
-      amount: 9900,
-      description: 'Growth Monthly',
+      amount: 20000,
+      description: 'Max Monthly',
     },
   },
 }));
@@ -91,28 +91,28 @@ describe('plan-change', () => {
       expect(isPlanUpgrade('free', 'pro')).toBe(true);
     });
 
-    it('should detect upgrade from free to growth', () => {
-      expect(isPlanUpgrade('free', 'growth')).toBe(true);
+    it('should detect upgrade from free to max', () => {
+      expect(isPlanUpgrade('free', 'max')).toBe(true);
     });
 
-    it('should detect upgrade from pro to growth', () => {
-      expect(isPlanUpgrade('pro', 'growth')).toBe(true);
+    it('should detect upgrade from pro to max', () => {
+      expect(isPlanUpgrade('pro', 'max')).toBe(true);
     });
 
     it('should not detect upgrade for same plan', () => {
       expect(isPlanUpgrade('pro', 'pro')).toBe(false);
     });
 
-    it('should not detect upgrade for downgrade from growth to pro', () => {
-      expect(isPlanUpgrade('growth', 'pro')).toBe(false);
+    it('should not detect upgrade for downgrade from max to pro', () => {
+      expect(isPlanUpgrade('max', 'pro')).toBe(false);
     });
 
     it('should not detect upgrade for downgrade from pro to free', () => {
       expect(isPlanUpgrade('pro', 'free')).toBe(false);
     });
 
-    it('should not detect upgrade for downgrade from growth to free', () => {
-      expect(isPlanUpgrade('growth', 'free')).toBe(false);
+    it('should not detect upgrade for downgrade from max to free', () => {
+      expect(isPlanUpgrade('max', 'free')).toBe(false);
     });
   });
 
