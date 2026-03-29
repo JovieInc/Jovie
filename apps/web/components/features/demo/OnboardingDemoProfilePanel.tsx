@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useMemo } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Avatar } from '@/components/molecules/Avatar';
-import { DrawerLinkSection } from '@/components/molecules/drawer/DrawerLinkSection';
+import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
 import { DrawerStatGrid } from '@/components/molecules/drawer/DrawerStatGrid';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
 import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
@@ -18,10 +18,6 @@ import {
 } from './mock-onboarding-data';
 import type { StepId } from './OnboardingDemoSteps';
 
-/**
- * Which profile sections are visible at each step.
- * The panel progressively reveals content as the user advances.
- */
 function getVisibleSections(step: StepId) {
   const order: StepId[] = [
     'handle',
@@ -36,12 +32,12 @@ function getVisibleSections(step: StepId) {
   ];
   const idx = order.indexOf(step);
   return {
-    header: true, // always show identity
-    hasArtist: idx >= 2, // after spotify confirm
-    stats: idx >= 4, // after upgrade, when DSPs start
-    dsps: idx >= 4, // dsp step and beyond
-    social: idx >= 5, // social step and beyond
-    releases: idx >= 6, // releases step and beyond
+    header: true,
+    hasArtist: idx >= 2,
+    stats: idx >= 4,
+    dsps: idx >= 4,
+    social: idx >= 5,
+    releases: idx >= 6,
   };
 }
 
@@ -69,8 +65,8 @@ export function OnboardingDemoProfilePanel({
       className='hidden shrink-0 overflow-y-auto overscroll-contain xl:block'
       style={{ width: SIDEBAR_WIDTH }}
     >
-      <div className='space-y-4 px-3 py-8'>
-        {/* Identity card — always visible, progressively fills */}
+      <div className='space-y-3 px-3 py-8'>
+        {/* Identity card — always pinned */}
         <DrawerSurfaceCard variant='card' className='p-4'>
           <EntityHeaderCard
             image={
@@ -99,30 +95,36 @@ export function OnboardingDemoProfilePanel({
               ) : null
             }
           />
+
+          {/* Stats inline under identity */}
+          {visible.stats ? (
+            <div className='mt-3 border-t border-subtle pt-3'>
+              <DrawerStatGrid variant='flush'>
+                <StatTile
+                  label='Releases'
+                  value={
+                    visible.releases
+                      ? String(snapshot.counts.releaseCount)
+                      : '—'
+                  }
+                />
+                <StatTile label='DSPs' value={String(confirmedDsps.length)} />
+                <StatTile
+                  label='Social'
+                  value={
+                    visible.social
+                      ? String(snapshot.counts.activeSocialCount)
+                      : '—'
+                  }
+                />
+              </DrawerStatGrid>
+            </div>
+          ) : null}
         </DrawerSurfaceCard>
 
-        {/* Stats — visible from DSP step onward */}
-        {visible.stats ? (
-          <DrawerStatGrid variant='card'>
-            <StatTile
-              label='Releases'
-              value={
-                visible.releases ? String(snapshot.counts.releaseCount) : '—'
-              }
-            />
-            <StatTile label='DSPs' value={String(confirmedDsps.length)} />
-            <StatTile
-              label='Social'
-              value={
-                visible.social ? String(snapshot.counts.activeSocialCount) : '—'
-              }
-            />
-          </DrawerStatGrid>
-        ) : null}
-
-        {/* DSPs — visible from DSP step onward */}
+        {/* Collapsible sections */}
         {visible.dsps && confirmedDsps.length > 0 ? (
-          <DrawerLinkSection title='Platforms' isEmpty={false}>
+          <DrawerSection title='Platforms' surface='card'>
             {confirmedDsps.map(item => (
               <SidebarLinkRow
                 key={item.id}
@@ -137,12 +139,11 @@ export function OnboardingDemoProfilePanel({
                 url={item.externalArtistUrl || '#'}
               />
             ))}
-          </DrawerLinkSection>
+          </DrawerSection>
         ) : null}
 
-        {/* Social links — visible from social step onward */}
         {visible.social && activeLinks.length > 0 ? (
-          <DrawerLinkSection title='Social' isEmpty={false}>
+          <DrawerSection title='Social' surface='card'>
             {activeLinks.map(link => (
               <SidebarLinkRow
                 key={`${link.kind}:${link.id}`}
@@ -158,12 +159,11 @@ export function OnboardingDemoProfilePanel({
                 deepLinkPlatform={link.platform}
               />
             ))}
-          </DrawerLinkSection>
+          </DrawerSection>
         ) : null}
 
-        {/* Releases — visible from releases step onward */}
         {visible.releases && snapshot.releases.length > 0 ? (
-          <DrawerLinkSection title='Releases' isEmpty={false}>
+          <DrawerSection title='Releases' surface='card'>
             {snapshot.releases.slice(0, 4).map(release => (
               <SidebarLinkRow
                 key={release.id}
@@ -194,7 +194,7 @@ export function OnboardingDemoProfilePanel({
                 }
               />
             ))}
-          </DrawerLinkSection>
+          </DrawerSection>
         ) : null}
       </div>
     </aside>
