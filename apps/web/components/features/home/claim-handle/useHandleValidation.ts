@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
+import { hasOnlyLowercaseLettersNumbersAndHyphens } from '@/lib/validation/handle';
 
 export interface HandleValidationResult {
   handleError: string | null;
@@ -96,8 +97,8 @@ export function useHandleValidation(handle: string): HandleValidationResult {
   const handleError = useMemo(() => {
     if (!handle) return null;
     if (handle.length < 3) return 'Handle must be at least 3 characters';
-    if (handle.length > 30) return 'Handle must be less than 30 characters';
-    if (!/^[a-z0-9-]+$/.test(handle))
+    if (handle.length > 24) return 'Handle must be no more than 24 characters';
+    if (!hasOnlyLowercaseLettersNumbersAndHyphens(handle))
       return 'Handle can only contain lowercase letters, numbers, and hyphens';
     if (handle.startsWith('-') || handle.endsWith('-'))
       return 'Handle cannot start or end with a hyphen';

@@ -13,7 +13,7 @@
  *   public/product-screenshots/
  */
 
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
   assertNoDevOverlays,
   hideTransientUI,
@@ -26,6 +26,16 @@ import {
 /** The seeded E2E test user's username handle */
 const PROFILE_USERNAME = 'e2e-test-user';
 
+async function assertProfileLoaded(
+  page: import('@playwright/test').Page
+): Promise<void> {
+  await expect(page).toHaveURL(new RegExp(`/${PROFILE_USERNAME}$`));
+  await expect(page.locator('body')).not.toContainText('Page not found');
+  await expect(page.locator('body')).not.toContainText(
+    'The link you followed may be broken'
+  );
+}
+
 test.describe('Product Screenshots – Public Profile', () => {
   test('profile – phone viewport', async ({ page }) => {
     test.setTimeout(120_000);
@@ -37,6 +47,7 @@ test.describe('Product Screenshots – Public Profile', () => {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
     });
+    await assertProfileLoaded(page);
 
     // Wait for profile content to load — look for profile-specific elements
     // (not img[alt] which matches hidden dark-mode logos)
@@ -70,6 +81,7 @@ test.describe('Product Screenshots – Public Profile', () => {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
     });
+    await assertProfileLoaded(page);
 
     await page
       .locator('[data-testid="profile-header"], h1, main img[alt]:visible')

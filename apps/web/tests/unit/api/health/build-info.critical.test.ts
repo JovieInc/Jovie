@@ -3,26 +3,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mockConsoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 const mutableEnv = process.env as Record<string, string | undefined>;
 let originalNodeEnv: string | undefined;
-
-vi.mock('node:fs', async importOriginal => {
-  const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
-    default: actual,
-    readFileSync: vi.fn(() => {
-      throw new Error('missing build id');
-    }),
-  };
-});
+let mockProcessCwd: ReturnType<typeof vi.spyOn<typeof process, 'cwd'>>;
 
 describe('@critical GET /api/health/build-info', () => {
   beforeEach(() => {
     originalNodeEnv = mutableEnv.NODE_ENV;
     vi.clearAllMocks();
     vi.resetModules();
+    mockProcessCwd = vi
+      .spyOn(process, 'cwd')
+      .mockReturnValue(`/tmp/jovie-build-info-missing-${Date.now()}`);
   });
 
   afterEach(() => {
+    mockProcessCwd.mockRestore();
+
     if (originalNodeEnv === undefined) {
       delete mutableEnv.NODE_ENV;
       return;

@@ -87,7 +87,7 @@ export function SuggestedPrompts({
           const cleanTitle = latestReleaseTitle.trim();
           return {
             ...suggestion,
-            label: `Set up a link for “${cleanTitle}”`,
+            label: `Link “${cleanTitle}”`,
             prompt: `Set up a link for ${cleanTitle}.`,
           };
         }
@@ -107,7 +107,7 @@ export function SuggestedPrompts({
             const cleanTitle = latestReleaseTitle.trim();
             return {
               ...PITCH_SUGGESTION,
-              label: `Generate pitches for “${cleanTitle}”`,
+              label: `Pitches for “${cleanTitle}”`,
               prompt: `Generate playlist pitches for ${cleanTitle}.`,
             };
           }
@@ -118,11 +118,19 @@ export function SuggestedPrompts({
   return (
     <div className='w-full max-w-[46rem]'>
       <div
-        className={CHAT_PROMPT_RAIL_SCROLL_CLASS}
+        className={cn(
+          CHAT_PROMPT_RAIL_SCROLL_CLASS,
+          'md:overflow-visible md:[mask-image:none] md:[-webkit-mask-image:none]'
+        )}
         style={CHAT_PROMPT_RAIL_MASK_STYLE}
         data-testid='suggested-prompts-rail'
       >
-        <div className={CHAT_PROMPT_RAIL_CLASS}>
+        <div
+          className={cn(
+            CHAT_PROMPT_RAIL_CLASS,
+            'md:flex-wrap md:justify-center md:gap-2'
+          )}
+        >
           {promptSuggestions.map(suggestion => (
             <SuggestionPill
               key={suggestion.label}

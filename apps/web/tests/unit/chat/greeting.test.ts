@@ -34,7 +34,6 @@ const emptyTippingStats = {
 describe('buildGreeting', () => {
   it('builds the first-session greeting with a profile link', () => {
     const greeting = buildGreeting({
-      displayName: 'Tim',
       username: 'timwhite',
       isFirstSession: true,
       insights: [],
@@ -43,7 +42,7 @@ describe('buildGreeting', () => {
 
     expect(greeting).toEqual({
       label: 'Artist ready',
-      body: 'Welcome, Tim. Your profile is live at',
+      body: 'Your profile is live at',
       profileHref: 'https://jov.ie/timwhite',
       profileLabel: 'jov.ie/timwhite',
     });
@@ -51,7 +50,6 @@ describe('buildGreeting', () => {
 
   it('falls back to jov.ie when the username is missing on first session', () => {
     const greeting = buildGreeting({
-      displayName: 'Tim',
       isFirstSession: true,
       insights: [],
       tippingStats: emptyTippingStats,
@@ -63,22 +61,18 @@ describe('buildGreeting', () => {
 
   it('uses the top insight for returning users', () => {
     const greeting = buildGreeting({
-      displayName: 'Tim',
       isFirstSession: false,
       insights: [createInsight()],
       tippingStats: emptyTippingStats,
     });
 
     expect(greeting.label).toBe('Welcome back');
-    expect(greeting.body).toBe(
-      'Welcome back, Tim. Your subscribers jumped 23% in LA this week.'
-    );
+    expect(greeting.body).toBe('Your subscribers jumped 23% in LA this week.');
     expect(greeting.profileHref).toBeNull();
   });
 
   it('falls back to tip activity when no insights are available', () => {
     const greeting = buildGreeting({
-      displayName: 'Tim',
       isFirstSession: false,
       insights: [],
       tippingStats: {
@@ -88,7 +82,7 @@ describe('buildGreeting', () => {
     });
 
     expect(greeting.body).toBe(
-      "Welcome back, Tim. You've received 2 tips since you last checked in."
+      "You've received 2 tips since your last check-in."
     );
   });
 
@@ -100,7 +94,7 @@ describe('buildGreeting', () => {
     });
 
     expect(greeting.body).toBe(
-      'Welcome back, there. Share your profile link to start building your audience.'
+      'Share your profile to start building your audience.'
     );
   });
 });
