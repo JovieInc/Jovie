@@ -16,6 +16,7 @@
  * - Multi-DSP presence: +5 points
  * - Has contact email: +5 points
  * - Paid verification (Twitter/X, Instagram, Facebook, Threads): +10 points
+ * - SoundCloud Pro subscription (music-specific paid signal): +10 points
  * - Has tracking pixels on link-in-bio: +5 points
  *
  * Max score: 100 points (capped)
@@ -24,7 +25,7 @@
 import type { FitScoreBreakdown } from '@/lib/db/schema/profiles';
 
 /** Current version of the scoring algorithm */
-export const FIT_SCORE_VERSION = 4;
+export const FIT_SCORE_VERSION = 5;
 
 /** Point values for each scoring criterion */
 export const SCORE_WEIGHTS = {
@@ -41,6 +42,7 @@ export const SCORE_WEIGHTS = {
   MULTI_DSP_PRESENCE: 5, // Present on 3+ streaming platforms
   HAS_CONTACT_EMAIL: 5, // Contact email available (easier outreach)
   PAID_VERIFICATION: 10, // Verified on a paid-verification platform (Twitter/X, Instagram, Facebook, Threads)
+  SOUNDCLOUD_PRO: 10, // SoundCloud Pro/Pro Unlimited/Next Pro subscription (music-specific paid signal)
   HAS_TRACKING_PIXELS: 5,
 } as const;
 
@@ -162,6 +164,10 @@ export interface FitScoreInput {
   dspPlatformCount?: number;
   /** Platforms where the creator has paid verification (e.g., ['twitter', 'instagram']) */
   paidVerificationPlatforms?: string[];
+  /** Whether the artist has a SoundCloud Pro/Pro Unlimited/Next Pro subscription */
+  hasSoundCloudPro?: boolean;
+  /** SoundCloud Pro tier if detected */
+  soundCloudProTier?: string | null;
   /** Whether the profile has tracking pixels detected on their link-in-bio */
   hasTrackingPixels?: boolean;
 }
@@ -189,6 +195,7 @@ function createInitialBreakdown(now: Date): FitScoreBreakdown {
     multiDspPresence: 0,
     hasContactEmail: 0,
     paidVerification: 0,
+    soundcloudPro: 0,
     hasTrackingPixels: 0,
     meta: {
       calculatedAt: now.toISOString(),
@@ -259,6 +266,7 @@ function getFitScoreTotal(breakdown: FitScoreBreakdown) {
     (breakdown.multiDspPresence ?? 0) +
     (breakdown.hasContactEmail ?? 0) +
     (breakdown.paidVerification ?? 0) +
+    (breakdown.soundcloudPro ?? 0) +
     (breakdown.hasTrackingPixels ?? 0)
   );
 }
@@ -352,7 +360,15 @@ export function calculateFitScore(input: FitScoreInput): FitScoreResult {
     breakdown.meta!.paidVerificationPlatforms = input.paidVerificationPlatforms;
   }
 
-  // 12. Has tracking pixels on link-in-bio (+5) - signals active ad spend
+  // 12. SoundCloud Pro subscription (+10) - music-specific paid signal, stronger than social verification
+  if (input.hasSoundCloudPro) {
+    breakdown.soundcloudPro = SCORE_WEIGHTS.SOUNDCLOUD_PRO;
+    if (input.soundCloudProTier) {
+      breakdown.meta!.soundcloudProTier = input.soundCloudProTier;
+    }
+  }
+
+  // 13. Has tracking pixels on link-in-bio (+5) - signals active ad spend
   if (input.hasTrackingPixels) {
     breakdown.hasTrackingPixels = SCORE_WEIGHTS.HAS_TRACKING_PIXELS;
   }
