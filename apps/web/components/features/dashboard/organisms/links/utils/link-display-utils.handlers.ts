@@ -118,15 +118,92 @@ export const PLATFORM_DISPLAY_HANDLERS: PlatformDisplayHandler[] = [
     },
   },
 
-  // YouTube: @handle, /channel/ID, /c/name, /user/name
+  // YouTube: @handle, /c/name, /user/name (skip opaque /channel/UCID)
   {
     match: id => id === 'youtube',
     format: ({ host, first, second }) => {
       if (first.startsWith('@')) return first;
-      if (['channel', 'c', 'user'].includes(first) && second) {
-        return formatAsHandle(second);
-      }
-      return first || host;
+      if (first === 'c' && second) return formatAsHandle(second);
+      if (first === 'user' && second) return formatAsHandle(second);
+      // /channel/UCID is opaque, fall back to host (platform name will be used)
+      return host;
+    },
+  },
+
+  // SoundCloud: soundcloud.com/username
+  {
+    match: id => id === 'soundcloud',
+    format: ({ host, first }) => {
+      if (!first) return host;
+      if (
+        [
+          'discover',
+          'stream',
+          'charts',
+          'search',
+          'upload',
+          'you',
+          'settings',
+          'messages',
+          'stations',
+        ].includes(first)
+      )
+        return host;
+      return formatAsHandle(first);
+    },
+  },
+
+  // Facebook: facebook.com/username (skip /pages/, /groups/, /events/)
+  {
+    match: id => id === 'facebook',
+    format: ({ host, first }) => {
+      if (!first) return host;
+      if (
+        [
+          'pages',
+          'groups',
+          'events',
+          'watch',
+          'marketplace',
+          'profile.php',
+        ].includes(first)
+      )
+        return host;
+      return formatAsHandle(first);
+    },
+  },
+
+  // Twitch: twitch.tv/username
+  {
+    match: id => id === 'twitch',
+    format: ({ host, first }) => {
+      if (!first) return host;
+      if (
+        [
+          'directory',
+          'settings',
+          'wallet',
+          'drops',
+          'subscriptions',
+          'search',
+          'downloads',
+          'videos',
+          'p',
+        ].includes(first)
+      )
+        return host;
+      return formatAsHandle(first);
+    },
+  },
+
+  // LinkedIn: linkedin.com/in/username
+  {
+    match: id => id === 'linkedin',
+    format: ({ host, first, second }) => {
+      if (!first) return host;
+      if (first === 'in' && second) return formatAsHandle(second);
+      if (first === 'company' && second) return formatAsHandle(second);
+      return host;
     },
   },
 
