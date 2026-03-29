@@ -1059,6 +1059,31 @@ useQuery({
 - Follow existing design tokens in `tailwind.config.ts`
 - Mobile-first responsive design
 
+#### Surface Elevation Rules (Card/Background Consistency)
+
+The main content area (`<main>`) uses `bg-(--linear-app-content-surface)` which maps to `surface-1` (white in light, #17171a in dark). All card-like elements inside it must create visible contrast.
+
+**Allowed patterns:**
+- Card on surface-1 parent → use `bg-surface-0` for recessed/"well" look (e.g., skeleton containers, empty states)
+- Card with elevation → use `Card` component as-is (has `bg-surface-1 border border-subtle shadow-card`)
+- Nested card inside card → use `bg-surface-0` for the inner element
+
+**Banned patterns (will cause invisible cards):**
+- `bg-surface-1` on elements inside a `surface-1` parent WITHOUT border+shadow — same color on same color
+- `bg-surface-1/XX` (semi-transparent) — low opacity surface-1 on surface-1 parent is nearly invisible
+- `Card className='border-0 shadow-none'` — strips all elevation from a surface-1 card, making it invisible on surface-1 parent
+- `bg-surface-0/XX` (semi-transparent) — use solid `bg-surface-0` instead
+- Card-within-card nesting (e.g., `DrawerSurfaceCard variant='card'` inside another card) — use `variant='flat'` for inner elements
+
+**Quick test:** If removing the element would cause no visual change, it's an elevation bug.
+
+#### No Duplicate Page Titles (Breadcrumb + Toolbar)
+
+The `DashboardHeader` breadcrumb already renders the page name prominently. Do NOT repeat the page name in `PageToolbar start={}`. The toolbar should only contain contextual metadata (counts, status) and action buttons.
+
+**Allowed:** `<PageToolbar start={<span>3 matched platforms</span>} end={<ActionButton />} />`
+**Banned:** `<PageToolbar start={<span>Earnings</span>} />` — duplicates the breadcrumb
+
 ### Testing
 
 - Unit tests: Vitest with jsdom

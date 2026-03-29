@@ -160,7 +160,7 @@ export function DemoReleaseDetail({
         {/* Activity */}
         <div className='mt-4'>
           <DrawerSectionHeading className='mb-3'>Activity</DrawerSectionHeading>
-          <DrawerSurfaceCard className='space-y-0.5 border-0 shadow-none bg-surface-1/24 p-2'>
+          <DrawerSurfaceCard className='space-y-0.5 border-0 shadow-none bg-surface-0 p-2'>
             {DEMO_ACTIVITY_TEMPLATE.map((activity, index) => (
               <div
                 key={activity.id}
@@ -198,7 +198,7 @@ export function DemoReleaseDetail({
 
         <div className='mt-5'>
           <DrawerSectionHeading className='mb-2'>Comments</DrawerSectionHeading>
-          <DrawerSurfaceCard className='border-0 shadow-none bg-surface-1/20 p-1.5'>
+          <DrawerSurfaceCard className='border-0 shadow-none bg-surface-0 p-1.5'>
             <div className='rounded bg-surface-0/90 px-2 py-1.5'>
               <label htmlFor='release-comment' className='sr-only'>
                 Add comment

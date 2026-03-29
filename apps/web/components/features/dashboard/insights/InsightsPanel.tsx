@@ -163,14 +163,9 @@ export function InsightsPanel() {
   const toolbar = (
     <PageToolbar
       start={
-        <div className='flex items-center gap-2'>
-          <span className='text-[12px] font-[560] tracking-[-0.01em] text-primary-token'>
-            AI Insights
-          </span>
-          <span className='text-[11px] text-tertiary-token'>
-            {getSubtitle(total)}
-          </span>
-        </div>
+        <span className='text-[11px] text-tertiary-token'>
+          {getSubtitle(total)}
+        </span>
       }
       end={
         <PageToolbarActionButton

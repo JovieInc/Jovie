@@ -160,7 +160,6 @@ export function ReleaseTable({
       return [
         'rounded-[10px] transition-[background-color,box-shadow] duration-150 ease-out',
         'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_30%,transparent)]',
-        'data-[state=selected]:bg-(--linear-row-selected)',
         baseClassName,
         refreshClassName,
         flashClassName,

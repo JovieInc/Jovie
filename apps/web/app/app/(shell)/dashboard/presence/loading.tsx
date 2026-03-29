@@ -22,7 +22,7 @@ export default function PresenceLoading() {
           {CARD_KEYS.map(key => (
             <div
               key={key}
-              className='rounded-[10px] border border-subtle bg-surface-1/50 p-3 animate-pulse'
+              className='rounded-[10px] border border-subtle bg-surface-0 p-3 animate-pulse'
             >
               <div className='flex items-center gap-2'>
                 <LoadingSkeleton

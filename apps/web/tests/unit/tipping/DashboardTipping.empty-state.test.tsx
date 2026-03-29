@@ -60,7 +60,9 @@ describe('DashboardTipping empty state behavior', () => {
       screen.getByRole('button', { name: 'Connect Venmo' })
     ).toBeInTheDocument();
 
-    expect(screen.getByText('Earnings')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Earnings Dashboard' })
+    ).toBeInTheDocument();
     expect(screen.queryByTestId('earnings-tab')).not.toBeInTheDocument();
   });
 
@@ -89,7 +91,9 @@ describe('DashboardTipping empty state behavior', () => {
 
     render(<DashboardTipping />);
 
-    expect(screen.getByText('Earnings')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Earnings Dashboard' })
+    ).toBeInTheDocument();
     expect(screen.getByTestId('earnings-tab')).toBeInTheDocument();
   });
 });
