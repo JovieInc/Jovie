@@ -232,6 +232,7 @@ export default async function TrackDeepLinkPage({
           title: track.title,
           artworkUrl: track.artworkUrl,
           releaseDate: toISOStringOrNull(track.releaseDate),
+          previewUrl: track.previewUrl ?? null,
         }}
         artist={{
           name: artistName,
