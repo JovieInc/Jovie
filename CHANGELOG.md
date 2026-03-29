@@ -29,6 +29,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - All 47 API routes now use `getCachedAuth()` instead of Clerk's `auth()` directly, fixing 401 errors when using dev test auth bypass
 - Onboarding return-to validator now accepts the chat route for post-checkout welcome chat bootstrap
+- Prevent false onboarding redirect on dashboard pages (audience, earnings, presence, releases) when dashboard data fails to load — existing users were being sent to a blank onboarding screen instead of seeing the error state
 
 ## [26.4.95] - 2026-03-28
 
