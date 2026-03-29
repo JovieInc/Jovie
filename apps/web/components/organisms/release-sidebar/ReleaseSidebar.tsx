@@ -69,7 +69,13 @@ import { useReleaseSidebar } from './useReleaseSidebar';
 import { useTrackAudioPlayer } from './useTrackAudioPlayer';
 
 /** Tab for organizing sidebar content into focused views */
-type SidebarTab = 'tracklist' | 'links' | 'details' | 'lyrics' | 'tasks';
+type SidebarTab =
+  | 'tracklist'
+  | 'links'
+  | 'details'
+  | 'lyrics'
+  | 'tasks'
+  | 'settings';
 
 /** Options for sidebar tab segment control */
 const SIDEBAR_TAB_OPTIONS = [
@@ -78,6 +84,7 @@ const SIDEBAR_TAB_OPTIONS = [
   { value: 'details' as const, label: 'Details' },
   { value: 'lyrics' as const, label: 'Lyrics' },
   { value: 'tasks' as const, label: 'Tasks' },
+  { value: 'settings' as const, label: 'Settings' },
 ];
 
 const RELEASE_SIDEBAR_CARD_CLASSNAME = cn(
@@ -753,25 +760,6 @@ export function ReleaseSidebar({
                     tracksOverride={tracksOverride}
                     showHeading={false}
                   />
-                  {isEditable && (
-                    <ReleaseSettingsCard
-                      allowDownloads={allowDownloads}
-                      onToggleArtworkDownloads={onToggleArtworkDownloads}
-                    />
-                  )}
-                  <ReleaseTargetPlaylistsSection
-                    key={release.id}
-                    releaseId={release.id}
-                    targetPlaylists={release.targetPlaylists}
-                    onSave={readOnly ? undefined : onSaveTargetPlaylists}
-                    readOnly={readOnly}
-                  />
-                  {!readOnly && (
-                    <ReleasePitchSection
-                      releaseId={release.id}
-                      existingPitches={release.generatedPitches}
-                    />
-                  )}
                 </div>
               </DrawerSurfaceCard>
             )}
@@ -814,18 +802,6 @@ export function ReleaseSidebar({
                     canEditCanvasStatus ? handleCanvasStatusChange : undefined
                   }
                 />
-                {isEditable && (
-                  <ReleaseSettingsCard
-                    allowDownloads={allowDownloads}
-                    onToggleArtworkDownloads={onToggleArtworkDownloads}
-                  />
-                )}
-                {!readOnly && (
-                  <ReleasePitchSection
-                    releaseId={release.id}
-                    existingPitches={release.generatedPitches}
-                  />
-                )}
               </div>
             )}
 
@@ -857,6 +833,33 @@ export function ReleaseSidebar({
                   }}
                 />
               </DrawerSurfaceCard>
+            )}
+
+            {activeTab === 'settings' && (
+              <div
+                className='space-y-2.5'
+                data-testid='release-settings-card-stack'
+              >
+                {isEditable && (
+                  <ReleaseSettingsCard
+                    allowDownloads={allowDownloads}
+                    onToggleArtworkDownloads={onToggleArtworkDownloads}
+                  />
+                )}
+                <ReleaseTargetPlaylistsSection
+                  key={release.id}
+                  releaseId={release.id}
+                  targetPlaylists={release.targetPlaylists}
+                  onSave={readOnly ? undefined : onSaveTargetPlaylists}
+                  readOnly={readOnly}
+                />
+                {!readOnly && (
+                  <ReleasePitchSection
+                    releaseId={release.id}
+                    existingPitches={release.generatedPitches}
+                  />
+                )}
+              </div>
             )}
           </div>
         </div>
