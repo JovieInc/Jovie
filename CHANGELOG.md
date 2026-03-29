@@ -7,6 +7,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.96] - 2026-03-28
 
+### Added
+
+- `/demo/onboarding` mock route for rapid onboarding UI iteration without auth gating
+- Progressive profile panel on right side during onboarding demo (fills as steps advance)
+- Step picker toolbar and step dots for instant navigation between all 9 onboarding steps
+- Fade-to-transparent reveal transition from onboarding overlay to dashboard
+
 ### Changed
 
 - Onboarding checkout/upgrade interstitial is now always shown after profile review (feature flag removed)
