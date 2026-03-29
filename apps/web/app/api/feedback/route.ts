@@ -1,7 +1,7 @@
-import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { captureError } from '@/lib/error-tracking';
@@ -19,7 +19,7 @@ export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     const body = await request.json();
     const parsed = payloadSchema.safeParse(body);
 

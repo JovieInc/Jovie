@@ -15,13 +15,10 @@ import {
 } from '@/features/dashboard/organisms/onboarding';
 import { track } from '@/lib/analytics';
 import {
-  clearPlanIntent,
   DEFAULT_UPSELL_PLAN,
   getPlanIntent,
   isPaidIntent,
 } from '@/lib/auth/plan-intent';
-import { useCodeFlag } from '@/lib/feature-flags/client';
-import { getOnboardingDashboardInitialQuery } from './onboardingDashboardQuery';
 
 import type { AppleStyleOnboardingFormProps } from './types';
 import { ONBOARDING_STEPS } from './types';
@@ -67,13 +64,10 @@ export function AppleStyleOnboardingForm({
 
   const [isDspEnriching, setIsDspEnriching] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
-  const checkoutStepEnabled = useCodeFlag('ONBOARDING_CHECKOUT_STEP');
-
   const {
     state,
     handleSubmit,
     isPendingSubmit,
-    spotifyImportState,
     autoSubmitClaimed,
     enrichedProfile,
     setEnrichedProfile,
@@ -208,26 +202,13 @@ export function AppleStyleOnboardingForm({
       return;
     }
 
-    // Always route to checkout when flag is on
-    // &source= disambiguates organic upsell from explicit paid intent for analytics
-    if (checkoutStepEnabled) {
-      const planIntent = getPlanIntent();
-      const hasIntent = isPaidIntent(planIntent);
-      const plan = hasIntent ? planIntent : DEFAULT_UPSELL_PLAN;
-      const source = hasIntent ? 'intent' : 'organic';
-      globalThis.location.href = `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=${plan}&source=${source}`;
-      return;
-    }
-
-    // Free flow (flag off): clear any stale intent and go to dashboard
-    clearPlanIntent();
-    const initialQuery = getOnboardingDashboardInitialQuery(
-      spotifyImportState.status
-    );
-    const dashboardUrl = `${APP_ROUTES.DASHBOARD}?q=${encodeURIComponent(initialQuery)}`;
-
-    globalThis.location.href = dashboardUrl;
-  }, [spotifyImportState.status, checkoutStepEnabled]);
+    // Route to checkout — &source= disambiguates organic upsell from explicit paid intent
+    const planIntent = getPlanIntent();
+    const hasIntent = isPaidIntent(planIntent);
+    const plan = hasIntent ? planIntent : DEFAULT_UPSELL_PLAN;
+    const source = hasIntent ? 'intent' : 'organic';
+    globalThis.location.href = `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=${plan}&source=${source}`;
+  }, []);
 
   const goToDashboard = useCallback(() => {
     if (process.env.NEXT_PUBLIC_E2E_MODE === '1') {

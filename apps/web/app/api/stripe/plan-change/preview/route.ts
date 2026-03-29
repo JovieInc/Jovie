@@ -9,8 +9,8 @@
  *   - Returns: ProrationPreview with amounts and timing
  */
 
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { isMaxPlanEnabled, isMaxPriceId } from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
@@ -23,7 +23,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

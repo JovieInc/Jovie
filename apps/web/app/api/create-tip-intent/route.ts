@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
-import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
@@ -54,7 +54,7 @@ function amountToCents(amount: number): number {
 export async function POST(req: NextRequest) {
   try {
     // Require authentication for payment intents
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json(
         { error: 'Authentication required' },

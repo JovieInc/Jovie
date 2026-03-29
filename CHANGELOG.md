@@ -7,8 +7,23 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.96] - 2026-03-28
 
+### Added
+
+- `/demo/onboarding` mock route for rapid onboarding UI iteration without auth gating
+- Progressive profile panel on right side during onboarding demo (fills as steps advance)
+- Step picker toolbar and step dots for instant navigation between all 9 onboarding steps
+- Fade-to-transparent reveal transition from onboarding overlay to dashboard
+
+### Changed
+
+- Onboarding checkout/upgrade interstitial is now always shown after profile review (feature flag removed)
+- Spotify artist enrichment (name, avatar, bio) is now awaited during onboarding so the profile shows the correct artist name immediately
+- Post-checkout redirect routes to the welcome chat page, enabling the "Welcome to Jovie" message with imported release counts
+
 ### Fixed
 
+- All 47 API routes now use `getCachedAuth()` instead of Clerk's `auth()` directly, fixing 401 errors when using dev test auth bypass
+- Onboarding return-to validator now accepts the chat route for post-checkout welcome chat bootstrap
 - Prevent false onboarding redirect on dashboard pages (audience, earnings, presence, releases) when dashboard data fails to load — existing users were being sent to a blank onboarding screen instead of seeing the error state
 
 ## [26.4.95] - 2026-03-28

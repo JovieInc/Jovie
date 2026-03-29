@@ -38,6 +38,11 @@ import {
   useOnboardingSubmit,
 } from '@/features/dashboard/organisms/apple-style-onboarding/useOnboardingSubmit';
 import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding';
+import {
+  DEFAULT_UPSELL_PLAN,
+  getPlanIntent,
+  isPaidIntent,
+} from '@/lib/auth/plan-intent';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   ONBOARDING_PREVIEW_SNAPSHOT_KEY,
@@ -1132,8 +1137,8 @@ export function OnboardingV2Form({
         return;
       }
 
-      enrichProfileFromDsp(artist.id, artist.url).catch(() => {
-        // Best-effort enrichment should not block a successful connect flow.
+      await enrichProfileFromDsp(artist.id, artist.url).catch(() => {
+        // Best-effort: if enrichment fails, the profile keeps its current name.
       });
 
       setIsArtistConnectPending(false);
@@ -1416,7 +1421,13 @@ export function OnboardingV2Form({
       // sessionStorage may be unavailable in restricted contexts
     }
 
-    const nextUrl = `${APP_ROUTES.CHAT}?from=onboarding&panel=profile`;
+    const planIntent = getPlanIntent();
+    const hasIntent = isPaidIntent(planIntent);
+    const plan = hasIntent ? planIntent : DEFAULT_UPSELL_PLAN;
+    const source = hasIntent ? 'intent' : 'organic';
+    const chatUrl = `${APP_ROUTES.CHAT}?from=onboarding&panel=profile`;
+    const nextUrl = `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=${plan}&source=${source}&returnTo=${encodeURIComponent(chatUrl)}`;
+
     if (
       'startViewTransition' in document &&
       typeof document.startViewTransition === 'function'
