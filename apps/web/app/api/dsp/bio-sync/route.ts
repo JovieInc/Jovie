@@ -14,9 +14,9 @@
  * capabilities (API vs email, enabled status, etc.).
  */
 
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { getOwnedProfile } from '@/lib/dsp-bio-sync/ownership';
 import {
   DSP_BIO_PROVIDERS,
@@ -48,7 +48,7 @@ const bioSyncRequestSchema = z.object({
 export async function POST(request: Request) {
   try {
     // Authenticate user
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

@@ -1,7 +1,7 @@
-import { auth } from '@clerk/nextjs/server';
 import { and, count, desc, sql as drizzleSql, eq, ne } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { discogReleases } from '@/lib/db/schema/content';
@@ -40,7 +40,7 @@ function parseConfidenceScore(
 
 export async function GET(request: Request) {
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

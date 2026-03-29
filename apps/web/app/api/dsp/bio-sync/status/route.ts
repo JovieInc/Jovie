@@ -7,8 +7,8 @@
  * Authentication: Required (creator must own the profile)
  */
 
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 
 import { getOwnedProfile } from '@/lib/dsp-bio-sync/ownership';
 import { getBioSyncStatus } from '@/lib/dsp-bio-sync/service';
@@ -17,7 +17,7 @@ import { captureError } from '@/lib/error-tracking';
 export async function GET(request: Request) {
   try {
     // Authenticate user
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

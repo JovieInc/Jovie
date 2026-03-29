@@ -10,9 +10,9 @@
  * Authentication: Required (creator must own the profile)
  */
 
-import { auth } from '@clerk/nextjs/server';
 import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -96,7 +96,7 @@ function isTerminalJobStatus(status: string | null | undefined): boolean {
 export async function GET(request: Request) {
   try {
     // Authenticate user
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

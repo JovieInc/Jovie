@@ -1,6 +1,7 @@
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { currentUser } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 
@@ -26,7 +27,7 @@ export async function POST() {
     );
   }
 
-  const { userId: clerkUserId } = await auth();
+  const { userId: clerkUserId } = await getCachedAuth();
   if (!clerkUserId) {
     return NextResponse.json(
       { success: false, error: 'Not authenticated' },

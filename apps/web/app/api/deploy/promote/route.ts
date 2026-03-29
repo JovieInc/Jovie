@@ -1,6 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { createRateLimitHeaders, deployPromoteLimiter } from '@/lib/rate-limit';
@@ -21,7 +21,7 @@ function isLimiterUnavailable(reason: string | undefined): boolean {
  * Rate limit: 1 per 60 seconds (Redis-backed in production)
  */
 export async function POST() {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
 
   const authError = await requireAdmin();
   if (authError) return authError;
