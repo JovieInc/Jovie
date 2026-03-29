@@ -25,8 +25,10 @@ interface NavMenuItemProps {
   readonly item: NavItem;
   readonly isActive: boolean;
   readonly shortcut?: KeyboardShortcut;
+  readonly prefetch?: boolean;
   readonly actions?: ReactNode;
   readonly children?: ReactNode;
+  readonly onNavigate?: () => void;
   /** When provided, renders a button instead of a link */
   readonly onClick?: () => void;
   /** Hover/focus prefetch handler — wired by DashboardNav, not this component */
@@ -82,8 +84,10 @@ export function NavMenuItem({
   item,
   isActive,
   shortcut,
+  prefetch,
   actions,
   children,
+  onNavigate,
   onClick,
   onPrefetch,
 }: NavMenuItemProps) {
@@ -135,7 +139,11 @@ export function NavMenuItem({
             {onClick ? (
               <button
                 type='button'
-                onClick={onClick}
+                onClick={() => {
+                  onNavigate?.();
+                  onClick();
+                }}
+                onMouseDown={onPrefetch}
                 onMouseEnter={onPrefetch}
                 onFocus={onPrefetch}
                 aria-pressed={isActive}
@@ -146,6 +154,9 @@ export function NavMenuItem({
             ) : (
               <Link
                 href={item.href}
+                prefetch={prefetch}
+                onClick={onNavigate}
+                onMouseDown={onPrefetch}
                 onMouseEnter={onPrefetch}
                 onFocus={onPrefetch}
                 aria-current={isActive ? 'page' : undefined}

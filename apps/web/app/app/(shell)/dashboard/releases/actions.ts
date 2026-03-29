@@ -242,6 +242,15 @@ async function fetchReleaseMatrixCore(
   );
 }
 
+export interface ReleaseProfileContext {
+  readonly userId: string;
+  readonly profileId: string;
+  readonly profileHandle: string;
+  readonly spotifyId: string | null;
+  readonly appleMusicId: string | null;
+  readonly settings: Record<string, unknown> | null;
+}
+
 /**
  * Core release matrix loading logic (cacheable).
  * Cache is invalidated on mutations (save/reset provider links, Spotify sync)
@@ -274,6 +283,19 @@ async function resolveReleaseMatrix(
  * Uses React's cache() for request-level deduplication.
  */
 export const loadReleaseMatrix = cache(resolveReleaseMatrix);
+
+export async function loadReleaseMatrixForProfile(
+  profile: ReleaseProfileContext
+): Promise<ReleaseViewModel[]> {
+  return unstable_cache(
+    () => fetchReleaseMatrixCore(profile.profileId, profile.profileHandle),
+    ['releases-matrix', profile.userId, profile.profileId],
+    {
+      revalidate: CACHE_TTL.MEDIUM,
+      tags: [`releases:${profile.userId}:${profile.profileId}`],
+    }
+  )();
+}
 
 export async function saveProviderOverride(params: {
   profileId: string;
@@ -1047,6 +1069,75 @@ export async function checkSpotifyConnection(): Promise<{
   }
 }
 
+export async function checkSpotifyConnectionForProfile(
+  profile: ReleaseProfileContext
+): Promise<{
+  connected: boolean;
+  spotifyId: string | null;
+  artistName: string | null;
+}> {
+  noStore();
+
+  const settings = profile.settings;
+  const artistName = (settings?.spotifyArtistName as string) ?? null;
+
+  if (profile.spotifyId) {
+    return { connected: true, spotifyId: profile.spotifyId, artistName };
+  }
+
+  const spotifyImportStatus =
+    typeof settings?.spotifyImportStatus === 'string'
+      ? settings.spotifyImportStatus
+      : null;
+  if (
+    artistName &&
+    (spotifyImportStatus === 'importing' || spotifyImportStatus === 'complete')
+  ) {
+    return { connected: true, spotifyId: null, artistName };
+  }
+
+  if (artistName) {
+    void captureError(
+      '[checkSpotifyConnectionForProfile] Spotify state inconsistency: artistName set but spotifyId is null',
+      new Error('Spotify state inconsistency'),
+      {
+        profileId: profile.profileId,
+        artistName,
+        spotifyImportStatus: spotifyImportStatus ?? 'none',
+      }
+    );
+  }
+
+  const [spotifyMatch] = await db
+    .select({
+      externalArtistId: dspArtistMatches.externalArtistId,
+      externalArtistName: dspArtistMatches.externalArtistName,
+      status: dspArtistMatches.status,
+    })
+    .from(dspArtistMatches)
+    .where(
+      and(
+        eq(dspArtistMatches.creatorProfileId, profile.profileId),
+        eq(dspArtistMatches.providerId, 'spotify')
+      )
+    )
+    .limit(1);
+
+  if (
+    spotifyMatch &&
+    (spotifyMatch.status === 'confirmed' ||
+      spotifyMatch.status === 'auto_confirmed')
+  ) {
+    return {
+      connected: true,
+      spotifyId: spotifyMatch.externalArtistId,
+      artistName: spotifyMatch.externalArtistName ?? artistName,
+    };
+  }
+
+  return { connected: false, spotifyId: null, artistName };
+}
+
 /**
  * Connect a Spotify artist to the profile and sync releases
  */
@@ -1529,6 +1620,52 @@ export async function checkAppleMusicConnection(): Promise<{
     throwIfRedirect(error);
     return { connected: false, artistName: null, artistId: null };
   }
+}
+
+export async function checkAppleMusicConnectionForProfile(
+  profile: ReleaseProfileContext
+): Promise<{
+  connected: boolean;
+  artistName: string | null;
+  artistId: string | null;
+}> {
+  noStore();
+
+  const [match] = await db
+    .select({
+      externalArtistName: dspArtistMatches.externalArtistName,
+      externalArtistId: dspArtistMatches.externalArtistId,
+      status: dspArtistMatches.status,
+    })
+    .from(dspArtistMatches)
+    .where(
+      and(
+        eq(dspArtistMatches.creatorProfileId, profile.profileId),
+        eq(dspArtistMatches.providerId, 'apple_music')
+      )
+    )
+    .limit(1);
+
+  if (
+    match &&
+    (match.status === 'confirmed' || match.status === 'auto_confirmed')
+  ) {
+    return {
+      connected: true,
+      artistName: match.externalArtistName,
+      artistId: match.externalArtistId,
+    };
+  }
+
+  if (profile.appleMusicId) {
+    return {
+      connected: true,
+      artistName: null,
+      artistId: profile.appleMusicId,
+    };
+  }
+
+  return { connected: false, artistName: null, artistId: null };
 }
 
 /**

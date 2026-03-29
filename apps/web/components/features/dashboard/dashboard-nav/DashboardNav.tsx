@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { Flagged } from '@/components/features/dev/Flagged';
+import { usePendingShell } from '@/components/organisms/AuthShellWrapper';
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -42,13 +43,18 @@ const RecentChats = dynamic(
 
 function isItemActive(pathname: string, item: NavItem): boolean {
   const normalizedPathname =
+    pathname === APP_ROUTES.DASHBOARD_RELEASES ||
     pathname === APP_ROUTES.RELEASES
-      ? APP_ROUTES.DASHBOARD_RELEASES
+      ? APP_ROUTES.RELEASES
       : pathname === APP_ROUTES.AUDIENCE
         ? APP_ROUTES.DASHBOARD_AUDIENCE
         : pathname;
 
-  if (normalizedPathname === item.href) {
+  if (
+    normalizedPathname === item.href ||
+    (normalizedPathname === APP_ROUTES.RELEASES &&
+      item.href === APP_ROUTES.DASHBOARD_RELEASES)
+  ) {
     return true;
   }
 
@@ -62,6 +68,7 @@ function isItemActive(pathname: string, item: NavItem): boolean {
 
 export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
+  const { showPendingShell } = usePendingShell();
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -118,16 +125,18 @@ export function DashboardNav(_: DashboardNavProps) {
     },
     []
   );
+
   const handlePrefetch = useCallback(
     (itemId: string) => {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+      const prefetchDelayMs = itemId === 'releases' ? 0 : 150;
       prefetchTimerRef.current = setTimeout(() => {
         void import('@/lib/queries/prefetch-dashboard').then(
           ({ prefetchForRoute }) => {
             prefetchForRoute(itemId, queryClient, profileId || undefined);
           }
         );
-      }, 150);
+      }, prefetchDelayMs);
     },
     [queryClient, profileId]
   );
@@ -159,8 +168,12 @@ export function DashboardNav(_: DashboardNavProps) {
           item={item}
           isActive={isActive}
           shortcut={shortcut}
+          prefetch={isReleasesItem ? false : undefined}
           actions={isProfileItem ? profileActions : null}
           onClick={onClick}
+          onNavigate={
+            isReleasesItem ? () => showPendingShell('releases') : undefined
+          }
           onPrefetch={() => handlePrefetch(item.id)}
         />
       );
@@ -171,6 +184,7 @@ export function DashboardNav(_: DashboardNavProps) {
       handleProfileClick,
       handleDemoNavClick,
       handlePrefetch,
+      showPendingShell,
       isPreviewOpen,
       isDemo,
     ]
