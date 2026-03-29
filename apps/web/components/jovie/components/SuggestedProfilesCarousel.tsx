@@ -211,7 +211,8 @@ function ProfileReadyCard({
         <button
           type='button'
           onClick={onDismiss}
-          className='absolute right-3 top-3 rounded-md p-1 text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token'
+          disabled={isActioning}
+          className='absolute right-3 top-3 rounded-md p-1 text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token disabled:opacity-30 disabled:cursor-not-allowed'
           aria-label='Dismiss'
         >
           <X className='h-3.5 w-3.5' />
