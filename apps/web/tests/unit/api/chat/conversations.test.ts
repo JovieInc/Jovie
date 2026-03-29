@@ -3,12 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const hoisted = vi.hoisted(() => {
   const selectLimitMock = vi.fn();
   const selectOrderByMock = vi.fn().mockReturnValue({ limit: selectLimitMock });
-  const selectWhereMock = vi.fn().mockReturnValue({ orderBy: selectOrderByMock });
+  const selectWhereMock = vi
+    .fn()
+    .mockReturnValue({ orderBy: selectOrderByMock });
   const selectFromMock = vi.fn().mockReturnValue({ where: selectWhereMock });
   const selectMock = vi.fn().mockReturnValue({ from: selectFromMock });
 
   const insertReturningMock = vi.fn();
-  const insertValuesMock = vi.fn().mockReturnValue({ returning: insertReturningMock });
+  const insertValuesMock = vi
+    .fn()
+    .mockReturnValue({ returning: insertReturningMock });
   const insertMock = vi.fn().mockReturnValue({ values: insertValuesMock });
 
   // For count query
@@ -72,13 +76,34 @@ vi.mock('@/lib/utils/logger', () => ({
   logger: { error: vi.fn() },
 }));
 
-vi.mock('../session-error-response', () => ({
+vi.mock('@/app/api/chat/session-error-response', () => ({
   getSessionErrorResponse: vi.fn().mockReturnValue(null),
 }));
 
 describe('GET /api/chat/conversations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    hoisted.getSessionContextMock.mockRejectedValue(
+      new TypeError('Unauthorized')
+    );
+
+    const mod = await import('@/app/api/chat/session-error-response');
+    const { getSessionErrorResponse } = mod as {
+      getSessionErrorResponse: ReturnType<typeof vi.fn>;
+    };
+    const { NextResponse } = await import('next/server');
+    getSessionErrorResponse.mockReturnValueOnce(
+      NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    );
+
+    const { GET } = await import('@/app/api/chat/conversations/route');
+    const request = new Request('http://localhost/api/chat/conversations');
+    const response = await GET(request);
+
+    expect(response.status).toBe(401);
   });
 
   it('returns 404 when no profile', async () => {
@@ -93,7 +118,12 @@ describe('GET /api/chat/conversations', () => {
 
   it('returns conversations list for authenticated user', async () => {
     const conversations = [
-      { id: 'conv_1', title: 'Test Conv', createdAt: new Date(), updatedAt: new Date() },
+      {
+        id: 'conv_1',
+        title: 'Test Conv',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     ];
     hoisted.getSessionContextMock.mockResolvedValue({
       profile: { id: 'profile_123' },
@@ -118,7 +148,9 @@ describe('GET /api/chat/conversations', () => {
     hoisted.selectLimitMock.mockResolvedValue([]);
 
     const { GET } = await import('@/app/api/chat/conversations/route');
-    const request = new Request('http://localhost/api/chat/conversations?limit=5');
+    const request = new Request(
+      'http://localhost/api/chat/conversations?limit=5'
+    );
     await GET(request);
 
     expect(hoisted.selectOrderByMock).toHaveBeenCalled();
@@ -165,7 +197,9 @@ describe('POST /api/chat/conversations', () => {
     hoisted.selectFromMock.mockReturnValueOnce({
       where: vi.fn().mockResolvedValue([{ value: 5 }]),
     });
-    hoisted.insertReturningMock.mockResolvedValue([{ id: 'conv_new', title: null }]);
+    hoisted.insertReturningMock.mockResolvedValue([
+      { id: 'conv_new', title: null },
+    ]);
 
     const { POST } = await import('@/app/api/chat/conversations/route');
     const request = new Request('http://localhost/api/chat/conversations', {

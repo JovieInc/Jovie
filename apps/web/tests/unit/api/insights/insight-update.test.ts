@@ -112,7 +112,10 @@ describe('PATCH /api/insights/[id]', () => {
     hoisted.getSessionContextMock.mockResolvedValue({
       profile: { id: 'profile_123' },
     });
-    hoisted.updateInsightStatusMock.mockResolvedValue({ id: validUUID, status: 'dismissed' });
+    hoisted.updateInsightStatusMock.mockResolvedValue({
+      id: validUUID,
+      status: 'dismissed',
+    });
 
     const { PATCH } = await import('@/app/api/insights/[id]/route');
     const request = new Request('http://localhost/api/insights/' + validUUID, {

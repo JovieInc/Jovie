@@ -117,7 +117,9 @@ describe('GET /api/insights', () => {
     });
 
     const { GET } = await import('@/app/api/insights/route');
-    const request = new Request('http://localhost/api/insights?limit=10&offset=0');
+    const request = new Request(
+      'http://localhost/api/insights?limit=10&offset=0'
+    );
     const response = await GET(request);
 
     const body = await response.json();

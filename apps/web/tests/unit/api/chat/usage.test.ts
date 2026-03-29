@@ -101,7 +101,9 @@ describe('GET /api/chat/usage', () => {
   it('returns 503 when billing unavailable and no cache', async () => {
     hoisted.authMock.mockResolvedValue({ userId: 'user_123' });
     hoisted.getUserBillingInfoMock.mockResolvedValue({ success: false });
-    hoisted.getRedisMock.mockReturnValue({ get: vi.fn().mockResolvedValue(null) });
+    hoisted.getRedisMock.mockReturnValue({
+      get: vi.fn().mockResolvedValue(null),
+    });
 
     const { GET } = await import('@/app/api/chat/usage/route');
     const response = await GET();

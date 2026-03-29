@@ -4,10 +4,18 @@ const hoisted = vi.hoisted(() => ({
   authMock: vi.fn(),
   findFirstMock: vi.fn(),
   updateWhereMock: vi.fn().mockResolvedValue(undefined),
-  updateSetMock: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
-  updateMock: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }) }),
+  updateSetMock: vi
+    .fn()
+    .mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+  updateMock: vi.fn().mockReturnValue({
+    set: vi
+      .fn()
+      .mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+  }),
   insertValuesMock: vi.fn().mockResolvedValue(undefined),
-  insertMock: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) }),
+  insertMock: vi
+    .fn()
+    .mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) }),
   captureExceptionMock: vi.fn(),
 }));
 
@@ -28,7 +36,12 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('@/lib/db/schema/profiles', () => ({
-  creatorProfiles: { id: 'id', userId: 'userId', displayName: 'displayName', bio: 'bio' },
+  creatorProfiles: {
+    id: 'id',
+    userId: 'userId',
+    displayName: 'displayName',
+    bio: 'bio',
+  },
 }));
 
 vi.mock('@/lib/db/schema/chat', () => ({

@@ -161,7 +161,9 @@ describe('POST /api/insights/generate', () => {
     hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({ isPro: true });
     hoisted.canGenerateInsightsMock.mockResolvedValue({ allowed: true });
     hoisted.createGenerationRunMock.mockResolvedValue({ id: 'run_123' });
-    hoisted.aggregateMetricsMock.mockRejectedValue(new Error('Aggregation failed'));
+    hoisted.aggregateMetricsMock.mockRejectedValue(
+      new Error('Aggregation failed')
+    );
     hoisted.completeGenerationRunMock.mockResolvedValue(undefined);
 
     const { POST } = await import('@/app/api/insights/generate/route');
