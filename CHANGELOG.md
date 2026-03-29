@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.99] - 2026-03-29
+
+### Fixed
+
+- Card elevation consistency across the app shell — replaced semi-transparent backgrounds with solid `bg-surface-0` so loading skeletons, empty states, and card containers are visually distinct from their parent surface
+- Card-within-card nesting in drawer empty states (double border/shadow removed)
+- Redundant "Earnings" / "AI Insights" / "DSP Presence" page titles that duplicated the breadcrumb header
+- Toast notifications now have proper elevation (solid background + card shadow)
+- Release table row deduplication to prevent multiple rows highlighting on click
+- Billing history section no longer wraps content in invisible same-color Card components
+
+### Added
+
+- Surface elevation guardrail test to catch semi-transparent backgrounds and card nesting regressions
+- AGENTS.md rules for surface elevation and duplicate page title prevention
+
 ## [26.4.98] - 2026-03-29
 
 ### Fixed
