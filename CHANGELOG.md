@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.96] - 2026-03-28
+
+### Added
+
+- Visual regression spec (`visual-regression.spec.ts`) covering homepage, auth pages, and pricing in light/dark mode
+- ClientProviders composition test catching the TooltipProvider regression class (a518d3fb5)
+- Proxy composition critical test for CSP nonce, test bypass, and matcher exclusions
+- Migration journal ordering guard (critical test) preventing schema drift
+- Coverage ratchet thresholds in `vitest.config.ci.mts` (placeholder zeros, calibrate on main)
+
 ## [26.4.95] - 2026-03-28
 
 ### Added
