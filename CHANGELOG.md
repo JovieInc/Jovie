@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.98] - 2026-03-29
+
+### Fixed
+
+- Consolidated suggested identity cards into single unified card (was two separate cards with header split from content)
+- Profile image cropping on DSP match suggestions (64px fixed height → responsive 3:1 aspect ratio)
+- Purple accent buttons in suggested identity carousel replaced with grayscale design system primary buttons
+- Dismiss button in profile-ready card now disabled during action to prevent double-dismiss
+
 ## [26.4.97] - 2026-03-28
 
 ### Fixed

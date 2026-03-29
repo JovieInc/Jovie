@@ -84,11 +84,81 @@ function CarouselDots({
             aria-hidden
             className={cn(
               'h-1.5 rounded-full transition-all duration-200',
-              index === current ? 'w-4 bg-accent' : 'w-1.5 bg-tertiary-token/30'
+              index === current
+                ? 'w-4 bg-primary-token'
+                : 'w-1.5 bg-tertiary-token/30'
             )}
           />
         );
       })}
+    </div>
+  );
+}
+
+function CarouselCardHeader({
+  heading,
+  currentIndex,
+  total,
+  onPrev,
+  onNext,
+  isActioning,
+}: {
+  readonly heading: string;
+  readonly currentIndex: number;
+  readonly total: number;
+  readonly onPrev: () => void;
+  readonly onNext: () => void;
+  readonly isActioning: boolean;
+}) {
+  return (
+    <div className='flex items-center justify-between border-b border-(--linear-app-frame-seam) px-3.5 py-2.5'>
+      <div>
+        <p className='text-[11px] font-[560] tracking-normal text-tertiary-token'>
+          Suggested identity
+        </p>
+        <p className='mt-0.5 text-[13px] font-medium text-secondary-token'>
+          {heading}
+        </p>
+      </div>
+      <div className='flex items-center gap-1'>
+        {total > 1 && (
+          <span className='text-xs tabular-nums text-tertiary-token'>
+            {currentIndex + 1} of {total}
+          </span>
+        )}
+        {total > 1 && (
+          <div className='flex items-center'>
+            <button
+              type='button'
+              onClick={onPrev}
+              disabled={currentIndex === 0 || isActioning}
+              className={cn(
+                'flex items-center justify-center rounded-lg text-tertiary-token transition-colors',
+                'h-11 w-11 sm:h-auto sm:w-auto sm:rounded-md sm:p-1',
+                'hover:bg-surface-0 hover:text-secondary-token',
+                'disabled:opacity-30 disabled:cursor-not-allowed'
+              )}
+              aria-label='Previous suggestion'
+            >
+              <ChevronLeft className='h-5 w-5' />
+            </button>
+            <button
+              type='button'
+              onClick={onNext}
+              disabled={currentIndex === total - 1 || isActioning}
+              className={cn(
+                'flex items-center justify-center rounded-lg text-tertiary-token transition-colors',
+                'h-11 w-11 sm:h-auto sm:w-auto sm:rounded-md sm:p-1',
+                'hover:bg-surface-0 hover:text-secondary-token',
+                'disabled:opacity-30 disabled:cursor-not-allowed'
+              )}
+              aria-label='Next suggestion'
+            >
+              <ChevronRight className='h-5 w-5' />
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -99,12 +169,24 @@ function ProfileReadyCard({
   avatarUrl,
   onDismiss,
   direction,
+  heading,
+  currentIndex,
+  total,
+  onPrev,
+  onNext,
+  isActioning,
 }: {
   readonly displayName?: string;
   readonly username?: string;
   readonly avatarUrl?: string | null;
   readonly onDismiss: () => void;
   readonly direction: SlideDirection;
+  readonly heading: string;
+  readonly currentIndex: number;
+  readonly total: number;
+  readonly onPrev: () => void;
+  readonly onNext: () => void;
+  readonly isActioning: boolean;
 }) {
   return (
     <div
@@ -116,12 +198,21 @@ function ProfileReadyCard({
         direction === 'right' && 'animate-slide-out-right'
       )}
     >
+      <CarouselCardHeader
+        heading={heading}
+        currentIndex={currentIndex}
+        total={total}
+        onPrev={onPrev}
+        onNext={onNext}
+        isActioning={isActioning}
+      />
       <div className='relative p-4'>
         {/* Dismiss button */}
         <button
           type='button'
           onClick={onDismiss}
-          className='absolute right-3 top-3 rounded-md p-1 text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token'
+          disabled={isActioning}
+          className='absolute right-3 top-3 rounded-md p-1 text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token disabled:opacity-30 disabled:cursor-not-allowed'
           aria-label='Dismiss'
         >
           <X className='h-3.5 w-3.5' />
@@ -174,8 +265,8 @@ function ProfileReadyCard({
           rel='noopener noreferrer'
           className={cn(
             'flex w-full items-center justify-center gap-1.5 rounded-[12px]',
-            'bg-accent px-3 py-2.5 text-[13px] font-medium text-accent-foreground',
-            'transition-colors hover:bg-accent/90',
+            'bg-btn-primary px-3 py-2.5 text-[13px] font-medium text-btn-primary-foreground',
+            'transition-colors hover:bg-btn-primary/90',
             'focus:outline-none'
           )}
         >
@@ -193,12 +284,22 @@ function SuggestionCard({
   onReject,
   isActioning,
   direction,
+  heading,
+  currentIndex,
+  total,
+  onPrev,
+  onNext,
 }: {
   readonly suggestion: ProfileSuggestion;
   readonly onConfirm: () => void;
   readonly onReject: () => void;
   readonly isActioning: boolean;
   readonly direction: SlideDirection;
+  readonly heading: string;
+  readonly currentIndex: number;
+  readonly total: number;
+  readonly onPrev: () => void;
+  readonly onNext: () => void;
 }) {
   const isAvatar = suggestion.type === 'avatar';
   const iconPlatform =
@@ -214,6 +315,14 @@ function SuggestionCard({
         direction === 'right' && 'animate-slide-out-right'
       )}
     >
+      <CarouselCardHeader
+        heading={heading}
+        currentIndex={currentIndex}
+        total={total}
+        onPrev={onPrev}
+        onNext={onNext}
+        isActioning={isActioning}
+      />
       <div className='p-4'>
         {/* Header with platform icon */}
         <div className='flex items-center gap-2.5 mb-3'>
@@ -254,7 +363,9 @@ function SuggestionCard({
           <div
             className={cn(
               'relative mb-3 overflow-hidden rounded-lg bg-surface-2',
-              isAvatar ? 'mx-auto h-24 w-24 rounded-full' : 'h-16 w-full'
+              isAvatar
+                ? 'mx-auto h-24 w-24 rounded-full'
+                : 'aspect-[3/1] w-full'
             )}
           >
             <Image
@@ -293,7 +404,7 @@ function SuggestionCard({
               'border border-subtle px-3 py-3 text-[13px] font-medium sm:py-2',
               'text-secondary-token transition-colors',
               'hover:bg-surface-2 hover:text-primary-token',
-              'focus:outline-none focus:ring-2 focus:ring-accent/20',
+              'focus:outline-none focus:ring-2 focus:ring-btn-primary/20',
               'disabled:opacity-50 disabled:cursor-not-allowed'
             )}
           >
@@ -310,9 +421,9 @@ function SuggestionCard({
             disabled={isActioning}
             className={cn(
               'flex flex-1 items-center justify-center gap-1.5 rounded-[12px]',
-              'bg-accent px-3 py-3 text-[13px] font-medium text-accent-foreground sm:py-2',
-              'transition-colors hover:bg-accent/90',
-              'focus:outline-none focus:ring-2 focus:ring-accent/20',
+              'bg-btn-primary px-3 py-3 text-[13px] font-medium text-btn-primary-foreground sm:py-2',
+              'transition-colors hover:bg-btn-primary/90',
+              'focus:outline-none focus:ring-2 focus:ring-btn-primary/20',
               'disabled:opacity-50 disabled:cursor-not-allowed'
             )}
           >
@@ -417,57 +528,6 @@ export function SuggestedProfilesCarousel({
 
   return (
     <div className='space-y-3'>
-      {/* Header */}
-      <div className='flex items-center justify-between rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3.5 py-2.5'>
-        <div>
-          <p className='text-[11px] font-[560] tracking-normal text-tertiary-token'>
-            Suggested identity
-          </p>
-          <p className='mt-0.5 text-[13px] font-medium text-secondary-token'>
-            {heading}
-          </p>
-        </div>
-        <div className='flex items-center gap-1'>
-          {total > 1 && (
-            <span className='text-xs tabular-nums text-tertiary-token'>
-              {currentIndex + 1} of {total}
-            </span>
-          )}
-          {total > 1 && (
-            <div className='flex items-center'>
-              <button
-                type='button'
-                onClick={handlePrev}
-                disabled={currentIndex === 0 || isActioning}
-                className={cn(
-                  'flex items-center justify-center rounded-lg text-tertiary-token transition-colors',
-                  'h-11 w-11 sm:h-auto sm:w-auto sm:rounded-md sm:p-1',
-                  'hover:bg-surface-0 hover:text-secondary-token',
-                  'disabled:opacity-30 disabled:cursor-not-allowed'
-                )}
-                aria-label='Previous suggestion'
-              >
-                <ChevronLeft className='h-5 w-5' />
-              </button>
-              <button
-                type='button'
-                onClick={handleNext}
-                disabled={currentIndex === total - 1 || isActioning}
-                className={cn(
-                  'flex items-center justify-center rounded-lg text-tertiary-token transition-colors',
-                  'h-11 w-11 sm:h-auto sm:w-auto sm:rounded-md sm:p-1',
-                  'hover:bg-surface-0 hover:text-secondary-token',
-                  'disabled:opacity-30 disabled:cursor-not-allowed'
-                )}
-                aria-label='Next suggestion'
-              >
-                <ChevronRight className='h-5 w-5' />
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Card */}
       {current.type === 'profile_ready' ? (
         <ProfileReadyCard
@@ -477,6 +537,12 @@ export function SuggestedProfilesCarousel({
           avatarUrl={avatarUrl}
           onDismiss={handleReject}
           direction={slideDirection}
+          heading={heading}
+          currentIndex={currentIndex}
+          total={total}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          isActioning={isActioning}
         />
       ) : (
         <SuggestionCard
@@ -486,6 +552,11 @@ export function SuggestedProfilesCarousel({
           onReject={handleReject}
           isActioning={isActioning}
           direction={slideDirection}
+          heading={heading}
+          currentIndex={currentIndex}
+          total={total}
+          onPrev={handlePrev}
+          onNext={handleNext}
         />
       )}
 
