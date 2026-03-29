@@ -5,7 +5,7 @@
  * in the socialAccounts table for fit score calculation.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { sql as drizzleSql } from 'drizzle-orm';
 
 import type { DbOrTransaction } from '@/lib/db';
 import { socialAccounts } from '@/lib/db/schema/links';
@@ -19,10 +19,11 @@ import {
 /**
  * Detect SoundCloud Pro status and store the result.
  *
- * - Positive detection: insert or update socialAccounts with paidFlag=true
- * - Negative detection: clear paidFlag if stale positive exists
+ * - Positive detection: upsert socialAccounts with paidFlag=true
+ * - Negative detection: upsert with paidFlag=false
  * - Null (uncertain): do nothing
  *
+ * Uses an atomic upsert on (creatorProfileId, platform) to prevent race conditions.
  * After storing, immediately rescores the profile's fit score.
  *
  * @param db - Database client (use plainDb, not tx, for non-blocking)
@@ -43,74 +44,46 @@ export async function detectAndStoreSoundCloudProStatus(
     return null;
   }
 
-  // Check for existing soundcloud social account row
-  const [existing] = await db
-    .select({
-      id: socialAccounts.id,
-      paidFlag: socialAccounts.paidFlag,
-    })
-    .from(socialAccounts)
-    .where(
-      and(
-        eq(socialAccounts.creatorProfileId, creatorProfileId),
-        eq(socialAccounts.platform, 'soundcloud')
-      )
-    )
-    .limit(1);
-
   const now = new Date();
 
-  if (result.isPro) {
-    // Positive detection: insert or update
-    const rawData: Record<string, unknown> = {
-      tier: result.tier,
-      productId: result.productId,
-      detectedAt: now.toISOString(),
-    };
+  const rawData: Record<string, unknown> = result.isPro
+    ? {
+        tier: result.tier,
+        productId: result.productId,
+        detectedAt: now.toISOString(),
+      }
+    : {
+        tier: null,
+        productId: result.productId,
+        detectedAt: now.toISOString(),
+        clearedReason: 'negative_detection',
+      };
 
-    if (existing) {
-      await db
-        .update(socialAccounts)
-        .set({
-          paidFlag: true,
-          rawData,
-          status: 'confirmed',
-          updatedAt: now,
-        })
-        .where(eq(socialAccounts.id, existing.id));
-    } else {
-      await db.insert(socialAccounts).values({
-        creatorProfileId,
-        platform: 'soundcloud',
-        handle: normalizedSlug,
-        url: `https://soundcloud.com/${normalizedSlug}`,
-        status: 'confirmed',
-        confidence: '0.95',
-        isVerifiedFlag: false, // Pro is a subscription, not verification
-        paidFlag: true,
+  // Atomic upsert: prevents race conditions from concurrent enrichment runs
+  await db
+    .insert(socialAccounts)
+    .values({
+      creatorProfileId,
+      platform: 'soundcloud',
+      handle: normalizedSlug,
+      url: `https://soundcloud.com/${normalizedSlug}`,
+      status: 'confirmed',
+      confidence: '0.95',
+      isVerifiedFlag: false,
+      paidFlag: result.isPro,
+      rawData,
+      sourcePlatform: 'soundcloud',
+      sourceType: 'ingested',
+    })
+    .onConflictDoUpdate({
+      target: [socialAccounts.creatorProfileId, socialAccounts.platform],
+      set: {
+        paidFlag: result.isPro,
         rawData,
-        sourcePlatform: 'soundcloud',
-        sourceType: 'ingested',
-      });
-    }
-  } else {
-    // Negative detection: clear stale paidFlag if exists
-    if (existing?.paidFlag) {
-      await db
-        .update(socialAccounts)
-        .set({
-          paidFlag: false,
-          rawData: {
-            tier: null,
-            productId: result.productId,
-            detectedAt: now.toISOString(),
-            clearedReason: 'negative_detection',
-          },
-          updatedAt: now,
-        })
-        .where(eq(socialAccounts.id, existing.id));
-    }
-  }
+        status: 'confirmed',
+        updatedAt: drizzleSql`now()`,
+      },
+    });
 
   // Immediately rescore the profile
   await calculateAndStoreFitScore(db, creatorProfileId);

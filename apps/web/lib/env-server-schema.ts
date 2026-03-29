@@ -105,6 +105,9 @@ export const ServerEnvSchema = z.object({
   APPLE_MUSIC_TEAM_ID: z.string().optional(),
   APPLE_MUSIC_PRIVATE_KEY: z.string().optional(),
 
+  // SoundCloud API v2 (Pro badge detection)
+  SOUNDCLOUD_CLIENT_ID: z.string().optional(),
+
   // MusicFetch.io (cross-platform DSP profiles + social links via ISRC/UPC)
   MUSICFETCH_API_TOKEN: z.string().optional(),
   MUSICFETCH_DAILY_HARD_LIMIT: z.string().optional(),
@@ -230,6 +233,7 @@ export const ENV_KEYS = [
   'APPLE_MUSIC_KEY_ID',
   'APPLE_MUSIC_TEAM_ID',
   'APPLE_MUSIC_PRIVATE_KEY',
+  'SOUNDCLOUD_CLIENT_ID',
   'MUSICFETCH_API_TOKEN',
   'MUSICFETCH_DAILY_HARD_LIMIT',
   'MUSICFETCH_MONTHLY_HARD_LIMIT',

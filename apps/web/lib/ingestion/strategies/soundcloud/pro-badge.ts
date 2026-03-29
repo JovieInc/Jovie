@@ -126,19 +126,13 @@ export async function fetchAndDetectSoundCloudPro(
 
   const url = `${SOUNDCLOUD_API_BASE}/resolve?url=https://soundcloud.com/${encodeURIComponent(normalizedSlug)}&client_id=${SOUNDCLOUD_CLIENT_ID}`;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(
-    () => controller.abort(),
-    SOUNDCLOUD_FETCH_CONFIG.timeoutMs
-  );
-
   try {
     const response = await fetch(url, {
       headers: {
         'User-Agent': SOUNDCLOUD_FETCH_CONFIG.userAgent,
         Accept: 'application/json',
       },
-      signal: controller.signal,
+      signal: AbortSignal.timeout(SOUNDCLOUD_FETCH_CONFIG.timeoutMs),
     });
 
     if (!response.ok) {
@@ -150,7 +144,5 @@ export async function fetchAndDetectSoundCloudPro(
   } catch {
     // Network error, timeout, parse error
     return { isPro: null, tier: null, productId: null };
-  } finally {
-    clearTimeout(timeout);
   }
 }
