@@ -99,6 +99,7 @@ test.describe('homepage visual regression', () => {
 // ==========================================================================
 test.describe('auth pages visual regression', () => {
   test('signin dark mode', async ({ page }) => {
+    await blockAnalytics(page);
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.goto('/signin', {
       waitUntil: 'networkidle',
@@ -110,8 +111,9 @@ test.describe('auth pages visual regression', () => {
       return;
     }
 
-    // Wait for Clerk components to render
-    await page.waitForTimeout(2000);
+    await expect(
+      page.locator('form, [data-clerk-component]').first()
+    ).toBeVisible({ timeout: 15_000 });
 
     await expect(page).toHaveScreenshot('signin-dark.png', {
       fullPage: false,
@@ -119,6 +121,7 @@ test.describe('auth pages visual regression', () => {
   });
 
   test('signin light mode', async ({ page }) => {
+    await blockAnalytics(page);
     await page.emulateMedia({ colorScheme: 'light' });
     await page.goto('/signin', {
       waitUntil: 'networkidle',
@@ -130,7 +133,9 @@ test.describe('auth pages visual regression', () => {
       return;
     }
 
-    await page.waitForTimeout(2000);
+    await expect(
+      page.locator('form, [data-clerk-component]').first()
+    ).toBeVisible({ timeout: 15_000 });
 
     await expect(page).toHaveScreenshot('signin-light.png', {
       fullPage: false,
@@ -138,6 +143,7 @@ test.describe('auth pages visual regression', () => {
   });
 
   test('signup dark mode', async ({ page }) => {
+    await blockAnalytics(page);
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.goto('/signup', {
       waitUntil: 'networkidle',
@@ -149,7 +155,9 @@ test.describe('auth pages visual regression', () => {
       return;
     }
 
-    await page.waitForTimeout(2000);
+    await expect(
+      page.locator('form, [data-clerk-component]').first()
+    ).toBeVisible({ timeout: 15_000 });
 
     await expect(page).toHaveScreenshot('signup-dark.png', {
       fullPage: false,
@@ -157,6 +165,7 @@ test.describe('auth pages visual regression', () => {
   });
 
   test('signup light mode', async ({ page }) => {
+    await blockAnalytics(page);
     await page.emulateMedia({ colorScheme: 'light' });
     await page.goto('/signup', {
       waitUntil: 'networkidle',
@@ -168,7 +177,9 @@ test.describe('auth pages visual regression', () => {
       return;
     }
 
-    await page.waitForTimeout(2000);
+    await expect(
+      page.locator('form, [data-clerk-component]').first()
+    ).toBeVisible({ timeout: 15_000 });
 
     await expect(page).toHaveScreenshot('signup-light.png', {
       fullPage: false,
