@@ -1,7 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { type Browser, chromium, type Page } from '@playwright/test';
+import {
+  type Browser,
+  chromium,
+  type Locator,
+  type Page,
+} from '@playwright/test';
 import { APP_ROUTES } from '../constants/routes';
 import {
   END_USER_PERF_ROUTE_MANIFEST,
@@ -411,6 +416,36 @@ async function waitForAnyVisible(
   return waitedSelector;
 }
 
+async function waitForVisibleTrigger(
+  page: Page,
+  selectors: readonly string[] | undefined,
+  timeoutMs = READY_TIMEOUT_MS
+): Promise<Locator | null> {
+  if (!selectors || selectors.length === 0) {
+    return null;
+  }
+
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    for (const selector of selectors) {
+      const locator = page.locator(selector);
+      const count = await locator.count().catch(() => 0);
+
+      for (let index = 0; index < count; index += 1) {
+        const candidate = locator.nth(index);
+        if (await candidate.isVisible().catch(() => false)) {
+          return candidate;
+        }
+      }
+    }
+
+    await page.waitForTimeout(50);
+  }
+
+  return null;
+}
+
 async function waitForAllHidden(
   page: Page,
   selectors: readonly string[] | undefined,
@@ -482,7 +517,7 @@ async function measureWarmNavigationRoute(
     timeout: NAVIGATION_TIMEOUT_MS,
     waitUntil: 'domcontentloaded',
   });
-  const visibleTrigger = await waitForAnyVisible(
+  const visibleTrigger = await waitForVisibleTrigger(
     page,
     route.readySelectors.navTrigger
   ).catch(() => null);
@@ -493,11 +528,16 @@ async function measureWarmNavigationRoute(
     route,
     `${parsedUrl.pathname}${parsedUrl.search}`
   );
-  const navTrigger = visibleTrigger ?? route.readySelectors.navTrigger?.[0];
-  if (navTrigger) {
+  const navTriggerSelector = route.readySelectors.navTrigger?.[0];
+  if (visibleTrigger) {
     await Promise.all([
       waitForExpectedUrl(page, expectedPaths),
-      page.locator(navTrigger).first().click(),
+      visibleTrigger.click({ noWaitAfter: true }),
+    ]);
+  } else if (navTriggerSelector) {
+    await Promise.all([
+      waitForExpectedUrl(page, expectedPaths),
+      page.locator(navTriggerSelector).first().click({ noWaitAfter: true }),
     ]);
   } else {
     await page.goto(url, {
@@ -620,6 +660,25 @@ function medianSampleByMetric(
     (left, right) => left.timingValues[metric] - right.timingValues[metric]
   );
   return ordered[Math.floor(ordered.length / 2)] as GuardSample;
+}
+
+function medianNumber(values: readonly number[]) {
+  const ordered = [...values].sort((left, right) => left - right);
+  return ordered[Math.floor(ordered.length / 2)] ?? 0;
+}
+
+function medianTimingValue(
+  samples: readonly GuardSample[],
+  metric: PerfTimingMetricName
+) {
+  return medianNumber(samples.map(sample => sample.timingValues[metric]));
+}
+
+function medianResourceValue(
+  samples: readonly GuardSample[],
+  metric: PerfResourceMetricName
+) {
+  return medianNumber(samples.map(sample => sample.resourceValues[metric]));
 }
 
 function createContextOptions(
@@ -790,11 +849,41 @@ function createPageResult(
 ): PageResult {
   const primaryMetric = getPrimaryTimingMetricName(route);
   const medianSample = medianSampleByMetric(samples, primaryMetric);
+  const rawTimings = {
+    'cumulative-layout-shift': medianTimingValue(
+      samples,
+      'cumulative-layout-shift'
+    ),
+    'first-contentful-paint': medianTimingValue(
+      samples,
+      'first-contentful-paint'
+    ),
+    'first-input-delay': medianTimingValue(samples, 'first-input-delay'),
+    'interactive-shell-ready': medianTimingValue(
+      samples,
+      'interactive-shell-ready'
+    ),
+    'largest-contentful-paint': medianTimingValue(
+      samples,
+      'largest-contentful-paint'
+    ),
+    'redirect-complete': medianTimingValue(samples, 'redirect-complete'),
+    'skeleton-to-content': medianTimingValue(samples, 'skeleton-to-content'),
+    'time-to-first-byte': medianTimingValue(samples, 'time-to-first-byte'),
+    'warm-shell-response': medianTimingValue(samples, 'warm-shell-response'),
+  } satisfies Record<PerfTimingMetricName, number>;
+  const rawResourceSizes = {
+    font: medianResourceValue(samples, 'font'),
+    image: medianResourceValue(samples, 'image'),
+    script: medianResourceValue(samples, 'script'),
+    stylesheet: medianResourceValue(samples, 'stylesheet'),
+    total: medianResourceValue(samples, 'total'),
+  } satisfies Record<PerfResourceMetricName, number>;
 
   const timings = getRouteTimingBudgets(route).map(budget =>
     buildMetricResult(
       budget.metric,
-      medianSample.timingValues[budget.metric],
+      rawTimings[budget.metric],
       budget.budget,
       budget.metric === 'cumulative-layout-shift' ? '' : 'ms'
     )
@@ -802,7 +891,7 @@ function createPageResult(
   const resourceSizes = getRouteResourceBudgets(route).map(budget =>
     buildMetricResult(
       budget.resourceType,
-      medianSample.resourceValues[budget.resourceType],
+      rawResourceSizes[budget.resourceType],
       budget.budget,
       'KB'
     )
@@ -823,8 +912,8 @@ function createPageResult(
     group: route.group,
     id: route.id,
     primaryMetric,
-    rawResourceSizes: medianSample.resourceValues,
-    rawTimings: medianSample.timingValues,
+    rawResourceSizes,
+    rawTimings,
     resolvedPath,
     resourceSizes,
     routeSurface: route.surface,

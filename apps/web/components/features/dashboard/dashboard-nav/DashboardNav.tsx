@@ -174,7 +174,9 @@ export function DashboardNav(_: DashboardNavProps) {
           onNavigate={
             isReleasesItem ? () => showPendingShell('releases') : undefined
           }
-          onPrefetch={() => handlePrefetch(item.id)}
+          onPrefetch={
+            isReleasesItem ? undefined : () => handlePrefetch(item.id)
+          }
         />
       );
     },

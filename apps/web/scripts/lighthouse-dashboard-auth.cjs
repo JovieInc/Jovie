@@ -2,6 +2,9 @@ const { spawnSync } = require('node:child_process');
 const { existsSync, mkdirSync, readFileSync } = require('node:fs');
 const path = require('node:path');
 
+// Keep these aligned with the canonical definitions in
+// apps/web/lib/auth/test-mode.ts. This script runs under plain `node`,
+// so importing the TypeScript source directly is not a safe option here.
 const TEST_MODE_COOKIE = '__e2e_test_mode';
 const TEST_USER_ID_COOKIE = '__e2e_test_user_id';
 const TEST_AUTH_BYPASS_MODE = 'bypass-auth';
