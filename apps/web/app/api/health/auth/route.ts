@@ -1,6 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { getDbUser } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -22,7 +22,7 @@ export async function GET() {
   }
 
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
 
     if (!userId) {
       return NextResponse.json(

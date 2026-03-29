@@ -23,7 +23,6 @@ export const FEATURE_FLAG_KEYS = {
   ENABLE_LIGHT_MODE: 'enable_light_mode',
   SHOW_AUDIENCE_CRM_SECTION: 'show_audience_crm_section',
   SHOW_SEE_IT_IN_ACTION: 'show_see_it_in_action',
-  ONBOARDING_CHECKOUT_STEP: 'onboarding.checkoutStep',
 } as const;
 
 /** @deprecated */
@@ -76,9 +75,6 @@ export const FEATURE_FLAGS = {
   SHOW_AUDIENCE_CRM_SECTION: false,
   /** "See it in action" section on homepage (gate: show_see_it_in_action) */
   SHOW_SEE_IT_IN_ACTION: false,
-  /** Onboarding checkout step (gate: onboarding.checkoutStep) */
-  ONBOARDING_CHECKOUT_STEP: false,
-
   // ── Code-level flags ──────────────────────────────────────────────
   /** JOV-1357: Threads in sidebar chat history */
   THREADS_ENABLED: false,
@@ -120,7 +116,6 @@ export const CODE_FLAG_KEYS = {
   ENABLE_LIGHT_MODE: 'code:ENABLE_LIGHT_MODE',
   SHOW_AUDIENCE_CRM_SECTION: 'code:SHOW_AUDIENCE_CRM_SECTION',
   SHOW_SEE_IT_IN_ACTION: 'code:SHOW_SEE_IT_IN_ACTION',
-  ONBOARDING_CHECKOUT_STEP: 'code:ONBOARDING_CHECKOUT_STEP',
   // Code flags
   THREADS_ENABLED: 'code:THREADS_ENABLED',
   SHOW_REPLACES_SECTION: 'code:SHOW_REPLACES_SECTION',

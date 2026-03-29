@@ -22,7 +22,7 @@ export function useSettingsContext() {
   }, [selectedArtist]);
   const { data: billingData } = useBillingStatusQuery();
   const isPro = billingData?.isPro ?? false;
-  const isGrowth = billingData?.plan === 'growth';
+  const isGrowth = billingData?.plan === 'max';
 
   return {
     artist,

@@ -7,8 +7,8 @@
  * Pricing Tiers:
  * - Free: $0 (no Stripe subscription)
  * - Founding: $9/mo (early supporter pricing, locked in for life)
- * - Pro: $39/mo or $348/yr (save 2 months)
- * - Growth: $99/mo or $948/yr (save 2 months) - Coming soon
+ * - Pro: $20/mo or $192/yr (save 2 months)
+ * - Max: $200/mo or $1,920/yr (save 2 months)
  */
 
 import 'server-only';
@@ -18,7 +18,7 @@ import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 
 // Plan types supported by the application
-export type PlanType = 'free' | 'founding' | 'pro' | 'growth';
+export type PlanType = 'free' | 'founding' | 'pro' | 'max';
 
 // Price mapping interface
 interface PriceMapping {
@@ -59,20 +59,20 @@ const buildPriceMappings = (): Record<string, PriceMapping> => {
       description: PRICING.pro.annual.label,
     },
     {
-      priceId: PRICING.growth.monthly.priceId || '',
-      plan: PRICING.growth.monthly.entitlementPlan,
-      amount: PRICING.growth.monthly.amount,
+      priceId: PRICING.max.monthly.priceId || '',
+      plan: PRICING.max.monthly.entitlementPlan,
+      amount: PRICING.max.monthly.amount,
       currency: 'usd',
-      interval: PRICING.growth.monthly.interval,
-      description: PRICING.growth.monthly.label,
+      interval: PRICING.max.monthly.interval,
+      description: PRICING.max.monthly.label,
     },
     {
-      priceId: PRICING.growth.annual.priceId || '',
-      plan: PRICING.growth.annual.entitlementPlan,
-      amount: PRICING.growth.annual.amount,
+      priceId: PRICING.max.annual.priceId || '',
+      plan: PRICING.max.annual.entitlementPlan,
+      amount: PRICING.max.annual.amount,
       currency: 'usd',
-      interval: PRICING.growth.annual.interval,
-      description: PRICING.growth.annual.label,
+      interval: PRICING.max.annual.interval,
+      description: PRICING.max.annual.label,
     },
   ];
 
@@ -118,12 +118,12 @@ export function getAvailablePricing() {
   return Object.values(PRICE_MAPPINGS).sort((a, b) => a.amount - b.amount);
 }
 
-export function isGrowthPlanEnabled(): boolean {
-  return publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+export function isMaxPlanEnabled(): boolean {
+  return publicEnv.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
 }
 
-export function isGrowthPriceId(priceId: string): boolean {
-  return getPlanFromPriceId(priceId) === 'growth';
+export function isMaxPriceId(priceId: string): boolean {
+  return getPlanFromPriceId(priceId) === 'max';
 }
 
 /**

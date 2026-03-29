@@ -5,10 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.95] - 2026-03-28
+## [26.4.97] - 2026-03-28
+
+### Added
+
+- SoundCloud Pro badge detection via SC API v2 as independent fit score signal (+10 points)
+- New scoring criterion `soundcloudPro` in fit scoring system (stacks independently with social paid verification)
+- SoundCloud strategy module with config, detection, and storage (`ingestion/strategies/soundcloud/`)
+- Negative detection support: clears stale Pro flags when subscription lapses
+- Immediate fit score recalculation after Pro status detection
+- Non-blocking SC Pro detection hook in MusicFetch enrichment pipeline
 
 ### Changed
 
+- Fit score version bumped from 4 to 5 (new SoundCloud Pro signal)
+- Fit score theoretical max increased from 125 to 135 (still capped at 100)
+
+## [26.4.96] - 2026-03-28
+
+### Added
+
+- Visual regression spec (`visual-regression.spec.ts`) covering homepage, auth pages, and pricing in light/dark mode
+- ClientProviders composition test catching the TooltipProvider regression class (a518d3fb5)
+- Proxy composition critical test for CSP nonce, test bypass, and matcher exclusions
+- Migration journal ordering guard (critical test) preventing schema drift
+- Coverage ratchet thresholds in `vitest.config.ci.mts` (placeholder zeros, calibrate on main)
+- `/demo/onboarding` mock route for rapid onboarding UI iteration without auth gating
+- Progressive profile panel on right side during onboarding demo (fills as steps advance)
+- Step picker toolbar and step dots for instant navigation between all 9 onboarding steps
+- Fade-to-transparent reveal transition from onboarding overlay to dashboard
+
+### Changed
+
+- Onboarding checkout/upgrade interstitial is now always shown after profile review (feature flag removed)
+- Spotify artist enrichment (name, avatar, bio) is now awaited during onboarding so the profile shows the correct artist name immediately
+- Post-checkout redirect routes to the welcome chat page, enabling the "Welcome to Jovie" message with imported release counts
+
+### Fixed
+
+- All 47 API routes now use `getCachedAuth()` instead of Clerk's `auth()` directly, fixing 401 errors when using dev test auth bypass
+- Onboarding return-to validator now accepts the chat route for post-checkout welcome chat bootstrap
+- Prevent false onboarding redirect on dashboard pages (audience, earnings, presence, releases) when dashboard data fails to load — existing users were being sent to a blank onboarding screen instead of seeing the error state
+
+## [26.4.95] - 2026-03-28
+
+### Added
+
+- Automated YC demo video recording pipeline via Playwright (`doppler run -- pnpm --filter web demo:record`)
+- Video-first `/demo/video` investor page with autoplay, loading states, and screenshot carousel fallback
+- Caption overlay injection in demo recording for silent video context
+- Production environment guard in demo spec to prevent accidental prod user creation
+- Download proxy API route at `/api/demo/download` for cross-origin video downloads
+- WebVTT captions file for accessibility on the demo page
+- `DemoVideoPlayer` component with loading/error/fallback states
+- `BrowserFrame` decorative browser chrome wrapper
+- `DEMO_REUSE_SERVER` option in `playwright.config.demo.ts` to use an existing dev server
+
+### Changed
+
+- Relaxed multi-DSP enrichment assertions in demo spec to best-effort (don't fail recording if enrichment is slow)
+- Simplified onboarding form detection in demo spec to match current UI selectors
 - Presence page converted from card grid to table layout, matching the Releases page pattern with row selection and sidebar integration
 - Insights page wrapped in DashboardWorkspacePanel with PageToolbar, matching all other dashboard pages
 - Right drawer card widths normalized by fixing asymmetric padding that caused cards to be narrower on the right side

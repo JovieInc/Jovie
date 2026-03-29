@@ -12,9 +12,9 @@
 const PLAN_INTENT_KEY = 'jovie_plan_intent';
 const PLAN_INTENT_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
-const VALID_PLANS = new Set(['free', 'founding', 'pro', 'growth']);
+const VALID_PLANS = new Set(['free', 'founding', 'pro', 'max']);
 
-export type PlanIntentTier = 'free' | 'founding' | 'pro' | 'growth';
+export type PlanIntentTier = 'free' | 'founding' | 'pro' | 'max';
 
 function getSecureCookieAttribute(): string {
   try {
@@ -154,20 +154,17 @@ export function isPaidIntent(plan: PlanIntentTier | null): boolean {
 export const DEFAULT_UPSELL_PLAN: PlanIntentTier = 'pro';
 
 /**
- * Spotify follower threshold for recommending Growth over Pro.
+ * Spotify follower threshold for recommending Max over Pro.
  */
-export const GROWTH_FOLLOWER_THRESHOLD = 10_000;
+export const MAX_FOLLOWER_THRESHOLD = 10_000;
 
 /**
  * Recommend a plan tier based on Spotify follower count.
- * Artists with 10K+ followers get Growth; everyone else gets Pro.
+ * Artists with 10K+ followers get Max; everyone else gets Pro.
  */
 export function recommendPlan(spotifyFollowers: number | null): PlanIntentTier {
-  if (
-    spotifyFollowers !== null &&
-    spotifyFollowers >= GROWTH_FOLLOWER_THRESHOLD
-  ) {
-    return 'growth';
+  if (spotifyFollowers !== null && spotifyFollowers >= MAX_FOLLOWER_THRESHOLD) {
+    return 'max';
   }
   return DEFAULT_UPSELL_PLAN;
 }

@@ -16,8 +16,8 @@
 
 export const runtime = 'nodejs';
 
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import {
   checkWrapLinkRateLimit,
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     // Get user ID if authenticated (needed for rate-limit keying)
     let userId: string | undefined;
     try {
-      const { userId: authUserId } = await auth();
+      const { userId: authUserId } = await getCachedAuth();
       userId = authUserId || undefined;
     } catch {
       // Not authenticated, continue without user ID
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const { userId: authUserId } = await auth();
+    const { userId: authUserId } = await getCachedAuth();
     if (!authUserId) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -212,7 +212,7 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const { userId: authUserId } = await auth();
+    const { userId: authUserId } = await getCachedAuth();
     if (!authUserId) {
       return NextResponse.json(
         { error: 'Authentication required' },

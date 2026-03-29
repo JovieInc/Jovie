@@ -15,7 +15,8 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         analyticsRetentionDays: 30,
         contactsLimit: 100,
         smartLinksLimit: null,
-        aiDailyMessageLimit: 25,
+        aiDailyMessageLimit: 10,
+        aiPitchGenPerRelease: 1,
       });
       expect(free.booleans).toEqual({
         canExportContacts: false,
@@ -30,16 +31,28 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canAccessFutureReleases: false,
         canSendNotifications: false,
         canEditSmartLinks: true,
+        canAccessPreSave: false,
+        canAccessTipping: false,
+        canAccessUrlEncryption: false,
+        canAccessStripeConnect: false,
+        canAccessFanSubscriptions: false,
+        canAccessEmailCampaigns: false,
+        canAccessApiKeys: false,
+        canAccessTeamManagement: false,
+        canAccessWebhooks: false,
+        canAccessWhiteLabel: false,
+        canAccessAbTesting: false,
       });
     });
 
     it('pro plan has correct limits', () => {
       const pro = ENTITLEMENT_REGISTRY.pro;
       expect(pro.limits).toEqual({
-        analyticsRetentionDays: 90,
-        contactsLimit: null,
+        analyticsRetentionDays: 180,
+        contactsLimit: 5000,
         smartLinksLimit: null,
         aiDailyMessageLimit: 100,
+        aiPitchGenPerRelease: null,
       });
       expect(pro.booleans).toEqual({
         canExportContacts: true,
@@ -54,18 +67,30 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canAccessFutureReleases: true,
         canSendNotifications: true,
         canEditSmartLinks: true,
+        canAccessPreSave: true,
+        canAccessTipping: true,
+        canAccessUrlEncryption: true,
+        canAccessStripeConnect: false,
+        canAccessFanSubscriptions: false,
+        canAccessEmailCampaigns: false,
+        canAccessApiKeys: false,
+        canAccessTeamManagement: false,
+        canAccessWebhooks: false,
+        canAccessWhiteLabel: false,
+        canAccessAbTesting: false,
       });
     });
 
-    it('growth plan has correct limits', () => {
-      const growth = ENTITLEMENT_REGISTRY.growth;
-      expect(growth.limits).toEqual({
-        analyticsRetentionDays: 365,
+    it('max plan has correct limits', () => {
+      const max = ENTITLEMENT_REGISTRY.max;
+      expect(max.limits).toEqual({
+        analyticsRetentionDays: null,
         contactsLimit: null,
         smartLinksLimit: null,
         aiDailyMessageLimit: 500,
+        aiPitchGenPerRelease: null,
       });
-      expect(growth.booleans).toEqual({
+      expect(max.booleans).toEqual({
         canExportContacts: true,
         canRemoveBranding: true,
         canAccessAdvancedAnalytics: true,
@@ -78,6 +103,17 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canAccessFutureReleases: true,
         canSendNotifications: true,
         canEditSmartLinks: true,
+        canAccessPreSave: true,
+        canAccessTipping: true,
+        canAccessUrlEncryption: true,
+        canAccessStripeConnect: true,
+        canAccessFanSubscriptions: true,
+        canAccessEmailCampaigns: true,
+        canAccessApiKeys: true,
+        canAccessTeamManagement: true,
+        canAccessWebhooks: true,
+        canAccessWhiteLabel: true,
+        canAccessAbTesting: true,
       });
     });
 
@@ -85,9 +121,9 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       expect(ENTITLEMENT_REGISTRY.free.limits.contactsLimit).toBe(100);
     });
 
-    it('pro and growth have unlimited contacts (null)', () => {
-      expect(ENTITLEMENT_REGISTRY.pro.limits.contactsLimit).toBeNull();
-      expect(ENTITLEMENT_REGISTRY.growth.limits.contactsLimit).toBeNull();
+    it('pro has 5000 contacts limit and max has unlimited contacts (null)', () => {
+      expect(ENTITLEMENT_REGISTRY.pro.limits.contactsLimit).toBe(5000);
+      expect(ENTITLEMENT_REGISTRY.max.limits.contactsLimit).toBeNull();
     });
   });
 
@@ -108,8 +144,8 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       expect(getEntitlements('pro')).toEqual(ENTITLEMENT_REGISTRY.pro);
     });
 
-    it('returns growth entitlements for "growth" plan', () => {
-      expect(getEntitlements('growth')).toEqual(ENTITLEMENT_REGISTRY.growth);
+    it('returns max entitlements for "max" plan', () => {
+      expect(getEntitlements('max')).toEqual(ENTITLEMENT_REGISTRY.max);
     });
   });
 
@@ -126,8 +162,8 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       expect(isProPlan('pro')).toBe(true);
     });
 
-    it('returns true for "growth"', () => {
-      expect(isProPlan('growth')).toBe(true);
+    it('returns true for "max"', () => {
+      expect(isProPlan('max')).toBe(true);
     });
   });
 
@@ -144,8 +180,8 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       expect(hasAdvancedFeatures('pro')).toBe(false);
     });
 
-    it('returns true only for "growth"', () => {
-      expect(hasAdvancedFeatures('growth')).toBe(true);
+    it('returns true only for "max"', () => {
+      expect(hasAdvancedFeatures('max')).toBe(true);
     });
   });
 
@@ -157,13 +193,13 @@ describe('Plan Configuration (Entitlement Registry)', () => {
     it('returns correct display names', () => {
       expect(getPlanDisplayName('free')).toBe('Free');
       expect(getPlanDisplayName('pro')).toBe('Pro');
-      expect(getPlanDisplayName('growth')).toBe('Growth');
+      expect(getPlanDisplayName('max')).toBe('Max');
     });
 
     it('returns "Free" for unknown plan strings', () => {
       expect(getPlanDisplayName('enterprise')).toBe('Free');
       expect(getPlanDisplayName('')).toBe('Free');
-      expect(getPlanDisplayName('GROWTH')).toBe('Free');
+      expect(getPlanDisplayName('MAX')).toBe('Free');
     });
   });
 
@@ -179,39 +215,36 @@ describe('Plan Configuration (Entitlement Registry)', () => {
     it('isProPlan rejects case-mismatched strings', () => {
       expect(isProPlan('Pro')).toBe(false);
       expect(isProPlan('PRO')).toBe(false);
-      expect(isProPlan('Growth')).toBe(false);
-      expect(isProPlan('GROWTH')).toBe(false);
+      expect(isProPlan('Max')).toBe(false);
+      expect(isProPlan('MAX')).toBe(false);
     });
 
     it('isProPlan rejects empty string', () => {
       expect(isProPlan('')).toBe(false);
     });
 
-    it('hasAdvancedFeatures rejects case-mismatched growth', () => {
-      expect(hasAdvancedFeatures('Growth')).toBe(false);
-      expect(hasAdvancedFeatures('GROWTH')).toBe(false);
+    it('hasAdvancedFeatures rejects case-mismatched max', () => {
+      expect(hasAdvancedFeatures('Max')).toBe(false);
+      expect(hasAdvancedFeatures('MAX')).toBe(false);
     });
 
-    it('plan hierarchy: growth > pro > free for retention days', () => {
-      expect(
-        ENTITLEMENT_REGISTRY.growth.limits.analyticsRetentionDays
-      ).toBeGreaterThan(ENTITLEMENT_REGISTRY.pro.limits.analyticsRetentionDays);
+    it('plan hierarchy: max > pro > free for retention days', () => {
+      // max has null (unlimited), pro has 180, free has 30
+      expect(ENTITLEMENT_REGISTRY.max.limits.analyticsRetentionDays).toBeNull();
       expect(
         ENTITLEMENT_REGISTRY.pro.limits.analyticsRetentionDays
       ).toBeGreaterThan(
-        ENTITLEMENT_REGISTRY.free.limits.analyticsRetentionDays
+        ENTITLEMENT_REGISTRY.free.limits.analyticsRetentionDays!
       );
     });
 
-    it('all paid plans have unlimited contacts (null)', () => {
-      const paidPlans = ['pro', 'growth'] as const;
-      for (const plan of paidPlans) {
-        expect(ENTITLEMENT_REGISTRY[plan].limits.contactsLimit).toBeNull();
-      }
+    it('max plan has unlimited contacts (null), pro has 5000', () => {
+      expect(ENTITLEMENT_REGISTRY.max.limits.contactsLimit).toBeNull();
+      expect(ENTITLEMENT_REGISTRY.pro.limits.contactsLimit).toBe(5000);
     });
 
-    it('all paid plans enable all boolean features', () => {
-      const paidPlans = ['pro', 'growth'] as const;
+    it('max plan enables all boolean features', () => {
+      const paidPlans = ['max'] as const;
       for (const plan of paidPlans) {
         for (const [, value] of Object.entries(
           ENTITLEMENT_REGISTRY[plan].booleans

@@ -26,9 +26,9 @@ vi.mock('@/lib/stripe/config', () => ({
       priceId: 'price_pro_yearly',
       plan: 'pro',
     },
-    price_growth_monthly: {
-      priceId: 'price_growth_monthly',
-      plan: 'growth',
+    price_max_monthly: {
+      priceId: 'price_max_monthly',
+      plan: 'max',
     },
   },
 }));

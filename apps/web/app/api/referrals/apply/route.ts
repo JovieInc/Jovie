@@ -5,8 +5,8 @@
  * Called during signup/onboarding when the user arrives via a referral link.
  */
 
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { createReferral, getInternalUserId } from '@/lib/referrals/service';
 import { logger } from '@/lib/utils/logger';
@@ -15,7 +15,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId: clerkUserId } = await auth();
+    const { userId: clerkUserId } = await getCachedAuth();
     if (!clerkUserId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

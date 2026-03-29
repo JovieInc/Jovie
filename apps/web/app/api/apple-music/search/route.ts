@@ -1,6 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import type { AppleMusicArtistResult } from '@/lib/contracts/api';
 import { cacheQuery } from '@/lib/db/cache';
 import { CircuitOpenError } from '@/lib/dsp-enrichment/circuit-breakers';
@@ -43,7 +43,7 @@ function parseLimit(
  * Returns a JSON list of Apple Music artists matching the query.
  */
 export async function GET(request: NextRequest) {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   const { searchParams } = request.nextUrl;
   const q = searchParams.get('q')?.trim();
   const limitParam = searchParams.get('limit');
