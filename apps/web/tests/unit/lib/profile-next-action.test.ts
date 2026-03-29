@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { resolveProfileNextAction } from '@/lib/profile-next-action';
+import type { LegacySocialLink } from '@/types/db';
 
-const link = (platform: string, url: string) => ({
+const link = (platform: string, url: string): LegacySocialLink => ({
+  id: platform,
+  artist_id: 'artist_1',
   platform,
   url,
-  id: platform,
-  displayName: platform,
   clicks: 0,
-  type: 'social' as const,
+  created_at: '2026-01-01T00:00:00Z',
 });
 
 describe('resolveProfileNextAction', () => {
@@ -58,9 +59,7 @@ describe('resolveProfileNextAction', () => {
 
   it('skips spotify when not preferred', () => {
     const result = resolveProfileNextAction({
-      socialLinks: [
-        link('Spotify', 'https://open.spotify.com/artist/123'),
-      ],
+      socialLinks: [link('Spotify', 'https://open.spotify.com/artist/123')],
       spotifyPreferred: false,
     });
 
@@ -103,9 +102,7 @@ describe('resolveProfileNextAction', () => {
 
   it('handles case-insensitive platform matching', () => {
     const result = resolveProfileNextAction({
-      socialLinks: [
-        link('BANDSINTOWN', 'https://bandsintown.com/a'),
-      ],
+      socialLinks: [link('BANDSINTOWN', 'https://bandsintown.com/a')],
       spotifyPreferred: false,
     });
 
