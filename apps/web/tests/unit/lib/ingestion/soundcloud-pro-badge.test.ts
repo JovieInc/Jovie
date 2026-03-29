@@ -3,7 +3,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { detectSoundCloudProFromApiData } from '@/lib/ingestion/strategies/soundcloud/pro-badge';
+import {
+  detectSoundCloudProFromApiData,
+  normalizeSoundCloudSlug,
+} from '@/lib/ingestion/strategies/soundcloud/pro-badge';
 
 describe('detectSoundCloudProFromApiData', () => {
   describe('positive detection', () => {
@@ -123,5 +126,22 @@ describe('detectSoundCloudProFromApiData', () => {
       });
       expect(result.isPro).toBeNull();
     });
+  });
+});
+
+describe('normalizeSoundCloudSlug', () => {
+  it('strips soundcloud URL prefixes case-insensitively', () => {
+    expect(
+      normalizeSoundCloudSlug('HTTPS://WWW.SOUNDCLOUD.COM/ArtistName')
+    ).toBe('ArtistName');
+  });
+
+  it('strips query params and hash fragments', () => {
+    expect(normalizeSoundCloudSlug('artist?utm=123#bio')).toBe('artist');
+    expect(normalizeSoundCloudSlug('artist#bio?utm=123')).toBe('artist');
+  });
+
+  it('strips trailing slashes', () => {
+    expect(normalizeSoundCloudSlug('artist///')).toBe('artist');
   });
 });
