@@ -41,9 +41,7 @@ export default async function AppShellLayout({
     // DashboardShellContent resolves dashboard data + feature flags.
     return (
       <Suspense fallback={<DashboardShellSkeleton />}>
-        <DashboardShellContent userId={auth.userId}>
-          {children}
-        </DashboardShellContent>
+        <DashboardShellContent>{children}</DashboardShellContent>
       </Suspense>
     );
   } catch (error) {
