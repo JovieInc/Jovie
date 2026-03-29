@@ -27,13 +27,6 @@ function resolvePriceIds(plan: PlanIntentTier): {
   annualAmount: number | null;
 } {
   switch (plan) {
-    case 'founding':
-      return {
-        monthlyPriceId: PRICING.founding.monthly.priceId || '',
-        annualPriceId: null,
-        monthlyAmount: PRICING.founding.monthly.amount,
-        annualAmount: null,
-      };
     case 'pro':
       return {
         monthlyPriceId: PRICING.pro.monthly.priceId || '',
