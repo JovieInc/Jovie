@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { BrowserFrame } from './BrowserFrame';
 import { ProductDemoCarousel } from './ProductDemoCarousel';
 
@@ -14,8 +14,6 @@ export function DemoVideoPlayer({
   const [state, setState] = useState<VideoState>(
     videoUrl ? 'loading' : 'error'
   );
-  const videoRef = useRef<HTMLVideoElement>(null);
-
   const handleLoadedData = useCallback(() => {
     setState('playing');
   }, []);
@@ -44,7 +42,6 @@ export function DemoVideoPlayer({
       {/* Video player */}
       {state !== 'error' && (
         <video
-          ref={videoRef}
           className={`aspect-[1280/720] w-full bg-black object-contain ${
             state === 'loading' ? 'hidden' : ''
           }`}
@@ -61,6 +58,7 @@ export function DemoVideoPlayer({
             src='/demo/yc-demo.vtt'
             srcLang='en'
             label='English'
+            default
           />
         </video>
       )}

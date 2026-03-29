@@ -14,7 +14,9 @@ export async function GET() {
     );
   }
 
-  const response = await fetch(videoUrl);
+  const response = await fetch(videoUrl, {
+    signal: AbortSignal.timeout(30_000),
+  });
 
   if (!response.ok) {
     return NextResponse.json(
@@ -23,11 +25,16 @@ export async function GET() {
     );
   }
 
-  return new NextResponse(response.body, {
-    headers: {
-      'Content-Type': 'video/mp4',
-      'Content-Disposition': 'attachment; filename="jovie-demo.mp4"',
-      'Cache-Control': 'public, max-age=3600',
-    },
-  });
+  const headers: Record<string, string> = {
+    'Content-Type': 'video/mp4',
+    'Content-Disposition': 'attachment; filename="jovie-demo.mp4"',
+    'Cache-Control': 'public, max-age=3600',
+  };
+
+  const contentLength = response.headers.get('content-length');
+  if (contentLength) {
+    headers['Content-Length'] = contentLength;
+  }
+
+  return new NextResponse(response.body, { headers });
 }
