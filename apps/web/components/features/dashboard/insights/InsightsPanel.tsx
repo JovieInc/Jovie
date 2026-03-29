@@ -4,7 +4,11 @@ import { useMemo, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
+import {
+  PageToolbar,
+  PageToolbarActionButton,
+} from '@/components/organisms/table';
+import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
 import { useGenerateInsightsMutation, useInsightsQuery } from '@/lib/queries';
 import type { InsightCategory, InsightResponse } from '@/types/insights';
 import { InsightCard } from './InsightCard';
@@ -156,18 +160,20 @@ export function InsightsPanel() {
     return { high, medium, low };
   }, [insights]);
 
-  return (
-    <div className='space-y-6'>
-      {/* Header */}
-      <div className='flex flex-wrap items-center justify-between gap-3'>
-        <div className='space-y-0.5'>
-          <h2 className='text-lg font-[590] text-primary-token'>AI Insights</h2>
-          <p className='text-[13px] text-secondary-token'>
+  const toolbar = (
+    <PageToolbar
+      start={
+        <div className='flex items-center gap-2'>
+          <span className='text-[12px] font-[560] tracking-[-0.01em] text-primary-token'>
+            AI Insights
+          </span>
+          <span className='text-[11px] text-tertiary-token'>
             {getSubtitle(total)}
-          </p>
+          </span>
         </div>
-
-        <DashboardHeaderActionButton
+      }
+      end={
+        <PageToolbarActionButton
           ariaLabel={isGenerating ? 'Generating insights' : 'Generate insights'}
           disabled={isGenerating}
           onClick={() => generate()}
@@ -178,28 +184,38 @@ export function InsightsPanel() {
             />
           }
           label={isGenerating ? 'Generating...' : 'Generate'}
-          className='h-8 px-3'
         />
+      }
+    />
+  );
+
+  return (
+    <DashboardWorkspacePanel
+      toolbar={toolbar}
+      data-testid='dashboard-insights-workspace'
+    >
+      <div className='flex-1 overflow-y-auto overflow-x-hidden'>
+        <div className='flex flex-col gap-5 px-3 py-3 sm:px-4 sm:py-4'>
+          {/* Category filter pills */}
+          <AppSegmentControl
+            value={selectedCategory}
+            onValueChange={setSelectedCategory}
+            options={CATEGORY_FILTERS}
+            aria-label='Filter insights by category'
+            surface='ghost'
+            className='flex flex-wrap gap-1.5 rounded-none border-0 bg-transparent p-0'
+            triggerClassName='min-h-8 border border-subtle bg-surface-1 px-3 py-1 text-[12.5px] text-secondary-token hover:border-default hover:bg-surface-0 hover:text-primary-token data-[state=active]:border-default data-[state=active]:bg-surface-0 data-[state=active]:text-primary-token'
+          />
+
+          {/* Content */}
+          <InsightsPanelContent
+            isLoading={isLoading}
+            error={error}
+            insights={insights}
+            grouped={grouped}
+          />
+        </div>
       </div>
-
-      {/* Category filter pills */}
-      <AppSegmentControl
-        value={selectedCategory}
-        onValueChange={setSelectedCategory}
-        options={CATEGORY_FILTERS}
-        aria-label='Filter insights by category'
-        surface='ghost'
-        className='flex flex-wrap gap-1.5 rounded-none border-0 bg-transparent p-0'
-        triggerClassName='min-h-8 border border-subtle bg-surface-1 px-3 py-1 text-[12.5px] text-secondary-token hover:border-default hover:bg-surface-0 hover:text-primary-token data-[state=active]:border-default data-[state=active]:bg-surface-0 data-[state=active]:text-primary-token'
-      />
-
-      {/* Content */}
-      <InsightsPanelContent
-        isLoading={isLoading}
-        error={error}
-        insights={insights}
-        grouped={grouped}
-      />
-    </div>
+    </DashboardWorkspacePanel>
   );
 }
