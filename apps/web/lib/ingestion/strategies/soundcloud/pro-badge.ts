@@ -99,22 +99,22 @@ export function detectSoundCloudProFromApiData(
 }
 
 /**
+ * Normalize a SoundCloud slug, stripping URL prefixes and query params.
+ */
+export function normalizeSoundCloudSlug(input: string): string {
+  const stripped = input
+    .replace(/^https?:\/\/(www\.)?soundcloud\.com\//i, '')
+    .replace(/[?#].*$/, '') // Strip query params and hash fragments
+    .replace(/\/+$/, '');
+  return stripped;
+}
+
+/**
  * Fetch SoundCloud user data and detect Pro status.
  *
  * @param slug - SoundCloud username/slug (e.g., "deadmau5")
  * @returns Detection result, or null isPro if fetch fails
  */
-/**
- * Normalize a SoundCloud slug, stripping URL prefixes if present.
- */
-function normalizeSoundCloudSlug(input: string): string {
-  // Strip full URL prefix if someone stored the full URL as the slug
-  const stripped = input
-    .replace(/^https?:\/\/(www\.)?soundcloud\.com\//i, '')
-    .replace(/\/+$/, '');
-  return stripped;
-}
-
 export async function fetchAndDetectSoundCloudPro(
   slug: string
 ): Promise<SoundCloudProResult> {

@@ -11,7 +11,10 @@ import type { DbOrTransaction } from '@/lib/db';
 import { socialAccounts } from '@/lib/db/schema/links';
 import { calculateAndStoreFitScore } from '@/lib/fit-scoring/service';
 
-import { fetchAndDetectSoundCloudPro } from './pro-badge';
+import {
+  fetchAndDetectSoundCloudPro,
+  normalizeSoundCloudSlug,
+} from './pro-badge';
 
 /**
  * Detect SoundCloud Pro status and store the result.
@@ -32,7 +35,8 @@ export async function detectAndStoreSoundCloudProStatus(
   creatorProfileId: string,
   soundcloudSlug: string
 ): Promise<boolean | null> {
-  const result = await fetchAndDetectSoundCloudPro(soundcloudSlug);
+  const normalizedSlug = normalizeSoundCloudSlug(soundcloudSlug);
+  const result = await fetchAndDetectSoundCloudPro(normalizedSlug);
 
   if (result.isPro === null) {
     // Uncertain, don't overwrite existing data
@@ -78,8 +82,8 @@ export async function detectAndStoreSoundCloudProStatus(
       await db.insert(socialAccounts).values({
         creatorProfileId,
         platform: 'soundcloud',
-        handle: soundcloudSlug,
-        url: `https://soundcloud.com/${soundcloudSlug}`,
+        handle: normalizedSlug,
+        url: `https://soundcloud.com/${normalizedSlug}`,
         status: 'confirmed',
         confidence: '0.95',
         isVerifiedFlag: false, // Pro is a subscription, not verification

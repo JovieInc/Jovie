@@ -435,7 +435,7 @@ export async function recalculateAllFitScores(
           ) FROM social_accounts sa WHERE sa.creator_profile_id = ${creatorProfiles.id})
         `,
         hasSoundCloudPro: drizzleSql<boolean>`
-          (SELECT bool_or(sa.paid_flag)
+          (SELECT coalesce(bool_or(sa.paid_flag), false)
           FROM social_accounts sa
           WHERE sa.creator_profile_id = ${creatorProfiles.id}
             AND lower(sa.platform) = 'soundcloud'
