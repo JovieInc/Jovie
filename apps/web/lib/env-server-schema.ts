@@ -68,9 +68,13 @@ export const ServerEnvSchema = z.object({
   STRIPE_PRICE_PRO_ANNUAL: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_YEARLY: z.string().startsWith('price_').optional(),
 
-  // Stripe price IDs for Growth tier ($99/mo, $948/yr)
+  // Stripe price IDs for Growth tier (legacy, kept for backward compat)
   STRIPE_PRICE_GROWTH_MONTHLY: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_GROWTH_YEARLY: z.string().startsWith('price_').optional(),
+
+  // Stripe price IDs for Max tier ($200/mo, $1,920/yr)
+  STRIPE_PRICE_MAX_MONTHLY: z.string().startsWith('price_').optional(),
+  STRIPE_PRICE_MAX_YEARLY: z.string().startsWith('price_').optional(),
   INGESTION_CRON_SECRET: z.string().optional(),
 
   // URL encryption (required in production/preview)
@@ -207,6 +211,8 @@ export const ENV_KEYS = [
   'STRIPE_PRICE_PRO_YEARLY',
   'STRIPE_PRICE_GROWTH_MONTHLY',
   'STRIPE_PRICE_GROWTH_YEARLY',
+  'STRIPE_PRICE_MAX_MONTHLY',
+  'STRIPE_PRICE_MAX_YEARLY',
   'INGESTION_CRON_SECRET',
   'LEAD_ATTRIBUTION_SECRET',
   'URL_ENCRYPTION_KEY',

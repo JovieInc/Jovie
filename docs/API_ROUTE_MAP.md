@@ -235,11 +235,11 @@
 |-------|---------|------|-------------|
 | `/api/feedback` | POST | `auth` | Submit user feedback |
 
-### Growth Access Request
+### Max Access Request
 
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
-| `/api/growth-access-request` | POST | `auth` | Request Growth tier access |
+| `/api/max-access-request` | POST | `auth` | Request Max tier access |
 
 ### Handle
 

@@ -106,7 +106,7 @@ Profile updates run Clerk sync and DB update in parallel via `Promise.all()`. If
 **Severity: MEDIUM-HIGH**
 **Files:**
 - `app/api/dashboard/social-links/route.ts`
-- `app/api/growth-access-request/route.ts`
+- `app/api/max-access-request/route.ts`
 - `app/api/notifications/confirm/route.ts`
 - `app/api/referrals/apply/route.ts`
 - `app/api/referrals/code/route.ts`

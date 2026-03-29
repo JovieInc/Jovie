@@ -16,7 +16,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 
 const RequestSchema = z.object({
-  plan: z.enum(['free', 'founding', 'pro', 'growth']),
+  plan: z.enum(['free', 'founding', 'pro', 'max']),
 });
 
 export async function POST(req: Request) {

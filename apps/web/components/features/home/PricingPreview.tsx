@@ -1,9 +1,10 @@
 import { Container } from '@/components/site/Container';
+import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { publicEnv } from '@/lib/env-public';
 
 // Extracted static style to avoid creating new object on each render
 const FONT_SYNTHESIS_STYLE = { fontSynthesisWeight: 'none' } as const;
-const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+const maxPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
 
 export function PricingPreview() {
   return (
@@ -22,7 +23,7 @@ export function PricingPreview() {
         </div>
 
         <div
-          className={`grid ${growthPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-8 max-w-4xl mx-auto`}
+          className={`grid ${maxPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-8 max-w-4xl mx-auto`}
         >
           {/* Free Tier */}
           <div className='text-center'>
@@ -55,29 +56,29 @@ export function PricingPreview() {
               className='text-4xl sm:text-5xl font-semibold text-neutral-900 dark:text-white mb-3'
               style={FONT_SYNTHESIS_STYLE}
             >
-              $39
+              ${ENTITLEMENT_REGISTRY.pro.marketing.price?.monthly ?? 0}
             </p>
             <p className='text-sm text-neutral-600 dark:text-neutral-400'>
               Your identity. Your data.
             </p>
           </div>
 
-          {growthPlanEnabled && (
+          {maxPlanEnabled && (
             <div className='text-center'>
               <h3
                 className='text-sm font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400 mb-3'
                 style={FONT_SYNTHESIS_STYLE}
               >
-                Growth
+                {ENTITLEMENT_REGISTRY.max.marketing.displayName}
               </h3>
               <p
                 className='text-4xl sm:text-5xl font-semibold text-neutral-900 dark:text-white mb-3'
                 style={FONT_SYNTHESIS_STYLE}
               >
-                $99
+                ${ENTITLEMENT_REGISTRY.max.marketing.price?.monthly ?? 0}
               </p>
               <p className='text-sm text-neutral-600 dark:text-neutral-400'>
-                Automation + retargeting
+                {ENTITLEMENT_REGISTRY.max.marketing.tagline}
               </p>
             </div>
           )}

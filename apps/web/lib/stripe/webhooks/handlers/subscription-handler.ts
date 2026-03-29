@@ -214,7 +214,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       .limit(1);
 
     const displayName = userData?.displayName ?? userData?.email ?? 'A user';
-    const planName = plan === 'growth' ? 'Growth' : 'Pro';
+    const planName = plan === 'max' || plan === 'growth' ? 'Max' : 'Pro';
 
     await notifySlackUpgrade(displayName, planName);
   }

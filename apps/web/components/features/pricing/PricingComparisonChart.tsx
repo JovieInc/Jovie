@@ -9,9 +9,9 @@ import {
 } from '@/lib/entitlements/registry';
 import { publicEnv } from '@/lib/env-public';
 
-const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+const maxPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
 
-type PlanColumn = 'free' | 'pro' | 'growth';
+type PlanColumn = 'free' | 'pro' | 'max';
 
 function CellValue({
   value,
@@ -150,9 +150,9 @@ function DesktopFeatureRow({
           comingSoon={feature.comingSoon && feature.pro !== false}
         />
       </td>
-      {growthPlanEnabled && (
+      {maxPlanEnabled && (
         <td className='py-3 text-center px-2'>
-          <CellValue value={feature.growth} comingSoon={feature.comingSoon} />
+          <CellValue value={feature.max} comingSoon={feature.comingSoon} />
         </td>
       )}
     </tr>
@@ -164,29 +164,28 @@ export function PricingComparisonChart() {
   const [selectedPlan, setSelectedPlan] = useState<PlanColumn>('pro');
 
   const free = ENTITLEMENT_REGISTRY.free;
-  const founding = ENTITLEMENT_REGISTRY.founding;
   const pro = ENTITLEMENT_REGISTRY.pro;
-  const growth = ENTITLEMENT_REGISTRY.growth;
+  const max = ENTITLEMENT_REGISTRY.max;
 
   const proPrice =
     isAnnual && pro.marketing.price?.yearly
       ? Math.round(pro.marketing.price.yearly / 12)
       : (pro.marketing.price?.monthly ?? 0);
 
-  const growthPrice =
-    isAnnual && growth.marketing.price?.yearly
-      ? Math.round(growth.marketing.price.yearly / 12)
-      : (growth.marketing.price?.monthly ?? 0);
+  const maxPrice =
+    isAnnual && max.marketing.price?.yearly
+      ? Math.round(max.marketing.price.yearly / 12)
+      : (max.marketing.price?.monthly ?? 0);
 
   const planOptions: { id: PlanColumn; name: string; price: string }[] = [
     { id: 'free', name: free.marketing.displayName, price: '$0' },
     { id: 'pro', name: pro.marketing.displayName, price: `$${proPrice}/mo` },
-    ...(growthPlanEnabled
+    ...(maxPlanEnabled
       ? [
           {
-            id: 'growth' as PlanColumn,
-            name: growth.marketing.displayName,
-            price: `$${growthPrice}/mo`,
+            id: 'max' as PlanColumn,
+            name: max.marketing.displayName,
+            price: `$${maxPrice}/mo`,
           },
         ]
       : []),
@@ -245,7 +244,7 @@ export function PricingComparisonChart() {
               color: 'var(--linear-success)',
             }}
           >
-            Save ~25%
+            Save ~20%
           </span>
         </span>
       </div>
@@ -337,27 +336,16 @@ export function PricingComparisonChart() {
                     ${pro.marketing.price.yearly}/yr
                   </div>
                 )}
-                <div
-                  className='mt-2 rounded-md px-2 py-1 text-[11px]'
-                  style={{
-                    backgroundColor: 'var(--linear-bg-surface-2)',
-                    border: '1px solid var(--linear-border-subtle)',
-                    color: 'var(--linear-text-secondary)',
-                  }}
-                >
-                  {founding.marketing.displayName}: $
-                  {founding.marketing.price?.monthly}/mo locked in
-                </div>
               </th>
-              {/* Growth */}
-              {growthPlanEnabled && (
+              {/* Max */}
+              {maxPlanEnabled && (
                 <th className='p-4 text-center min-w-[140px]'>
                   <div className='flex items-center justify-center gap-1.5'>
                     <span
                       className='text-[13px] font-medium'
                       style={{ color: 'var(--linear-text-tertiary)' }}
                     >
-                      {growth.marketing.displayName}
+                      {max.marketing.displayName}
                     </span>
                     <span
                       className='rounded-full px-1.5 py-px text-[10px] font-medium'
@@ -373,7 +361,7 @@ export function PricingComparisonChart() {
                     className='mt-1 text-2xl font-semibold'
                     style={{ color: 'var(--linear-text-primary)' }}
                   >
-                    ${growthPrice}
+                    ${maxPrice}
                     <span
                       className='text-[13px] font-normal'
                       style={{ color: 'var(--linear-text-tertiary)' }}
@@ -381,12 +369,12 @@ export function PricingComparisonChart() {
                       /mo
                     </span>
                   </div>
-                  {isAnnual && growth.marketing.price?.yearly && (
+                  {isAnnual && max.marketing.price?.yearly && (
                     <div
                       className='mt-0.5 text-[11px]'
                       style={{ color: 'var(--linear-text-tertiary)' }}
                     >
-                      ${growth.marketing.price.yearly}/yr
+                      ${max.marketing.price.yearly}/yr
                     </div>
                   )}
                 </th>
@@ -399,7 +387,7 @@ export function PricingComparisonChart() {
               <Fragment key={`cat-${category.category}`}>
                 <tr style={{ backgroundColor: 'var(--linear-bg-page)' }}>
                   <td
-                    colSpan={growthPlanEnabled ? 4 : 3}
+                    colSpan={maxPlanEnabled ? 4 : 3}
                     className='px-4 py-2.5 text-[12px] font-semibold uppercase tracking-wider'
                     style={{ color: 'var(--linear-text-tertiary)' }}
                   >

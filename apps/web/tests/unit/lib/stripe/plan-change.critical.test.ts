@@ -82,14 +82,14 @@ import {
 
 const PRICE_PRO_MONTHLY = 'price_pro_monthly';
 const PRICE_PRO_YEARLY = 'price_pro_yearly';
-const PRICE_GROWTH_MONTHLY = 'price_growth_monthly';
-const PRICE_GROWTH_YEARLY = 'price_growth_yearly';
+const PRICE_MAX_MONTHLY = 'price_max_monthly';
+const PRICE_MAX_YEARLY = 'price_max_yearly';
 
 const priceMappingsData: Record<
   string,
   {
     priceId: string;
-    plan: 'free' | 'pro' | 'growth';
+    plan: 'free' | 'pro' | 'max';
     amount: number;
     currency: string;
     interval: 'month' | 'year';
@@ -99,7 +99,7 @@ const priceMappingsData: Record<
   [PRICE_PRO_MONTHLY]: {
     priceId: PRICE_PRO_MONTHLY,
     plan: 'pro',
-    amount: 3900,
+    amount: 2000,
     currency: 'usd',
     interval: 'month',
     description: 'Pro Monthly',
@@ -107,26 +107,26 @@ const priceMappingsData: Record<
   [PRICE_PRO_YEARLY]: {
     priceId: PRICE_PRO_YEARLY,
     plan: 'pro',
-    amount: 34800,
+    amount: 19200,
     currency: 'usd',
     interval: 'year',
     description: 'Pro Yearly',
   },
-  [PRICE_GROWTH_MONTHLY]: {
-    priceId: PRICE_GROWTH_MONTHLY,
-    plan: 'growth',
-    amount: 9900,
+  [PRICE_MAX_MONTHLY]: {
+    priceId: PRICE_MAX_MONTHLY,
+    plan: 'max',
+    amount: 20000,
     currency: 'usd',
     interval: 'month',
-    description: 'Growth Monthly',
+    description: 'Max Monthly',
   },
-  [PRICE_GROWTH_YEARLY]: {
-    priceId: PRICE_GROWTH_YEARLY,
-    plan: 'growth',
-    amount: 94800,
+  [PRICE_MAX_YEARLY]: {
+    priceId: PRICE_MAX_YEARLY,
+    plan: 'max',
+    amount: 192000,
     currency: 'usd',
     interval: 'year',
-    description: 'Growth Yearly',
+    description: 'Max Yearly',
   },
 };
 
@@ -159,8 +159,8 @@ describe('@critical plan-change.ts', () => {
     mockGetActivePriceIds.mockReturnValue([
       PRICE_PRO_MONTHLY,
       PRICE_PRO_YEARLY,
-      PRICE_GROWTH_MONTHLY,
-      PRICE_GROWTH_YEARLY,
+      PRICE_MAX_MONTHLY,
+      PRICE_MAX_YEARLY,
     ]);
     mockGetPriceMappingDetails.mockImplementation(
       (priceId: string) => priceMappingsData[priceId] || null
@@ -225,16 +225,16 @@ describe('@critical plan-change.ts', () => {
       expect(isPlanUpgrade('free', 'pro')).toBe(true);
     });
 
-    it('returns true for free -> growth', () => {
-      expect(isPlanUpgrade('free', 'growth')).toBe(true);
+    it('returns true for free -> max', () => {
+      expect(isPlanUpgrade('free', 'max')).toBe(true);
     });
 
-    it('returns true for pro -> growth', () => {
-      expect(isPlanUpgrade('pro', 'growth')).toBe(true);
+    it('returns true for pro -> max', () => {
+      expect(isPlanUpgrade('pro', 'max')).toBe(true);
     });
 
-    it('returns false for growth -> pro (downgrade)', () => {
-      expect(isPlanUpgrade('growth', 'pro')).toBe(false);
+    it('returns false for max -> pro (downgrade)', () => {
+      expect(isPlanUpgrade('max', 'pro')).toBe(false);
     });
 
     it('returns false for pro -> free (downgrade)', () => {
@@ -280,7 +280,7 @@ describe('@critical plan-change.ts', () => {
         lines: {
           data: [
             {
-              description: 'Remaining time on Growth Monthly',
+              description: 'Remaining time on Max Monthly',
               amount: 6000,
               quantity: 1,
             },
@@ -290,7 +290,7 @@ describe('@critical plan-change.ts', () => {
 
       const result = await previewPlanChange({
         customerId: 'cus_abc',
-        newPriceId: PRICE_GROWTH_MONTHLY,
+        newPriceId: PRICE_MAX_MONTHLY,
       });
 
       expect(result).toBeTruthy();
@@ -298,7 +298,7 @@ describe('@critical plan-change.ts', () => {
       expect(result!.immediateAmount).toBe(6000);
       expect(result!.currency).toBe('usd');
       expect(result!.currentPlan.priceId).toBe(PRICE_PRO_MONTHLY);
-      expect(result!.newPlan.priceId).toBe(PRICE_GROWTH_MONTHLY);
+      expect(result!.newPlan.priceId).toBe(PRICE_MAX_MONTHLY);
       expect(result!.lineItems).toHaveLength(1);
       expect(result!.description).toContain('Upgrade');
     });
@@ -306,7 +306,7 @@ describe('@critical plan-change.ts', () => {
     it('returns a proration preview for a downgrade with zero immediate amount', async () => {
       const sub = makeSubscription({
         items: {
-          data: [{ id: 'si_item_1', price: { id: PRICE_GROWTH_MONTHLY } }],
+          data: [{ id: 'si_item_1', price: { id: PRICE_MAX_MONTHLY } }],
         },
       });
       mockStripeSubscriptions.list.mockResolvedValue({ data: [sub] });
@@ -343,7 +343,7 @@ describe('@critical plan-change.ts', () => {
 
       const result = await previewPlanChange({
         customerId: 'cus_none',
-        newPriceId: PRICE_GROWTH_MONTHLY,
+        newPriceId: PRICE_MAX_MONTHLY,
       });
 
       expect(result).toBeNull();
@@ -358,14 +358,14 @@ describe('@critical plan-change.ts', () => {
 
       const result = await previewPlanChange({
         customerId: 'cus_abc',
-        newPriceId: PRICE_GROWTH_MONTHLY,
+        newPriceId: PRICE_MAX_MONTHLY,
       });
 
       expect(result).toBeNull();
       expect(mockCaptureError).toHaveBeenCalledWith(
         'Error previewing plan change',
         expect.any(Error),
-        { customerId: 'cus_abc', newPriceId: PRICE_GROWTH_MONTHLY }
+        { customerId: 'cus_abc', newPriceId: PRICE_MAX_MONTHLY }
       );
     });
   });
@@ -382,18 +382,18 @@ describe('@critical plan-change.ts', () => {
 
       const result = await executePlanChange({
         subscriptionId: 'sub_123',
-        newPriceId: PRICE_GROWTH_MONTHLY,
+        newPriceId: PRICE_MAX_MONTHLY,
       });
 
       expect(result.success).toBe(true);
       expect(result.subscription).toBeTruthy();
-      // pro -> growth is an upgrade, not a scheduled change
+      // pro -> max is an upgrade, not a scheduled change
       expect(result.isScheduledChange).toBe(false);
       expect(mockStripeSubscriptions.update).toHaveBeenCalledWith(
         'sub_123',
         expect.objectContaining({
           proration_behavior: 'create_prorations',
-          items: [{ id: 'si_item_1', price: PRICE_GROWTH_MONTHLY }],
+          items: [{ id: 'si_item_1', price: PRICE_MAX_MONTHLY }],
         })
       );
     });
@@ -401,7 +401,7 @@ describe('@critical plan-change.ts', () => {
     it('executes a downgrade as a scheduled change', async () => {
       const sub = makeSubscription({
         items: {
-          data: [{ id: 'si_item_1', price: { id: PRICE_GROWTH_MONTHLY } }],
+          data: [{ id: 'si_item_1', price: { id: PRICE_MAX_MONTHLY } }],
         },
       });
       mockStripeSubscriptions.retrieve.mockResolvedValue(sub);
@@ -413,7 +413,7 @@ describe('@critical plan-change.ts', () => {
       });
 
       expect(result.success).toBe(true);
-      // growth -> pro is a downgrade, should be scheduled
+      // max -> pro is a downgrade, should be scheduled
       expect(result.isScheduledChange).toBe(true);
       expect(mockStripeSubscriptions.update).toHaveBeenCalledWith(
         'sub_123',
@@ -460,7 +460,7 @@ describe('@critical plan-change.ts', () => {
 
       const result = await executePlanChange({
         subscriptionId: 'sub_123',
-        newPriceId: PRICE_GROWTH_MONTHLY,
+        newPriceId: PRICE_MAX_MONTHLY,
       });
 
       expect(result.success).toBe(false);
@@ -488,7 +488,7 @@ describe('@critical plan-change.ts', () => {
 
       const result = await executePlanChange({
         subscriptionId: 'sub_123',
-        newPriceId: PRICE_GROWTH_MONTHLY,
+        newPriceId: PRICE_MAX_MONTHLY,
       });
 
       expect(result.success).toBe(false);
@@ -498,7 +498,7 @@ describe('@critical plan-change.ts', () => {
     it('respects explicit prorate=true override on downgrade', async () => {
       const sub = makeSubscription({
         items: {
-          data: [{ id: 'si_item_1', price: { id: PRICE_GROWTH_MONTHLY } }],
+          data: [{ id: 'si_item_1', price: { id: PRICE_MAX_MONTHLY } }],
         },
       });
       mockStripeSubscriptions.retrieve.mockResolvedValue(sub);
@@ -527,7 +527,7 @@ describe('@critical plan-change.ts', () => {
 
       const result = await executePlanChange({
         subscriptionId: 'sub_123',
-        newPriceId: PRICE_GROWTH_MONTHLY,
+        newPriceId: PRICE_MAX_MONTHLY,
       });
 
       expect(result.success).toBe(false);
@@ -535,7 +535,7 @@ describe('@critical plan-change.ts', () => {
       expect(mockCaptureError).toHaveBeenCalledWith(
         'Error executing plan change',
         expect.any(Error),
-        { subscriptionId: 'sub_123', newPriceId: PRICE_GROWTH_MONTHLY }
+        { subscriptionId: 'sub_123', newPriceId: PRICE_MAX_MONTHLY }
       );
     });
   });

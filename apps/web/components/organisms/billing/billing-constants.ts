@@ -27,10 +27,10 @@ export const PLAN_FEATURES = {
       return match ? { label: match[1], detail: match[2] } : { label: f };
     }),
   },
-  growth: {
-    name: ENTITLEMENT_REGISTRY.growth.marketing.displayName,
-    tagline: `${ENTITLEMENT_REGISTRY.growth.marketing.tagline} — Early Access`,
-    features: ENTITLEMENT_REGISTRY.growth.marketing.features.map(f => {
+  max: {
+    name: ENTITLEMENT_REGISTRY.max.marketing.displayName,
+    tagline: `${ENTITLEMENT_REGISTRY.max.marketing.tagline} — Early Access`,
+    features: ENTITLEMENT_REGISTRY.max.marketing.features.map(f => {
       const match = FEATURE_DETAIL_REGEX.exec(f);
       return match ? { label: match[1], detail: match[2] } : { label: f };
     }),
@@ -39,10 +39,10 @@ export const PLAN_FEATURES = {
 
 export type PlanKey = keyof typeof PLAN_FEATURES;
 
-const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+const maxPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
 
-export const PLAN_KEYS: PlanKey[] = growthPlanEnabled
-  ? ['free', 'pro', 'growth']
+export const PLAN_KEYS: PlanKey[] = maxPlanEnabled
+  ? ['free', 'pro', 'max']
   : ['free', 'pro'];
 
 export const EVENT_TYPE_LABELS: Record<string, string> = {
@@ -108,7 +108,7 @@ export function formatDate(dateStr: string): string {
 }
 
 export function getPlanDisplayName(plan: string | null): string {
-  if (plan === 'growth') return 'Growth';
+  if (plan === 'max') return 'Max';
   if (plan === 'pro') return 'Pro';
   return 'Free';
 }

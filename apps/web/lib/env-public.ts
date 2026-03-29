@@ -55,6 +55,9 @@ export const publicEnv = {
   get NEXT_PUBLIC_FEATURE_GROWTH_PLAN() {
     return process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN || undefined;
   },
+  get NEXT_PUBLIC_FEATURE_MAX_PLAN() {
+    return process.env.NEXT_PUBLIC_FEATURE_MAX_PLAN || undefined;
+  },
   get NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION() {
     return process.env.NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION || undefined;
   },

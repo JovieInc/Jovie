@@ -9,7 +9,7 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { track } from '@/lib/analytics';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
-import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
+import { getEntitlements } from '@/lib/entitlements/registry';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import { cn } from '@/lib/utils';
 
@@ -227,9 +227,7 @@ export function OnboardingCheckoutClient({
   const [error, setError] = useState<string | null>(null);
   const [showBranding, setShowBranding] = useState(true);
 
-  const planMarketing =
-    ENTITLEMENT_REGISTRY[plan]?.marketing ??
-    ENTITLEMENT_REGISTRY.founding.marketing;
+  const planMarketing = getEntitlements(plan).marketing;
 
   const currentPriceId =
     isAnnual && annualPriceId !== null ? annualPriceId : monthlyPriceId;
@@ -325,19 +323,6 @@ export function OnboardingCheckoutClient({
           username={username}
           onToggleBranding={handleToggleBranding}
         />
-
-        {/* Founding urgency callout */}
-        {plan === 'founding' ? (
-          <ContentSurfaceCard className='mb-4 border-[var(--linear-accent)]/30 px-4 py-3'>
-            <div className='flex items-center gap-2.5'>
-              <Sparkles className='h-4 w-4 shrink-0 text-(--linear-accent)' />
-              <p className='text-[13px] font-medium text-primary-token'>
-                Lock in founding member pricing — {formatPrice(monthlyAmount)}
-                /mo forever
-              </p>
-            </div>
-          </ContentSurfaceCard>
-        ) : null}
 
         {/* Pro highlights */}
         <ContentSurfaceCard className='mb-6 p-4'>

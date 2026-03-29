@@ -59,14 +59,14 @@ function createDemoQueryClient(profileId: string): QueryClient {
   );
   client.setQueryData<BillingStatusData>(queryKeys.billing.status(), {
     isPro: true,
-    plan: 'growth',
+    plan: 'max',
     hasStripeCustomer: true,
     stripeSubscriptionId: 'demo-subscription',
     stale: false,
     staleReason: null,
   });
   client.setQueryData<ChatUsageData>(queryKeys.chat.usage(), {
-    plan: 'growth',
+    plan: 'max',
     dailyLimit: 1000,
     used: 128,
     remaining: 872,
