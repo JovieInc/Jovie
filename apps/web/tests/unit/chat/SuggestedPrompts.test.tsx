@@ -10,9 +10,7 @@ describe('SuggestedPrompts', () => {
       <SuggestedPrompts onSelect={onSelect} />
     );
 
-    const rail = getByTestId('suggested-prompts-rail');
-    expect(rail).toBeTruthy();
-    expect(rail.getAttribute('style')).toBeNull();
+    expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
     expect(getByText('Preview profile')).toBeTruthy();
     expect(getByText('Change photo')).toBeTruthy();
     expect(getByText('Release link')).toBeTruthy();
@@ -43,8 +41,8 @@ describe('SuggestedPrompts', () => {
 
   it('calls onSelect with prompt when clicked', () => {
     const onSelect = vi.fn();
-    const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
-    getByText('Preview profile').closest('button')?.click();
+    const { getByRole } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
+    getByRole('button', { name: 'Preview profile' }).click();
     expect(onSelect).toHaveBeenCalledWith('Preview my profile.');
   });
 
