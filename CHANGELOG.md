@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.97] - 2026-03-28
+
+### Fixed
+
+- Consistent display name resolution for social/music links: displayText → handle → platform name
+- Broken `@handle` extraction in dashboard link pills and chat-style link items (was using `canonicalIdentity` which never returned `@`-prefixed strings)
+- YouTube `/channel/UCID` URLs no longer produce fake `@UCID` handles, fall back to platform name instead
+- Raised display label character limit from 28 to 40 to prevent silent truncation of user-set labels
+
+### Added
+
+- Platform display handlers for SoundCloud, Facebook, Twitch, and LinkedIn handle extraction
+- Smart secondary text: shows platform name when primary is a handle, shows handle when primary is a custom label
+- 12 new tests covering the display name fallback chain, YouTube channel ID handling, and new platform handlers
+
 ## [26.4.96] - 2026-03-28
 
 ### Added
