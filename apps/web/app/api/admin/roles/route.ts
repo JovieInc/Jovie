@@ -1,8 +1,8 @@
-import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { invalidateAdminCache, requireAdmin } from '@/lib/admin';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { syncAdminRoleChange } from '@/lib/auth/clerk-sync';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     invalidateAdminCache(targetUserId);
 
     // Get current admin user ID for logging
-    const { userId: currentAdminId } = await auth();
+    const { userId: currentAdminId } = await getCachedAuth();
 
     // Sync role change to Clerk metadata (best-effort)
     const headersList = await headers();
@@ -131,7 +131,7 @@ export async function DELETE(request: Request) {
     }
 
     const { userId: targetUserId } = validation.data;
-    const { userId: currentAdminId } = await auth();
+    const { userId: currentAdminId } = await getCachedAuth();
 
     // Prevent self-revocation
     if (targetUserId === currentAdminId) {

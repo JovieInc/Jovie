@@ -4,8 +4,8 @@
  * GET - Get the current user's referral statistics and earnings.
  */
 
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import {
   DEFAULT_COMMISSION_DURATION_MONTHS,
@@ -19,7 +19,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET() {
   try {
-    const { userId: clerkUserId } = await auth();
+    const { userId: clerkUserId } = await getCachedAuth();
     if (!clerkUserId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
