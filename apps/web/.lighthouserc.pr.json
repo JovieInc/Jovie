@@ -51,6 +51,8 @@
             "mainthread-work-breakdown": "warn",
             "render-blocking-resources": "off",
             "render-blocking-insight": "off",
+            "legacy-javascript-insight": "warn",
+            "unused-javascript": "warn",
             "categories:performance": [
               "error",
               {

@@ -62,6 +62,30 @@ function buildCookieForOrigin(cookie, origin) {
   return normalized;
 }
 
+function cookieMatchesBaseUrl(cookie, baseUrl) {
+  const hostname = new URL(baseUrl).hostname.toLowerCase();
+
+  if (typeof cookie.domain === 'string' && cookie.domain.trim()) {
+    return cookie.domain.replace(/^\./, '').toLowerCase() === hostname;
+  }
+
+  if (typeof cookie.url === 'string' && cookie.url.trim()) {
+    try {
+      return new URL(cookie.url).hostname.toLowerCase() === hostname;
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+function authStateMatchesBaseUrl(filePath, baseUrl) {
+  return readStorageStateCookies(filePath).some(cookie =>
+    cookieMatchesBaseUrl(cookie, baseUrl)
+  );
+}
+
 function ensureChromiumPath() {
   const chromePath = require('playwright').chromium.executablePath();
   if (!chromePath || !existsSync(chromePath)) {
@@ -94,6 +118,20 @@ function assertSuccess(result, message) {
   throw new Error(message);
 }
 
+function assertCiUsesSyntheticBypass() {
+  if (process.env.CI !== 'true') {
+    return;
+  }
+
+  if (process.env.E2E_CLERK_USER_ID?.trim()) {
+    return;
+  }
+
+  throw new Error(
+    'Dashboard Lighthouse CI requires E2E_CLERK_USER_ID so authenticated audits never reuse a real session file.'
+  );
+}
+
 function ensureAuthState(baseUrl) {
   const testUserId = process.env.E2E_CLERK_USER_ID?.trim();
   if (testUserId) {
@@ -101,11 +139,14 @@ function ensureAuthState(baseUrl) {
   }
 
   const authStatePath = resolveAuthStatePath();
-  if (existsSync(authStatePath)) {
+  if (
+    existsSync(authStatePath) &&
+    authStateMatchesBaseUrl(authStatePath, baseUrl)
+  ) {
     return authStatePath;
   }
 
-  mkdirSync(path.dirname(defaultAuthStatePath), { recursive: true });
+  mkdirSync(path.dirname(authStatePath), { recursive: true });
 
   const authEnv = { ...process.env };
   delete authEnv.E2E_USE_TEST_AUTH_BYPASS;
@@ -121,7 +162,7 @@ function ensureAuthState(baseUrl) {
       '--base-url',
       baseUrl,
       '--out',
-      path.relative(repoRoot, defaultAuthStatePath),
+      path.relative(repoRoot, authStatePath),
     ],
     {
       cwd: webRoot,
@@ -131,7 +172,7 @@ function ensureAuthState(baseUrl) {
   );
 
   assertSuccess(result, 'Dashboard Lighthouse auth bootstrap failed.');
-  return defaultAuthStatePath;
+  return authStatePath;
 }
 
 async function seedDashboardAuth(browser, { url }) {
@@ -176,6 +217,12 @@ async function seedDashboardAuth(browser, { url }) {
     );
   }
 
+  if (!authStateMatchesBaseUrl(authStatePath, url)) {
+    throw new Error(
+      `Lighthouse auth storage state at ${authStatePath} does not match ${origin}. Regenerate it for the target origin before rerunning.`
+    );
+  }
+
   const cookies = readStorageStateCookies(authStatePath).map(cookie =>
     buildCookieForOrigin(cookie, origin)
   );
@@ -195,6 +242,7 @@ async function seedDashboardAuth(browser, { url }) {
 
 function main() {
   const baseUrl = resolveBaseUrl();
+  assertCiUsesSyntheticBypass();
   const authStatePath = ensureAuthState(baseUrl);
   const chromePath = ensureChromiumPath();
   const env = {

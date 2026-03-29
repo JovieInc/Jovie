@@ -15,8 +15,8 @@ describe('env-client', () => {
     expect(env.IS_E2E).toBe(true);
   });
 
-  it('treats test auth bypass as E2E mode without a build-time public flag', async () => {
-    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+  it('treats NEXT_PUBLIC_E2E_MODE as E2E mode', async () => {
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
 
     const { env } = await import('@/lib/env-client');
 
