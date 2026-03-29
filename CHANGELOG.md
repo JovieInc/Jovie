@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.94] - 2026-03-28
+
+### Changed
+
+- Chat empty state content is now vertically centered instead of bottom-anchored, creating a more balanced layout when no conversation is active
+
 ## [26.4.93] - 2026-03-28
 
 ### Fixed
