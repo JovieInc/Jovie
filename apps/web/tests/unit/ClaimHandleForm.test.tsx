@@ -89,6 +89,19 @@ describe('ClaimHandleForm', () => {
     ).toBeInTheDocument();
   });
 
+  test('shows validation message for handles with invalid characters', () => {
+    render(<ClaimHandleForm />);
+
+    const input = screen.getByRole('textbox', { name: /choose your handle/i });
+    fireEvent.change(input, { target: { value: 'test_handle' } });
+
+    expect(
+      screen.getByText(
+        /Handle can only contain lowercase letters, numbers, and hyphens/i
+      )
+    ).toBeInTheDocument();
+  });
+
   test('does not inject inline animation styles (moved to globals.css)', () => {
     render(<ClaimHandleForm />);
 
