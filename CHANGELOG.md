@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.95] - 2026-03-28
+
+### Changed
+
+- Presence page converted from card grid to table layout, matching the Releases page pattern with row selection and sidebar integration
+- Insights page wrapped in DashboardWorkspacePanel with PageToolbar, matching all other dashboard pages
+- Right drawer card widths normalized by fixing asymmetric padding that caused cards to be narrower on the right side
+- Drawer tabs card padding aligned with entity header padding for visual consistency
+- Dashboard header action button gap tightened from 6px to 4px for more cohesive grouping
+
+### Removed
+
+- DspPresenceCard component (replaced by DspPresenceTable rows)
+
 ## [26.4.94] - 2026-03-28
 
 ### Added

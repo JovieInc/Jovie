@@ -10,10 +10,10 @@ import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
-import { DspPresenceCard } from './DspPresenceCard';
 import { DspPresenceEmptyState } from './DspPresenceEmptyState';
 import { DspPresenceSidebar } from './DspPresenceSidebar';
 import { DspPresenceSummary } from './DspPresenceSummary';
+import { DspPresenceTable } from './DspPresenceTable';
 
 // ============================================================================
 // View component
@@ -68,56 +68,14 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
   }, [selectedMatchId, data.items.length, isSidebarOpen]);
 
-  // Card click: toggle sidebar
-  const handleCardClick = useCallback(
+  // Row click: toggle sidebar
+  const handleRowSelect = useCallback(
     (item: DspPresenceItem) => {
       setSelectedMatchId(
         item.matchId === selectedMatchId ? null : item.matchId
       );
     },
     [selectedMatchId]
-  );
-
-  // Keyboard navigation for card grid
-  const gridRef = useRef<HTMLDivElement>(null);
-
-  const handleCardKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLButtonElement>) => {
-      if (!gridRef.current) return;
-      const cards = Array.from(
-        gridRef.current.querySelectorAll<HTMLElement>('button[aria-pressed]')
-      );
-      const currentIndex = cards.indexOf(e.currentTarget);
-      if (currentIndex === -1) return;
-
-      // Compute column count from rendered grid to make vertical nav correct
-      const cols =
-        globalThis
-          .getComputedStyle(gridRef.current)
-          .gridTemplateColumns.split(' ').length || 1;
-
-      let nextIndex: number;
-      if (e.key === 'ArrowRight') {
-        nextIndex = Math.min(currentIndex + 1, cards.length - 1);
-      } else if (e.key === 'ArrowLeft') {
-        nextIndex = Math.max(currentIndex - 1, 0);
-      } else if (e.key === 'ArrowDown') {
-        nextIndex = Math.min(currentIndex + cols, cards.length - 1);
-      } else if (e.key === 'ArrowUp') {
-        nextIndex = Math.max(currentIndex - cols, 0);
-      } else {
-        return;
-      }
-
-      e.preventDefault();
-      cards[nextIndex]?.focus();
-
-      // Update sidebar selection if open
-      if (selectedMatchId !== null && data.items[nextIndex]) {
-        setSelectedMatchId(data.items[nextIndex].matchId);
-      }
-    },
-    [selectedMatchId, data.items]
   );
 
   const sidebarPanel = useMemo(() => {
@@ -165,20 +123,11 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
       data-testid='dsp-presence-workspace'
     >
       <div className='flex-1 min-h-0 overflow-auto'>
-        <div
-          ref={gridRef}
-          className='grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3'
-        >
-          {data.items.map(item => (
-            <DspPresenceCard
-              key={item.matchId}
-              item={item}
-              isSelected={selectedMatchId === item.matchId}
-              onClick={() => handleCardClick(item)}
-              onKeyDown={handleCardKeyDown}
-            />
-          ))}
-        </div>
+        <DspPresenceTable
+          items={data.items}
+          selectedMatchId={selectedMatchId}
+          onRowSelect={handleRowSelect}
+        />
       </div>
     </DashboardWorkspacePanel>
   );

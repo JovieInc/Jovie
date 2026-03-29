@@ -208,7 +208,7 @@ export function EntitySidebarShell({
           {isMinimalHeader && !isEmpty && entityHeader ? (
             <div
               data-testid='entity-sidebar-entity-header'
-              className='space-y-2 lg:px-1.5 lg:pr-0.5'
+              className='space-y-2 lg:px-1.5'
             >
               {entityHeader}
             </div>
@@ -221,10 +221,7 @@ export function EntitySidebarShell({
               testId='entity-sidebar-tabs-card'
             >
               <div
-                className={cn(
-                  'px-2.5 py-2 [&>*]:w-full',
-                  tabsContainerClassName
-                )}
+                className={cn('px-3 py-2 [&>*]:w-full', tabsContainerClassName)}
               >
                 {tabs}
               </div>
@@ -233,14 +230,14 @@ export function EntitySidebarShell({
         </div>
 
         {isEmpty ? (
-          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5 lg:pr-0.5'>
+          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5'>
             <DrawerSurfaceCard variant='card' className='p-4'>
               <DrawerEmptyState message={emptyMessage} />
             </DrawerSurfaceCard>
           </div>
         ) : (
           <>
-            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5 lg:pr-0.5'>
+            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5'>
               <div className='space-y-2'>{children}</div>
             </div>
 

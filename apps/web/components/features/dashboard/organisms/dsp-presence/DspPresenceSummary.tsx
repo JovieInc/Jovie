@@ -7,6 +7,7 @@ import {
   PageToolbar,
   PageToolbarActionButton,
 } from '@/components/organisms/table';
+import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import { useTriggerDiscoveryMutation } from '@/lib/queries/useDspEnrichmentMutations';
 import { AddPlatformDialog } from './AddPlatformDialog';
@@ -97,6 +98,10 @@ export function DspPresenceSummary({
               label='Add Platform'
               icon={<Plus className='h-3.5 w-3.5' />}
               onClick={() => setDialogOpen(true)}
+            />
+            <DrawerToggleButton
+              chrome='page-toolbar'
+              ariaLabel='Toggle presence details sidebar'
             />
           </div>
         }
