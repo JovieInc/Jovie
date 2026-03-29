@@ -122,7 +122,7 @@ export function isAllowlistedPrivilegedTestAccountEmail(
 
 function buildDeterministicClerkId(email: string): string {
   const normalizedEmail = normalizeEmail(email);
-  const stableId = normalizedEmail.replace(/[^a-z0-9]+/gi, '_').slice(0, 48);
+  const stableId = normalizedEmail.replaceAll(/[^a-z0-9]+/gi, '_').slice(0, 48);
   return `user_dev_${stableId || 'browse'}`;
 }
 

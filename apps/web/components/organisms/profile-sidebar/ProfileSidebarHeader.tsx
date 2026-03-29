@@ -26,10 +26,10 @@ interface UseProfileHeaderPartsProps {
 
 function escapeVCardText(value: string): string {
   return value
-    .replaceAll('\\', '\\\\')
-    .replace(/\r\n|\r|\n/g, '\\n')
-    .replaceAll(';', '\\;')
-    .replaceAll(',', '\\,');
+    .replaceAll('\\', String.raw`\\`)
+    .replaceAll(/\r\n|\r|\n/g, String.raw`\n`)
+    .replaceAll(';', String.raw`\;`)
+    .replaceAll(',', String.raw`\,`);
 }
 
 function generateVCard(
