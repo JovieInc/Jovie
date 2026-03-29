@@ -56,6 +56,11 @@ vi.mock('@/components/atoms/DspLogo', async importOriginal => {
   };
 });
 
+// Mock SmartLinkAudioPreview to avoid duplicate text in DOM
+vi.mock('@/features/release/SmartLinkAudioPreview', () => ({
+  SmartLinkAudioPreview: () => <div data-testid='audio-preview' />,
+}));
+
 // Mock AlbumArtworkContextMenu to avoid QueryClient dependency
 vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
   AlbumArtworkContextMenu: ({ children }: { children: React.ReactNode }) => (
