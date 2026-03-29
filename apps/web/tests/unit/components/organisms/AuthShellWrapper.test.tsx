@@ -14,6 +14,8 @@ const { previewPanelProviderMock, useAuthRouteConfigMock } = vi.hoisted(() => ({
     breadcrumbs: [],
     showMobileTabs: false,
     isTableRoute: false,
+    isDemoRoute: false,
+    showChatUsageIndicator: false,
   })),
 }));
 // AuthShellWrapper pulls in context providers, @jovie/ui Sheet components,
@@ -103,6 +105,8 @@ describe('AuthShellWrapper', () => {
       breadcrumbs: [],
       showMobileTabs: false,
       isTableRoute: false,
+      isDemoRoute: false,
+      showChatUsageIndicator: false,
     });
   });
 
@@ -137,6 +141,8 @@ describe('AuthShellWrapper', () => {
       breadcrumbs: [],
       showMobileTabs: false,
       isTableRoute: false,
+      isDemoRoute: false,
+      showChatUsageIndicator: false,
     });
 
     render(

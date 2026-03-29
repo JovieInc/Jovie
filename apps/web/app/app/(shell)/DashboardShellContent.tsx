@@ -53,28 +53,38 @@ export async function DashboardShellContent({
     redirect(APP_ROUTES.ONBOARDING);
   }
 
+  const useLeanShellProviders = shouldUseEssentialShellData(pathname);
+
   // Read sidebar cookie server-side so SSR matches client state (no flash)
   const cookieStore = await cookies();
   const sidebarCookie = cookieStore.get('sidebar:state');
   const sidebarDefaultOpen = sidebarCookie?.value !== 'false';
 
-  return (
-    <HydrateClient state={getDehydratedState()}>
+  const shellContents = (
+    <>
       {/* ENG-004: Show environment issues to admins in non-production */}
       <OperatorBanner isAdmin={dashboardData.isAdmin} />
       <ImpersonationBannerWrapper />
-      <FeatureFlagsProvider>
-        <DashboardDataProvider value={dashboardData}>
-          <ProfileCompletionRedirect />
-          <AuthShellWrapper
-            persistSidebarCollapsed={setSidebarCollapsed}
-            sidebarDefaultOpen={sidebarDefaultOpen}
-            previewPanelDefaultOpen={!shouldUseEssentialShellData(pathname)}
-          >
-            {children}
-          </AuthShellWrapper>
-        </DashboardDataProvider>
-      </FeatureFlagsProvider>
+      <DashboardDataProvider value={dashboardData}>
+        <ProfileCompletionRedirect />
+        <AuthShellWrapper
+          persistSidebarCollapsed={setSidebarCollapsed}
+          sidebarDefaultOpen={sidebarDefaultOpen}
+          previewPanelDefaultOpen={!useLeanShellProviders}
+        >
+          {children}
+        </AuthShellWrapper>
+      </DashboardDataProvider>
+    </>
+  );
+
+  if (useLeanShellProviders) {
+    return shellContents;
+  }
+
+  return (
+    <HydrateClient state={getDehydratedState()}>
+      <FeatureFlagsProvider>{shellContents}</FeatureFlagsProvider>
     </HydrateClient>
   );
 }

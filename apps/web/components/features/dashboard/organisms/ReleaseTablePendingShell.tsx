@@ -1,0 +1,69 @@
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+
+interface ReleaseTablePendingShellProps {
+  readonly showHeader?: boolean;
+  readonly testId?: string;
+}
+
+const RELEASES_LOADING_ROW_KEYS = [
+  'loading-row-1',
+  'loading-row-2',
+  'loading-row-3',
+  'loading-row-4',
+] as const;
+
+export function ReleaseTablePendingShell({
+  showHeader = true,
+  testId = 'releases-loading',
+}: Readonly<ReleaseTablePendingShellProps>) {
+  return (
+    <div
+      className='flex h-full min-h-0 flex-col gap-4 px-3 py-3 lg:px-4'
+      data-testid={testId}
+      aria-busy='true'
+    >
+      {showHeader ? (
+        <div className='flex items-center justify-between rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-4'>
+          <div className='space-y-2'>
+            <LoadingSkeleton height='h-3' width='w-20' rounded='full' />
+            <LoadingSkeleton height='h-6' width='w-40' rounded='full' />
+          </div>
+          <LoadingSkeleton height='h-10' width='w-24' rounded='full' />
+        </div>
+      ) : null}
+
+      <div className='overflow-hidden rounded-[20px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'>
+        <div className='border-b border-(--linear-app-frame-seam) px-4 py-3'>
+          <div className='grid grid-cols-[minmax(0,2.3fr)_repeat(4,minmax(84px,1fr))] gap-3'>
+            <LoadingSkeleton height='h-3' width='w-full' rounded='full' />
+            <LoadingSkeleton height='h-3' width='w-full' rounded='full' />
+            <LoadingSkeleton height='h-3' width='w-full' rounded='full' />
+            <LoadingSkeleton height='h-3' width='w-full' rounded='full' />
+            <LoadingSkeleton height='h-3' width='w-full' rounded='full' />
+          </div>
+        </div>
+
+        <div className='divide-y divide-(--linear-app-frame-seam)'>
+          {RELEASES_LOADING_ROW_KEYS.map(rowKey => (
+            <div
+              key={rowKey}
+              className='grid grid-cols-[minmax(0,2.3fr)_repeat(4,minmax(84px,1fr))] gap-3 px-4 py-4'
+            >
+              <div className='space-y-2'>
+                <LoadingSkeleton height='h-4' width='w-[68%]' rounded='full' />
+                <LoadingSkeleton height='h-3' width='w-[44%]' rounded='full' />
+              </div>
+              <LoadingSkeleton height='h-9' width='w-full' rounded='lg' />
+              <LoadingSkeleton height='h-9' width='w-full' rounded='lg' />
+              <LoadingSkeleton height='h-9' width='w-full' rounded='lg' />
+              <div className='flex items-center justify-end gap-2'>
+                <LoadingSkeleton height='h-8' width='w-16' rounded='full' />
+                <LoadingSkeleton height='h-8' width='w-8' rounded='full' />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
