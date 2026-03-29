@@ -449,16 +449,16 @@ export const aiChatDailyFreeLimiter = createRateLimiter(
 export const aiChatDailyProLimiter = createRateLimiter(
   RATE_LIMITERS.aiChatDailyPro
 );
-export const aiChatDailyGrowthLimiter = createRateLimiter(
-  RATE_LIMITERS.aiChatDailyGrowth
+export const aiChatDailyMaxLimiter = createRateLimiter(
+  RATE_LIMITERS.aiChatDailyMax
 );
 
 /**
  * Plan-aware AI chat daily limiter.
  * Automatically selects the correct daily quota based on the user's plan tier.
  * - Free: 25 messages/day
- * - Pro/Founding: 100 messages/day
- * - Growth: 500 messages/day
+ * - Pro: 100 messages/day
+ * - Max: 500 messages/day
  */
 export const aiChatDailyPlanAwareLimiter: PlanAwareRateLimiter =
   createPlanAwareRateLimiter({
@@ -466,10 +466,10 @@ export const aiChatDailyPlanAwareLimiter: PlanAwareRateLimiter =
       free: RATE_LIMITERS.aiChatDailyFree,
       pro: RATE_LIMITERS.aiChatDailyPro,
       // founding falls back to pro automatically via the factory
-      growth: RATE_LIMITERS.aiChatDailyGrowth,
+      max: RATE_LIMITERS.aiChatDailyMax,
     },
     errorMessage: plan =>
-      plan === 'growth' || plan === 'pro' || plan === 'founding'
+      plan === 'max' || plan === 'pro'
         ? 'You have reached your daily AI message limit. Your quota resets tomorrow.'
         : 'You have reached your daily AI message limit. Upgrade to Pro for 100 messages per day.',
   });
@@ -627,7 +627,7 @@ export const appleMusicRescanPaidLimiter = _appleMusicRescanPaidLimiter;
  * Plan-aware Apple Music rescan limiter.
  * Automatically selects the correct limit based on the user's plan tier.
  * - Free: 1 per day
- * - Pro/Founding/Growth: 1 per hour
+ * - Pro/Max: 1 per hour
  */
 export const appleMusicRescanPlanAwareLimiter: PlanAwareRateLimiter =
   createPlanAwareRateLimiter({
@@ -635,17 +635,17 @@ export const appleMusicRescanPlanAwareLimiter: PlanAwareRateLimiter =
       free: RATE_LIMITERS.appleMusicRescanFree,
       pro: RATE_LIMITERS.appleMusicRescanPaid,
       // founding falls back to pro automatically via the factory
-      growth: RATE_LIMITERS.appleMusicRescanPaid,
+      max: RATE_LIMITERS.appleMusicRescanPaid,
     },
     errorMessage: plan =>
-      plan === 'growth' || plan === 'pro' || plan === 'founding'
+      plan === 'max' || plan === 'pro'
         ? 'Apple Music was recently refreshed. Please wait 1 hour before refreshing again.'
         : 'Apple Music was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to Pro for hourly refreshes.',
   });
 
 /**
  * Check Apple Music rescan rate limit (plan-aware).
- * Free: 1/day, Paid (pro/founding/growth): 1/hour.
+ * Free: 1/day, Paid (pro/max): 1/hour.
  */
 export async function checkAppleMusicRescanRateLimit(
   profileId: string,
@@ -688,7 +688,7 @@ export const releaseRefreshPaidLimiter = _releaseRefreshPaidLimiter;
  * Plan-aware release refresh limiter.
  * Automatically selects the correct limit based on the user's plan tier.
  * - Free: 1 per day
- * - Pro/Founding/Growth: 1 per hour
+ * - Pro/Max: 1 per hour
  */
 export const releaseRefreshPlanAwareLimiter: PlanAwareRateLimiter =
   createPlanAwareRateLimiter({
@@ -696,17 +696,17 @@ export const releaseRefreshPlanAwareLimiter: PlanAwareRateLimiter =
       free: RATE_LIMITERS.releaseRefreshFree,
       pro: RATE_LIMITERS.releaseRefreshPaid,
       // founding falls back to pro automatically via the factory
-      growth: RATE_LIMITERS.releaseRefreshPaid,
+      max: RATE_LIMITERS.releaseRefreshPaid,
     },
     errorMessage: plan =>
-      plan === 'growth' || plan === 'pro' || plan === 'founding'
+      plan === 'max' || plan === 'pro'
         ? 'This release was recently refreshed. Please wait 1 hour before refreshing again.'
         : 'This release was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to Pro for hourly refreshes.',
   });
 
 /**
  * Check release refresh rate limit (plan-aware).
- * Free: 1/day, Paid (pro/founding/growth): 1/hour.
+ * Free: 1/day, Paid (pro/max): 1/hour.
  */
 export async function checkReleaseRefreshRateLimit(
   releaseId: string,

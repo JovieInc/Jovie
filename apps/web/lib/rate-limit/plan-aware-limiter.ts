@@ -21,12 +21,7 @@ import type {
  * Valid plan IDs for rate limiting.
  * Used to validate plan strings and determine config lookup.
  */
-const VALID_PLAN_IDS: readonly PlanId[] = [
-  'free',
-  'founding',
-  'pro',
-  'growth',
-] as const;
+const VALID_PLAN_IDS: readonly PlanId[] = ['free', 'pro', 'max'] as const;
 
 function isPlanId(value: string): value is PlanId {
   return (VALID_PLAN_IDS as ReadonlyArray<string>).includes(value);
@@ -34,13 +29,16 @@ function isPlanId(value: string): value is PlanId {
 
 /**
  * Normalize a plan string to a valid PlanId.
- * Returns 'free' for null, undefined, or unknown plans.
+ * Maps legacy plan names (founding -> pro, growth -> max) and
+ * returns 'free' for null, undefined, or unknown plans.
  */
 function normalizePlan(plan: PlanInput): PlanId {
   if (!plan || typeof plan !== 'string') {
     return 'free';
   }
   const normalized = plan.toLowerCase();
+  if (normalized === 'founding') return 'pro';
+  if (normalized === 'growth') return 'max';
   return isPlanId(normalized) ? normalized : 'free';
 }
 
@@ -48,8 +46,7 @@ function normalizePlan(plan: PlanInput): PlanId {
  * Resolve the config for a given plan from a PlanRateLimitConfig.
  * Uses the following fallback chain:
  * 1. Exact plan match
- * 2. For 'founding', fall back to 'pro' if not explicitly defined
- * 3. Fall back to 'free' config (always required)
+ * 2. Fall back to 'free' config (always required)
  */
 function resolveConfigForPlan(
   configs: PlanRateLimitConfig,
@@ -59,11 +56,6 @@ function resolveConfigForPlan(
   const exactConfig = configs[plan];
   if (exactConfig) {
     return exactConfig;
-  }
-
-  // founding -> pro fallback (founding is equivalent to pro for rate limits)
-  if (plan === 'founding' && configs.pro) {
-    return configs.pro;
   }
 
   // Default to free (always defined per type constraint)
@@ -95,7 +87,7 @@ function defaultErrorMessage(plan: PlanId | null): string {
  *   configs: {
  *     free: { name: 'feature-free', limit: 10, window: '1 d', prefix: 'feature:free' },
  *     pro: { name: 'feature-pro', limit: 100, window: '1 d', prefix: 'feature:pro' },
- *     growth: { name: 'feature-growth', limit: 500, window: '1 d', prefix: 'feature:growth' },
+ *     max: { name: 'feature-max', limit: 500, window: '1 d', prefix: 'feature:max' },
  *   },
  *   errorMessage: (plan) => plan === 'free'
  *     ? 'Limit reached. Upgrade for more!'

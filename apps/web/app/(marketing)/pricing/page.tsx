@@ -42,7 +42,7 @@ export const metadata: Metadata = {
   },
 };
 
-const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+const maxPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
 
 // Product/Offer JSON-LD Structured Data — derived from ENTITLEMENT_REGISTRY
 const PRICING_SCHEMA = {
@@ -55,8 +55,7 @@ const PRICING_SCHEMA = {
   mainEntity: {
     '@type': 'ItemList',
     itemListElement: getAllPlanIds()
-      .filter(planId => growthPlanEnabled || planId !== 'growth')
-      .filter(planId => planId !== 'founding')
+      .filter(planId => maxPlanEnabled || planId !== 'max')
       .map((planId, index) => {
         const plan = ENTITLEMENT_REGISTRY[planId];
         const price = plan.marketing.price?.monthly ?? 0;
@@ -88,7 +87,6 @@ interface PricingTierProps {
   readonly billingLabel: string;
   readonly price: string;
   readonly priceSuffix?: string;
-  readonly foundingNote?: string;
   readonly buttonLabel: string;
   readonly buttonHref: string;
   readonly buttonVariant: 'primary' | 'secondary';
@@ -101,7 +99,6 @@ function PricingTier({
   billingLabel,
   price,
   priceSuffix,
-  foundingNote,
   buttonLabel,
   buttonHref,
   buttonVariant,
@@ -165,19 +162,6 @@ function PricingTier({
             </span>
           )}
         </div>
-
-        {/* Founding note */}
-        {foundingNote && (
-          <div
-            className='mt-2'
-            style={{
-              fontSize: 'var(--linear-label-size)',
-              color: 'var(--linear-text-tertiary)',
-            }}
-          >
-            {foundingNote}
-          </div>
-        )}
       </div>
 
       {/* CTA Button */}
@@ -233,8 +217,6 @@ function PricingTier({
 }
 
 export default function PricingPage() {
-  const founding = ENTITLEMENT_REGISTRY.founding;
-
   return (
     <div className='min-h-screen'>
       {/* Structured Data for SEO */}
@@ -251,7 +233,7 @@ export default function PricingPage() {
           {/* Pricing Grid */}
           <div className='mx-auto max-w-5xl'>
             <div
-              className={`grid grid-cols-1 ${growthPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} rounded-xl md:rounded-lg overflow-hidden`}
+              className={`grid grid-cols-1 ${maxPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} rounded-xl md:rounded-lg overflow-hidden`}
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-default)',
@@ -273,7 +255,7 @@ export default function PricingPage() {
               {/* Pro Tier - Highlighted */}
               <div
                 className={
-                  growthPlanEnabled
+                  maxPlanEnabled
                     ? 'border-b md:border-b-0 md:border-r border-default'
                     : ''
                 }
@@ -283,7 +265,6 @@ export default function PricingPage() {
                   billingLabel='Billed monthly'
                   price={`$${ENTITLEMENT_REGISTRY.pro.marketing.price?.monthly ?? 0}`}
                   priceSuffix='/month'
-                  foundingNote={`${founding.marketing.displayName}: $${founding.marketing.price?.monthly ?? 0}/mo locked in`}
                   buttonLabel='Get started'
                   buttonHref='/signup?plan=pro'
                   buttonVariant='primary'
@@ -292,17 +273,17 @@ export default function PricingPage() {
                 />
               </div>
 
-              {growthPlanEnabled && (
+              {maxPlanEnabled && (
                 <div>
                   <PricingTier
-                    name={ENTITLEMENT_REGISTRY.growth.marketing.displayName}
+                    name={ENTITLEMENT_REGISTRY.max.marketing.displayName}
                     billingLabel='Early Access · Billed monthly'
-                    price={`$${ENTITLEMENT_REGISTRY.growth.marketing.price?.monthly ?? 0}`}
+                    price={`$${ENTITLEMENT_REGISTRY.max.marketing.price?.monthly ?? 0}`}
                     priceSuffix='/month'
                     buttonLabel='Request Early Access'
-                    buttonHref='/signup?plan=growth'
+                    buttonHref='/signup?plan=max'
                     buttonVariant='secondary'
-                    features={ENTITLEMENT_REGISTRY.growth.marketing.features}
+                    features={ENTITLEMENT_REGISTRY.max.marketing.features}
                   />
                 </div>
               )}

@@ -148,18 +148,18 @@ describe('GET /api/billing/status', () => {
     expect(data.error).toBe('Failed to get billing status');
   });
 
-  it('returns growth user data correctly', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_growth' });
+  it('returns max user data correctly', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_max' });
     mockGetUserBillingInfo.mockResolvedValue({
       success: true,
       data: {
         userId: 'db_id',
-        email: 'growth@example.com',
+        email: 'max@example.com',
         isAdmin: false,
         isPro: true,
-        plan: 'growth',
-        stripeCustomerId: 'cus_growth',
-        stripeSubscriptionId: 'sub_growth',
+        plan: 'max',
+        stripeCustomerId: 'cus_max',
+        stripeSubscriptionId: 'sub_max',
         billingVersion: 1,
         lastBillingEventAt: null,
       },
@@ -171,7 +171,7 @@ describe('GET /api/billing/status', () => {
 
     expect(response.status).toBe(200);
     expect(data.isPro).toBe(true);
-    expect(data.plan).toBe('growth');
+    expect(data.plan).toBe('max');
   });
 
   it('defaults plan to free when plan is null in billing data', async () => {

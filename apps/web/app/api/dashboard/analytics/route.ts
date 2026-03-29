@@ -80,7 +80,9 @@ export async function GET(request: Request) {
       },
       { ttlSeconds: 5 * 60 }
     );
-    const range = clampRange(rawRange, retentionDays);
+    // null = unlimited (Max tier), skip clamping
+    const range =
+      retentionDays === null ? rawRange : clampRange(rawRange, retentionDays);
 
     const key = `dashboard-analytics:${userId}:${view}:${range}`;
 

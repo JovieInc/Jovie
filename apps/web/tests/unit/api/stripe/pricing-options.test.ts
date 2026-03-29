@@ -2,38 +2,38 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetAvailablePricing = vi.hoisted(() => vi.fn());
 
-const mockIsGrowthPlanEnabled = vi.hoisted(() => vi.fn());
+const mockIsMaxPlanEnabled = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/stripe/config', () => ({
   getAvailablePricing: mockGetAvailablePricing,
-  isGrowthPlanEnabled: mockIsGrowthPlanEnabled,
+  isMaxPlanEnabled: mockIsMaxPlanEnabled,
 }));
 
 describe('GET /api/stripe/pricing-options', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-    mockIsGrowthPlanEnabled.mockReturnValue(true);
+    mockIsMaxPlanEnabled.mockReturnValue(true);
   });
 
-  it('filters growth pricing when growth plan is disabled', async () => {
-    mockIsGrowthPlanEnabled.mockReturnValue(false);
+  it('filters max pricing when max plan is disabled', async () => {
+    mockIsMaxPlanEnabled.mockReturnValue(false);
     mockGetAvailablePricing.mockReturnValue([
       {
         priceId: 'price_pro_monthly',
-        amount: 3900,
+        amount: 2000,
         currency: 'usd',
         interval: 'month',
         description: 'Pro Monthly',
         plan: 'pro',
       },
       {
-        priceId: 'price_growth_monthly',
-        amount: 9900,
+        priceId: 'price_max_monthly',
+        amount: 20000,
         currency: 'usd',
         interval: 'month',
-        description: 'Growth Monthly',
-        plan: 'growth',
+        description: 'Max Monthly',
+        plan: 'max',
       },
     ]);
 

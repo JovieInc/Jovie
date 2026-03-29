@@ -146,10 +146,10 @@ describe('usePlanGate – edge cases', () => {
     expect(result.current.contactsLimit).toBe(100);
   });
 
-  it('growth user gets 365-day retention and unlimited contacts', async () => {
+  it('max user gets unlimited retention and unlimited contacts', async () => {
     mockBillingResponse({
       isPro: true,
-      plan: 'growth',
+      plan: 'max',
       stripeCustomerId: 'cus_g',
       stripeSubscriptionId: 'sub_g',
     });
@@ -162,7 +162,7 @@ describe('usePlanGate – edge cases', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(result.current.analyticsRetentionDays).toBe(365);
+    expect(result.current.analyticsRetentionDays).toBeNull();
     expect(result.current.contactsLimit).toBeNull();
     expect(result.current.canRemoveBranding).toBe(true);
   });
@@ -183,7 +183,7 @@ describe('usePlanGate – edge cases', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    // getRetentionDays / getContactsLimit only recognize 'pro' and 'growth'
+    // getRetentionDays / getContactsLimit only recognize 'pro' and 'max'
     expect(result.current.analyticsRetentionDays).toBe(30);
     expect(result.current.contactsLimit).toBe(100);
   });

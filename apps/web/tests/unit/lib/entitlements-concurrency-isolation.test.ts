@@ -36,7 +36,7 @@ describe('entitlements concurrent access isolation', () => {
     const authSequence = [
       { userId: 'user_free' },
       { userId: 'user_pro' },
-      { userId: 'user_growth' },
+      { userId: 'user_max' },
     ];
 
     mockCachedAuth.mockImplementation(async () => authSequence.shift());
@@ -45,7 +45,7 @@ describe('entitlements concurrent access isolation', () => {
     });
 
     mockIsAdmin.mockImplementation(
-      async (userId: string) => userId === 'user_growth'
+      async (userId: string) => userId === 'user_max'
     );
 
     mockGetUserBillingInfo
@@ -76,17 +76,17 @@ describe('entitlements concurrent access isolation', () => {
       .mockResolvedValueOnce({
         success: true,
         data: {
-          userId: 'db_growth',
-          email: 'growth@example.com',
+          userId: 'db_max',
+          email: 'max@example.com',
           isAdmin: false,
           isPro: true,
-          plan: 'growth',
-          stripeCustomerId: 'cus_growth',
-          stripeSubscriptionId: 'sub_growth',
+          plan: 'max',
+          stripeCustomerId: 'cus_max',
+          stripeSubscriptionId: 'sub_max',
         },
       });
 
-    const [free, pro, growth] = await Promise.all([
+    const [free, pro, max] = await Promise.all([
       getCurrentUserEntitlements(),
       getCurrentUserEntitlements(),
       getCurrentUserEntitlements(),
@@ -99,12 +99,12 @@ describe('entitlements concurrent access isolation', () => {
 
     expect(pro.userId).toBe('user_pro');
     expect(pro.plan).toBe('pro');
-    expect(pro.contactsLimit).toBeNull();
+    expect(pro.contactsLimit).toBe(5000);
     expect(pro.hasAdvancedFeatures).toBe(false);
 
-    expect(growth.userId).toBe('user_growth');
-    expect(growth.plan).toBe('growth');
-    expect(growth.hasAdvancedFeatures).toBe(true);
-    expect(growth.isAdmin).toBe(true);
+    expect(max.userId).toBe('user_max');
+    expect(max.plan).toBe('max');
+    expect(max.hasAdvancedFeatures).toBe(true);
+    expect(max.isAdmin).toBe(true);
   });
 });
