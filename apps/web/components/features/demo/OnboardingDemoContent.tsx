@@ -78,8 +78,8 @@ export function OnboardingDemoContent({
 
       {/* Main area: step content + progressive profile panel */}
       <div className='flex flex-1 min-h-0'>
-        {/* Center: step content — centered in available space */}
-        <div className='flex-1 overflow-y-auto overscroll-contain flex justify-center'>
+        {/* Center: step content — mx-auto in StepFrame handles centering */}
+        <div className='flex-1 min-w-0 overflow-y-auto overscroll-contain'>
           <OnboardingDemoStep step={currentStep} onFinish={onFinish} />
         </div>
 
