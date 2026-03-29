@@ -7,6 +7,7 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Avatar } from '@/components/molecules/Avatar';
 import { DrawerLinkSection } from '@/components/molecules/drawer/DrawerLinkSection';
 import { DrawerStatGrid } from '@/components/molecules/drawer/DrawerStatGrid';
+import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
 import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
 import { SidebarLinkRow } from '@/components/molecules/drawer/SidebarLinkRow';
 import { StatTile } from '@/components/molecules/drawer/StatTile';
@@ -70,33 +71,35 @@ export function OnboardingDemoProfilePanel({
     >
       <div className='space-y-4 px-3 py-8'>
         {/* Identity card — always visible, progressively fills */}
-        <EntityHeaderCard
-          image={
-            <Avatar
-              src={visible.hasArtist ? profile.avatarUrl : null}
-              alt={visible.hasArtist ? artist.name : 'Your profile'}
-              name={visible.hasArtist ? artist.name : '?'}
-              size='xl'
-              rounded='full'
-            />
-          }
-          title={visible.hasArtist ? artist.name : 'Your profile'}
-          subtitle={`@${profile.username}`}
-          meta={
-            visible.hasArtist && profile.genres?.length ? (
-              <div className='mt-1.5 flex flex-wrap gap-1.5'>
-                {profile.genres.slice(0, 3).map(genre => (
-                  <span
-                    key={genre}
-                    className='rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium capitalize text-secondary-token'
-                  >
-                    {genre}
-                  </span>
-                ))}
-              </div>
-            ) : null
-          }
-        />
+        <DrawerSurfaceCard variant='card' className='p-4'>
+          <EntityHeaderCard
+            image={
+              <Avatar
+                src={visible.hasArtist ? profile.avatarUrl : null}
+                alt={visible.hasArtist ? artist.name : 'Your profile'}
+                name={visible.hasArtist ? artist.name : '?'}
+                size='xl'
+                rounded='full'
+              />
+            }
+            title={visible.hasArtist ? artist.name : 'Your profile'}
+            subtitle={`@${profile.username}`}
+            meta={
+              visible.hasArtist && profile.genres?.length ? (
+                <div className='mt-1.5 flex flex-wrap gap-1.5'>
+                  {profile.genres.slice(0, 3).map(genre => (
+                    <span
+                      key={genre}
+                      className='rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium capitalize text-secondary-token'
+                    >
+                      {genre}
+                    </span>
+                  ))}
+                </div>
+              ) : null
+            }
+          />
+        </DrawerSurfaceCard>
 
         {/* Stats — visible from DSP step onward */}
         {visible.stats ? (
@@ -182,7 +185,11 @@ export function OnboardingDemoProfilePanel({
                 url='#'
                 badge={
                   release.releaseDate
-                    ? String(new Date(release.releaseDate).getFullYear())
+                    ? String(
+                        new Date(
+                          `${release.releaseDate}T00:00:00Z`
+                        ).getUTCFullYear()
+                      )
                     : undefined
                 }
               />
