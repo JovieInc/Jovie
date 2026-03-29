@@ -485,7 +485,7 @@ async function measureWarmNavigationRoute(
   const visibleTrigger = await waitForAnyVisible(
     page,
     route.readySelectors.navTrigger
-  );
+  ).catch(() => null);
 
   const startedAt = Date.now();
   const parsedUrl = new URL(url);

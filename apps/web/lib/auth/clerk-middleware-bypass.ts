@@ -19,7 +19,6 @@ const CLERK_REQUIRED_EXACT_PATHS = [
 
 const CLERK_REQUIRED_PREFIXES = [
   `${APP_ROUTES.DASHBOARD}/`,
-  '/api/',
   '/trpc',
   '/__clerk/',
   '/monitoring/',
@@ -61,6 +60,10 @@ export function shouldBypassClerkForRequest(options: {
   pathInfo: ClerkBypassPathInfo;
   pathname: string;
 }) {
+  // Public API routes must be able to answer as signed-out requests without
+  // entering Clerk's handshake/rewrite flow. Route handlers own auth for
+  // protected APIs, while authenticated callers still keep Clerk enabled
+  // below because they carry active Clerk cookies.
   if (isClerkRequiredPath(options.pathname, options.pathInfo)) {
     return false;
   }

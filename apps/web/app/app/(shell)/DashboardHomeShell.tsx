@@ -11,7 +11,7 @@ export function DashboardHomeShell() {
   return (
     <div className='flex h-full min-h-0 flex-col overflow-auto'>
       <div className='mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-4 py-6 sm:px-6 lg:px-8'>
-        <section className='rounded-[28px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-5 shadow-[0_20px_60px_-48px_rgba(15,23,42,0.45)] sm:p-6'>
+        <section className='rounded-[28px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-5 sm:p-6'>
           <div className='space-y-2'>
             <p className='text-[11px] font-[600] uppercase tracking-[0.18em] text-tertiary-token'>
               Home
@@ -28,7 +28,7 @@ export function DashboardHomeShell() {
           <form
             action={APP_ROUTES.CHAT}
             method='get'
-            className='mt-5 space-y-3 rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-0 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]'
+            className='mt-5 space-y-3 rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-0 p-3'
           >
             <label htmlFor='dashboard-home-query' className='sr-only'>
               Ask Jovie anything

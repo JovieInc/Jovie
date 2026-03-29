@@ -1,4 +1,4 @@
-const RELEASES_LOADING_ROW_KEYS = Array.from({ length: 5 }, (_, i) => i);
+const RELEASES_LOADING_ROW_KEYS = Array.from({ length: 3 }, (_, i) => i);
 
 /**
  * Keep the releases loading surface extremely cheap.
@@ -22,9 +22,9 @@ export function ReleaseTableSkeleton() {
 
       <div className='overflow-hidden rounded-[22px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'>
         <div className='grid grid-cols-[minmax(0,1.8fr)_110px_88px] gap-3 border-b border-(--linear-app-frame-seam) px-4 py-3 max-sm:hidden'>
-          <div className='h-3 w-20 rounded-full bg-surface-2/70 animate-pulse' />
-          <div className='h-3 w-16 rounded-full bg-surface-2/70 animate-pulse' />
-          <div className='h-3 w-12 rounded-full bg-surface-2/70 animate-pulse' />
+          <div className='h-3 w-20 rounded-full bg-surface-2/70' />
+          <div className='h-3 w-16 rounded-full bg-surface-2/70' />
+          <div className='h-3 w-12 rounded-full bg-surface-2/70' />
         </div>
 
         <div className='divide-y divide-(--linear-app-frame-seam)'>
@@ -34,17 +34,17 @@ export function ReleaseTableSkeleton() {
               className='grid grid-cols-[minmax(0,1.8fr)_110px_88px] items-center gap-3 px-4 py-3 max-sm:grid-cols-1'
             >
               <div className='flex items-center gap-3'>
-                <div className='h-10 w-10 shrink-0 rounded-[12px] bg-surface-2/70 animate-pulse' />
+                <div className='h-10 w-10 shrink-0 rounded-[12px] bg-surface-2/70' />
                 <div className='min-w-0 flex-1 space-y-2'>
-                  <div className='h-4 w-3/5 rounded-full bg-surface-2/70 animate-pulse' />
-                  <div className='h-3 w-24 rounded-full bg-surface-2/60 animate-pulse' />
+                  <div className='h-4 w-3/5 rounded-full bg-surface-2/70' />
+                  <div className='h-3 w-24 rounded-full bg-surface-2/60' />
                 </div>
               </div>
               <div className='flex items-center gap-2 max-sm:hidden'>
-                <div className='h-6 w-10 rounded-full bg-surface-2/60 animate-pulse' />
-                <div className='h-6 w-10 rounded-full bg-surface-2/60 animate-pulse' />
+                <div className='h-6 w-10 rounded-full bg-surface-2/60' />
+                <div className='h-6 w-10 rounded-full bg-surface-2/60' />
               </div>
-              <div className='ml-auto h-8 w-14 rounded-full bg-surface-2/70 animate-pulse max-sm:hidden' />
+              <div className='ml-auto h-8 w-14 rounded-full bg-surface-2/70 max-sm:hidden' />
             </div>
           ))}
         </div>
