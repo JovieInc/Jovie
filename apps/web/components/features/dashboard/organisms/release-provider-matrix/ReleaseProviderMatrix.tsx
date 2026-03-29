@@ -220,8 +220,20 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
   // Apply filters and search to rows — all releases shown (no tracks/releases split)
+  // Deduplicate by ID to prevent multiple rows highlighting on click
   const filteredRows = useMemo(() => {
-    return filterReleases(rows, filters, deferredSearchQuery);
+    const filtered = filterReleases(rows, filters, deferredSearchQuery);
+    const seen = new Set<string>();
+    return filtered.filter(r => {
+      if (seen.has(r.id)) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn(`[ReleaseTable] duplicate release id: ${r.id}`);
+        }
+        return false;
+      }
+      seen.add(r.id);
+      return true;
+    });
   }, [rows, filters, deferredSearchQuery]);
 
   // Smart link gating
