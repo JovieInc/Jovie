@@ -5,7 +5,7 @@
  * Used by both the main smart link page and the /sounds page.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { db } from '@/lib/db';
@@ -282,7 +282,7 @@ const fetchContentBySlug = async (
     .limit(1);
 
   if (release) {
-    const [links, credits] = await Promise.all([
+    const [links, credits, previewRow] = await Promise.all([
       db
         .select({
           providerId: providerLinks.providerId,
@@ -296,6 +296,25 @@ const fetchContentBySlug = async (
           )
         ),
       fetchReleaseCredits(release.id),
+      db
+        .select({ previewUrl: discogRecordings.previewUrl })
+        .from(discogRecordings)
+        .innerJoin(
+          discogReleaseTracks,
+          eq(discogReleaseTracks.recordingId, discogRecordings.id)
+        )
+        .where(
+          and(
+            eq(discogReleaseTracks.releaseId, release.id),
+            isNotNull(discogRecordings.previewUrl)
+          )
+        )
+        .orderBy(
+          discogReleaseTracks.discNumber,
+          discogReleaseTracks.trackNumber
+        )
+        .limit(1)
+        .then(rows => rows[0]),
     ]);
 
     const metadata = release.metadata as Record<string, unknown> | null;
@@ -314,6 +333,7 @@ const fetchContentBySlug = async (
       releaseType: release.releaseType,
       totalTracks: release.totalTracks,
       releaseId: release.id,
+      previewUrl: previewRow?.previewUrl ?? null,
       credits,
     };
   }

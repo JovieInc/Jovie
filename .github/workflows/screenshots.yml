@@ -92,17 +92,25 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          BRANCH="screenshots/auto-update-${GITHUB_RUN_ID}"
-          git checkout -b "$BRANCH"
-          git add apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
-          git commit -m "chore: update product screenshots [auto]"
-          git push -u origin "$BRANCH"
+          BRANCH="screenshots/auto-update"
 
-          EXISTING_PR=$(gh pr list --head "$BRANCH" --json number \
+          # Check for existing open PR before pushing
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number \
             -q '.[0].number' 2>/dev/null || true)
 
+          git checkout -b "$BRANCH"
+          git add apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
+          git commit -m "chore: update product screenshots [auto]
+
+          Triggered by ${GITHUB_SHA::8} (run ${GITHUB_RUN_ID})"
+          # Dedicated bot branch: always force-push latest generated screenshots.
+          # `--force-with-lease` can fail with stale lease info when concurrent
+          # screenshot runs update this branch between list + push.
+          git push --force origin "$BRANCH"
+
           if [ -n "$EXISTING_PR" ]; then
-            echo "Updated existing PR #$EXISTING_PR"
+            echo "Updated existing PR #$EXISTING_PR via force-push"
+            # Re-enable auto-merge (GitHub disables it on force-push)
             gh pr merge --auto --squash "$EXISTING_PR" 2>/dev/null || true
           else
             PR_URL=$(gh pr create \

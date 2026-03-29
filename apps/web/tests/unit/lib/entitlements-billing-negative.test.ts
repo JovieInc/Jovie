@@ -83,8 +83,8 @@ describe('Entitlements – Privilege Escalation Prevention', () => {
     expect(e.contactsLimit).toBe(100);
   });
 
-  it('isPro=false + plan=growth in DB → no growth features', async () => {
-    setupAuthenticatedUser({ isPro: false, plan: 'growth' });
+  it('isPro=false + plan=max in DB → no max features', async () => {
+    setupAuthenticatedUser({ isPro: false, plan: 'max' });
     const e = await getCurrentUserEntitlements();
 
     expect(e.isPro).toBe(false);
@@ -149,7 +149,7 @@ describe('Entitlements – Free Tier Boundary Enforcement', () => {
     }
   });
 
-  it('pro user has unlimited contacts (null, not Infinity)', async () => {
+  it('pro user has 5000 contacts limit', async () => {
     setupAuthenticatedUser({
       isPro: true,
       plan: 'pro',
@@ -158,15 +158,13 @@ describe('Entitlements – Free Tier Boundary Enforcement', () => {
     });
     const e = await getCurrentUserEntitlements();
 
-    expect(e.contactsLimit).toBeNull();
-    expect(e.contactsLimit).not.toBe(Infinity);
-    expect(e.contactsLimit).not.toBe(0);
+    expect(e.contactsLimit).toBe(5000);
   });
 
-  it('growth user has unlimited contacts (null, not Infinity)', async () => {
+  it('max user has unlimited contacts (null, not Infinity)', async () => {
     setupAuthenticatedUser({
       isPro: true,
-      plan: 'growth',
+      plan: 'max',
       stripeCustomerId: 'cus_2',
       stripeSubscriptionId: 'sub_2',
     });
@@ -288,7 +286,7 @@ describe('Entitlements – Plan Tier Completeness', () => {
       'contactsLimit',
     ];
 
-    for (const plan of ['free', 'pro', 'growth'] as const) {
+    for (const plan of ['free', 'pro', 'max'] as const) {
       setupAuthenticatedUser({
         isPro: plan !== 'free',
         plan,
@@ -305,23 +303,32 @@ describe('Entitlements – Plan Tier Completeness', () => {
     }
   });
 
-  it('pro plan retention is between free and growth', async () => {
-    const plans = ['free', 'pro', 'growth'] as const;
-    const retentions: number[] = [];
+  it('pro plan retention is between free and max', async () => {
+    // free = 30, pro = 180, max = null (unlimited)
+    setupAuthenticatedUser({ isPro: false, plan: 'free' });
+    const free = await getCurrentUserEntitlements();
 
-    for (const plan of plans) {
-      setupAuthenticatedUser({
-        isPro: plan !== 'free',
-        plan,
-        stripeCustomerId: plan !== 'free' ? 'cus_' + plan : null,
-        stripeSubscriptionId: plan !== 'free' ? 'sub_' + plan : null,
-      });
-      const e = await getCurrentUserEntitlements();
-      retentions.push(e.analyticsRetentionDays);
-    }
+    setupAuthenticatedUser({
+      isPro: true,
+      plan: 'pro',
+      stripeCustomerId: 'cus_pro',
+      stripeSubscriptionId: 'sub_pro',
+    });
+    const pro = await getCurrentUserEntitlements();
 
-    // free < pro < growth
-    expect(retentions[0]).toBeLessThan(retentions[1]);
-    expect(retentions[1]).toBeLessThan(retentions[2]);
+    setupAuthenticatedUser({
+      isPro: true,
+      plan: 'max',
+      stripeCustomerId: 'cus_max',
+      stripeSubscriptionId: 'sub_max',
+    });
+    const max = await getCurrentUserEntitlements();
+
+    // free < pro
+    expect(free.analyticsRetentionDays).toBeLessThan(
+      pro.analyticsRetentionDays
+    );
+    // max = null (unlimited) > any number
+    expect(max.analyticsRetentionDays).toBeNull();
   });
 });

@@ -13,21 +13,29 @@
    ============================================ */
 
 /* --- A. Custom properties scoped to auth roots --- */
+/* Auth pages always render on a dark background (hardcoded gradient overlay).
+   Use fixed dark-theme values so Clerk components (card, footer, branding)
+   display correctly regardless of the user's system light/dark mode. */
 :is(.cl-signIn-root, .cl-signUp-root) {
   --clerk-color-primary: var(--color-accent);
   --clerk-color-primary-foreground: #ffffff;
-  --clerk-color-foreground: var(--color-text-primary-token);
-  --clerk-color-muted-foreground: var(--color-text-secondary-token);
-  --clerk-color-background: var(--color-bg-surface-0);
-  --clerk-color-input: var(--color-bg-input);
-  --clerk-color-input-foreground: var(--color-text-primary-token);
-  --clerk-color-muted: var(--color-bg-surface-1);
-  --clerk-color-border: var(--color-border-subtle);
+  --clerk-color-foreground: #ffffff;
+  --clerk-color-neutral: #ffffff;
+  --clerk-color-muted-foreground: #e3e4e6;
+  --clerk-color-background: #0f1011;
+  --clerk-color-input: #191b1f;
+  --clerk-color-input-foreground: #ffffff;
+  --clerk-color-muted: #17171a;
+  --clerk-color-border: rgba(255, 255, 255, 0.05);
+  --clerk-color-border-strong: rgba(255, 255, 255, 0.08);
+  --clerk-color-tertiary-foreground: #969799;
+  --clerk-color-surface-2: #23252a;
   --clerk-color-ring: rgba(113, 112, 255, 0.28);
   --clerk-color-modal-backdrop: rgba(8, 9, 10, 0.72);
   --clerk-color-shadow: rgba(0, 0, 0, 0.35);
   --clerk-border-radius: var(--radius-xl);
   --clerk-font-family: var(--font-sans);
+  --clerk-spacing: 1.125rem;
   --clerk-focus-ring: 0 0 0 2px rgba(113, 112, 255, 0.28);
   font-feature-settings: var(--linear-font-features);
 }
@@ -41,8 +49,12 @@
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-card {
   overflow: hidden;
-  border: 1px solid var(--color-border-subtle);
-  background: color-mix(in srgb, var(--color-bg-surface-0) 94%, transparent);
+  border: 1px solid var(--clerk-color-border);
+  background: color-mix(
+    in srgb,
+    var(--clerk-color-background) 94%,
+    transparent
+  );
   border-radius: var(--radius-3xl);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
   backdrop-filter: blur(24px);
@@ -50,7 +62,7 @@
 
 /* --- C. Typography --- */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-headerTitle {
-  color: var(--color-text-primary-token);
+  color: var(--clerk-color-foreground);
   font-size: clamp(1.75rem, 2vw, 1.875rem);
   font-weight: 590;
   line-height: 1.08;
@@ -60,7 +72,7 @@
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-headerSubtitle {
   margin-top: 0.5rem;
-  color: var(--color-text-secondary-token);
+  color: var(--clerk-color-muted-foreground);
   font-size: 0.9375rem;
   line-height: 1.45;
   text-align: center;
@@ -68,7 +80,7 @@
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldLabel {
   margin-bottom: 0.25rem;
-  color: var(--color-text-secondary-token);
+  color: var(--clerk-color-muted-foreground);
   font-size: 0.8125rem;
   font-weight: 510;
   letter-spacing: -0.012em;
@@ -76,14 +88,14 @@
 
 /* Step-specific headers (OTP verification, etc.) */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formHeaderTitle {
-  color: var(--color-text-primary-token);
+  color: var(--clerk-color-foreground);
   font-size: 1.25rem;
   font-weight: 590;
   letter-spacing: -0.02em;
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formHeaderSubtitle {
-  color: var(--color-text-secondary-token);
+  color: var(--clerk-color-muted-foreground);
   font-size: 0.875rem;
   line-height: 1.5;
 }
@@ -91,9 +103,9 @@
 /* --- D. Inputs --- */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput {
   min-height: 44px;
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-input);
-  color: var(--color-text-primary-token);
+  border: 1px solid var(--clerk-color-border);
+  background: var(--clerk-color-input);
+  color: var(--clerk-color-input-foreground);
   border-radius: var(--radius-xl);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.16);
   transition:
@@ -102,7 +114,7 @@
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput::placeholder {
-  color: var(--color-text-tertiary-token);
+  color: var(--clerk-color-tertiary-foreground);
 }
 
 /* Input error state — Clerk uses data-feedback="error" and aria-invalid="true" */
@@ -118,7 +130,7 @@
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  background: var(--color-bg-surface-1);
+  background: var(--clerk-color-muted);
 }
 
 /* --- E. OTP fields --- */
@@ -129,9 +141,9 @@
 :is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput {
   min-height: 48px;
   width: 44px;
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-input);
-  color: var(--color-text-primary-token);
+  border: 1px solid var(--clerk-color-border);
+  background: var(--clerk-color-input);
+  color: var(--clerk-color-input-foreground);
   border-radius: var(--radius-xl);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.16);
   font-size: 1.25rem;
@@ -145,17 +157,17 @@
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput::placeholder {
-  color: var(--color-text-tertiary-token);
+  color: var(--clerk-color-tertiary-foreground);
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldSeparator {
-  color: var(--color-text-tertiary-token);
+  color: var(--clerk-color-tertiary-foreground);
 }
 
 /* OTP filled state — active input being typed into */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput[data-active] {
-  border-color: var(--color-border-default);
-  background: var(--color-bg-surface-1);
+  border-color: var(--clerk-color-border-strong);
+  background: var(--clerk-color-muted);
 }
 
 /* OTP error state — covers @clerk/ui (data-error, data-feedback) and Clerk Elements (data-invalid) */
@@ -218,21 +230,21 @@
     .cl-formButtonReset
   ):focus-visible {
   outline: none;
-  border-color: var(--color-border-default);
+  border-color: var(--clerk-color-border-strong);
   box-shadow: var(--clerk-focus-ring);
 }
 
 /* --- G. Interactive element states --- */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInputShowPasswordButton,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-identityPreviewEditButton {
-  color: var(--color-text-secondary-token);
+  color: var(--clerk-color-muted-foreground);
   transition: color 150ms var(--ease-interactive);
 }
 
 :is(.cl-signIn-root, .cl-signUp-root)
   .cl-formFieldInputShowPasswordButton:hover,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-identityPreviewEditButton:hover {
-  color: var(--color-text-primary-token);
+  color: var(--clerk-color-foreground);
 }
 
 /* --- H. Primary button --- */
@@ -278,9 +290,9 @@
 /* --- I. Social buttons --- */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton {
   min-height: 44px;
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-surface-1);
-  color: var(--color-text-primary-token);
+  border: 1px solid var(--clerk-color-border);
+  background: var(--clerk-color-muted);
+  color: var(--clerk-color-foreground);
   border-radius: var(--radius-xl);
   transition:
     background-color 150ms var(--ease-interactive),
@@ -289,8 +301,8 @@
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton:hover {
-  border-color: var(--color-border-default);
-  background: var(--color-bg-surface-2);
+  border-color: var(--clerk-color-border-strong);
+  background: var(--clerk-color-surface-2);
 }
 
 @media (hover: hover) {
@@ -306,22 +318,22 @@
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButtonText {
-  color: var(--color-text-primary-token);
+  color: var(--clerk-color-foreground);
   font-weight: 510;
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-alertText,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-identityPreviewText {
-  color: var(--color-text-primary-token);
+  color: var(--clerk-color-foreground);
 }
 
 /* --- J. Divider --- */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-dividerLine {
-  background: var(--color-border-subtle);
+  background: var(--clerk-color-border);
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-dividerText {
-  color: var(--color-text-tertiary-token);
+  color: var(--clerk-color-tertiary-foreground);
   font-size: 0.75rem;
   font-weight: 510;
   letter-spacing: 0.08em;
@@ -335,14 +347,14 @@
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-footerActionText {
-  color: var(--color-text-secondary-token);
+  color: var(--clerk-color-muted-foreground);
   font-size: 0.8125rem;
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-footerActionLink,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formResendCodeLink,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldResendButton {
-  color: var(--color-text-primary-token);
+  color: var(--clerk-color-foreground);
   text-decoration: underline;
   text-underline-offset: 2px;
   transition: color 150ms var(--ease-interactive);
@@ -358,9 +370,9 @@
 /* --- L. Alerts & identity preview --- */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-alert,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-identityPreview {
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-surface-1);
-  color: var(--color-text-primary-token);
+  border: 1px solid var(--clerk-color-border);
+  background: var(--clerk-color-muted);
+  color: var(--clerk-color-foreground);
   border-radius: var(--radius-xl);
 }
 
@@ -368,20 +380,20 @@
 
 /* Forgot password / form field action links */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldAction {
-  color: var(--color-text-secondary-token);
+  color: var(--clerk-color-muted-foreground);
   font-size: 0.8125rem;
   font-weight: 450;
   transition: color 150ms var(--ease-interactive);
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldAction:hover {
-  color: var(--color-text-primary-token);
+  color: var(--clerk-color-foreground);
 }
 
 /* Back link (OTP/verification screens) */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-backLink,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-headerBackLink {
-  color: var(--color-text-secondary-token);
+  color: var(--clerk-color-muted-foreground);
   font-size: 0.8125rem;
   font-weight: 510;
   transition: color 150ms var(--ease-interactive);
@@ -389,12 +401,12 @@
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-backLink:hover,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-headerBackLink:hover {
-  color: var(--color-text-primary-token);
+  color: var(--clerk-color-foreground);
 }
 
 /* Helper/hint text below inputs */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldHintText {
-  color: var(--color-text-tertiary-token);
+  color: var(--clerk-color-tertiary-foreground);
   font-size: 0.75rem;
   line-height: 1.5;
 }
@@ -413,22 +425,22 @@
 
 /* Reset/back button */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonReset {
-  color: var(--color-text-secondary-token);
+  color: var(--clerk-color-muted-foreground);
   font-size: 0.8125rem;
   font-weight: 510;
   transition: color 150ms var(--ease-interactive);
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonReset:hover {
-  color: var(--color-text-primary-token);
+  color: var(--clerk-color-foreground);
 }
 
 /* Alternative verification methods */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-alternativeMethodsBlockButton {
   min-height: 40px;
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-surface-1);
-  color: var(--color-text-primary-token);
+  border: 1px solid var(--clerk-color-border);
+  background: var(--clerk-color-muted);
+  color: var(--clerk-color-foreground);
   border-radius: var(--radius-xl);
   font-size: 0.875rem;
   font-weight: 450;
@@ -438,14 +450,14 @@
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-alternativeMethodsBlockButton:hover {
-  border-color: var(--color-border-default);
-  background: var(--color-bg-surface-2);
+  border-color: var(--clerk-color-border-strong);
+  background: var(--clerk-color-surface-2);
 }
 
 /* Magic link verification status */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-verificationLinkStatusBox {
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-surface-1);
+  border: 1px solid var(--clerk-color-border);
+  background: var(--clerk-color-muted);
   border-radius: var(--radius-xl);
   padding: 12px 16px;
 }
@@ -453,39 +465,39 @@
 /* Phone input */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-phoneInputBox {
   min-height: 44px;
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-input);
+  border: 1px solid var(--clerk-color-border);
+  background: var(--clerk-color-input);
   border-radius: var(--radius-xl);
 }
 
 /* Country/region selectors */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-selectButton {
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-surface-1);
+  border: 1px solid var(--clerk-color-border);
+  background: var(--clerk-color-muted);
   border-radius: var(--radius-xl);
-  color: var(--color-text-primary-token);
+  color: var(--clerk-color-foreground);
   transition:
     background-color 150ms var(--ease-interactive),
     border-color 150ms var(--ease-interactive);
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-selectButton:hover {
-  border-color: var(--color-border-default);
-  background: var(--color-bg-surface-2);
+  border-color: var(--clerk-color-border-strong);
+  background: var(--clerk-color-surface-2);
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-selectSearchInput {
-  background: var(--color-bg-input);
-  border: 1px solid var(--color-border-subtle);
-  color: var(--color-text-primary-token);
+  background: var(--clerk-color-input);
+  border: 1px solid var(--clerk-color-border);
+  color: var(--clerk-color-input-foreground);
   border-radius: var(--radius-xl);
 }
 
 /* Badge */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-badge {
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-surface-2);
-  color: var(--color-text-secondary-token);
+  border: 1px solid var(--clerk-color-border);
+  background: var(--clerk-color-surface-2);
+  color: var(--clerk-color-muted-foreground);
   border-radius: 9999px;
 }
 

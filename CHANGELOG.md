@@ -5,6 +5,99 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.97] - 2026-03-28
+
+### Added
+
+- SoundCloud Pro badge detection via SC API v2 as independent fit score signal (+10 points)
+- New scoring criterion `soundcloudPro` in fit scoring system (stacks independently with social paid verification)
+- SoundCloud strategy module with config, detection, and storage (`ingestion/strategies/soundcloud/`)
+- Negative detection support: clears stale Pro flags when subscription lapses
+- Immediate fit score recalculation after Pro status detection
+- Non-blocking SC Pro detection hook in MusicFetch enrichment pipeline
+
+### Changed
+
+- Fit score version bumped from 4 to 5 (new SoundCloud Pro signal)
+- Fit score theoretical max increased from 125 to 135 (still capped at 100)
+
+## [26.4.96] - 2026-03-28
+
+### Added
+
+- Visual regression spec (`visual-regression.spec.ts`) covering homepage, auth pages, and pricing in light/dark mode
+- ClientProviders composition test catching the TooltipProvider regression class (a518d3fb5)
+- Proxy composition critical test for CSP nonce, test bypass, and matcher exclusions
+- Migration journal ordering guard (critical test) preventing schema drift
+- Coverage ratchet thresholds in `vitest.config.ci.mts` (placeholder zeros, calibrate on main)
+- `/demo/onboarding` mock route for rapid onboarding UI iteration without auth gating
+- Progressive profile panel on right side during onboarding demo (fills as steps advance)
+- Step picker toolbar and step dots for instant navigation between all 9 onboarding steps
+- Fade-to-transparent reveal transition from onboarding overlay to dashboard
+
+### Changed
+
+- Onboarding checkout/upgrade interstitial is now always shown after profile review (feature flag removed)
+- Spotify artist enrichment (name, avatar, bio) is now awaited during onboarding so the profile shows the correct artist name immediately
+- Post-checkout redirect routes to the welcome chat page, enabling the "Welcome to Jovie" message with imported release counts
+
+### Fixed
+
+- All 47 API routes now use `getCachedAuth()` instead of Clerk's `auth()` directly, fixing 401 errors when using dev test auth bypass
+- Onboarding return-to validator now accepts the chat route for post-checkout welcome chat bootstrap
+- Prevent false onboarding redirect on dashboard pages (audience, earnings, presence, releases) when dashboard data fails to load — existing users were being sent to a blank onboarding screen instead of seeing the error state
+
+## [26.4.95] - 2026-03-28
+
+### Added
+
+- Automated YC demo video recording pipeline via Playwright (`doppler run -- pnpm --filter web demo:record`)
+- Video-first `/demo/video` investor page with autoplay, loading states, and screenshot carousel fallback
+- Caption overlay injection in demo recording for silent video context
+- Production environment guard in demo spec to prevent accidental prod user creation
+- Download proxy API route at `/api/demo/download` for cross-origin video downloads
+- WebVTT captions file for accessibility on the demo page
+- `DemoVideoPlayer` component with loading/error/fallback states
+- `BrowserFrame` decorative browser chrome wrapper
+- `DEMO_REUSE_SERVER` option in `playwright.config.demo.ts` to use an existing dev server
+
+### Changed
+
+- Relaxed multi-DSP enrichment assertions in demo spec to best-effort (don't fail recording if enrichment is slow)
+- Simplified onboarding form detection in demo spec to match current UI selectors
+- Presence page converted from card grid to table layout, matching the Releases page pattern with row selection and sidebar integration
+- Insights page wrapped in DashboardWorkspacePanel with PageToolbar, matching all other dashboard pages
+- Right drawer card widths normalized by fixing asymmetric padding that caused cards to be narrower on the right side
+- Drawer tabs card padding aligned with entity header padding for visual consistency
+- Dashboard header action button gap tightened from 6px to 4px for more cohesive grouping
+
+### Removed
+
+- DspPresenceCard component (replaced by DspPresenceTable rows)
+
+## [26.4.94] - 2026-03-28
+
+### Added
+
+- Audio preview player on release smart link pages: compact player card with play/pause, seek bar, and disabled state when no preview URL is available
+- Preview URL fetching from Spotify full track endpoint during import, carried through `mergeFullTrackMetadata`
+- Parallel database query for primary track preview URL on release page load
+
+### Changed
+
+- Chat empty state content is now vertically centered instead of bottom-anchored, creating a more balanced layout when no conversation is active
+
+## [26.4.93] - 2026-03-28
+
+### Fixed
+
+- Screenshot CI workflow now reuses a single PR instead of creating a new one each run, preventing stale screenshot PRs from piling up
+- Sitemap crash on Vercel: blog directory missing causes ENOENT, now returns empty list gracefully
+- Middleware redirect loop on `/monitoring` (Sentry tunnel): excluded from proxy matcher so Sentry events flow without hitting auth logic
+- Chat metadata crash: `generateMetadata` threw "User not found" when Clerk user had no DB record yet, now falls back to default titles
+- CSP blocking Clerk JS from `clerk.jov.ie`: added the Clerk proxy CNAME to `script-src` and `connect-src` directives
+- Chat usage API: narrowed `auth()` error handling to only catch Clerk middleware-detection errors, re-throws real infrastructure failures
+
 ## [26.4.92] - 2026-03-28
 
 ### Fixed
@@ -12,6 +105,31 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Homepage hero layout: text and phone mockup now display side-by-side on desktop instead of stacking vertically (Tailwind v4 specificity fix)
 
 ## [26.4.91] - 2026-03-28
+
+### Added
+
+- Manual DSP platform linking: artists can add streaming platform profiles by name and URL
+- Add Platform dialog with provider picker grid and URL validation against DSP_REGISTRY domains
+- Admin-only Refresh button to trigger DSP discovery re-scan from presence page
+- Card grid layout replacing table view on presence page with provider-colored borders
+- "Manual" badge for user-added matches (distinct from auto-discovered confidence scores)
+- Discovery overwrite protection: manual matches preserved when auto-discovery runs
+
+### Changed
+
+- Presence page uses responsive card grid (1/2/3 columns) instead of data table
+- Empty state updated with actionable "Add Platform" CTA
+- Loading skeleton matches new card grid layout
+- Sidebar guards null confidence for manual matches
+
+## [26.4.90] - 2026-03-28
+
+### Fixed
+
+- Auth page text invisible in light mode: Clerk footer ("Don't have an account?"), branding badge, and card elements used theme-dependent CSS tokens on a hardcoded dark background. Migrated all auth-scoped Clerk styling to fixed dark-theme `--clerk-color-*` CSS variables using Clerk v7's CSS custom property API.
+- Error page (`/error/user-creation-failed`) text invisible in light mode: same root cause, fixed with hardcoded light text values.
+
+## [26.4.90] - 2026-03-28
 
 ### Fixed
 

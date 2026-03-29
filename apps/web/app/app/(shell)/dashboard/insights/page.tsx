@@ -139,7 +139,7 @@ export default async function InsightsPage() {
           remains stable while streaming. */}
       <Suspense
         fallback={
-          <div className='max-w-3xl space-y-6'>
+          <div className='space-y-6'>
             <InsightsHeaderSkeleton />
             <InsightsFiltersSkeleton />
             <InsightsCardsSkeleton />

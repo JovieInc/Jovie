@@ -55,7 +55,7 @@ async function AudienceContent({
     // Onboarding check first — during provisioning, user may be null but
     // needsOnboarding is true. Checking user first would incorrectly redirect
     // authenticated-but-not-yet-provisioned users to signin.
-    if (dashboardData.needsOnboarding) {
+    if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
       redirect(APP_ROUTES.ONBOARDING);
     }
 

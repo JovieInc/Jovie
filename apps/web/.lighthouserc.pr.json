@@ -10,6 +10,7 @@
           "matchingUrlPattern": "http://localhost:3000/$",
           "preset": "lighthouse:no-pwa",
           "assertions": {
+            "errors-in-console": "warn",
             "interactive": [
               "warn",
               {
@@ -74,7 +75,6 @@
                 "minScore": 0.6
               }
             ],
-            "errors-in-console": "warn",
             "is-crawlable": "off",
             "network-dependency-tree-insight": "off",
             "target-size": "warn",

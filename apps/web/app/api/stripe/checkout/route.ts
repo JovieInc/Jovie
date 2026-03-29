@@ -3,9 +3,9 @@
  * Creates checkout sessions for subscription purchases
  */
 
-import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
@@ -22,8 +22,8 @@ import { createCheckoutSession } from '@/lib/stripe/client';
 import {
   getActivePriceIds,
   getPriceMappingDetails,
-  isGrowthPlanEnabled,
-  isGrowthPriceId,
+  isMaxPlanEnabled,
+  isMaxPriceId,
 } from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
 import {
@@ -131,7 +131,7 @@ async function handleCheckoutError(error: unknown): Promise<NextResponse> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) return jsonError('Unauthorized', 401);
 
     const body = await request.json();
@@ -154,8 +154,8 @@ export async function POST(request: NextRequest) {
     const priceError = await validatePriceId(priceId);
     if (priceError) return priceError;
 
-    if (!isGrowthPlanEnabled() && isGrowthPriceId(priceId)) {
-      return jsonError('Growth plan is not currently available', 403);
+    if (!isMaxPlanEnabled() && isMaxPriceId(priceId)) {
+      return jsonError('Max plan is not currently available', 403);
     }
 
     const priceDetails = getPriceMappingDetails(priceId);

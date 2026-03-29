@@ -1,8 +1,8 @@
-import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { getCachedAuth } from '@/lib/auth/cached';
 
 import { db } from '@/lib/db';
 import { chatAuditLog } from '@/lib/db/schema/chat';
@@ -25,7 +25,7 @@ const confirmRemoveLinkSchema = z.object({
  * Validates ownership, soft-deletes the link (state='rejected', isActive=false).
  */
 export async function POST(req: Request) {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized' },

@@ -1,6 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { profilePhotos } from '@/lib/db/schema/profiles';
@@ -27,7 +27,7 @@ interface RouteContext {
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const { userId: clerkUserId } = await auth();
+    const { userId: clerkUserId } = await getCachedAuth();
     if (!clerkUserId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

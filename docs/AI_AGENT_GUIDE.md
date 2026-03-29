@@ -216,7 +216,7 @@ All routes live under `apps/web/app/api/`. Auth is via Clerk (`auth()`) unless n
 | `/api/creator` | GET | Clerk | Get current creator profile |
 | `/api/featured-creators` | GET | Public | Featured creators list |
 | `/api/feedback` | POST | Clerk | Submit feedback |
-| `/api/growth-access-request` | POST | Clerk | Request growth features |
+| `/api/max-access-request` | POST | Clerk | Request Max plan features |
 | `/api/handle/check` | GET | Clerk | Check handle availability |
 | `/api/ingestion/jobs` | POST | Clerk | Trigger ingestion job |
 | `/api/monitoring/performance` | GET | Admin | Performance metrics |

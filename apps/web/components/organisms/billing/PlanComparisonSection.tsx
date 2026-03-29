@@ -53,7 +53,7 @@ function renderCtaButton({
       </Button>
     );
   }
-  if (planKey === 'growth') {
+  if (planKey === 'max') {
     return (
       <Button
         variant='secondary'

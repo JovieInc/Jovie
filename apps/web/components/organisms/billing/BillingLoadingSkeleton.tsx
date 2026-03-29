@@ -7,7 +7,7 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 const PLAN_CARD_SKELETONS = [
   { key: 'free', titleWidth: 'w-24', descriptionWidth: 'w-36' },
   { key: 'pro', titleWidth: 'w-24', descriptionWidth: 'w-36' },
-  { key: 'growth', titleWidth: 'w-24', descriptionWidth: 'w-36' },
+  { key: 'max', titleWidth: 'w-24', descriptionWidth: 'w-36' },
 ] as const;
 
 export function BillingLoadingSkeleton() {

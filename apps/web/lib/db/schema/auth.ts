@@ -28,7 +28,7 @@ export const users = pgTable(
 
     isAdmin: boolean('is_admin').default(false).notNull(),
     isPro: boolean('is_pro').default(false),
-    plan: text('plan').default('free'), // 'free' | 'pro' | 'growth'
+    plan: text('plan').default('free'), // 'free' | 'pro' | 'max'
     stripeCustomerId: text('stripe_customer_id').unique(),
     stripeSubscriptionId: text('stripe_subscription_id').unique(),
     stripePriceId: text('stripe_price_id'),
@@ -40,7 +40,7 @@ export const users = pgTable(
     welcomeFailedAt: timestamp('welcome_failed_at'),
     outboundSuppressedAt: timestamp('outbound_suppressed_at'),
     suppressionFailedAt: timestamp('suppression_failed_at'),
-    // Growth plan beta access request
+    // Max plan beta access request
     growthAccessRequestedAt: timestamp('growth_access_requested_at'),
     growthAccessReason: text('growth_access_reason'),
     // Active creator profile (FK added post-create to avoid circular dependency)

@@ -10,7 +10,7 @@
 
 import 'server-only';
 
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq, isNull, ne, or } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { type DbOrTransaction, db as plainDb } from '@/lib/db';
@@ -30,6 +30,7 @@ import {
 import { publishIdentityLinks } from '@/lib/identity/publish';
 import { storeRawIdentityLinks } from '@/lib/identity/store';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
+import { detectAndStoreSoundCloudProStatus } from '@/lib/ingestion/strategies/soundcloud';
 import {
   isMusicfetchInvalidServicesError,
   MusicfetchRequestError,
@@ -335,6 +336,10 @@ async function seedPresenceFromMusicFetch(
             externalArtistImageUrl: artistData.image?.url ?? null,
             updatedAt: now,
           },
+          where: or(
+            isNull(dspArtistMatches.matchSource),
+            ne(dspArtistMatches.matchSource, 'manual')
+          ),
         });
       seeded++;
       seededProviderIds.add(dspEntry.key);
@@ -398,6 +403,10 @@ async function seedPresenceFromMusicFetch(
             externalArtistImageUrl: artistData.image?.url ?? null,
             updatedAt: now,
           },
+          where: or(
+            isNull(dspArtistMatches.matchSource),
+            ne(dspArtistMatches.matchSource, 'manual')
+          ),
         });
       seeded++;
     } catch (error) {
@@ -619,6 +628,23 @@ export async function processMusicFetchEnrichmentJob(
         error: error instanceof Error ? error.message : 'Unknown error',
       }
     );
+  }
+
+  // Detect SoundCloud Pro badge (non-blocking, outside tx)
+  const scSlug = profile.soundcloudId;
+  if (scSlug) {
+    try {
+      await detectAndStoreSoundCloudProStatus(
+        plainDb,
+        creatorProfileId,
+        scSlug
+      );
+    } catch (error) {
+      logger.warn('SoundCloud Pro detection failed (non-blocking)', {
+        creatorProfileId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   }
 
   // Mark enrichment as complete

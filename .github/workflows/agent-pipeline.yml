@@ -678,6 +678,7 @@ jobs:
           fi
 
       - name: Auto-approve PR
+        id: auto-approve
         if: >-
           steps.check-statuses.outputs.all_passed == 'true' &&
           steps.sensitive-check.outputs.is_safe == 'true'
@@ -687,6 +688,7 @@ jobs:
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
           PR_AUTHOR=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER --jq '.user.login')
           APPROVER=$(gh api user --jq '.login')
+          echo "permission_denied=false" >> $GITHUB_OUTPUT
 
           if [[ "$PR_AUTHOR" == "$APPROVER" ]]; then
             echo "Skipping auto-approval for PR #$PR_NUMBER because approver '$APPROVER' matches PR author."
@@ -696,7 +698,8 @@ jobs:
           echo "All gates passed. Auto-approving PR #$PR_NUMBER as '$APPROVER'"
 
           # Submit approval review
-          gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
+          APPROVAL_ERROR_LOG=$(mktemp)
+          if ! gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
             --method POST \
             -f event="APPROVE" \
             -f body="## Auto-Approved by Agent Pipeline
@@ -710,7 +713,17 @@ jobs:
           This PR was auto-approved because it meets all criteria for low-risk agent changes.
           It will now enter the merge queue for final validation.
 
-          > If this approval is incorrect, dismiss it and add the \`needs-human\` label."
+          > If this approval is incorrect, dismiss it and add the \`needs-human\` label." \
+            2>"$APPROVAL_ERROR_LOG"; then
+            if rg -q "Resource not accessible by integration" "$APPROVAL_ERROR_LOG"; then
+              echo "permission_denied=true" >> $GITHUB_OUTPUT
+              echo "Skipping auto-approval for PR #$PR_NUMBER because the GitHub App token lacks review permission."
+              exit 0
+            fi
+
+            cat "$APPROVAL_ERROR_LOG"
+            exit 1
+          fi
 
           echo "PR #$PR_NUMBER approved"
 
@@ -718,6 +731,7 @@ jobs:
         if: >-
           steps.check-statuses.outputs.all_passed == 'true' &&
           steps.sensitive-check.outputs.is_safe == 'true' &&
+          steps.auto-approve.outputs.permission_denied != 'true' &&
           steps.queue-pressure.outputs.defer_auto_merge != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -738,6 +752,7 @@ jobs:
         if: >-
           steps.check-statuses.outputs.all_passed == 'true' &&
           steps.sensitive-check.outputs.is_safe == 'true' &&
+          steps.auto-approve.outputs.permission_denied != 'true' &&
           steps.queue-pressure.outputs.defer_auto_merge == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}

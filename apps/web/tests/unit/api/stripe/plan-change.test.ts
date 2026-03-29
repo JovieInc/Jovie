@@ -8,8 +8,8 @@ const mockGetAvailablePlanChanges = vi.hoisted(() => vi.fn());
 const mockExecutePlanChange = vi.hoisted(() => vi.fn());
 const mockCancelScheduledPlanChange = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
-const mockIsGrowthPlanEnabled = vi.hoisted(() => vi.fn());
-const mockIsGrowthPriceId = vi.hoisted(() => vi.fn());
+const mockIsMaxPlanEnabled = vi.hoisted(() => vi.fn());
+const mockIsMaxPriceId = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({ auth: mockAuth }));
 
@@ -29,8 +29,8 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 vi.mock('@/lib/stripe/config', () => ({
-  isGrowthPlanEnabled: mockIsGrowthPlanEnabled,
-  isGrowthPriceId: mockIsGrowthPriceId,
+  isMaxPlanEnabled: mockIsMaxPlanEnabled,
+  isMaxPriceId: mockIsMaxPriceId,
 }));
 
 vi.mock('@/lib/utils/logger', () => ({
@@ -44,8 +44,8 @@ describe('/api/stripe/plan-change route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-    mockIsGrowthPlanEnabled.mockReturnValue(true);
-    mockIsGrowthPriceId.mockReturnValue(false);
+    mockIsMaxPlanEnabled.mockReturnValue(true);
+    mockIsMaxPriceId.mockReturnValue(false);
   });
 
   describe('POST', () => {
@@ -83,24 +83,24 @@ describe('/api/stripe/plan-change route', () => {
       expect(await response.json()).toEqual({ error: 'Invalid price ID' });
     });
 
-    it('returns 403 when growth plan is disabled', async () => {
+    it('returns 403 when max plan is disabled', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
-      mockIsGrowthPlanEnabled.mockReturnValue(false);
-      mockIsGrowthPriceId.mockReturnValue(true);
+      mockIsMaxPlanEnabled.mockReturnValue(false);
+      mockIsMaxPriceId.mockReturnValue(true);
 
       const { POST } = await import('@/app/api/stripe/plan-change/route');
       const request = new NextRequest(
         'http://localhost/api/stripe/plan-change',
         {
           method: 'POST',
-          body: JSON.stringify({ priceId: 'price_growth_monthly' }),
+          body: JSON.stringify({ priceId: 'price_max_monthly' }),
         }
       );
 
       const response = await POST(request);
       expect(response.status).toBe(403);
       expect(await response.json()).toEqual({
-        error: 'Growth plan is not currently available',
+        error: 'Max plan is not currently available',
       });
     });
 
@@ -127,7 +127,7 @@ describe('/api/stripe/plan-change route', () => {
         'http://localhost/api/stripe/plan-change',
         {
           method: 'POST',
-          body: JSON.stringify({ priceId: 'price_growth_monthly' }),
+          body: JSON.stringify({ priceId: 'price_max_monthly' }),
         }
       );
 
@@ -143,7 +143,7 @@ describe('/api/stripe/plan-change route', () => {
       });
       expect(mockExecutePlanChange).toHaveBeenCalledWith({
         subscriptionId: 'sub_123',
-        newPriceId: 'price_growth_monthly',
+        newPriceId: 'price_max_monthly',
       });
     });
   });
@@ -172,7 +172,7 @@ describe('/api/stripe/plan-change route', () => {
 
     it('hides growth plan from available changes when growth is disabled', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
-      mockIsGrowthPlanEnabled.mockReturnValue(false);
+      mockIsMaxPlanEnabled.mockReturnValue(false);
       mockEnsureStripeCustomer.mockResolvedValue({
         success: true,
         customerId: 'cus_123',
@@ -181,7 +181,7 @@ describe('/api/stripe/plan-change route', () => {
         currentPlan: 'pro',
         currentPriceId: 'price_pro_monthly',
         currentInterval: 'month',
-        availableChanges: [{ plan: 'growth' }, { plan: 'free' }],
+        availableChanges: [{ plan: 'max' }, { plan: 'free' }],
       });
       mockGetActiveSubscription.mockResolvedValue({
         id: 'sub_123',
@@ -206,7 +206,7 @@ describe('/api/stripe/plan-change route', () => {
         currentPlan: 'pro',
         currentPriceId: 'price_pro_monthly',
         currentInterval: 'month',
-        availableChanges: [{ plan: 'growth' }],
+        availableChanges: [{ plan: 'max' }],
       });
       mockGetActiveSubscription.mockResolvedValue({
         id: 'sub_123',
@@ -222,7 +222,7 @@ describe('/api/stripe/plan-change route', () => {
         currentPlan: 'pro',
         currentPriceId: 'price_pro_monthly',
         currentInterval: 'month',
-        availableChanges: [{ plan: 'growth' }],
+        availableChanges: [{ plan: 'max' }],
         hasActiveSubscription: true,
         hasScheduledChange: true,
       });

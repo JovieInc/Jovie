@@ -54,7 +54,7 @@ describe('buildSystemPrompt', () => {
   it('includes the analytics tool guidance when insights are enabled', () => {
     const prompt = buildSystemPrompt(baseContext, [], {
       aiCanUseTools: true,
-      aiDailyMessageLimit: 25,
+      aiDailyMessageLimit: 10,
       insightsEnabled: true,
     });
 
@@ -64,7 +64,7 @@ describe('buildSystemPrompt', () => {
   it('does not instruct the model to call analytics tools when insights are disabled', () => {
     const prompt = buildSystemPrompt(baseContext, [], {
       aiCanUseTools: true,
-      aiDailyMessageLimit: 25,
+      aiDailyMessageLimit: 10,
       insightsEnabled: false,
     });
 

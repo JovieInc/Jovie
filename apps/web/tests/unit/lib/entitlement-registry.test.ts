@@ -3,6 +3,9 @@ import {
   type BooleanEntitlement,
   ENTITLEMENT_REGISTRY,
   getAllPlanIds,
+  getEntitlements,
+  hasAdvancedFeatures,
+  isProPlan,
   type NumericEntitlement,
   type PlanId,
 } from '@/lib/entitlements/registry';
@@ -29,6 +32,18 @@ describe('Entitlement Registry Consistency', () => {
       'canAccessFutureReleases',
       'canSendNotifications',
       'canEditSmartLinks',
+      'canAccessInbox',
+      'canAccessPreSave',
+      'canAccessTipping',
+      'canAccessUrlEncryption',
+      'canAccessStripeConnect',
+      'canAccessFanSubscriptions',
+      'canAccessEmailCampaigns',
+      'canAccessApiKeys',
+      'canAccessTeamManagement',
+      'canAccessWebhooks',
+      'canAccessWhiteLabel',
+      'canAccessAbTesting',
     ];
 
     for (const planId of planIds) {
@@ -46,6 +61,7 @@ describe('Entitlement Registry Consistency', () => {
       'contactsLimit',
       'smartLinksLimit',
       'aiDailyMessageLimit',
+      'aiPitchGenPerRelease',
     ];
 
     for (const planId of planIds) {
@@ -58,9 +74,9 @@ describe('Entitlement Registry Consistency', () => {
     }
   });
 
-  it('boolean escalation: if pro is true, growth must also be true', () => {
+  it('boolean escalation: if pro is true, max must also be true', () => {
     const proBooleans = ENTITLEMENT_REGISTRY.pro.booleans;
-    const growthBooleans = ENTITLEMENT_REGISTRY.growth.booleans;
+    const growthBooleans = ENTITLEMENT_REGISTRY.max.booleans;
 
     for (const [key, proValue] of Object.entries(proBooleans)) {
       if (proValue === true) {
@@ -69,23 +85,8 @@ describe('Entitlement Registry Consistency', () => {
     }
   });
 
-  it('founding has same booleans and limits as pro', () => {
-    const foundingBooleans = ENTITLEMENT_REGISTRY.founding.booleans;
-    const proBooleans = ENTITLEMENT_REGISTRY.pro.booleans;
-
-    for (const [key, proValue] of Object.entries(proBooleans)) {
-      expect(foundingBooleans[key as BooleanEntitlement]).toBe(proValue);
-    }
-
-    const foundingLimits = ENTITLEMENT_REGISTRY.founding.limits;
-    const proLimits = ENTITLEMENT_REGISTRY.pro.limits;
-
-    expect(foundingLimits).toEqual(proLimits);
-  });
-
-  it('numeric escalation: growth >= pro >= free (where not null)', () => {
-    // Founding is excluded — it has the same limits as pro but sits at a different price point
-    const plans: PlanId[] = ['free', 'pro', 'growth'];
+  it('numeric escalation: max >= pro >= free (where not null)', () => {
+    const plans: PlanId[] = ['free', 'pro', 'max'];
 
     const numericKeys: NumericEntitlement[] = [
       'analyticsRetentionDays',
@@ -171,20 +172,19 @@ describe('Entitlement Registry Consistency', () => {
 
   it('free plan has null price, paid plans have prices', () => {
     expect(ENTITLEMENT_REGISTRY.free.marketing.price).toBeNull();
-    expect(ENTITLEMENT_REGISTRY.founding.marketing.price).not.toBeNull();
     expect(ENTITLEMENT_REGISTRY.pro.marketing.price).not.toBeNull();
-    expect(ENTITLEMENT_REGISTRY.growth.marketing.price).not.toBeNull();
+    expect(ENTITLEMENT_REGISTRY.max.marketing.price).not.toBeNull();
   });
 
   it('paid plan prices: monthly is positive', () => {
-    for (const planId of ['founding', 'pro', 'growth'] as const) {
+    for (const planId of ['pro', 'max'] as const) {
       const price = ENTITLEMENT_REGISTRY[planId].marketing.price!;
       expect(price.monthly).toBeGreaterThan(0);
     }
   });
 
   it('plans with yearly pricing offer a discount', () => {
-    for (const planId of ['pro', 'growth'] as const) {
+    for (const planId of ['pro', 'max'] as const) {
       const price = ENTITLEMENT_REGISTRY[planId].marketing.price!;
       expect(price.yearly).toBeGreaterThan(0);
       // Yearly should be less than 12x monthly (a discount)
@@ -192,13 +192,33 @@ describe('Entitlement Registry Consistency', () => {
     }
   });
 
-  it('founding has no yearly pricing', () => {
-    expect(ENTITLEMENT_REGISTRY.founding.marketing.price!.yearly).toBeNull();
+  it('registry plan IDs match PlanId type values', () => {
+    // PlanId = 'free' | 'pro' | 'max' in registry.ts
+    const expectedPlans: PlanId[] = ['free', 'pro', 'max'];
+    expect([...planIds]).toEqual(expectedPlans);
   });
 
-  it('registry plan IDs match UserPlan type values', () => {
-    // UserPlan = 'free' | 'founding' | 'pro' | 'growth' in types/index.ts
-    const expectedPlans: PlanId[] = ['free', 'founding', 'pro', 'growth'];
-    expect([...planIds]).toEqual(expectedPlans);
+  // -------------------------------------------------------------------
+  // Backward compatibility: DB may still store legacy plan names
+  // -------------------------------------------------------------------
+
+  it('getEntitlements("founding") returns pro entitlements (backward compat)', () => {
+    expect(getEntitlements('founding')).toBe(ENTITLEMENT_REGISTRY.pro);
+  });
+
+  it('isProPlan("founding") returns true (backward compat)', () => {
+    expect(isProPlan('founding')).toBe(true);
+  });
+
+  it('getEntitlements("growth") returns max entitlements (backward compat)', () => {
+    expect(getEntitlements('growth')).toBe(ENTITLEMENT_REGISTRY.max);
+  });
+
+  it('isProPlan("growth") returns true (backward compat)', () => {
+    expect(isProPlan('growth')).toBe(true);
+  });
+
+  it('hasAdvancedFeatures("growth") returns true (backward compat)', () => {
+    expect(hasAdvancedFeatures('growth')).toBe(true);
   });
 });

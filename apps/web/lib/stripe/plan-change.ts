@@ -36,7 +36,7 @@ const PLAN_HIERARCHY: Record<PlanType, number> = {
   free: 0,
   founding: 1,
   pro: 2,
-  growth: 3,
+  max: 3,
 };
 
 /**

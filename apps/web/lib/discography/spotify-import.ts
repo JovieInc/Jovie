@@ -207,6 +207,7 @@ function mergeFullTrackMetadata(
         return {
           ...track,
           external_ids: fullTrack.external_ids,
+          preview_url: track.preview_url ?? fullTrack.preview_url,
         };
       }),
     },

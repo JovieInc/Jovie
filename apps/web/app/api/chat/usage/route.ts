@@ -1,5 +1,5 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { aiChatDailyPlanAwareLimiter } from '@/lib/rate-limit/limiters';
@@ -10,7 +10,7 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 
 type ChatUsageSnapshot = {
-  plan: 'free' | 'pro' | 'growth';
+  plan: 'free' | 'pro' | 'max';
   dailyLimit: number;
   used: number;
   remaining: number;
@@ -26,11 +26,12 @@ type StaleChatUsageSnapshot = ChatUsageSnapshot & {
 const CHAT_USAGE_CACHE_KEY_PREFIX = 'chat:usage:v1:';
 const CHAT_USAGE_CACHE_TTL_SECONDS = 60 * 60; // 1 hour
 
-function resolvePlan(
-  plan: string | null | undefined
-): 'free' | 'pro' | 'growth' {
-  if (plan === 'pro' || plan === 'growth') {
-    return plan;
+function resolvePlan(plan: string | null | undefined): 'free' | 'pro' | 'max' {
+  if (plan === 'max' || plan === 'growth') {
+    return 'max';
+  }
+  if (plan === 'pro') {
+    return 'pro';
   }
   return 'free';
 }
@@ -71,7 +72,18 @@ const CACHE_HEADERS = {
 } as const;
 
 export async function GET() {
-  const { userId } = await auth();
+  let userId: string | null;
+  try {
+    ({ userId } = await getCachedAuth());
+  } catch (error) {
+    // Clerk throws when middleware didn't run (e.g., matcher misconfiguration).
+    // Return 401 for that case, but let unexpected errors propagate to Sentry.
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('clerkMiddleware')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    throw error;
+  }
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

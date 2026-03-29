@@ -195,7 +195,7 @@ export function DashboardAnalytics() {
             onChange={setRange}
             tabsBaseId={rangeTabsBaseId}
             panelId={rangePanelId}
-            maxRetentionDays={analyticsRetentionDays}
+            maxRetentionDays={analyticsRetentionDays ?? undefined}
           />
         </div>
       </div>

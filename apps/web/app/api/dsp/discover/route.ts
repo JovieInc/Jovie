@@ -8,10 +8,10 @@
  * Authentication: Required (creator must own the profile)
  */
 
-import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { getCachedAuth } from '@/lib/auth/cached';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -42,7 +42,7 @@ const discoverRequestSchema = z.object({
 export async function POST(request: Request) {
   try {
     // Authenticate user
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
