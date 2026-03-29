@@ -10,7 +10,10 @@ import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCa
 import { DrawerTabs } from '@/components/molecules/drawer/DrawerTabs';
 import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
 import { SidebarLinkRow } from '@/components/molecules/drawer/SidebarLinkRow';
-import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
+
+/** Slightly narrower than the standard 360px drawer to keep onboarding airy. */
+const ONBOARDING_PANEL_WIDTH = 300;
+
 import {
   DEMO_DISCOVERY_SNAPSHOT,
   DEMO_SELECTED_ARTIST,
@@ -95,7 +98,7 @@ export function OnboardingDemoProfilePanel({
   return (
     <aside
       className='hidden shrink-0 overflow-y-auto overscroll-contain xl:block'
-      style={{ width: SIDEBAR_WIDTH }}
+      style={{ width: ONBOARDING_PANEL_WIDTH }}
     >
       <div className='space-y-3 px-3 py-8'>
         {/* Identity card — always pinned */}
