@@ -122,7 +122,7 @@ export function ReleasePitchSection({
     (e: React.KeyboardEvent) => {
       const keys = PLATFORM_CONFIG.map(p => p.key);
       const currentIndex = keys.indexOf(selectedPlatform);
-      let nextIndex = currentIndex;
+      let nextIndex: number;
 
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         e.preventDefault();
@@ -217,6 +217,7 @@ export function ReleasePitchSection({
         <div
           ref={tabsRef}
           role='tablist'
+          tabIndex={0}
           aria-label='Platform pitches'
           className='flex flex-wrap items-center gap-1'
           onKeyDown={handleKeyDown}

@@ -25,10 +25,8 @@ export function DrawerHeader({ title, actions, className }: DrawerHeaderProps) {
           <p className='truncate text-[12px] font-[560] tracking-[-0.012em] text-primary-token'>
             {title}
           </p>
-        ) : title ? (
-          title
         ) : (
-          <div aria-hidden='true' className='h-4' />
+          (title ?? <div aria-hidden='true' className='h-4' />)
         )}
       </div>
       {actions && <div className='flex items-center gap-1'>{actions}</div>}

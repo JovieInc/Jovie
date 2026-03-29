@@ -183,7 +183,7 @@ export async function resolveClerkTestUserId(
     return fallbackClerkId ?? buildDeterministicClerkId(email);
   }
 
-  if (!secretKey || !secretKey.startsWith('sk_test_')) {
+  if (!secretKey?.startsWith('sk_test_')) {
     return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
   }
 
@@ -214,7 +214,7 @@ export async function ensureClerkTestUser({
   const normalizedEmail = normalizeEmail(email);
   const secretKey = process.env.CLERK_SECRET_KEY;
 
-  if (!secretKey || !secretKey.startsWith('sk_test_')) {
+  if (!secretKey?.startsWith('sk_test_')) {
     return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
   }
 
