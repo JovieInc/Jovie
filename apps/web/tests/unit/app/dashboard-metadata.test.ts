@@ -51,8 +51,9 @@ describe('dashboard metadata generation', () => {
   });
 
   it('uses display name for app root tab title when available', async () => {
-    mockGetDashboardData.mockResolvedValue({
-      selectedProfile: { displayName: 'Ada' },
+    mockGetSessionContext.mockResolvedValue({
+      user: { id: 'user-id' },
+      profile: { displayName: 'Ada' },
     });
 
     const { generateMetadata } = await import('@/app/app/(shell)/page');

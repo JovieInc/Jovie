@@ -56,15 +56,25 @@ function hasActiveClerkCookie(cookie: ClerkCookieLike) {
 }
 
 export function shouldBypassClerkForRequest(options: {
+  allowAuthRouteBypass?: boolean;
   cookies: Iterable<ClerkCookieLike>;
   pathInfo: ClerkBypassPathInfo;
   pathname: string;
 }) {
+  const allowAuthRouteBypass = options.allowAuthRouteBypass === true;
+
   // Public API routes must be able to answer as signed-out requests without
   // entering Clerk's handshake/rewrite flow. Route handlers own auth for
   // protected APIs, while authenticated callers still keep Clerk enabled
   // below because they carry active Clerk cookies.
-  if (isClerkRequiredPath(options.pathname, options.pathInfo)) {
+  const authBypassPathInfo = allowAuthRouteBypass
+    ? {
+        ...options.pathInfo,
+        isAuthPath: false,
+      }
+    : options.pathInfo;
+
+  if (isClerkRequiredPath(options.pathname, authBypassPathInfo)) {
     return false;
   }
 
