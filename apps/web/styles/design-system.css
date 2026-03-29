@@ -1053,6 +1053,10 @@
   --color-btn-primary-fg: var(--linear-btn-primary-fg);
   --color-btn-secondary-bg: var(--linear-btn-secondary-bg);
   --color-btn-secondary-fg: var(--linear-btn-secondary-fg);
+  --color-btn-secondary-border: var(
+    --linear-btn-secondary-border,
+    var(--linear-btn-secondary-fg)
+  );
 
   /* Map Linear interactive states */
   --color-interactive-hover: var(--linear-bg-hover);

@@ -15,7 +15,7 @@ Jovie uses two related but distinct design systems based on surface purpose:
 | Marketing / homepage | System A | Cinematic, editorial, proof-led | `(marketing)/*`, blog, changelog, pricing, support |
 | Product app shell | System B | Compact, operational, tool-like | `app/*`, settings, admin, dashboard |
 | Auth / onboarding / waitlist | System B | Funnel-focused, product family | `(auth)/*`, `onboarding/*`, `waitlist/*` |
-| Public profiles | System B (public variant) | Expressive but product-native | `[username]/*` |
+| Public profiles | System A (profile variant) | Premium, achromatic, art-forward | `[username]/*` |
 | Legal / informational | System A (calmer variant) | Clean, readable | `(dynamic)/legal/*` |
 
 **Decision tree:** Selling/explaining → System A. Operating/using → System B. Public artifact → System B.
@@ -40,17 +40,18 @@ See the [Surface Classification](#canonical-surface-split) section below for ful
 
 ### Type Scale — Marketing (System A)
 
+> **Design direction:** Compact premium. H1 is razor-clean (weight 600, tight tracking).
+> Dramatic hierarchy jump from H1 to everything else. Smaller than typical SaaS.
+
 | Level | Size | Weight | Letter-spacing | Line-height | Usage |
 |-------|------|--------|----------------|-------------|-------|
-| H1 | 64px | 510 | -1.408px (-2.2%) | 67.84px (1.06) | Hero headlines |
-| H2 | 48px | 510 | -1.056px (-2.2%) | 48px (1.0) | Section headlines |
-| H3 | 20px | 590 | -0.24px (-1.2%) | 26.6px (1.33) | Sub-section titles |
-| H4 | 18px | 538 | — | 24px (1.33) | Card titles |
-| Body LG | 24px | 400 | -0.288px (-1.2%) | 31.92px (1.33) | Lead paragraphs |
-| Body | 15px | 400 | -0.165px (-1.1%) | 24px (1.6) | Body text |
-| Body SM | 14px | 400 | -0.182px (-1.3%) | 21px (1.5) | Small body |
-| Caption | 13px | 510 | -0.13px (-1.0%) | 19.5px (1.5) | Captions, meta |
-| Label | 12px | 400 | — | 19.2px (1.6) | Labels, tags |
+| H1 | 56px | 600 | -0.02em | 1.02 | Hero headlines — clean, precise, not funky |
+| H2 | 20px | 600 | -0.02em | 1.2 | Section headlines — dramatic drop from H1 |
+| H3 | 14px | 600 | -0.01em | 1.4 | Sub-section titles |
+| Body | 14px | 400 | — | 1.55 | Body text |
+| Small | 12px | 400 | — | 1.5 | Meta, secondary info |
+| Caption | 11px | 400 | — | 1.4 | Timestamps, fine print |
+| Micro | 10px | 500 | 0.06em | 1.3 | Section labels, uppercase |
 
 ### Type Scale — App (System B)
 
@@ -67,9 +68,9 @@ See the [Surface Classification](#canonical-surface-split) section below for ful
 
 | Level | Small (mobile) | Medium | Large (desktop) |
 |-------|---------------|--------|-----------------|
-| H1 | 38px | 56px | 64px |
-| H2 | 24px | 36px | 48px |
-| Body LG | 16px | — | 17px |
+| H1 | 32px | 44px | 56px |
+| H2 | 16px | 18px | 20px |
+| Body | 14px | 14px | 14px |
 
 ### OpenType Features
 
@@ -132,19 +133,45 @@ Three input variables generate the entire palette:
 | Border strong | `rgba(255,255,255,0.10)` | — | Emphasis |
 | Accent | `#7170ff` | — | Same as light mode |
 
-### Marketing Colors (System A — Dark by Default)
+### Marketing Colors (System A — Achromatic, Dark by Default)
+
+> **Design direction:** No accent color on marketing surfaces. Pure greyscale.
+> Album art is the only color on the page. Buttons are achromatic (white/black inversion).
+
+#### Dark mode (default)
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| Background | `#000000` | Pure black |
-| Primary text | `#F7F8F8` | Headlines, primary |
-| Body text | `#A2A7AF` | Paragraphs |
-| Muted text | `#8A8F98` | Nav items, secondary |
-| Quaternary text | `#62666d` | Subtle, disabled |
-| CTA accent | `#5E6AD2` | Linear indigo — sign-up buttons |
-| App accent | `#7170ff` | In-app accent (different from marketing CTA) |
-| Login button bg | `rgba(255,255,255,0.1)` | Subtle glass |
+| Page bg | `#000000` | Pure black |
+| Surface | `#080808` | Content areas |
+| Card | `#0E0E0E` | Cards, elevated panels |
+| Elevated | `#151515` | Inputs bg, hover surfaces |
+| Input | `#1A1A1A` | Form inputs |
+| Text primary | `#E8E8E8` | Headlines, primary |
+| Text secondary | `#888888` | Body text |
+| Text tertiary | `#666666` | Descriptions, meta |
+| Text quaternary | `#444444` | Placeholders, disabled |
+| Border subtle | `rgba(255,255,255,0.05)` | Section dividers |
+| Border default | `rgba(255,255,255,0.08)` | Card borders |
+| Border strong | `rgba(255,255,255,0.12)` | Emphasis borders |
 | Header bg | `transparent` | Blur backdrop |
+
+#### Light mode
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| Page bg | `#FFFFFF` | White |
+| Surface | `#FAFAFA` | Content areas |
+| Card | `#FFFFFF` | Cards |
+| Elevated | `#F5F5F5` | Inputs bg, hover surfaces |
+| Input | `#F0F0F0` | Form inputs |
+| Text primary | `#141414` | Headlines, primary |
+| Text secondary | `#666666` | Body text |
+| Text tertiary | `#888888` | Descriptions, meta |
+| Text quaternary | `#BBBBBB` | Placeholders, disabled |
+| Border subtle | `rgba(0,0,0,0.05)` | Section dividers |
+| Border default | `rgba(0,0,0,0.08)` | Card borders |
+| Border strong | `rgba(0,0,0,0.12)` | Emphasis borders |
 
 ### Gray Scale (Radix-style)
 
@@ -167,11 +194,24 @@ Pure neutral HSL — no hue tint. Used across both systems.
 
 ### Semantic Status Colors
 
+#### App (System B)
+
 | Token | Value | Usage |
 |-------|-------|-------|
 | Success | `oklch(72% 0.2 145)` | Green — confirmations |
 | Warning | `oklch(82% 0.17 85)` | Amber — cautions |
 | Error | `oklch(65% 0.2 25)` | Red — errors, destructive |
+
+#### Marketing (System A)
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| Success | `#34C759` | Green — confirmations |
+| Warning | `#FF9F0A` | Amber — cautions |
+| Error | `#FF453A` | Red — errors, destructive |
+| Info | `#64D2FF` | Blue — informational |
+
+Marketing uses Apple system colors (hex) for simplicity. Applied at ~4% bg opacity with ~10% border opacity.
 
 ---
 
@@ -209,9 +249,8 @@ Pure neutral HSL — no hue tint. Used across both systems.
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| Homepage max | 1344px | Full-width marketing |
-| Container | 1298px | Standard container |
-| Content | 1200px | Content area |
+| Marketing max | 1080px | Marketing pages (tighter = more premium) |
+| Content | 1080px | Content area |
 | Hero section | 1024px | Hero content |
 | Prose | 624px | Long-form text |
 | Pricing grid | 1024px | Pricing layout |
@@ -292,14 +331,61 @@ Pure neutral HSL — no hue tint. Used across both systems.
 
 ### Buttons
 
+#### App Buttons (System B — unchanged)
+
 | Variant | Light bg | Light fg | Dark bg | Dark fg |
 |---------|----------|----------|---------|---------|
 | Primary | `oklch(10% 0 0)` | `oklch(100% 0 0)` | `#e6e6e6` | `#08090a` |
 | Secondary | `oklch(93% chroma hue)` | `oklch(20% 0 0)` | `oklch(19% chroma hue)` | `oklch(90% 0 0)` |
 | Accent | `#7170ff` | white | `#7170ff` | white |
-| Marketing CTA | `#5E6AD2` | white | `#5E6AD2` | white |
 
-Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padding: 12px horizontal.
+Height: sm=32px, md=40px. Radius: pill (9999px). Padding: 12px horizontal.
+
+#### Marketing Buttons (System A — Pure Inversion, Vercel/Apple style)
+
+| Variant | Dark bg | Dark fg | Dark border | Light bg | Light fg | Light border |
+|---------|---------|---------|-------------|----------|----------|--------------|
+| Primary | `#E8E8E8` | `#000000` | none | `#141414` | `#FFFFFF` | none |
+| Secondary | `transparent` | `#E8E8E8` | `1px solid #E8E8E8` | `transparent` | `#141414` | `1px solid #141414` |
+| Ghost | `transparent` | `#666666` | none | `transparent` | `#888888` | none |
+
+Primary hover: `opacity: 0.8`. Secondary hover: `rgba(255,255,255,0.06)` dark / `rgba(0,0,0,0.04)` light.
+Ghost hover: text shifts to primary color.
+
+Font: 12px, weight 500. Padding: 6px 14px. Radius: 6px.
+Small variant: 11px, 4px 10px padding.
+
+### Compact Element Sizing (System A)
+
+> **Principle:** Tight internal padding, generous external whitespace. Elements run a notch
+> smaller than standard SaaS. The micro/macro contrast is the premium signal.
+
+| Element | Font | Padding | Radius |
+|---------|------|---------|--------|
+| Button | 12px / 500 | 6px 14px | 6px |
+| Button (sm) | 11px / 500 | 4px 10px | 6px |
+| Input | 12px / 400 | 7px 10px | 6px |
+| Badge | 10px / 500 | 2px 8px | 4px |
+| Alert | 12px / 400 | 8px 12px | 6px |
+| Nav link | 12px / 400 | — | — |
+| Nav CTA | 12px / 500 | 5px 14px | 6px |
+
+Section padding: 128px vertical (space-32). Container max-width: 1080px.
+
+### Public Profiles — Art Provides the Palette
+
+> Public profiles use **System A aesthetic** (not System B). The framework recedes;
+> album art is the only color.
+
+**Color extraction:** Faint radial glow from dominant album art colors at ~3-4% opacity.
+Atmospheric, not decorative. Sits below content as a barely visible warm/cool mood.
+
+**Profile structure:**
+- Dark backdrop (#000 base)
+- Album art hero with extraction glow below
+- Compact link buttons (achromatic, same inversion style)
+- Minimal Jovie chrome ("Powered by Jovie" in text-quaternary at bottom)
+- Artist name: 16px / 600, handle: 12px / tertiary
 
 ### Sidebar (App Shell)
 
@@ -377,20 +463,21 @@ Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padd
 | Auth funnel | `(auth)/*` | `AuthLayout` | System B |
 | Onboarding funnel | `onboarding/*` | `AuthLayout` with onboarding provider | System B |
 | Waitlist funnel | `waitlist/*` | `AuthLayout` | System B |
-| Public product surfaces | `[username]/*` (claim, contact, listen, tip, tour, shop, subscribe, notifications, releases) | Username public layouts | System B (public variant) |
+| Public product surfaces | `[username]/*` (claim, contact, listen, tip, tour, shop, subscribe, notifications, releases) | Username public layouts | System A (profile variant) |
 
 ### Rules
 
 **Do:**
-- Use System A for acquisition, storytelling, launch, and public informational pages
+- Use System A for acquisition, storytelling, launch, public informational pages, and public profiles
 - Use System B for sign-in, account setup, waitlist, dashboard, settings, admin
-- Treat public creator pages as public product surfaces
+- Use achromatic buttons (pure inversion) on all System A surfaces
+- Let album art be the only color on public profiles (extraction glow at ~3-4% opacity)
 - Document any intentional cross-system borrowing in PR notes
 
 **Don't:**
 - Use homepage section primitives on auth, onboarding, dashboard, or settings
 - Use dashboard/sidebar/table composition on marketing pages
-- Treat all public pages as marketing pages
+- Use accent colors (#7170ff, #5E6AD2) on marketing or public profile surfaces
 - Assume pages under the marketing shell should look like the homepage hero
 
 ---
@@ -426,3 +513,9 @@ Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padd
 | 2026-03-25 | Right panel inside `<main>` content card | Matches Linear's unified card layout — sidebar and panel share one card with a thin left-border divider |
 | 2026-03-25 | Sidebar: no border, radius, shadow, or backdrop-blur | Flat sidebar sits flush against page background — matches Linear's design (v26.4.72) |
 | 2026-03-25 | BrandLogo: `next/image` with dark/light variants | Reverted from inline SVG — `next/image` handles theme-aware loading with proper optimization |
+| 2026-03-28 | Marketing goes achromatic | Kill #5E6AD2 CTA accent. Buttons are white/black inversion (Vercel/Apple style). Album art is the only color. |
+| 2026-03-28 | Compact premium element sizing | Buttons 12px/6px pad, inputs 12px/7px pad, body 14px. Smaller than typical SaaS. Generous section whitespace (128px). |
+| 2026-03-28 | H1 weight 600, tracking -0.02em | Clean and precise, not funky. Dramatic H1→H2 hierarchy jump (56px→20px). |
+| 2026-03-28 | Public profiles → System A | Public profiles use marketing aesthetic (achromatic, compact, art-forward) not app shell aesthetic. |
+| 2026-03-28 | Marketing container → 1080px | Down from 1344px. Tighter container reads as more premium. |
+| 2026-03-28 | Semantic status: Apple system colors | Marketing uses #34C759, #FF9F0A, #FF453A, #64D2FF at low opacity for alerts. |

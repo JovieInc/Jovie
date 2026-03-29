@@ -424,15 +424,13 @@ body {
     line-height: var(--linear-leading-normal);
   }
   .marketing-h1-linear {
-    /* Discrete breakpoints matching Linear.app (verified 2026-03-23):
-       375px: 38px/1.1  |  768px: 56px/1.08  |  1280px+: 64px/1.06
-       Linear caps at 64px — never goes to 76px at any viewport width */
+    /* Compact premium: razor-clean H1
+       Weight 600, tight tracking, dramatic hierarchy jump to H2 */
     font-size: var(--linear-h1-size-sm);
-    font-weight: 510;
-    letter-spacing: -0.022em;
-    line-height: 1.1;
+    font-weight: var(--linear-h1-weight);
+    letter-spacing: var(--linear-h1-tracking);
+    line-height: var(--linear-h1-leading);
     font-feature-settings: var(--linear-font-features);
-    font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
   }
   @media (min-width: 768px) {
@@ -443,31 +441,25 @@ body {
   @media (min-width: 1280px) {
     .marketing-h1-linear {
       font-size: var(--linear-h1-size);
-      line-height: 1.06;
     }
   }
   .marketing-h2-linear {
-    /* Linear.app verified 2026-03-23:
-       Desktop max: 48px/510/-2.2%/1.0 — caps here, never goes to 56px
-       375px: 24px/1.33  |  768px: 36px/1.125  |  1280px+: 48px/1.0 */
+    /* Compact premium: dramatic drop from H1 (56px → 20px) */
     font-size: var(--linear-h2-size-sm);
-    font-weight: 510;
-    letter-spacing: -0.022em;
-    line-height: 1.33;
+    font-weight: var(--linear-h2-weight);
+    letter-spacing: var(--linear-h2-tracking);
+    line-height: var(--linear-h2-leading);
     font-feature-settings: var(--linear-font-features);
-    font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
   }
   @media (min-width: 768px) {
     .marketing-h2-linear {
       font-size: var(--linear-h2-size-md);
-      line-height: 1.125;
     }
   }
   @media (min-width: 1280px) {
     .marketing-h2-linear {
       font-size: var(--linear-h2-size);
-      line-height: 1;
     }
   }
   /* Hero radial glow — dramatic depth cue behind heading */
