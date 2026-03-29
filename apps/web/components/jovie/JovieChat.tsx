@@ -462,7 +462,7 @@ export function JovieChat({
             transition={{ duration: 0.15 }}
           >
             {/* Content area */}
-            <div className='flex flex-1 flex-col items-center justify-end px-4 pb-6 sm:px-5'>
+            <div className='flex flex-1 flex-col items-center justify-center px-4 pb-6 sm:px-5'>
               <div className='chat-stagger w-full max-w-[46rem] space-y-5'>
                 {showSuggestedProfiles && (
                   <SuggestedProfilesCarousel
