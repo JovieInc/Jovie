@@ -724,7 +724,7 @@ export function ReleaseSidebar({
             ariaLabel='Release sidebar view'
             actions={tabActions}
             overflowMode='scroll'
-            distribution='fill'
+            distribution='intrinsic'
           />
         ) : undefined
       }
