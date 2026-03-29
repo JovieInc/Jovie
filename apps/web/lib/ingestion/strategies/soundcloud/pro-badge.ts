@@ -102,10 +102,39 @@ export function detectSoundCloudProFromApiData(
  * Normalize a SoundCloud slug, stripping URL prefixes and query params.
  */
 export function normalizeSoundCloudSlug(input: string): string {
-  const stripped = input
-    .replace(/^https?:\/\/(www\.)?soundcloud\.com\//i, '')
-    .replace(/[?#].*$/, '') // Strip query params and hash fragments
-    .replace(/\/+$/, '');
+  const soundCloudPrefixes = [
+    'https://soundcloud.com/',
+    'http://soundcloud.com/',
+    'https://www.soundcloud.com/',
+    'http://www.soundcloud.com/',
+  ] as const;
+
+  let stripped = input.trim();
+  const lower = stripped.toLowerCase();
+  for (const prefix of soundCloudPrefixes) {
+    if (lower.startsWith(prefix)) {
+      stripped = stripped.slice(prefix.length);
+      break;
+    }
+  }
+
+  const queryIndex = stripped.indexOf('?');
+  const hashIndex = stripped.indexOf('#');
+  const cutIndex =
+    queryIndex === -1
+      ? hashIndex
+      : hashIndex === -1
+        ? queryIndex
+        : Math.min(queryIndex, hashIndex);
+
+  if (cutIndex !== -1) {
+    stripped = stripped.slice(0, cutIndex);
+  }
+
+  while (stripped.endsWith('/')) {
+    stripped = stripped.slice(0, -1);
+  }
+
   return stripped;
 }
 

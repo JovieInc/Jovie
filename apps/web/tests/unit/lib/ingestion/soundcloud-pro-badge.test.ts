@@ -3,7 +3,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { detectSoundCloudProFromApiData } from '@/lib/ingestion/strategies/soundcloud/pro-badge';
+import {
+  detectSoundCloudProFromApiData,
+  normalizeSoundCloudSlug,
+} from '@/lib/ingestion/strategies/soundcloud/pro-badge';
 
 describe('detectSoundCloudProFromApiData', () => {
   describe('positive detection', () => {
@@ -123,5 +126,28 @@ describe('detectSoundCloudProFromApiData', () => {
       });
       expect(result.isPro).toBeNull();
     });
+  });
+});
+
+describe('normalizeSoundCloudSlug', () => {
+  it('removes SoundCloud URL prefix and trailing slash', () => {
+    expect(normalizeSoundCloudSlug('https://soundcloud.com/deadmau5/')).toBe(
+      'deadmau5'
+    );
+  });
+
+  it('handles www and http prefixes case-insensitively', () => {
+    expect(normalizeSoundCloudSlug('HTTP://WWW.SOUNDCLOUD.COM/Alice')).toBe(
+      'Alice'
+    );
+  });
+
+  it('strips query and hash fragments without regex', () => {
+    expect(normalizeSoundCloudSlug('deadmau5?utm=1#bio')).toBe('deadmau5');
+    expect(normalizeSoundCloudSlug('deadmau5#bio?utm=1')).toBe('deadmau5');
+  });
+
+  it('returns trimmed slug when no prefix is present', () => {
+    expect(normalizeSoundCloudSlug('  artist-name  ')).toBe('artist-name');
   });
 });

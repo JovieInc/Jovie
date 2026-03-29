@@ -58,9 +58,13 @@ export function validateYouTubeChannelUrl(url: string): string | null {
     if (!CHANNEL_PATTERNS.some(rx => rx.test(candidate))) {
       return null;
     }
-    const aboutUrl = candidate.endsWith('/about')
-      ? candidate
-      : `${candidate.replace(/\/+$/, '')}/about`;
+    let sanitizedCandidate = candidate;
+    while (sanitizedCandidate.endsWith('/')) {
+      sanitizedCandidate = sanitizedCandidate.slice(0, -1);
+    }
+    const aboutUrl = sanitizedCandidate.endsWith('/about')
+      ? sanitizedCandidate
+      : `${sanitizedCandidate}/about`;
     const result = validatePlatformUrl(aboutUrl, YOUTUBE_CONFIG);
     return result.valid && result.normalized ? result.normalized : null;
   } catch {
