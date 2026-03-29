@@ -23,6 +23,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Relaxed multi-DSP enrichment assertions in demo spec to best-effort (don't fail recording if enrichment is slow)
 - Simplified onboarding form detection in demo spec to match current UI selectors
+- Presence page converted from card grid to table layout, matching the Releases page pattern with row selection and sidebar integration
+- Insights page wrapped in DashboardWorkspacePanel with PageToolbar, matching all other dashboard pages
+- Right drawer card widths normalized by fixing asymmetric padding that caused cards to be narrower on the right side
+- Drawer tabs card padding aligned with entity header padding for visual consistency
+- Dashboard header action button gap tightened from 6px to 4px for more cohesive grouping
+
+### Removed
+
+- DspPresenceCard component (replaced by DspPresenceTable rows)
 
 ## [26.4.94] - 2026-03-28
 
