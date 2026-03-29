@@ -1,14 +1,21 @@
+import type { ReactNode } from 'react';
 import { Container } from '@/components/site/Container';
 import { HeroClaimHandle } from './HeroClaimHandle';
 import { HeroDesktopPreviewMount } from './HeroDesktopPreviewMount';
 
 interface HeroCinematicProps {
   readonly fullScreen?: boolean;
+  readonly primaryAction?: ReactNode;
 }
 
 export function HeroCinematic({
   fullScreen = false,
+  primaryAction,
 }: Readonly<HeroCinematicProps>) {
+  const heroPrimaryAction = primaryAction ?? (
+    <HeroClaimHandle submitButtonTestId='homepage-primary-cta' />
+  );
+
   if (!fullScreen) {
     return (
       <section
@@ -41,7 +48,7 @@ export function HeroCinematic({
                   </p>
 
                   <div className='max-lg:mx-auto mt-6 w-full max-w-[27rem] md:mt-7 lg:mx-0'>
-                    <HeroClaimHandle submitButtonTestId='homepage-primary-cta' />
+                    {heroPrimaryAction}
                   </div>
 
                   <p className='mt-3.5 text-[11px] tracking-[0.01em] text-quaternary-token md:mt-4 lg:text-left'>
@@ -97,7 +104,7 @@ export function HeroCinematic({
           </p>
 
           <div className='mt-4 w-full max-w-[27rem] sm:mt-5'>
-            <HeroClaimHandle submitButtonTestId='homepage-primary-cta' />
+            {heroPrimaryAction}
           </div>
 
           <p className='mt-2.5 text-[11px] tracking-[0.01em] text-quaternary-token sm:mt-3'>
@@ -124,7 +131,7 @@ export function HeroCinematic({
               </p>
 
               <div className='mt-4 w-full max-w-[27rem] sm:mt-5 md:mt-6'>
-                <HeroClaimHandle submitButtonTestId='homepage-primary-cta' />
+                {heroPrimaryAction}
               </div>
 
               <p className='mt-2.5 text-[11px] tracking-[0.01em] text-quaternary-token sm:mt-3'>

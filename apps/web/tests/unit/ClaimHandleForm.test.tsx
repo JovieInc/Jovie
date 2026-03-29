@@ -1,14 +1,16 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 
 // Use hoisted mocks for shared state
-const { mockPush, mockPrefetch, mockFetch } = vi.hoisted(() => ({
+const { mockPush, mockPrefetch, mockFetch, mockTrack } = vi.hoisted(() => ({
   mockPush: vi.fn(),
   mockPrefetch: vi.fn(),
   mockFetch: vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({ available: true }),
   }),
+  mockTrack: vi.fn(),
 }));
 
 // Mock dependencies
@@ -25,6 +27,10 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
+vi.mock('@/lib/analytics', () => ({
+  track: mockTrack,
+}));
+
 // Mock fetch for handle checking
 global.fetch = mockFetch as unknown as typeof fetch;
 
@@ -34,6 +40,8 @@ beforeEach(() => {
   mockPush.mockReset();
   mockPrefetch.mockReset();
   mockFetch.mockClear();
+  mockTrack.mockReset();
+  window.history.pushState({}, '', '/');
 });
 
 describe('ClaimHandleForm', () => {
@@ -92,5 +100,44 @@ describe('ClaimHandleForm', () => {
     // Only check for component-specific animation keyframes (not third-party CSS like Sonner)
     expect(styleContents).not.toContain('jv-shake');
     expect(styleContents).not.toContain('jv-available');
+  });
+
+  test('tracks landing claim submits only on /new', () => {
+    window.history.pushState({}, '', APP_ROUTES.LANDING_NEW);
+
+    render(<ClaimHandleForm />);
+
+    fireEvent.change(
+      screen.getByRole('textbox', { name: /choose your handle/i }),
+      {
+        target: { value: 'releasefanclub' },
+      }
+    );
+    fireEvent.submit(document.querySelector('form') as HTMLFormElement);
+
+    expect(mockTrack).toHaveBeenCalledWith('landing_cta_claim_handle', {
+      section: 'final_cta',
+      handle: 'releasefanclub',
+    });
+    expect(mockPush).toHaveBeenCalledWith(
+      '/signup?redirect_url=%2Fonboarding%3Fhandle%3Dreleasefanclub'
+    );
+  });
+
+  test('does not track landing claim submits outside /new', () => {
+    render(<ClaimHandleForm />);
+
+    fireEvent.change(
+      screen.getByRole('textbox', { name: /choose your handle/i }),
+      {
+        target: { value: 'releasefanclub' },
+      }
+    );
+    fireEvent.submit(document.querySelector('form') as HTMLFormElement);
+
+    expect(mockTrack).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith(
+      '/signup?redirect_url=%2Fonboarding%3Fhandle%3Dreleasefanclub'
+    );
   });
 });
