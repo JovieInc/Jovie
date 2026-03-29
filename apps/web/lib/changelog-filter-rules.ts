@@ -26,11 +26,11 @@ const VENDOR_NAMES = [
 ];
 
 function escapeRegex(value: string): string {
-  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 const VENDOR_PATTERNS = VENDOR_NAMES.map(
-  name => new RegExp(`\\b${escapeRegex(name)}\\b`)
+  name => new RegExp(String.raw`\b${escapeRegex(name)}\b`)
 );
 
 /** Infrastructure, dev tooling, admin, and business-sensitive patterns. */

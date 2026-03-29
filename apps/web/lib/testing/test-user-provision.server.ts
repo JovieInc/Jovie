@@ -122,7 +122,7 @@ export function isAllowlistedPrivilegedTestAccountEmail(
 
 function buildDeterministicClerkId(email: string): string {
   const normalizedEmail = normalizeEmail(email);
-  const stableId = normalizedEmail.replace(/[^a-z0-9]+/gi, '_').slice(0, 48);
+  const stableId = normalizedEmail.replaceAll(/[^a-z0-9]+/gi, '_').slice(0, 48);
   return `user_dev_${stableId || 'browse'}`;
 }
 
@@ -183,7 +183,7 @@ export async function resolveClerkTestUserId(
     return fallbackClerkId ?? buildDeterministicClerkId(email);
   }
 
-  if (!secretKey || !secretKey.startsWith('sk_test_')) {
+  if (!secretKey?.startsWith('sk_test_')) {
     return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
   }
 
@@ -214,7 +214,7 @@ export async function ensureClerkTestUser({
   const normalizedEmail = normalizeEmail(email);
   const secretKey = process.env.CLERK_SECRET_KEY;
 
-  if (!secretKey || !secretKey.startsWith('sk_test_')) {
+  if (!secretKey?.startsWith('sk_test_')) {
     return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
   }
 
