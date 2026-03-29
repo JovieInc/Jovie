@@ -49,7 +49,7 @@ export default async function ReleasesPage() {
     );
   }
 
-  if (dashboardData.needsOnboarding) {
+  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
     redirect(APP_ROUTES.ONBOARDING);
   }
 

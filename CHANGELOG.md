@@ -25,6 +25,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- Visual regression spec (`visual-regression.spec.ts`) covering homepage, auth pages, and pricing in light/dark mode
+- ClientProviders composition test catching the TooltipProvider regression class (a518d3fb5)
+- Proxy composition critical test for CSP nonce, test bypass, and matcher exclusions
+- Migration journal ordering guard (critical test) preventing schema drift
+- Coverage ratchet thresholds in `vitest.config.ci.mts` (placeholder zeros, calibrate on main)
 - `/demo/onboarding` mock route for rapid onboarding UI iteration without auth gating
 - Progressive profile panel on right side during onboarding demo (fills as steps advance)
 - Step picker toolbar and step dots for instant navigation between all 9 onboarding steps
@@ -40,6 +45,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - All 47 API routes now use `getCachedAuth()` instead of Clerk's `auth()` directly, fixing 401 errors when using dev test auth bypass
 - Onboarding return-to validator now accepts the chat route for post-checkout welcome chat bootstrap
+- Prevent false onboarding redirect on dashboard pages (audience, earnings, presence, releases) when dashboard data fails to load — existing users were being sent to a blank onboarding screen instead of seeing the error state
 
 ## [26.4.95] - 2026-03-28
 
