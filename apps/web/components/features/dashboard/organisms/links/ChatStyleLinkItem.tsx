@@ -30,10 +30,9 @@ import {
 import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
 import { cn } from '@/lib/utils';
 import { getContrastTextOnBrand } from '@/lib/utils/color';
-import {
-  canonicalIdentity,
-  type DetectedLink,
-} from '@/lib/utils/platform-detection';
+import { type DetectedLink } from '@/lib/utils/platform-detection';
+import { buildPillLabel } from '../grouped-links/buildPillLabel';
+import { suggestionIdentity } from './utils';
 
 type LinkItemMenuItem = {
   id: string;
@@ -112,8 +111,11 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
     transition,
   };
 
-  const identity = canonicalIdentity(link);
-  const handle = identity.startsWith('@') ? identity : undefined;
+  const handle = suggestionIdentity(link);
+  const platformName = link.platform.name || link.platform.id;
+  // Use the same label resolver as SortableLinkItem for consistency
+  const resolvedLabel = buildPillLabel(link);
+  const secondaryText = resolvedLabel.startsWith('@') ? platformName : handle;
   const iconMeta = getPlatformIconMetadata(link.platform.icon);
   const brandColor = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
 
@@ -145,7 +147,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
         type='button'
         onClick={() => onEdit(index)}
         className={cn(SWIPE_ACTION_CLASS, 'bg-blue-500')}
-        aria-label={`Edit ${link.platform.name}`}
+        aria-label={`Edit ${resolvedLabel}`}
       >
         <Icon name='Pencil' className='h-4 w-4' />
         <span>Edit</span>
@@ -163,7 +165,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
         type='button'
         onClick={() => onRemove(index)}
         className={cn(SWIPE_ACTION_CLASS, 'bg-red-500')}
-        aria-label={`Delete ${link.platform.name}`}
+        aria-label={`Delete ${resolvedLabel}`}
       >
         <Icon name='Trash' className='h-4 w-4' />
         <span>Delete</span>
@@ -221,11 +223,11 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
           {/* Content */}
           <div className='min-w-0 flex-1'>
             <div className='truncate text-[13px] font-[510] text-primary-token'>
-              {link.platform.name || link.platform.id}
+              {resolvedLabel}
             </div>
-            {handle && (
+            {secondaryText && (
               <div className='truncate text-[13px] text-secondary-token'>
-                {handle}
+                {secondaryText}
               </div>
             )}
           </div>
@@ -233,7 +235,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
           {/* Menu button - 44px tap target on mobile */}
           <button
             type='button'
-            aria-label={`Open actions for ${link.platform.name}`}
+            aria-label={`Open actions for ${resolvedLabel}`}
             ref={floatingRefs.setReference}
             className={cn(
               'inline-flex h-11 w-11 items-center justify-center rounded-[6px] sm:h-9 sm:w-9 sm:rounded-[8px]',

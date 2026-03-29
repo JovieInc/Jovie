@@ -11,11 +11,8 @@ import {
   type LinkPillState,
 } from '@/features/dashboard/atoms/LinkPill';
 import { cn } from '@/lib/utils';
-import {
-  canonicalIdentity,
-  type DetectedLink,
-} from '@/lib/utils/platform-detection';
-import { compactUrlDisplay } from './utils';
+import { type DetectedLink } from '@/lib/utils/platform-detection';
+import { compactUrlDisplay, suggestionIdentity } from './utils';
 
 const SWIPE_ACTION_CLASS =
   'flex h-full flex-col items-center justify-center gap-1 px-4 text-white text-xs font-[510] transition-colors active:opacity-80';
@@ -135,8 +132,12 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
   };
 
   const urlDisplay = compactUrlDisplay(link.platform.id, link.normalizedUrl);
-  const identity = canonicalIdentity(link);
-  const secondaryText = identity.startsWith('@') ? identity : undefined;
+  const primaryLabel = buildPillLabel(link);
+  const handle = suggestionIdentity(link);
+  // If primary is a handle, show platform name as secondary (avoid redundancy)
+  const secondaryText = primaryLabel.startsWith('@')
+    ? link.platform.name || link.platform.id
+    : handle;
 
   const pillState = getPillState(visible, link.isValid);
   const badgeText = getBadgeText(link, visible, pillState, isLastAdded);
@@ -169,7 +170,7 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
         type='button'
         onClick={() => onEdit(index)}
         className={cn(SWIPE_ACTION_CLASS, 'bg-blue-500')}
-        aria-label={`Edit ${link.platform.name || link.platform.id}`}
+        aria-label={`Edit ${primaryLabel}`}
       >
         <Icon name='Pencil' className='h-4 w-4' />
         <span>Edit</span>
@@ -187,7 +188,7 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
         type='button'
         onClick={() => onRemove(index)}
         className={cn(SWIPE_ACTION_CLASS, 'bg-red-500')}
-        aria-label={`Delete ${link.platform.name || link.platform.id}`}
+        aria-label={`Delete ${primaryLabel}`}
       >
         <Icon name='Trash' className='h-4 w-4' />
         <span>Delete</span>
