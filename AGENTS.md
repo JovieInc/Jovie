@@ -1084,6 +1084,15 @@ The `DashboardHeader` breadcrumb already renders the page name prominently. Do N
 **Allowed:** `<PageToolbar start={<span>3 matched platforms</span>} end={<ActionButton />} />`
 **Banned:** `<PageToolbar start={<span>Earnings</span>} />` — duplicates the breadcrumb
 
+### Performance Optimization Loop
+
+`/perf-loop` runs an autonomous optimization loop that measures, experiments,
+and keeps only improvements. State is persisted to `.context/perf/` for resume
+capability. The skill uses `perf:loop` (performance-optimizer.ts) as its
+measurement primitive and commits each accepted improvement atomically.
+
+Runtime: ~30-50 minutes for a full run (4-10 iterations with builds).
+
 ### Testing
 
 - Unit tests: Vitest with jsdom
