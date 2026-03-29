@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.100] - 2026-03-29
+
+### Fixed
+
+- Stale "$9/mo" founding price fallback in sidebar upgrade banner (actual cheapest paid tier is Pro at $20/mo)
+- Second hardcoded $9 fallback in verified upgrade price formatter
+- Stale "$5 branding removal" copy in pricing page SEO metadata and PricingCTA component
+- Defensive founding→pro mapping in chat usage API's resolvePlan() for legacy DB rows
+- Stale comment claiming free-tier AI limit is 25/day (actual: 10/day from entitlement registry)
+
+### Removed
+
+- Founding tier from pricing config, Stripe config, plan hierarchy, env validation, and onboarding checkout
+- Founding from valid plan intent options (no longer offered to new users)
+
+### Added
+
+- Unit tests for resolvePlan() covering all plan values including legacy founding and growth mappings
+
 ## [26.4.99] - 2026-03-29
 
 ### Fixed
