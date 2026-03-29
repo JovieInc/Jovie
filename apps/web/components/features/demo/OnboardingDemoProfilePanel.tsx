@@ -6,11 +6,9 @@ import { useMemo } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Avatar } from '@/components/molecules/Avatar';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
-import { DrawerStatGrid } from '@/components/molecules/drawer/DrawerStatGrid';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
 import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
 import { SidebarLinkRow } from '@/components/molecules/drawer/SidebarLinkRow';
-import { StatTile } from '@/components/molecules/drawer/StatTile';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import {
   DEMO_DISCOVERY_SNAPSHOT,
@@ -95,36 +93,14 @@ export function OnboardingDemoProfilePanel({
               ) : null
             }
           />
-
-          {/* Stats inline under identity */}
-          {visible.stats ? (
-            <div className='mt-3 border-t border-subtle pt-3'>
-              <DrawerStatGrid variant='flush'>
-                <StatTile
-                  label='Releases'
-                  value={
-                    visible.releases
-                      ? String(snapshot.counts.releaseCount)
-                      : '—'
-                  }
-                />
-                <StatTile label='DSPs' value={String(confirmedDsps.length)} />
-                <StatTile
-                  label='Social'
-                  value={
-                    visible.social
-                      ? String(snapshot.counts.activeSocialCount)
-                      : '—'
-                  }
-                />
-              </DrawerStatGrid>
-            </div>
-          ) : null}
         </DrawerSurfaceCard>
 
         {/* Collapsible sections */}
         {visible.dsps && confirmedDsps.length > 0 ? (
-          <DrawerSection title='Platforms' surface='card'>
+          <DrawerSection
+            title={`Platforms (${confirmedDsps.length})`}
+            surface='card'
+          >
             {confirmedDsps.map(item => (
               <SidebarLinkRow
                 key={item.id}
@@ -143,7 +119,10 @@ export function OnboardingDemoProfilePanel({
         ) : null}
 
         {visible.social && activeLinks.length > 0 ? (
-          <DrawerSection title='Social' surface='card'>
+          <DrawerSection
+            title={`Social (${activeLinks.length})`}
+            surface='card'
+          >
             {activeLinks.map(link => (
               <SidebarLinkRow
                 key={`${link.kind}:${link.id}`}
@@ -163,7 +142,10 @@ export function OnboardingDemoProfilePanel({
         ) : null}
 
         {visible.releases && snapshot.releases.length > 0 ? (
-          <DrawerSection title='Releases' surface='card'>
+          <DrawerSection
+            title={`Releases (${Math.min(snapshot.releases.length, 4)})`}
+            surface='card'
+          >
             {snapshot.releases.slice(0, 4).map(release => (
               <SidebarLinkRow
                 key={release.id}
