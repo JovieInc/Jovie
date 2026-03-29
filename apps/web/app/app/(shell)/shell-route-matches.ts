@@ -27,9 +27,11 @@ export function isChatShellRoute(pathname: string | null): boolean {
 }
 
 export function isReleasesShellRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
   return (
     pathname === APP_ROUTES.RELEASES ||
-    pathname === APP_ROUTES.DASHBOARD_RELEASES
+    pathname === APP_ROUTES.DASHBOARD_RELEASES ||
+    pathname.startsWith(`${APP_ROUTES.DASHBOARD_RELEASES}/`)
   );
 }
 

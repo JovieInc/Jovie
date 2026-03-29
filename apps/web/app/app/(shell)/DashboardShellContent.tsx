@@ -34,6 +34,7 @@ export async function DashboardShellContent({
   userId,
   children,
 }: {
+  readonly userId: string;
   readonly children: React.ReactNode;
 }) {
   // Keep the shell fast on the chat-first landing path and releases.

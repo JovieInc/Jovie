@@ -864,7 +864,7 @@ async function resolveDashboardShellData(
   noStore();
 
   try {
-    const [isAdmin, coreData] = await Promise.all([
+    const [adminResult, coreData] = await Promise.allSettled([
       checkAdminRole(clerkUserId),
       Sentry.startSpan(
         { op: 'task', name: 'dashboard.getShellData' },
@@ -872,10 +872,15 @@ async function resolveDashboardShellData(
       ),
     ]);
 
+    if (coreData.status === 'rejected') throw coreData.reason;
+
+    const isAdmin =
+      adminResult.status === 'fulfilled' ? adminResult.value : false;
+
     return {
-      ...coreData,
+      ...coreData.value,
       isAdmin,
-      dashboardLoadError: coreData.dashboardLoadError,
+      dashboardLoadError: coreData.value.dashboardLoadError,
     };
   } catch (error) {
     Sentry.captureException(error, {
