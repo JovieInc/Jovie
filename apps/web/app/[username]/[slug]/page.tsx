@@ -466,6 +466,7 @@ function ContentPageBody({
         title: content.title,
         artworkUrl: content.artworkUrl,
         releaseDate: toISOStringOrNull(content.releaseDate),
+        previewUrl: content.previewUrl ?? null,
       }}
       artist={{
         name: artistName,

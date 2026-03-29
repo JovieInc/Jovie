@@ -19,6 +19,7 @@ import {
   buildArtworkSizes,
 } from '@/features/release/AlbumArtworkContextMenu';
 import { ReleaseCreditsDialog } from '@/features/release/ReleaseCreditsDialog';
+import { SmartLinkAudioPreview } from '@/features/release/SmartLinkAudioPreview';
 import {
   SmartLinkArtistName,
   SmartLinkArtworkCard,
@@ -42,6 +43,7 @@ interface ReleaseLandingPageProps
       readonly title: string;
       readonly artworkUrl: string | null;
       readonly releaseDate: string | null;
+      readonly previewUrl?: string | null;
     };
     readonly artist: {
       readonly name: string;
@@ -241,6 +243,17 @@ export function ReleaseLandingPage({
           >
             <ReleaseCreditsDialog credits={credits} />
           </div>
+        </div>
+
+        {/* Audio Preview Player */}
+        <div className='mt-4'>
+          <SmartLinkAudioPreview
+            contentId={tracking?.contentId ?? release.title}
+            title={release.title}
+            artistName={artist.name}
+            artworkUrl={release.artworkUrl}
+            previewUrl={release.previewUrl ?? null}
+          />
         </div>
       </div>
 
