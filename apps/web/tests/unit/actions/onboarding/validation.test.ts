@@ -169,6 +169,20 @@ describe('ensureHandleAvailable', () => {
     ).rejects.toThrow('[USERNAME_TAKEN]');
   });
 
+  it('does not report USERNAME_TAKEN to Sentry', async () => {
+    const tx = createMockTx();
+    tx.limitMock.mockResolvedValue([{ id: 'other_profile' }]);
+
+    const { ensureHandleAvailable } = await import(
+      '@/app/onboarding/actions/validation'
+    );
+    await expect(
+      ensureHandleAvailable(tx as any, 'takenhandle')
+    ).rejects.toThrow();
+
+    expect(hoisted.captureErrorMock).not.toHaveBeenCalled();
+  });
+
   it('reports unexpected DB errors to Sentry', async () => {
     const tx = createMockTx();
     tx.limitMock.mockRejectedValue(new Error('Timeout'));

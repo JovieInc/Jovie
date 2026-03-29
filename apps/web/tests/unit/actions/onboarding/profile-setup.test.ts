@@ -5,7 +5,12 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/db/schema/auth', () => ({
-  users: { id: 'id', clerkId: 'clerkId', activeProfileId: 'activeProfileId', updatedAt: 'updatedAt' },
+  users: {
+    id: 'id',
+    clerkId: 'clerkId',
+    activeProfileId: 'activeProfileId',
+    updatedAt: 'updatedAt',
+  },
 }));
 
 vi.mock('@/lib/db/schema/profiles', () => ({
@@ -58,7 +63,9 @@ function createMockTx() {
   const updateMock = vi.fn().mockReturnValue({ set: updateSetMock });
   const limitMock = vi.fn();
   const orderByMock = vi.fn().mockReturnValue({ limit: limitMock });
-  const whereMock = vi.fn().mockReturnValue({ limit: limitMock, orderBy: orderByMock });
+  const whereMock = vi
+    .fn()
+    .mockReturnValue({ limit: limitMock, orderBy: orderByMock });
   const fromMock = vi.fn().mockReturnValue({ where: whereMock });
   const selectMock = vi.fn().mockReturnValue({ from: fromMock });
 
@@ -176,9 +183,9 @@ describe('fetchExistingUser', () => {
     const { fetchExistingUser } = await import(
       '@/app/onboarding/actions/profile-setup'
     );
-    await expect(
-      fetchExistingUser(tx as any, 'clerk_123')
-    ).rejects.toThrow('DB down');
+    await expect(fetchExistingUser(tx as any, 'clerk_123')).rejects.toThrow(
+      'DB down'
+    );
 
     expect(hoisted.captureErrorMock).toHaveBeenCalled();
   });
