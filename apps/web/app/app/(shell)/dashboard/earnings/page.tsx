@@ -38,7 +38,7 @@ export default async function EarningsPage() {
     }
 
     // Handle redirects for users who need onboarding
-    if (dashboardData.needsOnboarding) {
+    if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
       redirect(APP_ROUTES.ONBOARDING);
     }
 
