@@ -62,7 +62,7 @@ export function getClerkProxyUrl(
   locationLike:
     | Pick<Location, 'hostname' | 'protocol'>
     | Pick<URL, 'hostname' | 'protocol'>
-    | undefined = typeof globalThis.window !== 'undefined'
+    | undefined = globalThis.window !== undefined
     ? globalThis.location
     : undefined
 ): string | undefined {
@@ -72,7 +72,7 @@ export function getClerkProxyUrl(
   if (publicEnv.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1') return undefined;
   // During SSR, window is unavailable — return undefined so Clerk doesn't
   // attempt new URL(proxyUrl, window.location.origin) server-side.
-  if (typeof globalThis.window === 'undefined') return undefined;
+  if (globalThis.window === undefined) return undefined;
   if (shouldDisableClerkProxyForLocation(locationLike)) return undefined;
   return publicEnv.NEXT_PUBLIC_CLERK_PROXY_URL || '/__clerk';
 }
