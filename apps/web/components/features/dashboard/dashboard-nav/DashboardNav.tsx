@@ -42,13 +42,18 @@ const RecentChats = dynamic(
 );
 
 function isItemActive(pathname: string, item: NavItem): boolean {
-  const normalizedPathname =
-    pathname === APP_ROUTES.DASHBOARD_RELEASES ||
-    pathname === APP_ROUTES.RELEASES
-      ? APP_ROUTES.RELEASES
-      : pathname === APP_ROUTES.AUDIENCE
-        ? APP_ROUTES.DASHBOARD_AUDIENCE
-        : pathname;
+  const normalizedPathname = (() => {
+    if (
+      pathname === APP_ROUTES.DASHBOARD_RELEASES ||
+      pathname === APP_ROUTES.RELEASES
+    ) {
+      return APP_ROUTES.RELEASES;
+    }
+    if (pathname === APP_ROUTES.AUDIENCE) {
+      return APP_ROUTES.DASHBOARD_AUDIENCE;
+    }
+    return pathname;
+  })();
 
   if (
     normalizedPathname === item.href ||

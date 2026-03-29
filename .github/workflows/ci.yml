@@ -876,6 +876,15 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
+      - name: Cleanup ephemeral Neon branch
+        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != ''
+        continue-on-error: true
+        run: |
+          curl -sS -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
+
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
     needs: [ci-path-changes]

@@ -213,34 +213,37 @@ async function seedDashboardAuth(browser, { url }) {
     return;
   }
 
-  const authStatePath = resolveAuthStatePath();
-  if (!existsSync(authStatePath)) {
-    throw new Error(
-      `Missing Lighthouse auth storage state at ${authStatePath}. Run perf:auth or set E2E_CLERK_USER_ID for bypass mode.`
-    );
-  }
+  try {
+    const authStatePath = resolveAuthStatePath();
+    if (!existsSync(authStatePath)) {
+      throw new Error(
+        `Missing Lighthouse auth storage state at ${authStatePath}. Run perf:auth or set E2E_CLERK_USER_ID for bypass mode.`
+      );
+    }
 
-  if (!authStateMatchesBaseUrl(authStatePath, url)) {
-    throw new Error(
-      `Lighthouse auth storage state at ${authStatePath} does not match ${origin}. Regenerate it for the target origin before rerunning.`
-    );
-  }
+    if (!authStateMatchesBaseUrl(authStatePath, url)) {
+      throw new Error(
+        `Lighthouse auth storage state at ${authStatePath} does not match ${origin}. Regenerate it for the target origin before rerunning.`
+      );
+    }
 
-  const cookies = readStorageStateCookies(authStatePath).map(cookie =>
-    buildCookieForOrigin(cookie, origin)
-  );
-  if (cookies.length === 0) {
-    throw new Error(
-      `No cookies found in Lighthouse auth storage state at ${authStatePath}.`
+    const cookies = readStorageStateCookies(authStatePath).map(cookie =>
+      buildCookieForOrigin(cookie, origin)
     );
-  }
+    if (cookies.length === 0) {
+      throw new Error(
+        `No cookies found in Lighthouse auth storage state at ${authStatePath}.`
+      );
+    }
 
-  if (browserContext?.setCookie) {
-    await browserContext.setCookie(...cookies);
-  } else {
-    await page.setCookie(...cookies);
+    if (browserContext?.setCookie) {
+      await browserContext.setCookie(...cookies);
+    } else {
+      await page.setCookie(...cookies);
+    }
+  } finally {
+    await page.close();
   }
-  await page.close();
 }
 
 function main() {
