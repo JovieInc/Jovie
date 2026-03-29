@@ -30,6 +30,7 @@ import {
 import { publishIdentityLinks } from '@/lib/identity/publish';
 import { storeRawIdentityLinks } from '@/lib/identity/store';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
+import { detectAndStoreSoundCloudProStatus } from '@/lib/ingestion/strategies/soundcloud';
 import {
   isMusicfetchInvalidServicesError,
   MusicfetchRequestError,
@@ -627,6 +628,23 @@ export async function processMusicFetchEnrichmentJob(
         error: error instanceof Error ? error.message : 'Unknown error',
       }
     );
+  }
+
+  // Detect SoundCloud Pro badge (non-blocking, outside tx)
+  const scSlug = profile.soundcloudId;
+  if (scSlug) {
+    try {
+      await detectAndStoreSoundCloudProStatus(
+        plainDb,
+        creatorProfileId,
+        scSlug
+      );
+    } catch (error) {
+      logger.warn('SoundCloud Pro detection failed (non-blocking)', {
+        creatorProfileId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   }
 
   // Mark enrichment as complete
