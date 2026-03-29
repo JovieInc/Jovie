@@ -1,7 +1,7 @@
 /**
  * Plan intent persistence for the signup-to-checkout funnel.
  *
- * When a user clicks a pricing CTA (e.g., "Choose Founding Member"),
+ * When a user clicks a pricing CTA (e.g., "Choose Pro"),
  * we capture their plan intent in a cookie + sessionStorage so it
  * survives the signup → onboarding → checkout flow.
  *
@@ -12,9 +12,9 @@
 const PLAN_INTENT_KEY = 'jovie_plan_intent';
 const PLAN_INTENT_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
-const VALID_PLANS = new Set(['free', 'founding', 'pro', 'max']);
+const VALID_PLANS = new Set(['free', 'pro', 'max']);
 
-export type PlanIntentTier = 'free' | 'founding' | 'pro' | 'max';
+export type PlanIntentTier = 'free' | 'pro' | 'max';
 
 function getSecureCookieAttribute(): string {
   try {

@@ -6,7 +6,6 @@
  *
  * Pricing Tiers:
  * - Free: $0 (no Stripe subscription)
- * - Founding: $9/mo (early supporter pricing, locked in for life)
  * - Pro: $20/mo or $192/yr (save 2 months)
  * - Max: $200/mo or $1,920/yr (save 2 months)
  */
@@ -18,7 +17,7 @@ import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 
 // Plan types supported by the application
-export type PlanType = 'free' | 'founding' | 'pro' | 'max';
+export type PlanType = 'free' | 'pro' | 'max';
 
 // Price mapping interface
 interface PriceMapping {
@@ -34,14 +33,6 @@ interface PriceMapping {
 const buildPriceMappings = (): Record<string, PriceMapping> => {
   const mappings: PriceMapping[] = [
     // All tiers from centralized PRICING config
-    {
-      priceId: PRICING.founding.monthly.priceId || '',
-      plan: PRICING.founding.monthly.entitlementPlan,
-      amount: PRICING.founding.monthly.amount,
-      currency: 'usd',
-      interval: PRICING.founding.monthly.interval,
-      description: PRICING.founding.monthly.label,
-    },
     {
       priceId: PRICING.pro.monthly.priceId || '',
       plan: PRICING.pro.monthly.entitlementPlan,
@@ -143,11 +134,7 @@ export function validateStripeConfig(): {
     missingVars.push('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY');
   }
 
-  // Founding tier is the primary paid product — must be configured
-  if (!env.STRIPE_PRICE_FOUNDING_MONTHLY) {
-    missingVars.push('STRIPE_PRICE_FOUNDING_MONTHLY');
-  }
-
+  // Pro tier is the primary paid product — must be configured
   if (!env.STRIPE_PRICE_PRO_MONTHLY) {
     missingVars.push('STRIPE_PRICE_PRO_MONTHLY');
   }

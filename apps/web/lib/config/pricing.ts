@@ -3,16 +3,6 @@ import 'server-only';
 import { env } from '@/lib/env-server';
 
 export const PRICING = {
-  founding: {
-    monthly: {
-      priceId: env.STRIPE_PRICE_FOUNDING_MONTHLY,
-      amount: 1200,
-      label: 'Founding Member',
-      entitlementPlan: 'pro',
-      billingTier: 'founding',
-      interval: 'month',
-    },
-  },
   pro: {
     monthly: {
       priceId: env.STRIPE_PRICE_PRO_MONTHLY,
@@ -51,4 +41,4 @@ export const PRICING = {
   },
 } as const;
 
-export type PlanTier = 'free' | 'founding' | 'pro' | 'max';
+export type PlanTier = 'free' | 'pro' | 'max';
