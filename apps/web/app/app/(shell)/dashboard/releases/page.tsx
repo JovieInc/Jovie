@@ -6,7 +6,7 @@ import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
-import { getDashboardDataEssential } from '../actions';
+import { getDashboardShellData } from '../actions';
 import {
   checkAppleMusicConnection,
   checkSpotifyConnection,
@@ -36,7 +36,7 @@ export default async function ReleasesPage() {
   return (
     <ReleasesClientBoundary>
       <Suspense fallback={<ReleaseTableSkeleton />}>
-        <ReleasesContent />
+        <ReleasesContent userId={userId} />
       </Suspense>
     </ReleasesClientBoundary>
   );
@@ -46,8 +46,8 @@ export default async function ReleasesPage() {
  * Async server component that fetches all release data in parallel.
  * Wrapped in Suspense above so the skeleton shows instantly.
  */
-async function ReleasesContent({}: Readonly<Record<never, never>>) {
-  const dashboardData = await getDashboardDataEssential();
+async function ReleasesContent({ userId }: Readonly<{ userId: string }>) {
+  const dashboardData = await getDashboardShellData(userId);
 
   if (dashboardData.dashboardLoadError) {
     void captureError(

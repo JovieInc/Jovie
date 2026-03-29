@@ -9,7 +9,7 @@ import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
 import {
   getDashboardData,
-  getDashboardDataEssential,
+  getDashboardShellData,
   setSidebarCollapsed,
 } from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
@@ -31,6 +31,7 @@ import {
  * Feature flags are now code-level (no Statsig), so no async bootstrap needed.
  */
 export async function DashboardShellContent({
+  userId,
   children,
 }: {
   readonly children: React.ReactNode;
@@ -41,7 +42,7 @@ export async function DashboardShellContent({
   const headerStore = await headers();
   const pathname = resolveAppShellRequestPath(headerStore.get('next-url'));
   const dashboardData = shouldUseEssentialShellData(pathname)
-    ? await getDashboardDataEssential()
+    ? await getDashboardShellData(userId)
     : await getDashboardData();
 
   if (
