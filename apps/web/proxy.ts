@@ -1106,9 +1106,13 @@ export default async function middleware(
   }
 
   const clerkPathInfo: ClerkBypassPathInfo = pathInfo;
+  const allowAuthRouteClerkBypass =
+    process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 
   if (
     shouldBypassClerkForRequest({
+      allowAuthRouteBypass: allowAuthRouteClerkBypass,
       pathname,
       pathInfo: clerkPathInfo,
       cookies: req.cookies.getAll(),

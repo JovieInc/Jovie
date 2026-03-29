@@ -69,4 +69,35 @@ describe('shouldBypassClerkForRequest', () => {
       })
     ).toBe(false);
   });
+
+  it('bypasses auth routes in mock lanes without an active Clerk session', () => {
+    expect(
+      shouldBypassClerkForRequest({
+        allowAuthRouteBypass: true,
+        cookies: [],
+        pathInfo: { ...PUBLIC_PATH_INFO, isAuthPath: true },
+        pathname: '/signin',
+      })
+    ).toBe(true);
+
+    expect(
+      shouldBypassClerkForRequest({
+        allowAuthRouteBypass: true,
+        cookies: [],
+        pathInfo: { ...PUBLIC_PATH_INFO, isAuthPath: true },
+        pathname: '/signup',
+      })
+    ).toBe(true);
+  });
+
+  it('keeps Clerk enabled for auth routes in mock lanes when a session exists', () => {
+    expect(
+      shouldBypassClerkForRequest({
+        allowAuthRouteBypass: true,
+        cookies: [{ name: '__session', value: 'sess_123' }],
+        pathInfo: { ...PUBLIC_PATH_INFO, isAuthPath: true },
+        pathname: '/signin',
+      })
+    ).toBe(false);
+  });
 });

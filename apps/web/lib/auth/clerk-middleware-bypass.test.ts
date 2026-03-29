@@ -64,11 +64,11 @@ describe('shouldBypassClerkForRequest', () => {
       expected: false,
     },
     {
-      name: 'does not bypass Clerk on api routes even without path flags',
+      name: 'bypasses public api routes without active Clerk cookies',
       pathname: '/api/user/profile',
       pathInfo: publicPathInfo,
       cookies: [],
-      expected: false,
+      expected: true,
     },
     {
       name: 'does not bypass Clerk on trpc routes even without path flags',
@@ -102,15 +102,33 @@ describe('shouldBypassClerkForRequest', () => {
       expected: false,
     },
     {
+      name: 'bypasses auth routes in mock lanes without an active Clerk session',
+      pathname: '/signin',
+      pathInfo: {
+        ...publicPathInfo,
+        isAuthPath: true,
+      },
+      cookies: [],
+      allowAuthRouteBypass: true,
+      expected: true,
+    },
+    {
       name: 'treats blank session cookies as anonymous',
       pathname: '/',
       pathInfo: publicPathInfo,
       cookies: [{ name: '__session', value: '   ' }],
       expected: true,
     },
-  ])('$name', ({ pathname, pathInfo, cookies, expected }) => {
+  ])('$name', ({
+    pathname,
+    pathInfo,
+    cookies,
+    expected,
+    allowAuthRouteBypass,
+  }) => {
     expect(
       shouldBypassClerkForRequest({
+        allowAuthRouteBypass,
         pathname,
         pathInfo,
         cookies,

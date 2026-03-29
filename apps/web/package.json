@@ -72,7 +72,7 @@
     "biome:ci": "biome ci .",
     "biome:check": "biome check .",
     "clean": "rm -rf .next out dist coverage .nyc_output",
-    "postbuild": "next-sitemap",
+    "postbuild": "next-sitemap && node scripts/sync-standalone-assets.mjs",
     "verify-artist-images": "node scripts/verify-artist-images.js",
     "update-artist-images": "node scripts/update-artist-images.js",
     "ensure-valid-artist-images": "node scripts/ensure-valid-artist-images.js",
