@@ -300,6 +300,13 @@ vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   revertReleaseArtwork: vi.fn(),
 }));
 
+// Capture the onArtworkUploaded callback so tests can trigger it after the
+// AddReleaseSidebar unmounts (matches real behavior where artwork upload
+// is a fire-and-forget async operation that completes after sidebar closes).
+let capturedOnArtworkUploaded:
+  | ((releaseId: string, artworkUrl: string) => void)
+  | null = null;
+
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/AddReleaseSidebar',
   () => ({
@@ -313,43 +320,34 @@ vi.mock(
         release: import('@/lib/discography/types').ReleaseViewModel
       ) => void;
       onArtworkUploaded?: (releaseId: string, artworkUrl: string) => void;
-    }) => (
-      <div>
-        {isOpen ? (
-          <button
-            type='button'
-            data-testid='mock-add-release-sidebar'
-            onClick={() =>
-              onCreated({
-                profileId: 'profile-1',
-                id: 'created-release',
-                title: 'Created Release',
-                slug: 'created-release',
-                smartLinkPath: '/artist/created-release',
-                providers: [],
-                releaseType: 'single',
-                isExplicit: false,
-                totalTracks: 1,
-              })
-            }
-          >
-            finish-create
-          </button>
-        ) : null}
-        <button
-          type='button'
-          data-testid='mock-add-release-artwork-uploaded'
-          onClick={() =>
-            onArtworkUploaded?.(
-              'created-release',
-              'https://cdn.example.com/cover.png'
-            )
-          }
-        >
-          finish-artwork-upload
-        </button>
-      </div>
-    ),
+    }) => {
+      capturedOnArtworkUploaded = onArtworkUploaded ?? null;
+      return (
+        <div>
+          {isOpen ? (
+            <button
+              type='button'
+              data-testid='mock-add-release-sidebar'
+              onClick={() =>
+                onCreated({
+                  profileId: 'profile-1',
+                  id: 'created-release',
+                  title: 'Created Release',
+                  slug: 'created-release',
+                  smartLinkPath: '/artist/created-release',
+                  providers: [],
+                  releaseType: 'single',
+                  isExplicit: false,
+                  totalTracks: 1,
+                })
+              }
+            >
+              finish-create
+            </button>
+          ) : null}
+        </div>
+      );
+    },
   })
 );
 
@@ -455,6 +453,7 @@ const primaryProviders = [
 describe('ReleaseProviderMatrix', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    capturedOnArtworkUploaded = null;
   });
 
   describe('conditional rendering', () => {
@@ -593,6 +592,28 @@ describe('ReleaseProviderMatrix', () => {
       );
     });
 
+    it('registers AddReleaseSidebar in the right panel when create button is clicked', async () => {
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease('existing-release')]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+      );
+
+      await waitFor(() => {
+        const rightPanelProbe = screen.getByTestId('right-panel-probe');
+        expect(rightPanelProbe).toContainElement(
+          screen.getByTestId('mock-add-release-sidebar')
+        );
+      });
+    });
+
     it('inserts a created release locally and opens the release drawer without router refresh', async () => {
       renderWithProviders(
         <ReleaseProviderMatrix
@@ -701,7 +722,15 @@ describe('ReleaseProviderMatrix', () => {
         );
       });
 
-      fireEvent.click(screen.getByTestId('mock-add-release-artwork-uploaded'));
+      // Simulate async artwork upload completing after sidebar switch
+      // (matches real behavior: fire-and-forget fetch that calls onArtworkUploaded)
+      expect(capturedOnArtworkUploaded).toBeTruthy();
+      await React.act(async () => {
+        capturedOnArtworkUploaded!(
+          'created-release',
+          'https://cdn.example.com/cover.png'
+        );
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('release-sidebar')).toHaveTextContent(
