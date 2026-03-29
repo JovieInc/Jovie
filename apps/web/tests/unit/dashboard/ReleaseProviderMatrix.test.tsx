@@ -725,10 +725,12 @@ describe('ReleaseProviderMatrix', () => {
       // Simulate async artwork upload completing after sidebar switch
       // (matches real behavior: fire-and-forget fetch that calls onArtworkUploaded)
       expect(capturedOnArtworkUploaded).toBeTruthy();
-      capturedOnArtworkUploaded!(
-        'created-release',
-        'https://cdn.example.com/cover.png'
-      );
+      await React.act(async () => {
+        capturedOnArtworkUploaded!(
+          'created-release',
+          'https://cdn.example.com/cover.png'
+        );
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('release-sidebar')).toHaveTextContent(

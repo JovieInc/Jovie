@@ -472,7 +472,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   const isReleaseSidebarOpen = Boolean(editingRelease);
   const isTrackSidebarOpen = Boolean(editingTrack);
-  const isSidebarOpen = isReleaseSidebarOpen || isTrackSidebarOpen;
+  const isSidebarOpen =
+    isReleaseSidebarOpen || isTrackSidebarOpen || addReleaseOpen;
 
   // Connect to tableMeta for drawer toggle button
   const { setTableMeta } = useTableMeta();
