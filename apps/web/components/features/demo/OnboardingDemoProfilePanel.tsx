@@ -7,18 +7,18 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Avatar } from '@/components/molecules/Avatar';
 import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
+import { DrawerTabbedCard } from '@/components/molecules/drawer/DrawerTabbedCard';
 import { DrawerTabs } from '@/components/molecules/drawer/DrawerTabs';
 import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
 import { SidebarLinkRow } from '@/components/molecules/drawer/SidebarLinkRow';
-
-/** Slightly narrower than the standard 360px drawer to keep onboarding airy. */
-const ONBOARDING_PANEL_WIDTH = 300;
-
 import {
   DEMO_DISCOVERY_SNAPSHOT,
   DEMO_SELECTED_ARTIST,
 } from './mock-onboarding-data';
 import type { StepId } from './OnboardingDemoSteps';
+
+/** Slightly narrower than the standard 360px drawer to keep onboarding airy. */
+const ONBOARDING_PANEL_WIDTH = 300;
 
 type ProfileTab = 'about' | 'platforms' | 'social' | 'releases';
 
@@ -95,13 +95,122 @@ export function OnboardingDemoProfilePanel({
     snapshot.releases.length,
   ]);
 
+  const tabContent = (() => {
+    switch (activeTab) {
+      case 'about':
+        return (
+          <div className='space-y-2'>
+            {profile.bio ? (
+              <p className='text-[12px] leading-[1.6] text-secondary-token'>
+                {profile.bio}
+              </p>
+            ) : null}
+            <div className='space-y-0.5'>
+              {profile.location ? (
+                <DrawerPropertyRow label='Location' value={profile.location} />
+              ) : null}
+              {profile.hometown ? (
+                <DrawerPropertyRow label='Hometown' value={profile.hometown} />
+              ) : null}
+              {profile.activeSinceYear ? (
+                <DrawerPropertyRow
+                  label='Active since'
+                  value={String(profile.activeSinceYear)}
+                />
+              ) : null}
+            </div>
+          </div>
+        );
+
+      case 'platforms':
+        if (!visible.dsps) return null;
+        return (
+          <div>
+            {confirmedDsps.map(item => (
+              <SidebarLinkRow
+                key={item.id}
+                icon={
+                  <SocialIcon
+                    platform={item.providerId}
+                    className='h-4 w-4'
+                    aria-hidden
+                  />
+                }
+                label={item.providerLabel}
+                url={item.externalArtistUrl || '#'}
+              />
+            ))}
+          </div>
+        );
+
+      case 'social':
+        if (!visible.social) return null;
+        return (
+          <div>
+            {activeLinks.map(link => (
+              <SidebarLinkRow
+                key={`${link.kind}:${link.id}`}
+                icon={
+                  <SocialIcon
+                    platform={link.platform}
+                    className='h-4 w-4'
+                    aria-hidden
+                  />
+                }
+                label={link.platformLabel}
+                url={link.url}
+                deepLinkPlatform={link.platform}
+              />
+            ))}
+          </div>
+        );
+
+      case 'releases':
+        if (!visible.releases) return null;
+        return (
+          <div>
+            {snapshot.releases.slice(0, 4).map(release => (
+              <SidebarLinkRow
+                key={release.id}
+                icon={
+                  release.artworkUrl ? (
+                    <Image
+                      src={release.artworkUrl}
+                      alt=''
+                      width={20}
+                      height={20}
+                      className='h-5 w-5 rounded-[3px] object-cover'
+                      unoptimized
+                    />
+                  ) : (
+                    <Disc3 className='h-4 w-4' />
+                  )
+                }
+                label={release.title}
+                url='#'
+                badge={
+                  release.releaseDate
+                    ? String(
+                        new Date(
+                          `${release.releaseDate}T00:00:00Z`
+                        ).getUTCFullYear()
+                      )
+                    : undefined
+                }
+              />
+            ))}
+          </div>
+        );
+    }
+  })();
+
   return (
     <aside
       className='hidden shrink-0 overflow-y-auto overscroll-contain xl:block'
       style={{ width: ONBOARDING_PANEL_WIDTH }}
     >
       <div className='space-y-3 px-3 py-8'>
-        {/* Identity card — always pinned */}
+        {/* Identity card */}
         <DrawerSurfaceCard variant='card' className='p-4'>
           <EntityHeaderCard
             image={
@@ -132,122 +241,21 @@ export function OnboardingDemoProfilePanel({
           />
         </DrawerSurfaceCard>
 
-        {/* Tabs — visible once artist is confirmed */}
+        {/* Tabbed content card — tabs inside the card */}
         {visible.hasArtist ? (
-          <>
-            <DrawerTabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              options={tabOptions}
-              ariaLabel='Profile sections'
-              overflowMode='scroll'
-            />
-
-            {/* Tab content */}
-            {activeTab === 'about' ? (
-              <div className='space-y-2'>
-                {profile.bio ? (
-                  <p className='text-[12px] leading-[1.6] text-secondary-token'>
-                    {profile.bio}
-                  </p>
-                ) : null}
-                <div className='space-y-0.5'>
-                  {profile.location ? (
-                    <DrawerPropertyRow
-                      label='Location'
-                      value={profile.location}
-                    />
-                  ) : null}
-                  {profile.hometown ? (
-                    <DrawerPropertyRow
-                      label='Hometown'
-                      value={profile.hometown}
-                    />
-                  ) : null}
-                  {profile.activeSinceYear ? (
-                    <DrawerPropertyRow
-                      label='Active since'
-                      value={String(profile.activeSinceYear)}
-                    />
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-
-            {activeTab === 'platforms' && visible.dsps ? (
-              <div>
-                {confirmedDsps.map(item => (
-                  <SidebarLinkRow
-                    key={item.id}
-                    icon={
-                      <SocialIcon
-                        platform={item.providerId}
-                        className='h-4 w-4'
-                        aria-hidden
-                      />
-                    }
-                    label={item.providerLabel}
-                    url={item.externalArtistUrl || '#'}
-                  />
-                ))}
-              </div>
-            ) : null}
-
-            {activeTab === 'social' && visible.social ? (
-              <div>
-                {activeLinks.map(link => (
-                  <SidebarLinkRow
-                    key={`${link.kind}:${link.id}`}
-                    icon={
-                      <SocialIcon
-                        platform={link.platform}
-                        className='h-4 w-4'
-                        aria-hidden
-                      />
-                    }
-                    label={link.platformLabel}
-                    url={link.url}
-                    deepLinkPlatform={link.platform}
-                  />
-                ))}
-              </div>
-            ) : null}
-
-            {activeTab === 'releases' && visible.releases ? (
-              <div>
-                {snapshot.releases.slice(0, 4).map(release => (
-                  <SidebarLinkRow
-                    key={release.id}
-                    icon={
-                      release.artworkUrl ? (
-                        <Image
-                          src={release.artworkUrl}
-                          alt=''
-                          width={20}
-                          height={20}
-                          className='h-5 w-5 rounded-[3px] object-cover'
-                          unoptimized
-                        />
-                      ) : (
-                        <Disc3 className='h-4 w-4' />
-                      )
-                    }
-                    label={release.title}
-                    url='#'
-                    badge={
-                      release.releaseDate
-                        ? String(
-                            new Date(
-                              `${release.releaseDate}T00:00:00Z`
-                            ).getUTCFullYear()
-                          )
-                        : undefined
-                    }
-                  />
-                ))}
-              </div>
-            ) : null}
-          </>
+          <DrawerTabbedCard
+            tabs={
+              <DrawerTabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                options={tabOptions}
+                ariaLabel='Profile sections'
+                overflowMode='scroll'
+              />
+            }
+          >
+            {tabContent}
+          </DrawerTabbedCard>
         ) : null}
       </div>
     </aside>
