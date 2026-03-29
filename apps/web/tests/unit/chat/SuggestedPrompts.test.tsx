@@ -11,12 +11,12 @@ describe('SuggestedPrompts', () => {
     );
 
     expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
-    expect(getByText('Preview my profile')).toBeTruthy();
-    expect(getByText('Change profile photo')).toBeTruthy();
-    expect(getByText('Set up a release link')).toBeTruthy();
+    expect(getByText('Preview profile')).toBeTruthy();
+    expect(getByText('Change photo')).toBeTruthy();
+    expect(getByText('Release link')).toBeTruthy();
 
     // First-session suggestions should not appear in default mode
-    expect(queryByText('How do I get paid?')).toBeNull();
+    expect(queryByText('Getting paid')).toBeNull();
   });
 
   it('renders first-session prompts including all suggestions', () => {
@@ -32,17 +32,17 @@ describe('SuggestedPrompts', () => {
     // First-session suggestions
     expect(
       getByRole('button', {
-        name: 'Set up a link for \u201CMidnight Drive\u201D',
+        name: 'Link \u201CMidnight Drive\u201D',
       })
     ).toBeTruthy();
-    expect(getByRole('button', { name: 'Preview my profile' })).toBeTruthy();
-    expect(getByRole('button', { name: 'How do I get paid?' })).toBeTruthy();
+    expect(getByRole('button', { name: 'Preview profile' })).toBeTruthy();
+    expect(getByRole('button', { name: 'Getting paid' })).toBeTruthy();
   });
 
   it('calls onSelect with prompt when clicked', () => {
     const onSelect = vi.fn();
     const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
-    getByText('Preview my profile').closest('button')?.click();
+    getByText('Preview profile').closest('button')?.click();
     expect(onSelect).toHaveBeenCalledWith('Preview my profile.');
   });
 
@@ -58,7 +58,7 @@ describe('SuggestedPrompts', () => {
 
     expect(
       getByRole('button', {
-        name: 'Generate pitches for “Midnight Drive”',
+        name: 'Pitches for “Midnight Drive”',
       })
     ).toBeTruthy();
     expect(getByRole('button', { name: 'Share feedback' })).toBeTruthy();

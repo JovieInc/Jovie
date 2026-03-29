@@ -175,19 +175,19 @@ export interface StarterSuggestionContext {
 export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
     icon: 'Eye',
-    label: 'Preview my profile',
+    label: 'Preview profile',
     prompt: 'Preview my profile.',
     accent: 'purple',
   },
   {
     icon: 'Camera',
-    label: 'Change profile photo',
+    label: 'Change photo',
     prompt: 'Help me change my profile photo.',
     accent: 'purple',
   },
   {
     icon: 'Link2',
-    label: 'Set up a release link',
+    label: 'Release link',
     prompt: 'Set up a link for my latest release.',
     accent: 'blue',
   },
@@ -199,7 +199,7 @@ export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
  */
 export const PITCH_SUGGESTION: ChatSuggestion = {
   icon: 'Music',
-  label: 'Generate pitches for my latest release',
+  label: 'Generate pitches',
   prompt: 'Generate playlist pitches for my latest release.',
   accent: 'blue',
 };
@@ -218,19 +218,19 @@ export const FEEDBACK_SUGGESTION: ChatSuggestion = {
 export const FIRST_SESSION_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
     icon: 'Link2',
-    label: 'Set up a link for my latest release',
+    label: 'Release link',
     prompt: 'Set up a link for my latest release.',
     accent: 'blue',
   },
   {
     icon: 'Eye',
-    label: 'Preview my profile',
+    label: 'Preview profile',
     prompt: 'Preview my profile.',
     accent: 'purple',
   },
   {
     icon: 'DollarSign',
-    label: 'How do I get paid?',
+    label: 'Getting paid',
     prompt: 'How do I get paid?',
     accent: 'green',
   },

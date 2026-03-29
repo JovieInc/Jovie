@@ -43,7 +43,7 @@ describe('buildGreeting', () => {
 
     expect(greeting).toEqual({
       label: 'Artist ready',
-      body: 'Welcome, Tim. Your profile is live at',
+      body: 'Your profile is live at',
       profileHref: 'https://jov.ie/timwhite',
       profileLabel: 'jov.ie/timwhite',
     });
@@ -70,9 +70,7 @@ describe('buildGreeting', () => {
     });
 
     expect(greeting.label).toBe('Welcome back');
-    expect(greeting.body).toBe(
-      'Welcome back, Tim. Your subscribers jumped 23% in LA this week.'
-    );
+    expect(greeting.body).toBe('Your subscribers jumped 23% in LA this week.');
     expect(greeting.profileHref).toBeNull();
   });
 
@@ -88,7 +86,7 @@ describe('buildGreeting', () => {
     });
 
     expect(greeting.body).toBe(
-      "Welcome back, Tim. You've received 2 tips since you last checked in."
+      "You've received 2 tips since your last check-in."
     );
   });
 
@@ -100,7 +98,7 @@ describe('buildGreeting', () => {
     });
 
     expect(greeting.body).toBe(
-      'Welcome back, there. Share your profile link to start building your audience.'
+      'Share your profile to start building your audience.'
     );
   });
 });
