@@ -2,13 +2,23 @@ import { BellRing, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import { Container } from '@/components/site/Container';
 
-const PROOF_POINTS = ['Imported automatically', 'Fans notified'] as const;
+const PROOF_POINTS = [
+  {
+    label: 'Imported automatically',
+    testId: 'landing-release-proof-imported',
+  },
+  {
+    label: 'Fans notified',
+    testId: 'landing-release-proof-fans-notified',
+  },
+] as const;
 
 export function LandingReleaseSection() {
   return (
     <section
       aria-labelledby='landing-release-heading'
       className='section-spacing-linear-sm relative overflow-hidden'
+      data-testid='landing-release-section'
     >
       <Container size='homepage'>
         <div className='homepage-section-shell mx-auto max-w-[1120px]'>
@@ -25,10 +35,11 @@ export function LandingReleaseSection() {
               <div className='mt-5 flex flex-wrap gap-2.5'>
                 {PROOF_POINTS.map(point => (
                   <span
-                    key={point}
+                    key={point.label}
+                    data-testid={point.testId}
                     className='inline-flex items-center rounded-full border border-subtle bg-surface-1 px-3 py-1.5 text-[12px] font-medium tracking-[-0.01em] text-secondary-token'
                   >
-                    {point}
+                    {point.label}
                   </span>
                 ))}
               </div>

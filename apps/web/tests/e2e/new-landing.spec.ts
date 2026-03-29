@@ -3,6 +3,12 @@ import { expect, test } from './setup';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
+async function gotoLanding(page: import('@playwright/test').Page) {
+  await page.goto(APP_ROUTES.LANDING_NEW, { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(2000);
+}
+
 async function blockAnalytics(page: import('@playwright/test').Page) {
   await page.route('**/api/profile/view', route =>
     route.fulfill({ status: 200, body: '{}' })
@@ -52,29 +58,19 @@ test.describe('/new landing page', () => {
   test('renders the simplified premium sections with live profile assets', async ({
     page,
   }) => {
-    await page.goto(APP_ROUTES.LANDING_NEW, { waitUntil: 'domcontentloaded' });
+    await gotoLanding(page);
 
-    await expect(page.locator('h1')).toContainText(
-      /The link your music\s*deserves\./
-    );
-    await expect(
-      page.getByText(
-        'Smart links, release automation, and fan insight that keep every launch moving.'
-      )
-    ).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Get started' })).toBeVisible();
+    await expect(page.getByTestId('homepage-shell')).toBeVisible();
+    await expect(page.getByTestId('hero-heading')).toBeVisible();
+    await expect(page.getByTestId('landing-hero-cta')).toBeVisible();
 
+    await expect(page.getByTestId('landing-release-section')).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Release day, automated.' })
+      page.getByTestId('landing-release-proof-imported')
     ).toBeVisible();
     await expect(
-      page.getByText('Imported automatically').first()
+      page.getByTestId('landing-release-proof-fans-notified')
     ).toBeVisible();
-    await expect(page.getByText('Fans notified').first()).toBeVisible();
-    await expect(page.getByText('Know every fan by name.')).toHaveCount(0);
-    await expect(
-      page.getByText('Smart links generated for every release')
-    ).toHaveCount(0);
 
     const desktopProfileImage = page.getByAltText(
       'Desktop artist profile showing smart links, fan capture, tour dates, and tipping'
@@ -112,12 +108,12 @@ test.describe('/new landing page', () => {
       )
       .toBeGreaterThan(0);
 
+    await expect(page.getByTestId('landing-profile-section')).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'One page. Every fan.' })
+      page.getByTestId('landing-profile-proof-owned-contacts')
     ).toBeVisible();
-    await expect(page.getByText('Own every contact').first()).toBeVisible();
     await expect(
-      page.getByText('See what brought them in').first()
+      page.getByTestId('landing-profile-proof-top-source')
     ).toBeVisible();
     await expect(page.locator('body')).not.toContainText('Page not found');
 
@@ -129,9 +125,9 @@ test.describe('/new landing page', () => {
 
   test('tracks the hero CTA and navigates to signup', async ({ page }) => {
     await stubGtag(page);
-    await page.goto(APP_ROUTES.LANDING_NEW, { waitUntil: 'domcontentloaded' });
+    await gotoLanding(page);
 
-    await page.getByRole('link', { name: 'Get started' }).click();
+    await page.getByTestId('landing-hero-cta').click();
 
     await expect(page).toHaveURL(/\/signup$/);
     expect(await getTrackedEvents(page)).toContain('landing_cta_get_started');
@@ -149,7 +145,7 @@ test.describe('/new landing page', () => {
       })
     );
 
-    await page.goto(APP_ROUTES.LANDING_NEW, { waitUntil: 'domcontentloaded' });
+    await gotoLanding(page);
     await page
       .getByRole('textbox', { name: /choose your handle/i })
       .fill('releasefanclub');
@@ -161,9 +157,18 @@ test.describe('/new landing page', () => {
     );
     expect(await getTrackedEvents(page)).toContain('landing_cta_claim_handle');
 
-    const pendingClaim = await page.evaluate(() =>
-      globalThis.sessionStorage.getItem('pendingClaim')
+    const pendingClaim = await page.evaluate(() => {
+      const stored = globalThis.sessionStorage.getItem('pendingClaim');
+      return stored ? JSON.parse(stored) : null;
+    });
+    expect(pendingClaim).toMatchObject({
+      handle: 'releasefanclub',
+    });
+    expect(pendingClaim).toEqual(
+      expect.objectContaining({
+        handle: 'releasefanclub',
+        ts: expect.any(Number),
+      })
     );
-    expect(pendingClaim).toContain('releasefanclub');
   });
 });

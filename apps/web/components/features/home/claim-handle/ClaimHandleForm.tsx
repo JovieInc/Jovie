@@ -14,7 +14,6 @@ import {
 } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { BASE_URL } from '@/constants/app';
-import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
@@ -168,6 +167,7 @@ export function ClaimHandleForm({
   onHandleChange,
   size = 'default',
   submitButtonTestId,
+  submitTracking,
 }: Readonly<ClaimHandleFormProps>) {
   const isHero = size === 'hero';
   const isDisplay = size === 'display';
@@ -216,11 +216,9 @@ export function ClaimHandleForm({
         );
       } catch {}
 
-      const currentPath =
-        globalThis.location?.pathname.replace(/\/+$/, '') ?? '';
-      if (currentPath === APP_ROUTES.LANDING_NEW) {
-        track('landing_cta_claim_handle', {
-          section: 'final_cta',
+      if (submitTracking) {
+        track(submitTracking.eventName, {
+          section: submitTracking.section,
           handle: normalizedHandle,
         });
       }
@@ -236,7 +234,7 @@ export function ClaimHandleForm({
 
       router.push(target);
     },
-    [handle, isSignedIn, router]
+    [handle, isSignedIn, router, submitTracking]
   );
 
   const showChecking = checkingAvail;

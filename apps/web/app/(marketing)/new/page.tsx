@@ -4,8 +4,8 @@ import { APP_ROUTES } from '@/constants/routes';
 import { LandingFinalCTA } from '@/features/landing/LandingFinalCTA';
 import { LandingHero } from '@/features/landing/LandingHero';
 import { LandingHowItWorks } from '@/features/landing/LandingHowItWorks';
-import { LandingReleaseSection } from '@/features/landing/LandingProductCard';
 import { LandingProfileSection } from '@/features/landing/LandingProfileSection';
+import { LandingReleaseSection } from '@/features/landing/LandingReleaseSection';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,

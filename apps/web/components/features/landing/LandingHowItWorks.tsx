@@ -40,15 +40,11 @@ export function LandingHowItWorks() {
             data-delay='80'
           >
             <div className='homepage-surface-card overflow-hidden rounded-[1rem]'>
-              <div className='grid gap-px bg-[rgba(255,255,255,0.05)] md:grid-cols-3'>
+              <div className='grid gap-px bg-surface-1/60 md:grid-cols-3'>
                 {STEPS.map(step => (
                   <div
                     key={step.number}
-                    className='px-5 py-5 sm:px-6 sm:py-6'
-                    style={{
-                      background:
-                        'color-mix(in oklab, var(--linear-bg-surface-0) 94%, var(--linear-bg-page))',
-                    }}
+                    className='bg-surface-0 px-5 py-5 sm:px-6 sm:py-6'
                   >
                     <p className='text-[11px] font-medium uppercase tracking-[0.18em] text-quaternary-token'>
                       {step.number}

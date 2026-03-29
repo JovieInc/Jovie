@@ -38,7 +38,10 @@ export function HeroCinematic({
                     Built for independent artists
                   </p>
 
-                  <h1 className='marketing-h1-linear hero-gradient-text mt-5 lg:text-left'>
+                  <h1
+                    className='marketing-h1-linear hero-gradient-text mt-5 lg:text-left'
+                    data-testid='hero-heading'
+                  >
                     The link your music deserves.
                   </h1>
 
@@ -93,7 +96,10 @@ export function HeroCinematic({
             Built for independent artists
           </p>
 
-          <h1 className='marketing-h1-linear mt-3 text-left text-primary-token sm:mt-4'>
+          <h1
+            className='marketing-h1-linear mt-3 text-left text-primary-token sm:mt-4'
+            data-testid='hero-heading'
+          >
             <span className='block'>The link your music</span>
             <span className='block'>deserves.</span>
           </h1>
@@ -121,7 +127,10 @@ export function HeroCinematic({
                 Built for independent artists
               </p>
 
-              <h1 className='marketing-h1-linear hero-gradient-text mt-3 max-w-[11ch] text-left sm:mt-4 lg:mt-5'>
+              <h1
+                className='marketing-h1-linear hero-gradient-text mt-3 max-w-[11ch] text-left sm:mt-4 lg:mt-5'
+                data-testid='hero-heading'
+              >
                 The link your music deserves.
               </h1>
 

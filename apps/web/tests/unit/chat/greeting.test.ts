@@ -34,7 +34,6 @@ const emptyTippingStats = {
 describe('buildGreeting', () => {
   it('builds the first-session greeting with a profile link', () => {
     const greeting = buildGreeting({
-      displayName: 'Tim',
       username: 'timwhite',
       isFirstSession: true,
       insights: [],
@@ -51,7 +50,6 @@ describe('buildGreeting', () => {
 
   it('falls back to jov.ie when the username is missing on first session', () => {
     const greeting = buildGreeting({
-      displayName: 'Tim',
       isFirstSession: true,
       insights: [],
       tippingStats: emptyTippingStats,
@@ -63,7 +61,6 @@ describe('buildGreeting', () => {
 
   it('uses the top insight for returning users', () => {
     const greeting = buildGreeting({
-      displayName: 'Tim',
       isFirstSession: false,
       insights: [createInsight()],
       tippingStats: emptyTippingStats,
@@ -76,7 +73,6 @@ describe('buildGreeting', () => {
 
   it('falls back to tip activity when no insights are available', () => {
     const greeting = buildGreeting({
-      displayName: 'Tim',
       isFirstSession: false,
       insights: [],
       tippingStats: {

@@ -11,6 +11,7 @@ export function LandingHero() {
           label='Get started'
           eventName='landing_cta_get_started'
           section='hero'
+          testId='landing-hero-cta'
         />
       }
     />

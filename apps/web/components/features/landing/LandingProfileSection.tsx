@@ -3,13 +3,23 @@ import Image from 'next/image';
 import { Container } from '@/components/site/Container';
 import { PhoneFrame } from '@/features/home/PhoneFrame';
 
-const PROOF_POINTS = ['Own every contact', 'See what brought them in'] as const;
+const PROOF_POINTS = [
+  {
+    label: 'Own every contact',
+    testId: 'landing-profile-proof-owned-contacts',
+  },
+  {
+    label: 'See what brought them in',
+    testId: 'landing-profile-proof-top-source',
+  },
+] as const;
 
 export function LandingProfileSection() {
   return (
     <section
       aria-labelledby='landing-profile-heading'
       className='section-spacing-linear-sm relative overflow-hidden'
+      data-testid='landing-profile-section'
     >
       <Container size='homepage'>
         <div className='homepage-section-shell mx-auto max-w-[1120px]'>
@@ -26,10 +36,11 @@ export function LandingProfileSection() {
               <div className='mt-5 flex flex-wrap gap-2.5'>
                 {PROOF_POINTS.map(point => (
                   <span
-                    key={point}
+                    key={point.label}
+                    data-testid={point.testId}
                     className='inline-flex items-center rounded-full border border-subtle bg-surface-1 px-3 py-1.5 text-[12px] font-medium tracking-[-0.01em] text-secondary-token'
                   >
-                    {point}
+                    {point.label}
                   </span>
                 ))}
               </div>

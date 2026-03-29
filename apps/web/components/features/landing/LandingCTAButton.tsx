@@ -5,9 +5,7 @@ import Link from 'next/link';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
-type LandingCTAEventName =
-  | 'landing_cta_get_started'
-  | 'landing_cta_see_profile';
+type LandingCTAEventName = 'landing_cta_get_started';
 
 interface LandingCTAButtonProps {
   readonly href: string;
@@ -16,6 +14,7 @@ interface LandingCTAButtonProps {
   readonly section: 'hero';
   readonly variant?: 'primary' | 'text';
   readonly className?: string;
+  readonly testId?: string;
 }
 
 export function LandingCTAButton({
@@ -25,12 +24,14 @@ export function LandingCTAButton({
   section,
   variant = 'primary',
   className,
+  testId,
 }: Readonly<LandingCTAButtonProps>) {
   const isPrimary = variant === 'primary';
 
   return (
     <Link
       href={href}
+      data-testid={testId}
       onClick={() => {
         track(eventName, { section });
       }}

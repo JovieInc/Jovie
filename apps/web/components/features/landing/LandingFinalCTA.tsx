@@ -38,7 +38,13 @@ export function LandingFinalCTA() {
           </p>
 
           <div className='mx-auto mt-6 w-full max-w-[27rem]'>
-            <ClaimHandleForm submitButtonTestId='landing-claim-submit' />
+            <ClaimHandleForm
+              submitButtonTestId='landing-claim-submit'
+              submitTracking={{
+                eventName: 'landing_cta_claim_handle',
+                section: 'final_cta',
+              }}
+            />
           </div>
 
           <p className='mt-4 text-[11px] tracking-[0.01em] text-quaternary-token'>
