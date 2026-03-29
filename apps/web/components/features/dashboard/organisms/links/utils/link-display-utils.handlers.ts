@@ -126,7 +126,7 @@ export const PLATFORM_DISPLAY_HANDLERS: PlatformDisplayHandler[] = [
       if (first === 'c' && second) return formatAsHandle(second);
       if (first === 'user' && second) return formatAsHandle(second);
       // /channel/UCID is opaque, fall back to host (platform name will be used)
-      return first.startsWith('@') ? first : host;
+      return host;
     },
   },
 
@@ -144,7 +144,16 @@ export const PLATFORM_DISPLAY_HANDLERS: PlatformDisplayHandler[] = [
     match: id => id === 'facebook',
     format: ({ host, first }) => {
       if (!first) return host;
-      if (['pages', 'groups', 'events', 'watch', 'marketplace'].includes(first))
+      if (
+        [
+          'pages',
+          'groups',
+          'events',
+          'watch',
+          'marketplace',
+          'profile.php',
+        ].includes(first)
+      )
         return host;
       return formatAsHandle(first);
     },

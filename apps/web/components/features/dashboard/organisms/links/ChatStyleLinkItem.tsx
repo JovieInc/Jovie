@@ -31,6 +31,7 @@ import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
 import { cn } from '@/lib/utils';
 import { getContrastTextOnBrand } from '@/lib/utils/color';
 import { type DetectedLink } from '@/lib/utils/platform-detection';
+import { buildPillLabel } from '../grouped-links/buildPillLabel';
 import { suggestionIdentity } from './utils';
 
 type LinkItemMenuItem = {
@@ -112,13 +113,9 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
 
   const handle = suggestionIdentity(link);
   const platformName = link.platform.name || link.platform.id;
-  // Resolve primary label: displayText → handle → platform name
-  const resolvedLabel = (() => {
-    const suggested = (link.suggestedTitle || '').trim();
-    if (suggested && suggested !== platformName) return suggested;
-    if (handle) return handle;
-    return platformName;
-  })();
+  // Use the same label resolver as SortableLinkItem for consistency
+  const resolvedLabel = buildPillLabel(link);
+  const secondaryText = resolvedLabel.startsWith('@') ? platformName : handle;
   const iconMeta = getPlatformIconMetadata(link.platform.icon);
   const brandColor = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
 
@@ -228,9 +225,9 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
             <div className='truncate text-[13px] font-[510] text-primary-token'>
               {resolvedLabel}
             </div>
-            {resolvedLabel !== platformName && (
+            {secondaryText && (
               <div className='truncate text-[13px] text-secondary-token'>
-                {platformName}
+                {secondaryText}
               </div>
             )}
           </div>
