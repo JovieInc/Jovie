@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useMemo } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Avatar } from '@/components/molecules/Avatar';
+import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
 import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
@@ -94,6 +95,31 @@ export function OnboardingDemoProfilePanel({
             }
           />
         </DrawerSurfaceCard>
+
+        {/* About — visible once artist is confirmed */}
+        {visible.hasArtist ? (
+          <DrawerSection title='About' surface='card' defaultOpen={false}>
+            {profile.bio ? (
+              <p className='px-1.5 text-[12px] leading-[1.6] text-secondary-token'>
+                {profile.bio}
+              </p>
+            ) : null}
+            <div className='mt-1.5 space-y-0.5'>
+              {profile.location ? (
+                <DrawerPropertyRow label='Location' value={profile.location} />
+              ) : null}
+              {profile.hometown ? (
+                <DrawerPropertyRow label='Hometown' value={profile.hometown} />
+              ) : null}
+              {profile.activeSinceYear ? (
+                <DrawerPropertyRow
+                  label='Active since'
+                  value={String(profile.activeSinceYear)}
+                />
+              ) : null}
+            </div>
+          </DrawerSection>
+        ) : null}
 
         {/* Collapsible sections */}
         {visible.dsps && confirmedDsps.length > 0 ? (
