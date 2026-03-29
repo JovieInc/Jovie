@@ -69,7 +69,9 @@ describe('GET /api/dashboard/analytics', () => {
     hoisted.getUserDashboardAnalyticsMock.mockResolvedValue(mockAnalytics);
 
     const { GET } = await import('@/app/api/dashboard/analytics/route');
-    const request = new Request('http://localhost/api/dashboard/analytics?range=30d&view=full');
+    const request = new Request(
+      'http://localhost/api/dashboard/analytics?range=30d&view=full'
+    );
     const response = await GET(request);
 
     expect(response.status).toBe(200);
@@ -79,8 +81,10 @@ describe('GET /api/dashboard/analytics', () => {
   });
 
   it('returns zeroed stats when profile not found', async () => {
-    hoisted.requireAuthMock.mockRejectedValue(
-      new Error('Creator profile not found')
+    hoisted.requireAuthMock.mockResolvedValue('user_123');
+    // Profile-not-found error comes from the data layer, not auth
+    hoisted.cacheQueryMock.mockRejectedValue(
+      new Error('Creator profile not found for user')
     );
 
     const { GET } = await import('@/app/api/dashboard/analytics/route');
@@ -91,6 +95,30 @@ describe('GET /api/dashboard/analytics', () => {
     const body = await response.json();
     expect(body.profile_views).toBe(0);
     expect(body.top_cities).toEqual([]);
+  });
+
+  it('clamps requested range to plan retention limit', async () => {
+    hoisted.requireAuthMock.mockResolvedValue('user_123');
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
+      analyticsRetentionDays: 7,
+    });
+    hoisted.getUserDashboardAnalyticsMock.mockResolvedValue({
+      profile_views: 0,
+      unique_users: 0,
+    });
+
+    const { GET } = await import('@/app/api/dashboard/analytics/route');
+    const request = new Request(
+      'http://localhost/api/dashboard/analytics?range=90d'
+    );
+    await GET(request);
+
+    // The cache key should contain the clamped range (7d), not 90d
+    expect(hoisted.cacheQueryMock).toHaveBeenCalledWith(
+      expect.stringContaining('7d'),
+      expect.any(Function),
+      expect.any(Object)
+    );
   });
 
   it('defaults range to 30d when not specified', async () => {

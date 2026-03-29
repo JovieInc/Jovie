@@ -55,7 +55,9 @@ describe('GET /api/dashboard/contacts', () => {
     hoisted.getCachedAuthMock.mockResolvedValue({ userId: null });
 
     const { GET } = await import('@/app/api/dashboard/contacts/route');
-    const request = new Request('http://localhost/api/dashboard/contacts?profileId=abc');
+    const request = new Request(
+      'http://localhost/api/dashboard/contacts?profileId=abc'
+    );
     const response = await GET(request);
 
     expect(response.status).toBe(401);
@@ -75,10 +77,6 @@ describe('GET /api/dashboard/contacts', () => {
 
   it('returns 404 when profile not found', async () => {
     hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'user_123' });
-    hoisted.withDbSessionTxMock.mockImplementation(
-      async (callback: Function) => callback(null, 'user_123')
-    );
-    // withDbSessionTx returns null when profile not found
     hoisted.withDbSessionTxMock.mockResolvedValue(null);
 
     const { GET } = await import('@/app/api/dashboard/contacts/route');
@@ -88,6 +86,25 @@ describe('GET /api/dashboard/contacts', () => {
     const response = await GET(request);
 
     expect(response.status).toBe(404);
+  });
+
+  it('returns contacts list for valid profile', async () => {
+    const mockContacts = [
+      { id: 'c1', creatorProfileId: 'p1', role: 'manager', personName: 'Jane' },
+    ];
+    hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'user_123' });
+    hoisted.withDbSessionTxMock.mockResolvedValue(mockContacts);
+
+    const { GET } = await import('@/app/api/dashboard/contacts/route');
+    const request = new Request(
+      'http://localhost/api/dashboard/contacts?profileId=profile_123'
+    );
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toHaveLength(1);
+    expect(body[0].personName).toBe('Jane');
   });
 
   it('returns 500 on unexpected error', async () => {

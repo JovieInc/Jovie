@@ -89,15 +89,21 @@ describe('GET /api/dashboard/shop', () => {
     });
 
     // Mock the DB query chain
-    hoisted.selectLimitMock.mockResolvedValue([{
-      id: 'profile_1',
-      username: 'artist',
-      usernameNormalized: 'artist',
-      settings: { shopifyUrl: 'https://mystore.myshopify.com' },
-    }]);
+    hoisted.selectLimitMock.mockResolvedValue([
+      {
+        id: 'profile_1',
+        username: 'artist',
+        usernameNormalized: 'artist',
+        settings: { shopifyUrl: 'https://mystore.myshopify.com' },
+      },
+    ]);
     hoisted.selectWhereMock.mockReturnValue({ limit: hoisted.selectLimitMock });
-    hoisted.selectInnerJoinMock.mockReturnValue({ where: hoisted.selectWhereMock });
-    hoisted.selectFromMock.mockReturnValue({ innerJoin: hoisted.selectInnerJoinMock });
+    hoisted.selectInnerJoinMock.mockReturnValue({
+      where: hoisted.selectWhereMock,
+    });
+    hoisted.selectFromMock.mockReturnValue({
+      innerJoin: hoisted.selectInnerJoinMock,
+    });
     hoisted.selectMock.mockReturnValue({ from: hoisted.selectFromMock });
 
     const { GET } = await import('@/app/api/dashboard/shop/route');
@@ -115,8 +121,12 @@ describe('GET /api/dashboard/shop', () => {
 
     hoisted.selectLimitMock.mockResolvedValue([]);
     hoisted.selectWhereMock.mockReturnValue({ limit: hoisted.selectLimitMock });
-    hoisted.selectInnerJoinMock.mockReturnValue({ where: hoisted.selectWhereMock });
-    hoisted.selectFromMock.mockReturnValue({ innerJoin: hoisted.selectInnerJoinMock });
+    hoisted.selectInnerJoinMock.mockReturnValue({
+      where: hoisted.selectWhereMock,
+    });
+    hoisted.selectFromMock.mockReturnValue({
+      innerJoin: hoisted.selectInnerJoinMock,
+    });
     hoisted.selectMock.mockReturnValue({ from: hoisted.selectFromMock });
 
     const { GET } = await import('@/app/api/dashboard/shop/route');
