@@ -13,6 +13,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Preview URL fetching from Spotify full track endpoint during import, carried through `mergeFullTrackMetadata`
 - Parallel database query for primary track preview URL on release page load
 
+### Changed
+
+- Chat empty state content is now vertically centered instead of bottom-anchored, creating a more balanced layout when no conversation is active
+
 ## [26.4.93] - 2026-03-28
 
 ### Fixed
