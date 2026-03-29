@@ -141,6 +141,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const openTrackDrawer = useCallback(
     (trackData: TrackSidebarData) => {
       closeEditor();
+      setAddReleaseOpen(false);
       setEditingTrack(current =>
         current?.id === trackData.id ? null : trackData
       );
@@ -408,8 +409,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       experienceAdapter.onCreateRelease();
       return;
     }
+    closeEditor();
+    closeTrackDrawer();
     setAddReleaseOpen(true);
-  }, [experienceAdapter]);
+  }, [experienceAdapter, closeEditor, closeTrackDrawer]);
 
   const handleAddReleaseCreated = useCallback(
     (createdRelease: ReleaseViewModel) => {
@@ -419,6 +422,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     },
     [handleReleaseCreated]
   );
+
+  // Wrap openEditor to clear add-release state (prevents zombie drawer resurrection)
+  const handleOpenEditor = useCallback(
+    (release: ReleaseViewModel) => {
+      setAddReleaseOpen(false);
+      openEditor(release);
+    },
+    [openEditor]
+  );
+
+  const closeAddRelease = useCallback(() => setAddReleaseOpen(false), []);
 
   // Artwork upload handler - calls the artwork upload API endpoint
   const handleArtworkUpload = useCallback(
@@ -470,7 +484,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   const isReleaseSidebarOpen = Boolean(editingRelease);
   const isTrackSidebarOpen = Boolean(editingTrack);
-  const isSidebarOpen = isReleaseSidebarOpen || isTrackSidebarOpen;
+  const isSidebarOpen =
+    isReleaseSidebarOpen || isTrackSidebarOpen || addReleaseOpen;
 
   // Connect to tableMeta for drawer toggle button
   const { setTableMeta } = useTableMeta();
@@ -592,7 +607,36 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         </Suspense>
       );
     }
-    if (!isReleaseSidebarOpen) return null;
+    if (!isReleaseSidebarOpen) {
+      // Add-release form drawer (lowest priority — track/release sidebars take precedence)
+      if (
+        addReleaseOpen &&
+        experienceMode === 'live' &&
+        canCreateManualReleases
+      ) {
+        return (
+          <Suspense
+            fallback={
+              <DrawerLoadingSkeleton
+                ariaLabel='Loading add release form'
+                width={RELEASE_DETAIL_PANEL_WIDTH}
+                showTabs={false}
+                contentRows={6}
+              />
+            }
+          >
+            <AddReleaseSidebar
+              isOpen={addReleaseOpen}
+              artistName={artistName}
+              onClose={closeAddRelease}
+              onCreated={handleAddReleaseCreated}
+              onArtworkUploaded={handleReleaseArtworkUploaded}
+            />
+          </Suspense>
+        );
+      }
+      return null;
+    }
 
     const selectedSidebarData =
       experienceAdapter?.sidebarDataByReleaseId?.[editingRelease?.id ?? ''];
@@ -649,6 +693,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   }, [
     isReleaseSidebarOpen,
     isTrackSidebarOpen,
+    addReleaseOpen,
     editingRelease,
     editingTrack,
     providerConfig,
@@ -656,6 +701,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     closeEditor,
     closeTrackDrawer,
     experienceAdapter,
+    experienceMode,
+    canCreateManualReleases,
+    closeAddRelease,
+    handleAddReleaseCreated,
+    handleReleaseArtworkUploaded,
     handleBackToReleaseFromTrack,
     handleTrackClickFromRelease,
     refreshingReleaseId,
@@ -669,7 +719,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     isSaving,
     allowArtworkDownloads,
     canEditSmartLinks,
-    experienceMode,
     handleCanvasStatusUpdate,
     releaseSidebarHandlers,
   ]);
@@ -767,7 +816,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 providerConfig={providerConfig}
                 artistName={artistName}
                 onCopy={copyHandler}
-                onEdit={openEditor}
+                onEdit={handleOpenEditor}
                 columnVisibility={columnVisibility}
                 rowHeight={rowHeight}
                 groupByYear={groupByYear}
@@ -871,29 +920,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           onImportStart={handleImportStart}
         />
       </Suspense>
-
-      {experienceMode === 'live' && canCreateManualReleases && (
-        <Suspense
-          fallback={
-            addReleaseOpen ? (
-              <DrawerLoadingSkeleton
-                ariaLabel='Loading add release form'
-                width={RELEASE_DETAIL_PANEL_WIDTH}
-                showTabs={false}
-                contentRows={6}
-              />
-            ) : null
-          }
-        >
-          <AddReleaseSidebar
-            isOpen={addReleaseOpen}
-            artistName={artistName}
-            onClose={() => setAddReleaseOpen(false)}
-            onCreated={handleAddReleaseCreated}
-            onArtworkUploaded={handleReleaseArtworkUploaded}
-          />
-        </Suspense>
-      )}
     </>
   );
 });

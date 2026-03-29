@@ -7,7 +7,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export interface VerifyCronRequestOptions {
   route: string;
-  cronSecret?: string | undefined;
+  cronSecret?: string;
   allowDevelopmentBypass?: boolean;
   requireTrustedOrigin?: boolean;
 }

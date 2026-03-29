@@ -93,23 +93,21 @@ export async function detectAndStoreSoundCloudProStatus(
         sourceType: 'ingested',
       });
     }
-  } else {
+  } else if (existing?.paidFlag) {
     // Negative detection: clear stale paidFlag if exists
-    if (existing?.paidFlag) {
-      await db
-        .update(socialAccounts)
-        .set({
-          paidFlag: false,
-          rawData: {
-            tier: null,
-            productId: result.productId,
-            detectedAt: now.toISOString(),
-            clearedReason: 'negative_detection',
-          },
-          updatedAt: now,
-        })
-        .where(eq(socialAccounts.id, existing.id));
-    }
+    await db
+      .update(socialAccounts)
+      .set({
+        paidFlag: false,
+        rawData: {
+          tier: null,
+          productId: result.productId,
+          detectedAt: now.toISOString(),
+          clearedReason: 'negative_detection',
+        },
+        updatedAt: now,
+      })
+      .where(eq(socialAccounts.id, existing.id));
   }
 
   // Immediately rescore the profile
