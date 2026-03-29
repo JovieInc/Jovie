@@ -77,6 +77,11 @@ function createMockTx() {
     limitMock,
     returningMock,
     executeMock,
+    orderByMock,
+    updateSetMock,
+    updateWhereMock,
+    insertValuesMock,
+    onConflictDoNothingMock,
   };
 }
 
@@ -211,6 +216,8 @@ describe('fetchExistingProfile', () => {
     const result = await fetchExistingProfile(tx as any, 'user_123');
 
     expect(result).toEqual(mockProfile);
+    // Ensure claimed profiles are prioritised — the core contract of this function.
+    expect(tx.orderByMock).toHaveBeenCalled();
   });
 
   it('returns null when no profile exists', async () => {
@@ -223,5 +230,119 @@ describe('fetchExistingProfile', () => {
     const result = await fetchExistingProfile(tx as any, 'user_123');
 
     expect(result).toBeNull();
+  });
+});
+
+describe('createProfileForExistingUser', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('creates profile and returns completion result', async () => {
+    const tx = createMockTx();
+    const mockProfile = { id: 'profile_new', userId: 'user_123' };
+    tx.returningMock.mockResolvedValue([mockProfile]);
+    tx.onConflictDoNothingMock.mockResolvedValue(undefined);
+
+    const { createProfileForExistingUser } = await import(
+      '@/app/onboarding/actions/profile-setup'
+    );
+    const result = await createProfileForExistingUser(
+      tx as any,
+      'user_123',
+      'myartist',
+      'My Artist'
+    );
+
+    expect(result.status).toBe('created');
+    expect(result.profileId).toBe('profile_new');
+    expect(tx.insert).toHaveBeenCalled();
+    expect(tx.update).toHaveBeenCalled();
+  });
+
+  it('reports errors to Sentry and rethrows', async () => {
+    const tx = createMockTx();
+    tx.returningMock.mockRejectedValue(new Error('Insert failed'));
+
+    const { createProfileForExistingUser } = await import(
+      '@/app/onboarding/actions/profile-setup'
+    );
+    await expect(
+      createProfileForExistingUser(tx as any, 'user_123', 'u', 'D')
+    ).rejects.toThrow('Insert failed');
+
+    expect(hoisted.captureErrorMock).toHaveBeenCalled();
+  });
+});
+
+describe('updateExistingProfile', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('updates profile and returns completion result', async () => {
+    const tx = createMockTx();
+    const existingProfile = {
+      id: 'profile_123',
+      userId: 'user_123',
+      displayName: 'Old Name',
+    };
+    const updatedProfile = { ...existingProfile, displayName: 'New Name' };
+    tx.returningMock.mockResolvedValue([updatedProfile]);
+
+    const { updateExistingProfile } = await import(
+      '@/app/onboarding/actions/profile-setup'
+    );
+    const result = await updateExistingProfile(
+      tx as any,
+      existingProfile as any,
+      'myartist',
+      'New Name',
+      'myartist'
+    );
+
+    expect(result.status).toBe('updated');
+    expect(result.profileId).toBe('profile_123');
+    expect(tx.update).toHaveBeenCalled();
+  });
+
+  it('reports errors to Sentry and rethrows', async () => {
+    const tx = createMockTx();
+    tx.returningMock.mockRejectedValue(new Error('Update failed'));
+
+    const { updateExistingProfile } = await import(
+      '@/app/onboarding/actions/profile-setup'
+    );
+    await expect(
+      updateExistingProfile(
+        tx as any,
+        { id: 'p1', userId: 'u1', displayName: 'D' } as any,
+        'u',
+        'D',
+        'u'
+      )
+    ).rejects.toThrow('Update failed');
+
+    expect(hoisted.captureErrorMock).toHaveBeenCalled();
+  });
+});
+
+describe('deactivateOrphanedProfiles', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('deactivates orphaned profiles', async () => {
+    const tx = createMockTx();
+    tx.updateSetMock.mockReturnValue({
+      where: tx.limitMock.mockResolvedValue(undefined),
+    });
+
+    const { deactivateOrphanedProfiles } = await import(
+      '@/app/onboarding/actions/profile-setup'
+    );
+    await deactivateOrphanedProfiles(tx as any, 'user_123', 'profile_active');
+
+    expect(tx.update).toHaveBeenCalled();
   });
 });
