@@ -9,19 +9,39 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Consistent display name resolution for social/music links: displayText → handle → platform name
-- Broken `@handle` extraction in dashboard link pills and chat-style link items (was using `canonicalIdentity` which never returned `@`-prefixed strings)
-- YouTube `/channel/UCID` URLs no longer produce fake `@UCID` handles, fall back to platform name instead
-- Raised display label character limit from 28 to 40 to prevent silent truncation of user-set labels
 - TikTok auto-generated titles like "TikTok (@handle)" now correctly extract the handle instead of displaying redundantly
 - SoundCloud reserved routes (`/discover`, `/stream`, `/charts`, etc.) no longer produce fake `@` handles
 - Twitch reserved routes (`/directory`, `/settings`, `/wallet`, etc.) no longer produce fake `@` handles
 
 ### Added
 
+- Tests for reserved route filtering across SoundCloud and Twitch platform handlers
+
+## [26.4.97] - 2026-03-28
+
+### Fixed
+
+- Consistent display name resolution for social/music links: displayText → handle → platform name
+- Broken `@handle` extraction in dashboard link pills and chat-style link items (was using `canonicalIdentity` which never returned `@`-prefixed strings)
+- YouTube `/channel/UCID` URLs no longer produce fake `@UCID` handles, fall back to platform name instead
+- Raised display label character limit from 28 to 40 to prevent silent truncation of user-set labels
+
+### Added
+
 - Platform display handlers for SoundCloud, Facebook, Twitch, and LinkedIn handle extraction
 - Smart secondary text: shows platform name when primary is a handle, shows handle when primary is a custom label
-- Tests covering display name fallback chain, YouTube channel ID handling, reserved route filtering, and new platform handlers
+- 12 new tests covering the display name fallback chain, YouTube channel ID handling, and new platform handlers
+- SoundCloud Pro badge detection via SC API v2 as independent fit score signal (+10 points)
+- New scoring criterion `soundcloudPro` in fit scoring system (stacks independently with social paid verification)
+- SoundCloud strategy module with config, detection, and storage (`ingestion/strategies/soundcloud/`)
+- Negative detection support: clears stale Pro flags when subscription lapses
+- Immediate fit score recalculation after Pro status detection
+- Non-blocking SC Pro detection hook in MusicFetch enrichment pipeline
+
+### Changed
+
+- Fit score version bumped from 4 to 5 (new SoundCloud Pro signal)
+- Fit score theoretical max increased from 125 to 135 (still capped at 100)
 
 ## [26.4.96] - 2026-03-28
 
