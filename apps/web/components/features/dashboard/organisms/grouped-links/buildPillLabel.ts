@@ -9,6 +9,7 @@ export function buildPillLabel(link: DetectedLink): string {
   ).trim();
   const suggested = (link.suggestedTitle || '').trim();
 
+  // Strip " on Platform" suffix from suggested titles (e.g., "@timwhite on YouTube")
   const cleanSuggested = (() => {
     if (!suggested) return '';
     const onIdx = suggested.toLowerCase().indexOf(' on ');
@@ -18,36 +19,26 @@ export function buildPillLabel(link: DetectedLink): string {
     return suggested;
   })();
 
-  const pickShortest = (candidates: string[]): string => {
-    const filtered = candidates
-      .map(s => s.trim())
-      .filter(Boolean)
-      .filter(s => s.length <= 28);
-    if (filtered.length === 0) return platform;
-    return filtered.reduce(
-      (best, next) => (next.length < best.length ? next : best),
-      filtered[0]
-    );
-  };
+  // Fallback chain: displayText → handle → platform name
+  // displayText is embedded in suggestedTitle by link-transformers.ts:57
 
-  // Prefer @handles when present.
+  // 1. If suggestedTitle carries a user-set displayText (differs from platform name), use it.
+  if (cleanSuggested && cleanSuggested !== platform) {
+    return cleanSuggested.length <= 40
+      ? cleanSuggested
+      : cleanSuggested.slice(0, 37) + '...';
+  }
+
+  // 2. If @handle extractable from URL, use it.
   if (identity.startsWith('@')) {
-    return pickShortest([identity]);
+    return identity;
   }
 
-  // Website-style labels should just be the host.
+  // 3. Website-style labels: show the host.
   if (link.platform.id === 'website' && identity) {
-    return pickShortest([identity, platform]);
+    return identity.length <= 40 ? identity : platform;
   }
 
-  // For DSPs, the URL identity is usually just the host; prefer platform name / suggested.
-  if (link.platform.category === 'dsp') {
-    return pickShortest([cleanSuggested, platform]);
-  }
-
-  if (!identity) {
-    return pickShortest([cleanSuggested, platform]);
-  }
-
-  return pickShortest([cleanSuggested, `${platform} • ${identity}`, platform]);
+  // 4. Fall back to platform name.
+  return platform;
 }
