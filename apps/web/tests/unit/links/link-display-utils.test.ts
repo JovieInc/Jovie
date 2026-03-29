@@ -102,13 +102,13 @@ describe('link-display-utils', () => {
         ).toBe('@MrBeast');
       });
 
-      it('should handle YouTube channel URLs', () => {
+      it('should fall back to hostname for opaque YouTube channel IDs', () => {
         expect(
           compactUrlDisplay(
             'youtube',
             'https://www.youtube.com/channel/UCX6OQ3DkcsbYNE6H8uQQuVA'
           )
-        ).toBe('@UCX6OQ3DkcsbYNE6H8uQQuVA');
+        ).toBe('youtube.com');
       });
 
       it('should handle YouTube user URLs', () => {
@@ -123,27 +123,27 @@ describe('link-display-utils', () => {
         ).toBe('@mrbeast6000');
       });
 
-      it('should return path segment for other YouTube URLs', () => {
+      it('should fall back to hostname for non-handle YouTube paths', () => {
         expect(
           compactUrlDisplay('youtube', 'https://www.youtube.com/watch')
-        ).toBe('watch');
+        ).toBe('youtube.com');
       });
 
-      it('should handle YouTube channel URLs without second segment', () => {
+      it('should fall back to hostname for YouTube channel without second segment', () => {
         expect(
           compactUrlDisplay('youtube', 'https://www.youtube.com/channel')
-        ).toBe('channel');
+        ).toBe('youtube.com');
       });
 
-      it('should handle YouTube user URLs without second segment', () => {
+      it('should fall back to hostname for YouTube user without second segment', () => {
         expect(
           compactUrlDisplay('youtube', 'https://www.youtube.com/user')
-        ).toBe('user');
+        ).toBe('youtube.com');
       });
 
-      it('should handle YouTube c URLs without second segment', () => {
+      it('should fall back to hostname for YouTube c without second segment', () => {
         expect(compactUrlDisplay('youtube', 'https://www.youtube.com/c')).toBe(
-          'c'
+          'youtube.com'
         );
       });
 
@@ -214,10 +214,57 @@ describe('link-display-utils', () => {
         ).toBe('music.youtube.com');
       });
 
-      it('should return hostname for soundcloud', () => {
+      it('should extract handle for soundcloud', () => {
         expect(
           compactUrlDisplay('soundcloud', 'https://soundcloud.com/artist')
-        ).toBe('soundcloud.com');
+        ).toBe('@artist');
+      });
+    });
+
+    describe('SoundCloud reserved routes', () => {
+      it('should return host for /discover, /stream, etc.', () => {
+        for (const route of [
+          'discover',
+          'stream',
+          'charts',
+          'search',
+          'upload',
+          'you',
+          'settings',
+        ]) {
+          expect(
+            compactUrlDisplay('soundcloud', `https://soundcloud.com/${route}`)
+          ).toBe('soundcloud.com');
+        }
+      });
+
+      it('should still extract handles for real usernames', () => {
+        expect(
+          compactUrlDisplay('soundcloud', 'https://soundcloud.com/djsnake')
+        ).toBe('@djsnake');
+      });
+    });
+
+    describe('Twitch reserved routes', () => {
+      it('should return host for /directory, /settings, etc.', () => {
+        for (const route of [
+          'directory',
+          'settings',
+          'wallet',
+          'drops',
+          'subscriptions',
+          'search',
+        ]) {
+          expect(
+            compactUrlDisplay('twitch', `https://twitch.tv/${route}`)
+          ).toBe('twitch.tv');
+        }
+      });
+
+      it('should still extract handles for real usernames', () => {
+        expect(compactUrlDisplay('twitch', 'https://twitch.tv/ninja')).toBe(
+          '@ninja'
+        );
       });
     });
 

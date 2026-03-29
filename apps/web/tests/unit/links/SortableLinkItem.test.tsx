@@ -348,8 +348,9 @@ describe('SortableLinkItem', () => {
 
       renderWithProviders(<SortableLinkItem {...defaultProps} link={link} />);
 
-      // The secondary text should show the identity
-      expect(screen.getByText('@coolartist')).toBeInTheDocument();
+      // The identity should appear in visible UI (not just sr-only)
+      const matches = screen.getAllByText('@coolartist');
+      expect(matches.some(node => !node.closest('.sr-only'))).toBe(true);
     });
 
     it('should not show secondary text for non-@ identities', () => {

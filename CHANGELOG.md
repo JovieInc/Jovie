@@ -7,8 +7,18 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.97] - 2026-03-28
 
+### Fixed
+
+- Consistent display name resolution for social/music links: displayText → handle → platform name
+- Broken `@handle` extraction in dashboard link pills and chat-style link items (was using `canonicalIdentity` which never returned `@`-prefixed strings)
+- YouTube `/channel/UCID` URLs no longer produce fake `@UCID` handles, fall back to platform name instead
+- Raised display label character limit from 28 to 40 to prevent silent truncation of user-set labels
+
 ### Added
 
+- Platform display handlers for SoundCloud, Facebook, Twitch, and LinkedIn handle extraction
+- Smart secondary text: shows platform name when primary is a handle, shows handle when primary is a custom label
+- 12 new tests covering the display name fallback chain, YouTube channel ID handling, and new platform handlers
 - SoundCloud Pro badge detection via SC API v2 as independent fit score signal (+10 points)
 - New scoring criterion `soundcloudPro` in fit scoring system (stacks independently with social paid verification)
 - SoundCloud strategy module with config, detection, and storage (`ingestion/strategies/soundcloud/`)
