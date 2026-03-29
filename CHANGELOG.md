@@ -9,6 +9,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- Visual regression spec (`visual-regression.spec.ts`) covering homepage, auth pages, and pricing in light/dark mode
+- ClientProviders composition test catching the TooltipProvider regression class (a518d3fb5)
+- Proxy composition critical test for CSP nonce, test bypass, and matcher exclusions
+- Migration journal ordering guard (critical test) preventing schema drift
+- Coverage ratchet thresholds in `vitest.config.ci.mts` (placeholder zeros, calibrate on main)
 - `/demo/onboarding` mock route for rapid onboarding UI iteration without auth gating
 - Progressive profile panel on right side during onboarding demo (fills as steps advance)
 - Step picker toolbar and step dots for instant navigation between all 9 onboarding steps
