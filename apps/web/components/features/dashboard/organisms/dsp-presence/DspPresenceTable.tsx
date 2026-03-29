@@ -3,7 +3,7 @@
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ExternalLink } from 'lucide-react';
 import Image from 'next/image';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import type { DspPresenceItem } from '@/app/app/(shell)/dashboard/presence/actions';
 import { UnifiedTable } from '@/components/organisms/table';
 import {
@@ -24,10 +24,116 @@ interface DspPresenceTableProps {
 }
 
 // ============================================================================
+// Cell renderers (extracted to module scope to avoid re-creation on render)
+// ============================================================================
+
+function PlatformCell({
+  providerId,
+}: {
+  providerId: DspPresenceItem['providerId'];
+}) {
+  const label = PROVIDER_LABELS[providerId];
+  return (
+    <div className='flex items-center gap-2'>
+      <DspProviderIcon provider={providerId} size='sm' />
+      <span className='text-[13px] text-secondary-token'>{label}</span>
+    </div>
+  );
+}
+
+function ArtistCell({ item }: { item: DspPresenceItem }) {
+  const label = PROVIDER_LABELS[item.providerId];
+  return (
+    <div className='flex items-center gap-2 min-w-0'>
+      {item.externalArtistImageUrl ? (
+        <div className='relative h-6 w-6 shrink-0 overflow-hidden rounded-full border border-subtle bg-surface-1'>
+          <Image
+            src={item.externalArtistImageUrl}
+            alt={item.externalArtistName ?? label}
+            fill
+            sizes='24px'
+            className='object-cover'
+            unoptimized={isExternalDspImage(item.externalArtistImageUrl)}
+          />
+        </div>
+      ) : (
+        <div className='flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-surface-1'>
+          <DspProviderIcon provider={item.providerId} size='sm' />
+        </div>
+      )}
+      <span className='truncate font-[510] text-[13px] text-primary-token'>
+        {item.externalArtistName ?? 'Unknown Artist'}
+      </span>
+    </div>
+  );
+}
+
+function StatusCell({ item }: { item: DspPresenceItem }) {
+  const isManual = item.matchSource === 'manual';
+  return isManual ? (
+    <span className='text-[11px] text-tertiary-token'>Manual</span>
+  ) : (
+    <MatchStatusBadge status={item.status} size='sm' />
+  );
+}
+
+function LinkCell({ item }: { item: DspPresenceItem }) {
+  const label = PROVIDER_LABELS[item.providerId];
+  if (!item.externalArtistUrl) return null;
+  return (
+    <a
+      href={item.externalArtistUrl}
+      target='_blank'
+      rel='noopener noreferrer'
+      className='flex h-6 w-6 items-center justify-center rounded text-tertiary-token transition-colors hover:text-primary-token'
+      aria-label={`View on ${label}`}
+      onClick={e => e.stopPropagation()}
+    >
+      <ExternalLink className='h-3.5 w-3.5' />
+    </a>
+  );
+}
+
+// ============================================================================
 // Column definitions
 // ============================================================================
 
 const columnHelper = createColumnHelper<DspPresenceItem>();
+
+const columns: ColumnDef<DspPresenceItem, unknown>[] = [
+  columnHelper.accessor('providerId', {
+    id: 'platform',
+    header: 'Platform',
+    cell: info => <PlatformCell providerId={info.getValue()} />,
+    size: 160,
+    enableSorting: false,
+    meta: { className: 'pl-4 pr-2' },
+  }),
+  columnHelper.accessor('externalArtistName', {
+    id: 'artist',
+    header: 'Artist Name',
+    cell: info => <ArtistCell item={info.row.original} />,
+    size: 9999,
+    enableSorting: false,
+    meta: { className: 'px-2' },
+  }),
+  columnHelper.accessor('status', {
+    id: 'status',
+    header: 'Status',
+    cell: info => <StatusCell item={info.row.original} />,
+    size: 120,
+    enableSorting: false,
+    meta: { className: 'px-2' },
+  }),
+  columnHelper.display({
+    id: 'externalLink',
+    header: '',
+    cell: info => <LinkCell item={info.row.original} />,
+    size: 44,
+    enableSorting: false,
+    meta: { className: 'pr-4 pl-2' },
+  }),
+] as ColumnDef<DspPresenceItem, unknown>[];
 
 // ============================================================================
 // Component
@@ -38,105 +144,6 @@ export function DspPresenceTable({
   selectedMatchId,
   onRowSelect,
 }: DspPresenceTableProps) {
-  const columns = useMemo(() => {
-    const platformColumn = columnHelper.accessor('providerId', {
-      id: 'platform',
-      header: 'Platform',
-      cell: info => {
-        const providerId = info.getValue();
-        const label = PROVIDER_LABELS[providerId];
-        return (
-          <div className='flex items-center gap-2'>
-            <DspProviderIcon provider={providerId} size='sm' />
-            <span className='text-[13px] text-secondary-token'>{label}</span>
-          </div>
-        );
-      },
-      size: 160,
-      enableSorting: false,
-      meta: { className: 'pl-4 pr-2' },
-    });
-
-    const artistColumn = columnHelper.accessor('externalArtistName', {
-      id: 'artist',
-      header: 'Artist Name',
-      cell: info => {
-        const item = info.row.original;
-        const label = PROVIDER_LABELS[item.providerId];
-        return (
-          <div className='flex items-center gap-2 min-w-0'>
-            {item.externalArtistImageUrl ? (
-              <div className='relative h-6 w-6 shrink-0 overflow-hidden rounded-full border border-subtle bg-surface-1'>
-                <Image
-                  src={item.externalArtistImageUrl}
-                  alt={item.externalArtistName ?? label}
-                  fill
-                  sizes='24px'
-                  className='object-cover'
-                  unoptimized={isExternalDspImage(item.externalArtistImageUrl)}
-                />
-              </div>
-            ) : (
-              <div className='flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-surface-1'>
-                <DspProviderIcon provider={item.providerId} size='sm' />
-              </div>
-            )}
-            <span className='truncate font-[510] text-[13px] text-primary-token'>
-              {item.externalArtistName ?? 'Unknown Artist'}
-            </span>
-          </div>
-        );
-      },
-      size: 9999,
-      enableSorting: false,
-      meta: { className: 'px-2' },
-    });
-
-    const statusColumn = columnHelper.accessor('status', {
-      id: 'status',
-      header: 'Status',
-      cell: info => {
-        const item = info.row.original;
-        const isManual = item.matchSource === 'manual';
-        return isManual ? (
-          <span className='text-[11px] text-tertiary-token'>Manual</span>
-        ) : (
-          <MatchStatusBadge status={item.status} size='sm' />
-        );
-      },
-      size: 120,
-      enableSorting: false,
-      meta: { className: 'px-2' },
-    });
-
-    const linkColumn = columnHelper.display({
-      id: 'externalLink',
-      header: '',
-      cell: info => {
-        const item = info.row.original;
-        const label = PROVIDER_LABELS[item.providerId];
-        if (!item.externalArtistUrl) return null;
-        return (
-          <a
-            href={item.externalArtistUrl}
-            target='_blank'
-            rel='noopener noreferrer'
-            className='flex h-6 w-6 items-center justify-center rounded text-tertiary-token transition-colors hover:text-primary-token'
-            aria-label={`View on ${label}`}
-            onClick={e => e.stopPropagation()}
-          >
-            <ExternalLink className='h-3.5 w-3.5' />
-          </a>
-        );
-      },
-      size: 44,
-      enableSorting: false,
-      meta: { className: 'pr-4 pl-2' },
-    });
-
-    return [platformColumn, artistColumn, statusColumn, linkColumn];
-  }, []);
-
   const getRowId = useCallback((row: DspPresenceItem) => row.matchId, []);
 
   const getRowClassName = useCallback(

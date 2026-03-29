@@ -194,7 +194,7 @@ export function InsightsPanel() {
       toolbar={toolbar}
       data-testid='dashboard-insights-workspace'
     >
-      <div className='flex-1 overflow-y-auto overflow-x-hidden'>
+      <div className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden'>
         <div className='flex flex-col gap-5 px-3 py-3 sm:px-4 sm:py-4'>
           {/* Category filter pills */}
           <AppSegmentControl
