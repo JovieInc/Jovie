@@ -102,13 +102,13 @@ describe('link-display-utils', () => {
         ).toBe('@MrBeast');
       });
 
-      it('should handle YouTube channel URLs', () => {
+      it('should fall back to hostname for opaque YouTube channel IDs', () => {
         expect(
           compactUrlDisplay(
             'youtube',
             'https://www.youtube.com/channel/UCX6OQ3DkcsbYNE6H8uQQuVA'
           )
-        ).toBe('@UCX6OQ3DkcsbYNE6H8uQQuVA');
+        ).toBe('youtube.com');
       });
 
       it('should handle YouTube user URLs', () => {
@@ -123,27 +123,27 @@ describe('link-display-utils', () => {
         ).toBe('@mrbeast6000');
       });
 
-      it('should return path segment for other YouTube URLs', () => {
+      it('should fall back to hostname for non-handle YouTube paths', () => {
         expect(
           compactUrlDisplay('youtube', 'https://www.youtube.com/watch')
-        ).toBe('watch');
+        ).toBe('youtube.com');
       });
 
-      it('should handle YouTube channel URLs without second segment', () => {
+      it('should fall back to hostname for YouTube channel without second segment', () => {
         expect(
           compactUrlDisplay('youtube', 'https://www.youtube.com/channel')
-        ).toBe('channel');
+        ).toBe('youtube.com');
       });
 
-      it('should handle YouTube user URLs without second segment', () => {
+      it('should fall back to hostname for YouTube user without second segment', () => {
         expect(
           compactUrlDisplay('youtube', 'https://www.youtube.com/user')
-        ).toBe('user');
+        ).toBe('youtube.com');
       });
 
-      it('should handle YouTube c URLs without second segment', () => {
+      it('should fall back to hostname for YouTube c without second segment', () => {
         expect(compactUrlDisplay('youtube', 'https://www.youtube.com/c')).toBe(
-          'c'
+          'youtube.com'
         );
       });
 
@@ -214,10 +214,10 @@ describe('link-display-utils', () => {
         ).toBe('music.youtube.com');
       });
 
-      it('should return hostname for soundcloud', () => {
+      it('should extract handle for soundcloud', () => {
         expect(
           compactUrlDisplay('soundcloud', 'https://soundcloud.com/artist')
-        ).toBe('soundcloud.com');
+        ).toBe('@artist');
       });
     });
 
