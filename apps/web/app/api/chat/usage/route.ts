@@ -30,7 +30,7 @@ function resolvePlan(plan: string | null | undefined): 'free' | 'pro' | 'max' {
   if (plan === 'max' || plan === 'growth') {
     return 'max';
   }
-  if (plan === 'pro') {
+  if (plan === 'pro' || plan === 'founding') {
     return 'pro';
   }
   return 'free';
