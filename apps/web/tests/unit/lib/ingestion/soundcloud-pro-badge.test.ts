@@ -3,7 +3,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { detectSoundCloudProFromApiData } from '@/lib/ingestion/strategies/soundcloud/pro-badge';
+import {
+  detectSoundCloudProFromApiData,
+  normalizeSoundCloudSlug,
+} from '@/lib/ingestion/strategies/soundcloud/pro-badge';
 
 describe('detectSoundCloudProFromApiData', () => {
   describe('positive detection', () => {
@@ -123,5 +126,28 @@ describe('detectSoundCloudProFromApiData', () => {
       });
       expect(result.isPro).toBeNull();
     });
+  });
+});
+
+describe('normalizeSoundCloudSlug', () => {
+  it('strips SoundCloud URL prefixes', () => {
+    expect(normalizeSoundCloudSlug('https://soundcloud.com/deadmau5')).toBe(
+      'deadmau5'
+    );
+    expect(normalizeSoundCloudSlug('http://www.soundcloud.com/skrillex')).toBe(
+      'skrillex'
+    );
+  });
+
+  it('strips query params and hash fragments', () => {
+    expect(normalizeSoundCloudSlug('deadmau5?si=abc123')).toBe('deadmau5');
+    expect(normalizeSoundCloudSlug('deadmau5#tracks')).toBe('deadmau5');
+    expect(normalizeSoundCloudSlug('deadmau5?si=abc123#tracks')).toBe(
+      'deadmau5'
+    );
+  });
+
+  it('strips trailing slashes and whitespace', () => {
+    expect(normalizeSoundCloudSlug('  deadmau5///  ')).toBe('deadmau5');
   });
 });
