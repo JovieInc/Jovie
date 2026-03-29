@@ -1,6 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import { eq, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { setupDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { userSettings, users } from '@/lib/db/schema/auth';
@@ -22,7 +22,7 @@ export const runtime = 'nodejs';
  * Exports all user data as a downloadable JSON file.
  */
 export async function GET() {
-  const { userId: clerkUserId } = await auth();
+  const { userId: clerkUserId } = await getCachedAuth();
   if (!clerkUserId) {
     return NextResponse.json(
       { error: 'Unauthorized' },

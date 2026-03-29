@@ -5,8 +5,8 @@
  * POST - Generate a referral code with an optional custom code
  */
 
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import {
   getInternalUserId,
@@ -18,7 +18,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET() {
   try {
-    const { userId: clerkUserId } = await auth();
+    const { userId: clerkUserId } = await getCachedAuth();
     if (!clerkUserId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -57,7 +57,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId: clerkUserId } = await auth();
+    const { userId: clerkUserId } = await getCachedAuth();
     if (!clerkUserId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

@@ -4,11 +4,12 @@
 
 'use server';
 
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { currentUser } from '@clerk/nextjs/server';
 import { revalidatePath } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -55,7 +56,7 @@ export async function completeOnboarding({
 }): Promise<CompletionResult> {
   try {
     // Step 1: Authentication check
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       const error = createOnboardingError(
         OnboardingErrorCode.NOT_AUTHENTICATED,

@@ -1,6 +1,7 @@
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import { clerkClient } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { setupDbSession } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
@@ -33,7 +34,7 @@ interface DeleteAccountBody {
  * Requires confirmation text "DELETE" in the request body.
  */
 export async function POST(request: Request) {
-  const { userId: clerkUserId } = await auth();
+  const { userId: clerkUserId } = await getCachedAuth();
   if (!clerkUserId) {
     return NextResponse.json(
       { error: 'Unauthorized' },

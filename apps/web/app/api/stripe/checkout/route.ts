@@ -3,9 +3,9 @@
  * Creates checkout sessions for subscription purchases
  */
 
-import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
@@ -131,7 +131,7 @@ async function handleCheckoutError(error: unknown): Promise<NextResponse> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) return jsonError('Unauthorized', 401);
 
     const body = await request.json();

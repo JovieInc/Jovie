@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { gateway } from '@ai-sdk/gateway';
-import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { convertToModelMessages, streamText, tool, type UIMessage } from 'ai';
 import { and, count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
@@ -8,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
@@ -1376,7 +1376,7 @@ export async function POST(req: Request) {
   );
 
   // Auth check - ensure user is authenticated
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized', requestId },

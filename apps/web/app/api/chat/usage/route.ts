@@ -1,5 +1,5 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { aiChatDailyPlanAwareLimiter } from '@/lib/rate-limit/limiters';
@@ -74,7 +74,7 @@ const CACHE_HEADERS = {
 export async function GET() {
   let userId: string | null;
   try {
-    ({ userId } = await auth());
+    ({ userId } = await getCachedAuth());
   } catch (error) {
     // Clerk throws when middleware didn't run (e.g., matcher misconfiguration).
     // Return 401 for that case, but let unexpected errors propagate to Sentry.

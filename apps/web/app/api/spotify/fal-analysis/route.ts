@@ -1,6 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { cacheQuery } from '@/lib/db/cache';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, captureWarning } from '@/lib/error-tracking';
@@ -27,7 +27,7 @@ export const runtime = 'nodejs';
  */
 export async function GET(request: NextRequest) {
   // Auth check
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
