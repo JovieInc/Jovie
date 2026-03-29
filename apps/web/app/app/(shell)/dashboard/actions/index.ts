@@ -31,6 +31,7 @@ export {
   getDashboardDataCached,
   getDashboardDataEssential,
   getDashboardDataFresh,
+  getDashboardShellData,
   prefetchDashboardData,
 } from './dashboard-data';
 // User dashboard settings server actions
