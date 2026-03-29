@@ -634,17 +634,21 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // /waitlist during RSC navigation causes layout hierarchy mismatches that
     // manifest as "page not found" errors on the client.
     if (userState) {
-      // Redirect banned/deleted users immediately — before any other routing
+      // Rewrite banned/deleted users to generic unavailable page.
+      // Uses rewrite (not redirect) so the URL bar stays on whatever page
+      // they were visiting — no dedicated path to discover.
+      // Note: /app/* routes are handled by the shell layout ban check,
+      // not here (proxy skips getUserState for /app/* paths).
       if (
         userState.isBanned &&
-        pathname !== '/banned' &&
         isNavigationMethod &&
-        !isRSCPrefetch
+        !isRSCPrefetch &&
+        pathname !== APP_ROUTES.UNAVAILABLE
       ) {
-        return NextResponse.redirect(new URL('/banned', req.url));
-      }
-
-      if (
+        res = NextResponse.rewrite(new URL(APP_ROUTES.UNAVAILABLE, req.url), {
+          request: { headers: requestHeaders },
+        });
+      } else if (
         userState.needsWaitlist &&
         pathname !== '/waitlist' &&
         !pathname.startsWith('/api/') &&
@@ -1123,8 +1127,8 @@ export default async function middleware(
 
 export const config = {
   matcher: [
-    // Skip Next.js internals, all static files, and .well-known directory
-    '/((?!_next|\.well-known|.*\.(?:html?|css|js|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // Skip Next.js internals, static files, .well-known, and Sentry tunnel (/monitoring)
+    '/((?!_next|monitoring(?:/|$)|\.well-known|.*\.(?:html?|css|js|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Always run for API routes
     '/(api|trpc)(.*)',
     // Always run for Clerk proxy paths (including .js bundles from /npm/)

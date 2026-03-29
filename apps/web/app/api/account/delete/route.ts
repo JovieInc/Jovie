@@ -2,6 +2,7 @@ import { auth, clerkClient } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { setupDbSession } from '@/lib/auth/session';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { feedbackItems } from '@/lib/db/schema/feedback';
@@ -132,6 +133,7 @@ export async function POST(request: Request) {
     for (const profile of profiles) {
       if (profile.usernameNormalized) {
         await invalidateHandleCache(profile.usernameNormalized);
+        await invalidateProfileCache(profile.usernameNormalized);
       }
     }
 

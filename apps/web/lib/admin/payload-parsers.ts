@@ -296,3 +296,93 @@ export type BulkRefreshPayload = {
 };
 
 export const parseBulkRefreshPayload = createBulkParser();
+
+// ============================================================================
+// BAN / UNBAN PAYLOADS
+// ============================================================================
+
+export type BanPayload = {
+  userId: string;
+  reason: string;
+};
+
+export async function parseBanPayload(
+  request: NextRequest
+): Promise<BanPayload> {
+  return parseRequestBody(
+    request,
+    json => {
+      const payload = json as { userId?: string; reason?: string };
+
+      if (!payload.userId || typeof payload.userId !== 'string') {
+        throw new TypeError('userId is required');
+      }
+      if (
+        !payload.reason ||
+        typeof payload.reason !== 'string' ||
+        payload.reason.trim().length === 0
+      ) {
+        throw new TypeError('reason is required');
+      }
+
+      assertValidUuid(payload.userId, 'userId');
+
+      return {
+        userId: payload.userId,
+        reason: payload.reason.trim(),
+      };
+    },
+    formData => {
+      const userId = formData.get('userId');
+      const reason = formData.get('reason');
+
+      if (typeof userId !== 'string' || userId.trim().length === 0) {
+        throw new TypeError('userId is required');
+      }
+      if (typeof reason !== 'string' || reason.trim().length === 0) {
+        throw new TypeError('reason is required');
+      }
+
+      assertValidUuid(userId, 'userId');
+
+      return {
+        userId,
+        reason: reason.trim(),
+      };
+    }
+  );
+}
+
+export type UnbanPayload = {
+  userId: string;
+};
+
+export async function parseUnbanPayload(
+  request: NextRequest
+): Promise<UnbanPayload> {
+  return parseRequestBody(
+    request,
+    json => {
+      const payload = json as { userId?: string };
+
+      if (!payload.userId || typeof payload.userId !== 'string') {
+        throw new TypeError('userId is required');
+      }
+
+      assertValidUuid(payload.userId, 'userId');
+
+      return { userId: payload.userId };
+    },
+    formData => {
+      const userId = formData.get('userId');
+
+      if (typeof userId !== 'string' || userId.trim().length === 0) {
+        throw new TypeError('userId is required');
+      }
+
+      assertValidUuid(userId, 'userId');
+
+      return { userId };
+    }
+  );
+}

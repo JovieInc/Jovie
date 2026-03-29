@@ -5,31 +5,81 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.93] - 2026-03-28
+
+### Fixed
+
+- Screenshot CI workflow now reuses a single PR instead of creating a new one each run, preventing stale screenshot PRs from piling up
+- Sitemap crash on Vercel: blog directory missing causes ENOENT, now returns empty list gracefully
+- Middleware redirect loop on `/monitoring` (Sentry tunnel): excluded from proxy matcher so Sentry events flow without hitting auth logic
+- Chat metadata crash: `generateMetadata` threw "User not found" when Clerk user had no DB record yet, now falls back to default titles
+- CSP blocking Clerk JS from `clerk.jov.ie`: added the Clerk proxy CNAME to `script-src` and `connect-src` directives
+- Chat usage API: narrowed `auth()` error handling to only catch Clerk middleware-detection errors, re-throws real infrastructure failures
+
+## [26.4.92] - 2026-03-28
+
+### Fixed
+
+- Homepage hero layout: text and phone mockup now display side-by-side on desktop instead of stacking vertically (Tailwind v4 specificity fix)
+
+## [26.4.91] - 2026-03-28
+
+### Added
+
+- Manual DSP platform linking: artists can add streaming platform profiles by name and URL
+- Add Platform dialog with provider picker grid and URL validation against DSP_REGISTRY domains
+- Admin-only Refresh button to trigger DSP discovery re-scan from presence page
+- Card grid layout replacing table view on presence page with provider-colored borders
+- "Manual" badge for user-added matches (distinct from auto-discovered confidence scores)
+- Discovery overwrite protection: manual matches preserved when auto-discovery runs
+
+### Changed
+
+- Presence page uses responsive card grid (1/2/3 columns) instead of data table
+- Empty state updated with actionable "Add Platform" CTA
+- Loading skeleton matches new card grid layout
+- Sidebar guards null confidence for manual matches
+
 ## [26.4.90] - 2026-03-28
 
 ### Fixed
 
-- Right drawer entity header and tabs now pin to top (sticky) in minimal mode instead of scrolling away with content
-- Release sidebar: entity header card and analytics render above tabs instead of below (was completely inverted)
-- Profile sidebar: smart link analytics render above tabs instead of in scrollable content below
-- Empty drawer state no longer shows orphaned tabs/header above the "Select an item" message
+- Auth page text invisible in light mode: Clerk footer ("Don't have an account?"), branding badge, and card elements used theme-dependent CSS tokens on a hardcoded dark background. Migrated all auth-scoped Clerk styling to fixed dark-theme `--clerk-color-*` CSS variables using Clerk v7's CSS custom property API.
+- Error page (`/error/user-creation-failed`) text invisible in light mode: same root cause, fixed with hardcoded light text values.
+
+## [26.4.90] - 2026-03-28
+
+### Fixed
+
+- Account deletion now invalidates profile ISR cache so deleted artist pages don't linger
+- Account deletion signs out the user via Clerk instead of a bare redirect, clearing stale session cookies
+- Right drawer entity header and tabs scroll with content in minimal mode instead of pinning to top (restores intended layout)
+- Release sidebar: entity header and analytics render inside scrollable content instead of pinned header area
+- Profile sidebar: smart link analytics render inside scrollable content instead of pinned header area
+
+### Removed
+
+- Algorithm Health Check admin page and Spotify FAL analysis API (deprecated experimental feature)
+- CI self-approval guard in agent pipeline (no longer needed)
+- Unreleased changelog entries for removed features
 
 ## [26.4.89] - 2026-03-28
 
 ### Added
 
-- Algorithm Health Check admin page: diagnose Spotify "Fans Also Like" algorithmic positioning with neighbour scoring, size comparison, genre overlap, and bot detection heuristics
-- Spotify FAL analysis API endpoint with HTML scraping, search resolution, and 10-minute caching
-- Authenticity scoring for FAL neighbours: flags suspect artists using follower/popularity ratio, genre assignment, and engagement signals
+- User suspension system with admin UI (confirmation dialog with required reason)
+- Generic "service unavailable" page for suspended users (no account-specific language)
+- Ban check in dashboard layout to cover all `/app` routes
+- Admin audit trail for all suspension/restoration actions with Clerk metadata sync
+
+### Changed
+
+- Middleware uses URL rewrite instead of redirect for suspended users (URL bar stays on original page)
 
 ### Removed
 
 - Deprecated `/autopilot`, `/orchestrate`, and `/swarm` agent-dispatch skills (replaced by Conductor workspaces)
 - `.claude/skills/parallel-agents.md` (duplicate of swarm)
-
-### Changed
-
-- `/drain` Phase 3 rewritten to be self-contained instead of delegating to `/orchestrate`
 
 ## [26.4.88] - 2026-03-28
 

@@ -86,6 +86,7 @@ const STATIC_CSP_PARTS = {
     'https://*.clerk.com',
     'https://*.clerk.services',
     'https://*.clerk.accounts.dev',
+    'https://clerk.jov.ie',
     'https://challenges.cloudflare.com',
   ].join(' '),
 
@@ -102,6 +103,7 @@ const STATIC_CSP_PARTS = {
     'https://*.clerk.com',
     'https://*.clerk.services',
     'https://*.clerk.accounts.dev',
+    'https://clerk.jov.ie',
     'https://api.stripe.com',
     'https://*.ingest.sentry.io',
     'https://*.ingest.us.sentry.io',

@@ -130,7 +130,11 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
           </div>
           <div className='flex items-center justify-between'>
             <span className='text-[12px] text-tertiary-token'>Confidence</span>
-            <ConfidenceBadge score={item.confidenceScore} size='sm' />
+            {item.confidenceScore != null ? (
+              <ConfidenceBadge score={item.confidenceScore} size='sm' />
+            ) : (
+              <span className='text-[12px] text-tertiary-token'>Manual</span>
+            )}
           </div>
           <div className='flex items-center justify-between'>
             <span className='text-[12px] text-tertiary-token'>
@@ -151,7 +155,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
         </div>
       </DrawerSection>
 
-      {item.confidenceBreakdown && (
+      {item.confidenceBreakdown && item.confidenceScore != null && (
         <DrawerSection
           title='Confidence Breakdown'
           className='space-y-1.5'
