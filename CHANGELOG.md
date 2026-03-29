@@ -12,6 +12,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - TikTok auto-generated titles like "TikTok (@handle)" now correctly extract the handle instead of displaying redundantly
 - SoundCloud reserved routes (`/discover`, `/stream`, `/charts`, etc.) no longer produce fake `@` handles
 - Twitch reserved routes (`/directory`, `/settings`, `/wallet`, etc.) no longer produce fake `@` handles
+- Consolidated suggested identity cards into single unified card (was two separate cards with header split from content)
+- Profile image cropping on DSP match suggestions (64px fixed height → responsive 3:1 aspect ratio)
+- Purple accent buttons in suggested identity carousel replaced with grayscale design system primary buttons
+- Dismiss button in profile-ready card now disabled during action to prevent double-dismiss
 
 ### Added
 
