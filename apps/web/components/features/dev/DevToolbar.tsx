@@ -1,7 +1,10 @@
 'use client';
 
 import * as Switch from '@radix-ui/react-switch';
-import { useQueryClient } from '@tanstack/react-query';
+import {
+  type QueryClient,
+  useQueryClient as useQueryClientBase,
+} from '@tanstack/react-query';
 import {
   ArrowUpCircle,
   Check,
@@ -35,6 +38,16 @@ import {
 } from '@/lib/feature-flags/shared';
 import { queryKeys } from '@/lib/queries/keys';
 import { useBillingStatusQuery } from '@/lib/queries/useBillingStatusQuery';
+
+/** Safe query client — returns null outside QueryClientProvider (root layout). */
+function useSafeQueryClient(): QueryClient | null {
+  try {
+    return useQueryClientBase();
+  } catch {
+    return null;
+  }
+}
+
 import {
   registerServiceWorker,
   SW_ENABLED_KEY,
@@ -255,10 +268,6 @@ export function DevToolbar({
   const { theme, setTheme } = useTheme();
   const overridesCtx = useLocalOverrides();
   const flagBadgeCtx = useFlagBadges();
-  const { data: billing } = useBillingStatusQuery();
-  const queryClient = useQueryClient();
-  const [planSwitching, setPlanSwitching] = useState(false);
-  const currentPlan = billing?.plan ?? 'free';
   const toolbarRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const breakpoint = useBreakpoint();
@@ -764,47 +773,8 @@ export function DevToolbar({
             <span className='max-sm:hidden sm:inline text-[10px]'>Admin</span>
           </Link>
 
-          {/* Plan toggle */}
-          <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
-          <div className='flex items-center gap-0.5'>
-            <span className='text-[10px] text-[var(--color-text-quaternary-token)] mr-0.5'>
-              Plan
-            </span>
-            {(['free', 'pro', 'max'] as const).map(plan => (
-              <button
-                key={plan}
-                type='button'
-                disabled={planSwitching}
-                onClick={async () => {
-                  if (plan === currentPlan || planSwitching) return;
-                  setPlanSwitching(true);
-                  try {
-                    const res = await fetch('/api/admin/set-plan', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ plan }),
-                    });
-                    if (res.ok) {
-                      await queryClient.invalidateQueries({
-                        queryKey: queryKeys.billing.all,
-                      });
-                    }
-                  } finally {
-                    setPlanSwitching(false);
-                  }
-                }}
-                className={`px-1.5 py-0.5 rounded text-[10px] transition-colors ${
-                  plan === currentPlan
-                    ? 'font-semibold text-[var(--color-accent)] bg-[var(--color-accent)]/10'
-                    : 'text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)]'
-                } ${planSwitching ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                title={`Switch to ${plan} plan`}
-                aria-label={`Switch to ${plan} plan`}
-              >
-                {plan}
-              </button>
-            ))}
-          </div>
+          {/* Plan toggle — self-contained, safe outside QueryClientProvider */}
+          <PlanToggle />
 
           {env !== 'production' && (
             <button
@@ -951,6 +921,69 @@ export function DevToolbar({
         </div>
       </div>
     </div>
+  );
+}
+
+/** Plan toggle gate — only renders inner component when QueryClientProvider exists. */
+function PlanToggle() {
+  const queryClient = useSafeQueryClient();
+  if (!queryClient) return null;
+  return <PlanToggleInner queryClient={queryClient} />;
+}
+
+/** Plan toggle for admin users. Uses billing query to show/switch plans. */
+function PlanToggleInner({
+  queryClient,
+}: {
+  readonly queryClient: QueryClient;
+}) {
+  const { data: billing } = useBillingStatusQuery();
+  const [switching, setSwitching] = useState(false);
+  const currentPlan = billing?.plan ?? 'free';
+
+  return (
+    <>
+      <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+      <div className='flex items-center gap-0.5'>
+        <span className='text-[10px] text-[var(--color-text-quaternary-token)] mr-0.5'>
+          Plan
+        </span>
+        {(['free', 'pro', 'max'] as const).map(plan => (
+          <button
+            key={plan}
+            type='button'
+            disabled={switching}
+            onClick={async () => {
+              if (plan === currentPlan || switching) return;
+              setSwitching(true);
+              try {
+                const res = await fetch('/api/admin/set-plan', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ plan }),
+                });
+                if (res.ok) {
+                  await queryClient.invalidateQueries({
+                    queryKey: queryKeys.billing.all,
+                  });
+                }
+              } finally {
+                setSwitching(false);
+              }
+            }}
+            className={`px-1.5 py-0.5 rounded text-[10px] transition-colors ${
+              plan === currentPlan
+                ? 'font-semibold text-[var(--color-accent)] bg-[var(--color-accent)]/10'
+                : 'text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)]'
+            } ${switching ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            title={`Switch to ${plan} plan`}
+            aria-label={`Switch to ${plan} plan`}
+          >
+            {plan}
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
 
