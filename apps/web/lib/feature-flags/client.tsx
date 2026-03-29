@@ -36,12 +36,10 @@ const OverridesContext = createContext<FeatureFlagOverridesContext | null>(
 
 /**
  * FeatureFlagsProvider — provides localStorage overrides for the dev toolbar.
- * The `bootstrap` prop is accepted but ignored (Statsig removed).
  */
 export function FeatureFlagsProvider({
   children,
 }: {
-  readonly bootstrap?: { gates: Record<string, boolean> };
   readonly children: React.ReactNode;
 }) {
   const [overrides, setOverrides] =

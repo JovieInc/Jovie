@@ -34,9 +34,8 @@ import {
  */
 const PLAN_HIERARCHY: Record<PlanType, number> = {
   free: 0,
-  founding: 1,
-  pro: 2,
-  max: 3,
+  pro: 1,
+  max: 2,
 };
 
 /**

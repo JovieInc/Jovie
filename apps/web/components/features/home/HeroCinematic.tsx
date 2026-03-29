@@ -1,14 +1,21 @@
+import type { ReactNode } from 'react';
 import { Container } from '@/components/site/Container';
 import { HeroClaimHandle } from './HeroClaimHandle';
 import { HeroDesktopPreviewMount } from './HeroDesktopPreviewMount';
 
 interface HeroCinematicProps {
   readonly fullScreen?: boolean;
+  readonly primaryAction?: ReactNode;
 }
 
 export function HeroCinematic({
   fullScreen = false,
+  primaryAction,
 }: Readonly<HeroCinematicProps>) {
+  const heroPrimaryAction = primaryAction ?? (
+    <HeroClaimHandle submitButtonTestId='homepage-primary-cta' />
+  );
+
   if (!fullScreen) {
     return (
       <section
@@ -31,7 +38,10 @@ export function HeroCinematic({
                     Built for independent artists
                   </p>
 
-                  <h1 className='marketing-h1-linear hero-gradient-text mt-5 lg:text-left'>
+                  <h1
+                    className='marketing-h1-linear hero-gradient-text mt-5 lg:text-left'
+                    data-testid='hero-heading'
+                  >
                     The link your music deserves.
                   </h1>
 
@@ -41,7 +51,7 @@ export function HeroCinematic({
                   </p>
 
                   <div className='max-lg:mx-auto mt-6 w-full max-w-[27rem] md:mt-7 lg:mx-0'>
-                    <HeroClaimHandle submitButtonTestId='homepage-primary-cta' />
+                    {heroPrimaryAction}
                   </div>
 
                   <p className='mt-3.5 text-[11px] tracking-[0.01em] text-quaternary-token md:mt-4 lg:text-left'>
@@ -86,7 +96,10 @@ export function HeroCinematic({
             Built for independent artists
           </p>
 
-          <h1 className='marketing-h1-linear mt-3 text-left text-primary-token sm:mt-4'>
+          <h1
+            className='marketing-h1-linear mt-3 text-left text-primary-token sm:mt-4'
+            data-testid='hero-heading'
+          >
             <span className='block'>The link your music</span>
             <span className='block'>deserves.</span>
           </h1>
@@ -97,7 +110,7 @@ export function HeroCinematic({
           </p>
 
           <div className='mt-4 w-full max-w-[27rem] sm:mt-5'>
-            <HeroClaimHandle submitButtonTestId='homepage-primary-cta' />
+            {heroPrimaryAction}
           </div>
 
           <p className='mt-2.5 text-[11px] tracking-[0.01em] text-quaternary-token sm:mt-3'>
@@ -114,7 +127,10 @@ export function HeroCinematic({
                 Built for independent artists
               </p>
 
-              <h1 className='marketing-h1-linear hero-gradient-text mt-3 max-w-[11ch] text-left sm:mt-4 lg:mt-5'>
+              <h1
+                className='marketing-h1-linear hero-gradient-text mt-3 max-w-[11ch] text-left sm:mt-4 lg:mt-5'
+                data-testid='hero-heading'
+              >
                 The link your music deserves.
               </h1>
 
@@ -124,7 +140,7 @@ export function HeroCinematic({
               </p>
 
               <div className='mt-4 w-full max-w-[27rem] sm:mt-5 md:mt-6'>
-                <HeroClaimHandle submitButtonTestId='homepage-primary-cta' />
+                {heroPrimaryAction}
               </div>
 
               <p className='mt-2.5 text-[11px] tracking-[0.01em] text-quaternary-token sm:mt-3'>

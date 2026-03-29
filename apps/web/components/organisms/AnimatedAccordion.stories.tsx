@@ -102,7 +102,7 @@ export const FAQExample: Story = {
       },
       {
         q: 'Can I remove branding?',
-        a: 'Yes, upgrade to Pro for $5/month to remove branding.',
+        a: 'Yes, upgrade to Pro to remove branding and unlock advanced features.',
       },
     ];
 

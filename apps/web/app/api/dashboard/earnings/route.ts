@@ -112,12 +112,20 @@ export async function GET() {
       return NextResponse.json(response, { headers: NO_STORE_HEADERS });
     });
   } catch (error) {
-    captureError('Failed to fetch earnings data', error, {
-      route: '/api/dashboard/earnings',
-    });
+    const isUnauthorized =
+      error instanceof Error && error.message === 'Unauthorized';
+    if (!isUnauthorized) {
+      captureError('Failed to fetch earnings data', error, {
+        route: '/api/dashboard/earnings',
+      });
+    }
     return NextResponse.json(
-      { error: 'Failed to fetch earnings data' },
-      { status: 500, headers: NO_STORE_HEADERS }
+      {
+        error: isUnauthorized
+          ? 'Unauthorized'
+          : 'Failed to fetch earnings data',
+      },
+      { status: isUnauthorized ? 401 : 500, headers: NO_STORE_HEADERS }
     );
   }
 }

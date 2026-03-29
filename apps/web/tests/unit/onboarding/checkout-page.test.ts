@@ -96,11 +96,11 @@ describe('onboarding checkout page plan resolution', () => {
   it('explicit intent without cookie uses query param plan', () => {
     const result = resolveCheckoutPlan({
       cookieHeader: '',
-      planParam: 'founding',
+      planParam: 'pro',
       sourceParam: 'intent',
       spotifyFollowers: null,
     });
-    expect(result.plan).toBe('founding');
+    expect(result.plan).toBe('pro');
     expect(result.isDefaultUpsell).toBe(false);
   });
 
@@ -138,26 +138,26 @@ describe('onboarding checkout page plan resolution', () => {
     expect(result.isDefaultUpsell).toBe(true);
   });
 
-  it('founding plan cookie is NOT overridden when source param is absent', () => {
+  it('pro plan cookie is NOT overridden when source param is absent', () => {
     const result = resolveCheckoutPlan({
-      cookieHeader: 'jovie_plan_intent=founding',
-      planParam: 'founding',
+      cookieHeader: 'jovie_plan_intent=pro',
+      planParam: 'pro',
       sourceParam: null,
       spotifyFollowers: 50_000,
     });
-    // Founding cookie = paid intent, so recommendPlan must NOT override it
-    expect(result.plan).toBe('founding');
+    // Pro cookie = paid intent, so recommendPlan must NOT override it
+    expect(result.plan).toBe('pro');
     expect(result.isDefaultUpsell).toBe(true);
   });
 
-  it('founding plan cookie preserved even with source=organic', () => {
+  it('pro plan cookie preserved even with source=organic', () => {
     const result = resolveCheckoutPlan({
-      cookieHeader: 'jovie_plan_intent=founding',
+      cookieHeader: 'jovie_plan_intent=pro',
       planParam: null,
       sourceParam: 'organic',
       spotifyFollowers: 15_000,
     });
-    expect(result.plan).toBe('founding');
+    expect(result.plan).toBe('pro');
     expect(result.isDefaultUpsell).toBe(true);
   });
 

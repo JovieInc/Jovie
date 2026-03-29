@@ -74,7 +74,7 @@ describe('GET /api/handle/check', () => {
 
   it('returns 400 when handle is too long', async () => {
     const { GET } = await import('@/app/api/handle/check/route');
-    const longHandle = 'a'.repeat(31);
+    const longHandle = 'a'.repeat(25);
     const request = new Request(
       `http://localhost/api/handle/check?handle=${longHandle}`
     );
@@ -84,7 +84,7 @@ describe('GET /api/handle/check', () => {
 
     expect(response.status).toBe(400);
     expect(data.available).toBe(false);
-    expect(data.error).toContain('less than 30');
+    expect(data.error).toContain('no more than 24');
   });
 
   it('returns 400 when handle has invalid characters', async () => {

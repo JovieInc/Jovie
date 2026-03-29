@@ -5,16 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.100] - 2026-03-29
+
+### Fixed
+
+- Stale "$9/mo" founding price fallback in sidebar upgrade banner (actual cheapest paid tier is Pro at $20/mo)
+- Second hardcoded $9 fallback in verified upgrade price formatter
+- Stale "$5 branding removal" copy in pricing page SEO metadata and PricingCTA component
+- Defensive founding→pro mapping in chat usage API's resolvePlan() for legacy DB rows
+- Stale comment claiming free-tier AI limit is 25/day (actual: 10/day from entitlement registry)
+
+### Removed
+
+- Founding tier from pricing config, Stripe config, plan hierarchy, env validation, and onboarding checkout
+- Founding from valid plan intent options (no longer offered to new users)
+
+### Added
+
+- Unit tests for resolvePlan() covering all plan values including legacy founding and growth mappings
+
+## [26.4.99] - 2026-03-29
+
+### Fixed
+
+- Card elevation consistency across the app shell — replaced semi-transparent backgrounds with solid `bg-surface-0` so loading skeletons, empty states, and card containers are visually distinct from their parent surface
+- Card-within-card nesting in drawer empty states (double border/shadow removed)
+- Redundant "Earnings" / "AI Insights" / "DSP Presence" page titles that duplicated the breadcrumb header
+- Toast notifications now have proper elevation (solid background + card shadow)
+- Release table row deduplication to prevent multiple rows highlighting on click
+- Billing history section no longer wraps content in invisible same-color Card components
+
+### Added
+
+- Surface elevation guardrail test to catch semi-transparent backgrounds and card nesting regressions
+- AGENTS.md rules for surface elevation and duplicate page title prevention
+
 ## [26.4.98] - 2026-03-29
 
 ### Fixed
 
+- TikTok auto-generated titles like "TikTok (@handle)" now correctly extract the handle instead of displaying redundantly
+- SoundCloud reserved routes (`/discover`, `/stream`, `/charts`, etc.) no longer produce fake `@` handles
+- Twitch reserved routes (`/directory`, `/settings`, `/wallet`, etc.) no longer produce fake `@` handles
 - "New Release" button on dashboard did nothing when clicked — AddReleaseSidebar was rendered inline inside an `overflow-hidden` container instead of through the right panel system
 - Zombie drawer: add-release form would reappear after closing a release or track sidebar because `addReleaseOpen` state was never cleared when opening other sidebars
 - Consolidated suggested identity cards into single unified card (was two separate cards with header split from content)
 - Profile image cropping on DSP match suggestions (64px fixed height → responsive 3:1 aspect ratio)
 - Purple accent buttons in suggested identity carousel replaced with grayscale design system primary buttons
 - Dismiss button in profile-ready card now disabled during action to prevent double-dismiss
+
+### Added
+
+- Tests for reserved route filtering across SoundCloud and Twitch platform handlers
 
 ## [26.4.97] - 2026-03-28
 

@@ -714,7 +714,7 @@ jobs:
           It will now enter the merge queue for final validation.
 
           > If this approval is incorrect, dismiss it and add the \`needs-human\` label." \
-            2>"$APPROVAL_ERROR_LOG"; then
+            >"$APPROVAL_ERROR_LOG" 2>&1; then
             if rg -q "Resource not accessible by integration" "$APPROVAL_ERROR_LOG"; then
               echo "permission_denied=true" >> $GITHUB_OUTPUT
               echo "Skipping auto-approval for PR #$PR_NUMBER because the GitHub App token lacks review permission."

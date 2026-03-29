@@ -2,21 +2,17 @@
 
 import type { SegmentControlOption } from '@jovie/ui';
 import type { ReactNode } from 'react';
-import {
-  TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME,
-  TAB_BAR_DRAWER_TRIGGER_CLASSNAME,
-  TAB_BAR_RAIL_CLASSNAME,
-  TabBar,
-} from '@/components/molecules/tab-bar/TabBar';
+import { TabBar } from '@/components/molecules/tab-bar/TabBar';
 
 /**
  * Re-export classname constants for backward compatibility.
  * Used by AudienceHeaderBadge and tests.
  */
-export const DRAWER_TABS_RAIL_CLASSNAME = TAB_BAR_RAIL_CLASSNAME;
-export const DRAWER_TABS_TRIGGER_CLASSNAME = TAB_BAR_DRAWER_TRIGGER_CLASSNAME;
-export const DRAWER_TABS_TRIGGER_ACTIVE_CLASSNAME =
-  TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME;
+export {
+  TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME as DRAWER_TABS_TRIGGER_ACTIVE_CLASSNAME,
+  TAB_BAR_DRAWER_TRIGGER_CLASSNAME as DRAWER_TABS_TRIGGER_CLASSNAME,
+  TAB_BAR_RAIL_CLASSNAME as DRAWER_TABS_RAIL_CLASSNAME,
+} from '@/components/molecules/tab-bar/TabBar';
 
 export interface DrawerTabsProps<T extends string> {
   readonly value: T;

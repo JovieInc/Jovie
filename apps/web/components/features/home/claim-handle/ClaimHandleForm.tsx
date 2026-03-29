@@ -15,6 +15,7 @@ import {
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { BASE_URL } from '@/constants/app';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
+import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { HandleStatusIcon } from './HandleStatusIcon';
 import type { ClaimHandleFormProps } from './types';
@@ -166,6 +167,7 @@ export function ClaimHandleForm({
   onHandleChange,
   size = 'default',
   submitButtonTestId,
+  submitTracking,
 }: Readonly<ClaimHandleFormProps>) {
   const isHero = size === 'hero';
   const isDisplay = size === 'display';
@@ -200,7 +202,9 @@ export function ClaimHandleForm({
       e.preventDefault();
       setFormSubmitted(true);
 
-      if (!handle.trim()) {
+      const normalizedHandle = handle.toLowerCase().trim();
+
+      if (!normalizedHandle) {
         inputRef.current?.focus();
         return;
       }
@@ -208,11 +212,18 @@ export function ClaimHandleForm({
       try {
         sessionStorage.setItem(
           'pendingClaim',
-          JSON.stringify({ handle: handle.toLowerCase(), ts: Date.now() })
+          JSON.stringify({ handle: normalizedHandle, ts: Date.now() })
         );
       } catch {}
 
-      const target = `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`;
+      if (submitTracking) {
+        track(submitTracking.eventName, {
+          section: submitTracking.section,
+          handle: normalizedHandle,
+        });
+      }
+
+      const target = `/onboarding?handle=${encodeURIComponent(normalizedHandle)}`;
 
       setNavigating(true);
 
@@ -223,7 +234,7 @@ export function ClaimHandleForm({
 
       router.push(target);
     },
-    [handle, isSignedIn, router]
+    [handle, isSignedIn, router, submitTracking]
   );
 
   const showChecking = checkingAvail;

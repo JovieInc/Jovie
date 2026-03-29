@@ -22,7 +22,6 @@ import { ProfileCompletionRedirect } from './ProfileCompletionRedirect';
 export async function DashboardShellContent({
   children,
 }: {
-  readonly userId: string;
   readonly children: React.ReactNode;
 }) {
   // Full dashboard data fetch — the provider wraps the entire (shell) tree

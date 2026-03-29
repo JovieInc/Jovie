@@ -9,18 +9,10 @@ export interface GreetingContent {
 }
 
 interface BuildGreetingParams {
-  readonly displayName?: string;
   readonly username?: string;
   readonly isFirstSession: boolean;
   readonly insights: readonly InsightResponse[];
   readonly tippingStats: ArtistContext['tippingStats'];
-}
-
-function getDisplayName(displayName?: string) {
-  const trimmedDisplayName = displayName?.trim();
-  return trimmedDisplayName && trimmedDisplayName.length > 0
-    ? trimmedDisplayName
-    : 'there';
 }
 
 function ensureSentence(text: string) {
@@ -37,14 +29,11 @@ function getTipLabel(tipsSubmitted: number) {
 }
 
 export function buildGreeting({
-  displayName,
   username,
   isFirstSession,
   insights,
   tippingStats,
 }: BuildGreetingParams): GreetingContent {
-  const resolvedDisplayName = getDisplayName(displayName);
-
   if (isFirstSession) {
     const trimmedUsername = username?.trim();
     const profileLabel =
@@ -54,7 +43,7 @@ export function buildGreeting({
 
     return {
       label: 'Artist ready',
-      body: `Welcome, ${resolvedDisplayName}. Your profile is live at`,
+      body: 'Your profile is live at',
       profileHref: trimmedUsername
         ? `https://jov.ie/${trimmedUsername}`
         : 'https://jov.ie',
@@ -66,7 +55,7 @@ export function buildGreeting({
   if (topInsight) {
     return {
       label: 'Welcome back',
-      body: `Welcome back, ${resolvedDisplayName}. ${ensureSentence(topInsight.title)}`,
+      body: ensureSentence(topInsight.title),
       profileHref: null,
       profileLabel: null,
     };
@@ -75,7 +64,7 @@ export function buildGreeting({
   if (tippingStats.tipsSubmitted > 0) {
     return {
       label: 'Welcome back',
-      body: `Welcome back, ${resolvedDisplayName}. You've received ${tippingStats.tipsSubmitted} ${getTipLabel(tippingStats.tipsSubmitted)} since you last checked in.`,
+      body: `You've received ${tippingStats.tipsSubmitted} ${getTipLabel(tippingStats.tipsSubmitted)} since your last check-in.`,
       profileHref: null,
       profileLabel: null,
     };
@@ -83,7 +72,7 @@ export function buildGreeting({
 
   return {
     label: 'Welcome back',
-    body: `Welcome back, ${resolvedDisplayName}. Share your profile link to start building your audience.`,
+    body: 'Share your profile to start building your audience.',
     profileHref: null,
     profileLabel: null,
   };

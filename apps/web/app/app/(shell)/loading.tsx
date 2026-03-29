@@ -11,7 +11,7 @@ import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 export default function ShellLoading() {
   return (
     <div
-      className='space-y-5 rounded-2xl border border-subtle/80 bg-surface-1/40 p-4 sm:p-5'
+      className='space-y-5 rounded-2xl border border-subtle bg-surface-0 p-4 sm:p-5'
       aria-busy='true'
       aria-live='polite'
     >
@@ -20,7 +20,7 @@ export default function ShellLoading() {
         <LoadingSkeleton height='h-8' width='w-24' rounded='md' />
       </div>
 
-      <div className='space-y-3 rounded-xl border border-subtle/70 bg-surface-0/60 p-3'>
+      <div className='space-y-3 rounded-xl border border-subtle/70 bg-surface-0 p-3'>
         <div className='grid grid-cols-[minmax(0,1.5fr)_120px_72px] gap-3 border-b border-subtle/60 pb-2'>
           <LoadingSkeleton height='h-3' width='w-24' rounded='sm' />
           <LoadingSkeleton height='h-3' width='w-16' rounded='sm' />

@@ -397,15 +397,11 @@ export function DashboardTipping() {
     return null;
   }
 
-  const toolbar = (
-    <PageToolbar
-      start={
-        <span className='text-[12px] font-[560] tracking-[-0.01em] text-primary-token'>
-          Earnings
-        </span>
-      }
-      end={
-        hasVenmoHandle && !isEditing ? (
+  const toolbar =
+    hasVenmoHandle && !isEditing ? (
+      <PageToolbar
+        start={null}
+        end={
           <VenmoConnectedBadge
             venmoHandle={artist.venmo_handle?.replace(/^@/, '') ?? ''}
             onEdit={() => {
@@ -414,10 +410,9 @@ export function DashboardTipping() {
             }}
             onDisconnect={handleDisconnect}
           />
-        ) : undefined
-      }
-    />
-  );
+        }
+      />
+    ) : undefined;
 
   return (
     <>

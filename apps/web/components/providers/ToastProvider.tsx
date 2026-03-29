@@ -96,8 +96,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
         // lightweight classNames here for icon coloring.
         toastOptions={{
           classNames: {
-            toast:
-              'items-start border border-subtle/80 bg-surface-1/90 shadow-none backdrop-blur-[2px]',
+            toast: 'items-start border border-subtle bg-surface-1 shadow-card',
             title: 'font-medium text-secondary-token',
             description: 'font-normal text-tertiary-token',
             actionButton:

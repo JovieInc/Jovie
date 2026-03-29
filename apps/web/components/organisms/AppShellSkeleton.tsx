@@ -82,7 +82,7 @@ export function AppShellSkeleton() {
               <div className='skeleton h-9 w-28 rounded-md' />
             </div>
 
-            <div className='space-y-2 rounded-xl bg-surface-1/20 p-2.5'>
+            <div className='space-y-2 rounded-xl bg-surface-0 p-2.5'>
               <div className='grid grid-cols-[minmax(0,1.4fr)_110px_68px] gap-3 border-b border-subtle/60 pb-2'>
                 <div className='skeleton h-3 w-24 rounded' />
                 <div className='skeleton h-3 w-16 rounded' />

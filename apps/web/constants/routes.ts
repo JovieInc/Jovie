@@ -86,6 +86,7 @@ export const APP_ROUTES = {
 
   // Marketing
   DEMO: '/demo',
+  LANDING_NEW: '/new',
   PRICING: '/pricing',
   LAUNCH: '/launch',
   LAUNCH_PRICING: '/launch/pricing',

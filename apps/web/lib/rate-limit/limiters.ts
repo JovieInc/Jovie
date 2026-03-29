@@ -456,7 +456,7 @@ export const aiChatDailyMaxLimiter = createRateLimiter(
 /**
  * Plan-aware AI chat daily limiter.
  * Automatically selects the correct daily quota based on the user's plan tier.
- * - Free: 25 messages/day
+ * - Free: 10 messages/day
  * - Pro: 100 messages/day
  * - Max: 500 messages/day
  */

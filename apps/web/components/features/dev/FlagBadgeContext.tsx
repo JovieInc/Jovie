@@ -5,6 +5,7 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useMemo,
   useState,
 } from 'react';
 
@@ -41,8 +42,13 @@ export function FlagBadgeProvider({
     });
   }, []);
 
+  const value = useMemo(
+    () => ({ showBadges, toggleBadges }),
+    [showBadges, toggleBadges]
+  );
+
   return (
-    <FlagBadgeContext.Provider value={{ showBadges, toggleBadges }}>
+    <FlagBadgeContext.Provider value={value}>
       {children}
     </FlagBadgeContext.Provider>
   );
