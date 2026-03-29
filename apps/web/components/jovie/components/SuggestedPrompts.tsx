@@ -20,7 +20,6 @@ import {
 } from '../types';
 import {
   CHAT_PROMPT_RAIL_CLASS,
-  CHAT_PROMPT_RAIL_MASK_STYLE,
   CHAT_PROMPT_RAIL_SCROLL_CLASS,
   getChatPromptPillClass,
 } from './chat-prompt-styles';
@@ -34,6 +33,9 @@ const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   MessageSquare,
   Music,
 };
+
+const SUGGESTED_PROMPT_RAIL_MASK_CLASS =
+  '[-webkit-mask-image:linear-gradient(to_right,transparent_0,black_18px,black_calc(100%_-_18px),transparent_100%)] [mask-image:linear-gradient(to_right,transparent_0,black_18px,black_calc(100%_-_18px),transparent_100%)]';
 
 interface SuggestedPromptsProps {
   readonly onSelect: (prompt: string) => void;
@@ -120,9 +122,9 @@ export function SuggestedPrompts({
       <div
         className={cn(
           CHAT_PROMPT_RAIL_SCROLL_CLASS,
+          SUGGESTED_PROMPT_RAIL_MASK_CLASS,
           'md:overflow-visible md:[mask-image:none] md:[-webkit-mask-image:none]'
         )}
-        style={CHAT_PROMPT_RAIL_MASK_STYLE}
         data-testid='suggested-prompts-rail'
       >
         <div

@@ -10,7 +10,9 @@ describe('SuggestedPrompts', () => {
       <SuggestedPrompts onSelect={onSelect} />
     );
 
-    expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
+    const rail = getByTestId('suggested-prompts-rail');
+    expect(rail).toBeTruthy();
+    expect(rail.getAttribute('style')).toBeNull();
     expect(getByText('Preview profile')).toBeTruthy();
     expect(getByText('Change photo')).toBeTruthy();
     expect(getByText('Release link')).toBeTruthy();
