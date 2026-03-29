@@ -1137,8 +1137,8 @@ export function OnboardingV2Form({
         return;
       }
 
-      enrichProfileFromDsp(artist.id, artist.url).catch(() => {
-        // Best-effort enrichment should not block a successful connect flow.
+      await enrichProfileFromDsp(artist.id, artist.url).catch(() => {
+        // Best-effort: if enrichment fails, the profile keeps its current name.
       });
 
       setIsArtistConnectPending(false);
@@ -1425,7 +1425,8 @@ export function OnboardingV2Form({
     const hasIntent = isPaidIntent(planIntent);
     const plan = hasIntent ? planIntent : DEFAULT_UPSELL_PLAN;
     const source = hasIntent ? 'intent' : 'organic';
-    const nextUrl = `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=${plan}&source=${source}`;
+    const chatUrl = `${APP_ROUTES.CHAT}?from=onboarding&panel=profile`;
+    const nextUrl = `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=${plan}&source=${source}&returnTo=${encodeURIComponent(chatUrl)}`;
 
     if (
       'startViewTransition' in document &&
