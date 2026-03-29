@@ -20,8 +20,22 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.95] - 2026-03-28
 
+### Added
+
+- Automated YC demo video recording pipeline via Playwright (`doppler run -- pnpm --filter web demo:record`)
+- Video-first `/demo/video` investor page with autoplay, loading states, and screenshot carousel fallback
+- Caption overlay injection in demo recording for silent video context
+- Production environment guard in demo spec to prevent accidental prod user creation
+- Download proxy API route at `/api/demo/download` for cross-origin video downloads
+- WebVTT captions file for accessibility on the demo page
+- `DemoVideoPlayer` component with loading/error/fallback states
+- `BrowserFrame` decorative browser chrome wrapper
+- `DEMO_REUSE_SERVER` option in `playwright.config.demo.ts` to use an existing dev server
+
 ### Changed
 
+- Relaxed multi-DSP enrichment assertions in demo spec to best-effort (don't fail recording if enrichment is slow)
+- Simplified onboarding form detection in demo spec to match current UI selectors
 - Presence page converted from card grid to table layout, matching the Releases page pattern with row selection and sidebar integration
 - Insights page wrapped in DashboardWorkspacePanel with PageToolbar, matching all other dashboard pages
 - Right drawer card widths normalized by fixing asymmetric padding that caused cards to be narrower on the right side

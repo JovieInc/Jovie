@@ -1,15 +1,9 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import {
-  ArrowRight,
-  Check,
-  Disc3,
-  ExternalLink,
-  Music2,
-  RefreshCw,
-} from 'lucide-react';
+import { ArrowRight, Check, Disc3, ExternalLink, Music2 } from 'lucide-react';
 import Image from 'next/image';
+import { useCallback, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Avatar } from '@/components/molecules/Avatar';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -134,6 +128,233 @@ function getDspStatusLabel(
     case 'rejected':
       return 'Rejected';
   }
+}
+
+function DspReviewStep({
+  snapshot,
+}: Readonly<{ snapshot: MockDiscoverySnapshot }>) {
+  const [statuses, setStatuses] = useState<
+    Record<string, 'suggested' | 'confirmed' | 'rejected' | 'auto_confirmed'>
+  >(() => Object.fromEntries(snapshot.dspItems.map(i => [i.id, i.status])));
+
+  const setStatus = useCallback(
+    (id: string, status: 'confirmed' | 'rejected') => {
+      setStatuses(prev => ({ ...prev, [id]: status }));
+    },
+    []
+  );
+
+  const confirmed = snapshot.dspItems.filter(
+    i => statuses[i.id] === 'confirmed' || statuses[i.id] === 'auto_confirmed'
+  );
+  const suggested = snapshot.dspItems.filter(
+    i => statuses[i.id] === 'suggested'
+  );
+  const rejected = snapshot.dspItems.filter(i => statuses[i.id] === 'rejected');
+
+  return (
+    <StepFrame title='Music platforms'>
+      <DrawerLinkSection
+        title='Confirmed'
+        isEmpty={confirmed.length === 0}
+        emptyMessage='No confirmed platforms yet.'
+      >
+        {confirmed.map(item => (
+          <SidebarLinkRow
+            key={item.id}
+            icon={
+              <SocialIcon
+                platform={item.providerId}
+                className='h-4 w-4'
+                aria-hidden
+              />
+            }
+            label={`${item.externalArtistName || 'Artist'} — ${item.providerLabel}`}
+            url={item.externalArtistUrl || '#'}
+            badge={getDspStatusLabel(statuses[item.id])}
+          />
+        ))}
+      </DrawerLinkSection>
+
+      {suggested.length > 0 ? (
+        <DrawerLinkSection title='Needs review' isEmpty={false}>
+          {suggested.map(item => (
+            <div key={item.id} className='flex items-center gap-1'>
+              <div className='min-w-0 flex-1'>
+                <SidebarLinkRow
+                  icon={
+                    <SocialIcon
+                      platform={item.providerId}
+                      className='h-4 w-4'
+                      aria-hidden
+                    />
+                  }
+                  label={`${item.externalArtistName || 'Artist'} — ${item.providerLabel}`}
+                  url={item.externalArtistUrl || '#'}
+                />
+              </div>
+              <div className='flex shrink-0 gap-1'>
+                <Button
+                  size='sm'
+                  variant='secondary'
+                  onClick={() => setStatus(item.id, 'rejected')}
+                >
+                  Reject
+                </Button>
+                <Button
+                  size='sm'
+                  onClick={() => setStatus(item.id, 'confirmed')}
+                >
+                  Accept
+                </Button>
+              </div>
+            </div>
+          ))}
+        </DrawerLinkSection>
+      ) : null}
+
+      {rejected.length > 0 ? (
+        <DrawerLinkSection title='Rejected' isEmpty={false}>
+          {rejected.map(item => (
+            <SidebarLinkRow
+              key={item.id}
+              icon={
+                <SocialIcon
+                  platform={item.providerId}
+                  className='h-4 w-4'
+                  aria-hidden
+                />
+              }
+              label={`${item.externalArtistName || 'Artist'} — ${item.providerLabel}`}
+              url={item.externalArtistUrl || '#'}
+              badge='Rejected'
+              isVisible={false}
+            />
+          ))}
+        </DrawerLinkSection>
+      ) : null}
+    </StepFrame>
+  );
+}
+
+function SocialReviewStep({
+  snapshot,
+}: Readonly<{ snapshot: MockDiscoverySnapshot }>) {
+  const [states, setStates] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      snapshot.socialItems.map(i => [`${i.kind}:${i.id}`, i.state])
+    )
+  );
+
+  const accept = useCallback((key: string) => {
+    setStates(prev => ({ ...prev, [key]: 'active' }));
+  }, []);
+
+  const dismiss = useCallback((key: string) => {
+    setStates(prev => ({ ...prev, [key]: 'dismissed' }));
+  }, []);
+
+  const active = snapshot.socialItems.filter(i => {
+    const key = `${i.kind}:${i.id}`;
+    const state = states[key];
+    return state === 'active';
+  });
+
+  const pending = snapshot.socialItems.filter(i => {
+    const key = `${i.kind}:${i.id}`;
+    const state = states[key];
+    return state === 'pending' || state === 'suggested';
+  });
+
+  const dismissed = snapshot.socialItems.filter(i => {
+    const key = `${i.kind}:${i.id}`;
+    return states[key] === 'dismissed';
+  });
+
+  return (
+    <StepFrame title='Social links'>
+      <DrawerLinkSection
+        title='Active'
+        isEmpty={active.length === 0}
+        emptyMessage='No active social links yet.'
+      >
+        {active.map(item => (
+          <SidebarLinkRow
+            key={`${item.kind}:${item.id}`}
+            icon={
+              <SocialIcon
+                platform={item.platform}
+                className='h-4 w-4'
+                aria-hidden
+              />
+            }
+            label={item.platformLabel}
+            url={item.url}
+            deepLinkPlatform={item.platform}
+          />
+        ))}
+      </DrawerLinkSection>
+
+      {pending.length > 0 ? (
+        <DrawerLinkSection title='Suggested' isEmpty={false}>
+          {pending.map(item => {
+            const key = `${item.kind}:${item.id}`;
+            return (
+              <div key={key} className='flex items-center gap-1'>
+                <div className='min-w-0 flex-1'>
+                  <SidebarLinkRow
+                    icon={
+                      <SocialIcon
+                        platform={item.platform}
+                        className='h-4 w-4'
+                        aria-hidden
+                      />
+                    }
+                    label={item.platformLabel}
+                    url={item.url}
+                    deepLinkPlatform={item.platform}
+                  />
+                </div>
+                <div className='flex shrink-0 gap-1'>
+                  <Button
+                    size='sm'
+                    variant='secondary'
+                    onClick={() => dismiss(key)}
+                  >
+                    Dismiss
+                  </Button>
+                  <Button size='sm' onClick={() => accept(key)}>
+                    Add
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </DrawerLinkSection>
+      ) : null}
+
+      {dismissed.length > 0 ? (
+        <DrawerLinkSection title='Dismissed' isEmpty={false}>
+          {dismissed.map(item => (
+            <SidebarLinkRow
+              key={`${item.kind}:${item.id}`}
+              icon={
+                <SocialIcon
+                  platform={item.platform}
+                  className='h-4 w-4'
+                  aria-hidden
+                />
+              }
+              label={item.platformLabel}
+              url={item.url}
+              isVisible={false}
+              deepLinkPlatform={item.platform}
+            />
+          ))}
+        </DrawerLinkSection>
+      ) : null}
+    </StepFrame>
+  );
 }
 
 interface OnboardingDemoStepProps {
@@ -325,167 +546,10 @@ export function OnboardingDemoStep({
       );
 
     case 'dsp':
-      return (
-        <StepFrame
-          title='Music platforms'
-          actions={
-            <Button variant='secondary'>
-              <RefreshCw className='mr-1 h-4 w-4' />
-              Refresh
-            </Button>
-          }
-        >
-          {(() => {
-            const confirmed = snapshot.dspItems.filter(
-              i => i.status === 'confirmed' || i.status === 'auto_confirmed'
-            );
-            const suggested = snapshot.dspItems.filter(
-              i => i.status === 'suggested'
-            );
-            const rejected = snapshot.dspItems.filter(
-              i => i.status === 'rejected'
-            );
-            return (
-              <>
-                <DrawerLinkSection
-                  title='Confirmed'
-                  isEmpty={confirmed.length === 0}
-                  emptyMessage='No confirmed platforms yet.'
-                >
-                  {confirmed.map(item => (
-                    <SidebarLinkRow
-                      key={item.id}
-                      icon={
-                        <SocialIcon
-                          platform={item.providerId}
-                          className='h-4 w-4'
-                          aria-hidden
-                        />
-                      }
-                      label={`${item.externalArtistName || 'Artist'} — ${item.providerLabel}`}
-                      url={item.externalArtistUrl || '#'}
-                      badge={getDspStatusLabel(item.status)}
-                    />
-                  ))}
-                </DrawerLinkSection>
-
-                {suggested.length > 0 ? (
-                  <DrawerLinkSection title='Needs review' isEmpty={false}>
-                    {suggested.map(item => (
-                      <SidebarLinkRow
-                        key={item.id}
-                        icon={
-                          <SocialIcon
-                            platform={item.providerId}
-                            className='h-4 w-4'
-                            aria-hidden
-                          />
-                        }
-                        label={`${item.externalArtistName || 'Artist'} — ${item.providerLabel}`}
-                        url={item.externalArtistUrl || '#'}
-                        badge='Suggested'
-                      />
-                    ))}
-                  </DrawerLinkSection>
-                ) : null}
-
-                {rejected.length > 0 ? (
-                  <DrawerLinkSection title='Rejected' isEmpty={false}>
-                    {rejected.map(item => (
-                      <SidebarLinkRow
-                        key={item.id}
-                        icon={
-                          <SocialIcon
-                            platform={item.providerId}
-                            className='h-4 w-4'
-                            aria-hidden
-                          />
-                        }
-                        label={`${item.externalArtistName || 'Artist'} — ${item.providerLabel}`}
-                        url={item.externalArtistUrl || '#'}
-                        badge='Rejected'
-                        isVisible={false}
-                      />
-                    ))}
-                  </DrawerLinkSection>
-                ) : null}
-              </>
-            );
-          })()}
-        </StepFrame>
-      );
+      return <DspReviewStep snapshot={snapshot} />;
 
     case 'social':
-      return (
-        <StepFrame
-          title='Social links'
-          actions={
-            <Button variant='secondary'>
-              <RefreshCw className='mr-1 h-4 w-4' />
-              Refresh
-            </Button>
-          }
-        >
-          {(() => {
-            const active = snapshot.socialItems.filter(
-              i =>
-                (i.kind === 'link' && i.state === 'active') ||
-                (i.kind === 'suggestion' && i.state !== 'pending')
-            );
-            const pending = snapshot.socialItems.filter(
-              i =>
-                (i.kind === 'suggestion' && i.state === 'pending') ||
-                (i.kind === 'link' && i.state === 'suggested')
-            );
-            return (
-              <>
-                <DrawerLinkSection
-                  title='Active'
-                  isEmpty={active.length === 0}
-                  emptyMessage='No active social links yet.'
-                >
-                  {active.map(item => (
-                    <SidebarLinkRow
-                      key={`${item.kind}:${item.id}`}
-                      icon={
-                        <SocialIcon
-                          platform={item.platform}
-                          className='h-4 w-4'
-                          aria-hidden
-                        />
-                      }
-                      label={item.platformLabel}
-                      url={item.url}
-                      deepLinkPlatform={item.platform}
-                    />
-                  ))}
-                </DrawerLinkSection>
-
-                {pending.length > 0 ? (
-                  <DrawerLinkSection title='Suggested' isEmpty={false}>
-                    {pending.map(item => (
-                      <SidebarLinkRow
-                        key={`${item.kind}:${item.id}`}
-                        icon={
-                          <SocialIcon
-                            platform={item.platform}
-                            className='h-4 w-4'
-                            aria-hidden
-                          />
-                        }
-                        label={item.platformLabel}
-                        url={item.url}
-                        badge='Needs review'
-                        deepLinkPlatform={item.platform}
-                      />
-                    ))}
-                  </DrawerLinkSection>
-                ) : null}
-              </>
-            );
-          })()}
-        </StepFrame>
-      );
+      return <SocialReviewStep snapshot={snapshot} />;
 
     case 'releases':
       return (
@@ -524,7 +588,9 @@ export function OnboardingDemoStep({
                 url='#'
                 badge={
                   release.releaseDate
-                    ? new Date(release.releaseDate).toLocaleDateString()
+                    ? new Date(
+                        `${release.releaseDate}T00:00:00Z`
+                      ).toLocaleDateString(undefined, { timeZone: 'UTC' })
                     : 'Pending'
                 }
               />

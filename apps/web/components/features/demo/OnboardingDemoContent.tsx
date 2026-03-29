@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import { OnboardingDemoProfilePanel } from './OnboardingDemoProfilePanel';
 import {
   ALL_STEPS,
   OnboardingDemoStep,
@@ -18,6 +19,12 @@ const STEP_LABELS: Record<StepId, string> = {
   'late-arrivals': 'Late',
   'profile-ready': 'Ready',
 };
+
+function getDotClass(index: number, currentIndex: number): string {
+  if (index === currentIndex) return 'w-6 bg-primary-token';
+  if (index < currentIndex) return 'w-1.5 bg-primary-token/40';
+  return 'w-1.5 bg-primary-token/15';
+}
 
 interface OnboardingDemoContentProps {
   readonly currentStep: StepId;
@@ -44,7 +51,7 @@ export function OnboardingDemoContent({
     >
       {/* Dev step picker — sits at top, clearly labeled */}
       <div className='shrink-0 border-b border-subtle bg-surface-0/80 backdrop-blur-sm'>
-        <div className='mx-auto flex max-w-2xl items-center gap-1 overflow-x-auto px-4 py-2 sm:px-6'>
+        <div className='mx-auto flex items-center gap-1 overflow-x-auto px-4 py-2 sm:px-6'>
           <span className='mr-2 shrink-0 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400'>
             Dev
           </span>
@@ -69,9 +76,15 @@ export function OnboardingDemoContent({
         </div>
       </div>
 
-      {/* Step content — H1 stays at a fixed vertical position */}
-      <div className='flex-1 overflow-y-auto overscroll-contain'>
-        <OnboardingDemoStep step={currentStep} onFinish={onFinish} />
+      {/* Main area: step content + progressive profile panel */}
+      <div className='flex flex-1 min-h-0'>
+        {/* Center: step content */}
+        <div className='flex-1 overflow-y-auto overscroll-contain'>
+          <OnboardingDemoStep step={currentStep} onFinish={onFinish} />
+        </div>
+
+        {/* Right: progressive profile build-up */}
+        <OnboardingDemoProfilePanel currentStep={currentStep} />
       </div>
 
       {/* Step dots */}
@@ -84,11 +97,7 @@ export function OnboardingDemoContent({
             aria-label={`Step ${index + 1}`}
             className={cn(
               'h-1.5 rounded-full transition-all duration-300',
-              index === currentIndex
-                ? 'w-6 bg-primary-token'
-                : index < currentIndex
-                  ? 'w-1.5 bg-primary-token/40'
-                  : 'w-1.5 bg-primary-token/15'
+              getDotClass(index, currentIndex)
             )}
           />
         ))}
