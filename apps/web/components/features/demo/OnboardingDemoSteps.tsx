@@ -160,19 +160,28 @@ function DspReviewStep({
         emptyMessage='No confirmed platforms yet.'
       >
         {confirmed.map(item => (
-          <SidebarLinkRow
-            key={item.id}
-            icon={
-              <SocialIcon
-                platform={item.providerId}
-                className='h-4 w-4'
-                aria-hidden
+          <div key={item.id} className='flex items-center gap-1'>
+            <div className='min-w-0 flex-1'>
+              <SidebarLinkRow
+                icon={
+                  <SocialIcon
+                    platform={item.providerId}
+                    className='h-4 w-4'
+                    aria-hidden
+                  />
+                }
+                label={`${item.externalArtistName || 'Artist'} — ${item.providerLabel}`}
+                url={item.externalArtistUrl || '#'}
+                badge={getDspStatusLabel(statuses[item.id])}
               />
-            }
-            label={`${item.externalArtistName || 'Artist'} — ${item.providerLabel}`}
-            url={item.externalArtistUrl || '#'}
-            badge={getDspStatusLabel(statuses[item.id])}
-          />
+            </div>
+            <div className='invisible flex shrink-0 gap-1'>
+              <Button size='sm' variant='secondary'>
+                Reject
+              </Button>
+              <Button size='sm'>Accept</Button>
+            </div>
+          </div>
         ))}
       </DrawerLinkSection>
 
@@ -216,20 +225,29 @@ function DspReviewStep({
       {rejected.length > 0 ? (
         <DrawerLinkSection title='Rejected' isEmpty={false}>
           {rejected.map(item => (
-            <SidebarLinkRow
-              key={item.id}
-              icon={
-                <SocialIcon
-                  platform={item.providerId}
-                  className='h-4 w-4'
-                  aria-hidden
+            <div key={item.id} className='flex items-center gap-1'>
+              <div className='min-w-0 flex-1'>
+                <SidebarLinkRow
+                  icon={
+                    <SocialIcon
+                      platform={item.providerId}
+                      className='h-4 w-4'
+                      aria-hidden
+                    />
+                  }
+                  label={`${item.externalArtistName || 'Artist'} — ${item.providerLabel}`}
+                  url={item.externalArtistUrl || '#'}
+                  badge='Rejected'
+                  isVisible={false}
                 />
-              }
-              label={`${item.externalArtistName || 'Artist'} — ${item.providerLabel}`}
-              url={item.externalArtistUrl || '#'}
-              badge='Rejected'
-              isVisible={false}
-            />
+              </div>
+              <div className='invisible flex shrink-0 gap-1'>
+                <Button size='sm' variant='secondary'>
+                  Reject
+                </Button>
+                <Button size='sm'>Accept</Button>
+              </div>
+            </div>
           ))}
         </DrawerLinkSection>
       ) : null}
@@ -279,19 +297,31 @@ function SocialReviewStep({
         emptyMessage='No active social links yet.'
       >
         {active.map(item => (
-          <SidebarLinkRow
+          <div
             key={`${item.kind}:${item.id}`}
-            icon={
-              <SocialIcon
-                platform={item.platform}
-                className='h-4 w-4'
-                aria-hidden
+            className='flex items-center gap-1'
+          >
+            <div className='min-w-0 flex-1'>
+              <SidebarLinkRow
+                icon={
+                  <SocialIcon
+                    platform={item.platform}
+                    className='h-4 w-4'
+                    aria-hidden
+                  />
+                }
+                label={item.platformLabel}
+                url={item.url}
+                deepLinkPlatform={item.platform}
               />
-            }
-            label={item.platformLabel}
-            url={item.url}
-            deepLinkPlatform={item.platform}
-          />
+            </div>
+            <div className='invisible flex shrink-0 gap-1'>
+              <Button size='sm' variant='secondary'>
+                Dismiss
+              </Button>
+              <Button size='sm'>Add</Button>
+            </div>
+          </div>
         ))}
       </DrawerLinkSection>
 
@@ -336,20 +366,32 @@ function SocialReviewStep({
       {dismissed.length > 0 ? (
         <DrawerLinkSection title='Dismissed' isEmpty={false}>
           {dismissed.map(item => (
-            <SidebarLinkRow
+            <div
               key={`${item.kind}:${item.id}`}
-              icon={
-                <SocialIcon
-                  platform={item.platform}
-                  className='h-4 w-4'
-                  aria-hidden
+              className='flex items-center gap-1'
+            >
+              <div className='min-w-0 flex-1'>
+                <SidebarLinkRow
+                  icon={
+                    <SocialIcon
+                      platform={item.platform}
+                      className='h-4 w-4'
+                      aria-hidden
+                    />
+                  }
+                  label={item.platformLabel}
+                  url={item.url}
+                  isVisible={false}
+                  deepLinkPlatform={item.platform}
                 />
-              }
-              label={item.platformLabel}
-              url={item.url}
-              isVisible={false}
-              deepLinkPlatform={item.platform}
-            />
+              </div>
+              <div className='invisible flex shrink-0 gap-1'>
+                <Button size='sm' variant='secondary'>
+                  Dismiss
+                </Button>
+                <Button size='sm'>Add</Button>
+              </div>
+            </div>
           ))}
         </DrawerLinkSection>
       ) : null}
