@@ -287,9 +287,20 @@ export const loadReleaseMatrix = cache(resolveReleaseMatrix);
 export async function loadReleaseMatrixForProfile(
   profile: ReleaseProfileContext
 ): Promise<ReleaseViewModel[]> {
+  // Auth guard: verify caller owns this profile
+  const { userId } = await getCachedAuth();
+  if (!userId || userId !== profile.userId) {
+    throw new Error('Unauthorized');
+  }
+
   return unstable_cache(
     () => fetchReleaseMatrixCore(profile.profileId, profile.profileHandle),
-    ['releases-matrix', profile.userId, profile.profileId],
+    [
+      'releases-matrix',
+      profile.userId,
+      profile.profileId,
+      profile.profileHandle,
+    ],
     {
       revalidate: CACHE_TTL.MEDIUM,
       tags: [`releases:${profile.userId}:${profile.profileId}`],
@@ -1078,6 +1089,12 @@ export async function checkSpotifyConnectionForProfile(
 }> {
   noStore();
 
+  // Auth guard: verify caller owns this profile
+  const { userId } = await getCachedAuth();
+  if (!userId || userId !== profile.userId) {
+    throw new Error('Unauthorized');
+  }
+
   const settings = profile.settings;
   const artistName = (settings?.spotifyArtistName as string) ?? null;
 
@@ -1630,6 +1647,12 @@ export async function checkAppleMusicConnectionForProfile(
   artistId: string | null;
 }> {
   noStore();
+
+  // Auth guard: verify caller owns this profile
+  const { userId } = await getCachedAuth();
+  if (!userId || userId !== profile.userId) {
+    throw new Error('Unauthorized');
+  }
 
   const [match] = await db
     .select({
