@@ -91,7 +91,7 @@ describe('GET /api/chat/conversations', () => {
     );
 
     const mod = await import('@/app/api/chat/session-error-response');
-    const { getSessionErrorResponse } = mod as {
+    const { getSessionErrorResponse } = mod as unknown as {
       getSessionErrorResponse: ReturnType<typeof vi.fn>;
     };
     const { NextResponse } = await import('next/server');
@@ -170,6 +170,31 @@ describe('GET /api/chat/conversations', () => {
 describe('POST /api/chat/conversations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    hoisted.getSessionContextMock.mockRejectedValue(
+      new TypeError('Unauthorized')
+    );
+
+    const mod = await import('@/app/api/chat/session-error-response');
+    const { getSessionErrorResponse } = mod as unknown as {
+      getSessionErrorResponse: ReturnType<typeof vi.fn>;
+    };
+    const { NextResponse } = await import('next/server');
+    getSessionErrorResponse.mockReturnValueOnce(
+      NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    );
+
+    const { POST } = await import('@/app/api/chat/conversations/route');
+    const request = new Request('http://localhost/api/chat/conversations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const response = await POST(request);
+
+    expect(response.status).toBe(401);
   });
 
   it('returns 404 when no profile', async () => {
