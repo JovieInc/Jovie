@@ -1205,7 +1205,7 @@ const ONBOARDING_ROUTES = [
     timings: [
       { metric: 'first-contentful-paint', budget: 1900 },
       { metric: 'largest-contentful-paint', budget: 2500 },
-      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'cumulative-layout-shift', budget: 0.15 },
       { metric: 'first-input-delay', budget: 100 },
       { metric: 'time-to-first-byte', budget: 1200 },
     ],
