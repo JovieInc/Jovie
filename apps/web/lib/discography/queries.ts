@@ -904,8 +904,8 @@ export async function updateRecordingPreviewByIsrc(
   creatorProfileId: string,
   isrc: string,
   previewUrl: string
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const result = await db
     .update(discogRecordings)
     .set({ previewUrl, updatedAt: new Date() })
     .where(
@@ -915,6 +915,7 @@ export async function updateRecordingPreviewByIsrc(
         drizzleSql`${discogRecordings.previewUrl} IS NULL`
       )
     );
+  return (result.rowCount ?? 0) > 0;
 }
 
 /**

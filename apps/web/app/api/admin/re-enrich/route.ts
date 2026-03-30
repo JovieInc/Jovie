@@ -11,7 +11,7 @@ import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300; // 5 minutes for profile re-enrichment
+export const maxDuration = 600; // 10 minutes for sweep mode (10 profiles × N releases × 11s delay)
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -23,7 +23,14 @@ const reEnrichSchema = z
   })
   .refine(data => data.profileId || data.sweep || data.dryRun, {
     message: 'Must provide profileId, sweep, or dryRun',
-  });
+  })
+  .refine(
+    data => {
+      const modes = [data.profileId, data.sweep, data.dryRun].filter(Boolean);
+      return modes.length <= 1;
+    },
+    { message: 'Only one of profileId, sweep, or dryRun may be specified' }
+  );
 
 export async function POST(request: Request) {
   try {

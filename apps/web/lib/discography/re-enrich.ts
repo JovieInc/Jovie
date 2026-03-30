@@ -100,6 +100,7 @@ export async function reEnrichProfile(
 
       result.releasesProcessed++;
       result.linksDiscovered += discoveryResult.discovered.length;
+      result.previewsBackfilled += discoveryResult.previewsBackfilled;
 
       if (discoveryResult.errors.length > 0) {
         for (const error of discoveryResult.errors) {
@@ -208,6 +209,11 @@ export async function sweepUnderEnrichedProfiles(): Promise<{
 
   for (const profile of profiles) {
     try {
+      // Rate limit: add delay between profiles to avoid MusicFetch rate limit
+      if (summary.profilesProcessed > 0) {
+        await new Promise(resolve => setTimeout(resolve, INTER_RELEASE_DELAY_MS));
+      }
+
       const result = await reEnrichProfile(profile.creatorProfileId);
       summary.profilesProcessed++;
       summary.totalLinksDiscovered += result.linksDiscovered;
