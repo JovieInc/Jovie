@@ -8,8 +8,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { SettingsActionRow } from '@/components/features/dashboard/molecules/SettingsActionRow';
-import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
+import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { APP_ROUTES } from '@/constants/routes';
 import { useBillingStatusQuery, usePortalMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -112,9 +112,9 @@ export function SettingsBillingSection() {
         <SettingsActionRow
           icon={
             canOpenPortal ? (
-              <CreditCard className='h-4.5 w-4.5' aria-hidden />
+              <CreditCard className='h-4 w-4' aria-hidden />
             ) : (
-              <Sparkles className='h-4.5 w-4.5' aria-hidden />
+              <Sparkles className='h-4 w-4' aria-hidden />
             )
           }
           title={
@@ -142,7 +142,6 @@ export function SettingsBillingSection() {
             <Button
               onClick={handleBilling}
               loading={portalMutation.isPending || billingLoading || undefined}
-              className='h-7 rounded-[8px] px-2.5 text-[11px] font-[510]'
               variant='secondary'
               size='sm'
             >

@@ -13,8 +13,8 @@ import {
 } from '@jovie/ui';
 import { Download, Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { SettingsActionRow } from '@/components/features/dashboard/molecules/SettingsActionRow';
-import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
+import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useDeleteAccountMutation, useExportDataMutation } from '@/lib/queries';
 
