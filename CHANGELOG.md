@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.105] - 2026-03-30
+
+### Changed
+
+- Audience table consolidated from 9 columns to 6: User (with type dot), Location, Engagement (visits + intent), Value (dollar amount), and Last Seen (action + time)
+- Audience table now responsively hides Location and Value columns below 1024px
+- Mobile audience cards now show city and LTV value inline, with a subtle accent border for high-value members
+- LTV column displays actual dollar amounts instead of tier labels ($, $$, $$$)
+
+### Added
+
+- Text casing rules in DESIGN.md and AGENTS.md to prevent lowercase labels and headings
+- `capitalizeFirst()` utility for consistent casing on dynamic database strings
+- New `AudienceEngagementCell` component combining visit count with intent icon
+
 ## [26.4.104] - 2026-03-30
 
 ### Changed
