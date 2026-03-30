@@ -376,8 +376,9 @@ export function AdminFeedbackTable({
               <DrawerCardActionBar
                 primaryActions={
                   [
-                    ...(selected.status !== 'dismissed'
-                      ? [
+                    ...(selected.status === 'dismissed'
+                      ? []
+                      : [
                           {
                             id: 'dismiss-feedback',
                             label: 'Dismiss',
@@ -387,8 +388,7 @@ export function AdminFeedbackTable({
                               dismissRow(selected);
                             },
                           } satisfies DrawerHeaderAction,
-                        ]
-                      : []),
+                        ]),
                     {
                       id: 'copy-feedback-markdown',
                       label: 'Copy as Markdown',
@@ -402,13 +402,13 @@ export function AdminFeedbackTable({
               />
               <div className='border-t border-subtle px-3.5 py-2'>
                 <span className='text-[12px] leading-[16px] text-tertiary-token'>
-                  {selected.status !== 'dismissed'
-                    ? 'Marked as pending'
-                    : `Dismissed ${
+                  {selected.status === 'dismissed'
+                    ? `Dismissed ${
                         selected.dismissedAtIso
                           ? new Date(selected.dismissedAtIso).toLocaleString()
                           : ''
-                      }`}
+                      }`
+                    : 'Marked as pending'}
                 </span>
               </div>
             </DrawerSurfaceCard>

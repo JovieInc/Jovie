@@ -145,8 +145,8 @@ export function EntitySidebarShell({
       contextMenuItems={contextMenuItems}
       data-testid={testId}
     >
-      <div className='flex h-full min-h-0 flex-col gap-1.5 px-1.5 py-1.5 lg:px-0 lg:py-0'>
-        <div className='shrink-0 space-y-1.5'>
+      <div className='flex h-full min-h-0 flex-col gap-1 px-1.5 py-1.5 lg:px-0 lg:py-0'>
+        <div className='shrink-0 space-y-1'>
           <DrawerSurfaceCard
             variant='card'
             className='overflow-hidden lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none'
@@ -208,24 +208,22 @@ export function EntitySidebarShell({
           {isMinimalHeader && !isEmpty && entityHeader ? (
             <div
               data-testid='entity-sidebar-entity-header'
-              className='space-y-2 lg:px-1.5'
+              className='space-y-1 lg:px-1.5'
             >
               {entityHeader}
             </div>
           ) : null}
 
           {isMinimalHeader && !isEmpty && tabs && !renderMinimalTabsInHeader ? (
-            <DrawerSurfaceCard
-              variant='card'
-              className='overflow-hidden'
-              testId='entity-sidebar-tabs-card'
+            <div
+              className={cn(
+                'px-3 py-1 lg:px-[18px] [&>*]:w-full',
+                tabsContainerClassName
+              )}
+              data-testid='entity-sidebar-tabs-card'
             >
-              <div
-                className={cn('px-3 py-2 [&>*]:w-full', tabsContainerClassName)}
-              >
-                {tabs}
-              </div>
-            </DrawerSurfaceCard>
+              {tabs}
+            </div>
           ) : null}
         </div>
 
@@ -238,7 +236,7 @@ export function EntitySidebarShell({
         ) : (
           <>
             <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5'>
-              <div className='space-y-2'>{children}</div>
+              <div className='space-y-1'>{children}</div>
             </div>
 
             {footer ? (

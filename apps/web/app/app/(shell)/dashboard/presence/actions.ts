@@ -86,7 +86,7 @@ export async function loadDspPresence(): Promise<DspPresenceData> {
       externalArtistUrl: match.externalArtistUrl,
       externalArtistImageUrl: match.externalArtistImageUrl,
       confidenceScore:
-        match.confidenceScore != null ? Number(match.confidenceScore) : null,
+        match.confidenceScore == null ? null : Number(match.confidenceScore),
       confidenceBreakdown: match.confidenceBreakdown,
       matchingIsrcCount: match.matchingIsrcCount,
       status: match.status as DspMatchStatus,
