@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.102] - 2026-03-29
+
+### Added
+
+- DSP icons for all regional streaming platforms (Deezer, NetEase Music, QQ Music, JioSaavn, LINE MUSIC, Yandex Music, KKBOX, Gaana, JOOX, Audius, AWA, FLO, Trebel)
+- Provider config and platform mappings for 13 previously unmapped ProviderKey types
+
 ## [26.4.101] - 2026-03-29
 
 ### Added
