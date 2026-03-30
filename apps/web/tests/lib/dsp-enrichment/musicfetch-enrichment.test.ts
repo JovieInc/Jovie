@@ -809,6 +809,43 @@ describe('musicfetch-enrichment', () => {
       );
     });
 
+    it('seeds MusicFetch presence matches without fake confidence data', async () => {
+      const musicFetchResult = makeMusicFetchResult();
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload()
+      );
+
+      const appleMusicInsert = mockPlainDbValues.mock.calls.find(
+        ([values]) =>
+          (values as { providerId?: string }).providerId === 'apple_music'
+      )?.[0] as
+        | {
+            confidenceScore?: unknown;
+            confidenceBreakdown?: unknown;
+            matchSource?: string;
+            status?: string;
+          }
+        | undefined;
+
+      expect(appleMusicInsert).toEqual(
+        expect.objectContaining({
+          confidenceScore: null,
+          confidenceBreakdown: null,
+          matchSource: 'musicfetch',
+          status: 'auto_confirmed',
+        })
+      );
+    });
+
     it('seeds well above ten streaming DSP matches when MusicFetch returns a broad service set', async () => {
       const musicFetchResult = makeMusicFetchResult({
         services: {
