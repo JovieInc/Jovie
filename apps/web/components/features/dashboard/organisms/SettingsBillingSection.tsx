@@ -14,6 +14,50 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useBillingStatusQuery, usePortalMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
+function resolvePlanLabel(plan: string | null | undefined): string {
+  if (plan === 'max' || plan === 'growth') return 'Max';
+  if (plan === 'pro') return 'Pro';
+  return 'Free';
+}
+
+function resolveBadgeLabel(ctx: {
+  billingLoading: boolean;
+  isStale: boolean;
+  isPro: boolean;
+  canOpenPortal: boolean;
+}): string {
+  if (ctx.billingLoading) return 'Syncing';
+  if (ctx.isStale) return 'Cached';
+  if (ctx.isPro) return 'Active';
+  if (ctx.canOpenPortal) return 'Manageable';
+  return 'Free';
+}
+
+function resolveBadgeVariant(ctx: {
+  billingLoading: boolean;
+  isStale: boolean;
+  isPro: boolean;
+}): 'secondary' | 'warning' | 'success' {
+  if (ctx.billingLoading) return 'secondary';
+  if (ctx.isStale) return 'warning';
+  if (ctx.isPro) return 'success';
+  return 'secondary';
+}
+
+function resolveSummaryDescription(ctx: {
+  billingLoading: boolean;
+  isPro: boolean;
+  canOpenPortal: boolean;
+}): string {
+  if (ctx.billingLoading)
+    return 'Checking your subscription and billing access.';
+  if (ctx.isPro)
+    return 'Manage invoices, payment methods, and subscription details without leaving the app.';
+  if (ctx.canOpenPortal)
+    return 'Open Stripe to review invoices, payment details, or reactivate your plan.';
+  return 'Compare plans and upgrade when you are ready.';
+}
+
 export function SettingsBillingSection() {
   const router = useRouter();
   const { data: billingData, isLoading: billingLoading } =
@@ -23,37 +67,25 @@ export function SettingsBillingSection() {
   const isPro = billingData?.isPro ?? false;
   const hasStripeCustomer = billingData?.hasStripeCustomer ?? false;
   const isStale = billingData?.stale ?? false;
-  const planLabel =
-    billingData?.plan === 'max' || billingData?.plan === 'growth'
-      ? 'Max'
-      : billingData?.plan === 'pro'
-        ? 'Pro'
-        : 'Free';
+  const planLabel = resolvePlanLabel(billingData?.plan);
   const canOpenPortal = hasStripeCustomer;
-  const badgeLabel = billingLoading
-    ? 'Syncing'
-    : isStale
-      ? 'Cached'
-      : isPro
-        ? 'Active'
-        : canOpenPortal
-          ? 'Manageable'
-          : 'Free';
-  const badgeVariant = billingLoading
-    ? 'secondary'
-    : isStale
-      ? 'warning'
-      : isPro
-        ? 'success'
-        : 'secondary';
+  const badgeLabel = resolveBadgeLabel({
+    billingLoading,
+    isStale,
+    isPro,
+    canOpenPortal,
+  });
+  const badgeVariant = resolveBadgeVariant({
+    billingLoading,
+    isStale,
+    isPro,
+  });
   const summaryTitle = billingLoading ? 'Loading billing' : `${planLabel} plan`;
-  const summaryDescription = billingLoading
-    ? 'Checking your subscription and billing access.'
-    : isPro
-      ? 'Manage invoices, payment methods, and subscription details without leaving the app.'
-      : canOpenPortal
-        ? 'Open Stripe to review invoices, payment details, or reactivate your plan.'
-        : 'Compare plans and upgrade when you are ready.';
+  const summaryDescription = resolveSummaryDescription({
+    billingLoading,
+    isPro,
+    canOpenPortal,
+  });
   const primaryActionLabel = canOpenPortal
     ? 'Manage in Stripe'
     : 'Compare plans';
