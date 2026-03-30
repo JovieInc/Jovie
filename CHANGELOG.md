@@ -17,8 +17,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- DSP icons for all regional streaming platforms (Deezer, NetEase Music, QQ Music, JioSaavn, LINE MUSIC, Yandex Music, KKBOX, Gaana, JOOX, Audius, AWA, FLO, Trebel)
-- Provider config and platform mappings for 13 previously unmapped ProviderKey types
+- Interactive investor links manager: create links, copy shareable URLs, toggle active/inactive, deactivate with confirmation
+- Investor portal settings form: fundraise display, CTA URLs, follow-up automation, Slack webhook
+- Referral settings page wired to existing referral APIs (code display, stats, program terms)
+- Ad pixels settings page wired to existing pixel APIs (Facebook, Google, TikTok with encrypted token storage)
+- Route completeness guard test: catches orphaned loading skeletons without matching pages in CI
+
+### Changed
+
+- Investor link delete now correctly soft-deletes (matches server behavior) instead of removing from list
 
 ## [26.4.101] - 2026-03-29
 
