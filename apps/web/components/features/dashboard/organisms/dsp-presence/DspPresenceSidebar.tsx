@@ -2,7 +2,6 @@
 
 import { Button } from '@jovie/ui';
 
-import { Camera } from 'lucide-react';
 import Image from 'next/image';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import type { DspPresenceItem } from '@/app/app/(shell)/dashboard/presence/actions';
@@ -90,7 +89,10 @@ function SidebarEntityHeader({
             <div className='relative flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-surface-0'>
               <DspProviderIcon provider={item.providerId} size='lg' />
               <div className='absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/60'>
-                <Camera className='h-2.5 w-2.5 text-amber-600 dark:text-amber-400' />
+                <Icon
+                  name='Camera'
+                  className='h-2.5 w-2.5 text-amber-600 dark:text-amber-400'
+                />
               </div>
             </div>
           )}
