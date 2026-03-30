@@ -15,7 +15,7 @@ export function buildPillLabel(link: DetectedLink): string {
   const cleanSuggested = (() => {
     if (!suggested) return '';
     // "Platform (@handle)" pattern (TikTok, etc.)
-    const parenMatch = suggested.match(/\(@([^)]+)\)/);
+    const parenMatch = /\(@([^)]+)\)/.exec(suggested);
     if (parenMatch) return `@${parenMatch[1]}`;
     // "Handle on Platform" pattern
     const onIdx = suggested.toLowerCase().indexOf(' on ');
