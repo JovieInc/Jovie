@@ -159,7 +159,9 @@ function writeResult(options: PerfAuthCliOptions, output: object) {
 
 async function main() {
   const options = parseCliArgs(process.argv.slice(2));
-  if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
+  const usedBypassAuth = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+
+  if (usedBypassAuth) {
     mkdirSync(dirname(options.outPath), { recursive: true });
     await runBypassAuthSetup(options);
   } else {
@@ -191,7 +193,7 @@ async function main() {
     baseUrl: options.baseUrl,
     cookieCount: readStorageState(options.outPath).cookies?.length ?? 0,
     persona: options.persona,
-    sourcePath: authSetupOutputPath,
+    sourcePath: usedBypassAuth ? 'test-auth-bypass' : authSetupOutputPath,
   });
 }
 

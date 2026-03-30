@@ -386,12 +386,8 @@ export async function ensureDevTestAuthActor(
     isAdmin: config.isAdmin,
   });
 
-  let profilePath = config.profilePath;
-
-  if (persona === 'creator' || persona === 'admin') {
-    await ensurePersonaProfile(persona, dbUserId, config);
-    profilePath = `/${config.username}`;
-  }
+  await ensurePersonaProfile(persona, dbUserId, config);
+  const profilePath = `/${config.username}`;
 
   try {
     await invalidateTestUserCaches(

@@ -149,7 +149,7 @@ describe('dev-test-auth.server', () => {
     });
   });
 
-  it('prefers explicit admin credentials and skips creator-profile provisioning for admin', async () => {
+  it('prefers explicit admin credentials and provisions an admin profile', async () => {
     vi.stubEnv('E2E_CLERK_ADMIN_USERNAME', 'admin+clerk_test@jov.ie');
     const { ensureDevTestAuthActor } = await import(
       '@/lib/auth/dev-test-auth.server'
@@ -162,9 +162,28 @@ describe('dev-test-auth.server', () => {
         username: 'browse-admin-user',
       })
     );
-    expect(mockEnsureCreatorProfileRecord).not.toHaveBeenCalled();
-    expect(mockEnsureUserProfileClaim).not.toHaveBeenCalled();
-    expect(mockSetActiveProfileForUser).not.toHaveBeenCalled();
+    expect(mockEnsureCreatorProfileRecord).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        username: 'browse-admin-user',
+        usernameNormalized: 'browse-admin-user',
+        bio: 'Stable admin profile for local perf checks and admin-shell QA.',
+        venmoHandle: 'browse-admin-user',
+        isPublic: false,
+        isClaimed: true,
+      })
+    );
+    expect(mockEnsureUserProfileClaim).toHaveBeenCalledWith(
+      expect.anything(),
+      'db_user',
+      'profile_1'
+    );
+    expect(mockSetActiveProfileForUser).toHaveBeenCalledWith(
+      expect.anything(),
+      'db_user',
+      'profile_1'
+    );
+    expect(mockEnsureSocialLinkRecord).not.toHaveBeenCalled();
     expect(actor).toEqual({
       persona: 'admin',
       clerkUserId: 'user_clerk',
@@ -172,7 +191,7 @@ describe('dev-test-auth.server', () => {
       username: 'browse-admin-user',
       fullName: 'Browse Admin',
       isAdmin: true,
-      profilePath: null,
+      profilePath: '/browse-admin-user',
     });
   });
 
