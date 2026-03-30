@@ -22,18 +22,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.105] - 2026-03-30
 
-### Changed
+### Fixed
 
-- Audience table consolidated from 9 columns to 6: User (with type dot), Location, Engagement (visits + intent), Value (dollar amount), and Last Seen (action + time)
-- Audience table now responsively hides Location and Value columns below 1024px
-- Mobile audience cards now show city and LTV value inline, with a subtle accent border for high-value members
-- LTV column displays actual dollar amounts instead of tier labels ($, $$, $$$)
-
-### Added
-
-- Text casing rules in DESIGN.md and AGENTS.md to prevent lowercase labels and headings
-- `capitalizeFirst()` utility for consistent casing on dynamic database strings
-- New `AudienceEngagementCell` component combining visit count with intent icon
+- Home page now renders the real chat UI instead of a separate card-style layout introduced by the perf wave
+- Added guardrail rule preventing performance PRs from replacing route UIs with different layouts
+- Added regression test ensuring the home page always renders the same chat component as `/app/chat`
 
 ## [26.4.104] - 2026-03-30
 
