@@ -105,6 +105,20 @@ export function JovieChat({
   const insightsSummary = useInsightsSummaryQuery({
     enabled: shouldLoadInsightSuggestions,
   });
+  const showGreetingSummary = useMemo(() => {
+    if (isFirstSession) {
+      return true;
+    }
+
+    const hasInsight = (insightsSummary.data?.insights ?? []).some(
+      insight => insight.title.trim().length > 0
+    );
+    if (hasInsight) {
+      return true;
+    }
+
+    return (tippingStats?.tipsSubmitted ?? 0) > 0;
+  }, [insightsSummary.data?.insights, isFirstSession, tippingStats]);
 
   const {
     input,
@@ -455,78 +469,99 @@ export function JovieChat({
         ) : (
           <motion.div
             key='empty-state'
-            className='flex flex-1 flex-col'
+            className='flex flex-1 flex-col overflow-y-auto'
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.15 }}
           >
-            {/* Content area */}
-            <div className='flex flex-1 flex-col items-center justify-center px-4 py-8 sm:px-5 sm:py-10'>
-              <div className='chat-stagger w-full max-w-[46rem] space-y-4 sm:space-y-5'>
-                {showSuggestedProfiles && (
-                  <SuggestedProfilesCarousel
-                    suggestions={suggestedProfiles.suggestions}
-                    isLoading={suggestedProfiles.isLoading}
-                    currentIndex={suggestedProfiles.currentIndex}
-                    total={suggestedProfiles.total}
-                    next={suggestedProfiles.next}
-                    prev={suggestedProfiles.prev}
-                    confirm={suggestedProfiles.confirm}
-                    reject={suggestedProfiles.reject}
-                    isActioning={suggestedProfiles.isActioning}
-                    username={username}
-                    displayName={displayName}
-                    avatarUrl={avatarUrl}
+            <div className='flex flex-1 flex-col px-4 py-8 sm:px-5 sm:py-10'>
+              <div className='mx-auto flex w-full max-w-[52rem] flex-1 flex-col justify-center'>
+                <div className='relative'>
+                  <div
+                    aria-hidden='true'
+                    className='pointer-events-none absolute left-1/2 top-[5.5rem] h-56 w-56 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,color-mix(in_oklab,var(--linear-accent)_12%,transparent)_0%,transparent_72%)] blur-3xl'
                   />
-                )}
 
-                {!hasCarouselItems &&
-                  (profileCompletion?.percentage ?? 0) < 100 && (
-                    <ProfileCompletionCard />
-                  )}
+                  <div className='relative mx-auto flex max-w-[42rem] flex-col items-center text-center'>
+                    <h1 className='text-balance text-[2rem] font-[560] tracking-[-0.04em] text-primary-token sm:text-[2.75rem]'>
+                      Welcome to Jovie
+                    </h1>
+                    <p className='mt-2 max-w-[28rem] text-balance text-[14px] leading-6 text-secondary-token sm:text-[15px]'>
+                      Ask anything or tell Jovie what you need
+                    </p>
 
-                {!hasCarouselItems &&
-                  (profileCompletion?.percentage ?? 0) >= 100 && (
-                    <>
+                    {showGreetingSummary && (
                       <JovieGreeting
                         username={username}
                         isFirstSession={isFirstSession}
                         insights={insightsSummary.data?.insights ?? []}
                         tippingStats={tippingStats}
+                        variant='inline'
+                        className='mt-4'
                       />
+                    )}
+                  </div>
 
-                      <SuggestedPrompts
-                        onSelect={handleSuggestedPrompt}
-                        isFirstSession={isFirstSession}
-                        latestReleaseTitle={latestReleaseTitle}
-                        canUseAdvancedTools={aiCanUseTools}
+                  <div className='relative mx-auto mt-6 w-full max-w-[35rem] space-y-3'>
+                    {isRateLimited && (
+                      <p
+                        className='text-center text-xs text-tertiary-token'
+                        aria-live='polite'
+                      >
+                        Sending too fast. Please wait a second before your next
+                        message.
+                      </p>
+                    )}
+                    <ChatUsageAlert />
+                    <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
+
+                    {chatError && (
+                      <ErrorDisplay
+                        chatError={chatError}
+                        onRetry={handleRetry}
+                        isLoading={isLoading}
+                        isSubmitting={isSubmitting}
                       />
-                    </>
-                  )}
-              </div>
-            </div>
+                    )}
+                  </div>
 
-            {/* Input pinned at bottom */}
-            <div className='bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-6'>
-              <div className='mx-auto w-full max-w-2xl space-y-3'>
-                {isRateLimited && (
-                  <p className='text-xs text-tertiary-token' aria-live='polite'>
-                    Sending too fast. Please wait a second before your next
-                    message.
-                  </p>
-                )}
-                <ChatUsageAlert />
-                <ChatInput {...chatInputProps} />
+                  <div className='mt-5 flex flex-col items-center gap-3'>
+                    <p className='text-[11px] font-[560] tracking-[0.01em] text-tertiary-token'>
+                      Get Started With Some Examples
+                    </p>
+                    <SuggestedPrompts
+                      onSelect={handleSuggestedPrompt}
+                      isFirstSession={isFirstSession}
+                      latestReleaseTitle={latestReleaseTitle}
+                      canUseAdvancedTools={aiCanUseTools}
+                    />
+                  </div>
 
-                {chatError && (
-                  <ErrorDisplay
-                    chatError={chatError}
-                    onRetry={handleRetry}
-                    isLoading={isLoading}
-                    isSubmitting={isSubmitting}
-                  />
-                )}
+                  <div className='chat-stagger mx-auto mt-6 w-full max-w-[46rem] space-y-4 sm:space-y-5'>
+                    {showSuggestedProfiles && (
+                      <SuggestedProfilesCarousel
+                        suggestions={suggestedProfiles.suggestions}
+                        isLoading={suggestedProfiles.isLoading}
+                        currentIndex={suggestedProfiles.currentIndex}
+                        total={suggestedProfiles.total}
+                        next={suggestedProfiles.next}
+                        prev={suggestedProfiles.prev}
+                        confirm={suggestedProfiles.confirm}
+                        reject={suggestedProfiles.reject}
+                        isActioning={suggestedProfiles.isActioning}
+                        username={username}
+                        displayName={displayName}
+                        avatarUrl={avatarUrl}
+                      />
+                    )}
+
+                    {!hasCarouselItems &&
+                      (profileCompletion?.percentage ?? 0) < 100 && (
+                        <ProfileCompletionCard />
+                      )}
+                  </div>
+                </div>
               </div>
             </div>
           </motion.div>

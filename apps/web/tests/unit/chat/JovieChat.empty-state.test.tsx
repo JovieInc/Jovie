@@ -158,6 +158,19 @@ describe('JovieChat empty state', () => {
     mockPlanGateState.aiCanUseTools = false;
   });
 
+  it('renders the authenticated home hero with centered examples', () => {
+    const { getByText } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' displayName='Tim' />
+    );
+
+    expect(getByText('Welcome to Jovie')).toBeTruthy();
+    expect(getByText('Ask anything or tell Jovie what you need')).toBeTruthy();
+    expect(getByText('Get Started With Some Examples')).toBeTruthy();
+    expect(getByText('Preview profile')).toBeTruthy();
+    expect(getByText('Change photo')).toBeTruthy();
+    expect(getByText('Release link')).toBeTruthy();
+  });
+
   it('shows the top insight in the greeting and keeps prompt cards skill-based', () => {
     mockInsightsSummaryState.data = {
       insights: [createInsight()],
@@ -167,6 +180,7 @@ describe('JovieChat empty state', () => {
       <JovieChat profileId='profile-1' displayName='Tim' username='timwhite' />
     );
 
+    expect(getByText('Welcome to Jovie')).toBeTruthy();
     expect(getByText('Welcome back')).toBeTruthy();
     expect(
       getByText('Your subscribers jumped 23% in LA this week.')
