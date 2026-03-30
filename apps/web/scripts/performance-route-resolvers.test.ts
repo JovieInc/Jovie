@@ -243,9 +243,33 @@ describe('performance route resolvers', () => {
         waitUntil: 'domcontentloaded',
       }
     );
+    expect(waitForSelector).toHaveBeenNthCalledWith(
+      1,
+      '[data-testid="release-row"]',
+      {
+        timeout: 15_000,
+      }
+    );
+    expect(waitForSelector).toHaveBeenNthCalledWith(
+      2,
+      '[data-testid="release-sidebar"]',
+      {
+        timeout: 15_000,
+      }
+    );
+    expect(waitForSelector).toHaveBeenNthCalledWith(
+      3,
+      '[data-testid="release-tasks-card"]',
+      {
+        timeout: 15_000,
+      }
+    );
     expect(click).toHaveBeenNthCalledWith(1, '[data-testid="release-row"]');
     expect(click).toHaveBeenNthCalledWith(2, 'button:has-text("Tasks")');
     expect(click).toHaveBeenNthCalledWith(3, 'button:has-text("Open")');
+    expect(waitForURL).toHaveBeenCalledWith('**/tasks', {
+      timeout: 15_000,
+    });
     expect(contextClose).toHaveBeenCalledOnce();
     expect(browserClose).toHaveBeenCalledOnce();
   });
