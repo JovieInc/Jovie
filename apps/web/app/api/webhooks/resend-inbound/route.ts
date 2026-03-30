@@ -29,6 +29,7 @@ import { db } from '@/lib/db';
 import { emailThreads, inboundEmails } from '@/lib/db/schema/inbox';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { classifyEmail } from '@/lib/inbox/classifier';
 import { normalizeSubject } from '@/lib/inbox/constants';
@@ -256,6 +257,17 @@ export async function POST(req: NextRequest) {
       from: data.from,
       error: error instanceof Error ? error.message : String(error),
     });
+    await captureCriticalError(
+      'Resend inbound webhook processing failed',
+      error,
+      {
+        route: '/api/webhooks/resend-inbound',
+        username,
+        from: data.from,
+        recipientEmail,
+        emailId: data.email_id,
+      }
+    );
 
     // Return 500 so Resend retries
     return NextResponse.json(
