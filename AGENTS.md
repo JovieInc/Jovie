@@ -44,12 +44,14 @@ If a dedicated helper is added later (for example `./scripts/dev-db-branch.sh`),
 
 ### Running tests and commands requiring secrets
 
-ALL commands that need secrets MUST be prefixed with `doppler run --`:
+ALL commands that need secrets MUST be prefixed with Doppler, and local/dev commands should pin the repo's default scope explicitly as `doppler run --project jovie-web --config dev --`:
 
-- `doppler run -- pnpm test`
-- `doppler run -- pnpm exec playwright test`
-- `doppler run -- pnpm run dev:local`
+- `doppler run --project jovie-web --config dev -- pnpm test`
+- `doppler run --project jovie-web --config dev -- pnpm exec playwright test`
+- `doppler run --project jovie-web --config dev -- pnpm run dev:local`
 - `pnpm test` alone **will fail** — missing env vars
+
+Reason: local agents and worktrees should not rely on whatever Doppler scope happens to be active in the shell.
 
 ### If Doppler is not installed
 

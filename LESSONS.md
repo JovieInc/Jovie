@@ -74,6 +74,11 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ## CI / Build
 
+### Local Doppler commands must pin `jovie-web/dev`
+**Mistake:** Local commands were run as bare `doppler run -- ...`, which depends on ambient Doppler scope. In fresh worktrees that can fail with "You must specify a config" even though the repo always expects the `jovie-web/dev` local setup.
+
+**Rule:** For local development, testing, and agent commands that need secrets, use `doppler run --project jovie-web --config dev -- <command>`. `scripts/setup.sh` and printed examples should use the same explicit form.
+
 ### New generated Drizzle migrations must be allowed to update `_journal.json`
 **Mistake:** The root migration rule and file-protection hook treated any `_journal.json` edit as forbidden, even though the repo's migration scripts require a new migration to append the journal and add a snapshot.
 
