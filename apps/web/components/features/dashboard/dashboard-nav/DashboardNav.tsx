@@ -136,11 +136,11 @@ export function DashboardNav(_: DashboardNavProps) {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
       const prefetchDelayMs = itemId === 'releases' ? 0 : 150;
       prefetchTimerRef.current = setTimeout(() => {
-        void import('@/lib/queries/prefetch-dashboard').then(
-          ({ prefetchForRoute }) => {
-            prefetchForRoute(itemId, queryClient, profileId || undefined);
-          }
-        );
+        void import('@/lib/queries/prefetch-dashboard')
+          .then(({ prefetchForRoute }) =>
+            prefetchForRoute(itemId, queryClient, profileId || undefined)
+          )
+          .catch(() => {});
       }, prefetchDelayMs);
     },
     [queryClient, profileId]
