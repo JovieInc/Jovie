@@ -35,10 +35,23 @@ export function isReleasesShellRoute(pathname: string | null): boolean {
   );
 }
 
+function isDashboardSubRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname.startsWith(`${APP_ROUTES.DASHBOARD_OVERVIEW}/`);
+}
+
 export function shouldUseEssentialShellData(pathname: string | null): boolean {
-  return isChatShellRoute(pathname) || isReleasesShellRoute(pathname);
+  return (
+    isChatShellRoute(pathname) ||
+    isReleasesShellRoute(pathname) ||
+    isDashboardSubRoute(pathname)
+  );
 }
 
 export function shouldRedirectToOnboarding(pathname: string | null): boolean {
-  return isChatShellRoute(pathname) || isReleasesShellRoute(pathname);
+  return (
+    isChatShellRoute(pathname) ||
+    isReleasesShellRoute(pathname) ||
+    isDashboardSubRoute(pathname)
+  );
 }
