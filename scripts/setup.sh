@@ -15,6 +15,9 @@ info()    { echo "   $*"; }
 
 MISSING=()
 IS_WORKTREE=false
+DOPPLER_PROJECT="jovie-web"
+DOPPLER_CONFIG="dev"
+DOPPLER_LOCAL_RUN=(doppler run --project "$DOPPLER_PROJECT" --config "$DOPPLER_CONFIG" --)
 
 if git rev-parse --is-inside-work-tree &>/dev/null && [ -f ".git" ]; then
   IS_WORKTREE=true
@@ -150,13 +153,13 @@ else
     fi
   else
     # Interactive mode: check if doppler is configured and working
-    if doppler run -- echo "doppler-ok" &>/dev/null 2>&1; then
-      success "Doppler is authenticated and configured"
+    if "${DOPPLER_LOCAL_RUN[@]}" echo "doppler-ok" &>/dev/null 2>&1; then
+      success "Doppler is authenticated for ${DOPPLER_PROJECT} / ${DOPPLER_CONFIG}"
     else
       # Try to auto-configure the project/config scope
-      info "Configuring Doppler project (jovie-web / dev)..."
-      if doppler setup --project jovie-web --config dev --no-interactive 2>/dev/null; then
-        success "Doppler configured (jovie-web / dev)"
+      info "Configuring Doppler project (${DOPPLER_PROJECT} / ${DOPPLER_CONFIG})..."
+      if doppler setup --project "$DOPPLER_PROJECT" --config "$DOPPLER_CONFIG" --no-interactive 2>/dev/null; then
+        success "Doppler configured (${DOPPLER_PROJECT} / ${DOPPLER_CONFIG})"
       else
         # Auto-setup failed — likely not authenticated
         if ! doppler configure get token &>/dev/null 2>&1; then
@@ -169,7 +172,7 @@ else
           MISSING+=("Doppler auth (run: doppler login)")
         else
           warn "Could not auto-configure Doppler project. Run manually:"
-          info "doppler setup --project jovie-web --config dev"
+          info "doppler setup --project ${DOPPLER_PROJECT} --config ${DOPPLER_CONFIG}"
         fi
       fi
     fi
@@ -182,10 +185,10 @@ fi
 # USER_CREATION_FAILED. This step syncs them automatically.
 echo ""
 echo "── Dev Clerk ID sync ─────────────────────────────────────────────────"
-if command -v doppler &>/dev/null && doppler run -- echo "ok" &>/dev/null 2>&1; then
+if command -v doppler &>/dev/null && "${DOPPLER_LOCAL_RUN[@]}" echo "ok" &>/dev/null 2>&1; then
   SYNC_SCRIPT="$REPO_ROOT/scripts/sync-dev-clerk-ids.ts"
   if [[ -f "$SYNC_SCRIPT" ]]; then
-    if doppler run -p jovie-web -c dev -- pnpm tsx "$SYNC_SCRIPT" 2>/dev/null; then
+    if "${DOPPLER_LOCAL_RUN[@]}" pnpm tsx "$SYNC_SCRIPT" 2>/dev/null; then
       success "Dev Clerk IDs synced"
     else
       warn "Clerk ID sync failed (non-blocking — app may prompt user creation)"
@@ -204,10 +207,10 @@ if [[ ${#MISSING[@]} -eq 0 ]]; then
   success "Ready to develop"
   echo ""
   echo "  Start the dev server:"
-  echo "    doppler run -- pnpm --filter web dev:local"
+  echo "    doppler run --project ${DOPPLER_PROJECT} --config ${DOPPLER_CONFIG} -- pnpm --filter web dev:local"
   echo ""
   echo "  Run tests:"
-  echo "    doppler run -- pnpm vitest run"
+  echo "    doppler run --project ${DOPPLER_PROJECT} --config ${DOPPLER_CONFIG} -- pnpm vitest run"
 else
   warn "Missing: $(IFS=', '; echo "${MISSING[*]}")"
   echo "  See instructions above to resolve each item, then re-run: ./scripts/setup.sh"

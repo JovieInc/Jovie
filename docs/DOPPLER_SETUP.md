@@ -68,22 +68,22 @@ doppler configure get
 
 **Development server:**
 ```bash
-doppler run -- pnpm dev
+doppler run --project jovie-web --config dev -- pnpm dev
 ```
 
 **Type checking:**
 ```bash
-doppler run -- pnpm typecheck
+doppler run --project jovie-web --config dev -- pnpm typecheck
 ```
 
 **Tests:**
 ```bash
-doppler run -- pnpm test
+doppler run --project jovie-web --config dev -- pnpm test
 ```
 
 **Any command:**
 ```bash
-doppler run -- <your-command>
+doppler run --project jovie-web --config dev -- <your-command>
 ```
 
 ### 5. Update package.json Scripts (Optional)
@@ -234,8 +234,8 @@ doppler configure get
 # Reset to dev
 doppler setup --project jovie-web --config dev
 
-# Or use explicit config flag
-doppler run --config dev -- pnpm dev
+# Or use explicit project + config flags
+doppler run --project jovie-web --config dev -- pnpm dev
 ```
 
 ### Vercel Sync Not Working
