@@ -109,7 +109,7 @@ function ReleaseViewButtons({
       }))}
       size='sm'
       surface='muted'
-      className={cn('w-full md:w-auto', className)}
+      className={cn('w-auto', className)}
       triggerClassName='min-w-[72px] px-3'
       aria-label='Choose releases view'
     />
@@ -309,7 +309,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           <ReleaseViewButtons
             value={releaseView}
             onChange={onReleaseViewChange}
-            className='w-full pb-px md:w-auto'
+            className='pb-px'
           />
         ) : null
       }

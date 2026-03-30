@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.104] - 2026-03-30
+
+### Changed
+
+- Sidebar drawers (Analytics, Audience Member, DSP Presence, Profile Contact) now consolidate the close button into the overflow menu instead of showing a standalone close button alongside the three-dot menu
+- Updated drawer chrome tests to verify the new overflow menu pattern
+
 ## [26.4.103] - 2026-03-30
 
 ### Changed
