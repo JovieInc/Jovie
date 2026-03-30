@@ -139,7 +139,7 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 
    ```bash
    # With Doppler
-   doppler run -- pnpm drizzle:migrate:main
+   doppler run --project jovie-web --config dev -- pnpm drizzle:migrate:main
 
    # Or without Doppler
    pnpm drizzle:migrate:main
@@ -149,7 +149,7 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 
    ```bash
    # With Doppler (recommended)
-   doppler run -- pnpm dev
+   doppler run --project jovie-web --config dev -- pnpm dev
 
    # Or without Doppler
    pnpm dev
