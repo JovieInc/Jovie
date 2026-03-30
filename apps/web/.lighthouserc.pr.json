@@ -52,7 +52,6 @@
             "forced-reflow-insight": "warn",
             "render-blocking-resources": "off",
             "render-blocking-insight": "off",
-            "forced-reflow-insight": "warn",
             "legacy-javascript-insight": "warn",
             "unused-javascript": "warn",
             "categories:performance": [
