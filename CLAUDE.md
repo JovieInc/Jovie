@@ -44,6 +44,7 @@ This project includes [gstack](https://github.com/garrytan/gstack) vendored at `
 | `/setup-browser-cookies` | Import authenticated browser sessions for testing |
 | `/retro` | Weekly engineering retrospective with commit analysis |
 | `/document-release` | Document a release |
+| `/perf-loop` | Autonomous performance optimization loop (fire and forget) |
 
 **Troubleshooting:** If gstack skills aren't working, run `cd .claude/skills/gstack && ./setup` to build the binary and register skills.
 

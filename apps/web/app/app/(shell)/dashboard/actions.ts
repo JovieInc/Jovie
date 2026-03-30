@@ -30,6 +30,7 @@ export {
   getDashboardDataCached,
   getDashboardDataEssential,
   getDashboardDataFresh,
+  getDashboardShellData,
   getProfileSocialLinks,
   prefetchDashboardData,
   publishProfileBasics,

@@ -40,6 +40,21 @@ export const TABLE_MIN_WIDTHS = {
 } as const;
 
 /**
+ * Skeleton row count for loading shells.
+ *
+ * Sized to fill the tallest common viewport (1440px minus shell chrome)
+ * so the skeleton always covers the visible area with no gap at the bottom.
+ * The overflow-hidden on the table container clips any excess rows.
+ * Using a single generous count avoids layout shift when real data lands.
+ */
+export const SKELETON_ROW_COUNT = {
+  /** Desktop table rows (44px each → 25 rows covers ~1100px) */
+  TABLE: 25,
+  /** Mobile card rows (taller cards → fewer needed) */
+  MOBILE: 16,
+} as const;
+
+/**
  * Release table width calculation constants
  *
  * Base width covers fixed columns: Checkbox(56) + Release(min 200) + Meta(min 200)

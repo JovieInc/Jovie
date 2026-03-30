@@ -119,7 +119,7 @@ export function AudienceMemberSidebar({
             onValueChange={value => setActiveTab(value as AudienceTab)}
             options={AUDIENCE_TAB_OPTIONS}
             ariaLabel='Audience member tabs'
-            distribution='fill'
+            distribution='intrinsic'
           />
         ) : undefined
       }

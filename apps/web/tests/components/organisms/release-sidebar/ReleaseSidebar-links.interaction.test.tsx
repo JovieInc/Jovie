@@ -361,9 +361,13 @@ describe('ReleaseSidebar Links tab', () => {
     await user.click(screen.getByTestId('drawer-tab-details'));
     expect(screen.getAllByText('Metadata').length).toBeGreaterThan(0);
     expect(screen.getByTestId('metadata')).toBeInTheDocument();
-    expect(screen.getByTestId('async-toggle')).toBeInTheDocument();
     expect(screen.queryByTestId('lyrics')).not.toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
+
+    // Switch to Settings tab (async-toggle lives here now)
+    await user.click(screen.getByTestId('drawer-tab-settings'));
+    expect(screen.getByTestId('async-toggle')).toBeInTheDocument();
+    expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
 
     // Switch to Lyrics tab
     await user.click(screen.getByTestId('drawer-tab-lyrics'));

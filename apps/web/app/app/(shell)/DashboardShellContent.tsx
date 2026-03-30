@@ -1,13 +1,26 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
+import { UnavailablePage } from '@/components/UnavailablePage';
+import { APP_ROUTES } from '@/constants/routes';
 import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
 import { OperatorBanner } from '@/features/admin/OperatorBanner';
+import { getUserBanStatus } from '@/lib/auth/ban-check';
 import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
 import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
-import { getDashboardData, setSidebarCollapsed } from './dashboard/actions';
+import {
+  getDashboardData,
+  getDashboardShellData,
+  setSidebarCollapsed,
+} from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
 import { ProfileCompletionRedirect } from './ProfileCompletionRedirect';
+import {
+  resolveAppShellRequestPath,
+  shouldRedirectToOnboarding,
+  shouldUseEssentialShellData,
+} from './shell-route-matches';
 
 /**
  * Async server component that fetches dashboard data,
@@ -17,42 +30,73 @@ import { ProfileCompletionRedirect } from './ProfileCompletionRedirect';
  * so the browser receives a streaming skeleton immediately while this
  * component resolves data from the database.
  *
+ * Ban check runs in parallel with the dashboard data fetch — banned users
+ * are rare enough that blocking every page load for them isn't worth it.
+ *
  * Feature flags are now code-level (no Statsig), so no async bootstrap needed.
  */
 export async function DashboardShellContent({
+  userId,
   children,
 }: {
+  readonly userId: string;
   readonly children: React.ReactNode;
 }) {
-  // Full dashboard data fetch — the provider wraps the entire (shell) tree
-  // and client components (DashboardTipping, ProfileCompletion, etc.) read
-  // tippingStats, hasSocialLinks, hasMusicLinks from context. Using the
-  // essential fetch here would return zeros for those fields.
-  // The Suspense boundary in the layout streams the skeleton while this resolves.
-  const dashboardData = await getDashboardData();
+  // Keep the shell fast on the chat-first landing path and releases.
+  // Other dashboard/settings routes still receive the full dashboard context
+  // because they rely on supplementary fields from the slower fetch.
+  const headerStore = await headers();
+  const pathname = resolveAppShellRequestPath(headerStore.get('next-url'));
+  const useEssentialShell = shouldUseEssentialShellData(pathname);
+
+  // Run ban check in parallel with dashboard data fetch
+  const [dashboardData, banStatus] = await Promise.all([
+    useEssentialShell ? getDashboardShellData(userId) : getDashboardData(),
+    getUserBanStatus(userId),
+  ]);
+
+  if (banStatus.isBanned) {
+    return <UnavailablePage />;
+  }
+
+  if (
+    shouldRedirectToOnboarding(pathname) &&
+    dashboardData.needsOnboarding &&
+    !dashboardData.dashboardLoadError
+  ) {
+    redirect(APP_ROUTES.ONBOARDING);
+  }
 
   // Read sidebar cookie server-side so SSR matches client state (no flash)
   const cookieStore = await cookies();
   const sidebarCookie = cookieStore.get('sidebar:state');
   const sidebarDefaultOpen = sidebarCookie?.value !== 'false';
 
-  return (
-    <HydrateClient state={getDehydratedState()}>
+  const shellContents = (
+    <>
       {/* ENG-004: Show environment issues to admins in non-production */}
       <OperatorBanner isAdmin={dashboardData.isAdmin} />
       <ImpersonationBannerWrapper />
-      <FeatureFlagsProvider>
-        <DashboardDataProvider value={dashboardData}>
-          <ProfileCompletionRedirect />
-          <AuthShellWrapper
-            persistSidebarCollapsed={setSidebarCollapsed}
-            sidebarDefaultOpen={sidebarDefaultOpen}
-            previewPanelDefaultOpen
-          >
-            {children}
-          </AuthShellWrapper>
-        </DashboardDataProvider>
-      </FeatureFlagsProvider>
+      <DashboardDataProvider value={dashboardData}>
+        <ProfileCompletionRedirect />
+        <AuthShellWrapper
+          persistSidebarCollapsed={setSidebarCollapsed}
+          sidebarDefaultOpen={sidebarDefaultOpen}
+          previewPanelDefaultOpen={!useEssentialShell}
+        >
+          {children}
+        </AuthShellWrapper>
+      </DashboardDataProvider>
+    </>
+  );
+
+  if (useEssentialShell) {
+    return shellContents;
+  }
+
+  return (
+    <HydrateClient state={getDehydratedState()}>
+      <FeatureFlagsProvider>{shellContents}</FeatureFlagsProvider>
     </HydrateClient>
   );
 }

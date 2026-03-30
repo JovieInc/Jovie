@@ -597,7 +597,7 @@ export function ProfileContactSidebar() {
           }
           actionsClassName='h-[26px] w-[26px]'
           overflowMode='scroll'
-          distribution='fill'
+          distribution='intrinsic'
         />
       }
     >

@@ -923,7 +923,7 @@ Remove the import or remove "use client" if this should be a server component.
 | Use `db.query.*` or `db.select()` | Direct SQL strings outside lib/db |
 | `db.insert().values([...items])` | Loop with individual `db.insert()` calls |
 
-The project uses `@neondatabase/serverless` with the HTTP driver and Neon's built-in connection pooling. The `lib/db/client.ts` is a legacy HTTP-based client - do not use it.
+The project uses `@neondatabase/serverless` with the **WebSocket driver** for stateful RLS connections. Application code creates a client-side `Pool` (max 20 per Vercel container) because WebSocket connections are stateful and need lifecycle management. The DATABASE_URL uses Neon's **direct** endpoint (not the `-pooler` endpoint). Scripts and migrations use the HTTP driver for stateless one-off operations. The `lib/db/client.ts` is a legacy HTTP-based client — do not use it.
 
 **Transaction Restrictions (Canonical Policy):**
 - **NEVER** introduce new direct `db.transaction()` usage in app code without explicit human approval.
@@ -935,7 +935,7 @@ The project uses `@neondatabase/serverless` with the HTTP driver and Neon's buil
 **Forbidden Database Patterns:**
 | Forbidden                          | Why                               | Alternative                            |
 | ---------------------------------- | --------------------------------- | -------------------------------------- |
-| `db.transaction(async (tx) => ...)` | Neon HTTP driver incompatible     | Sequential operations or batch insert  |
+| `db.transaction(async (tx) => ...)` | Requires explicit approval; use approved RLS wrappers | Sequential operations or batch insert  |
 | `import { Pool } from 'pg'`        | Manual pooling conflicts with Neon | Use `import { db } from '@/lib/db'`   |
 | `import pg from 'pg'`              | Direct postgres driver            | Use `import { db } from '@/lib/db'`   |
 | `new Pool()` or `pool.connect()`   | Manual connection management      | Use `import { db } from '@/lib/db'`   |
@@ -1083,6 +1083,15 @@ The `DashboardHeader` breadcrumb already renders the page name prominently. Do N
 
 **Allowed:** `<PageToolbar start={<span>3 matched platforms</span>} end={<ActionButton />} />`
 **Banned:** `<PageToolbar start={<span>Earnings</span>} />` — duplicates the breadcrumb
+
+### Performance Optimization Loop
+
+`/perf-loop` runs an autonomous optimization loop that measures, experiments,
+and keeps only improvements. State is persisted to `.context/perf/` for resume
+capability. The skill uses `perf:loop` (performance-optimizer.ts) as its
+measurement primitive and commits each accepted improvement atomically.
+
+Runtime: ~30-50 minutes for a full run (4-10 iterations with builds).
 
 ### Testing
 

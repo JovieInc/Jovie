@@ -19,7 +19,6 @@ const CLERK_REQUIRED_EXACT_PATHS = [
 
 const CLERK_REQUIRED_PREFIXES = [
   `${APP_ROUTES.DASHBOARD}/`,
-  '/api/',
   '/trpc',
   '/__clerk/',
   '/monitoring/',
@@ -57,11 +56,25 @@ function hasActiveClerkCookie(cookie: ClerkCookieLike) {
 }
 
 export function shouldBypassClerkForRequest(options: {
+  allowAuthRouteBypass?: boolean;
   cookies: Iterable<ClerkCookieLike>;
   pathInfo: ClerkBypassPathInfo;
   pathname: string;
 }) {
-  if (isClerkRequiredPath(options.pathname, options.pathInfo)) {
+  const allowAuthRouteBypass = options.allowAuthRouteBypass === true;
+
+  // Public API routes must be able to answer as signed-out requests without
+  // entering Clerk's handshake/rewrite flow. Route handlers own auth for
+  // protected APIs, while authenticated callers still keep Clerk enabled
+  // below because they carry active Clerk cookies.
+  const authBypassPathInfo = allowAuthRouteBypass
+    ? {
+        ...options.pathInfo,
+        isAuthPath: false,
+      }
+    : options.pathInfo;
+
+  if (isClerkRequiredPath(options.pathname, authBypassPathInfo)) {
     return false;
   }
 

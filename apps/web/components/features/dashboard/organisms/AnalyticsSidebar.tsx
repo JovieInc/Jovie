@@ -321,7 +321,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
               options={ANALYTICS_TAB_OPTIONS}
               className='w-full'
               ariaLabel='Analytics data tabs'
-              distribution='fill'
+              distribution='intrinsic'
             />
           }
           contentClassName='pt-2'

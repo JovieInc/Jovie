@@ -42,6 +42,9 @@ export const CACHE_TAGS = {
 
   // Billing/subscription data
   BILLING_DATA: 'billing-data',
+
+  // Audience data caches
+  AUDIENCE_DATA: 'audience-data',
 } as const;
 
 export type CacheTag = (typeof CACHE_TAGS)[keyof typeof CACHE_TAGS];
@@ -90,6 +93,17 @@ export function createAvatarTag(userId: string): string {
 
 export function createSmartLinkContentTag(profileId: string): string {
   return `smartlink-content:${profileId}`;
+}
+
+/**
+ * Create a profile-specific audience data cache tag.
+ * Used for targeted invalidation when audience data changes.
+ *
+ * @param profileId - The profile UUID
+ * @returns The cache tag string
+ */
+export function createAudienceDataTag(profileId: string): string {
+  return `audience-data:${profileId}`;
 }
 
 /**

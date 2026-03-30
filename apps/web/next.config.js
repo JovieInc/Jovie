@@ -228,6 +228,7 @@ const nextConfig = {
       { source: '/app/contact', destination: '/app/settings/contacts' },
       { source: '/app/profile', destination: '/app/chat?panel=profile' },
       { source: '/app/contacts', destination: '/app/settings/contacts' },
+      { source: '/app/tipping', destination: '/app/earnings' },
       { source: '/app/tour-dates', destination: '/app/settings/touring' },
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },

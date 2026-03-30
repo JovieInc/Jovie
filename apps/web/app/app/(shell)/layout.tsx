@@ -2,14 +2,19 @@ import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
-import { UnavailablePage } from '@/components/UnavailablePage';
 import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
-import { getUserBanStatus } from '@/lib/auth/ban-check';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
+import ChatLoading from './chat/loading';
 import { DashboardShellContent } from './DashboardShellContent';
 import { DashboardShellSkeleton } from './DashboardShellSkeleton';
+import { ReleaseTableSkeleton } from './dashboard/releases/loading';
+import {
+  isChatShellRoute,
+  isReleasesShellRoute,
+  resolveAppShellRequestPath,
+} from './shell-route-matches';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -28,20 +33,28 @@ export default async function AppShellLayout({
       const headerStore = await headers();
       redirect(buildAppShellSignInUrl(headerStore));
     }
+    const headerStore = await headers();
+    const pathname = resolveAppShellRequestPath(headerStore.get('next-url'));
+    const shellFallback = isChatShellRoute(pathname) ? (
+      <ChatLoading />
+    ) : isReleasesShellRoute(pathname) ? (
+      <ReleaseTableSkeleton />
+    ) : (
+      <DashboardShellSkeleton />
+    );
 
-    // Ban check — the proxy skips user state for /app/* routes (proxy.ts:581-585),
-    // so we check here. Renders the generic unavailable page inline to avoid
-    // layout tree mismatch issues with middleware rewrites on /app/* paths.
-    const banStatus = await getUserBanStatus(auth.userId);
-    if (banStatus.isBanned) {
-      return <UnavailablePage />;
-    }
+    // Ban check moved inside DashboardShellContent (runs in parallel with
+    // shell data fetch). Banned users are 1-in-a-million — their experience
+    // is not worth adding a blocking DB query to the critical path of every
+    // dashboard page load for every user.
 
-    // Stream the shell: the skeleton renders at first byte while
+    // Stream the shell: the route-aware skeleton renders at first byte while
     // DashboardShellContent resolves dashboard data + feature flags.
     return (
-      <Suspense fallback={<DashboardShellSkeleton />}>
-        <DashboardShellContent>{children}</DashboardShellContent>
+      <Suspense fallback={shellFallback}>
+        <DashboardShellContent userId={auth.userId}>
+          {children}
+        </DashboardShellContent>
       </Suspense>
     );
   } catch (error) {

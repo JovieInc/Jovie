@@ -50,15 +50,11 @@ describe('dashboard metadata generation', () => {
     mockLimit.mockResolvedValue([]);
   });
 
-  it('uses display name for app root tab title when available', async () => {
-    mockGetDashboardData.mockResolvedValue({
-      selectedProfile: { displayName: 'Ada' },
-    });
-
+  it('uses the static dashboard title for the app root', async () => {
     const { generateMetadata } = await import('@/app/app/(shell)/page');
     const metadata = await generateMetadata();
 
-    expect(metadata.title).toBe('Ada | Jovie');
+    expect(metadata.title).toBe('Home | Jovie');
   });
 
   it('falls back to dashboard title when profile display name is missing', async () => {

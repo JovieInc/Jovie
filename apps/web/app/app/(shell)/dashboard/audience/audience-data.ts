@@ -10,9 +10,10 @@ import {
   or,
   type SQL,
 } from 'drizzle-orm';
-import { unstable_noStore as noStore } from 'next/cache';
+import { unstable_cache } from 'next/cache';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { CACHE_TAGS, CACHE_TTL, createAudienceDataTag } from '@/lib/cache/tags';
 import {
   buildCursorCondition,
   decodeCursor,
@@ -701,36 +702,19 @@ function buildDataPromise(
   });
 }
 
-export async function getAudienceServerData(params: {
-  userId: string;
-  selectedProfileId: string | null;
-  searchParams: SearchParams;
-  includeDetails?: boolean;
-  memberId?: string;
-  view?: AudienceView;
-  segments?: string[];
-}): Promise<AudienceServerData> {
-  noStore();
-
-  const {
-    userId: _userId,
-    selectedProfileId,
-    searchParams,
-    includeDetails = false,
-    memberId,
-    view = 'all',
-    segments,
-  } = params;
-
-  // Map view to internal mode
-  const mode: AudienceMode = 'members';
-
-  if (!selectedProfileId) {
-    return buildEmptyAudienceData(mode, view);
-  }
-
-  // All audience reads now go through authenticated RLS-protected sessions
-  // RLS bypass capability has been removed for security hardening
+/**
+ * Inner fetch function that runs inside withDbSessionTx.
+ * Separated from getAudienceServerData so unstable_cache can wrap it
+ * without conflicting with the noStore() that withDbSessionTx calls internally.
+ */
+async function fetchAudienceData(
+  selectedProfileId: string,
+  searchParams: SearchParams,
+  includeDetails: boolean,
+  memberId: string | undefined,
+  view: AudienceView,
+  segments: string[] | undefined
+): Promise<AudienceServerData> {
   return await withDbSessionTx(async (tx, clerkUserId) => {
     const data = await buildDataPromise(
       tx,
@@ -751,6 +735,77 @@ export async function getAudienceServerData(params: {
       totalAudienceCount: null,
     };
   });
+}
+
+export async function getAudienceServerData(params: {
+  userId: string;
+  selectedProfileId: string | null;
+  searchParams: SearchParams;
+  includeDetails?: boolean;
+  memberId?: string;
+  view?: AudienceView;
+  segments?: string[];
+}): Promise<AudienceServerData> {
+  const {
+    userId,
+    selectedProfileId,
+    searchParams,
+    includeDetails = false,
+    memberId,
+    view = 'all',
+    segments,
+  } = params;
+
+  // Map view to internal mode
+  const mode: AudienceMode = 'members';
+
+  if (!selectedProfileId) {
+    return buildEmptyAudienceData(mode, view);
+  }
+
+  // Build a stable cache key from all query parameters.
+  // Segments are sorted to ensure consistent key regardless of URL order.
+  const segmentsKey = segments
+    ? [...segments].sort((a, b) => a.localeCompare(b)).join(',')
+    : '';
+  const sp = (key: string): string => {
+    const v = searchParams[key];
+    return Array.isArray(v) ? (v[0] ?? '') : (v ?? '');
+  };
+  const cacheKeyParts: string[] = [
+    'audience-data',
+    userId,
+    selectedProfileId,
+    view,
+    includeDetails ? 'details' : 'summary',
+    memberId ?? '',
+    sp('sort'),
+    sp('direction'),
+    sp('page'),
+    sp('pageSize'),
+    sp('cursor'),
+    segmentsKey,
+  ];
+
+  return unstable_cache(
+    () =>
+      fetchAudienceData(
+        selectedProfileId,
+        searchParams,
+        includeDetails,
+        memberId,
+        view,
+        segments
+      ),
+    cacheKeyParts,
+    {
+      revalidate: CACHE_TTL.MEDIUM, // 300 seconds (5 minutes)
+      tags: [
+        CACHE_TAGS.AUDIENCE_DATA,
+        createAudienceDataTag(selectedProfileId),
+      ],
+    }
+  )();
 }
 
 export function getAudienceUrlSearchParams(searchParams: SearchParams) {

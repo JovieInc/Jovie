@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.103] - 2026-03-30
+
+### Changed
+
+- All dashboard sub-routes now use the fast essential shell data path, reducing unnecessary DB queries for audience, earnings, insights, and presence pages
+- Calibrated skeleton-to-content performance budgets to realistic values based on production build measurements (auth'd server-rendered pages have a ~500ms rendering floor)
+- Fixed presence page performance selector to match actual DOM (`dsp-presence-workspace`)
+
+## [26.4.102] - 2026-03-29
+
+### Added
+
+- DSP icons for all regional streaming platforms (Deezer, NetEase Music, QQ Music, JioSaavn, LINE MUSIC, Yandex Music, KKBOX, Gaana, JOOX, Audius, AWA, FLO, Trebel)
+- Provider config and platform mappings for 13 previously unmapped ProviderKey types
+
+## [26.4.101] - 2026-03-29
+
+### Added
+
+- Re-enrichment pipeline for profiles imported before MusicFetch integration (backfills ~12 additional DSPs per release)
+- Admin API endpoint for single-profile and batch re-enrichment (`/api/admin/re-enrich`)
+- Preview URL capture from Deezer and MusicFetch during link discovery (backfills audio previews when Spotify returns null)
+- Under-enriched profile sweep to automatically find and fix profiles with incomplete DSP coverage
+
+### Fixed
+
+- Preview URLs now validated (HTTPS-only) and sanitized before persistence
+- Deezer empty/non-string preview responses handled gracefully without losing provider link
+
 ## [26.4.100] - 2026-03-29
 
 ### Fixed

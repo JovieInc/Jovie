@@ -128,11 +128,11 @@ describe('DashboardNav interactions', () => {
     expect(screen.getByRole('button', { name: 'Profile' })).toBeDefined();
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
       'href',
-      APP_ROUTES.RELEASES
+      APP_ROUTES.DASHBOARD_RELEASES
     );
     expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
       'href',
-      APP_ROUTES.AUDIENCE
+      APP_ROUTES.DASHBOARD_AUDIENCE
     );
   });
 
