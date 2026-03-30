@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { checkAppleMusicConnection } from '../dashboard/releases/actions';
 import { DeferredChatPageClient } from './DeferredChatPageClient';
 
 const CHAT_DESCRIPTION = 'Start a new thread with Jovie AI';
@@ -12,25 +11,13 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function ChatPage() {
-  const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
-
-  const appleMusicResult = isE2EClientRuntime
-    ? {
-        connected: false,
-        artistName: null,
-        artistId: null,
-      }
-    : await checkAppleMusicConnection().catch(() => ({
-        connected: false,
-        artistName: null,
-        artistId: null,
-      }));
-
-  return (
-    <DeferredChatPageClient
-      appleMusicConnected={appleMusicResult.connected}
-      appleMusicArtistName={appleMusicResult.artistName}
-    />
-  );
+/**
+ * Chat page — renders instantly with no server-side data dependencies.
+ *
+ * Apple Music connection status defaults to disconnected and hydrates
+ * client-side via the dashboard context provider. This eliminates the
+ * ~600ms getDashboardData() call that was blocking first paint.
+ */
+export default function ChatPage() {
+  return <DeferredChatPageClient />;
 }

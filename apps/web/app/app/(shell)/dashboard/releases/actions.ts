@@ -75,7 +75,7 @@ import { slugify } from '@/lib/utils';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { targetPlaylistsSchema } from '@/lib/validation/schemas/dashboard/profile';
-import { getDashboardData } from '../actions';
+import { getDashboardData, getDashboardShellData } from '../actions';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
   'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
@@ -1588,7 +1588,8 @@ export async function checkAppleMusicConnection(): Promise<{
   }
 
   try {
-    const data = await getDashboardData();
+    // Use shell data path (skips settings/entitlements) — only need the profile
+    const data = await getDashboardShellData(userId);
 
     if (data.needsOnboarding || !data.selectedProfile) {
       return { connected: false, artistName: null, artistId: null };
