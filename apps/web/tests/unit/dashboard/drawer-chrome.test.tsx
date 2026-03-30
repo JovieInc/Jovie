@@ -42,7 +42,7 @@ const audienceMember: AudienceMember = {
 };
 
 describe('dashboard drawer chrome', () => {
-  it('audience member drawer uses an entity card with a direct close button', () => {
+  it('audience member drawer has close in overflow menu, not a standalone button', () => {
     render(
       <AudienceMemberSidebar
         member={audienceMember}
@@ -52,15 +52,16 @@ describe('dashboard drawer chrome', () => {
       />
     );
 
+    // Close is inside the overflow menu, not a standalone button
     expect(
-      screen.getByRole('button', { name: 'Close details' })
+      screen.getByRole('button', { name: 'More actions' })
     ).toBeInTheDocument();
     expect(
       screen.queryByText('Audience member details')
     ).not.toBeInTheDocument();
   });
 
-  it('presence drawer drops the decorative DSP profile label and keeps close affordance', () => {
+  it('presence drawer has close in overflow menu and drops decorative label', () => {
     render(
       <DspPresenceSidebar
         item={{
@@ -79,8 +80,9 @@ describe('dashboard drawer chrome', () => {
       />
     );
 
+    // Close is inside the overflow menu, not a standalone button
     expect(
-      screen.getByRole('button', { name: 'Close details' })
+      screen.getByRole('button', { name: 'More actions' })
     ).toBeInTheDocument();
     expect(screen.queryByText('DSP profile')).not.toBeInTheDocument();
   });

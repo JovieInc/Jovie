@@ -8,7 +8,7 @@
  * to the table row context menu.
  */
 
-import { MapPin, X } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { useState } from 'react';
 import {
   DrawerSurfaceCard,
@@ -57,14 +57,9 @@ function AudienceMemberEntityHeader({
       <div className='relative p-3.5'>
         <div className='absolute right-2.5 top-2.5'>
           <DrawerHeaderActions
-            primaryActions={[
-              {
-                id: 'close-audience-member',
-                label: 'Close details',
-                icon: X,
-                onClick: onClose,
-              },
-            ]}
+            primaryActions={[]}
+            overflowActions={[]}
+            onClose={onClose}
           />
         </div>
         <EntityHeaderCard

@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { X } from 'lucide-react';
+
 import Image from 'next/image';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import type { DspPresenceItem } from '@/app/app/(shell)/dashboard/presence/actions';
@@ -70,14 +70,9 @@ function SidebarEntityHeader({
       <div className='relative p-3.5'>
         <div className='absolute right-2.5 top-2.5'>
           <DrawerHeaderActions
-            primaryActions={[
-              {
-                id: 'close-dsp-presence',
-                label: 'Close details',
-                icon: X,
-                onClick: onClose,
-              },
-            ]}
+            primaryActions={[]}
+            overflowActions={[]}
+            onClose={onClose}
           />
         </div>
         <div className='flex items-center gap-2 pr-8'>

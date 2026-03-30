@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -123,15 +123,9 @@ function ProfileEntityHeader({
       <div className='relative p-3.5'>
         <div className='absolute right-2.5 top-2.5'>
           <DrawerHeaderActions
-            primaryActions={[
-              {
-                id: 'close-profile-contact',
-                label: 'Close profile details',
-                icon: X,
-                onClick: onClose,
-              },
-            ]}
+            primaryActions={[]}
             overflowActions={overflowActions}
+            onClose={onClose}
           />
         </div>
         <EntityHeaderCard
