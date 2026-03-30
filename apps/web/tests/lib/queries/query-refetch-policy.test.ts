@@ -77,7 +77,7 @@ describe('query refetch policies', () => {
 
     expect(useQueryMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        refetchOnMount: false,
+        refetchOnMount: 'always',
         refetchOnWindowFocus: false,
       })
     );
