@@ -775,6 +775,8 @@ export async function getAudienceServerData(params: {
     userId,
     selectedProfileId,
     view,
+    includeDetails ? 'details' : 'summary',
+    memberId ?? '',
     sp('sort'),
     sp('direction'),
     sp('page'),
