@@ -32,8 +32,8 @@ export const MIN_LINK_CLICKS = 20;
 /** Minimum audience members with geo data for tour insights */
 export const MIN_AUDIENCE_FOR_TOUR = 50;
 
-/** Maximum insights per generation run */
-export const MAX_INSIGHTS_PER_RUN = 8;
+/** Maximum insights per generation run (reduced from 8 after pruning low-value types) */
+export const MAX_INSIGHTS_PER_RUN = 5;
 
 /** Rate limit: minimum hours between generation runs per user */
 export const GENERATION_COOLDOWN_HOURS = 1;

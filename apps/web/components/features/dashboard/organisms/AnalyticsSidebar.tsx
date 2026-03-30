@@ -16,6 +16,7 @@ import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { AnalyticsRange } from '@/types/analytics';
+import { AudienceInsightsCard } from './AudienceInsightsCard';
 
 /**
  * Calculate conversion rate between two funnel stages.
@@ -375,6 +376,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
             />
           )}
         </DrawerTabbedCard>
+        <AudienceInsightsCard />
       </div>
     </EntitySidebarShell>
   );
