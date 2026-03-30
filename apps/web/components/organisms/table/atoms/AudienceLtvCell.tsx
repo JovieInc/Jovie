@@ -23,7 +23,7 @@ const TIER_STYLES = {
   high: 'text-emerald-600 dark:text-emerald-400 font-[590]',
 } as const;
 
-function formatDollars(cents: number): string {
+export function formatDollars(cents: number): string {
   return (cents / 100).toLocaleString('en-US', {
     style: 'currency',
     currency: 'USD',

@@ -101,7 +101,11 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
             TYPE_DOT_COLORS[type]
           )}
           aria-hidden='true'
-          title={type.charAt(0).toUpperCase() + type.slice(1)}
+          title={
+            type === 'sms'
+              ? 'SMS'
+              : type.charAt(0).toUpperCase() + type.slice(1)
+          }
         />
       )}
     </div>

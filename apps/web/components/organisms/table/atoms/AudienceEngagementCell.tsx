@@ -32,7 +32,10 @@ export function AudienceEngagementCell({
   const { icon: IconComponent, color, label } = INTENT_ICONS[intentLevel];
 
   return (
-    <SimpleTooltip content={`${visits} visits · ${label}`} side='top'>
+    <SimpleTooltip
+      content={`${visits} ${visits === 1 ? 'visit' : 'visits'} · ${label}`}
+      side='top'
+    >
       <div
         className={cn(
           'flex items-center gap-1.5 text-[13px] text-secondary-token',

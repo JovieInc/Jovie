@@ -8,6 +8,7 @@ import { formatTimeAgo, getFallbackName } from '@/lib/utils/audience';
 import { calculateLtv } from '@/lib/utils/ltv';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import type { AudienceIntentLevel, AudienceMember } from '@/types';
+import { formatDollars } from './AudienceLtvCell';
 
 export interface AudienceMobileCardProps {
   readonly member: AudienceMember;
@@ -63,15 +64,6 @@ function isInternalReferrer(url: string): boolean {
   } catch {
     return false;
   }
-}
-
-function formatDollars(cents: number): string {
-  return (cents / 100).toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
 }
 
 /**
