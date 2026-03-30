@@ -394,7 +394,7 @@ function LinkActions({
         variant='ghost'
         size='sm'
         onClick={handleCopy}
-        title='Copy shareable URL'
+        aria-label={copied ? 'Copied' : 'Copy shareable URL'}
         className='h-8 px-2'
       >
         {copied ? (
@@ -408,6 +408,9 @@ function LinkActions({
           variant='ghost'
           size='sm'
           onClick={() => setMenuOpen(!menuOpen)}
+          aria-label='Link actions'
+          aria-haspopup='menu'
+          aria-expanded={menuOpen}
           className='h-8 px-2'
         >
           <MoreHorizontal className='h-3.5 w-3.5' />
@@ -441,8 +444,8 @@ function LinkActions({
                 setMenuOpen(false);
                 // Deactivates the link (soft-delete) — confirm first
                 if (
-                  window.confirm(
-                    `Delete "${link.label}"? The link will be permanently removed.`
+                  globalThis.confirm(
+                    `Deactivate "${link.label}"? The link will be disabled.`
                   )
                 ) {
                   onDelete(link.id);
@@ -487,6 +490,7 @@ export function InvestorLinksManager() {
   }, [fetchLinks]);
 
   const handleToggleActive = async (id: string, isActive: boolean) => {
+    const original = links.find(l => l.id === id);
     // Optimistic update
     setLinks(prev => prev.map(l => (l.id === id ? { ...l, isActive } : l)));
     try {
@@ -497,10 +501,13 @@ export function InvestorLinksManager() {
       });
       if (!res.ok) throw new Error('Failed to update link');
     } catch {
-      // Revert on failure
-      setLinks(prev =>
-        prev.map(l => (l.id === id ? { ...l, isActive: !isActive } : l))
-      );
+      if (original) {
+        setLinks(prev =>
+          prev.map(l =>
+            l.id === id ? { ...l, isActive: original.isActive } : l
+          )
+        );
+      }
     }
   };
 
@@ -539,10 +546,9 @@ export function InvestorLinksManager() {
           subtitle='Preparing link manager.'
         />
         <div className='space-y-2 px-3 py-3'>
-          {Array.from({ length: 4 }, (_, i) => (
+          {['sk-a', 'sk-b', 'sk-c', 'sk-d'].map(id => (
             <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders never reorder
-              key={`skeleton-${i}`}
+              key={id}
               className='h-11 animate-pulse rounded-[12px] bg-surface-0'
             />
           ))}

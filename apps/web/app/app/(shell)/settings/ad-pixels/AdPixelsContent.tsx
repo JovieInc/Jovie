@@ -4,6 +4,7 @@ import { Input, Switch } from '@jovie/ui';
 import { Loader2, Save, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   DrawerButton,
@@ -135,19 +136,8 @@ export function AdPixelsContent() {
       }
 
       setSuccess(true);
-      // Update token presence indicators
-      setHasTokens({
-        facebook: hasTokens.facebook || !!form.facebookAccessToken,
-        google: hasTokens.google || !!form.googleApiSecret,
-        tiktok: hasTokens.tiktok || !!form.tiktokAccessToken,
-      });
-      // Clear token fields after save (they're encrypted server-side)
-      setForm(prev => ({
-        ...prev,
-        facebookAccessToken: '',
-        googleApiSecret: '',
-        tiktokAccessToken: '',
-      }));
+      // Refetch to get accurate token presence from server
+      await fetchSettings();
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save settings');
@@ -166,10 +156,9 @@ export function AdPixelsContent() {
   if (loading) {
     return (
       <div className='space-y-3'>
-        {Array.from({ length: 3 }, (_, i) => (
+        {['sk-fb', 'sk-ga', 'sk-tt'].map(id => (
           <div
-            // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders never reorder
-            key={`skeleton-${i}`}
+            key={id}
             className='h-24 animate-pulse rounded-lg bg-surface-0'
           />
         ))}
@@ -215,11 +204,7 @@ export function AdPixelsContent() {
       {/* Facebook */}
       <PixelSection
         title='Facebook / Meta Pixel'
-        icon={
-          <div className='flex h-6 w-6 items-center justify-center rounded bg-[#1877F2] text-white text-[10px] font-bold'>
-            f
-          </div>
-        }
+        icon={<SocialIcon platform='facebook' className='h-6 w-6' />}
       >
         <DrawerFormField label='Pixel ID' helperText='Your Facebook Pixel ID'>
           <Input
@@ -298,11 +283,7 @@ export function AdPixelsContent() {
       {/* TikTok */}
       <PixelSection
         title='TikTok Pixel'
-        icon={
-          <div className='flex h-6 w-6 items-center justify-center rounded bg-black text-white text-[10px] font-bold'>
-            T
-          </div>
-        }
+        icon={<SocialIcon platform='tiktok' className='h-6 w-6' />}
       >
         <DrawerFormField label='Pixel ID' helperText='Your TikTok Pixel ID'>
           <Input

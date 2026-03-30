@@ -3,7 +3,7 @@
 import { Button, Input, Switch } from '@jovie/ui';
 import { ArrowLeft, Loader2, Save } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -75,7 +75,7 @@ function settingsToFormState(
 }
 
 function safeParseInt(value: string): number | null {
-  const parsed = parseInt(value, 10);
+  const parsed = Number.parseInt(value, 10);
   return Number.isNaN(parsed) ? null : parsed;
 }
 
@@ -122,6 +122,13 @@ export function InvestorSettingsForm() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+    };
+  }, []);
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -160,7 +167,7 @@ export function InvestorSettingsForm() {
       }
 
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      successTimeoutRef.current = setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save settings');
     } finally {
@@ -183,10 +190,9 @@ export function InvestorSettingsForm() {
           subtitle='Preparing portal configuration.'
         />
         <div className='space-y-2 px-6 py-6'>
-          {Array.from({ length: 5 }, (_, i) => (
+          {['sk-a', 'sk-b', 'sk-c', 'sk-d', 'sk-e'].map(id => (
             <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders never reorder
-              key={`skeleton-${i}`}
+              key={id}
               className='h-10 animate-pulse rounded-lg bg-surface-0'
             />
           ))}
