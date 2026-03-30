@@ -42,9 +42,9 @@ export async function DashboardShellContent({
   readonly userId: string;
   readonly children: React.ReactNode;
 }) {
-  // Keep the shell fast on the chat-first landing path and releases.
-  // Other dashboard/settings routes still receive the full dashboard context
-  // because they rely on supplementary fields from the slower fetch.
+  // Chat, releases, and all /app/dashboard/* sub-routes use the fast essential
+  // shell path (skips entitlements, billing, avatar quality). Only the dashboard
+  // overview root and settings routes use the full getDashboardData() fetch.
   const headerStore = await headers();
   const pathname = resolveAppShellRequestPath(headerStore.get('next-url'));
   const useEssentialShell = shouldUseEssentialShellData(pathname);
