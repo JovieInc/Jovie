@@ -4,6 +4,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { getPressPhotosByUserId } from '@/lib/db/queries/press-photos';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = {
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
       );
     }
 
-    return withDbSessionTx(async (tx, clerkUserId) => {
+    return await withDbSessionTx(async (tx, clerkUserId) => {
       const dbUser = await getUserByClerkId(tx, clerkUserId);
 
       if (!dbUser) {
@@ -57,6 +58,10 @@ export async function GET(req: Request) {
     });
   } catch (error) {
     logger.error('[press-photos] Failed to load press photos:', error);
+    await captureError('Dashboard press photos fetch failed', error, {
+      route: '/api/dashboard/press-photos',
+      method: 'GET',
+    });
     return NextResponse.json(
       { error: 'Failed to load press photos' },
       { status: 500, headers: NO_STORE_HEADERS }
