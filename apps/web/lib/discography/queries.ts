@@ -897,6 +897,27 @@ export async function updateTrackLyrics(
 }
 
 /**
+ * Update preview URL for a recording identified by ISRC + creator profile.
+ * Only updates if the recording's current previewUrl is NULL (doesn't overwrite existing).
+ */
+export async function updateRecordingPreviewByIsrc(
+  creatorProfileId: string,
+  isrc: string,
+  previewUrl: string
+): Promise<void> {
+  await db
+    .update(discogRecordings)
+    .set({ previewUrl, updatedAt: new Date() })
+    .where(
+      and(
+        eq(discogRecordings.creatorProfileId, creatorProfileId),
+        eq(discogRecordings.isrc, isrc),
+        drizzleSql`${discogRecordings.previewUrl} IS NULL`
+      )
+    );
+}
+
+/**
  * Get tracks for a release
  */
 export async function getTracksForRelease(

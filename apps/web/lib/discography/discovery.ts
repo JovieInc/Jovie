@@ -27,6 +27,7 @@ import {
 import {
   getReleaseById,
   getTracksForRelease,
+  updateRecordingPreviewByIsrc,
   updateTrackLyrics,
   upsertProviderLink,
 } from './queries';
@@ -296,6 +297,15 @@ export async function discoverLinksForRelease(
                 trackId: deezerResult.trackId,
               },
             });
+
+            // Backfill preview URL from Deezer if recording has none
+            if (deezerResult.previewUrl && trackWithIsrc.creatorProfileId) {
+              await updateRecordingPreviewByIsrc(
+                trackWithIsrc.creatorProfileId,
+                isrc,
+                deezerResult.previewUrl
+              );
+            }
           }
         })
         .catch(error => {
@@ -336,6 +346,20 @@ export async function discoverLinksForRelease(
               isrc,
               result,
             });
+          }
+
+          // Backfill preview URL from MusicFetch if recording has none
+          const mfPreview = musicfetchResult.raw.previewUrl;
+          if (
+            typeof mfPreview === 'string' &&
+            mfPreview.startsWith('https://') &&
+            trackWithIsrc.creatorProfileId
+          ) {
+            await updateRecordingPreviewByIsrc(
+              trackWithIsrc.creatorProfileId,
+              isrc,
+              mfPreview
+            );
           }
         })
         .catch(error => {

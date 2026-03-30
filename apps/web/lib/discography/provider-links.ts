@@ -85,6 +85,8 @@ export interface DeezerLookupResult {
   trackId: string;
   albumUrl: string | null;
   albumId: string | null;
+  /** 30-second audio preview URL, or null if unavailable */
+  previewUrl: string | null;
 }
 
 /**
@@ -108,6 +110,7 @@ export async function lookupDeezerByIsrc(
       error?: { type: string; message: string };
       id?: number;
       link?: string;
+      preview?: string;
       album?: {
         id?: number;
         link?: string;
@@ -117,11 +120,18 @@ export async function lookupDeezerByIsrc(
     // Deezer returns error object instead of 404
     if (payload.error || !payload.id || !payload.link) return null;
 
+    // Normalize empty/non-string preview to null, validate HTTPS
+    const rawPreview =
+      typeof payload.preview === 'string' ? payload.preview.trim() : '';
+    const previewUrl =
+      rawPreview && rawPreview.startsWith('https://') ? rawPreview : null;
+
     return {
       url: payload.link,
       trackId: String(payload.id),
       albumUrl: payload.album?.link ?? null,
       albumId: payload.album?.id ? String(payload.album.id) : null,
+      previewUrl,
     };
   } catch (error) {
     Sentry.addBreadcrumb({

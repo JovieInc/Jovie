@@ -50,6 +50,8 @@ export interface MusicfetchIsrcResult {
   artists?: Array<{ name: string }>;
   albums?: Array<{ name: string }>;
   lyrics?: string;
+  /** 30-second audio preview URL (typically Spotify CDN) */
+  previewUrl?: string;
 }
 
 interface MusicfetchResponse {
