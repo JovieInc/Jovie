@@ -13,73 +13,65 @@ const DashboardTipping = dynamic(
     })),
   {
     loading: () => (
-      <div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-        {/* Tab bar skeleton */}
-        <div className='shrink-0 border-b border-subtle px-3 py-2 sm:px-4'>
-          <div className='flex gap-1'>
-            <LoadingSkeleton height='h-7' width='w-20' rounded='md' />
-            <LoadingSkeleton height='h-7' width='w-20' rounded='md' />
-          </div>
+      <div className='flex flex-col gap-6 pb-6'>
+        {/* Header */}
+        <div className='space-y-1'>
+          <LoadingSkeleton height='h-6' width='w-28' rounded='md' />
+          <LoadingSkeleton height='h-4' width='w-56' rounded='md' />
         </div>
 
-        <div className='flex h-full min-h-0 flex-col gap-3 px-3 py-3 sm:px-4 sm:py-4'>
-          <ContentSurfaceCard className='shrink-0 p-3'>
-            <div className='flex items-center gap-2 rounded-lg border border-subtle px-3 py-2'>
-              <LoadingSkeleton height='h-4' width='w-full' rounded='sm' />
-              <LoadingSkeleton height='h-7' width='w-14' rounded='md' />
+        {/* Section label */}
+        <LoadingSkeleton height='h-3' width='w-16' rounded='sm' />
+
+        {/* Stat cards */}
+        <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
+          {STAT_CARD_KEYS.map(key => (
+            <ContentSurfaceCard key={key} className='space-y-2 p-4'>
+              <div className='flex items-center gap-2'>
+                <LoadingSkeleton height='h-7' width='w-7' rounded='lg' />
+                <LoadingSkeleton height='h-3' width='w-16' rounded='sm' />
+              </div>
+              <LoadingSkeleton height='h-7' width='w-20' rounded='md' />
+              <LoadingSkeleton height='h-3' width='w-28' rounded='sm' />
+            </ContentSurfaceCard>
+          ))}
+        </div>
+
+        {/* Share section label */}
+        <LoadingSkeleton height='h-3' width='w-12' rounded='sm' />
+
+        {/* Share cards */}
+        <div className='grid gap-4 sm:grid-cols-2'>
+          <ContentSurfaceCard className='p-4 sm:p-5'>
+            <div className='space-y-3'>
+              <div className='flex items-center gap-2'>
+                <LoadingSkeleton height='h-7' width='w-7' rounded='lg' />
+                <LoadingSkeleton height='h-4' width='w-16' rounded='sm' />
+              </div>
+              <LoadingSkeleton height='h-10' width='w-full' rounded='lg' />
+              <LoadingSkeleton height='h-3' width='w-48' rounded='sm' />
             </div>
           </ContentSurfaceCard>
-
-          <div className='grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.95fr)]'>
-            <ContentSurfaceCard className='p-3'>
-              <LoadingSkeleton height='h-4' width='w-36' rounded='sm' />
-              <LoadingSkeleton
-                height='h-3'
-                width='w-44'
-                rounded='sm'
-                className='mt-1'
-              />
-              <div className='mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3'>
-                {[...STAT_CARD_KEYS, 'stat-4', 'stat-5', 'stat-6'].map(key => (
-                  <ContentSurfaceCard key={key} className='space-y-2 p-2.5'>
-                    <div className='flex items-center gap-2'>
-                      <LoadingSkeleton height='h-7' width='w-7' rounded='lg' />
-                      <LoadingSkeleton height='h-3' width='w-16' rounded='sm' />
-                    </div>
-                    <LoadingSkeleton height='h-7' width='w-20' rounded='md' />
-                    <LoadingSkeleton height='h-3' width='w-24' rounded='sm' />
-                  </ContentSurfaceCard>
-                ))}
+          <ContentSurfaceCard className='p-4 sm:p-5'>
+            <div className='space-y-4'>
+              <div className='flex items-center gap-2'>
+                <LoadingSkeleton height='h-7' width='w-7' rounded='lg' />
+                <LoadingSkeleton height='h-4' width='w-16' rounded='sm' />
               </div>
-            </ContentSurfaceCard>
-
-            <ContentSurfaceCard className='p-3'>
-              <LoadingSkeleton height='h-4' width='w-24' rounded='sm' />
               <LoadingSkeleton
-                height='h-3'
-                width='w-36'
-                rounded='sm'
-                className='mt-1'
+                height='h-40'
+                width='w-40'
+                rounded='lg'
+                className='mx-auto'
               />
-              <div className='mt-3 flex flex-col gap-3'>
-                <div className='mx-auto'>
-                  <LoadingSkeleton
-                    height='h-[132px]'
-                    width='w-[132px]'
-                    rounded='lg'
-                  />
-                </div>
-                <div className='space-y-2'>
-                  <LoadingSkeleton height='h-9' width='w-full' rounded='md' />
-                  <div className='grid gap-2 sm:grid-cols-3 xl:grid-cols-2'>
-                    <LoadingSkeleton height='h-8' width='w-full' rounded='md' />
-                    <LoadingSkeleton height='h-8' width='w-full' rounded='md' />
-                    <LoadingSkeleton height='h-8' width='w-full' rounded='md' />
-                  </div>
-                </div>
-              </div>
-            </ContentSurfaceCard>
-          </div>
+              <LoadingSkeleton
+                height='h-8'
+                width='w-28'
+                rounded='md'
+                className='mx-auto'
+              />
+            </div>
+          </ContentSurfaceCard>
         </div>
       </div>
     ),

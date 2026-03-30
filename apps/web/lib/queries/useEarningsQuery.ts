@@ -41,7 +41,7 @@ export function useEarningsQuery(enabled = true) {
     queryFn: fetchEarnings,
     enabled,
     ...FREQUENT_CACHE,
-    refetchOnMount: 'always',
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
   });
 }

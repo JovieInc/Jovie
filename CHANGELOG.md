@@ -7,20 +7,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.107] - 2026-03-30
 
-### Added
-
-- Compact `Signals` card in the audience analytics sidebar with top AI insights and Ask Jovie drill-down links
-- Insight data-hash freshness gate so cron and manual generation can skip unchanged insight types
-
 ### Changed
 
-- `/app/insights` now redirects to the audience dashboard, with stale route benchmarks removed from the performance manifest
-- Insight generation narrowed to the remaining high-value categories and a max of five surfaced insights per run
+- Flattened dashboard content surfaces and shared app controls so cards use quieter borders and pill geometry instead of elevated tile chrome
+- Updated analytics range tabs, dashboard header actions, settings rows, and setup/checklist affordances to use the same rounded-full control language
 
-### Fixed
+### Added
 
-- Repeated insight generation now avoids recycling stale signals when the underlying metric slice has not changed
-- Cron insights concurrency test timeout increased to reflect the observed route import cost in CI-like environments
+- Regression coverage for the flatter content-surface and pill-control classes across dashboard and settings UI primitives
 
 ## [26.4.106] - 2026-03-30
 

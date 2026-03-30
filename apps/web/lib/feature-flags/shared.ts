@@ -43,8 +43,6 @@ export interface FeatureFlagsBootstrap {
  * Former Statsig gates are marked with their old gate key for reference.
  * Set the boolean to true to enable a feature in production.
  */
-const STRIPE_CONNECT_ENABLED_IN_DEV = process.env.NODE_ENV === 'development';
-
 export const FEATURE_FLAGS = {
   // ── Former Statsig gates ──────────────────────────────────────────
   /** Profile V2 layout (gate: feature_profile_v2) */
@@ -68,7 +66,7 @@ export const FEATURE_FLAGS = {
   /** Spotify OAuth login (gate: feature_spotify_oauth) */
   SPOTIFY_OAUTH: false,
   /** Stripe Connect payouts (gate: stripe-connect-enabled) */
-  STRIPE_CONNECT_ENABLED: STRIPE_CONNECT_ENABLED_IN_DEV,
+  STRIPE_CONNECT_ENABLED: false,
   /** Example profiles carousel on homepage (gate: show_example_profiles_carousel) */
   SHOW_EXAMPLE_PROFILES_CAROUSEL: false,
   /** Light mode theme option (gate: enable_light_mode) */

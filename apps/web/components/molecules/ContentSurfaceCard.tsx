@@ -3,16 +3,16 @@ import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 const contentSurfaceCardVariants = cva(
-  'border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[var(--linear-app-card-shadow)]',
+  'border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-none',
   {
     variants: {
       surface: {
-        default: 'rounded-[10px]',
-        details: 'rounded-[10px]',
+        default: 'rounded-xl',
+        details: 'rounded-xl',
         marketing: 'rounded-xl',
-        nested: 'rounded-[8px]',
-        settings: 'rounded-[10px] px-4 py-3 sm:px-5',
-        table: 'rounded-[10px]',
+        nested: 'rounded-[10px]',
+        settings: 'rounded-xl px-4 py-3 sm:px-5',
+        table: 'rounded-xl',
       },
     },
     defaultVariants: {
@@ -23,7 +23,7 @@ const contentSurfaceCardVariants = cva(
 
 /** @deprecated Use `contentSurfaceCardVariants` instead for new code. */
 export const CONTENT_SURFACE_CARD_CLASSNAME =
-  'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[var(--linear-app-card-shadow)]';
+  'rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-none';
 
 export interface ContentSurfaceCardProps
   extends VariantProps<typeof contentSurfaceCardVariants> {
