@@ -5,6 +5,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = {
@@ -31,7 +32,7 @@ export async function DELETE(
   try {
     const { photoId } = await context.params;
 
-    return withDbSessionTx(async (tx, clerkUserId) => {
+    return await withDbSessionTx(async (tx, clerkUserId) => {
       const dbUser = await getUserByClerkId(tx, clerkUserId);
 
       if (!dbUser) {
@@ -96,6 +97,11 @@ export async function DELETE(
           photoId: photo.id,
           error: error instanceof Error ? error.message : String(error),
         });
+        void captureError('Press photo blob deletion failed', error, {
+          route: '/api/images/press-photos/[photoId]',
+          method: 'DELETE',
+          photoId: photo.id,
+        });
       }
 
       if (deleted.creatorProfileId) {
@@ -112,6 +118,11 @@ export async function DELETE(
             photoId: photo.id,
             error: error instanceof Error ? error.message : String(error),
           });
+          void captureError('Press photo cache invalidation failed', error, {
+            route: '/api/images/press-photos/[photoId]',
+            method: 'DELETE',
+            photoId: photo.id,
+          });
         }
       }
 
@@ -122,6 +133,10 @@ export async function DELETE(
     });
   } catch (error) {
     logger.error('[press-photos] Failed to delete press photo:', error);
+    await captureError('Press photo delete failed', error, {
+      route: '/api/images/press-photos/[photoId]',
+      method: 'DELETE',
+    });
     return NextResponse.json(
       { error: 'Failed to delete press photo' },
       { status: 500, headers: NO_STORE_HEADERS }
