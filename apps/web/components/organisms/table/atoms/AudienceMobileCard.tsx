@@ -5,7 +5,10 @@ import { Icon } from '@/components/atoms/Icon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo, getFallbackName } from '@/lib/utils/audience';
+import { calculateLtv } from '@/lib/utils/ltv';
+import { capitalizeFirst } from '@/lib/utils/string-utils';
 import type { AudienceIntentLevel, AudienceMember } from '@/types';
+import { formatDollars } from './AudienceLtvCell';
 
 export interface AudienceMobileCardProps {
   readonly member: AudienceMember;
@@ -78,13 +81,27 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
   const displayName = member.displayName || getFallbackName(member.type);
   const isHighIntent = member.intentLevel === 'high';
 
+  // Calculate LTV for value accent
+  const ltvBreakdown = calculateLtv({
+    tipAmountTotalCents: member.tipAmountTotalCents,
+    tipCount: member.tipCount,
+    visits: member.visits,
+    engagementScore: member.engagementScore,
+    streamingClicks: member.ltvStreamingClicks ?? 0,
+    tipClickValueCents: member.ltvTipClickValueCents ?? 0,
+    merchSalesCents: member.ltvMerchSalesCents ?? 0,
+    ticketSalesCents: member.ltvTicketSalesCents ?? 0,
+  });
+  const hasValue = ltvBreakdown.tier !== 'none';
+
   return (
     <button
       type='button'
       className={cn(
         'flex w-full items-start gap-3 px-4 py-3.5 text-left transition-[background-color,color] duration-150',
         isSelected ? 'bg-surface-0' : 'active:bg-surface-0',
-        isHighIntent && 'font-[510]'
+        isHighIntent && 'font-[510]',
+        hasValue && 'border-l-2 border-l-emerald-500/20'
       )}
       onClick={() => onTap(member)}
       aria-label={`View details for ${displayName}`}
@@ -124,7 +141,11 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
         </div>
 
         {mode === 'members' ? (
-          <MemberDetails member={member} />
+          <MemberDetails
+            member={member}
+            hasValue={hasValue}
+            ltvCents={ltvBreakdown.totalValueCents}
+          />
         ) : (
           <SubscriberDetails member={member} />
         )}
@@ -143,7 +164,15 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
 });
 
 /** Subtitle lines for members mode */
-function MemberDetails({ member }: { readonly member: AudienceMember }) {
+function MemberDetails({
+  member,
+  hasValue,
+  ltvCents,
+}: {
+  readonly member: AudienceMember;
+  readonly hasValue: boolean;
+  readonly ltvCents: number;
+}) {
   const isReturning = member.visits > 1;
   const utmSource = member.utmParams?.source;
   let source = 'Direct';
@@ -157,37 +186,65 @@ function MemberDetails({ member }: { readonly member: AudienceMember }) {
       ? parseSourceForMobile(externalReferrer.url)
       : 'Direct';
   }
+
+  // City only (no country) for mobile density
+  const city = member.geoCity ?? null;
+
   const lastAction =
-    member.latestActions.length > 0 ? member.latestActions[0].label : null;
+    member.latestActions.length > 0
+      ? capitalizeFirst(member.latestActions[0].label)
+      : null;
 
   return (
     <div className='mt-0.5 space-y-0.5'>
-      {/* Intent + Returning badge row */}
-      <p className='text-[11px] flex items-center gap-1.5'>
+      {/* Row 2: Intent + Returning + Source + City */}
+      <p className='text-[11px] flex items-center gap-1.5 min-w-0'>
         <span
           className={cn(
-            'inline-block size-1.5 rounded-full',
+            'inline-block size-1.5 rounded-full shrink-0',
             INTENT_DOT_STYLES[member.intentLevel]
           )}
           aria-hidden='true'
         />
-        <span className={cn('font-[510]', INTENT_STYLES[member.intentLevel])}>
-          {member.intentLevel.charAt(0).toUpperCase() +
-            member.intentLevel.slice(1)}
+        <span
+          className={cn(
+            'font-[510] shrink-0',
+            INTENT_STYLES[member.intentLevel]
+          )}
+        >
+          {capitalizeFirst(member.intentLevel)}
         </span>
         <DotSeparator />
         {isReturning ? (
-          <span className='font-[510] text-secondary-token'>Returning</span>
+          <span className='font-[510] text-secondary-token shrink-0'>
+            Returning
+          </span>
         ) : (
-          <span className='text-tertiary-token'>New</span>
+          <span className='text-tertiary-token shrink-0'>New</span>
         )}
         <DotSeparator />
-        <span className='text-tertiary-token'>{source}</span>
+        <span className='text-tertiary-token truncate'>{source}</span>
+        {city && (
+          <>
+            <DotSeparator />
+            <span className='text-tertiary-token truncate'>{city}</span>
+          </>
+        )}
       </p>
 
-      {/* Last action */}
-      {lastAction && (
-        <p className='truncate text-[11px] text-tertiary-token'>{lastAction}</p>
+      {/* Row 3: Last action + LTV value */}
+      {(lastAction || hasValue) && (
+        <p className='text-[11px] flex items-center gap-1.5 min-w-0'>
+          {lastAction && (
+            <span className='truncate text-tertiary-token'>{lastAction}</span>
+          )}
+          {lastAction && hasValue && <DotSeparator />}
+          {hasValue && (
+            <span className='shrink-0 font-[510] text-emerald-600 dark:text-emerald-400'>
+              {formatDollars(ltvCents)}
+            </span>
+          )}
+        </p>
       )}
     </div>
   );
@@ -228,7 +285,10 @@ function SubscriberDetails({ member }: { readonly member: AudienceMember }) {
 /** Tiny dot separator for inline metadata */
 function DotSeparator() {
   return (
-    <span className='select-none text-quaternary-token' aria-hidden='true'>
+    <span
+      className='select-none text-quaternary-token shrink-0'
+      aria-hidden='true'
+    >
       ·
     </span>
   );

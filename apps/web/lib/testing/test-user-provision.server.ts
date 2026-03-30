@@ -288,9 +288,9 @@ export async function ensureUserRecord(
     return {
       id: existingUser.id,
       previousClerkId:
-        existingUser.clerkId !== normalizedValues.clerkId
-          ? existingUser.clerkId
-          : null,
+        existingUser.clerkId === normalizedValues.clerkId
+          ? null
+          : existingUser.clerkId,
     };
   }
 
@@ -327,9 +327,9 @@ export async function ensureUserRecord(
     return {
       id: racedUser.id,
       previousClerkId:
-        racedUser.clerkId !== normalizedValues.clerkId
-          ? racedUser.clerkId
-          : null,
+        racedUser.clerkId === normalizedValues.clerkId
+          ? null
+          : racedUser.clerkId,
     };
   }
 }

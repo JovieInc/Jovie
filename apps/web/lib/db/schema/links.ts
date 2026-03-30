@@ -101,6 +101,10 @@ export const socialAccounts = pgTable(
     profilePlatformStatusIdx: index(
       'idx_social_accounts_profile_platform_status'
     ).on(table.creatorProfileId, table.platform, table.status),
+    // Unique constraint for atomic upserts (one row per creator per platform)
+    profilePlatformUnique: uniqueIndex(
+      'uq_social_accounts_profile_platform'
+    ).on(table.creatorProfileId, table.platform),
   })
 );
 
