@@ -21,6 +21,7 @@ import { visitSchema } from '@/lib/validation/schemas';
 import {
   createFingerprint,
   deriveIntentLevel,
+  mergeAudienceTags,
   trimHistory,
 } from '../lib/audience-utils';
 
@@ -69,22 +70,6 @@ function inferDeviceType(
     return 'mobile';
   }
   return 'desktop';
-}
-
-function mergeAudienceTags(
-  currentTags: string[] | null | undefined,
-  incomingTags: string[]
-) {
-  if (incomingTags.length === 0) {
-    return Array.isArray(currentTags) ? currentTags : [];
-  }
-
-  return Array.from(
-    new Set([
-      ...(Array.isArray(currentTags) ? currentTags : []),
-      ...incomingTags,
-    ])
-  );
 }
 
 async function incrementDailyProfileViews(

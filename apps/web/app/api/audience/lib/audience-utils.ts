@@ -55,6 +55,22 @@ export function trimHistory<T>(items: T[], maxItems = 3) {
   return items.slice(0, maxItems);
 }
 
+export function mergeAudienceTags(
+  currentTags: string[] | null | undefined,
+  incomingTags: string[]
+) {
+  if (incomingTags.length === 0) {
+    return Array.isArray(currentTags) ? currentTags : [];
+  }
+
+  return Array.from(
+    new Set([
+      ...(Array.isArray(currentTags) ? currentTags : []),
+      ...incomingTags,
+    ])
+  );
+}
+
 /**
  * Hash an IP address for privacy-compliant storage.
  * Uses SHA-256 with a daily salt to prevent rainbow table attacks

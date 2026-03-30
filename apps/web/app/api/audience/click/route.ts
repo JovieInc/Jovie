@@ -24,6 +24,7 @@ import {
   createFingerprint,
   deriveIntentLevel,
   getActionWeight,
+  mergeAudienceTags,
   trimHistory,
 } from '../lib/audience-utils';
 
@@ -118,22 +119,6 @@ function resolveTipAmountCents(
   if (typeof metadata?.tipAmount === 'number')
     return Math.round(metadata.tipAmount * 100);
   return defaultCents;
-}
-
-function mergeAudienceTags(
-  currentTags: string[] | null | undefined,
-  incomingTags: string[]
-) {
-  if (incomingTags.length === 0) {
-    return Array.isArray(currentTags) ? currentTags : [];
-  }
-
-  return Array.from(
-    new Set([
-      ...(Array.isArray(currentTags) ? currentTags : []),
-      ...incomingTags,
-    ])
-  );
 }
 
 export async function POST(request: NextRequest) {

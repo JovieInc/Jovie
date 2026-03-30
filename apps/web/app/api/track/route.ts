@@ -18,6 +18,7 @@ import {
   createFingerprint,
   deriveIntentLevel,
   getActionWeight,
+  mergeAudienceTags,
   trimHistory,
 } from '../audience/lib/audience-utils';
 import { validateTrackRequest } from './validation';
@@ -107,22 +108,6 @@ function inferAudienceDeviceType(
     return 'mobile';
   }
   return 'desktop';
-}
-
-function mergeAudienceTags(
-  currentTags: string[] | null | undefined,
-  incomingTags: string[]
-) {
-  if (incomingTags.length === 0) {
-    return Array.isArray(currentTags) ? currentTags : [];
-  }
-
-  return Array.from(
-    new Set([
-      ...(Array.isArray(currentTags) ? currentTags : []),
-      ...incomingTags,
-    ])
-  );
 }
 
 // ---------------------------------------------------------------------------
