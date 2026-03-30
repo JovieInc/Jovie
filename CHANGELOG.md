@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.106] - 2026-03-30
+
+### Removed
+
+- Dead ad-pixels settings page (was behind a redirect to `/settings/audience` since v26.4.46)
+- Orphaned `SettingsGroupHeading` component (replaced by `SettingsPanel`)
+
+### Changed
+
+- Account settings sections (Email, Connected Accounts, Sessions) now use `SettingsPanel` for consistent title typography
+- Referral page rewritten with standard `SettingsPanel` components and proper loading/error states
+- Billing button uses standard `variant='secondary' size='sm'` instead of custom className overrides
+- Settings icon sizes normalized to `h-4 w-4` across all pages
+- Import paths standardized from re-export barrel (`features/dashboard/molecules/`) to source (`molecules/settings/`)
+
 ## [26.4.105] - 2026-03-30
 
 ### Changed
