@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
 import { ReleaseTaskPage } from '@/components/features/dashboard/release-tasks';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
@@ -11,6 +12,21 @@ interface TasksPageProps {
 
 export default async function TasksPage({ params }: TasksPageProps) {
   const { releaseId } = await params;
+
+  return (
+    <Suspense
+      fallback={
+        <div className='flex flex-1 items-center justify-center p-8'>
+          <div className='h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent' />
+        </div>
+      }
+    >
+      <TasksContent releaseId={releaseId} />
+    </Suspense>
+  );
+}
+
+async function TasksContent({ releaseId }: { releaseId: string }) {
   const profileId = await requireProfileId();
 
   const [release] = await db
