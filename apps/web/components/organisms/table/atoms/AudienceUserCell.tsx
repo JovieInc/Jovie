@@ -4,7 +4,10 @@ import { Ghost, User } from 'lucide-react';
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { getFallbackName } from '@/lib/utils/audience';
-import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
+import {
+  capitalizeFirst,
+  safeDecodeURIComponent,
+} from '@/lib/utils/string-utils';
 import type { AudienceMemberType } from '@/types';
 
 export interface AudienceUserCellProps {
@@ -109,11 +112,7 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
             TYPE_DOT_COLORS[type]
           )}
           aria-hidden='true'
-          title={
-            type === 'sms'
-              ? 'SMS'
-              : type.charAt(0).toUpperCase() + type.slice(1)
-          }
+          title={type === 'sms' ? 'SMS' : capitalizeFirst(type)}
         />
       )}
     </div>

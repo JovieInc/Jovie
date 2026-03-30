@@ -288,44 +288,58 @@ export function TouringCityCell({ row }: CellContext<AudienceMember, unknown>) {
 export function UserCellWithTouring({
   row,
 }: CellContext<AudienceMember, string | null>) {
-  const { getTouringCity } = useAudienceTableStableContext();
+  const { getTouringCity, hiddenMetadataColumns } =
+    useAudienceTableStableContext();
   const touringInfo = getTouringCity(row.original);
   const m = row.original;
 
-  // Build subtitle tokens
-  const subtitleParts: { text: string; className?: string }[] = [];
+  // Build subtitle tokens for the metadata that is hidden in the current layout.
+  const subtitleParts: {
+    key: string;
+    text: string;
+    className?: string;
+  }[] = [];
 
-  if (m.intentLevel === 'high') {
-    subtitleParts.push({
-      text: 'High',
-      className: 'font-[510] text-emerald-600 dark:text-emerald-400',
-    });
-  } else if (m.intentLevel === 'medium') {
-    subtitleParts.push({
-      text: 'Medium',
-      className: 'font-[510] text-amber-600 dark:text-amber-400',
-    });
-  }
+  if (hiddenMetadataColumns.engagement) {
+    if (m.intentLevel === 'high') {
+      subtitleParts.push({
+        key: 'intent',
+        text: 'High',
+        className: 'font-[510] text-emerald-600 dark:text-emerald-400',
+      });
+    } else if (m.intentLevel === 'medium') {
+      subtitleParts.push({
+        key: 'intent',
+        text: 'Medium',
+        className: 'font-[510] text-amber-600 dark:text-amber-400',
+      });
+    }
 
-  if (m.visits > 0) {
-    subtitleParts.push({
-      text: `${m.visits} ${m.visits === 1 ? 'visit' : 'visits'}`,
-    });
-  }
-
-  // Location (city preferred, fall back to country)
-  const locationCity = m.geoCity ?? m.geoCountry ?? null;
-  if (locationCity) {
-    try {
-      subtitleParts.push({ text: decodeURIComponent(locationCity) });
-    } catch {
-      subtitleParts.push({ text: locationCity });
+    if (m.visits > 0) {
+      subtitleParts.push({
+        key: 'visits',
+        text: `${m.visits} ${m.visits === 1 ? 'visit' : 'visits'}`,
+      });
     }
   }
 
-  // Last seen
-  if (m.lastSeenAt) {
+  if (hiddenMetadataColumns.location) {
+    const locationCity = m.geoCity ?? m.geoCountry ?? null;
+    if (locationCity) {
+      try {
+        subtitleParts.push({
+          key: 'location',
+          text: decodeURIComponent(locationCity),
+        });
+      } catch {
+        subtitleParts.push({ key: 'location', text: locationCity });
+      }
+    }
+  }
+
+  if (hiddenMetadataColumns.lastSeen && m.lastSeenAt) {
     subtitleParts.push({
+      key: 'last-seen',
       text: formatTimeAgo(m.lastSeenAt),
       className: 'tabular-nums',
     });
@@ -347,7 +361,7 @@ export function UserCellWithTouring({
         {subtitleParts.length > 0 && (
           <div className='flex items-center gap-1 min-w-0 pl-[22px] text-[11px] text-tertiary-token leading-tight'>
             {subtitleParts.map((part, i) => (
-              <span key={part.text} className='flex items-center gap-1 min-w-0'>
+              <span key={part.key} className='flex items-center gap-1 min-w-0'>
                 {i > 0 && (
                   <span
                     className='text-quaternary-token select-none shrink-0'

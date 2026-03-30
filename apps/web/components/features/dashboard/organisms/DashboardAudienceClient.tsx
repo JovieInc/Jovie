@@ -122,11 +122,7 @@ function DashboardAudienceClientInner({
   const previousIsBelowLgRef = React.useRef<boolean | null>(null);
 
   React.useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    if (window.innerWidth >= 1024) {
+    if ((globalThis.window?.innerWidth ?? 0) >= 1024) {
       open('analytics');
     }
   }, [open]);

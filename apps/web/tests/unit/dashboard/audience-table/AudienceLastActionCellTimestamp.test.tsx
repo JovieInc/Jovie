@@ -22,6 +22,7 @@ describe('AudienceLastActionCell with lastSeenAt', () => {
     expect(screen.getByText('Visited profile')).toBeInTheDocument();
     // Should show a dot separator between action and time
     expect(screen.getByText('·')).toBeInTheDocument();
+    expect(screen.getByText(/ago/i)).toBeInTheDocument();
   });
 
   it('renders time only when no actions but lastSeenAt exists', () => {

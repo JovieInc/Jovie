@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   type ColumnDef,
@@ -185,10 +186,16 @@ const MobileCardList = memo(function MobileCardList({
   rows,
   selectedMemberId,
   onTap,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
 }: {
   rows: AudienceMember[];
   selectedMemberId: string | null;
   onTap: (member: AudienceMember) => void;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
 }) {
   return (
     <div className='md:hidden h-full overflow-auto'>
@@ -205,6 +212,20 @@ const MobileCardList = memo(function MobileCardList({
           />
         </div>
       ))}
+      {hasNextPage ? (
+        <div className='p-3'>
+          <Button
+            type='button'
+            variant='secondary'
+            size='sm'
+            className='w-full'
+            loading={isFetchingNextPage}
+            onClick={() => onLoadMore?.()}
+          >
+            Load more members
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 });
@@ -250,22 +271,20 @@ export const DashboardAudienceTableUnified = memo(
       profileUrl,
     });
 
-    const desktopTableRef = React.useRef<HTMLDivElement>(null);
+    const [desktopTableNode, setDesktopTableNode] =
+      React.useState<HTMLDivElement | null>(null);
     const [desktopTableWidth, setDesktopTableWidth] = React.useState<number>(
       TABLE_MIN_WIDTHS.SMALL
     );
 
     React.useEffect(() => {
-      const node = desktopTableRef.current;
+      const node = desktopTableNode;
       if (!node) {
         return;
       }
 
       const updateWidth = (nextWidth?: number) => {
-        const measuredWidth =
-          nextWidth ??
-          node.getBoundingClientRect().width ??
-          TABLE_MIN_WIDTHS.SMALL;
+        const measuredWidth = nextWidth ?? node.getBoundingClientRect().width;
 
         setDesktopTableWidth(currentWidth =>
           currentWidth === measuredWidth ? currentWidth : measuredWidth
@@ -276,9 +295,9 @@ export const DashboardAudienceTableUnified = memo(
 
       if (typeof ResizeObserver !== 'function') {
         const handleResize = () => updateWidth();
-        window.addEventListener('resize', handleResize);
+        globalThis.addEventListener('resize', handleResize);
         return () => {
-          window.removeEventListener('resize', handleResize);
+          globalThis.removeEventListener('resize', handleResize);
         };
       }
 
@@ -291,12 +310,26 @@ export const DashboardAudienceTableUnified = memo(
       return () => {
         resizeObserver.disconnect();
       };
-    }, []);
+    }, [desktopTableNode]);
 
     const columnVisibility = React.useMemo(
       () => getColumnVisibility(desktopTableWidth),
       [desktopTableWidth]
     );
+
+    const hiddenMetadataColumns = React.useMemo(
+      () => ({
+        location: columnVisibility.location === false,
+        engagement: columnVisibility.engagement === false,
+        lastSeen: columnVisibility.lastSeen === false,
+      }),
+      [columnVisibility]
+    );
+
+    const hasMetadataSubtitle =
+      hiddenMetadataColumns.location ||
+      hiddenMetadataColumns.engagement ||
+      hiddenMetadataColumns.lastSeen;
 
     const tableMinWidth = React.useMemo(
       () => `${getTableMinWidth(desktopTableWidth)}px`,
@@ -473,6 +506,7 @@ export const DashboardAudienceTableUnified = memo(
         onViewProfile: handleViewProfile,
         onSendNotification: handleSendNotification,
         getTouringCity,
+        hiddenMetadataColumns,
       }),
       [
         toggleSelect,
@@ -483,6 +517,7 @@ export const DashboardAudienceTableUnified = memo(
         handleViewProfile,
         handleSendNotification,
         getTouringCity,
+        hiddenMetadataColumns,
       ]
     );
 
@@ -520,13 +555,13 @@ export const DashboardAudienceTableUnified = memo(
       (row: AudienceMember) => {
         const isSelected = selectedMember?.id === row.id;
         return cn(
-          'h-12',
+          hasMetadataSubtitle ? 'h-12' : 'h-10',
           isSelected
             ? 'bg-(--linear-row-selected)'
             : 'bg-transparent hover:bg-(--linear-row-hover)'
         );
       },
-      [selectedMember]
+      [hasMetadataSubtitle, selectedMember]
     );
 
     // Issue 4: Arrow keys update sidebar when panel is open
@@ -666,10 +701,16 @@ export const DashboardAudienceTableUnified = memo(
                       rows={rows}
                       selectedMemberId={selectedMember?.id ?? null}
                       onTap={setSelectedMember}
+                      hasNextPage={hasNextPage}
+                      isFetchingNextPage={isFetchingNextPage}
+                      onLoadMore={onLoadMore}
                     />
 
                     {/* Desktop table */}
-                    <div ref={desktopTableRef} className='max-md:hidden h-full'>
+                    <div
+                      ref={setDesktopTableNode}
+                      className='max-md:hidden h-full'
+                    >
                       <UnifiedTable
                         data={rows}
                         columns={columns}

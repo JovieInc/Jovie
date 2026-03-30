@@ -1,6 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
+  fireEvent,
   type RenderOptions,
   render,
   screen,
@@ -109,6 +110,8 @@ let capturedTableData: unknown[] = [];
 let capturedColumnVisibility: Record<string, boolean> | undefined;
 let capturedMinWidth: string | undefined;
 let mockDesktopTableWidth = 1200;
+let resizeObserverCallback: ResizeObserverCallback | null = null;
+let resizeObserverTarget: Element | null = null;
 
 vi.mock('@/components/organisms/table', () => ({
   AudienceMobileCard: () => null,
@@ -216,12 +219,41 @@ const defaultProps = {
   subscriberCount: 0,
 };
 
+function fireDesktopTableResize(width: number) {
+  mockDesktopTableWidth = width;
+  if (!resizeObserverCallback || !resizeObserverTarget) {
+    return;
+  }
+
+  resizeObserverCallback(
+    [
+      {
+        target: resizeObserverTarget,
+        contentRect: {
+          width,
+          height: 600,
+          x: 0,
+          y: 0,
+          top: 0,
+          right: width,
+          bottom: 600,
+          left: 0,
+          toJSON: () => ({}),
+        },
+      } as ResizeObserverEntry,
+    ],
+    {} as ResizeObserver
+  );
+}
+
 describe('DashboardAudienceTable', () => {
   beforeEach(() => {
     capturedTableData = [];
     capturedColumnVisibility = undefined;
     capturedMinWidth = undefined;
     mockDesktopTableWidth = 1200;
+    resizeObserverCallback = null;
+    resizeObserverTarget = null;
     vi.clearAllMocks();
     vi.stubGlobal(
       'ResizeObserver',
@@ -230,28 +262,12 @@ describe('DashboardAudienceTable', () => {
 
         constructor(callback: ResizeObserverCallback) {
           this.callback = callback;
+          resizeObserverCallback = callback;
         }
 
         observe = vi.fn((target: Element) => {
-          this.callback(
-            [
-              {
-                target,
-                contentRect: {
-                  width: mockDesktopTableWidth,
-                  height: 600,
-                  x: 0,
-                  y: 0,
-                  top: 0,
-                  right: mockDesktopTableWidth,
-                  bottom: 600,
-                  left: 0,
-                  toJSON: () => ({}),
-                },
-              } as ResizeObserverEntry,
-            ],
-            this as unknown as ResizeObserver
-          );
+          resizeObserverTarget = target;
+          fireDesktopTableResize(mockDesktopTableWidth);
         });
 
         unobserve = vi.fn();
@@ -360,6 +376,51 @@ describe('DashboardAudienceTable', () => {
       expect(capturedColumnVisibility).toEqual({});
       expect(capturedMinWidth).toBe('800px');
     });
+  });
+
+  it('updates the desktop layout when the table width changes after mount', async () => {
+    renderWithProviders(
+      <DashboardAudienceTable
+        {...defaultProps}
+        rows={MOCK_DATA_LARGE}
+        total={100}
+      />
+    );
+
+    await waitFor(() => {
+      expect(capturedColumnVisibility).toEqual({});
+      expect(capturedMinWidth).toBe('800px');
+    });
+
+    fireDesktopTableResize(700);
+
+    await waitFor(() => {
+      expect(capturedColumnVisibility).toEqual({
+        location: false,
+        value: false,
+        engagement: false,
+        lastSeen: false,
+      });
+      expect(capturedMinWidth).toBe('480px');
+    });
+  });
+
+  it('renders a mobile load more control and forwards clicks', () => {
+    const onLoadMore = vi.fn();
+
+    renderWithProviders(
+      <DashboardAudienceTable
+        {...defaultProps}
+        rows={MOCK_DATA_LARGE}
+        total={100}
+        hasNextPage
+        onLoadMore={onLoadMore}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load more members' }));
+
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
   });
 
   it('renders in subscribers mode', () => {
