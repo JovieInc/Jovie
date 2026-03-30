@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.103] - 2026-03-30
+
+### Changed
+
+- All dashboard sub-routes now use the fast essential shell data path, reducing unnecessary DB queries for audience, earnings, insights, and presence pages
+- Calibrated skeleton-to-content performance budgets to realistic values based on production build measurements (auth'd server-rendered pages have a ~500ms rendering floor)
+- Fixed presence page performance selector to match actual DOM (`dsp-presence-workspace`)
+
 ## [26.4.102] - 2026-03-29
 
 ### Added
