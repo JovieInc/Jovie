@@ -2,11 +2,11 @@
 
 import { BarChart3 } from 'lucide-react';
 import { useCallback } from 'react';
-import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
+import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
 import { useOptimisticToggle } from '@/features/dashboard/hooks/useOptimisticToggle';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
-import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
 import { useAnalyticsFilterMutation } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 
