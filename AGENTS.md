@@ -391,6 +391,13 @@ Never mark a task complete without confirming the fix works:
 - For API changes: confirm the endpoint returns expected shape
 - Paste the passing output as evidence in the PR description
 
+### 16. Performance Must Not Replace Route UIs
+
+- **NEVER** replace a route's component with a different layout/design as a performance optimization
+- Use code-splitting (`dynamic()`), skeleton states, `Suspense`, and progressive hydration to make the *same* design faster
+- Screenshot test: before and after a perf PR, the fully-loaded page must look identical
+- If a route needs a genuinely different UI, that is a product decision requiring explicit approval, not a perf side effect
+
 ---
 
 ## Custom ESLint Rules (Quick Reference)
