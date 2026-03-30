@@ -103,12 +103,10 @@ export function useTabOverflow<T extends string>({
           lastFittingIndex = i - 1;
           break;
         }
-      } else {
+      } else if (tabRight > containerWidth) {
         // Last tab — check if it fits without More button
-        if (tabRight > containerWidth) {
-          lastFittingIndex = i - 1;
-          break;
-        }
+        lastFittingIndex = i - 1;
+        break;
       }
     }
 
