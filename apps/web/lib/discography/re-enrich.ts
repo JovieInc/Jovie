@@ -211,7 +211,9 @@ export async function sweepUnderEnrichedProfiles(): Promise<{
     try {
       // Rate limit: add delay between profiles to avoid MusicFetch rate limit
       if (summary.profilesProcessed > 0) {
-        await new Promise(resolve => setTimeout(resolve, INTER_RELEASE_DELAY_MS));
+        await new Promise(resolve =>
+          setTimeout(resolve, INTER_RELEASE_DELAY_MS)
+        );
       }
 
       const result = await reEnrichProfile(profile.creatorProfileId);

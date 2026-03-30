@@ -191,6 +191,7 @@ describe('lookupDeezerByIsrc', () => {
       trackId: '1234567',
       albumUrl: null,
       albumId: null,
+      previewUrl: null,
     });
   });
 });

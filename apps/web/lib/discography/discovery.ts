@@ -279,7 +279,9 @@ export async function discoverLinksForRelease(
   // Deezer lookup — always run when there's a recording to backfill previews for,
   // even if the Deezer link already exists (preview URL may be missing)
   const needsDeezerLookup =
-    !skipExisting || !existingSet.has('deezer') || trackWithIsrc.creatorProfileId;
+    !skipExisting ||
+    !existingSet.has('deezer') ||
+    trackWithIsrc.creatorProfileId;
   if (needsDeezerLookup) {
     lookupPromises.push(
       lookupDeezerByIsrc(isrc)
