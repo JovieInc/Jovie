@@ -87,6 +87,15 @@ export function safeDecodeURIComponent(value: string): string {
 }
 
 /**
+ * Capitalize the first letter of a string, leaving the rest unchanged.
+ * Returns empty string for null/undefined/empty input.
+ */
+export function capitalizeFirst(value: string | null | undefined): string {
+  if (!value) return '';
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/**
  * Format location parts (city, region, country) into a readable location string.
  *
  * Filters out null/undefined/empty values, decodes any URL-encoded strings,

@@ -259,6 +259,14 @@ These rules are enforced by `.claude/hooks/` and will **block your changes** if 
 - For decorative indicators, use small SVG icon components (e.g., Lucide icons or inline SVGs)
 - This applies to marketing pages, dashboards, mockups, and all user-facing surfaces
 
+### 4a. Text Casing Rules
+
+- All user-facing text must follow `DESIGN.md` casing rules
+- **Title Case** for labels, headings, buttons, badges, column headers, nav items
+- **Sentence case** for body text, descriptions, tooltips, toasts
+- Never lowercase the first word of a visible label or heading
+- Use `capitalizeFirst()` from `apps/web/lib/utils/string-utils.ts` for dynamic data from the database
+
 ### 5. Conventional Commits Required
 
 ```bash

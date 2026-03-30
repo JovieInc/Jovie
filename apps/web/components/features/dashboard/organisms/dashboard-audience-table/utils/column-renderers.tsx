@@ -6,6 +6,7 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
   AudienceActionsCell,
   AudienceDeviceCell,
+  AudienceEngagementCell,
   AudienceIdentificationIndicator,
   AudienceIntentScoreCell,
   AudienceLastActionCell,
@@ -274,7 +275,7 @@ export function TouringCityCell({ row }: CellContext<AudienceMember, unknown>) {
 }
 
 /**
- * Renders the user cell with an inline touring badge when the member is in a touring city.
+ * Renders the user cell with type dot and an inline touring badge.
  */
 export function UserCellWithTouring({
   row,
@@ -289,6 +290,7 @@ export function UserCellWithTouring({
         deviceType={row.original.deviceType}
         geoCity={row.original.geoCity}
         geoCountry={row.original.geoCountry}
+        showTypeDot
         className='flex-1 min-w-0'
       />
       {touringInfo && (
@@ -331,6 +333,34 @@ export function renderTypeBadgeCell({
   getValue,
 }: CellContext<AudienceMember, AudienceMemberType>) {
   return <AudienceTypeBadge type={getValue()} />;
+}
+
+/**
+ * Renders the engagement cell (visits count + intent icon).
+ */
+export function renderEngagementCell({
+  row,
+}: CellContext<AudienceMember, number>) {
+  return (
+    <AudienceEngagementCell
+      visits={row.original.visits}
+      intentLevel={row.original.intentLevel}
+    />
+  );
+}
+
+/**
+ * Renders last action + last seen time combined in one cell.
+ */
+export function renderLastSeenActionCell({
+  row,
+}: CellContext<AudienceMember, AudienceMember['latestActions']>) {
+  return (
+    <AudienceLastActionCell
+      actions={row.original.latestActions}
+      lastSeenAt={row.original.lastSeenAt}
+    />
+  );
 }
 
 /**
