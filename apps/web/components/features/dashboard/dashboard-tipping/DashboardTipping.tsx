@@ -8,21 +8,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Input,
+  type SegmentControlOption,
 } from '@jovie/ui';
-import {
-  BarChart3,
-  Check,
-  Copy,
-  Link2,
-  Link2Off,
-  MoreHorizontal,
-  MousePointerClick,
-  Pencil,
-  ScanLine,
-  Wallet,
-} from 'lucide-react';
+import { Check, Link2Off, MoreHorizontal, Pencil, Wallet } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   Dialog,
@@ -32,68 +24,31 @@ import {
 } from '@/components/organisms/Dialog';
 import { PageToolbar } from '@/components/organisms/table';
 import { BASE_URL } from '@/constants/domains';
-import { CopyToClipboardButton } from '@/features/dashboard/molecules/CopyToClipboardButton';
 import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
-import { EarningsTab } from '@/features/dashboard/organisms/EarningsTab';
-import { ShopifyStoreCard } from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
-import { cn } from '@/lib/utils';
+import { EarningsOverviewTab } from '@/features/dashboard/organisms/EarningsOverviewTab';
+import { EarningsTippersTab } from '@/features/dashboard/organisms/EarningsTippersTab';
+import { useEarningsQuery } from '@/lib/queries';
 import { useDashboardTipping } from './useDashboardTipping';
-import { formatCount } from './utils';
 
 // =============================================================================
 // Constants
 // =============================================================================
 
+const EARNINGS_TABS = ['overview', 'tippers'] as const;
+type EarningsTabValue = (typeof EARNINGS_TABS)[number];
+
+const TAB_OPTIONS: readonly SegmentControlOption<EarningsTabValue>[] = [
+  { value: 'overview', label: 'Overview' },
+  { value: 'tippers', label: 'Tippers' },
+];
+
+function isValidTab(value: string | null): value is EarningsTabValue {
+  return value === 'overview' || value === 'tippers';
+}
+
 // =============================================================================
 // Sub-components
 // =============================================================================
-
-interface StatCardProps {
-  readonly label: string;
-  readonly value: number;
-  readonly description: string;
-  readonly icon: React.ComponentType<{ className?: string }>;
-  readonly iconChipClassName: string;
-  readonly iconClassName: string;
-}
-
-const StatCard = memo(function StatCard({
-  label,
-  value,
-  description,
-  icon: Icon,
-  iconChipClassName,
-  iconClassName,
-}: StatCardProps) {
-  return (
-    <section aria-label={`${label} metric`}>
-      <dl className='flex h-full flex-col'>
-        <div className='flex items-center gap-2'>
-          <div
-            className={cn(
-              'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg',
-              iconChipClassName
-            )}
-            aria-hidden='true'
-          >
-            <Icon className={cn('h-3.5 w-3.5', iconClassName)} />
-          </div>
-          <dt className='text-[13px] font-[510] text-secondary-token'>
-            {label}
-          </dt>
-        </div>
-        <dd className='mt-2 text-2xl font-[590] tabular-nums leading-none tracking-[-0.011em] text-primary-token sm:text-3xl'>
-          {formatCount(value)}
-        </dd>
-        <dd className='mt-1.5 text-[11px] leading-4 text-tertiary-token sm:text-[13px]'>
-          {description}
-        </dd>
-      </dl>
-    </section>
-  );
-});
-
-// -----------------------------------------------------------------------------
 
 interface VenmoConnectedBadgeProps {
   readonly venmoHandle: string;
@@ -128,21 +83,12 @@ const VenmoConnectedBadge = memo(function VenmoConnectedBadge({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' sideOffset={6}>
-        <DropdownMenuItem
-          onSelect={() => {
-            onEdit();
-          }}
-        >
+        <DropdownMenuItem onSelect={onEdit}>
           <Pencil className='mr-2 h-3.5 w-3.5' />
           Edit
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          variant='destructive'
-          onSelect={() => {
-            onDisconnect();
-          }}
-        >
+        <DropdownMenuItem variant='destructive' onSelect={onDisconnect}>
           <Link2Off className='mr-2 h-3.5 w-3.5' />
           Disconnect
         </DropdownMenuItem>
@@ -298,51 +244,6 @@ const VenmoConnectDialog = memo(function VenmoConnectDialog({
   );
 });
 
-// -----------------------------------------------------------------------------
-
-interface TipLinkSectionProps {
-  readonly tipUrl: string;
-  readonly tipRelativePathLink: string;
-}
-
-const TipLinkSection = memo(function TipLinkSection({
-  tipUrl,
-  tipRelativePathLink,
-}: TipLinkSectionProps) {
-  return (
-    <ContentSurfaceCard className='p-4 sm:p-5'>
-      <div className='flex items-center gap-2 mb-3'>
-        <div
-          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border border-subtle bg-surface-1'
-          aria-hidden='true'
-        >
-          <Link2 className='h-3.5 w-3.5 text-blue-500 dark:text-blue-400' />
-        </div>
-        <h3 className='text-[13px] font-[510] text-primary-token'>Tip link</h3>
-      </div>
-
-      <div className='flex items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5'>
-        <Copy className='max-sm:hidden h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-        <span className='min-w-0 flex-1 truncate text-[13px] text-secondary-token'>
-          {tipUrl}
-        </span>
-        <CopyToClipboardButton
-          relativePath={tipRelativePathLink}
-          idleLabel='Copy'
-          successLabel='Copied'
-          errorLabel='Failed'
-          className='h-7 shrink-0 px-2.5 text-[13px]'
-        />
-      </div>
-      <p className='mt-2 text-[11px] text-tertiary-token sm:text-[13px]'>
-        Share this link anywhere to receive tips.
-      </p>
-    </ContentSurfaceCard>
-  );
-});
-
-// -----------------------------------------------------------------------------
-
 // =============================================================================
 // Main Component
 // =============================================================================
@@ -363,6 +264,29 @@ export function DashboardTipping() {
     handleDisconnect,
   } = useDashboardTipping();
 
+  // ── Tab state (URL-persisted) ──────────────────
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const rawTab = searchParams.get('tab');
+  const activeTab: EarningsTabValue = isValidTab(rawTab) ? rawTab : 'overview';
+
+  const handleTabChange = useCallback(
+    (value: EarningsTabValue) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value === 'overview') {
+        params.delete('tab');
+      } else {
+        params.set('tab', value);
+      }
+      const qs = params.toString();
+      router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false });
+    },
+    [searchParams, router, pathname]
+  );
+
+  // ── Venmo dialog state ─────────────────────────
   const [isConnectOpen, setIsConnectOpen] = useState(false);
 
   const handleCloseConnect = useCallback(() => {
@@ -374,24 +298,25 @@ export function DashboardTipping() {
 
   useEffect(() => {
     if (!hasVenmoHandle || !isConnectOpen) return;
-
     setIsConnectOpen(false);
     setVenmoHandle('');
   }, [hasVenmoHandle, isConnectOpen, setVenmoHandle]);
 
+  // ── Derived data ───────────────────────────────
   const tipUrls = useMemo(() => {
     const tipHandle = artist?.handle ?? '';
     const tipRelativePath = tipHandle ? `/${tipHandle}/tip` : '/tip';
     const tipRelativePathLink = `${tipRelativePath}?source=link`;
     const tipUrl = `${BASE_URL}${tipRelativePathLink}`;
-
-    return {
-      tipRelativePathLink,
-      tipUrl,
-    };
+    return { tipRelativePathLink, tipUrl };
   }, [artist?.handle]);
 
   const { tipClicks, qrTipClicks, linkTipClicks } = dashboardData.tippingStats;
+
+  // ── Earnings query (hoisted above tabs) ────────
+  const { data: earnings, isLoading: isEarningsLoading } = useEarningsQuery(
+    Boolean(artist)
+  );
 
   if (!artist) {
     return null;
@@ -421,92 +346,83 @@ export function DashboardTipping() {
         toolbar={toolbar}
         data-testid='dashboard-earnings-workspace'
       >
-        <div className='flex-1 overflow-y-auto overflow-x-hidden'>
-          <div className='flex flex-col gap-5 px-3 py-3 sm:px-4 sm:py-4'>
-            {!hasVenmoHandle && (
-              <>
-                <ContentSurfaceCard className='px-6 py-12 sm:px-8 sm:py-14'>
-                  <div className='mx-auto flex max-w-md flex-col items-center text-center'>
-                    <div
-                      className='mb-4 flex h-11 w-11 items-center justify-center rounded-[10px] border border-accent/20 bg-accent/10'
-                      aria-hidden='true'
-                    >
-                      <Wallet className='h-5 w-5 text-accent-token' />
-                    </div>
-                    <h2 className='text-[17px] font-[590] tracking-[-0.011em] text-primary-token sm:text-[18px]'>
-                      Connect Venmo to unlock earnings
-                    </h2>
-                    <p className='mt-2 text-[13px] leading-5 text-secondary-token sm:text-[14px]'>
-                      Link your Venmo once to start receiving tips and reveal
-                      your full earnings dashboard.
-                    </p>
-                    <Button
-                      onClick={() => setIsConnectOpen(true)}
-                      variant='primary'
-                      size='sm'
-                      className='mt-5 rounded-[10px] text-[11px] font-[510] tracking-[-0.01em]'
-                    >
-                      Connect Venmo
-                    </Button>
+        {!hasVenmoHandle && (
+          <div className='flex-1 overflow-y-auto overflow-x-hidden'>
+            <div className='flex flex-col gap-5 px-3 py-3 sm:px-4 sm:py-4'>
+              <ContentSurfaceCard className='px-6 py-12 sm:px-8 sm:py-14'>
+                <div className='mx-auto flex max-w-md flex-col items-center text-center'>
+                  <div
+                    className='mb-4 flex h-11 w-11 items-center justify-center rounded-[10px] border border-accent/20 bg-accent/10'
+                    aria-hidden='true'
+                  >
+                    <Wallet className='h-5 w-5 text-accent-token' />
                   </div>
-                </ContentSurfaceCard>
-                <VenmoConnectDialog
-                  open={isConnectOpen}
-                  onClose={handleCloseConnect}
-                  venmoHandle={venmoHandle}
-                  onVenmoHandleChange={setVenmoHandle}
-                  onSave={handleSaveVenmo}
-                  isSaving={isSaving}
-                  saveSuccess={saveSuccess}
-                />
-              </>
-            )}
-
-            {hasVenmoHandle && (
-              <>
-                <ContentSurfaceCard className='p-4 sm:p-5'>
-                  <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
-                    <StatCard
-                      label='QR scans'
-                      value={qrTipClicks}
-                      description='Fans who scanned your QR'
-                      icon={ScanLine}
-                      iconChipClassName='border border-subtle bg-surface-1'
-                      iconClassName='text-success'
-                    />
-                    <StatCard
-                      label='Link clicks'
-                      value={linkTipClicks}
-                      description='Fans who clicked your link'
-                      icon={MousePointerClick}
-                      iconChipClassName='border border-subtle bg-surface-1'
-                      iconClassName='text-info'
-                    />
-                    <StatCard
-                      label='Total visits'
-                      value={tipClicks}
-                      description='QR + link combined'
-                      icon={BarChart3}
-                      iconChipClassName='border border-subtle bg-surface-1'
-                      iconClassName='text-accent'
-                    />
-                  </div>
-                </ContentSurfaceCard>
-
-                <div className='grid gap-4 sm:grid-cols-2'>
-                  <TipLinkSection
-                    tipUrl={tipUrls.tipUrl}
-                    tipRelativePathLink={tipUrls.tipRelativePathLink}
-                  />
+                  <h2 className='text-[17px] font-[590] tracking-[-0.011em] text-primary-token sm:text-[18px]'>
+                    Connect Venmo to unlock earnings
+                  </h2>
+                  <p className='mt-2 text-[13px] leading-5 text-secondary-token sm:text-[14px]'>
+                    Link your Venmo once to start receiving tips and reveal your
+                    full earnings dashboard.
+                  </p>
+                  <Button
+                    onClick={() => setIsConnectOpen(true)}
+                    variant='primary'
+                    size='sm'
+                    className='mt-5 rounded-[10px] text-[11px] font-[510] tracking-[-0.01em]'
+                  >
+                    Connect Venmo
+                  </Button>
                 </div>
+              </ContentSurfaceCard>
+              <VenmoConnectDialog
+                open={isConnectOpen}
+                onClose={handleCloseConnect}
+                venmoHandle={venmoHandle}
+                onVenmoHandleChange={setVenmoHandle}
+                onSave={handleSaveVenmo}
+                isSaving={isSaving}
+                saveSuccess={saveSuccess}
+              />
+            </div>
+          </div>
+        )}
 
-                <EarningsTab />
-              </>
+        {hasVenmoHandle && (
+          <div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
+            {/* Tab bar */}
+            <div className='shrink-0 border-b border-subtle px-3 py-2 sm:px-4'>
+              <AppSegmentControl
+                value={activeTab}
+                onValueChange={handleTabChange}
+                options={TAB_OPTIONS}
+                surface='ghost'
+              />
+            </div>
+
+            {/* Tab content */}
+            {activeTab === 'overview' && (
+              <div className='flex-1 overflow-hidden'>
+                <EarningsOverviewTab
+                  tipUrl={tipUrls.tipUrl}
+                  tipRelativePathLink={tipUrls.tipRelativePathLink}
+                  handle={artist.handle ?? ''}
+                  earnings={earnings}
+                  isEarningsLoading={isEarningsLoading}
+                  qrTipClicks={qrTipClicks}
+                  linkTipClicks={linkTipClicks}
+                  tipClicks={tipClicks}
+                />
+              </div>
             )}
 
-            <ShopifyStoreCard />
+            {activeTab === 'tippers' && (
+              <EarningsTippersTab
+                tippers={earnings?.tippers ?? []}
+                isLoading={isEarningsLoading}
+              />
+            )}
           </div>
-        </div>
+        )}
       </DashboardWorkspacePanel>
 
       <Dialog
