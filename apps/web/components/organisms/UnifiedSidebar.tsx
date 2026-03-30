@@ -355,12 +355,12 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      {!isInSettings ? (
+      {isInSettings ? null : (
         <div className='mt-auto shrink-0'>
           <div className='px-2 pb-1'>
             <NowPlayingCard />
           </div>
-          {!isDemoRoute ? <SidebarUpgradeBanner /> : null}
+          {isDemoRoute ? null : <SidebarUpgradeBanner />}
           <SidebarInstallBanner />
 
           {isUserAdmin && (
@@ -374,7 +374,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
             </div>
           )}
         </div>
-      ) : null}
+      )}
     </Sidebar>
   );
 }
