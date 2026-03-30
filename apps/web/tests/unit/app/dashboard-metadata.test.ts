@@ -87,4 +87,14 @@ describe('dashboard metadata generation', () => {
 
     expect(metadata.title).toBe('Thread | Jovie');
   });
+
+  it('home page renders the same chat client as /app/chat (AGENTS.md #16)', async () => {
+    const { DeferredChatPageClient } = await import(
+      '@/app/app/(shell)/chat/DeferredChatPageClient'
+    );
+    const homePage = await import('@/app/app/(shell)/page');
+
+    const result = homePage.default();
+    expect(result.type).toBe(DeferredChatPageClient);
+  });
 });

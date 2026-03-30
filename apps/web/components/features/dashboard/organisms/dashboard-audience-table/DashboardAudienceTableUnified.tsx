@@ -6,6 +6,7 @@ import {
   createColumnHelper,
   type OnChangeFn,
   type SortingState,
+  type VisibilityState,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Users } from 'lucide-react';
@@ -47,13 +48,10 @@ import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
 import { copyTextToClipboard, downloadVCard } from './utils';
 import {
-  QuickActionsCell,
-  renderIntentScoreCell,
-  renderLastActionCell,
+  renderEngagementCell,
+  renderLastSeenActionCell,
   renderLocationCellFromRow,
   renderLtvCell,
-  renderTypeBadgeCell,
-  renderVisitsNumberCell,
   SelectCell,
   UserCellWithTouring,
 } from './utils/column-renderers';
@@ -67,28 +65,28 @@ function getSrDescription(isEmpty: boolean): string {
   return 'Every visitor, anonymous or identified, lives in this table.';
 }
 
-/** Map column ID → server sort field for URL state bridge. */
+/** Map column ID → server sort field for URL state bridge.
+ * Note: Value sorts by engagement score (server proxy for LTV — no computed LTV column exists). */
 const COLUMN_SORT_MAP: Record<string, string> = {
-  type: 'type',
-  intent: 'intent',
-  visits: 'visits',
-  ltv: 'engagement',
-  lastAction: 'lastSeen',
+  engagement: 'visits',
+  value: 'engagement',
+  lastSeen: 'lastSeen',
 };
 
-/** Reverse map: server sort field → column ID. */
+/** Reverse map: server sort field → column ID.
+ * Includes legacy mappings (intent, type) so bookmarked URLs degrade gracefully. */
 const SORT_FIELD_TO_COLUMN: Record<string, string> = {
-  type: 'type',
-  intent: 'intent',
-  visits: 'visits',
-  engagement: 'ltv',
-  lastSeen: 'lastAction',
+  visits: 'engagement',
+  intent: 'engagement',
+  type: 'engagement',
+  engagement: 'value',
+  lastSeen: 'lastSeen',
 };
 
 /**
- * Linear-style column definitions — one concept per column with visible sortable headers.
+ * Consolidated column layout — fewer, denser columns.
  *
- * Layout: Select | User (flex) | Type | Location | Intent | Visits | LTV | Last Action | Quick Actions
+ * Layout: Select | User (flex, with type dot) | Location | Engagement | Value | Last Seen
  */
 const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   memberColumnHelper.display({
@@ -103,59 +101,48 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     header: 'User',
     cell: UserCellWithTouring,
     size: 9999,
-    minSize: 180,
+    minSize: 220,
     enableSorting: false,
-  }),
-  memberColumnHelper.accessor('type', {
-    id: 'type',
-    header: 'Type',
-    cell: renderTypeBadgeCell,
-    size: 90,
-    enableSorting: true,
   }),
   memberColumnHelper.accessor('locationLabel', {
     id: 'location',
     header: 'Location',
     cell: renderLocationCellFromRow,
-    size: 160,
+    size: 140,
     enableSorting: false,
   }),
-  memberColumnHelper.accessor('intentLevel', {
-    id: 'intent',
-    header: 'Intent',
-    cell: renderIntentScoreCell,
-    size: 70,
-    enableSorting: true,
-  }),
   memberColumnHelper.accessor('visits', {
-    id: 'visits',
-    header: 'Visits',
-    cell: renderVisitsNumberCell,
-    size: 70,
+    id: 'engagement',
+    header: 'Engagement',
+    cell: renderEngagementCell,
+    size: 100,
     enableSorting: true,
   }),
   memberColumnHelper.accessor('tipAmountTotalCents', {
-    id: 'ltv',
-    header: 'LTV',
+    id: 'value',
+    header: 'Value',
     cell: renderLtvCell,
-    size: 80,
+    size: 90,
     enableSorting: true,
   }),
   memberColumnHelper.accessor('latestActions', {
-    id: 'lastAction',
-    header: 'Last Action',
-    cell: renderLastActionCell,
+    id: 'lastSeen',
+    header: 'Last Seen',
+    cell: renderLastSeenActionCell,
     size: 180,
     enableSorting: true,
   }),
-  memberColumnHelper.display({
-    id: 'quickActions',
-    header: '',
-    cell: QuickActionsCell,
-    size: 80,
-    enableSorting: false,
-  }),
 ];
+
+/** Responsive column visibility by viewport width. */
+function getColumnVisibility(width: number): VisibilityState {
+  if (width < 1024) {
+    // md breakpoint: hide location and value
+    return { location: false, value: false };
+  }
+  // lg+: show all columns
+  return {};
+}
 
 /** Estimated height of each mobile card row in px. */
 const MOBILE_CARD_HEIGHT = 72;
@@ -252,6 +239,23 @@ export const DashboardAudienceTableUnified = memo(
       direction,
       profileUrl,
     });
+
+    // Responsive column visibility
+    const [columnVisibility, setColumnVisibility] =
+      React.useState<VisibilityState>(() =>
+        typeof window !== 'undefined'
+          ? getColumnVisibility(window.innerWidth)
+          : {}
+      );
+
+    React.useEffect(() => {
+      const lgQuery = window.matchMedia('(min-width: 1024px)');
+      const handler = () => {
+        setColumnVisibility(getColumnVisibility(window.innerWidth));
+      };
+      lgQuery.addEventListener('change', handler);
+      return () => lgQuery.removeEventListener('change', handler);
+    }, []);
 
     // Bridge URL sort state ↔ TanStack SortingState
     const sorting: SortingState = useMemo(() => {
@@ -639,7 +643,8 @@ export const DashboardAudienceTableUnified = memo(
                         enableKeyboardNavigation={true}
                         sorting={sorting}
                         onSortingChange={handleSortingChange}
-                        minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+                        columnVisibility={columnVisibility}
+                        minWidth={`${TABLE_MIN_WIDTHS.SMALL}px`}
                         className='text-[13px]'
                         getRowClassName={getRowClassName}
                         onRowClick={row => handleViewProfile(row)}

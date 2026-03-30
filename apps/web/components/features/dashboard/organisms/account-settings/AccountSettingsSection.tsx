@@ -7,7 +7,7 @@
  * appearance, and notification preference cards.
  */
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
-import { SettingsGroupHeading } from '@/features/dashboard/molecules/SettingsGroupHeading';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsAppearanceSection } from '@/features/dashboard/organisms/SettingsAppearanceSection';
 import { SettingsNotificationsSection } from '@/features/dashboard/organisms/SettingsNotificationsSection';
 import { useSessionSafe, useUserSafe } from '@/hooks/useClerkSafe';
@@ -45,27 +45,27 @@ function ClerkAccountSections() {
 
   return (
     <>
-      <div>
-        <SettingsGroupHeading className='pb-3 pt-6 first:pt-0'>
-          Email
-        </SettingsGroupHeading>
+      <SettingsPanel
+        title='Email'
+        cardClassName='border-0 bg-transparent shadow-none p-0'
+      >
         <EmailManagementCard user={typedUser} />
-      </div>
-      <div>
-        <SettingsGroupHeading className='pb-3 pt-6'>
-          Connected accounts
-        </SettingsGroupHeading>
+      </SettingsPanel>
+      <SettingsPanel
+        title='Connected accounts'
+        cardClassName='border-0 bg-transparent shadow-none p-0'
+      >
         <ConnectedAccountsCard user={typedUser} />
-      </div>
-      <div>
-        <SettingsGroupHeading className='pb-3 pt-6'>
-          Sessions
-        </SettingsGroupHeading>
+      </SettingsPanel>
+      <SettingsPanel
+        title='Sessions'
+        cardClassName='border-0 bg-transparent shadow-none p-0'
+      >
         <SessionManagementCard
           user={typedUser}
           activeSessionId={activeSession?.id}
         />
-      </div>
+      </SettingsPanel>
     </>
   );
 }
