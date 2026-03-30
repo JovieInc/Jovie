@@ -117,6 +117,8 @@ function getMatchSourceLabel(matchSource: string | null): string {
       return 'Discovered via Spotify';
     case 'isrc_discovery':
       return 'Verified by ISRC matching';
+    case 'backfill':
+      return 'Imported from profile';
     default:
       return 'Linked';
   }

@@ -90,4 +90,28 @@ describe('dashboard drawer chrome', () => {
     expect(screen.getByText('Tracks Verified')).toBeInTheDocument();
     expect(screen.queryByText('Confidence Breakdown')).not.toBeInTheDocument();
   });
+
+  it('presence drawer maps backfill matches to a distinct source label', () => {
+    render(
+      <DspPresenceSidebar
+        item={{
+          matchId: 'match-2',
+          providerId: 'spotify',
+          status: 'auto_confirmed',
+          confidenceScore: null,
+          matchingIsrcCount: 0,
+          matchSource: 'backfill',
+          confirmedAt: '2026-03-20T00:00:00.000Z',
+          externalArtistName: 'Tim White',
+          externalArtistUrl: 'https://open.spotify.com/artist/4u',
+          externalArtistImageUrl: null,
+          confidenceBreakdown: null,
+        }}
+        onClose={() => undefined}
+      />
+    );
+
+    expect(screen.getByText('Imported from profile')).toBeInTheDocument();
+    expect(screen.queryByText('Tracks Verified')).not.toBeInTheDocument();
+  });
 });
