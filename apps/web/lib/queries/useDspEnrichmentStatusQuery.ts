@@ -8,6 +8,7 @@
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 
@@ -76,6 +77,11 @@ export interface UseDspEnrichmentStatusQueryOptions {
    * Default: 5000ms when processing, false when complete/idle.
    */
   refetchInterval?: number | false;
+  /**
+   * Called when enrichment transitions from an active phase to complete.
+   * Use this to trigger page refreshes or other side effects.
+   */
+  onComplete?: () => void;
 }
 
 // ============================================================================
@@ -138,6 +144,7 @@ export function useDspEnrichmentStatusQuery({
   profileId,
   enabled = true,
   refetchInterval,
+  onComplete,
 }: UseDspEnrichmentStatusQueryOptions) {
   const queryClient = useQueryClient();
 
@@ -148,7 +155,7 @@ export function useDspEnrichmentStatusQuery({
   const isPolling =
     cachedData != null && ACTIVE_PHASES.has(cachedData.overallPhase);
 
-  return useQuery<EnrichmentStatus>({
+  const query = useQuery<EnrichmentStatus>({
     queryKey: queryKeys.dspEnrichment.status(profileId),
     queryFn: ({ signal }) => fetchEnrichmentStatus(profileId, signal),
     enabled: enabled && !!profileId,
@@ -180,6 +187,43 @@ export function useDspEnrichmentStatusQuery({
     retry: 3,
     retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
+
+  // Track phase transitions: fire callback when enrichment finishes or new data appears.
+  // Triggers on: active → complete, discovering → non-discovering (new matches found)
+  const prevPhaseRef = useRef<EnrichmentPhase | undefined>(undefined);
+  const prevProfileIdRef = useRef(profileId);
+  useEffect(() => {
+    const currentPhase = query.data?.overallPhase;
+    const prevProfileId = prevProfileIdRef.current;
+    prevProfileIdRef.current = profileId;
+
+    if (prevProfileId !== profileId) {
+      prevPhaseRef.current = currentPhase;
+      return;
+    }
+
+    const prevPhase = prevPhaseRef.current;
+    prevPhaseRef.current = currentPhase;
+
+    if (prevPhase == null || currentPhase == null || prevPhase === currentPhase)
+      return;
+
+    const shouldRefresh =
+      // Active → complete: full enrichment finished
+      (ACTIVE_PHASES.has(prevPhase) && currentPhase === 'complete') ||
+      // Discovering → non-discovering: discovery found new matches
+      (prevPhase === 'discovering' && currentPhase !== 'discovering');
+
+    if (shouldRefresh) {
+      // Invalidate matches cache so any mounted matches queries get fresh data
+      queryClient.invalidateQueries({
+        queryKey: [...queryKeys.dspEnrichment.all, 'matches', profileId],
+      });
+      onComplete?.();
+    }
+  }, [query.data?.overallPhase, profileId, queryClient, onComplete]);
+
+  return query;
 }
 
 // ============================================================================
