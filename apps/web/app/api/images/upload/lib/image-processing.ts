@@ -98,78 +98,10 @@ const PRESS_DOWNLOAD_SIZES = [1200, 800, 400] as const;
 const PRESS_MAX_DIMENSION = 2048;
 const PRESS_AVIF_QUALITY = 75;
 
-/**
- * Process an avatar image into multiple download sizes, mirroring
- * the album-art multi-size pipeline used by processArtworkToSizes.
- *
- * Returns a map of `{ original, '512', '256', '128' }` → Buffer.
- */
-export async function processAvatarToSizes(
-  file: File
+async function processPressPhotoSizesFromBuffer(
+  inputBuffer: Buffer
 ): Promise<Record<string, Buffer>> {
   const sharp = await getSharp();
-  const inputBuffer = await fileToBuffer(file);
-  const baseImage = sharp(inputBuffer, { failOnError: false })
-    .rotate()
-    .withMetadata({ orientation: undefined });
-
-  const metadata = await baseImage.metadata();
-  const originalWidth = metadata.width ?? AVATAR_MAX_DIMENSION;
-  const originalHeight = metadata.height ?? AVATAR_MAX_DIMENSION;
-
-  const results: Record<string, Buffer> = {};
-
-  // Original: capped at 1536px, no upscaling
-  const maxDim = Math.max(originalWidth, originalHeight);
-  const originalResize =
-    maxDim > AVATAR_MAX_DIMENSION ? AVATAR_MAX_DIMENSION : undefined;
-
-  let originalPipeline = baseImage.clone();
-  if (originalResize) {
-    originalPipeline = originalPipeline.resize({
-      width: originalResize,
-      height: originalResize,
-      fit: 'inside',
-      withoutEnlargement: true,
-    });
-  }
-  const { data: originalData } = await originalPipeline
-    .toColourspace('srgb')
-    .avif({ quality: AVATAR_AVIF_QUALITY, effort: 4 })
-    .toBuffer({ resolveWithObject: true });
-
-  results.original = originalData;
-
-  // Generate each download size (square crop, no upscaling)
-  for (const size of AVATAR_DOWNLOAD_SIZES) {
-    if (originalWidth < size && originalHeight < size) {
-      continue;
-    }
-
-    const { data } = await baseImage
-      .clone()
-      .resize({
-        width: size,
-        height: size,
-        fit: 'cover',
-        position: 'centre',
-        withoutEnlargement: true,
-      })
-      .toColourspace('srgb')
-      .avif({ quality: AVATAR_AVIF_QUALITY, effort: 4 })
-      .toBuffer({ resolveWithObject: true });
-
-    results[String(size)] = data;
-  }
-
-  return results;
-}
-
-export async function processPressPhotoToSizes(
-  file: File
-): Promise<Record<string, Buffer>> {
-  const sharp = await getSharp();
-  const inputBuffer = await fileToBuffer(file);
   const baseImage = sharp(inputBuffer, { failOnError: false })
     .rotate()
     .withMetadata({ orientation: undefined });
@@ -221,6 +153,96 @@ export async function processPressPhotoToSizes(
   }
 
   return results;
+}
+
+async function processAvatarSizesFromBuffer(
+  inputBuffer: Buffer
+): Promise<Record<string, Buffer>> {
+  const sharp = await getSharp();
+  const baseImage = sharp(inputBuffer, { failOnError: false })
+    .rotate()
+    .withMetadata({ orientation: undefined });
+
+  const metadata = await baseImage.metadata();
+  const originalWidth = metadata.width ?? AVATAR_MAX_DIMENSION;
+  const originalHeight = metadata.height ?? AVATAR_MAX_DIMENSION;
+  const results: Record<string, Buffer> = {};
+
+  // Original: capped at 1536px, no upscaling
+  const maxDim = Math.max(originalWidth, originalHeight);
+  const originalResize =
+    maxDim > AVATAR_MAX_DIMENSION ? AVATAR_MAX_DIMENSION : undefined;
+
+  let originalPipeline = baseImage.clone();
+  if (originalResize) {
+    originalPipeline = originalPipeline.resize({
+      width: originalResize,
+      height: originalResize,
+      fit: 'cover',
+      position: 'centre',
+      withoutEnlargement: true,
+    });
+  }
+  const { data: originalData } = await originalPipeline
+    .toColourspace('srgb')
+    .avif({ quality: AVATAR_AVIF_QUALITY, effort: 4 })
+    .toBuffer({ resolveWithObject: true });
+
+  results.original = originalData;
+
+  // Generate each download size (square crop, no upscaling)
+  for (const size of AVATAR_DOWNLOAD_SIZES) {
+    if (originalWidth < size && originalHeight < size) {
+      continue;
+    }
+
+    const { data } = await baseImage
+      .clone()
+      .resize({
+        width: size,
+        height: size,
+        fit: 'cover',
+        position: 'centre',
+        withoutEnlargement: true,
+      })
+      .toColourspace('srgb')
+      .avif({ quality: AVATAR_AVIF_QUALITY, effort: 4 })
+      .toBuffer({ resolveWithObject: true });
+
+    results[String(size)] = data;
+  }
+
+  return results;
+}
+
+/**
+ * Process an avatar image into multiple download sizes, mirroring
+ * the album-art multi-size pipeline used by processArtworkToSizes.
+ *
+ * Returns a map of `{ original, '512', '256', '128' }` → Buffer.
+ */
+export async function processAvatarToSizes(
+  file: File
+): Promise<Record<string, Buffer>> {
+  const inputBuffer = await fileToBuffer(file);
+  return processAvatarSizesFromBuffer(inputBuffer);
+}
+
+export async function processPressPhotoToSizes(
+  file: File
+): Promise<Record<string, Buffer>> {
+  const inputBuffer = await fileToBuffer(file);
+  return processPressPhotoSizesFromBuffer(inputBuffer);
+}
+
+/**
+ * Process a press photo from a Buffer (for DSP image ingestion).
+ * Same as processPressPhotoToSizes but accepts a Buffer instead of a File.
+ */
+export async function processPressPhotoBufferToSizes(
+  inputBuffer: Buffer
+): Promise<Record<string, Buffer>> {
+  return processPressPhotoSizesFromBuffer(inputBuffer);
 }
 
 export async function getImageBufferMetadata(buffer: Buffer): Promise<{
