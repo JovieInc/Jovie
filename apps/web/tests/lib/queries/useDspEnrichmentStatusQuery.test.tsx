@@ -57,6 +57,7 @@ describe('useDspEnrichmentStatusQuery', () => {
   it.each([
     ['discovering', 'matching'],
     ['matching', 'complete'],
+    ['enriching', 'complete'],
   ] as const)('calls onComplete when phase transitions from %s to %s', async (fromPhase, toPhase) => {
     const onComplete = vi.fn();
 
@@ -104,6 +105,33 @@ describe('useDspEnrichmentStatusQuery', () => {
     mockFetch.mockResolvedValueOnce(
       createResponse(createStatus('discovering'))
     );
+
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it('does not call onComplete when discovery fails', async () => {
+    const onComplete = vi.fn();
+
+    mockFetch.mockResolvedValueOnce(
+      createResponse(createStatus('discovering'))
+    );
+
+    const { result } = renderHook(
+      () =>
+        useDspEnrichmentStatusQuery({
+          profileId: 'profile-123',
+          onComplete,
+        }),
+      { wrapper }
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    mockFetch.mockResolvedValueOnce(createResponse(createStatus('failed')));
 
     await act(async () => {
       await result.current.refetch();

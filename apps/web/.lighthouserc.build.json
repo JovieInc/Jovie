@@ -47,6 +47,7 @@
                 "maxNumericValue": 3000
               }
             ],
+            "forced-reflow-insight": "warn",
             "categories:performance": [
               "warn",
               {

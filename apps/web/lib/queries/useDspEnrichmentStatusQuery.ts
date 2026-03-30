@@ -80,6 +80,8 @@ export interface UseDspEnrichmentStatusQueryOptions {
   /**
    * Called when enrichment transitions from an active phase to complete.
    * Use this to trigger page refreshes or other side effects.
+   * Must be stable (for example wrapped in `useCallback`) to avoid unnecessary
+   * effect re-runs.
    */
   onComplete?: () => void;
 }
@@ -211,8 +213,10 @@ export function useDspEnrichmentStatusQuery({
     const shouldRefresh =
       // Active → complete: full enrichment finished
       (ACTIVE_PHASES.has(prevPhase) && currentPhase === 'complete') ||
-      // Discovering → non-discovering: discovery found new matches
-      (prevPhase === 'discovering' && currentPhase !== 'discovering');
+      // Discovering → matching/enriching/complete: discovery produced new data
+      (prevPhase === 'discovering' &&
+        currentPhase !== 'discovering' &&
+        currentPhase !== 'failed');
 
     if (shouldRefresh) {
       // Invalidate matches cache so any mounted matches queries get fresh data

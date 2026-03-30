@@ -40,6 +40,11 @@ export function DspPresenceSummary({
   const { mutate: triggerDiscovery, isPending: isRefreshing } =
     useTriggerDiscoveryMutation();
   const isDiscovering = isEnrichmentInProgress(enrichmentStatus);
+  const refreshTooltip = isDiscovering
+    ? 'Discovery in progress...'
+    : spotifyId
+      ? 'Re-scan streaming platforms'
+      : 'Connect Spotify first to enable discovery';
 
   function handleRefresh() {
     if (!spotifyId || !profileId) return;
@@ -100,13 +105,7 @@ export function DspPresenceSummary({
                 onClick={handleRefresh}
                 disabled={!spotifyId || isRefreshing || isDiscovering}
                 iconOnly
-                tooltipLabel={
-                  isDiscovering
-                    ? 'Discovery in progress...'
-                    : spotifyId
-                      ? 'Re-scan streaming platforms'
-                      : 'Connect Spotify first to enable discovery'
-                }
+                tooltipLabel={refreshTooltip}
               />
             )}
             <PageToolbarActionButton
