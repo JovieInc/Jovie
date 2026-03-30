@@ -165,6 +165,12 @@ async function main() {
     mkdirSync(dirname(options.outPath), { recursive: true });
     await runBypassAuthSetup(options);
   } else {
+    if (options.persona !== 'creator') {
+      throw new Error(
+        'The requested persona requires E2E_USE_TEST_AUTH_BYPASS=1. Re-run perf:auth with bypass enabled or omit --persona.'
+      );
+    }
+
     const setupResult = runAuthSetup(options.baseUrl);
     if (setupResult.status !== 0) {
       throw new Error(

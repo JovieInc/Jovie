@@ -103,7 +103,7 @@ function resolvePersonaSeedConfig(
       firstName,
       lastName,
       isAdmin: true,
-      profilePath: null,
+      profilePath: `/${DEFAULT_ADMIN_USERNAME}`,
     };
   }
 
