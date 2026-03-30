@@ -288,6 +288,7 @@ export function UserCellWithTouring({
       <AudienceUserCell
         displayName={row.original.displayName}
         type={row.original.type}
+        tags={row.original.tags}
         deviceType={row.original.deviceType}
         geoCity={row.original.geoCity}
         geoCountry={row.original.geoCountry}

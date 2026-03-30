@@ -151,9 +151,60 @@ describe('POST /api/audience/visit', () => {
     expect(insertedValues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          engagementScore: 0,
           tags: ['bot'],
+          visits: 0,
         }),
       ])
+    );
+  });
+
+  it('uses the resolved user agent for bot detection', async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'profile_123', isPublic: true }]),
+        }),
+      }),
+    });
+
+    mockWithSystemIngestionSession.mockImplementation(async callback => {
+      await callback({
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        insert: vi.fn().mockReturnValue({
+          values: vi.fn().mockReturnValue({
+            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      });
+    });
+
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'user-agent': 'Header User Agent',
+      },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+        userAgent: 'Body User Agent',
+      }),
+    });
+
+    await POST(request);
+
+    expect(mockDetectBot).toHaveBeenCalledWith(
+      expect.any(NextRequest),
+      '/api/audience/visit',
+      expect.objectContaining({ userAgent: 'Body User Agent' })
     );
   });
 

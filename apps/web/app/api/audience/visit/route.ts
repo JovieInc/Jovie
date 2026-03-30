@@ -220,7 +220,9 @@ export async function POST(request: NextRequest) {
     const resolvedUserAgent =
       userAgent ?? request.headers.get('user-agent') ?? undefined;
     const resolvedIpAddress = ipAddress ?? clientIP ?? undefined;
-    const botResult = detectBot(request, '/api/audience/visit');
+    const botResult = detectBot(request, '/api/audience/visit', {
+      userAgent: resolvedUserAgent,
+    });
     const audienceTags = botResult.isBot ? ['bot'] : [];
     // Use the client-provided referrer (document.referrer) if available.
     // The HTTP Referer header on same-origin fetch() is the current page URL,
@@ -298,22 +300,6 @@ export async function POST(request: NextRequest) {
     await withSystemIngestionSession(async tx => {
       const viewDate = now.toISOString().slice(0, 10);
 
-      if (hasDailyProfileViewsTable && !botResult.isBot) {
-        try {
-          await incrementDailyProfileViews(tx, profileId, viewDate, now);
-        } catch (error) {
-          if (!isMissingDailyProfileViewsTableError(error)) {
-            throw error;
-          }
-
-          await captureWarning(
-            '[audience/visit] daily_profile_views table missing; skipping aggregate write',
-            error,
-            { profileId, viewDate }
-          );
-        }
-      }
-
       const [existing] = await tx
         .select({
           id: audienceMembers.id,
@@ -336,14 +322,18 @@ export async function POST(request: NextRequest) {
         )
         .limit(1);
 
-      const updatedVisits = (existing?.visits ?? 0) + 1;
+      const mergedTags = mergeAudienceTags(existing?.tags, audienceTags);
+      const isBotAudienceMember = mergedTags.includes('bot');
+      const updatedVisits = isBotAudienceMember
+        ? (existing?.visits ?? 0)
+        : (existing?.visits ?? 0) + 1;
       const actionCount = Array.isArray(existing?.latestActions)
         ? existing.latestActions.length
         : 0;
-      const updatedIntent = botResult.isBot
+      const updatedIntent = isBotAudienceMember
         ? 'low'
         : deriveIntentLevel(updatedVisits, actionCount);
-      const updatedScore = botResult.isBot
+      const updatedScore = isBotAudienceMember
         ? (existing?.engagementScore ?? 0)
         : (existing?.engagementScore ?? 0) + 1;
       const previousReferrers = Array.isArray(existing?.referrerHistory)
@@ -366,7 +356,21 @@ export async function POST(request: NextRequest) {
       const resolvedUtmParams = hasUtmParams
         ? utmParams
         : (existing?.utmParams ?? {});
-      const mergedTags = mergeAudienceTags(existing?.tags, audienceTags);
+      if (hasDailyProfileViewsTable && !isBotAudienceMember) {
+        try {
+          await incrementDailyProfileViews(tx, profileId, viewDate, now);
+        } catch (error) {
+          if (!isMissingDailyProfileViewsTableError(error)) {
+            throw error;
+          }
+
+          await captureWarning(
+            '[audience/visit] daily_profile_views table missing; skipping aggregate write',
+            error,
+            { profileId, viewDate }
+          );
+        }
+      }
 
       if (existing) {
         await tx
@@ -397,9 +401,9 @@ export async function POST(request: NextRequest) {
           displayName: 'Visitor',
           firstSeenAt: now,
           lastSeenAt: now,
-          visits: 1,
-          engagementScore: 1,
-          intentLevel: 'low',
+          visits: updatedVisits,
+          engagementScore: updatedScore,
+          intentLevel: updatedIntent,
           geoCity: geoCityValue,
           geoCountry: geoCountryValue,
           deviceType: normalizedDevice,

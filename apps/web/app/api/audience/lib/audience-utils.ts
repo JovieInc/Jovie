@@ -55,6 +55,8 @@ export function trimHistory<T>(items: T[], maxItems = 3) {
   return items.slice(0, maxItems);
 }
 
+// Bot tags are intentionally sticky so later mixed traffic from the same
+// fingerprint does not start contributing to "clean" analytics again.
 export function mergeAudienceTags(
   currentTags: string[] | null | undefined,
   incomingTags: string[]

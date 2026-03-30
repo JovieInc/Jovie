@@ -54,20 +54,20 @@ export function SettingsAnalyticsSection({
         {isPro ? (
           <SettingsToggleRow
             icon={<BarChart3 className='h-4 w-4' aria-hidden />}
-            title='Traffic quality filtering'
+            title='Traffic Quality Filtering'
             description='Keep your own profile views and link clicks out of analytics so your numbers reflect real audience behavior. Likely bot traffic stays visible in Audience and is labeled for review.'
             checked={excludeSelf}
             onCheckedChange={handleToggle}
             disabled={isPending}
-            ariaLabel='Toggle traffic quality filtering'
+            ariaLabel='Toggle Traffic Quality Filtering'
           />
         ) : (
           <SettingsToggleRow
             gated
             icon={<BarChart3 className='h-4 w-4' aria-hidden />}
-            title='Traffic quality filtering'
+            title='Traffic Quality Filtering'
             description='Keep your own profile views and link clicks out of analytics so your numbers reflect real audience behavior. Likely bot traffic stays visible in Audience and is labeled for review.'
-            gateFeatureContext='Traffic quality filtering'
+            gateFeatureContext='Traffic Quality Filtering'
           />
         )}
         {isPro && excludeSelf ? (
@@ -75,7 +75,7 @@ export function SettingsAnalyticsSection({
             <BarChart3 className='mt-0.5 h-4 w-4 shrink-0 text-secondary-token' />
             <div>
               <p className='text-[13px] font-[560] tracking-[-0.02em] text-primary-token'>
-                Traffic quality filtering active
+                Traffic Quality Filtering Active
               </p>
               <p className='mt-1 text-[13px] text-secondary-token'>
                 Your own profile views and link clicks are being excluded from

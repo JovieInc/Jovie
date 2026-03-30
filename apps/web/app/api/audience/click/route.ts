@@ -323,13 +323,14 @@ export async function POST(request: NextRequest) {
       const latestActions = trimHistory([actionEntry, ...existingActions], 5);
       const actionCount = latestActions.length;
       const weight = getActionWeight(linkType);
-      const updatedScore = botDetection.isBot
+      const tags = mergeAudienceTags(member.tags, audienceTags);
+      const isBotMember = tags.includes('bot');
+      const updatedScore = isBotMember
         ? (member.engagementScore ?? 0)
         : (member.engagementScore ?? 0) + weight;
-      const intentLevel = botDetection.isBot
+      const intentLevel = isBotMember
         ? 'low'
         : deriveIntentLevel(member.visits ?? 0, actionCount);
-      const tags = mergeAudienceTags(member.tags, audienceTags);
 
       const metadataWithTipValue =
         linkType === 'tip'

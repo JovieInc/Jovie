@@ -223,13 +223,14 @@ async function upsertAudienceMember(
   };
   const latestActions = trimHistory([actionEntry, ...existingActions], 5);
   const weight = getActionWeight(opts.linkType);
-  const updatedScore = opts.isBot
+  const tags = mergeAudienceTags(resolvedMember.tags, audienceTags);
+  const isBotMember = tags.includes('bot');
+  const updatedScore = isBotMember
     ? (resolvedMember.engagementScore ?? 0)
     : (resolvedMember.engagementScore ?? 0) + weight;
-  const intentLevel = opts.isBot
+  const intentLevel = isBotMember
     ? 'low'
     : deriveIntentLevel(resolvedMember.visits ?? 0, latestActions.length);
-  const tags = mergeAudienceTags(resolvedMember.tags, audienceTags);
 
   await tx
     .update(audienceMembers)
