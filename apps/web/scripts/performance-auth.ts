@@ -141,6 +141,13 @@ async function runBypassAuthSetup(options: PerfAuthCliOptions) {
       { waitUntil: 'domcontentloaded' }
     );
 
+    const landedPath = new URL(page.url()).pathname;
+    if (landedPath !== redirectPath) {
+      throw new Error(
+        `Test-auth bypass redirected to ${landedPath || page.url()} instead of ${redirectPath}.`
+      );
+    }
+
     await context.storageState({ path: options.outPath });
   } finally {
     await browser.close();

@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import { chromium } from '@playwright/test';
+import { type Browser, type BrowserContext, chromium } from '@playwright/test';
 import { APP_ROUTES } from '../constants/routes';
 import type {
   PerfResolveContext,
@@ -89,11 +89,13 @@ async function createConversationViaApp(context: PerfResolveContext) {
     return null;
   }
 
-  const browser = await chromium.launch();
-  const pageContext = await browser.newContext();
+  let browser: Browser | null = null;
+  let pageContext: BrowserContext | null = null;
   const baseUrl = context.baseUrl.replace(/\/$/, '');
 
   try {
+    browser = await chromium.launch();
+    pageContext = await browser.newContext();
     await pageContext.addCookies([...context.authCookies]);
     const page = await pageContext.newPage();
     await page.goto(`${baseUrl}${APP_ROUTES.CHAT}`, {
@@ -136,8 +138,8 @@ async function createConversationViaApp(context: PerfResolveContext) {
 
     return created ?? null;
   } finally {
-    await pageContext.close().catch(() => undefined);
-    await browser.close().catch(() => undefined);
+    await pageContext?.close().catch(() => undefined);
+    await browser?.close().catch(() => undefined);
   }
 }
 
