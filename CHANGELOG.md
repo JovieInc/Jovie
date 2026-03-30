@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.102] - 2026-03-29
+
+### Added
+
+- Interactive investor links manager: create links, copy shareable URLs, toggle active/inactive, deactivate with confirmation
+- Investor portal settings form: fundraise display, CTA URLs, follow-up automation, Slack webhook
+- Referral settings page wired to existing referral APIs (code display, stats, program terms)
+- Ad pixels settings page wired to existing pixel APIs (Facebook, Google, TikTok with encrypted token storage)
+- Route completeness guard test: catches orphaned loading skeletons without matching pages in CI
+
+### Changed
+
+- Investor link delete now correctly soft-deletes (matches server behavior) instead of removing from list
+
 ## [26.4.101] - 2026-03-29
 
 ### Added
