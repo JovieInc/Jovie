@@ -13,6 +13,7 @@ export interface PerfRunConfig {
   maxNoProgress: number;
   runsPerSample: number;
   artifactsDir: string;
+  route?: string;
 }
 
 export interface PerfLoopCliOptions {
@@ -23,6 +24,7 @@ export interface PerfLoopCliOptions {
   hypothesis?: string;
   maxNoProgress: number;
   mode: PerfMode;
+  route?: string;
   runsPerSample: number;
   skipBuild: boolean;
   threshold: number;
@@ -414,6 +416,16 @@ export function parsePerfLoopArgs(
       continue;
     }
 
+    if (arg === '--route') {
+      const value = args[index + 1];
+      if (!value) {
+        throw new TypeError('Expected a value for --route');
+      }
+      options.route = value;
+      index += 1;
+      continue;
+    }
+
     if (arg === '--hypothesis') {
       const value = args[index + 1];
       if (!value) {
@@ -531,12 +543,16 @@ export function extractDashboardSample(
     );
   }
 
-  const warmShellResponseMs = coerceNumber(
-    page.rawTimings['warm-shell-response']
-  );
+  const rawWarmShell = coerceNumber(page.rawTimings['warm-shell-response']);
+  // Page-load mode routes (e.g. audience) don't have warm-shell-response.
+  // Fall back to skeleton-to-content as the primary metric.
+  const warmShellResponseMs =
+    rawWarmShell > 0
+      ? rawWarmShell
+      : coerceNumber(page.rawTimings['skeleton-to-content']);
   if (warmShellResponseMs <= 0) {
     throw new Error(
-      'Warm shell response timing is missing. The dashboard guard must expose rawTimings.warm-shell-response.'
+      'Neither warm-shell-response nor skeleton-to-content timing found. The dashboard guard must expose at least one of these in rawTimings.'
     );
   }
 
@@ -589,7 +605,10 @@ export function createDashboardMeasurement(
   };
 }
 
-export function buildDashboardBudgetGuardArgs(resolvedAuthPath?: string) {
+export function buildDashboardBudgetGuardArgs(
+  resolvedAuthPath?: string,
+  route?: string
+) {
   const args = [
     'run',
     '--',
@@ -601,7 +620,7 @@ export function buildDashboardBudgetGuardArgs(resolvedAuthPath?: string) {
     PERFORMANCE_BUDGET_GUARD_SCRIPT,
     '--json',
     '--path',
-    APP_ROUTES.DASHBOARD_RELEASES,
+    route || APP_ROUTES.DASHBOARD_RELEASES,
   ];
 
   if (resolvedAuthPath) {

@@ -416,7 +416,11 @@ function parseJsonOutput(output: string, message: string) {
   return JSON.parse(jsonStr) as unknown;
 }
 
-function measureDashboardSample(baseUrl: string, authPath?: string) {
+function measureDashboardSample(
+  baseUrl: string,
+  authPath?: string,
+  route?: string
+) {
   const env: NodeJS.ProcessEnv = { ...process.env, BASE_URL: baseUrl };
   const resolvedAuthPath = resolveAuthPath(authPath);
   if (!process.env.CLERK_SESSION_COOKIE && !resolvedAuthPath) {
@@ -428,7 +432,7 @@ function measureDashboardSample(baseUrl: string, authPath?: string) {
     env.PERF_BUDGET_AUTH_PATH = resolvedAuthPath;
   }
 
-  const args = buildDashboardBudgetGuardArgs(resolvedAuthPath);
+  const args = buildDashboardBudgetGuardArgs(resolvedAuthPath, route);
   const result = runCommand('doppler', args, { cwd: repoRoot, env });
   const rawSummary = parseJsonOutput(
     result.stdout,
@@ -478,7 +482,11 @@ async function measureCurrentState(
     const samples: DashboardSample[] = [];
     const rawSamples: unknown[] = [];
     for (let run = 0; run < config.runsPerSample; run++) {
-      const result = measureDashboardSample(config.baseUrl, config.authPath);
+      const result = measureDashboardSample(
+        config.baseUrl,
+        config.authPath,
+        config.route
+      );
       samples.push(result.sample);
       rawSamples.push(result.raw);
       writeJsonFile(
@@ -721,6 +729,7 @@ async function main() {
     maxNoProgress: cliOptions.maxNoProgress,
     runsPerSample: cliOptions.runsPerSample,
     artifactsDir: artifactDir,
+    route: cliOptions.route,
   };
 
   const changedFiles = collectChangedFiles();
