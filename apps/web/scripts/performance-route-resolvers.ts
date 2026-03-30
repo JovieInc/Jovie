@@ -143,6 +143,48 @@ async function createConversationViaApp(context: PerfResolveContext) {
   }
 }
 
+async function resolveReleaseTasksViaApp(context: PerfResolveContext) {
+  if (context.authCookies.length === 0) {
+    return null;
+  }
+
+  let browser: Browser | null = null;
+  let pageContext: BrowserContext | null = null;
+  const baseUrl = context.baseUrl.replace(/\/$/, '');
+
+  try {
+    browser = await chromium.launch();
+    pageContext = await browser.newContext();
+    await pageContext.addCookies([...context.authCookies]);
+    const page = await pageContext.newPage();
+    await page.goto(`${baseUrl}${APP_ROUTES.DASHBOARD_RELEASES}`, {
+      waitUntil: 'domcontentloaded',
+    });
+
+    await page.waitForSelector('[data-testid="release-row"]', {
+      timeout: 15_000,
+    });
+    await page.click('[data-testid="release-row"]');
+    await page.waitForSelector('[data-testid="release-sidebar"]', {
+      timeout: 15_000,
+    });
+    await page.click('button:has-text("Tasks")');
+    await page.waitForSelector('[data-testid="release-tasks-card"]', {
+      timeout: 15_000,
+    });
+    await page.click('button:has-text("Open")');
+    await page.waitForURL('**/tasks', {
+      timeout: 15_000,
+    });
+
+    const finalUrl = new URL(page.url());
+    return `${finalUrl.pathname}${finalUrl.search}`;
+  } finally {
+    await pageContext?.close().catch(() => undefined);
+    await browser?.close().catch(() => undefined);
+  }
+}
+
 async function resolveSeedProfileHandle(seedProfile?: string) {
   const requestedHandle =
     seedProfile === 'active-user'
@@ -247,12 +289,18 @@ export async function resolveChatConversationPerfPath(
 }
 
 export async function resolveReleaseTasksPerfPath(
-  route: PerfRouteDefinition
+  route: PerfRouteDefinition,
+  context: PerfResolveContext
 ): Promise<string> {
   const sql = getSqlClient();
   const activeProfile = await queryActiveProfile();
 
   if (!sql || !activeProfile) {
+    const resolvedPath = await resolveReleaseTasksViaApp(context);
+    if (resolvedPath) {
+      return resolvedPath;
+    }
+
     throw new Error(
       'DATABASE_URL and E2E_CLERK_USER_ID are required to resolve release tasks.'
     );
@@ -268,6 +316,11 @@ export async function resolveReleaseTasksPerfPath(
 
   const releaseId = releases[0]?.id;
   if (!releaseId) {
+    const resolvedPath = await resolveReleaseTasksViaApp(context);
+    if (resolvedPath) {
+      return resolvedPath;
+    }
+
     throw new Error('No seeded release found for the active E2E user.');
   }
 

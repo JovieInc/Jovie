@@ -181,8 +181,96 @@ describe('performance route resolvers', () => {
       path: '/app/dashboard/releases/[releaseId]/tasks',
     } as PerfRouteDefinition;
 
-    await expect(resolveReleaseTasksPerfPath(route)).resolves.toBe(
-      '/app/dashboard/releases/release_456/tasks'
+    await expect(
+      resolveReleaseTasksPerfPath(route, {
+        authCookies: [],
+        baseUrl: 'http://127.0.0.1:4100',
+      })
+    ).resolves.toBe('/app/dashboard/releases/release_456/tasks');
+  });
+
+  it('falls back to the authenticated releases UI when DB release lookup is unavailable', async () => {
+    vi.unstubAllEnvs();
+
+    const click = vi.fn().mockResolvedValue(undefined);
+    const goto = vi.fn().mockResolvedValue(undefined);
+    const waitForSelector = vi.fn().mockResolvedValue(undefined);
+    const waitForURL = vi.fn().mockResolvedValue(undefined);
+    const addCookies = vi.fn().mockResolvedValue(undefined);
+    const contextClose = vi.fn().mockResolvedValue(undefined);
+    const browserClose = vi.fn().mockResolvedValue(undefined);
+
+    resolverMocks.chromiumLaunch.mockResolvedValue({
+      close: browserClose,
+      newContext: vi.fn().mockResolvedValue({
+        addCookies,
+        close: contextClose,
+        newPage: vi.fn().mockResolvedValue({
+          click,
+          goto,
+          url: vi.fn(
+            () =>
+              'http://127.0.0.1:4100/app/dashboard/releases/release_987/tasks'
+          ),
+          waitForSelector,
+          waitForURL,
+        }),
+      }),
+    });
+
+    const route = {
+      path: '/app/dashboard/releases/[releaseId]/tasks',
+    } as PerfRouteDefinition;
+
+    await expect(
+      resolveReleaseTasksPerfPath(route, {
+        authCookies: [
+          {
+            domain: '127.0.0.1',
+            name: 'session',
+            path: '/',
+            value: 'cookie',
+          },
+        ],
+        baseUrl: 'http://127.0.0.1:4100',
+      })
+    ).resolves.toBe('/app/dashboard/releases/release_987/tasks');
+
+    expect(addCookies).toHaveBeenCalledOnce();
+    expect(goto).toHaveBeenCalledWith(
+      'http://127.0.0.1:4100/app/dashboard/releases',
+      {
+        waitUntil: 'domcontentloaded',
+      }
     );
+    expect(waitForSelector).toHaveBeenNthCalledWith(
+      1,
+      '[data-testid="release-row"]',
+      {
+        timeout: 15_000,
+      }
+    );
+    expect(waitForSelector).toHaveBeenNthCalledWith(
+      2,
+      '[data-testid="release-sidebar"]',
+      {
+        timeout: 15_000,
+      }
+    );
+    expect(waitForSelector).toHaveBeenNthCalledWith(
+      3,
+      '[data-testid="release-tasks-card"]',
+      {
+        timeout: 15_000,
+      }
+    );
+    expect(click).toHaveBeenNthCalledWith(1, '[data-testid="release-row"]');
+    expect(click).toHaveBeenNthCalledWith(2, 'button:has-text("Tasks")');
+    expect(click).toHaveBeenNthCalledWith(3, 'button:has-text("Open")');
+    expect(waitForURL).toHaveBeenCalledWith('**/tasks', {
+      timeout: 15_000,
+    });
+    expect(contextClose).toHaveBeenCalledOnce();
+    expect(browserClose).toHaveBeenCalledOnce();
   });
 });
