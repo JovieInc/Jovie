@@ -1,5 +1,12 @@
 import { KNOWLEDGE_TOPICS } from './topics';
 
+export interface SelectedKnowledgeContext {
+  readonly content: string;
+  readonly topicIds: string[];
+  readonly hasVolatileTopics: boolean;
+  readonly cautions: string[];
+}
+
 /**
  * Maximum number of topic documents to inject per request.
  * Each topic is ~1,000-1,300 words (~1,500-2,000 tokens).
@@ -12,6 +19,13 @@ const MAX_TOPICS = 2;
  * Prevents injecting marginally-related content.
  */
 const MIN_SCORE = 2;
+
+export const EMPTY_KNOWLEDGE_CONTEXT: SelectedKnowledgeContext = {
+  content: '',
+  topicIds: [],
+  hasVolatileTopics: false,
+  cautions: [],
+};
 
 /**
  * Check if a keyword matches in the message text.
@@ -31,8 +45,10 @@ function keywordMatches(text: string, keyword: string): boolean {
  * Returns the concatenated content of the top matching topics,
  * or an empty string if no topics are relevant.
  */
-export function selectKnowledgeContext(message: string): string {
-  if (!message || message.length < 3) return '';
+export function selectKnowledgeContext(
+  message: string
+): SelectedKnowledgeContext {
+  if (!message || message.length < 3) return EMPTY_KNOWLEDGE_CONTEXT;
 
   const lower = message.toLowerCase();
 
@@ -51,7 +67,18 @@ export function selectKnowledgeContext(message: string): string {
     .sort((a, b) => b.score - a.score)
     .slice(0, MAX_TOPICS);
 
-  if (scored.length === 0) return '';
+  if (scored.length === 0) return EMPTY_KNOWLEDGE_CONTEXT;
 
-  return scored.map(s => s.topic.content).join('\n\n---\n\n');
+  const selectedTopics = scored.map(s => s.topic);
+
+  return {
+    content: selectedTopics.map(topic => topic.content).join('\n\n---\n\n'),
+    topicIds: selectedTopics.map(topic => topic.id),
+    hasVolatileTopics: selectedTopics.some(
+      topic => topic.freshness === 'volatile'
+    ),
+    cautions: selectedTopics.flatMap(topic =>
+      topic.caution ? [topic.caution] : []
+    ),
+  };
 }

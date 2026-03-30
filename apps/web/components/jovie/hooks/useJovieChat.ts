@@ -33,7 +33,7 @@ import {
 interface UseJovieChatOptions {
   /** Profile ID for server-side context fetching (preferred) */
   readonly profileId?: string;
-  /** @deprecated Use profileId instead. Client-provided artist context for backward compatibility. */
+  /** @deprecated Compatibility-only input. No longer sent to `/api/chat`; use `profileId`. */
   readonly artistContext?: ArtistContext; // NOSONAR - kept for backward compatibility
   readonly conversationId?: string | null;
   readonly onConversationCreate?: (conversationId: string) => void;
@@ -49,7 +49,7 @@ const TITLE_POLL_MAX_DURATION_MS = 15_000;
 
 export function useJovieChat({
   profileId,
-  artistContext, // NOSONAR - kept for backward compatibility
+  artistContext: _artistContext, // NOSONAR - kept for backward compatibility
   conversationId,
   onConversationCreate,
   username,
@@ -107,19 +107,19 @@ export function useJovieChat({
       refetchInterval: shouldPollForTitle ? TITLE_POLL_INTERVAL_MS : false,
     });
 
-  // Create transport: prefer profileId for server-side fetching, fall back to artistContext
+  // Create transport: only profileId is sent to `/api/chat`.
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: '/api/chat',
         body: {
-          ...(profileId ? { profileId } : { artistContext }),
+          ...(profileId ? { profileId } : {}),
           ...(activeConversationId
             ? { conversationId: activeConversationId }
             : {}),
         },
       }),
-    [profileId, artistContext, activeConversationId]
+    [profileId, activeConversationId]
   );
 
   // Convert loaded messages to the UIMessage format useChat expects
@@ -584,6 +584,16 @@ export function useJovieChat({
       // Check for deterministic commands before hitting AI
       if (!hasFiles && tryHandleCommand(trimmedText)) return;
 
+      if (!profileId) {
+        setChatError({
+          type: 'server',
+          message:
+            'Jovie chat is unavailable until the profile finishes loading.',
+          failedMessage: trimmedText,
+        });
+        return;
+      }
+
       const payload = {
         text: trimmedText,
         ...(hasFiles ? { files } : {}),
@@ -613,6 +623,7 @@ export function useJovieChat({
       setInput('');
     },
     [
+      profileId,
       isLoading,
       isSubmitting,
       sendMessage,

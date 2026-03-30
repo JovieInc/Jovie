@@ -13,10 +13,13 @@ import { fileURLToPath } from 'node:url';
  * the Vercel standalone bundle automatically.
  */
 
-interface KnowledgeTopic {
+export interface KnowledgeTopic {
   readonly id: string;
   readonly keywords: string[];
   readonly content: string;
+  readonly freshness: 'evergreen' | 'volatile';
+  readonly lastReviewed: string;
+  readonly caution?: string;
 }
 
 const TOPICS_DIR = join(dirname(fileURLToPath(import.meta.url)), 'topics');
@@ -55,6 +58,10 @@ export const KNOWLEDGE_TOPICS: readonly KnowledgeTopic[] = [
       'how to release',
     ],
     content: loadTopic('release-strategy.md'),
+    freshness: 'volatile',
+    lastReviewed: '2026-03-30',
+    caution:
+      'Release timing, playlist deadlines, and platform feature availability can change by distributor and DSP.',
   },
   {
     id: 'playlist-strategy',
@@ -72,6 +79,10 @@ export const KNOWLEDGE_TOPICS: readonly KnowledgeTopic[] = [
       'get on a playlist',
     ],
     content: loadTopic('playlist-strategy.md'),
+    freshness: 'volatile',
+    lastReviewed: '2026-03-30',
+    caution:
+      'Editorial and algorithmic playlist tooling, submission windows, and curator workflows can change over time.',
   },
   {
     id: 'streaming-metrics',
@@ -91,6 +102,10 @@ export const KNOWLEDGE_TOPICS: readonly KnowledgeTopic[] = [
       'how are streams counted',
     ],
     content: loadTopic('streaming-metrics.md'),
+    freshness: 'volatile',
+    lastReviewed: '2026-03-30',
+    caution:
+      'Streaming metrics labels, payout behavior, and platform reporting conventions vary by service and can change.',
   },
   {
     id: 'profile-optimization',
@@ -111,6 +126,10 @@ export const KNOWLEDGE_TOPICS: readonly KnowledgeTopic[] = [
       'optimize my profile',
     ],
     content: loadTopic('profile-optimization.md'),
+    freshness: 'volatile',
+    lastReviewed: '2026-03-30',
+    caution:
+      'DSP campaign tools, visual features, and claimed performance lifts can change or be rolled out unevenly.',
   },
   {
     id: 'marketing-promotion',
@@ -131,6 +150,10 @@ export const KNOWLEDGE_TOPICS: readonly KnowledgeTopic[] = [
       'grow my audience',
     ],
     content: loadTopic('marketing-promotion.md'),
+    freshness: 'volatile',
+    lastReviewed: '2026-03-30',
+    caution:
+      'Ad platform minimums, short-form tactics, and campaign performance benchmarks are time-sensitive.',
   },
   {
     id: 'distribution-basics',
@@ -149,6 +172,10 @@ export const KNOWLEDGE_TOPICS: readonly KnowledgeTopic[] = [
       'how to distribute',
     ],
     content: loadTopic('distribution-basics.md'),
+    freshness: 'volatile',
+    lastReviewed: '2026-03-30',
+    caution:
+      'Distributor features, delivery timelines, and DSP access workflows can change across providers.',
   },
   {
     id: 'monetization',
@@ -172,6 +199,10 @@ export const KNOWLEDGE_TOPICS: readonly KnowledgeTopic[] = [
       'how to make money',
     ],
     content: loadTopic('monetization.md'),
+    freshness: 'volatile',
+    lastReviewed: '2026-03-30',
+    caution:
+      'Per-stream economics, monetization programs, and campaign returns vary by territory, platform, and time period.',
   },
   {
     id: 'music-rights',
@@ -195,5 +226,9 @@ export const KNOWLEDGE_TOPICS: readonly KnowledgeTopic[] = [
       'who owns',
     ],
     content: loadTopic('music-rights.md'),
+    freshness: 'evergreen',
+    lastReviewed: '2026-03-30',
+    caution:
+      'Rights and royalty administration depend on jurisdiction, contract terms, and collection setup.',
   },
 ] as const;

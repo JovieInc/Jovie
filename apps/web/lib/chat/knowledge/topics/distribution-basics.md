@@ -50,6 +50,12 @@ Five key codes form essential metadata: IPI identifies the songwriter/composer, 
 
 **Release timing and pitching** requires submitting information 3-4 weeks before release for optimal consideration. Spotify's playlist submission tool requires at least 7 days advance notice for algorithmic playlist eligibility (Release Radar, Discover Weekly). Missing this window means tracks won't appear in these playlists until weeks 2-4 after release.
 
+## Exclusive vs. Non-Exclusive Distribution
+
+Exclusive distribution requires extra caution. It can make sense when the distributor is offering real value beyond delivery, such as meaningful marketing support, funding, or clear strategic access.
+
+For many independent artists, non-exclusive distribution preserves flexibility and makes it easier to move if service quality, economics, or release plans change. Read the term length, rights granted, revenue share, and exit terms carefully before committing.
+
 ## Metadata Best Practices
 
 Accurate metadata prevents revenue loss and ensures proper attribution. Common mistakes include using special characters in artist names (dollar signs, hyphens, non-Latin characters) that systems may not handle properly, potentially costing thousands in lost royalties.

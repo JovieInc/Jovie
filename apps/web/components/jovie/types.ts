@@ -21,7 +21,7 @@ export interface ArtistContext {
 export interface JovieChatProps {
   /** Profile ID for server-side context fetching (preferred) */
   readonly profileId?: string;
-  /** @deprecated Use profileId instead. Client-provided artist context for backward compatibility. */
+  /** @deprecated Compatibility-only prop. No longer sent to `/api/chat`; use `profileId`. */
   readonly artistContext?: ArtistContext;
   /** Conversation ID to load and continue */
   readonly conversationId?: string | null;

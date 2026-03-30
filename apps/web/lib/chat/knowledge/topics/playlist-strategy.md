@@ -4,15 +4,15 @@ Playlists have become the primary tastemaking force in streaming music, offering
 
 ## Understanding the Playlist Ecosystem
 
-Three distinct types of playlists drive music discovery on streaming platforms. Editorial playlists are curated by platform specialists who select music based on quality, cultural relevance, and audience fit. These include flagship playlists like New Music Friday, genre-specific lists, and discovery-focused playlists like Fresh Finds. Personalized algorithmic playlists use listener data to create unique experiences for each user, including Discover Weekly, Release Radar, and various mood-based mixes. User-generated playlists represent the majority of streaming activity, where fans actively save, share, and curate music they love.
+Three distinct types of playlists drive music discovery on streaming platforms. Editorial playlists are curated by platform editors and human curators who select music based on quality, cultural relevance, and audience fit. These include flagship playlists like New Music Friday, genre-specific lists, and discovery-focused playlists like Fresh Finds. Personalized algorithmic playlists use listener data to create unique experiences for each user, including Discover Weekly, Release Radar, and various mood-based mixes. User-generated playlists represent the majority of streaming activity, where fans actively save, share, and curate music they love.
 
 The most valuable streams come from engaged listening sessions where fans actively choose your music from artist pages, personal libraries, or saved playlists. These engaged streams signal genuine fan interest to platform algorithms and editors, while lean-back streams from editorial playlists provide exposure but less engagement weight. A healthy mix of both stream types indicates both discovery potential and fan loyalty.
 
 ## Pitching and Timing Strategy
 
-We recommend pitching 4-6 weeks before your release date for editorial playlist consideration. This window is measured from when your distributor delivers the track to Spotify, not your upload date. Allow 3-5 additional days for distributor processing and approval. This gives editorial curators sufficient time to evaluate your submission, plan playlist updates, and potentially pass your song to curators in other genre categories.
+Pitch before the release date, not after. A practical target is at least 7 days early, with 2-4 weeks of lead time giving you more margin for distributor processing and campaign setup. Once the song is live, editorial pitching is no longer available.
 
-For Release Radar specifically, submit at least 7 days before release. Release Radar shows your new track to anyone who follows your profile and can feature songs for up to 4 weeks. This is a separate, algorithmic playlist — different from editorial placement.
+For Release Radar specifically, submit at least 7 days before release. Release Radar is algorithmic, not editorial.
 
 You can only pitch one unreleased song at a time through Spotify for Artists, and once a track goes live, it becomes ineligible for pitching. Most streaming platforms refresh playlists weekly, with the heaviest activity occurring around new release cycles. The only quiet period for playlist updates is the Christmas and New Year window.
 

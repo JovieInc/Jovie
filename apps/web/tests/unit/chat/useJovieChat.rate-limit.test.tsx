@@ -16,6 +16,12 @@ const sendMessageMock = vi.fn();
 const maybeExecuteMock = vi.fn();
 const mutateAsyncMock = vi.fn();
 const setMessagesMock = vi.fn();
+let lastTransportBody:
+  | {
+      profileId?: string;
+      conversationId?: string;
+    }
+  | undefined;
 let onRejectHandler: (() => void) | undefined;
 let mockStatus: 'ready' | 'streaming' = 'ready';
 let mockMessages: Array<{
@@ -40,8 +46,9 @@ vi.mock('@ai-sdk/react', () => ({
   useChat: ({
     transport,
   }: {
-    transport: { body?: { conversationId?: string } };
+    transport: { body?: { conversationId?: string; profileId?: string } };
   }) => {
+    lastTransportBody = transport.body;
     const currentConversationId = transport.body?.conversationId;
     return {
       messages: mockMessages,
@@ -73,14 +80,19 @@ vi.mock('@tanstack/react-pacer', () => ({
   },
 }));
 
-vi.mock('@/lib/queries/useChatConversationQuery', () => ({
+vi.mock('@/lib/queries', () => ({
+  FetchError: class FetchError extends Error {},
+  queryKeys: {
+    chat: {
+      usage: () => ['chat-usage'],
+      conversation: (id?: string | null) => ['chat-conversation', id ?? null],
+      conversations: () => ['chat-conversations'],
+    },
+  },
   useChatConversationQuery: () => ({
     data: mockConversationData,
     isLoading: false,
   }),
-}));
-
-vi.mock('@/lib/queries/useChatMutations', () => ({
   useAddMessagesMutation: () => ({
     mutate: vi.fn(),
   }),
@@ -99,6 +111,7 @@ describe('useJovieChat', () => {
     mutateAsyncMock.mockResolvedValue({
       conversation: { id: 'conv_123' },
     });
+    lastTransportBody = undefined;
     onRejectHandler = undefined;
     mockStatus = 'ready';
     mockMessages = [];
@@ -191,5 +204,51 @@ describe('useJovieChat', () => {
       conversationIdAtSend: 'conv_123',
       payload: { text: 'Hello Jovie' },
     });
+  });
+
+  it('does not send deprecated artistContext in the transport body', () => {
+    renderHook(() =>
+      useJovieChat({
+        profileId: 'profile_1',
+        artistContext: {
+          displayName: 'Artist',
+          username: 'artist',
+          bio: null,
+          genres: [],
+          spotifyFollowers: null,
+          spotifyPopularity: null,
+          profileViews: 0,
+          hasSocialLinks: false,
+          hasMusicLinks: false,
+          tippingStats: {
+            tipClicks: 0,
+            tipsSubmitted: 0,
+            totalReceivedCents: 0,
+            monthReceivedCents: 0,
+          },
+        },
+      })
+    );
+
+    expect(lastTransportBody).toEqual({ profileId: 'profile_1' });
+  });
+
+  it('surfaces a client error when profileId is missing and skips sending', async () => {
+    const { result } = renderHook(() => useJovieChat({}));
+
+    await act(async () => {
+      await result.current.submitMessage('Hello Jovie');
+    });
+
+    expect(sendMessageMock).not.toHaveBeenCalled();
+    expect(mutateAsyncMock).not.toHaveBeenCalled();
+    expect(result.current.chatError).toEqual(
+      expect.objectContaining({
+        type: 'server',
+        message:
+          'Jovie chat is unavailable until the profile finishes loading.',
+        failedMessage: 'Hello Jovie',
+      })
+    );
   });
 });

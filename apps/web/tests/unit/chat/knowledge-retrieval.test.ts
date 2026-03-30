@@ -9,32 +9,34 @@ describe('selectKnowledgeContext', () => {
     const result = selectKnowledgeContext(
       'When should I release my single? What is the best release date?'
     );
-    expect(result).toBeTruthy();
-    expect(result.length).toBeGreaterThan(0);
+    expect(result.content).toBeTruthy();
+    expect(result.topicIds).toContain('release-strategy');
   });
 
   it('returns playlist-strategy content for playlist queries', () => {
     const result = selectKnowledgeContext(
       'How do I get on a playlist? I want editorial playlist placement for my song.'
     );
-    expect(result).toBeTruthy();
-    expect(result.length).toBeGreaterThan(0);
+    expect(result.content).toBeTruthy();
+    expect(result.topicIds).toContain('playlist-strategy');
   });
 
   it('returns streaming-metrics content for streaming questions', () => {
     const result = selectKnowledgeContext(
       'How are streams counted? What counts as a stream on Spotify?'
     );
-    expect(result).toBeTruthy();
-    expect(result.length).toBeGreaterThan(0);
+    expect(result.content).toBeTruthy();
+    expect(result.topicIds).toContain('streaming-metrics');
+    expect(result.hasVolatileTopics).toBe(true);
+    expect(result.cautions.length).toBeGreaterThan(0);
   });
 
   it('returns monetization content for royalty/payment questions', () => {
     const result = selectKnowledgeContext(
       'How much do streams pay? What are royalties? How do I earn money?'
     );
-    expect(result).toBeTruthy();
-    expect(result.length).toBeGreaterThan(0);
+    expect(result.content).toBeTruthy();
+    expect(result.topicIds).toContain('monetization');
   });
 
   // ---- Threshold behavior ----
@@ -42,22 +44,27 @@ describe('selectKnowledgeContext', () => {
   it('returns empty string for queries below MIN_SCORE threshold', () => {
     // Single keyword match should be below MIN_SCORE of 2
     const result = selectKnowledgeContext('release');
-    expect(result).toBe('');
+    expect(result).toEqual({
+      content: '',
+      topicIds: [],
+      hasVolatileTopics: false,
+      cautions: [],
+    });
   });
 
   it('returns empty string for unrelated queries', () => {
     const result = selectKnowledgeContext('Hello, who are you?');
-    expect(result).toBe('');
+    expect(result.content).toBe('');
   });
 
   it('returns empty string for very short input', () => {
     const result = selectKnowledgeContext('hi');
-    expect(result).toBe('');
+    expect(result.content).toBe('');
   });
 
   it('returns empty string for empty input', () => {
     const result = selectKnowledgeContext('');
-    expect(result).toBe('');
+    expect(result.content).toBe('');
   });
 
   // ---- Multi-topic selection ----
@@ -66,19 +73,23 @@ describe('selectKnowledgeContext', () => {
     const result = selectKnowledgeContext(
       'I want to schedule my release date for new music on friday and also get editorial playlist placement with a playlist pitch submission'
     );
-    expect(result).toBeTruthy();
+    expect(result.content).toBeTruthy();
     // The separator between topics is "---"
-    const topicCount = result.split('---').length;
+    const topicCount = result.content.split('---').length;
     expect(topicCount).toBeLessThanOrEqual(3); // At most 2 topics = at most 1 separator + original
+    expect(result.topicIds.length).toBeLessThanOrEqual(2);
   });
 
   it('selects both release and playlist topics for combined queries', () => {
     const result = selectKnowledgeContext(
       'I want to schedule my release date for new music and get editorial playlist placement with a playlist pitch'
     );
-    expect(result).toBeTruthy();
+    expect(result.content).toBeTruthy();
     // Should have content from multiple topics (indicated by separator)
-    expect(result.length).toBeGreaterThan(500);
+    expect(result.content.length).toBeGreaterThan(500);
+    expect(result.topicIds).toEqual(
+      expect.arrayContaining(['release-strategy', 'playlist-strategy'])
+    );
   });
 
   // ---- Word boundary matching ----
@@ -90,7 +101,7 @@ describe('selectKnowledgeContext', () => {
       'I had a bad day but nothing about advertising'
     );
     // Should not trigger marketing-promotion topic from "ad" alone
-    expect(result).toBe('');
+    expect(result.content).toBe('');
   });
 
   it('matches multi-word keywords as substrings', () => {
@@ -98,7 +109,7 @@ describe('selectKnowledgeContext', () => {
     const result = selectKnowledgeContext(
       'How do I set up a pre-save for my release date?'
     );
-    expect(result).toBeTruthy();
+    expect(result.content).toBeTruthy();
   });
 
   // ---- Multi-turn concatenation simulation ----
@@ -112,7 +123,16 @@ describe('selectKnowledgeContext', () => {
     const concatenated = `${turn1} ${turn2} ${turn3}`;
 
     const result = selectKnowledgeContext(concatenated);
-    expect(result).toBeTruthy();
-    expect(result.length).toBeGreaterThan(0);
+    expect(result.content).toBeTruthy();
+    expect(result.topicIds).toContain('release-strategy');
+  });
+
+  it('does not inject music knowledge for Jovie competitor chatter', () => {
+    const result = selectKnowledgeContext(
+      'Is Jovie better than another product for artist chat?'
+    );
+
+    expect(result.content).toBe('');
+    expect(result.topicIds).toEqual([]);
   });
 });

@@ -4,11 +4,14 @@ Release strategy encompasses the critical decisions around timing, format, and p
 
 ## Release Timing and Scheduling
 
+**Best Day of Week**
+Friday is still the default release day for most independent artists because major DSPs, editors, and listeners are already oriented around New Music Friday. If you have a special reason to break that pattern, be explicit about why, but Friday is the baseline answer.
+
 **Optimal Lead Times**
 Submit your music to distributors at least 4 weeks before your intended release date. This timeline allows adequate preparation for pitching, marketing setup, and platform processing. For playlist consideration on Spotify, pitch your music at least 7 days before release through their submission tool - anything less than this window excludes you from algorithmic playlists like Release Radar and Discover Weekly in the first week.
 
 **Seasonal Considerations**
-Release timing matters less than campaign alignment. The only period when playlist refreshes slow down significantly is around Christmas and New Year. Instead of following arbitrary seasonal rules, coordinate releases with meaningful campaign moments: festival appearances, press features, tour announcements, or other off-platform activities that amplify your music's impact.
+Campaign alignment matters, but it does not replace release-week conventions. Avoid holiday dead zones when attention and playlist refreshes slow down. Outside of that, default to Friday and align the surrounding campaign with meaningful moments such as tour announcements, press features, or other off-platform activity.
 
 **Release Frequency**
 Consistency trumps perfection. Waiting 4-6 weeks between releases risks audience forgetfulness, while releasing every 2-3 weeks maintains momentum. The sweet spot depends on your content and genre - tracks in different genres can be released closer together since they target different playlists. Plan your next release before dropping your current one to capitalize on any momentum gained.

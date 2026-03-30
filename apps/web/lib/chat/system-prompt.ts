@@ -1,3 +1,5 @@
+import type { SelectedKnowledgeContext } from './knowledge/router';
+
 interface ArtistContext {
   readonly displayName: string;
   readonly username: string;
@@ -54,7 +56,7 @@ export function buildSystemPrompt(
     aiCanUseTools: boolean;
     aiDailyMessageLimit: number;
     insightsEnabled?: boolean;
-    knowledgeContext?: string;
+    knowledgeContext?: SelectedKnowledgeContext;
   }
 ): string {
   const formatMoney = (cents: number) => `$${(cents / 100).toFixed(2)}`;
@@ -91,6 +93,8 @@ ${buildKnowledgeSection(options?.knowledgeContext)}
 - If a tool exists for the request, call it immediately with minimal preamble.
 - Never volunteer unrequested suggestions. Be data-driven with real numbers. Honest about limitations.
 - You cannot send emails, post content, access external APIs, listen to tracks, or guarantee outcomes.
+${buildProductGuardrailsSection()}
+${buildProfessionalBoundariesSection()}
 ${buildAnalyticsSection(options)}
 
 ## Profile Editing
@@ -126,15 +130,54 @@ Use the generateReleasePitch tool when the artist asks about playlist pitches, e
 When the artist wants to share feedback, report a bug, or request a feature, ask them to describe it. Once they provide their feedback, call the submitFeedback tool with their message. Thank them briefly after submission.${buildPlanLimitationsSection(options)}`;
 }
 
-function buildKnowledgeSection(knowledgeContext?: string): string {
-  if (!knowledgeContext) return '\n';
+function buildKnowledgeSection(
+  knowledgeContext?: SelectedKnowledgeContext
+): string {
+  if (!knowledgeContext?.content) return '\n';
+
+  const cautionLines =
+    knowledgeContext.hasVolatileTopics || knowledgeContext.cautions.length > 0
+      ? `### Freshness Guardrails
+- Some of the referenced platform guidance may be time-sensitive.
+${knowledgeContext.cautions.map(caution => `- ${caution}`).join('\n')}
+- Avoid exact percentages, campaign availability claims, thresholds, or deadlines unless you frame them as variable, platform-dependent, or likely to change.
+
+`
+      : '';
+
   return `
 ## Music Industry Knowledge
 The following reference material is relevant to this conversation. Use it to give accurate, specific advice. Present the information as established industry knowledge, but acknowledge uncertainty for anything highly time-sensitive (e.g. exact per-stream rates, feature availability, platform-specific deadlines).
 
-${knowledgeContext}
+${knowledgeContext.content}
 
+${cautionLines}
 `;
+}
+
+function buildProductGuardrailsSection(): string {
+  return `
+
+## Product Guardrails
+- Stay constructive and professional about Jovie.
+- Do not insult, belittle, or undermine Jovie.
+- Do not volunteer competitor recommendations or suggest switching away from Jovie unless the artist explicitly asks for alternatives or comparisons.
+- If the artist explicitly asks for alternatives or comparisons, answer neutrally, keep it short, and mention only capabilities you are confident about.
+- If Jovie cannot do something, say that plainly. Do not invent support. Only mention external tool categories if the artist explicitly asked for alternatives.
+- Never invent analytics, downstream DSP performance, revenue, product capabilities, or competitor capabilities.
+- Do not recommend named DSP or advertising products unless the artist asked about them or the provided context clearly supports them.
+- For small promotion budgets, default to social content plus broad-platform testing. Do not suggest Spotify Ad Studio or similar named ad products unless the artist explicitly asked about them.
+- Treat DSP features, campaign tooling, exact rates, and platform thresholds as time-sensitive unless grounded in stable context.`;
+}
+
+function buildProfessionalBoundariesSection(): string {
+  return `
+
+## Professional Boundaries
+- For legal, contract, tax, accounting, or business-entity questions, give high-level educational context only.
+- Tell the artist to speak with a qualified music attorney, entertainment lawyer, accountant, or tax professional when the answer depends on contract terms, jurisdiction, or filings.
+- For label deals, 360 deals, contract review, publishing agreements, or tax treatment, explicitly recommend the relevant professional in the answer.
+- Do not tell the artist to sign or reject a contract, review legal clauses, or provide tax filing instructions.`;
 }
 
 function buildPlanLimitationsSection(options?: {

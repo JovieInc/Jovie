@@ -54,31 +54,25 @@ const MAX_MESSAGE_LENGTH = 4000;
 /** Maximum allowed messages per request */
 const MAX_MESSAGES_PER_REQUEST = 50;
 
-/**
- * Zod schema for validating client-provided artist context.
- * Used when profileId is not provided (backward compatibility).
- */
-const artistContextSchema = z.object({
-  displayName: z.string().max(100),
-  username: z.string().max(50),
-  bio: z.string().max(500).nullable(),
-  genres: z.array(z.string().max(50)).max(10),
-  spotifyFollowers: z.number().int().nonnegative().nullable(),
-  spotifyPopularity: z.number().int().min(0).max(100).nullable(),
-  spotifyUrl: z.string().url().nullable().optional(),
-  appleMusicUrl: z.string().url().nullable().optional(),
-  profileViews: z.number().int().nonnegative(),
-  hasSocialLinks: z.boolean(),
-  hasMusicLinks: z.boolean(),
-  tippingStats: z.object({
-    tipClicks: z.number().int().nonnegative(),
-    tipsSubmitted: z.number().int().nonnegative(),
-    totalReceivedCents: z.number().int().nonnegative(),
-    monthReceivedCents: z.number().int().nonnegative(),
-  }),
-});
-
-type ArtistContext = z.infer<typeof artistContextSchema>;
+interface ArtistContext {
+  readonly displayName: string;
+  readonly username: string;
+  readonly bio: string | null;
+  readonly genres: string[];
+  readonly spotifyFollowers: number | null;
+  readonly spotifyPopularity: number | null;
+  readonly spotifyUrl?: string | null;
+  readonly appleMusicUrl?: string | null;
+  readonly profileViews: number;
+  readonly hasSocialLinks: boolean;
+  readonly hasMusicLinks: boolean;
+  readonly tippingStats: {
+    readonly tipClicks: number;
+    readonly tipsSubmitted: number;
+    readonly totalReceivedCents: number;
+    readonly monthReceivedCents: number;
+  };
+}
 
 /**
  * Fetches artist context server-side from the database.
@@ -247,41 +241,33 @@ async function fetchReleasesForChat(
  * Returns { context } on success or { error } with a NextResponse on failure.
  */
 async function resolveArtistContext(
-  profileId: unknown,
-  artistContextInput: unknown,
+  profileId: string | null,
   userId: string,
   corsHeaders: Record<string, string>
 ): Promise<
   | { context: ArtistContext; error?: never }
   | { context?: never; error: NextResponse }
 > {
-  if (profileId && typeof profileId === 'string') {
-    const context = await fetchArtistContext(profileId, userId);
-    if (!context) {
-      return {
-        error: NextResponse.json(
-          { error: 'Profile not found or unauthorized' },
-          { status: 404, headers: corsHeaders }
-        ),
-      };
-    }
-    return { context };
-  }
-
-  // Backward compatibility: accept client-provided artistContext with validation
-  const parseResult = artistContextSchema.safeParse(artistContextInput);
-  if (!parseResult.success) {
+  if (!profileId) {
     return {
       error: NextResponse.json(
-        {
-          error: 'Invalid artistContext format',
-          details: parseResult.error.flatten().fieldErrors,
-        },
+        { error: 'Missing profileId' },
         { status: 400, headers: corsHeaders }
       ),
     };
   }
-  return { context: parseResult.data };
+
+  const context = await fetchArtistContext(profileId, userId);
+  if (!context) {
+    return {
+      error: NextResponse.json(
+        { error: 'Profile not found or unauthorized' },
+        { status: 404, headers: corsHeaders }
+      ),
+    };
+  }
+
+  return { context };
 }
 
 /**
@@ -1330,7 +1316,7 @@ function buildChatErrorResponse(
 
 async function tryRouteViaIntent(
   uiMessages: UIMessage[],
-  profileId: unknown,
+  profileId: string,
   userId: string,
   corsHeaders: Record<string, string>,
   requestId: string
@@ -1350,10 +1336,9 @@ async function tryRouteViaIntent(
   const intent = classifyIntent(userText);
   if (!isDeterministicIntent(intent)) return null;
 
-  const resolvedProfileId = toNullableString(profileId);
   const result = await routeIntent(intent, {
     clerkUserId: userId,
-    profileId: resolvedProfileId,
+    profileId,
   });
   if (!result) return null;
 
@@ -1422,7 +1407,6 @@ export async function POST(req: Request) {
     messages?: unknown;
     profileId?: unknown;
     conversationId?: unknown;
-    artistContext?: unknown;
   };
   try {
     body = await req.json();
@@ -1435,13 +1419,17 @@ export async function POST(req: Request) {
 
   const { messages, profileId, conversationId } = body;
 
-  // Validate that either profileId or artistContext is provided
-  if (
-    !toNullableString(profileId) &&
-    (!body.artistContext || typeof body.artistContext !== 'object')
-  ) {
+  const resolvedProfileId = toNullableString(profileId);
+  if (!resolvedProfileId) {
+    Sentry.addBreadcrumb({
+      category: 'ai-chat',
+      level: 'warning',
+      message: 'Rejected chat request without profileId',
+      data: { requestId, conversationId: toNullableString(conversationId) },
+    });
+
     return NextResponse.json(
-      { error: 'Missing profileId or artistContext', requestId },
+      { error: 'Missing profileId', requestId },
       { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
@@ -1461,7 +1449,7 @@ export async function POST(req: Request) {
   // --- Deterministic intent routing (skip AI for simple CRUD) ---
   const intentResponse = await tryRouteViaIntent(
     uiMessages,
-    profileId,
+    resolvedProfileId,
     userId,
     corsHeaders,
     requestId
@@ -1470,8 +1458,7 @@ export async function POST(req: Request) {
 
   // Fetch artist context server-side (preferred) or fall back to client-provided
   const contextResult = await resolveArtistContext(
-    profileId,
-    body.artistContext,
+    resolvedProfileId,
     userId,
     corsHeaders
   );
@@ -1480,7 +1467,6 @@ export async function POST(req: Request) {
   }
   const artistContext = contextResult.context;
 
-  const resolvedProfileId = toNullableString(profileId);
   const resolvedConversationId = toNullableString(conversationId);
   const releases = await fetchOptionalReleases(resolvedProfileId);
 
@@ -1505,7 +1491,8 @@ export async function POST(req: Request) {
     aiCanUseTools: planLimits.booleans.aiCanUseTools,
     aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
     insightsEnabled,
-    knowledgeContext: knowledgeContext || undefined,
+    knowledgeContext:
+      knowledgeContext.topicIds.length > 0 ? knowledgeContext : undefined,
   });
 
   try {
@@ -1539,7 +1526,11 @@ export async function POST(req: Request) {
         recordInputs: true,
         recordOutputs: true,
         functionId: 'jovie-chat',
-        metadata: { model: selectedModel },
+        metadata: {
+          model: selectedModel,
+          knowledgeTopicIds: knowledgeContext.topicIds,
+          hasVolatileTopics: knowledgeContext.hasVolatileTopics,
+        },
       },
       onError: ({ error }) => {
         if (isClientDisconnect(error, req.signal)) return;
@@ -1552,6 +1543,8 @@ export async function POST(req: Request) {
             requestId,
             profileId: resolvedProfileId,
             conversationId: resolvedConversationId,
+            knowledgeTopicIds: knowledgeContext.topicIds,
+            hasVolatileTopics: knowledgeContext.hasVolatileTopics,
           },
         });
       },
