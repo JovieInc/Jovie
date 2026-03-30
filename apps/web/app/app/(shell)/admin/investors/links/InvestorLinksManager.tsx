@@ -442,7 +442,7 @@ function LinkActions({
                 // Deactivates the link (soft-delete) — confirm first
                 if (
                   window.confirm(
-                    `Deactivate "${link.label}"? The link will stop working for the investor.`
+                    `Delete "${link.label}"? The link will be permanently removed.`
                   )
                 ) {
                   onDelete(link.id);
@@ -450,7 +450,7 @@ function LinkActions({
               }}
             >
               <Trash2 className='h-3.5 w-3.5' />
-              Deactivate
+              Delete
             </button>
           </div>
         )}
@@ -505,6 +505,7 @@ export function InvestorLinksManager() {
   };
 
   const handleDelete = async (id: string) => {
+    const original = links.find(l => l.id === id);
     // Optimistic soft-delete (matches server behavior: sets isActive=false)
     setLinks(prev =>
       prev.map(l => (l.id === id ? { ...l, isActive: false } : l))
@@ -515,10 +516,14 @@ export function InvestorLinksManager() {
       });
       if (!res.ok) throw new Error('Failed to delete link');
     } catch {
-      // Revert on failure
-      setLinks(prev =>
-        prev.map(l => (l.id === id ? { ...l, isActive: true } : l))
-      );
+      // Revert on failure — restore original isActive state
+      if (original) {
+        setLinks(prev =>
+          prev.map(l =>
+            l.id === id ? { ...l, isActive: original.isActive } : l
+          )
+        );
+      }
     }
   };
 
