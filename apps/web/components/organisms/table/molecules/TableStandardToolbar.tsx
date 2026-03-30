@@ -84,7 +84,7 @@ export function TableStandardToolbar({
   return (
     <div
       className={cn(
-        'flex min-w-0 items-center gap-3 overflow-x-auto overflow-y-hidden border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3.5 py-2 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        'flex min-w-0 items-center gap-3 overflow-x-auto overflow-y-hidden bg-(--linear-app-content-surface) px-3.5 py-2 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         className
       )}
     >

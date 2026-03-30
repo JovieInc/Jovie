@@ -82,6 +82,7 @@ export function DspPresenceSummary({
                 }
                 onClick={handleRefresh}
                 disabled={!spotifyId || isRefreshing}
+                iconOnly
                 tooltipLabel={
                   spotifyId
                     ? 'Re-scan streaming platforms'
@@ -93,6 +94,8 @@ export function DspPresenceSummary({
               label='Add Platform'
               icon={<Plus className='h-3.5 w-3.5' />}
               onClick={() => setDialogOpen(true)}
+              iconOnly
+              tooltipLabel='Add platform'
             />
             <DrawerToggleButton
               chrome='page-toolbar'
