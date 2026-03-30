@@ -14,11 +14,11 @@ export default async function OnboardingLayout({
   await resolveUserState();
 
   return (
-    <ResolvedClientProviders>
-      <FeatureFlagsProvider>
-        <Script src='/theme-init.js' strategy='beforeInteractive' />
-        {children}
-      </FeatureFlagsProvider>
-    </ResolvedClientProviders>
+    <>
+      <Script src='/theme-init.js' strategy='beforeInteractive' />
+      <ResolvedClientProviders>
+        <FeatureFlagsProvider>{children}</FeatureFlagsProvider>
+      </ResolvedClientProviders>
+    </>
   );
 }

@@ -29,7 +29,7 @@ afterEach(() => {
 });
 
 describe('app route layout', () => {
-  it('wraps app routes with resolved client providers and theme init script', async () => {
+  it('keeps the theme init script outside the client provider boundary', async () => {
     const { default: AppLayout } = await import('./layout');
 
     render(
@@ -38,7 +38,8 @@ describe('app route layout', () => {
       })
     );
 
-    expect(screen.getByTestId('resolved-client-providers')).toBeInTheDocument();
+    const provider = screen.getByTestId('resolved-client-providers');
+    expect(provider).toBeInTheDocument();
     expect(screen.getByTestId('app-child')).toBeInTheDocument();
 
     const themeInitScript = screen.getByTestId('theme-init-script');
@@ -47,5 +48,7 @@ describe('app route layout', () => {
       'data-strategy',
       'beforeInteractive'
     );
+    expect(provider).not.toContainElement(themeInitScript);
+    expect(themeInitScript.nextElementSibling).toBe(provider);
   });
 });

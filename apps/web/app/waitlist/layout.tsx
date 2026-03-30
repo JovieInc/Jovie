@@ -17,9 +17,9 @@ export default async function WaitlistLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ResolvedClientProviders>
+    <>
       <Script src='/theme-init.js' strategy='beforeInteractive' />
-      {children}
-    </ResolvedClientProviders>
+      <ResolvedClientProviders>{children}</ResolvedClientProviders>
+    </>
   );
 }
