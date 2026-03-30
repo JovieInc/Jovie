@@ -11,8 +11,8 @@ import { BASE_URL } from '@/constants/app';
 interface ReferralStats {
   totalReferrals: number;
   activeReferrals: number;
-  totalEarnings: number;
-  pendingEarnings: number;
+  totalEarningsCents: number;
+  pendingEarningsCents: number;
   programTerms: {
     commissionRate: string;
     durationMonths: number;
@@ -59,15 +59,16 @@ export function ReferralContent() {
         fetch('/api/referrals/stats'),
       ]);
 
-      if (codeRes.ok) {
-        const codeData = await codeRes.json();
-        setCode(codeData.code);
+      if (!codeRes.ok || !statsRes.ok) {
+        setError('Failed to load referral data');
+        return;
       }
 
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData);
-      }
+      const codeData = await codeRes.json();
+      setCode(codeData.code);
+
+      const statsData = await statsRes.json();
+      setStats(statsData);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to load referral data'
@@ -190,12 +191,12 @@ export function ReferralContent() {
           />
           <StatCard
             label='Total earned'
-            value={`$${(stats.totalEarnings / 100).toFixed(2)}`}
+            value={`$${(stats.totalEarningsCents / 100).toFixed(2)}`}
             description='Lifetime commission earnings'
           />
           <StatCard
             label='Pending'
-            value={`$${(stats.pendingEarnings / 100).toFixed(2)}`}
+            value={`$${(stats.pendingEarningsCents / 100).toFixed(2)}`}
             description='Awaiting payout'
           />
         </div>
