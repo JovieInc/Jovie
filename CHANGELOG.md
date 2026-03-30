@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.107] - 2026-03-30
+
+### Added
+
+- Compact `Signals` card in the audience analytics sidebar with top AI insights and Ask Jovie drill-down links
+- Insight data-hash freshness gate so cron and manual generation can skip unchanged insight types
+
+### Changed
+
+- `/app/insights` now redirects to the audience dashboard, with stale route benchmarks removed from the performance manifest
+- Insight generation narrowed to the remaining high-value categories and a max of five surfaced insights per run
+
+### Fixed
+
+- Repeated insight generation now avoids recycling stale signals when the underlying metric slice has not changed
+- Cron insights concurrency test timeout increased to reflect the observed route import cost in CI-like environments
+
 ## [26.4.106] - 2026-03-30
 
 ### Removed

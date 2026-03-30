@@ -623,32 +623,7 @@ const CREATOR_SHELL_ROUTES = [
     priority: 5,
     seedProfile: 'active-user',
   },
-  {
-    id: 'creator-insights',
-    group: 'creator-shell',
-    surface: 'creator-app',
-    path: APP_ROUTES.INSIGHTS,
-    requiresAuth: true,
-    warmupStrategy: 'authenticated-route',
-    measureMode: 'page-load',
-    readySelectors: {
-      content: [
-        'h2:has-text("AI Insights")',
-        'button[aria-label*="Generate insights" i]',
-      ],
-    },
-    timings: [
-      { metric: 'first-contentful-paint', budget: 1800 },
-      { metric: 'largest-contentful-paint', budget: 3000 },
-      { metric: 'cumulative-layout-shift', budget: 0.1 },
-      { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1600 },
-      { metric: 'skeleton-to-content', budget: 600 },
-    ],
-    resourceSizes: CHAT_RESOURCE_BUDGETS,
-    priority: 6,
-    seedProfile: 'active-user',
-  },
+  // creator-insights route removed — insights page now redirects to audience
   {
     id: 'creator-presence',
     group: 'creator-shell',

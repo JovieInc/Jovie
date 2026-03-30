@@ -32,6 +32,7 @@ export const APP_ROUTES = {
   EARNINGS: '/app/earnings',
   CHAT: '/app/chat',
   CHAT_PROFILE_PANEL: '/app/chat?panel=profile',
+  /** @deprecated Redirects to DASHBOARD_AUDIENCE — insights now in analytics sidebar */
   INSIGHTS: '/app/insights',
   PRESENCE: '/app/presence',
 

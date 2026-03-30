@@ -8,8 +8,10 @@ const hoisted = vi.hoisted(() => ({
   completeGenerationRunMock: vi.fn(),
   aggregateMetricsMock: vi.fn(),
   generateInsightsMock: vi.fn(),
+  findStaleTypesMock: vi.fn(),
   persistInsightsMock: vi.fn(),
   getExistingInsightTypesMock: vi.fn(),
+  getLatestInsightsForFreshnessMock: vi.fn(),
   captureExceptionMock: vi.fn(),
 }));
 
@@ -27,6 +29,7 @@ vi.mock('@/lib/services/insights/lifecycle', () => ({
   completeGenerationRun: hoisted.completeGenerationRunMock,
   persistInsights: hoisted.persistInsightsMock,
   getExistingInsightTypes: hoisted.getExistingInsightTypesMock,
+  getLatestInsightsForFreshness: hoisted.getLatestInsightsForFreshnessMock,
 }));
 
 vi.mock('@/lib/services/insights/data-aggregator', () => ({
@@ -35,6 +38,7 @@ vi.mock('@/lib/services/insights/data-aggregator', () => ({
 
 vi.mock('@/lib/services/insights/insight-generator', () => ({
   generateInsights: hoisted.generateInsightsMock,
+  findStaleTypes: hoisted.findStaleTypesMock,
 }));
 
 vi.mock('@/lib/services/insights/thresholds', () => ({
@@ -136,6 +140,8 @@ describe('POST /api/insights/generate', () => {
       comparisonPeriod: { start: new Date(), end: new Date() },
     });
     hoisted.getExistingInsightTypesMock.mockResolvedValue([]);
+    hoisted.getLatestInsightsForFreshnessMock.mockResolvedValue([]);
+    hoisted.findStaleTypesMock.mockReturnValue([]);
     hoisted.generateInsightsMock.mockResolvedValue({
       insights: [{ type: 'growth', title: 'Test' }],
       modelUsed: 'claude-3',
