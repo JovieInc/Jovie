@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.105] - 2026-03-30
+
+### Fixed
+
+- Home page now renders the real chat UI instead of a separate card-style layout introduced by the perf wave
+- Added guardrail rule preventing performance PRs from replacing route UIs with different layouts
+- Added regression test ensuring the home page always renders the same chat component as `/app/chat`
+
 ## [26.4.104] - 2026-03-30
 
 ### Changed
