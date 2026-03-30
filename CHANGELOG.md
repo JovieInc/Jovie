@@ -16,11 +16,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - `/app/insights` now redirects to the audience dashboard, with stale route benchmarks removed from the performance manifest
 - Insight generation narrowed to the remaining high-value categories and a max of five surfaced insights per run
+- Audience rows now collapse based on the actual table container width instead of raw viewport width, so the desktop layout stays readable with the drawer open or closed
+- Audience user rows now carry a metadata subtitle when columns are hidden, preserving engagement, location, and recency context at tighter breakpoints
 
 ### Fixed
 
 - Repeated insight generation now avoids recycling stale signals when the underlying metric slice has not changed
 - Cron insights concurrency test timeout increased to reflect the observed route import cost in CI-like environments
+- Analytics no longer default-opens into the full-screen mobile drawer on first load; it now opens after mount on desktop and closes when crossing down to mobile
+- Audience table unit tests now cover narrow, medium, and wide desktop layouts and mock the mobile card through the current table barrel export
 
 ## [26.4.106] - 2026-03-30
 
