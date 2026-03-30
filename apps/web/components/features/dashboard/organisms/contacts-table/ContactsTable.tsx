@@ -106,8 +106,8 @@ export const ContactsTable = memo(function ContactsTable({
           ariaLabel='Add contact'
           onClick={() => onAddContactRef.current()}
           icon={<Plus className='h-3.5 w-3.5' />}
-          label='Add Contact'
-          hideLabelOnMobile
+          iconOnly
+          tooltipLabel='Add contact'
         />
       </DashboardHeaderActionGroup>
     ),

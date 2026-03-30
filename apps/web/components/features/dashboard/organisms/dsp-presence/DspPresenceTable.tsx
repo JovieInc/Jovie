@@ -44,7 +44,7 @@ function PlatformCell({
 function ArtistCell({ item }: Readonly<{ item: DspPresenceItem }>) {
   const label = PROVIDER_LABELS[item.providerId];
   return (
-    <div className='flex items-center gap-2 min-w-0'>
+    <div className='flex items-center gap-2.5 min-w-0'>
       {item.externalArtistImageUrl ? (
         <div className='relative h-6 w-6 shrink-0 overflow-hidden rounded-full border border-subtle bg-surface-1'>
           <Image
@@ -57,13 +57,20 @@ function ArtistCell({ item }: Readonly<{ item: DspPresenceItem }>) {
           />
         </div>
       ) : (
-        <div className='flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-surface-1'>
+        <div className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1'>
           <DspProviderIcon provider={item.providerId} size='sm' />
         </div>
       )}
-      <span className='truncate font-[510] text-[13px] text-primary-token'>
-        {item.externalArtistName ?? 'Unknown Artist'}
-      </span>
+      <div className='flex min-w-0 items-center gap-2'>
+        <DspProviderIcon
+          provider={item.providerId}
+          size='sm'
+          className='shrink-0'
+        />
+        <span className='truncate whitespace-nowrap font-[510] text-[13px] text-primary-token'>
+          {item.externalArtistName ?? 'Unknown Artist'}
+        </span>
+      </div>
     </div>
   );
 }
@@ -101,21 +108,13 @@ function LinkCell({ item }: Readonly<{ item: DspPresenceItem }>) {
 const columnHelper = createColumnHelper<DspPresenceItem>();
 
 const columns: ColumnDef<DspPresenceItem, unknown>[] = [
-  columnHelper.accessor('providerId', {
-    id: 'platform',
-    header: 'Platform',
-    cell: info => <PlatformCell providerId={info.getValue()} />,
-    size: 160,
-    enableSorting: false,
-    meta: { className: 'pl-4 pr-2' },
-  }),
   columnHelper.accessor('externalArtistName', {
     id: 'artist',
-    header: 'Artist Name',
+    header: 'Artist',
     cell: info => <ArtistCell item={info.row.original} />,
     size: 9999,
     enableSorting: false,
-    meta: { className: 'px-2' },
+    meta: { className: 'pl-4 pr-2' },
   }),
   columnHelper.accessor('status', {
     id: 'status',

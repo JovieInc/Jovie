@@ -40,7 +40,7 @@ function isDashboardSubRoute(pathname: string | null): boolean {
   return pathname.startsWith(`${APP_ROUTES.DASHBOARD_OVERVIEW}/`);
 }
 
-export function shouldUseEssentialShellData(pathname: string | null): boolean {
+function isLightweightShellRoute(pathname: string | null): boolean {
   return (
     isChatShellRoute(pathname) ||
     isReleasesShellRoute(pathname) ||
@@ -48,10 +48,10 @@ export function shouldUseEssentialShellData(pathname: string | null): boolean {
   );
 }
 
+export function shouldUseEssentialShellData(pathname: string | null): boolean {
+  return isLightweightShellRoute(pathname);
+}
+
 export function shouldRedirectToOnboarding(pathname: string | null): boolean {
-  return (
-    isChatShellRoute(pathname) ||
-    isReleasesShellRoute(pathname) ||
-    isDashboardSubRoute(pathname)
-  );
+  return isLightweightShellRoute(pathname);
 }

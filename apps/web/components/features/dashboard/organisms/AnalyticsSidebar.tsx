@@ -1,6 +1,6 @@
 'use client';
 
-import { Globe, Link2, MapPin, X } from 'lucide-react';
+import { Globe, Link2, MapPin } from 'lucide-react';
 import { type ComponentType, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import {
@@ -261,14 +261,9 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           <div className='relative p-3.5'>
             <div className='absolute right-2.5 top-2.5'>
               <DrawerHeaderActions
-                primaryActions={[
-                  {
-                    id: 'close-analytics',
-                    label: 'Close analytics',
-                    icon: X,
-                    onClick: onClose,
-                  },
-                ]}
+                primaryActions={[]}
+                overflowActions={[]}
+                onClose={onClose}
               />
             </div>
             <div className='flex items-start justify-between gap-3 pr-8'>

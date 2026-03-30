@@ -62,9 +62,9 @@ export function getClerkProxyUrl(
   locationLike:
     | Pick<Location, 'hostname' | 'protocol'>
     | Pick<URL, 'hostname' | 'protocol'>
-    | undefined = globalThis.window !== undefined
-    ? globalThis.location
-    : undefined
+    | undefined = globalThis.window === undefined
+    ? undefined
+    : globalThis.location
 ): string | undefined {
   // Disable proxy for screenshot pipeline — Clerk JS loads from its own CDN
   // instead of proxying through localhost (which requires HTTPS and doesn't

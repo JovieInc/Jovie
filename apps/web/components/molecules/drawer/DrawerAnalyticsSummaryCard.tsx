@@ -87,15 +87,14 @@ export function DrawerAnalyticsSummaryCard({
       >
         <div className='space-y-3 px-3 py-3'>
           {state === 'loading' ? (
-            <div
-              role='status'
+            <output
               aria-label='Loading analytics'
               className={cn('grid gap-2.5', gridClassName)}
             >
               {loadingMetricKeys.map(metricKey => (
                 <LoadingMetricTile key={metricKey} />
               ))}
-            </div>
+            </output>
           ) : null}
 
           {state === 'error' ? (

@@ -366,6 +366,29 @@ Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padd
 
 ---
 
+## Text Casing
+
+| Context | Convention | Example |
+|---------|------------|---------|
+| Headings (H1-H4) | Title Case | "Grow Your Audience" |
+| Button labels | Title Case | "Copy Profile Link" |
+| Nav / tab labels | Title Case | "Dashboard", "Identified" |
+| Column headers | Title Case | "Last Action" |
+| Badge / tag labels | Title Case | "Returning", "High Intent" |
+| Body text / descriptions | Sentence case | "Share your profile link on social media." |
+| Tooltips | Sentence case | "High intent" |
+| Toast messages | Sentence case | "Member removed" |
+| Dynamic labels | Sentence case (first word capitalized) | "Mobile visitor from London" |
+
+**Anti-patterns:**
+- Never ALL CAPS except abbreviations (LTV, SMS, UTM)
+- Never lowercase first word of a visible label or heading
+- Dynamic strings forming readable phrases must start with a capital letter
+
+**Utility:** Use `capitalizeFirst()` from `apps/web/lib/utils/string-utils.ts` for dynamic data.
+
+---
+
 ## Canonical Surface Split
 
 | Surface | Routes / entrypoints | Layout / shell | Design system |

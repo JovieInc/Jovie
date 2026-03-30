@@ -179,6 +179,10 @@ export function InsightsPanel() {
             />
           }
           label={isGenerating ? 'Generating...' : 'Generate'}
+          iconOnly
+          tooltipLabel={
+            isGenerating ? 'Generating insights...' : 'Generate insights'
+          }
         />
       }
     />
