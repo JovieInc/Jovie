@@ -29,9 +29,9 @@ interface DspPresenceTableProps {
 
 function PlatformCell({
   providerId,
-}: {
+}: Readonly<{
   providerId: DspPresenceItem['providerId'];
-}) {
+}>) {
   const label = PROVIDER_LABELS[providerId];
   return (
     <div className='flex items-center gap-2'>
@@ -41,7 +41,7 @@ function PlatformCell({
   );
 }
 
-function ArtistCell({ item }: { item: DspPresenceItem }) {
+function ArtistCell({ item }: Readonly<{ item: DspPresenceItem }>) {
   const label = PROVIDER_LABELS[item.providerId];
   return (
     <div className='flex items-center gap-2 min-w-0'>
@@ -68,7 +68,7 @@ function ArtistCell({ item }: { item: DspPresenceItem }) {
   );
 }
 
-function StatusCell({ item }: { item: DspPresenceItem }) {
+function StatusCell({ item }: Readonly<{ item: DspPresenceItem }>) {
   const isManual = item.matchSource === 'manual';
   return isManual ? (
     <span className='text-[11px] text-tertiary-token'>Manual</span>
@@ -77,7 +77,7 @@ function StatusCell({ item }: { item: DspPresenceItem }) {
   );
 }
 
-function LinkCell({ item }: { item: DspPresenceItem }) {
+function LinkCell({ item }: Readonly<{ item: DspPresenceItem }>) {
   const label = PROVIDER_LABELS[item.providerId];
   if (!item.externalArtistUrl) return null;
   return (

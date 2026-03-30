@@ -434,10 +434,7 @@ export function ChatPageClient({
       const delay =
         WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS[
           welcomeChatRetryCountRef.current
-        ] ??
-        WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS[
-          WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS.length - 1
-        ];
+        ] ?? WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS.at(-1);
 
       welcomeChatRetryCountRef.current += 1;
       setWelcomeChatBootstrapStatus('scheduled');

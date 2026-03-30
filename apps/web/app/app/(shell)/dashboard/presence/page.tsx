@@ -25,7 +25,7 @@ export default async function PresencePage() {
   );
 }
 
-async function PresenceContent({ userId }: { userId: string }) {
+async function PresenceContent({ userId }: Readonly<{ userId: string }>) {
   try {
     const dashboardData = await getDashboardShellData(userId);
 

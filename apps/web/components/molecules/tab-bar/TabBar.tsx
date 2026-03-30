@@ -274,7 +274,7 @@ function LegacyTabBar<T extends string>({
   actionsClassName,
   overflowMode,
   distribution,
-}: {
+}: Readonly<{
   value: T;
   onValueChange: (value: T) => void;
   options: readonly SegmentControlOption<T>[];
@@ -288,7 +288,7 @@ function LegacyTabBar<T extends string>({
   actionsClassName?: string;
   overflowMode: string;
   distribution: 'intrinsic' | 'fill';
-}) {
+}>) {
   const usesFillDistribution = distribution === 'fill';
   const tabs = (
     <div
