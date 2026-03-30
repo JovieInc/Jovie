@@ -116,7 +116,7 @@ const PRO_FEATURES: readonly string[] = [
   'Remove Jovie branding',
   'Extended analytics (180 days)',
   'Advanced analytics & geographic insights',
-  'Filter your own visits',
+  'Traffic quality filtering',
   'AI-powered insights',
   'Up to 5,000 contacts',
   'Contact export',
@@ -404,7 +404,7 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
         max: true,
       },
       {
-        name: 'Filter your own visits',
+        name: 'Traffic quality filtering',
         free: false,
         pro: true,
         max: true,

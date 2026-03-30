@@ -24,6 +24,7 @@ import {
   createFingerprint,
   deriveIntentLevel,
   getActionWeight,
+  mergeAudienceTags,
   trimHistory,
 } from '../lib/audience-utils';
 
@@ -54,6 +55,7 @@ type AudienceMemberRecord = {
   geoCountry: string | null;
   deviceType: string | null;
   spotifyConnected: boolean | null;
+  tags: string[] | null;
 };
 
 async function findAudienceMember(
@@ -73,6 +75,7 @@ async function findAudienceMember(
         geoCountry: audienceMembers.geoCountry,
         deviceType: audienceMembers.deviceType,
         spotifyConnected: audienceMembers.spotifyConnected,
+        tags: audienceMembers.tags,
       })
       .from(audienceMembers)
       .where(eq(audienceMembers.id, explicitId))
@@ -93,6 +96,7 @@ async function findAudienceMember(
       geoCountry: audienceMembers.geoCountry,
       deviceType: audienceMembers.deviceType,
       spotifyConnected: audienceMembers.spotifyConnected,
+      tags: audienceMembers.tags,
     })
     .from(audienceMembers)
     .where(
@@ -243,6 +247,7 @@ export async function POST(request: NextRequest) {
     const fingerprint = createFingerprint(resolvedIP, userAgent);
     const normalizedDevice = deviceType ?? 'unknown';
     const now = new Date();
+    const audienceTags = botDetection.isBot ? ['bot'] : [];
 
     // Encrypt IP address for storage (GDPR/CCPA compliance)
     const encryptedIP = encryptIP(resolvedIP);
@@ -271,6 +276,7 @@ export async function POST(request: NextRequest) {
             deviceType: normalizedDevice,
             referrerHistory: [],
             latestActions: [],
+            tags: audienceTags,
             createdAt: now,
             updatedAt: now,
           })
@@ -289,6 +295,7 @@ export async function POST(request: NextRequest) {
             geoCountry: audienceMembers.geoCountry,
             deviceType: audienceMembers.deviceType,
             spotifyConnected: audienceMembers.spotifyConnected,
+            tags: audienceMembers.tags,
           });
 
         if (inserted) {
@@ -316,8 +323,14 @@ export async function POST(request: NextRequest) {
       const latestActions = trimHistory([actionEntry, ...existingActions], 5);
       const actionCount = latestActions.length;
       const weight = getActionWeight(linkType);
-      const updatedScore = (member.engagementScore ?? 0) + weight;
-      const intentLevel = deriveIntentLevel(member.visits ?? 0, actionCount);
+      const tags = mergeAudienceTags(member.tags, audienceTags);
+      const isBotMember = tags.includes('bot');
+      const updatedScore = isBotMember
+        ? (member.engagementScore ?? 0)
+        : (member.engagementScore ?? 0) + weight;
+      const intentLevel = isBotMember
+        ? 'low'
+        : deriveIntentLevel(member.visits ?? 0, actionCount);
 
       const metadataWithTipValue =
         linkType === 'tip'
@@ -357,6 +370,7 @@ export async function POST(request: NextRequest) {
           deviceType: normalizedDevice,
           geoCity: city ?? member.geoCity ?? null,
           geoCountry: country ?? member.geoCountry ?? null,
+          tags,
           spotifyConnected:
             (member.spotifyConnected ?? false) || linkType === 'listen',
         })
