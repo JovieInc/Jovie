@@ -27,6 +27,7 @@ import {
 import {
   getReleaseById,
   getTracksForRelease,
+  updateRecordingPreviewByIsrc,
   updateTrackLyrics,
   upsertProviderLink,
 } from './queries';
@@ -39,6 +40,7 @@ export interface DiscoveryResult {
     url: string;
     quality: 'canonical' | 'search_fallback';
   }[];
+  previewsBackfilled: number;
   errors: string[];
 }
 
@@ -223,6 +225,7 @@ export async function discoverLinksForRelease(
   const result: DiscoveryResult = {
     releaseId,
     discovered: [],
+    previewsBackfilled: 0,
     errors: [],
   };
 
@@ -273,29 +276,47 @@ export async function discoverLinksForRelease(
     );
   }
 
-  // Deezer lookup
-  if (!skipExisting || !existingSet.has('deezer')) {
+  // Deezer lookup — always run when there's a recording to backfill previews for,
+  // even if the Deezer link already exists (preview URL may be missing)
+  const needsDeezerLookup =
+    !skipExisting ||
+    !existingSet.has('deezer') ||
+    trackWithIsrc.creatorProfileId;
+  if (needsDeezerLookup) {
     lookupPromises.push(
       lookupDeezerByIsrc(isrc)
         .then(async deezerResult => {
           if (deezerResult) {
-            // Prefer album URL over track URL
-            const url = deezerResult.albumUrl ?? deezerResult.url;
-            const externalId = deezerResult.albumId ?? deezerResult.trackId;
+            // Only save the link if it doesn't already exist
+            if (!existingSet.has('deezer')) {
+              // Prefer album URL over track URL
+              const url = deezerResult.albumUrl ?? deezerResult.url;
+              const externalId = deezerResult.albumId ?? deezerResult.trackId;
 
-            await saveDiscoveredLink({
-              releaseId,
-              providerId: 'deezer',
-              url,
-              externalId,
-              source: 'deezer_isrc',
-              isrc,
-              result,
-              extraMetadata: {
-                trackUrl: deezerResult.url,
-                trackId: deezerResult.trackId,
-              },
-            });
+              await saveDiscoveredLink({
+                releaseId,
+                providerId: 'deezer',
+                url,
+                externalId,
+                source: 'deezer_isrc',
+                isrc,
+                result,
+                extraMetadata: {
+                  trackUrl: deezerResult.url,
+                  trackId: deezerResult.trackId,
+                },
+              });
+            }
+
+            // Backfill preview URL from Deezer if recording has none
+            if (deezerResult.previewUrl && trackWithIsrc.creatorProfileId) {
+              const updated = await updateRecordingPreviewByIsrc(
+                trackWithIsrc.creatorProfileId,
+                isrc,
+                deezerResult.previewUrl
+              );
+              if (updated) result.previewsBackfilled++;
+            }
           }
         })
         .catch(error => {
@@ -336,6 +357,20 @@ export async function discoverLinksForRelease(
               isrc,
               result,
             });
+          }
+
+          // Backfill preview URL from MusicFetch if recording has none
+          const mfPreview = musicfetchResult.raw.previewUrl;
+          if (
+            typeof mfPreview === 'string' &&
+            mfPreview.startsWith('https://') &&
+            trackWithIsrc.creatorProfileId
+          ) {
+            await updateRecordingPreviewByIsrc(
+              trackWithIsrc.creatorProfileId,
+              isrc,
+              mfPreview
+            );
           }
         })
         .catch(error => {
