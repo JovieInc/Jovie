@@ -10,6 +10,11 @@ import {
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import { useTriggerDiscoveryMutation } from '@/lib/queries/useDspEnrichmentMutations';
+import type { EnrichmentStatus } from '@/lib/queries/useDspEnrichmentStatusQuery';
+import {
+  getPhaseLabel,
+  isEnrichmentInProgress,
+} from '@/lib/queries/useDspEnrichmentStatusQuery';
 import { AddPlatformDialog } from './AddPlatformDialog';
 
 interface DspPresenceSummaryProps {
@@ -19,6 +24,7 @@ interface DspPresenceSummaryProps {
   readonly profileId: string;
   readonly isAdmin?: boolean;
   readonly spotifyId?: string | null;
+  readonly enrichmentStatus?: EnrichmentStatus;
 }
 
 export function DspPresenceSummary({
@@ -28,10 +34,17 @@ export function DspPresenceSummary({
   profileId,
   isAdmin = false,
   spotifyId,
+  enrichmentStatus,
 }: DspPresenceSummaryProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { mutate: triggerDiscovery, isPending: isRefreshing } =
     useTriggerDiscoveryMutation();
+  const isDiscovering = isEnrichmentInProgress(enrichmentStatus);
+  const refreshTooltip = isDiscovering
+    ? 'Discovery in progress...'
+    : spotifyId
+      ? 'Re-scan streaming platforms'
+      : 'Connect Spotify first to enable discovery';
 
   function handleRefresh() {
     if (!spotifyId || !profileId) return;
@@ -66,6 +79,15 @@ export function DspPresenceSummary({
                 </span>
               </>
             )}
+            {isDiscovering && enrichmentStatus && (
+              <>
+                <span className='text-quaternary-token'>&middot;</span>
+                <span className='inline-flex items-center gap-1.5 text-blue-500'>
+                  <Loader2 className='h-3 w-3 animate-spin' />
+                  {getPhaseLabel(enrichmentStatus.overallPhase)}
+                </span>
+              </>
+            )}
           </div>
         }
         end={
@@ -74,20 +96,16 @@ export function DspPresenceSummary({
               <PageToolbarActionButton
                 label='Refresh'
                 icon={
-                  isRefreshing ? (
+                  isRefreshing || isDiscovering ? (
                     <Loader2 className='h-3.5 w-3.5 animate-spin' />
                   ) : (
                     <RefreshCw className='h-3.5 w-3.5' />
                   )
                 }
                 onClick={handleRefresh}
-                disabled={!spotifyId || isRefreshing}
+                disabled={!spotifyId || isRefreshing || isDiscovering}
                 iconOnly
-                tooltipLabel={
-                  spotifyId
-                    ? 'Re-scan streaming platforms'
-                    : 'Connect Spotify first to enable discovery'
-                }
+                tooltipLabel={refreshTooltip}
               />
             )}
             <PageToolbarActionButton
