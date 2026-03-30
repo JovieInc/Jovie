@@ -6,23 +6,34 @@ import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
-import { getDashboardData } from '../actions';
+import { getDashboardShellData } from '../actions';
 import { loadDspPresence } from './actions';
 import PresenceLoading from './loading';
 
 export const runtime = 'nodejs';
 
-async function PresenceContent() {
+export default async function PresencePage() {
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.PRESENCE}`);
+  }
+
+  return (
+    <Suspense fallback={<PresenceLoading />}>
+      <PresenceContent userId={userId} />
+    </Suspense>
+  );
+}
+
+async function PresenceContent({ userId }: { userId: string }) {
   try {
-    const dashboardData = await getDashboardData();
+    const dashboardData = await getDashboardShellData(userId);
 
     if (dashboardData.dashboardLoadError) {
       void captureError(
         'Dashboard data load failed on presence page',
         dashboardData.dashboardLoadError,
-        {
-          route: APP_ROUTES.PRESENCE,
-        }
+        { route: APP_ROUTES.PRESENCE }
       );
       return (
         <PageErrorState message='Failed to load presence data. Please refresh the page.' />
@@ -54,17 +65,4 @@ async function PresenceContent() {
       <PageErrorState message='Failed to load presence data. Please refresh the page.' />
     );
   }
-}
-
-export default async function PresencePage() {
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.PRESENCE}`);
-  }
-
-  return (
-    <Suspense fallback={<PresenceLoading />}>
-      <PresenceContent />
-    </Suspense>
-  );
 }
