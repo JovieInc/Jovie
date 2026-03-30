@@ -45,10 +45,14 @@ function ArtistCell({ item }: Readonly<{ item: DspPresenceItem }>) {
       ) : (
         <div className='relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1'>
           <DspProviderIcon provider={item.providerId} size='sm' />
-          <div className='absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/60'>
+          <div
+            className='absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/60'
+            role='img'
+            aria-label='Profile image missing'
+          >
             <Icon
               name='Camera'
-              className='h-2 w-2 text-amber-600 dark:text-amber-400'
+              className='h-4 w-4 text-amber-600 dark:text-amber-400'
             />
           </div>
         </div>

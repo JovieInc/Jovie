@@ -88,6 +88,7 @@ describe('dashboard drawer chrome', () => {
     expect(screen.queryByText('DSP profile')).not.toBeInTheDocument();
     expect(screen.getByText('Discovered via Spotify')).toBeInTheDocument();
     expect(screen.getByText('Tracks Verified')).toBeInTheDocument();
+    expect(screen.getByLabelText('Profile image missing')).toBeInTheDocument();
     expect(screen.queryByText('Confidence Breakdown')).not.toBeInTheDocument();
   });
 
