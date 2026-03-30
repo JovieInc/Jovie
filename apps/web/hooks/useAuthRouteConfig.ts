@@ -20,6 +20,7 @@ export interface AuthRouteConfig {
   isTableRoute: boolean;
   isArtistProfileSettings: boolean;
   isDemoRoute: boolean;
+  showChatUsageIndicator: boolean;
 }
 
 /**
@@ -136,6 +137,11 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     [pathname]
   );
 
+  const showChatUsageIndicator = useMemo(
+    () => pathname.startsWith(`${APP_ROUTES.CHAT}/`),
+    [pathname]
+  );
+
   return {
     section,
     breadcrumbs,
@@ -143,5 +149,6 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     isTableRoute,
     isArtistProfileSettings,
     isDemoRoute: isDemoReleasesRoute,
+    showChatUsageIndicator,
   };
 }

@@ -3,20 +3,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mockConsoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 const mutableEnv = process.env as Record<string, string | undefined>;
 let originalNodeEnv: string | undefined;
-let mockProcessCwd: ReturnType<typeof vi.spyOn<typeof process, 'cwd'>>;
+let cwdSpy: ReturnType<typeof vi.spyOn> | undefined;
 
 describe('@critical GET /api/health/build-info', () => {
   beforeEach(() => {
     originalNodeEnv = mutableEnv.NODE_ENV;
     vi.clearAllMocks();
     vi.resetModules();
-    mockProcessCwd = vi
-      .spyOn(process, 'cwd')
-      .mockReturnValue(`/tmp/jovie-build-info-missing-${Date.now()}`);
+    cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue('/__missing-build-id__');
   });
 
   afterEach(() => {
-    mockProcessCwd.mockRestore();
+    cwdSpy?.mockRestore();
+    cwdSpy = undefined;
 
     if (originalNodeEnv === undefined) {
       delete mutableEnv.NODE_ENV;

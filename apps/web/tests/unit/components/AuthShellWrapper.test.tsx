@@ -9,6 +9,8 @@ vi.mock('@/hooks/useAuthRouteConfig', () => ({
     isTableRoute: false,
     showMobileTabs: false,
     isArtistProfileSettings: false,
+    isDemoRoute: false,
+    showChatUsageIndicator: false,
   }),
 }));
 

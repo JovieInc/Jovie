@@ -445,7 +445,7 @@ All Drizzle schema files: `apps/web/lib/db/schema/`
 import { db } from '@/lib/db';
 ```
 
-This is the ONLY valid import for database access. Uses `@neondatabase/serverless` HTTP driver with Neon's built-in connection pooling.
+This is the ONLY valid import for database access. Uses `@neondatabase/serverless` WebSocket driver with a client-side Pool for stateful RLS connections.
 
 ### Query Patterns
 
@@ -484,7 +484,7 @@ Import these instead of writing ad-hoc queries. Each file covers a domain (analy
 
 ### Forbidden Patterns
 
-- No `db.transaction()` (Neon HTTP driver incompatible)
+- No `db.transaction()` (requires explicit approval; use approved RLS wrappers)
 - No `import { Pool } from 'pg'` (use `db` from `@/lib/db`)
 - No per-row insert loops (use batch `db.insert().values([...])`)
 
@@ -551,7 +551,7 @@ For the full set of enforced rules, see [`AGENTS.md`](../AGENTS.md). Key points:
 - **Node 22 + pnpm 9.15.4** -- verify before any command
 - **Monorepo commands from root** -- `pnpm --filter web ...`, never `cd apps/web`
 - **Server/client boundaries** -- no DB imports in `'use client'` files
-- **No `db.transaction()`** -- Neon HTTP driver limitation
+- **No `db.transaction()`** -- requires explicit approval; use approved RLS wrappers
 - **No emoji in UI** -- use SVG icons
 - **Conventional commits** -- `type(scope): description`
 - **PR size limits** -- max 10 files, 400 lines diff

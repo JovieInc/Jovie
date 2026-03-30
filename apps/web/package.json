@@ -39,6 +39,7 @@
     "test:guard": "tsx scripts/test-performance-guard.ts",
     "test:budgets": "tsx scripts/performance-budgets-guard.ts",
     "test:lighthouse:pr": "BASE_URL=${BASE_URL:-http://localhost:3000} lhci autorun --config=.lighthouserc.pr.json --collect.url=$BASE_URL/ --collect.url=$BASE_URL/tim",
+    "test:lighthouse:dashboard:pr": "node scripts/lighthouse-dashboard-auth.cjs",
     "test:flaky": "tsx scripts/flaky-test-detector.ts",
     "test:e2e": "playwright test",
     "test:e2e:fast": "node scripts/run-playwright-fast.mjs",
@@ -71,7 +72,7 @@
     "biome:ci": "biome ci .",
     "biome:check": "biome check .",
     "clean": "rm -rf .next out dist coverage .nyc_output",
-    "postbuild": "next-sitemap",
+    "postbuild": "next-sitemap && node scripts/sync-standalone-assets.mjs",
     "verify-artist-images": "node scripts/verify-artist-images.js",
     "update-artist-images": "node scripts/update-artist-images.js",
     "ensure-valid-artist-images": "node scripts/ensure-valid-artist-images.js",
@@ -110,7 +111,9 @@
     "storybook:test": "vitest --config=vitest.config.storybook.mts",
     "test:a11y": "vitest run --config=vitest.config.storybook.mts",
     "test:visual-a11y": "pnpm run e2e:visual && pnpm run test:a11y",
-    "perf:loop": "tsx scripts/performance-optimizer.ts"
+    "perf:auth": "tsx scripts/performance-auth.ts",
+    "perf:loop": "tsx scripts/performance-optimizer.ts",
+    "perf:overnight": "tsx scripts/performance-overnight.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^3.0.79",

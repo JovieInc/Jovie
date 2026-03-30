@@ -392,10 +392,35 @@ function parseJsonOutput(output: string, message: string) {
   if (!trimmed) {
     throw new Error(message);
   }
-  return JSON.parse(trimmed) as unknown;
+  // The output may contain non-JSON preamble (Doppler warnings, pnpm noise).
+  // Find the first '{' and extract JSON from there.
+  const jsonStart = trimmed.indexOf('{');
+  if (jsonStart === -1) {
+    throw new Error(message);
+  }
+  // Find matching closing brace by parsing from jsonStart
+  const jsonCandidate = trimmed.slice(jsonStart);
+  let depth = 0;
+  let jsonEnd = -1;
+  for (let i = 0; i < jsonCandidate.length; i++) {
+    if (jsonCandidate[i] === '{') depth++;
+    else if (jsonCandidate[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        jsonEnd = i + 1;
+        break;
+      }
+    }
+  }
+  const jsonStr = jsonEnd > 0 ? jsonCandidate.slice(0, jsonEnd) : jsonCandidate;
+  return JSON.parse(jsonStr) as unknown;
 }
 
-function measureDashboardSample(baseUrl: string, authPath?: string) {
+function measureDashboardSample(
+  baseUrl: string,
+  authPath?: string,
+  route?: string
+) {
   const env: NodeJS.ProcessEnv = { ...process.env, BASE_URL: baseUrl };
   const resolvedAuthPath = resolveAuthPath(authPath);
   if (!process.env.CLERK_SESSION_COOKIE && !resolvedAuthPath) {
@@ -407,7 +432,7 @@ function measureDashboardSample(baseUrl: string, authPath?: string) {
     env.PERF_BUDGET_AUTH_PATH = resolvedAuthPath;
   }
 
-  const args = buildDashboardBudgetGuardArgs(resolvedAuthPath);
+  const args = buildDashboardBudgetGuardArgs(resolvedAuthPath, route);
   const result = runCommand('doppler', args, { cwd: repoRoot, env });
   const rawSummary = parseJsonOutput(
     result.stdout,
@@ -457,7 +482,11 @@ async function measureCurrentState(
     const samples: DashboardSample[] = [];
     const rawSamples: unknown[] = [];
     for (let run = 0; run < config.runsPerSample; run++) {
-      const result = measureDashboardSample(config.baseUrl, config.authPath);
+      const result = measureDashboardSample(
+        config.baseUrl,
+        config.authPath,
+        config.route
+      );
       samples.push(result.sample);
       rawSamples.push(result.raw);
       writeJsonFile(
@@ -700,6 +729,7 @@ async function main() {
     maxNoProgress: cliOptions.maxNoProgress,
     runsPerSample: cliOptions.runsPerSample,
     artifactsDir: artifactDir,
+    route: cliOptions.route,
   };
 
   const changedFiles = collectChangedFiles();

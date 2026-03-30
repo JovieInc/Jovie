@@ -135,7 +135,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
+  const isE2EClientRuntime =
+    process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+  const clerkMockEnabled = process.env.NEXT_PUBLIC_CLERK_MOCK === '1';
+  const clerkProxyDisabled =
+    process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
   const devEnv =
     process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development';
   const devSha = (process.env.NEXT_PUBLIC_BUILD_SHA ?? '').slice(0, 7);
@@ -179,6 +184,9 @@ export default async function RootLayout({
     <html
       lang='en'
       className='dark'
+      data-clerk-mock={clerkMockEnabled ? '1' : undefined}
+      data-clerk-proxy-disabled={clerkProxyDisabled ? '1' : undefined}
+      data-e2e-mode={isE2EClientRuntime ? '1' : undefined}
       data-scroll-behavior='smooth'
       suppressHydrationWarning
     >

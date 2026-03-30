@@ -16,30 +16,55 @@ import {
   trimTrailingSlashes,
 } from '@/lib/utils/string-utils';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
-import { getDashboardDataEssential } from '../actions';
+import { getDashboardShellData } from '../actions';
 import { loadUpcomingTourDates } from '../tour-dates/actions';
 import { getAudienceServerData } from './audience-data';
 
 export const runtime = 'nodejs';
 
-async function AudienceContent({
+/**
+ * Audience page — streams instantly after auth gate.
+ *
+ * Auth check via getCachedAuth (Clerk JWT, no DB) runs at the page level
+ * so unauthenticated users redirect immediately. Uses getDashboardShellData
+ * (skips settings/entitlements) for faster shell rendering. Audience data
+ * is cached via unstable_cache (5 min TTL) so repeat visits are instant.
+ */
+export default async function AudiencePage({
   searchParams,
 }: Readonly<{
   searchParams: Promise<SearchParams>;
 }>) {
-  try {
-    // Auth check via Clerk JWT (no DB dependency) — ensures unauthenticated
-    // users are redirected even during DB outages
-    const { userId } = await getCachedAuth();
-    if (!userId) {
-      redirect(
-        `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_AUDIENCE}`
-      );
-    }
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    redirect(
+      `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_AUDIENCE}`
+    );
+  }
 
+  return (
+    <Suspense fallback={<AudienceTableLoadingShell />}>
+      <AudienceContent userId={userId} searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+/**
+ * Async server component — fetches dashboard shell + audience data.
+ * Suspense boundary above shows skeleton instantly while this resolves.
+ */
+async function AudienceContent({
+  userId,
+  searchParams,
+}: Readonly<{
+  userId: string;
+  searchParams: Promise<SearchParams>;
+}>) {
+  try {
     const isE2E = process.env.NEXT_PUBLIC_E2E_MODE === '1';
 
-    const dashboardData = await getDashboardDataEssential();
+    // Shell data is faster than essential data (skips settings/entitlements)
+    const dashboardData = await getDashboardShellData(userId);
 
     if (dashboardData.dashboardLoadError) {
       void captureError(
@@ -139,20 +164,4 @@ async function AudienceContent({
       <PageErrorState message='Failed to load audience data. Please refresh the page.' />
     );
   }
-}
-
-function AudienceSkeleton() {
-  return <AudienceTableLoadingShell />;
-}
-
-export default async function AudiencePage({
-  searchParams,
-}: Readonly<{
-  searchParams: Promise<SearchParams>;
-}>) {
-  return (
-    <Suspense fallback={<AudienceSkeleton />}>
-      <AudienceContent searchParams={searchParams} />
-    </Suspense>
-  );
 }

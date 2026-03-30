@@ -16,6 +16,7 @@ import {
 } from 'next/cache';
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
+import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
 import { type DbOrTransaction } from '@/lib/db';
@@ -281,7 +282,10 @@ function createEmptyCoreData(overrides?: Partial<CoreData>): CoreData {
  */
 async function fetchDashboardBaseWithSession(
   tx: DbOrTransaction,
-  sessionUserId: string
+  sessionUserId: string,
+  options?: {
+    readonly includeSettings?: boolean;
+  }
 ): Promise<CoreData> {
   const [userData] = await dashboardQuery(
     () =>
@@ -334,37 +338,42 @@ async function fetchDashboardBaseWithSession(
       selectDashboardProfile(creatorData))
     : selectDashboardProfile(creatorData);
 
-  const settings = await dashboardQuery(
-    () =>
-      tx
-        .select()
-        .from(userSettings)
-        .where(eq(userSettings.userId, userData.id))
-        .limit(1),
-    'User settings query'
-  )
-    .then(result => result?.[0] as { sidebarCollapsed: boolean } | undefined)
-    .catch((error: unknown) => {
-      const migrationResult = handleMigrationErrors(error, {
-        userId: userData.id,
-        operation: 'user_settings',
-      });
+  const settings =
+    options?.includeSettings === false
+      ? undefined
+      : await dashboardQuery(
+          () =>
+            tx
+              .select()
+              .from(userSettings)
+              .where(eq(userSettings.userId, userData.id))
+              .limit(1),
+          'User settings query'
+        )
+          .then(
+            result => result?.[0] as { sidebarCollapsed: boolean } | undefined
+          )
+          .catch((error: unknown) => {
+            const migrationResult = handleMigrationErrors(error, {
+              userId: userData.id,
+              operation: 'user_settings',
+            });
 
-      if (!migrationResult.shouldRetry) {
-        return migrationResult.fallbackData as
-          | { sidebarCollapsed: boolean }
-          | undefined;
-      }
+            if (!migrationResult.shouldRetry) {
+              return migrationResult.fallbackData as
+                | { sidebarCollapsed: boolean }
+                | undefined;
+            }
 
-      Sentry.captureException(error, {
-        level: 'warning',
-        tags: {
-          query: 'user_settings',
-          context: 'dashboard_data_settled',
-        },
-      });
-      return undefined;
-    });
+            Sentry.captureException(error, {
+              level: 'warning',
+              tags: {
+                query: 'user_settings',
+                context: 'dashboard_data_settled',
+              },
+            });
+            return undefined;
+          });
 
   return {
     user: userData,
@@ -708,6 +717,55 @@ async function fetchDashboardEssentialWithSession(
 }
 
 /**
+ * Shell-specific fast path.
+ *
+ * Uses the already-authenticated Clerk user id from the app shell so the
+ * request can skip the entitlements + billing path entirely. This keeps
+ * `/app`, `/app/chat`, and releases on the narrowest data path that still
+ * provides selectedProfile + creatorProfiles for the sidebar shell.
+ */
+async function fetchDashboardShellWithSession(
+  clerkUserId: string
+): Promise<CoreData> {
+  try {
+    return await withDbSessionTx(
+      async (tx, sessionUserId) =>
+        fetchDashboardBaseWithSession(tx, sessionUserId, {
+          includeSettings: false,
+        }),
+      { clerkUserId }
+    );
+  } catch (error) {
+    const errorObj = error as
+      | Error
+      | { code?: string; message?: string; cause?: unknown };
+    const message =
+      (errorObj as Error).message ??
+      (errorObj as { message?: string }).message ??
+      'Unknown error';
+    const code =
+      (errorObj as { code?: string }).code ??
+      (errorObj as { cause?: { code?: string } }).cause?.code;
+    const errorType = errorObj?.constructor?.name ?? typeof errorObj;
+
+    logger.error('Error fetching shell dashboard data', {
+      message,
+      code,
+      errorType,
+    });
+
+    return createEmptyCoreData({
+      dashboardLoadError: {
+        stage: 'core_fetch',
+        message,
+        code: code ?? null,
+        errorType,
+      },
+    });
+  }
+}
+
+/**
  * Cached essential dashboard data (fast path).
  * Only user + profiles + settings. No tipping/links/avatar.
  */
@@ -715,6 +773,15 @@ const getCachedDashboardEssential = unstableCache(
   async (clerkUserId: string) =>
     fetchDashboardEssentialWithSession(clerkUserId),
   ['dashboard-essential'],
+  {
+    revalidate: CACHE_TTL.MEDIUM,
+    tags: [CACHE_TAGS.DASHBOARD_DATA],
+  }
+);
+
+const getCachedDashboardShell = unstableCache(
+  async (clerkUserId: string) => fetchDashboardShellWithSession(clerkUserId),
+  ['dashboard-shell'],
   {
     revalidate: CACHE_TTL.MEDIUM,
     tags: [CACHE_TAGS.DASHBOARD_DATA],
@@ -791,12 +858,56 @@ async function resolveDashboardDataEssential(): Promise<DashboardData> {
   );
 }
 
+async function resolveDashboardShellData(
+  clerkUserId: string
+): Promise<DashboardData> {
+  noStore();
+
+  try {
+    const [adminResult, coreData] = await Promise.allSettled([
+      checkAdminRole(clerkUserId),
+      Sentry.startSpan(
+        { op: 'task', name: 'dashboard.getShellData' },
+        async () => getCachedDashboardShell(clerkUserId)
+      ),
+    ]);
+
+    if (coreData.status === 'rejected') throw coreData.reason;
+
+    const isAdmin =
+      adminResult.status === 'fulfilled' ? adminResult.value : false;
+
+    return {
+      ...coreData.value,
+      isAdmin,
+      dashboardLoadError: coreData.value.dashboardLoadError,
+    };
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { context: 'get_dashboard_shell_data' },
+    });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {
+      ...createEmptyCoreData({
+        dashboardLoadError: {
+          stage: 'core_cache',
+          message: errorMessage,
+          code: null,
+          errorType: error?.constructor?.name ?? typeof error,
+        },
+      }),
+      isAdmin: false,
+    };
+  }
+}
+
 /**
  * Cached loader for dashboard data.
  * Uses React's cache() for request-level deduplication.
  */
 const loadDashboardData = cache(resolveDashboardData);
 const loadDashboardDataEssential = cache(resolveDashboardDataEssential);
+const loadDashboardShellData = cache(resolveDashboardShellData);
 
 /**
  * Prefetches dashboard data for the current request.
@@ -832,6 +943,19 @@ export async function getDashboardData(): Promise<DashboardData> {
  */
 export async function getDashboardDataEssential(): Promise<DashboardData> {
   return loadDashboardDataEssential();
+}
+
+/**
+ * Gets the shell-optimized dashboard data for an already-authenticated user.
+ *
+ * This path intentionally skips entitlements/billing resolution and the
+ * `user_settings` query so app-shell routes can render their visible surface
+ * before the rest of the workspace metadata is needed.
+ */
+export async function getDashboardShellData(
+  clerkUserId: string
+): Promise<DashboardData> {
+  return loadDashboardShellData(clerkUserId);
 }
 
 /**

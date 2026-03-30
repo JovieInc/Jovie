@@ -9,8 +9,8 @@ Scan the codebase for non-standard database access patterns that violate our sin
 
 ## What This Checks
 
-1. **db.transaction() usage** - Neon HTTP driver doesn't support transactions
-2. **Manual pooling** - `pg`, `pg-pool` imports conflict with Neon's pooling
+1. **db.transaction() usage** - Requires explicit approval; use approved RLS wrappers
+2. **Manual pooling** - `pg`, `pg-pool` imports conflict with the canonical `@/lib/db` client
 3. **Legacy client** - `@/lib/db/client` is deprecated
 4. **Direct driver imports** - Should use `@/lib/db` abstraction
 
