@@ -2,11 +2,15 @@ import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { chromium } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
+import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
 
 interface PerfAuthCliOptions {
   readonly baseUrl: string;
   readonly json: boolean;
   readonly outPath: string;
+  readonly persona: DevTestAuthPersona;
 }
 
 interface StorageStateCookie {
@@ -34,6 +38,7 @@ function parseCliArgs(args: readonly string[]): PerfAuthCliOptions {
   let baseUrl = defaultBaseUrl;
   let json = false;
   let outPath = defaultPerfAuthPath;
+  let persona: DevTestAuthPersona = 'creator';
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -66,6 +71,16 @@ function parseCliArgs(args: readonly string[]): PerfAuthCliOptions {
       continue;
     }
 
+    if (arg === '--persona') {
+      const value = args[index + 1];
+      if (value !== 'creator' && value !== 'admin') {
+        throw new TypeError('Missing or invalid value for --persona');
+      }
+      persona = value;
+      index += 1;
+      continue;
+    }
+
     throw new TypeError(`Unknown argument: ${arg}`);
   }
 
@@ -73,6 +88,7 @@ function parseCliArgs(args: readonly string[]): PerfAuthCliOptions {
     baseUrl,
     json,
     outPath,
+    persona,
   };
 }
 
@@ -111,6 +127,26 @@ function runAuthSetup(baseUrl: string) {
   );
 }
 
+async function runBypassAuthSetup(options: PerfAuthCliOptions) {
+  const browser = await chromium.launch();
+
+  try {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const redirectPath =
+      options.persona === 'admin' ? APP_ROUTES.ADMIN : APP_ROUTES.DASHBOARD;
+
+    await page.goto(
+      `${options.baseUrl.replace(/\/$/, '')}/api/dev/test-auth/enter?persona=${options.persona}&redirect=${encodeURIComponent(redirectPath)}`,
+      { waitUntil: 'domcontentloaded' }
+    );
+
+    await context.storageState({ path: options.outPath });
+  } finally {
+    await browser.close();
+  }
+}
+
 function writeResult(options: PerfAuthCliOptions, output: object) {
   const serialized = JSON.stringify(output, null, 2);
   if (options.json) {
@@ -121,36 +157,42 @@ function writeResult(options: PerfAuthCliOptions, output: object) {
   console.log(serialized);
 }
 
-function main() {
+async function main() {
   const options = parseCliArgs(process.argv.slice(2));
-  const setupResult = runAuthSetup(options.baseUrl);
-  if (setupResult.status !== 0) {
-    throw new Error(
-      [
-        'Playwright auth bootstrap failed.',
-        setupResult.stdout.trim(),
-        setupResult.stderr.trim(),
-      ]
-        .filter(Boolean)
-        .join('\n')
-    );
-  }
+  if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
+    mkdirSync(dirname(options.outPath), { recursive: true });
+    await runBypassAuthSetup(options);
+  } else {
+    const setupResult = runAuthSetup(options.baseUrl);
+    if (setupResult.status !== 0) {
+      throw new Error(
+        [
+          'Playwright auth bootstrap failed.',
+          setupResult.stdout.trim(),
+          setupResult.stderr.trim(),
+        ]
+          .filter(Boolean)
+          .join('\n')
+      );
+    }
 
-  if (!hasUsableCookies(authSetupOutputPath)) {
-    throw new Error(
-      'Auth bootstrap completed without a usable storage state. Verify the Clerk test user or enable loopback test-auth bypass before rerunning perf:auth.'
-    );
-  }
+    if (!hasUsableCookies(authSetupOutputPath)) {
+      throw new Error(
+        'Auth bootstrap completed without a usable storage state. Verify the Clerk test user or enable loopback test-auth bypass before rerunning perf:auth.'
+      );
+    }
 
-  mkdirSync(dirname(options.outPath), { recursive: true });
-  copyFileSync(authSetupOutputPath, options.outPath);
+    mkdirSync(dirname(options.outPath), { recursive: true });
+    copyFileSync(authSetupOutputPath, options.outPath);
+  }
 
   writeResult(options, {
     authStatePath: options.outPath,
     baseUrl: options.baseUrl,
     cookieCount: readStorageState(options.outPath).cookies?.length ?? 0,
+    persona: options.persona,
     sourcePath: authSetupOutputPath,
   });
 }
 
-main();
+void main();

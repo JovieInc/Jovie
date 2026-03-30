@@ -91,26 +91,24 @@ async function createConversationViaApp(context: PerfResolveContext) {
 
   const browser = await chromium.launch();
   const pageContext = await browser.newContext();
+  const baseUrl = context.baseUrl.replace(/\/$/, '');
 
   try {
     await pageContext.addCookies([...context.authCookies]);
     const page = await pageContext.newPage();
+    await page.goto(`${baseUrl}${APP_ROUTES.CHAT}`, {
+      waitUntil: 'domcontentloaded',
+    });
 
-    const existing = await page.evaluate(
-      async input => {
-        const response = await fetch(
-          `${input.baseUrl}/api/chat/conversations?limit=1`,
-          {
-            credentials: 'same-origin',
-          }
-        );
-        const payload = (await response.json().catch(() => ({}))) as {
-          conversations?: Array<{ id?: string }>;
-        };
-        return payload.conversations?.[0]?.id ?? null;
-      },
-      { baseUrl: context.baseUrl.replace(/\/$/, '') }
-    );
+    const existing = await page.evaluate(async () => {
+      const response = await fetch('/api/chat/conversations?limit=1', {
+        credentials: 'include',
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        conversations?: Array<{ id?: string }>;
+      };
+      return payload.conversations?.[0]?.id ?? null;
+    });
 
     if (existing) {
       return existing;
@@ -118,24 +116,20 @@ async function createConversationViaApp(context: PerfResolveContext) {
 
     const created = await page.evaluate(
       async input => {
-        const response = await fetch(
-          `${input.baseUrl}/api/chat/conversations`,
-          {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ title: input.title }),
-          }
-        );
+        const response = await fetch('/api/chat/conversations', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ title: input.title }),
+        });
         const payload = (await response.json().catch(() => ({}))) as {
           conversation?: { id?: string };
         };
         return payload.conversation?.id ?? null;
       },
       {
-        baseUrl: context.baseUrl.replace(/\/$/, ''),
         title: PERF_CHAT_THREAD_TITLE,
       }
     );

@@ -36,6 +36,17 @@ describe('performance route resolvers', () => {
     resolverMocks.chromiumLaunch.mockReset();
     resolverMocks.neon.mockClear();
     resolverMocks.sql.mockReset();
+    resolverMocks.chromiumLaunch.mockResolvedValue({
+      close: vi.fn().mockResolvedValue(undefined),
+      newContext: vi.fn().mockResolvedValue({
+        addCookies: vi.fn().mockResolvedValue(undefined),
+        close: vi.fn().mockResolvedValue(undefined),
+        newPage: vi.fn().mockResolvedValue({
+          evaluate: vi.fn(),
+          goto: vi.fn().mockResolvedValue(undefined),
+        }),
+      }),
+    });
     resolverMocks.sql.mockImplementation(
       async (
         strings: TemplateStringsArray,
@@ -95,6 +106,74 @@ describe('performance route resolvers', () => {
         baseUrl: 'http://127.0.0.1:4100',
       })
     ).resolves.toBe('/app/chat/conv_123');
+  });
+
+  it('creates a chat thread via an authenticated app page when no thread exists yet', async () => {
+    resolverMocks.sql.mockImplementation(
+      async (
+        strings: TemplateStringsArray,
+        ...values: readonly unknown[]
+      ): Promise<readonly Record<string, string>[]> => {
+        const query = strings.join(' ').replace(/\s+/g, ' ').trim();
+
+        if (query.includes('from users u')) {
+          return [{ id: 'profile_123', username_normalized: 'musicmaker' }];
+        }
+
+        if (query.includes('from chat_conversations')) {
+          return [];
+        }
+
+        return [];
+      }
+    );
+
+    const evaluate = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce('conv_created');
+    const goto = vi.fn().mockResolvedValue(undefined);
+    const addCookies = vi.fn().mockResolvedValue(undefined);
+    const contextClose = vi.fn().mockResolvedValue(undefined);
+    const browserClose = vi.fn().mockResolvedValue(undefined);
+
+    resolverMocks.chromiumLaunch.mockResolvedValue({
+      close: browserClose,
+      newContext: vi.fn().mockResolvedValue({
+        addCookies,
+        close: contextClose,
+        newPage: vi.fn().mockResolvedValue({
+          evaluate,
+          goto,
+        }),
+      }),
+    });
+
+    const route = {
+      path: '/app/chat/[id]',
+    } as PerfRouteDefinition;
+
+    await expect(
+      resolveChatConversationPerfPath(route, {
+        authCookies: [
+          {
+            domain: '127.0.0.1',
+            name: 'session',
+            path: '/',
+            value: 'cookie',
+          },
+        ],
+        baseUrl: 'http://127.0.0.1:4100',
+      })
+    ).resolves.toBe('/app/chat/conv_created');
+
+    expect(addCookies).toHaveBeenCalledOnce();
+    expect(goto).toHaveBeenCalledWith('http://127.0.0.1:4100/app/chat', {
+      waitUntil: 'domcontentloaded',
+    });
+    expect(evaluate).toHaveBeenCalledTimes(2);
+    expect(contextClose).toHaveBeenCalledOnce();
+    expect(browserClose).toHaveBeenCalledOnce();
   });
 
   it('resolves the latest seeded release task route for the active creator profile', async () => {

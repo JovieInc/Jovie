@@ -45,6 +45,9 @@ const DEFAULT_CREATOR_VENMO = 'browse-test-user';
 const DEFAULT_ADMIN_EMAIL = 'browse-admin+clerk_test@jov.ie';
 const DEFAULT_ADMIN_USERNAME = 'browse-admin-user';
 const DEFAULT_ADMIN_FULL_NAME = 'Browse Admin';
+const DEFAULT_ADMIN_BIO =
+  'Stable admin profile for local perf checks and admin-shell QA.';
+const DEFAULT_ADMIN_VENMO = 'browse-admin-user';
 
 interface DevTestAuthAvailability {
   readonly enabled: boolean;
@@ -229,6 +232,52 @@ async function findDevTestAuthSession(
   };
 }
 
+async function ensurePersonaProfile(
+  persona: DevTestAuthPersona,
+  dbUserId: string,
+  config: PersonaSeedConfig
+) {
+  const isAdminPersona = persona === 'admin';
+  const profileId = await ensureCreatorProfileRecord(db, {
+    userId: dbUserId,
+    creatorType: 'artist',
+    username: config.username,
+    usernameNormalized: config.username.toLowerCase(),
+    displayName: config.fullName,
+    bio: isAdminPersona ? DEFAULT_ADMIN_BIO : DEFAULT_CREATOR_BIO,
+    venmoHandle: isAdminPersona ? DEFAULT_ADMIN_VENMO : DEFAULT_CREATOR_VENMO,
+    avatarUrl: DEFAULT_TEST_AVATAR_URL,
+    spotifyUrl: null,
+    appleMusicUrl: null,
+    appleMusicId: null,
+    youtubeMusicId: null,
+    deezerId: null,
+    tidalId: null,
+    soundcloudId: null,
+    isPublic: !isAdminPersona,
+    isVerified: false,
+    isClaimed: true,
+    ingestionStatus: 'idle',
+    onboardingCompletedAt: new Date(),
+  });
+
+  await ensureUserProfileClaim(db, dbUserId, profileId);
+  await setActiveProfileForUser(db, dbUserId, profileId);
+
+  if (!isAdminPersona) {
+    await ensureSocialLinkRecord(db, {
+      creatorProfileId: profileId,
+      platform: 'venmo',
+      platformType: 'payment',
+      url: `https://venmo.com/${DEFAULT_CREATOR_VENMO}`,
+      displayText: 'Tip on Venmo',
+      isActive: true,
+      sortOrder: 1,
+      state: 'active',
+    });
+  }
+}
+
 export const getCachedDevTestAuthSession = cache(async () => {
   if (!isTestAuthBypassEnabled()) {
     return null;
@@ -339,43 +388,8 @@ export async function ensureDevTestAuthActor(
 
   let profilePath = config.profilePath;
 
-  if (persona === 'creator') {
-    const profileId = await ensureCreatorProfileRecord(db, {
-      userId: dbUserId,
-      creatorType: 'artist',
-      username: config.username,
-      usernameNormalized: config.username.toLowerCase(),
-      displayName: config.fullName,
-      bio: DEFAULT_CREATOR_BIO,
-      venmoHandle: DEFAULT_CREATOR_VENMO,
-      avatarUrl: DEFAULT_TEST_AVATAR_URL,
-      spotifyUrl: null,
-      appleMusicUrl: null,
-      appleMusicId: null,
-      youtubeMusicId: null,
-      deezerId: null,
-      tidalId: null,
-      soundcloudId: null,
-      isPublic: true,
-      isVerified: false,
-      isClaimed: true,
-      ingestionStatus: 'idle',
-      onboardingCompletedAt: new Date(),
-    });
-
-    await ensureUserProfileClaim(db, dbUserId, profileId);
-    await setActiveProfileForUser(db, dbUserId, profileId);
-    await ensureSocialLinkRecord(db, {
-      creatorProfileId: profileId,
-      platform: 'venmo',
-      platformType: 'payment',
-      url: `https://venmo.com/${DEFAULT_CREATOR_VENMO}`,
-      displayText: 'Tip on Venmo',
-      isActive: true,
-      sortOrder: 1,
-      state: 'active',
-    });
-
+  if (persona === 'creator' || persona === 'admin') {
+    await ensurePersonaProfile(persona, dbUserId, config);
     profilePath = `/${config.username}`;
   }
 
