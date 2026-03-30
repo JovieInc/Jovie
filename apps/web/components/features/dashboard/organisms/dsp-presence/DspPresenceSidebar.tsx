@@ -125,10 +125,10 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
           </div>
           <div className='flex items-center justify-between'>
             <span className='text-[12px] text-tertiary-token'>Confidence</span>
-            {item.confidenceScore != null ? (
-              <ConfidenceBadge score={item.confidenceScore} size='sm' />
-            ) : (
+            {item.confidenceScore == null ? (
               <span className='text-[12px] text-tertiary-token'>Manual</span>
+            ) : (
+              <ConfidenceBadge score={item.confidenceScore} size='sm' />
             )}
           </div>
           <div className='flex items-center justify-between'>
