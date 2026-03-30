@@ -8,10 +8,9 @@ import {
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
-import { useVirtualizer } from '@tanstack/react-virtual';
 import { Users } from 'lucide-react';
 import * as React from 'react';
-import { memo, useMemo, useRef } from 'react';
+import { memo, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
 import { EmptyState } from '@/components/organisms/EmptyState';
@@ -134,67 +133,78 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   }),
 ];
 
-/** Responsive column visibility by viewport width. */
-function getColumnVisibility(width: number): VisibilityState {
-  if (width < 1024) {
-    // md breakpoint: hide location and value
-    return { location: false, value: false };
+type AudienceTableLayout = 'narrow' | 'medium' | 'wide';
+
+function getAudienceTableLayout(width: number): AudienceTableLayout {
+  if (width < 720) {
+    return 'narrow';
   }
-  // lg+: show all columns
-  return {};
+  if (width < 960) {
+    return 'medium';
+  }
+  return 'wide';
 }
 
-/** Estimated height of each mobile card row in px. */
-const MOBILE_CARD_HEIGHT = 72;
+/** Responsive column visibility by viewport width.
+ *
+ * Progressive hiding is based on the measured desktop table container width,
+ * not the window width, so the layout adapts correctly with the shell sidebar
+ * and right drawer both open and closed.
+ */
+function getColumnVisibility(width: number): VisibilityState {
+  switch (getAudienceTableLayout(width)) {
+    case 'narrow':
+      return {
+        location: false,
+        value: false,
+        engagement: false,
+        lastSeen: false,
+      };
+    case 'medium':
+      return { location: false, value: false };
+    case 'wide':
+    default:
+      return {};
+  }
+}
 
-/** Virtualized mobile card list to avoid rendering all rows at once. */
+function getTableMinWidth(width: number): number {
+  switch (getAudienceTableLayout(width)) {
+    case 'narrow':
+      return 480;
+    case 'medium':
+      return 640;
+    case 'wide':
+    default:
+      return TABLE_MIN_WIDTHS.SMALL;
+  }
+}
+
+/** Mobile card list — plain rendering (no virtualization needed for paginated data). */
 const MobileCardList = memo(function MobileCardList({
   rows,
-  mode,
   selectedMemberId,
   onTap,
 }: {
   rows: AudienceMember[];
-  mode: 'members';
   selectedMemberId: string | null;
   onTap: (member: AudienceMember) => void;
 }) {
-  const parentRef = useRef<HTMLDivElement>(null);
-
-  const virtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => MOBILE_CARD_HEIGHT,
-    overscan: 5,
-  });
-
   return (
-    <div ref={parentRef} className='md:hidden h-full overflow-auto'>
-      <div
-        className='relative w-full'
-        style={{ height: `${virtualizer.getTotalSize()}px` }}
-      >
-        {virtualizer.getVirtualItems().map(virtualRow => {
-          const member = rows[virtualRow.index];
-          return (
-            <div
-              key={member.id}
-              className='absolute left-0 w-full border-b border-(--linear-app-frame-seam)'
-              style={{
-                height: `${virtualRow.size}px`,
-                transform: `translateY(${virtualRow.start}px)`,
-              }}
-            >
-              <AudienceMobileCard
-                member={member}
-                mode='members'
-                isSelected={selectedMemberId === member.id}
-                onTap={onTap}
-              />
-            </div>
-          );
-        })}
-      </div>
+    <div className='md:hidden h-full overflow-auto'>
+      {rows.map(member => (
+        <div
+          key={member.id}
+          className='border-b border-(--linear-app-frame-seam)'
+        >
+          <AudienceMobileCard
+            member={member}
+            mode='members'
+            isSelected={selectedMemberId === member.id}
+            onTap={onTap}
+          />
+        </div>
+      ))}
     </div>
   );
 });
@@ -240,22 +250,58 @@ export const DashboardAudienceTableUnified = memo(
       profileUrl,
     });
 
-    // Responsive column visibility
-    const [columnVisibility, setColumnVisibility] =
-      React.useState<VisibilityState>(() =>
-        typeof window !== 'undefined'
-          ? getColumnVisibility(window.innerWidth)
-          : {}
-      );
+    const desktopTableRef = React.useRef<HTMLDivElement>(null);
+    const [desktopTableWidth, setDesktopTableWidth] = React.useState<number>(
+      TABLE_MIN_WIDTHS.SMALL
+    );
 
     React.useEffect(() => {
-      const lgQuery = window.matchMedia('(min-width: 1024px)');
-      const handler = () => {
-        setColumnVisibility(getColumnVisibility(window.innerWidth));
+      const node = desktopTableRef.current;
+      if (!node) {
+        return;
+      }
+
+      const updateWidth = (nextWidth?: number) => {
+        const measuredWidth =
+          nextWidth ??
+          node.getBoundingClientRect().width ??
+          TABLE_MIN_WIDTHS.SMALL;
+
+        setDesktopTableWidth(currentWidth =>
+          currentWidth === measuredWidth ? currentWidth : measuredWidth
+        );
       };
-      lgQuery.addEventListener('change', handler);
-      return () => lgQuery.removeEventListener('change', handler);
+
+      updateWidth();
+
+      if (typeof ResizeObserver !== 'function') {
+        const handleResize = () => updateWidth();
+        window.addEventListener('resize', handleResize);
+        return () => {
+          window.removeEventListener('resize', handleResize);
+        };
+      }
+
+      const resizeObserver = new ResizeObserver(entries => {
+        updateWidth(entries[0]?.contentRect.width);
+      });
+
+      resizeObserver.observe(node);
+
+      return () => {
+        resizeObserver.disconnect();
+      };
     }, []);
+
+    const columnVisibility = React.useMemo(
+      () => getColumnVisibility(desktopTableWidth),
+      [desktopTableWidth]
+    );
+
+    const tableMinWidth = React.useMemo(
+      () => `${getTableMinWidth(desktopTableWidth)}px`,
+      [desktopTableWidth]
+    );
 
     // Bridge URL sort state ↔ TanStack SortingState
     const sorting: SortingState = useMemo(() => {
@@ -474,7 +520,7 @@ export const DashboardAudienceTableUnified = memo(
       (row: AudienceMember) => {
         const isSelected = selectedMember?.id === row.id;
         return cn(
-          'h-10',
+          'h-12',
           isSelected
             ? 'bg-(--linear-row-selected)'
             : 'bg-transparent hover:bg-(--linear-row-hover)'
@@ -618,13 +664,12 @@ export const DashboardAudienceTableUnified = memo(
                     {/* Mobile card list (virtualized) */}
                     <MobileCardList
                       rows={rows}
-                      mode='members'
                       selectedMemberId={selectedMember?.id ?? null}
                       onTap={setSelectedMember}
                     />
 
                     {/* Desktop table */}
-                    <div className='max-md:hidden h-full'>
+                    <div ref={desktopTableRef} className='max-md:hidden h-full'>
                       <UnifiedTable
                         data={rows}
                         columns={columns}
@@ -644,7 +689,7 @@ export const DashboardAudienceTableUnified = memo(
                         sorting={sorting}
                         onSortingChange={handleSortingChange}
                         columnVisibility={columnVisibility}
-                        minWidth={`${TABLE_MIN_WIDTHS.SMALL}px`}
+                        minWidth={tableMinWidth}
                         className='text-[13px]'
                         getRowClassName={getRowClassName}
                         onRowClick={row => handleViewProfile(row)}

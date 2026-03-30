@@ -1,8 +1,13 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { type RenderOptions, render, screen } from '@testing-library/react';
+import {
+  type RenderOptions,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import * as React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { AudiencePanelProvider } from '@/features/dashboard/organisms/AudiencePanelContext';
@@ -84,10 +89,6 @@ vi.mock('@/features/dashboard/organisms/AnalyticsSidebar', () => ({
   AnalyticsSidebar: () => null,
 }));
 
-vi.mock('@/features/dashboard/audience/table/atoms/AudienceMobileCard', () => ({
-  AudienceMobileCard: () => null,
-}));
-
 vi.mock('@/components/organisms/EmptyState', () => ({
   EmptyState: ({ heading }: { heading?: string }) => (
     <div data-testid='empty-state'>{heading}</div>
@@ -105,10 +106,24 @@ vi.mock(
 
 // Track data passed to UnifiedTable to verify prop forwarding
 let capturedTableData: unknown[] = [];
+let capturedColumnVisibility: Record<string, boolean> | undefined;
+let capturedMinWidth: string | undefined;
+let mockDesktopTableWidth = 1200;
 
 vi.mock('@/components/organisms/table', () => ({
-  UnifiedTable: ({ data }: { data?: unknown[] }) => {
+  AudienceMobileCard: () => null,
+  UnifiedTable: ({
+    data,
+    columnVisibility,
+    minWidth,
+  }: {
+    data?: unknown[];
+    columnVisibility?: Record<string, boolean>;
+    minWidth?: string;
+  }) => {
     capturedTableData = data ?? [];
+    capturedColumnVisibility = columnVisibility;
+    capturedMinWidth = minWidth;
     return <table data-testid='unified-table' />;
   },
   convertToCommonDropdownItems: vi.fn(() => []),
@@ -204,7 +219,49 @@ const defaultProps = {
 describe('DashboardAudienceTable', () => {
   beforeEach(() => {
     capturedTableData = [];
+    capturedColumnVisibility = undefined;
+    capturedMinWidth = undefined;
+    mockDesktopTableWidth = 1200;
     vi.clearAllMocks();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class MockResizeObserver {
+        private readonly callback: ResizeObserverCallback;
+
+        constructor(callback: ResizeObserverCallback) {
+          this.callback = callback;
+        }
+
+        observe = vi.fn((target: Element) => {
+          this.callback(
+            [
+              {
+                target,
+                contentRect: {
+                  width: mockDesktopTableWidth,
+                  height: 600,
+                  x: 0,
+                  y: 0,
+                  top: 0,
+                  right: mockDesktopTableWidth,
+                  bottom: 600,
+                  left: 0,
+                  toJSON: () => ({}),
+                },
+              } as ResizeObserverEntry,
+            ],
+            this as unknown as ResizeObserver
+          );
+        });
+
+        unobserve = vi.fn();
+        disconnect = vi.fn();
+      }
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('renders the table container with test id', () => {
@@ -246,6 +303,63 @@ describe('DashboardAudienceTable', () => {
     );
 
     expect(capturedTableData).toHaveLength(100);
+  });
+
+  it('collapses to a user-only desktop layout when the table is narrow', async () => {
+    mockDesktopTableWidth = 700;
+
+    renderWithProviders(
+      <DashboardAudienceTable
+        {...defaultProps}
+        rows={MOCK_DATA_LARGE}
+        total={100}
+      />
+    );
+
+    await waitFor(() => {
+      expect(capturedColumnVisibility).toEqual({
+        location: false,
+        value: false,
+        engagement: false,
+        lastSeen: false,
+      });
+      expect(capturedMinWidth).toBe('480px');
+    });
+  });
+
+  it('keeps engagement and recency visible at medium desktop widths', async () => {
+    mockDesktopTableWidth = 900;
+
+    renderWithProviders(
+      <DashboardAudienceTable
+        {...defaultProps}
+        rows={MOCK_DATA_LARGE}
+        total={100}
+      />
+    );
+
+    await waitFor(() => {
+      expect(capturedColumnVisibility).toEqual({
+        location: false,
+        value: false,
+      });
+      expect(capturedMinWidth).toBe('640px');
+    });
+  });
+
+  it('shows all desktop columns at wide widths', async () => {
+    renderWithProviders(
+      <DashboardAudienceTable
+        {...defaultProps}
+        rows={MOCK_DATA_LARGE}
+        total={100}
+      />
+    );
+
+    await waitFor(() => {
+      expect(capturedColumnVisibility).toEqual({});
+      expect(capturedMinWidth).toBe('800px');
+    });
   });
 
   it('renders in subscribers mode', () => {
