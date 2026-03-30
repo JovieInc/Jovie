@@ -22,6 +22,19 @@ export const PROVIDER_CONFIG: Record<
   boomplay: { label: 'Boomplay', accent: '#0052FF' },
   iheartradio: { label: 'iHeartRadio', accent: '#C6002B' },
   tiktok: { label: 'TikTok', accent: '#000000' },
+  netease: { label: 'NetEase Music', accent: '#D43C33' },
+  qq_music: { label: 'QQ Music', accent: '#1EBAFC' },
+  awa: { label: 'AWA', accent: '#FF1168' },
+  audius: { label: 'Audius', accent: '#7E1BCC' },
+  flo: { label: 'FLO', accent: '#1A1A1A' },
+  gaana: { label: 'Gaana', accent: '#E72C30' },
+  jio_saavn: { label: 'JioSaavn', accent: '#2BC5B2' },
+  joox: { label: 'JOOX', accent: '#00D458' },
+  kkbox: { label: 'KKBOX', accent: '#09CEF6' },
+  line_music: { label: 'LINE MUSIC', accent: '#00C300' },
+  trebel: { label: 'Trebel', accent: '#00B4E6' },
+  yandex: { label: 'Yandex Music', accent: '#FFCC00' },
+  amazon: { label: 'Amazon', accent: '#FF9900' },
 };
 
 export const PRIMARY_PROVIDER_KEYS: ProviderKey[] = [

@@ -861,7 +861,9 @@ async function resolveDashboardDataEssential(): Promise<DashboardData> {
 async function resolveDashboardShellData(
   clerkUserId: string
 ): Promise<DashboardData> {
-  noStore();
+  // noStore() removed: the inner getCachedDashboardShell() uses unstable_cache
+  // with a 5-minute TTL. Calling noStore() here was preventing the Data Cache
+  // from serving cached results on subsequent requests.
 
   try {
     const [adminResult, coreData] = await Promise.allSettled([

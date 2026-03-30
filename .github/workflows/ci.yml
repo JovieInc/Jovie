@@ -425,10 +425,6 @@ jobs:
           # Run migration guard and validation from apps/web directory
           cd apps/web
 
-          if [ -z "$E2E_CLERK_USER_ID" ]; then
-            echo "E2E_CLERK_USER_ID not set — skipping dashboard Lighthouse."
-            exit 0
-          fi
           ./scripts/check-migrations.sh
           ./scripts/validate-migrations.sh
         env:
@@ -663,10 +659,6 @@ jobs:
         run: |
           cd apps/web
 
-          if [ -z "$E2E_CLERK_USER_ID" ]; then
-            echo "E2E_CLERK_USER_ID not set — skipping dashboard Lighthouse."
-            exit 0
-          fi
           if [ ! -f tests/e2e/layout-overlap-guard.spec.ts ]; then
             echo "⚠ layout-overlap-guard.spec.ts not found — skipping"
             exit 0
@@ -724,10 +716,6 @@ jobs:
         run: |
           cd apps/web
 
-          if [ -z "$E2E_CLERK_USER_ID" ]; then
-            echo "E2E_CLERK_USER_ID not set — skipping dashboard Lighthouse."
-            exit 0
-          fi
 
           if [ ! -f .next/standalone/apps/web/server.js ]; then
             echo "Standalone server not found — build may not have produced standalone output"
@@ -1244,10 +1232,6 @@ jobs:
         run: |
           cd apps/web
 
-          if [ -z "$E2E_CLERK_USER_ID" ]; then
-            echo "E2E_CLERK_USER_ID not set — skipping dashboard Lighthouse."
-            exit 0
-          fi
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           CI=true BASE_URL=https://jov.ie pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
@@ -1321,10 +1305,6 @@ jobs:
         run: |
           cd apps/web
 
-          if [ -z "$E2E_CLERK_USER_ID" ]; then
-            echo "E2E_CLERK_USER_ID not set — skipping dashboard Lighthouse."
-            exit 0
-          fi
 
           if [ ! -f .lighthouserc.build.json ]; then
             echo "⚠️ Lighthouse config not found; skipping."
@@ -1564,10 +1544,6 @@ jobs:
         run: |
           cd apps/web
 
-          if [ -z "$E2E_CLERK_USER_ID" ]; then
-            echo "E2E_CLERK_USER_ID not set — skipping dashboard Lighthouse."
-            exit 0
-          fi
           # Create empty auth state so Playwright's auth-setup project doesn't crash.
           # The axe audit only tests public routes (SMOKE_ONLY=1) so no real auth is needed.
           mkdir -p tests/.auth
@@ -2499,10 +2475,6 @@ jobs:
         run: |
           cd apps/web
 
-          if [ -z "$E2E_CLERK_USER_ID" ]; then
-            echo "E2E_CLERK_USER_ID not set — skipping dashboard Lighthouse."
-            exit 0
-          fi
           # Start standalone production server (not Turbopack dev) to avoid SWC OOM on CI runners
           # IMPORTANT: Pass runtime env vars explicitly — the step's env: block only applies to
           # the shell process, but backgrounded processes inherit from the shell's exported vars.

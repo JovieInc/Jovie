@@ -765,9 +765,7 @@ export async function getAudienceServerData(params: {
 
   // Build a stable cache key from all query parameters.
   // Segments are sorted to ensure consistent key regardless of URL order.
-  const segmentsKey = segments
-    ? [...segments].sort((a, b) => a.localeCompare(b)).join(',')
-    : '';
+  const segmentsKey = segments ? [...segments].sort().join(',') : '';
   const sp = (key: string): string => {
     const v = searchParams[key];
     return Array.isArray(v) ? (v[0] ?? '') : (v ?? '');
@@ -777,6 +775,8 @@ export async function getAudienceServerData(params: {
     userId,
     selectedProfileId,
     view,
+    includeDetails ? 'details' : 'summary',
+    memberId ?? '',
     sp('sort'),
     sp('direction'),
     sp('page'),

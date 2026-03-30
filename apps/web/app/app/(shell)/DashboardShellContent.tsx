@@ -1,9 +1,11 @@
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
+import { UnavailablePage } from '@/components/UnavailablePage';
 import { APP_ROUTES } from '@/constants/routes';
 import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
 import { OperatorBanner } from '@/features/admin/OperatorBanner';
+import { getUserBanStatus } from '@/lib/auth/ban-check';
 import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
 import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
@@ -28,6 +30,9 @@ import {
  * so the browser receives a streaming skeleton immediately while this
  * component resolves data from the database.
  *
+ * Ban check runs in parallel with the dashboard data fetch — banned users
+ * are rare enough that blocking every page load for them isn't worth it.
+ *
  * Feature flags are now code-level (no Statsig), so no async bootstrap needed.
  */
 export async function DashboardShellContent({
@@ -42,9 +47,17 @@ export async function DashboardShellContent({
   // because they rely on supplementary fields from the slower fetch.
   const headerStore = await headers();
   const pathname = resolveAppShellRequestPath(headerStore.get('next-url'));
-  const dashboardData = shouldUseEssentialShellData(pathname)
-    ? await getDashboardShellData(userId)
-    : await getDashboardData();
+  const useEssentialShell = shouldUseEssentialShellData(pathname);
+
+  // Run ban check in parallel with dashboard data fetch
+  const [dashboardData, banStatus] = await Promise.all([
+    useEssentialShell ? getDashboardShellData(userId) : getDashboardData(),
+    getUserBanStatus(userId),
+  ]);
+
+  if (banStatus.isBanned) {
+    return <UnavailablePage />;
+  }
 
   if (
     shouldRedirectToOnboarding(pathname) &&
@@ -53,8 +66,6 @@ export async function DashboardShellContent({
   ) {
     redirect(APP_ROUTES.ONBOARDING);
   }
-
-  const useLeanShellProviders = shouldUseEssentialShellData(pathname);
 
   // Read sidebar cookie server-side so SSR matches client state (no flash)
   const cookieStore = await cookies();
@@ -71,7 +82,7 @@ export async function DashboardShellContent({
         <AuthShellWrapper
           persistSidebarCollapsed={setSidebarCollapsed}
           sidebarDefaultOpen={sidebarDefaultOpen}
-          previewPanelDefaultOpen={!useLeanShellProviders}
+          previewPanelDefaultOpen={!useEssentialShell}
         >
           {children}
         </AuthShellWrapper>
@@ -79,7 +90,7 @@ export async function DashboardShellContent({
     </>
   );
 
-  if (useLeanShellProviders) {
+  if (useEssentialShell) {
     return shellContents;
   }
 
