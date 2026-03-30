@@ -57,10 +57,11 @@ vi.mock('@/lib/utils/ip-extraction', () => ({
   extractClientIP: vi.fn().mockReturnValue('127.0.0.1'),
 }));
 
+const { POST } = await import('@/app/api/audience/visit/route');
+
 describe('POST /api/audience/visit', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
 
     mockPublicVisitLimiterGetStatus.mockReturnValue({
       blocked: false,
@@ -83,7 +84,6 @@ describe('POST /api/audience/visit', () => {
       reset: new Date(Date.now() + 60_000),
     });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -101,8 +101,39 @@ describe('POST /api/audience/visit', () => {
 
   it('silently filters bot traffic', async () => {
     mockDetectBot.mockReturnValue({ isBot: true, reason: 'User-Agent match' });
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'profile_123', isPublic: true }]),
+        }),
+      }),
+    });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
+    const insertedValues: unknown[] = [];
+    mockWithSystemIngestionSession.mockImplementation(async callback => {
+      const mockInsert = vi.fn().mockReturnValue({
+        values: vi.fn().mockImplementation(value => {
+          insertedValues.push(value);
+          return {
+            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          };
+        }),
+      });
+
+      await callback({
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        insert: mockInsert,
+      });
+    });
+
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -116,11 +147,17 @@ describe('POST /api/audience/visit', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(data.fingerprint).toBe('bot-filtered');
+    expect(data.fingerprint).toBeDefined();
+    expect(insertedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          tags: ['bot'],
+        }),
+      ])
+    );
   });
 
   it('returns 400 for invalid payload', async () => {
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -143,7 +180,6 @@ describe('POST /api/audience/visit', () => {
       }),
     });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -170,7 +206,6 @@ describe('POST /api/audience/visit', () => {
       }),
     });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -223,7 +258,6 @@ describe('POST /api/audience/visit', () => {
       });
     });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -310,7 +344,6 @@ describe('POST /api/audience/visit', () => {
       });
     });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -360,7 +393,6 @@ describe('POST /api/audience/visit', () => {
       });
     });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -405,7 +437,6 @@ describe('POST /api/audience/visit', () => {
       });
     });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

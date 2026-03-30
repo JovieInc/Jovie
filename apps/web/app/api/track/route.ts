@@ -12,6 +12,7 @@ import {
   trackingIpClicksLimiter,
 } from '@/lib/rate-limit';
 import { detectPlatformFromUA } from '@/lib/utils';
+import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import {
   createFingerprint,
@@ -108,6 +109,22 @@ function inferAudienceDeviceType(
   return 'desktop';
 }
 
+function mergeAudienceTags(
+  currentTags: string[] | null | undefined,
+  incomingTags: string[]
+) {
+  if (incomingTags.length === 0) {
+    return Array.isArray(currentTags) ? currentTags : [];
+  }
+
+  return Array.from(
+    new Set([
+      ...(Array.isArray(currentTags) ? currentTags : []),
+      ...incomingTags,
+    ])
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Attribution helpers
 // ---------------------------------------------------------------------------
@@ -139,6 +156,7 @@ const AUDIENCE_MEMBER_COLUMNS = {
   deviceType: audienceMembers.deviceType,
   spotifyConnected: audienceMembers.spotifyConnected,
   attributionSource: audienceMembers.attributionSource,
+  tags: audienceMembers.tags,
 } as const;
 
 async function upsertAudienceMember(
@@ -153,9 +171,11 @@ async function upsertAudienceMember(
     utmParams: Record<string, string> | null | undefined;
     linkType: string;
     target: string;
+    isBot: boolean;
   }
 ): Promise<string> {
   const attribution = deriveAttributionSource(opts.utmParams);
+  const audienceTags = opts.isBot ? ['bot'] : [];
 
   const [insertedMember] = await tx
     .insert(audienceMembers)
@@ -176,6 +196,7 @@ async function upsertAudienceMember(
       latestActions: [],
       geoCity: opts.geoCity ?? null,
       geoCountry: opts.geoCountry ?? null,
+      tags: audienceTags,
       ...(attribution ? { attributionSource: attribution } : {}),
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -217,11 +238,13 @@ async function upsertAudienceMember(
   };
   const latestActions = trimHistory([actionEntry, ...existingActions], 5);
   const weight = getActionWeight(opts.linkType);
-  const updatedScore = (resolvedMember.engagementScore ?? 0) + weight;
-  const intentLevel = deriveIntentLevel(
-    resolvedMember.visits ?? 0,
-    latestActions.length
-  );
+  const updatedScore = opts.isBot
+    ? (resolvedMember.engagementScore ?? 0)
+    : (resolvedMember.engagementScore ?? 0) + weight;
+  const intentLevel = opts.isBot
+    ? 'low'
+    : deriveIntentLevel(resolvedMember.visits ?? 0, latestActions.length);
+  const tags = mergeAudienceTags(resolvedMember.tags, audienceTags);
 
   await tx
     .update(audienceMembers)
@@ -234,6 +257,7 @@ async function upsertAudienceMember(
       deviceType: opts.audienceDeviceType,
       geoCity: opts.geoCity ?? resolvedMember.geoCity ?? null,
       geoCountry: opts.geoCountry ?? resolvedMember.geoCountry ?? null,
+      tags,
       spotifyConnected:
         Boolean(resolvedMember.spotifyConnected) || opts.linkType === 'listen',
       ...(attribution && !resolvedMember.attributionSource
@@ -340,6 +364,7 @@ export async function POST(request: NextRequest) {
 
     const userAgent = request.headers.get('user-agent');
     const platformDetected = detectPlatformFromUA(userAgent || undefined);
+    const botDetection = detectBot(request, '/api/track');
     // ipAddress already extracted above for rate limiting
     // Filter out self-referrals: the HTTP Referer header on same-origin fetch()
     // is the current page URL, not the external traffic source.
@@ -398,6 +423,7 @@ export async function POST(request: NextRequest) {
             utmParams,
             linkType,
             target,
+            isBot: botDetection.isBot,
           })
         : null;
 
@@ -423,6 +449,7 @@ export async function POST(request: NextRequest) {
           country: geoCountry,
           city: geoCity,
           deviceType: platformDetected,
+          isBot: botDetection.isBot,
           metadata,
           audienceMemberId,
         })

@@ -71,6 +71,22 @@ function inferDeviceType(
   return 'desktop';
 }
 
+function mergeAudienceTags(
+  currentTags: string[] | null | undefined,
+  incomingTags: string[]
+) {
+  if (incomingTags.length === 0) {
+    return Array.isArray(currentTags) ? currentTags : [];
+  }
+
+  return Array.from(
+    new Set([
+      ...(Array.isArray(currentTags) ? currentTags : []),
+      ...incomingTags,
+    ])
+  );
+}
+
 async function incrementDailyProfileViews(
   tx: DbOrTransaction,
   profileId: string,
@@ -183,16 +199,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Bot detection - silently skip recording for bots
-    const botResult = detectBot(request, '/api/audience/visit');
-    if (botResult.isBot) {
-      // Return success but don't record - prevents metric inflation
-      return NextResponse.json(
-        { success: true, fingerprint: 'bot-filtered' },
-        { headers: NO_STORE_HEADERS }
-      );
-    }
-
     const body = await request.json();
     const parsed = visitSchema.safeParse(body);
 
@@ -229,6 +235,8 @@ export async function POST(request: NextRequest) {
     const resolvedUserAgent =
       userAgent ?? request.headers.get('user-agent') ?? undefined;
     const resolvedIpAddress = ipAddress ?? clientIP ?? undefined;
+    const botResult = detectBot(request, '/api/audience/visit');
+    const audienceTags = botResult.isBot ? ['bot'] : [];
     // Use the client-provided referrer (document.referrer) if available.
     // The HTTP Referer header on same-origin fetch() is the current page URL,
     // NOT the external referrer, so we filter out self-referrals from the fallback.
@@ -305,7 +313,7 @@ export async function POST(request: NextRequest) {
     await withSystemIngestionSession(async tx => {
       const viewDate = now.toISOString().slice(0, 10);
 
-      if (hasDailyProfileViewsTable) {
+      if (hasDailyProfileViewsTable && !botResult.isBot) {
         try {
           await incrementDailyProfileViews(tx, profileId, viewDate, now);
         } catch (error) {
@@ -332,6 +340,7 @@ export async function POST(request: NextRequest) {
           geoCountry: audienceMembers.geoCountry,
           deviceType: audienceMembers.deviceType,
           utmParams: audienceMembers.utmParams,
+          tags: audienceMembers.tags,
         })
         .from(audienceMembers)
         .where(
@@ -346,8 +355,12 @@ export async function POST(request: NextRequest) {
       const actionCount = Array.isArray(existing?.latestActions)
         ? existing.latestActions.length
         : 0;
-      const updatedIntent = deriveIntentLevel(updatedVisits, actionCount);
-      const updatedScore = (existing?.engagementScore ?? 0) + 1;
+      const updatedIntent = botResult.isBot
+        ? 'low'
+        : deriveIntentLevel(updatedVisits, actionCount);
+      const updatedScore = botResult.isBot
+        ? (existing?.engagementScore ?? 0)
+        : (existing?.engagementScore ?? 0) + 1;
       const previousReferrers = Array.isArray(existing?.referrerHistory)
         ? existing.referrerHistory
         : [];
@@ -368,6 +381,7 @@ export async function POST(request: NextRequest) {
       const resolvedUtmParams = hasUtmParams
         ? utmParams
         : (existing?.utmParams ?? {});
+      const mergedTags = mergeAudienceTags(existing?.tags, audienceTags);
 
       if (existing) {
         await tx
@@ -382,6 +396,7 @@ export async function POST(request: NextRequest) {
             geoCountry: geoCountryValue,
             deviceType: normalizedDevice,
             referrerHistory,
+            tags: mergedTags,
             ...(utmParams && { utmParams: resolvedUtmParams }),
           })
           .where(eq(audienceMembers.id, existing.id));
@@ -405,7 +420,7 @@ export async function POST(request: NextRequest) {
           deviceType: normalizedDevice,
           referrerHistory,
           utmParams: resolvedUtmParams,
-          tags: [],
+          tags: mergedTags,
           latestActions: [],
           updatedAt: now,
           createdAt: now,

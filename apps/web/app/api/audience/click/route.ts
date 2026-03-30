@@ -54,6 +54,7 @@ type AudienceMemberRecord = {
   geoCountry: string | null;
   deviceType: string | null;
   spotifyConnected: boolean | null;
+  tags: string[] | null;
 };
 
 async function findAudienceMember(
@@ -73,6 +74,7 @@ async function findAudienceMember(
         geoCountry: audienceMembers.geoCountry,
         deviceType: audienceMembers.deviceType,
         spotifyConnected: audienceMembers.spotifyConnected,
+        tags: audienceMembers.tags,
       })
       .from(audienceMembers)
       .where(eq(audienceMembers.id, explicitId))
@@ -93,6 +95,7 @@ async function findAudienceMember(
       geoCountry: audienceMembers.geoCountry,
       deviceType: audienceMembers.deviceType,
       spotifyConnected: audienceMembers.spotifyConnected,
+      tags: audienceMembers.tags,
     })
     .from(audienceMembers)
     .where(
@@ -115,6 +118,22 @@ function resolveTipAmountCents(
   if (typeof metadata?.tipAmount === 'number')
     return Math.round(metadata.tipAmount * 100);
   return defaultCents;
+}
+
+function mergeAudienceTags(
+  currentTags: string[] | null | undefined,
+  incomingTags: string[]
+) {
+  if (incomingTags.length === 0) {
+    return Array.isArray(currentTags) ? currentTags : [];
+  }
+
+  return Array.from(
+    new Set([
+      ...(Array.isArray(currentTags) ? currentTags : []),
+      ...incomingTags,
+    ])
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -243,6 +262,7 @@ export async function POST(request: NextRequest) {
     const fingerprint = createFingerprint(resolvedIP, userAgent);
     const normalizedDevice = deviceType ?? 'unknown';
     const now = new Date();
+    const audienceTags = botDetection.isBot ? ['bot'] : [];
 
     // Encrypt IP address for storage (GDPR/CCPA compliance)
     const encryptedIP = encryptIP(resolvedIP);
@@ -271,6 +291,7 @@ export async function POST(request: NextRequest) {
             deviceType: normalizedDevice,
             referrerHistory: [],
             latestActions: [],
+            tags: audienceTags,
             createdAt: now,
             updatedAt: now,
           })
@@ -289,6 +310,7 @@ export async function POST(request: NextRequest) {
             geoCountry: audienceMembers.geoCountry,
             deviceType: audienceMembers.deviceType,
             spotifyConnected: audienceMembers.spotifyConnected,
+            tags: audienceMembers.tags,
           });
 
         if (inserted) {
@@ -316,8 +338,13 @@ export async function POST(request: NextRequest) {
       const latestActions = trimHistory([actionEntry, ...existingActions], 5);
       const actionCount = latestActions.length;
       const weight = getActionWeight(linkType);
-      const updatedScore = (member.engagementScore ?? 0) + weight;
-      const intentLevel = deriveIntentLevel(member.visits ?? 0, actionCount);
+      const updatedScore = botDetection.isBot
+        ? (member.engagementScore ?? 0)
+        : (member.engagementScore ?? 0) + weight;
+      const intentLevel = botDetection.isBot
+        ? 'low'
+        : deriveIntentLevel(member.visits ?? 0, actionCount);
+      const tags = mergeAudienceTags(member.tags, audienceTags);
 
       const metadataWithTipValue =
         linkType === 'tip'
@@ -357,6 +384,7 @@ export async function POST(request: NextRequest) {
           deviceType: normalizedDevice,
           geoCity: city ?? member.geoCity ?? null,
           geoCountry: country ?? member.geoCountry ?? null,
+          tags,
           spotifyConnected:
             (member.spotifyConnected ?? false) || linkType === 'listen',
         })
