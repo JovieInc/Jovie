@@ -37,6 +37,11 @@ export default function DemoAudienceSection() {
       onViewProfile: noopMember,
       onSendNotification: noopMember,
       getTouringCity,
+      hiddenMetadataColumns: {
+        location: false,
+        engagement: false,
+        lastSeen: false,
+      },
     }),
     [toggleSelect, noop, noopMember, getContextMenuItems, getTouringCity]
   );

@@ -10,11 +10,15 @@ import {
 } from 'nuqs';
 import * as React from 'react';
 import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
 import { QueryErrorBoundary, useAudienceInfiniteQuery } from '@/lib/queries';
 import type { TourDateForMatching } from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
-import { AudiencePanelProvider } from './AudiencePanelContext';
+import {
+  AudiencePanelProvider,
+  useAudiencePanel,
+} from './AudiencePanelContext';
 import { AudienceTableLoadingShell } from './dashboard-audience-table/AudienceTableLoadingShell';
 import type {
   AudienceFilters,
@@ -80,7 +84,7 @@ export function DashboardAudienceClient({
   tourDates,
 }: Readonly<DashboardAudienceClientProps>) {
   return (
-    <AudiencePanelProvider initialMode='analytics'>
+    <AudiencePanelProvider initialMode={null}>
       <DashboardAudienceClientInner
         mode={mode}
         view={view}
@@ -113,6 +117,30 @@ function DashboardAudienceClientInner({
   filters: initialFilters,
   tourDates,
 }: Readonly<Omit<DashboardAudienceClientProps, 'page' | 'pageSize'>>) {
+  const { mode: panelMode, open, close } = useAudiencePanel();
+  const isBelowLg = useBreakpointDown('lg');
+  const previousIsBelowLgRef = React.useRef<boolean | null>(null);
+
+  React.useEffect(() => {
+    if ((globalThis.window?.innerWidth ?? 0) >= 1024) {
+      open('analytics');
+    }
+  }, [open]);
+
+  React.useEffect(() => {
+    if (previousIsBelowLgRef.current === null) {
+      previousIsBelowLgRef.current = isBelowLg;
+      return;
+    }
+
+    const crossedToMobile = previousIsBelowLgRef.current === false && isBelowLg;
+    previousIsBelowLgRef.current = isBelowLg;
+
+    if (crossedToMobile && panelMode === 'analytics') {
+      close();
+    }
+  }, [close, isBelowLg, panelMode]);
+
   // State comes from server props; we only use nuqs to update the URL
   const [, setUrlParams] = useQueryStates(audienceUrlParsers, {
     shallow: false,
