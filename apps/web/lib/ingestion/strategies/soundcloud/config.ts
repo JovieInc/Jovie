@@ -1,3 +1,7 @@
+import 'server-only';
+
+import { env } from '@/lib/env-server';
+
 /**
  * SoundCloud Pro Badge Detection Config
  *
@@ -5,8 +9,8 @@
  * The API returns structured JSON with badges and subscription data.
  */
 
-/** SoundCloud API v2 client ID (extracted from SC web app JS bundles) */
-export const SOUNDCLOUD_CLIENT_ID = 'WU4bVxk5Df0g5JC8ULzW77Ry7OM10Lyj';
+/** SoundCloud API v2 client ID — set via SOUNDCLOUD_CLIENT_ID env var */
+export const SOUNDCLOUD_CLIENT_ID = env.SOUNDCLOUD_CLIENT_ID ?? '';
 
 /** SoundCloud API v2 resolve endpoint */
 export const SOUNDCLOUD_API_BASE = 'https://api-v2.soundcloud.com';

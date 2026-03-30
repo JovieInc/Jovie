@@ -123,8 +123,7 @@ export async function lookupDeezerByIsrc(
     // Normalize empty/non-string preview to null, validate HTTPS
     const rawPreview =
       typeof payload.preview === 'string' ? payload.preview.trim() : '';
-    const previewUrl =
-      rawPreview && rawPreview.startsWith('https://') ? rawPreview : null;
+    const previewUrl = rawPreview?.startsWith('https://') ? rawPreview : null;
 
     return {
       url: payload.link,
