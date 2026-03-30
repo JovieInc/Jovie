@@ -13,6 +13,8 @@ export interface AudienceUserCellProps {
   readonly deviceType?: string | null;
   readonly geoCity?: string | null;
   readonly geoCountry?: string | null;
+  /** Show a colored type dot inline after the name */
+  readonly showTypeDot?: boolean;
   readonly className?: string;
 }
 
@@ -20,6 +22,14 @@ const DEVICE_LABELS: Record<string, string> = {
   mobile: 'Mobile',
   tablet: 'Tablet',
   desktop: 'Desktop',
+};
+
+const TYPE_DOT_COLORS: Record<AudienceMemberType, string> = {
+  anonymous: 'bg-zinc-400',
+  email: 'bg-blue-500',
+  sms: 'bg-violet-500',
+  spotify: 'bg-emerald-500',
+  customer: 'bg-amber-500',
 };
 
 function formatAnonymousVisitorLabel(
@@ -43,6 +53,7 @@ function formatAnonymousVisitorLabel(
  *
  * Anonymous visitors get a Ghost icon; identified contacts get a User icon.
  * Primary label is either the display name or a descriptive "Mobile visitor from ..." label.
+ * When showTypeDot is true, a colored dot indicating member type appears after the name.
  */
 export const AudienceUserCell = React.memo(function AudienceUserCell({
   displayName,
@@ -50,6 +61,7 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
   deviceType,
   geoCity,
   geoCountry,
+  showTypeDot,
   className,
 }: AudienceUserCellProps) {
   const isAnonymous = type === 'anonymous';
@@ -82,6 +94,16 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
       >
         {primaryLabel}
       </span>
+      {showTypeDot && !isAnonymous && (
+        <span
+          className={cn(
+            'h-1.5 w-1.5 shrink-0 rounded-full',
+            TYPE_DOT_COLORS[type]
+          )}
+          aria-hidden='true'
+          title={type.charAt(0).toUpperCase() + type.slice(1)}
+        />
+      )}
     </div>
   );
 });

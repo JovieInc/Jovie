@@ -96,10 +96,16 @@ export function AudienceLtvCell({
     ticketSalesCents: ticketSalesCents ?? 0,
   });
 
+  // Show dollar amount for non-zero, dash for none
+  const displayLabel =
+    breakdown.tier === 'none'
+      ? '---'
+      : formatDollars(breakdown.totalValueCents);
+
   const content = (
     <div className={cn('flex items-center text-[13px]', className)}>
-      <span className={cn('font-[510]', TIER_STYLES[breakdown.tier])}>
-        {breakdown.label}
+      <span className={cn('tabular-nums', TIER_STYLES[breakdown.tier])}>
+        {displayLabel}
       </span>
     </div>
   );
