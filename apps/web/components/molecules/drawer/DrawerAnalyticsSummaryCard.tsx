@@ -21,8 +21,7 @@ export interface DrawerAnalyticsSummaryCardProps {
   readonly testId?: string;
 }
 
-const METRIC_TILE_CLASSNAME =
-  'rounded-[8px] border border-subtle bg-surface-0 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]';
+const METRIC_TILE_CLASSNAME = 'px-3 py-2.5';
 
 function MetricTile({
   label,
@@ -124,9 +123,7 @@ export function DrawerAnalyticsSummaryCard({
           ) : null}
         </div>
 
-        {footer ? (
-          <div className='border-t border-subtle px-3 py-2.5'>{footer}</div>
-        ) : null}
+        {footer ? <div className='px-3 pb-3'>{footer}</div> : null}
       </div>
     </DrawerSurfaceCard>
   );
