@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import { chromium } from '@playwright/test';
+import { type Browser, type BrowserContext, chromium } from '@playwright/test';
 import { APP_ROUTES } from '../constants/routes';
 import type {
   PerfResolveContext,
@@ -89,28 +89,28 @@ async function createConversationViaApp(context: PerfResolveContext) {
     return null;
   }
 
-  const browser = await chromium.launch();
-  const pageContext = await browser.newContext();
+  let browser: Browser | null = null;
+  let pageContext: BrowserContext | null = null;
+  const baseUrl = context.baseUrl.replace(/\/$/, '');
 
   try {
+    browser = await chromium.launch();
+    pageContext = await browser.newContext();
     await pageContext.addCookies([...context.authCookies]);
     const page = await pageContext.newPage();
+    await page.goto(`${baseUrl}${APP_ROUTES.CHAT}`, {
+      waitUntil: 'domcontentloaded',
+    });
 
-    const existing = await page.evaluate(
-      async input => {
-        const response = await fetch(
-          `${input.baseUrl}/api/chat/conversations?limit=1`,
-          {
-            credentials: 'same-origin',
-          }
-        );
-        const payload = (await response.json().catch(() => ({}))) as {
-          conversations?: Array<{ id?: string }>;
-        };
-        return payload.conversations?.[0]?.id ?? null;
-      },
-      { baseUrl: context.baseUrl.replace(/\/$/, '') }
-    );
+    const existing = await page.evaluate(async () => {
+      const response = await fetch('/api/chat/conversations?limit=1', {
+        credentials: 'include',
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        conversations?: Array<{ id?: string }>;
+      };
+      return payload.conversations?.[0]?.id ?? null;
+    });
 
     if (existing) {
       return existing;
@@ -118,32 +118,70 @@ async function createConversationViaApp(context: PerfResolveContext) {
 
     const created = await page.evaluate(
       async input => {
-        const response = await fetch(
-          `${input.baseUrl}/api/chat/conversations`,
-          {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ title: input.title }),
-          }
-        );
+        const response = await fetch('/api/chat/conversations', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ title: input.title }),
+        });
         const payload = (await response.json().catch(() => ({}))) as {
           conversation?: { id?: string };
         };
         return payload.conversation?.id ?? null;
       },
       {
-        baseUrl: context.baseUrl.replace(/\/$/, ''),
         title: PERF_CHAT_THREAD_TITLE,
       }
     );
 
     return created ?? null;
   } finally {
-    await pageContext.close().catch(() => undefined);
-    await browser.close().catch(() => undefined);
+    await pageContext?.close().catch(() => undefined);
+    await browser?.close().catch(() => undefined);
+  }
+}
+
+async function resolveReleaseTasksViaApp(context: PerfResolveContext) {
+  if (context.authCookies.length === 0) {
+    return null;
+  }
+
+  let browser: Browser | null = null;
+  let pageContext: BrowserContext | null = null;
+  const baseUrl = context.baseUrl.replace(/\/$/, '');
+
+  try {
+    browser = await chromium.launch();
+    pageContext = await browser.newContext();
+    await pageContext.addCookies([...context.authCookies]);
+    const page = await pageContext.newPage();
+    await page.goto(`${baseUrl}${APP_ROUTES.DASHBOARD_RELEASES}`, {
+      waitUntil: 'domcontentloaded',
+    });
+
+    await page.waitForSelector('[data-testid="release-row"]', {
+      timeout: 15_000,
+    });
+    await page.click('[data-testid="release-row"]');
+    await page.waitForSelector('[data-testid="release-sidebar"]', {
+      timeout: 15_000,
+    });
+    await page.click('button:has-text("Tasks")');
+    await page.waitForSelector('[data-testid="release-tasks-card"]', {
+      timeout: 15_000,
+    });
+    await page.click('button:has-text("Open")');
+    await page.waitForURL('**/tasks', {
+      timeout: 15_000,
+    });
+
+    const finalUrl = new URL(page.url());
+    return `${finalUrl.pathname}${finalUrl.search}`;
+  } finally {
+    await pageContext?.close().catch(() => undefined);
+    await browser?.close().catch(() => undefined);
   }
 }
 
@@ -251,12 +289,18 @@ export async function resolveChatConversationPerfPath(
 }
 
 export async function resolveReleaseTasksPerfPath(
-  route: PerfRouteDefinition
+  route: PerfRouteDefinition,
+  context: PerfResolveContext
 ): Promise<string> {
   const sql = getSqlClient();
   const activeProfile = await queryActiveProfile();
 
   if (!sql || !activeProfile) {
+    const resolvedPath = await resolveReleaseTasksViaApp(context);
+    if (resolvedPath) {
+      return resolvedPath;
+    }
+
     throw new Error(
       'DATABASE_URL and E2E_CLERK_USER_ID are required to resolve release tasks.'
     );
@@ -272,6 +316,11 @@ export async function resolveReleaseTasksPerfPath(
 
   const releaseId = releases[0]?.id;
   if (!releaseId) {
+    const resolvedPath = await resolveReleaseTasksViaApp(context);
+    if (resolvedPath) {
+      return resolvedPath;
+    }
+
     throw new Error('No seeded release found for the active E2E user.');
   }
 
