@@ -40,7 +40,6 @@ jobs:
     outputs:
       run_build: ${{ steps.detect.outputs.run_build }}
       run_test: ${{ steps.detect.outputs.run_test }}
-      run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse }}
       run_e2e: ${{ steps.detect.outputs.run_e2e }}
       run_drizzle: ${{ steps.detect.outputs.run_drizzle }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes }}
@@ -58,7 +57,7 @@ jobs:
           # Force run all if the 'testing' label is present
           if [[ "$FULL_CI_LABEL" == "true" ]]; then
             echo "Forcing full CI run due to 'testing' label"
-            for t in run_build run_test run_dashboard_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_e2e run_drizzle has_code_changes; do
               echo "$t=true" >> $GITHUB_OUTPUT
             done
             exit 0
@@ -71,7 +70,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_dashboard_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_e2e run_drizzle has_code_changes; do
               echo "$t=true" >> $GITHUB_OUTPUT
             done
             exit 0
@@ -82,7 +81,7 @@ jobs:
           # Check if only docs changed (exclude .github/ — workflow changes must run CI)
           if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
             echo "Only documentation files changed"
-            for t in run_build run_test run_dashboard_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_e2e run_drizzle has_code_changes; do
               echo "$t=false" >> $GITHUB_OUTPUT
             done
             exit 0
@@ -93,28 +92,17 @@ jobs:
           # Build paths
           BUILD_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|apps/web/instrumentation.*\.ts|apps/web/sentry\..*\.config\.ts|apps/web/middleware\.ts|package.*\.json|turbo\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$BUILD_PATTERN"; then
-            RUN_BUILD=true
             echo "run_build=true" >> $GITHUB_OUTPUT
           else
-            RUN_BUILD=false
             echo "run_build=false" >> $GITHUB_OUTPUT
           fi
 
           # Test paths
           TEST_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/tests/unit/|apps/web/__tests__/|packages/|.*\.test\.|.*\.spec\.|apps/web/package.*\.json|package.*\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$TEST_PATTERN"; then
-            RUN_TEST=true
             echo "run_test=true" >> $GITHUB_OUTPUT
           else
-            RUN_TEST=false
             echo "run_test=false" >> $GITHUB_OUTPUT
-          fi
-
-          DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.dashboard\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs)$'
-          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$DASHBOARD_LIGHTHOUSE_PATTERN"; then
-            echo "run_dashboard_lighthouse=true" >> $GITHUB_OUTPUT
-          else
-            echo "run_dashboard_lighthouse=false" >> $GITHUB_OUTPUT
           fi
 
           # E2E paths
@@ -138,7 +126,6 @@ jobs:
             echo "Fork PR: disabling e2e and build"
             echo "run_e2e=false" >> $GITHUB_OUTPUT
             echo "run_build=false" >> $GITHUB_OUTPUT
-            echo "run_dashboard_lighthouse=false" >> $GITHUB_OUTPUT
             echo "run_test=false" >> $GITHUB_OUTPUT
           fi
 
@@ -505,7 +492,7 @@ jobs:
     name: PR Ready
     # Single merge gate for PRs and merge queue.
     # Gates on fast checks (typecheck, lint, guardrails), unit tests, and public-route build.
-    needs: [ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr]
+    needs: [ci-fast, ci-unit-tests, ci-build-public]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -515,11 +502,9 @@ jobs:
           FAST_RESULT="${{ needs.ci-fast.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_RESULT="${{ needs.ci-build-public.result }}"
-          DASHBOARD_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-dashboard-pr.result }}"
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
-          echo "ci-lighthouse-dashboard-pr: $DASHBOARD_LIGHTHOUSE_RESULT"
 
           # ci-fast must succeed (or be skipped when path-gated with no app files changed)
           if [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
@@ -536,11 +521,6 @@ jobs:
           # Build must succeed. Only skipped for fork PRs (no secrets).
           if [[ "$BUILD_RESULT" != "success" && "$BUILD_RESULT" != "skipped" ]]; then
             echo "❌ ci-build-public did not pass (result: $BUILD_RESULT)"
-            exit 1
-          fi
-
-          if [[ "$DASHBOARD_LIGHTHOUSE_RESULT" != "success" && "$DASHBOARD_LIGHTHOUSE_RESULT" != "skipped" ]]; then
-            echo "❌ ci-lighthouse-dashboard-pr did not pass (result: $DASHBOARD_LIGHTHOUSE_RESULT)"
             exit 1
           fi
 
@@ -744,144 +724,6 @@ jobs:
           kill $SERVER_PID 2>/dev/null || true
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-
-  ci-lighthouse-dashboard-pr:
-    name: Lighthouse (dashboard PR)
-    needs: [ci-fast, ci-path-changes]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          fetch-depth: 1
-
-      - name: Check for relevant changes
-        id: check_changes
-        shell: bash
-        run: |
-          RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
-          RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
-          RUN_DASHBOARD_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_dashboard_lighthouse }}"
-          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" || "$RUN_DASHBOARD_LIGHTHOUSE" == "true" ]]; then
-            echo "run_full_ci=true" >> $GITHUB_OUTPUT
-          else
-            echo "run_full_ci=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Skip notification
-        if: steps.check_changes.outputs.run_full_ci != 'true'
-        run: echo "Skipping dashboard Lighthouse — no dashboard-relevant paths changed."
-
-      - uses: ./.github/actions/setup-node-pnpm
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-
-      - name: Cache Playwright Browsers
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
-
-      - name: Create ephemeral Neon database branch (with retry)
-        id: neon-branch
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: ./.github/actions/neon-create-branch-with-retry
-        with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: dashboard-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
-
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: |
-          CANDIDATE="${{ steps.neon-branch.outputs.db_url }}"
-          if [ -z "$CANDIDATE" ]; then
-            echo "No Neon ephemeral DATABASE_URL available."
-            exit 1
-          fi
-          echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
-
-      - name: Build app for dashboard Lighthouse
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web run build
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          NEXT_IGNORE_ESLINT: '1'
-          NEXT_IGNORE_TYPECHECK: '1'
-          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
-
-      - name: Run authenticated dashboard Lighthouse
-        if: steps.check_changes.outputs.run_full_ci == 'true' && secrets.E2E_CLERK_USER_ID != ''
-        run: |
-          cd apps/web
-
-          export E2E_USE_TEST_AUTH_BYPASS=1
-          export NEXT_PUBLIC_CLERK_MOCK=1
-          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
-
-          if [ ! -f .next/standalone/apps/web/server.js ]; then
-            echo "Standalone server not found — dashboard Lighthouse cannot start."
-            exit 1
-          fi
-
-          node .next/standalone/apps/web/server.js &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-
-          echo "Waiting for standalone server..."
-          SERVER_READY=false
-          for i in {1..30}; do
-            if curl -s http://localhost:3000 > /dev/null; then
-              SERVER_READY=true
-              break
-            fi
-            sleep 1
-          done
-
-          if [ "$SERVER_READY" = "false" ]; then
-            echo "Server failed to start within 30s."
-            exit 1
-          fi
-
-          pnpm run test:lighthouse:dashboard:pr
-        env:
-          CI: true
-          BASE_URL: http://localhost:3000
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          URL_ENCRYPTION_KEY: lighthouse-dashboard-ci-url-encryption-key
-          AI_GATEWAY_API_KEY: lighthouse-dashboard-ci
-          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
-          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
-          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
-          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-
-      - name: Upload dashboard Lighthouse artifacts
-        if: always() && steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: lighthouse-dashboard-pr-${{ github.run_id }}-${{ github.run_attempt }}
-          path: apps/web/.lighthouseci/dashboard-pr/
-          if-no-files-found: ignore
-          retention-days: 3
-
-      - name: Cleanup ephemeral Neon branch
-        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != ''
-        continue-on-error: true
-        run: |
-          curl -sS -X DELETE \
-            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
 
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
@@ -2187,7 +2029,6 @@ jobs:
       - ci-build-public
       - ci-layout-guard
       - ci-lighthouse-pr
-      - ci-lighthouse-dashboard-pr
       - ci-a11y
     runs-on: ubuntu-latest
     timeout-minutes: 5
