@@ -10,13 +10,11 @@ import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { ConfidenceBadge } from '@/features/dashboard/atoms/ConfidenceBadge';
 import {
   DspProviderIcon,
   PROVIDER_LABELS,
 } from '@/features/dashboard/atoms/DspProviderIcon';
 import { MatchStatusBadge } from '@/features/dashboard/atoms/MatchStatusBadge';
-import { MatchConfidenceBreakdown } from '@/features/dashboard/molecules/MatchConfidenceBreakdown';
 import { useDspMatchActions } from '@/features/dashboard/organisms/dsp-matches/hooks';
 import { isExternalDspImage } from '@/lib/utils/dsp-images';
 
@@ -88,8 +86,18 @@ function SidebarEntityHeader({
               />
             </div>
           ) : (
-            <div className='flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-surface-0'>
+            <div className='relative flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-surface-0'>
               <DspProviderIcon provider={item.providerId} size='lg' />
+              <div
+                className='absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/60'
+                role='img'
+                aria-label='Profile image missing'
+              >
+                <Icon
+                  name='Camera'
+                  className='h-4 w-4 text-amber-600 dark:text-amber-400'
+                />
+              </div>
             </div>
           )}
           <div className='min-w-0 flex-1'>
@@ -105,6 +113,21 @@ function SidebarEntityHeader({
       </div>
     </DrawerSurfaceCard>
   );
+}
+
+function getMatchSourceLabel(matchSource: string | null): string {
+  switch (matchSource) {
+    case 'manual':
+      return 'Linked manually';
+    case 'musicfetch':
+      return 'Discovered via Spotify';
+    case 'isrc_discovery':
+      return 'Verified by ISRC matching';
+    case 'backfill':
+      return 'Imported from profile';
+    default:
+      return 'Linked';
+  }
 }
 
 function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
@@ -124,21 +147,21 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
             <MatchStatusBadge status={item.status} size='sm' />
           </div>
           <div className='flex items-center justify-between'>
-            <span className='text-[12px] text-tertiary-token'>Confidence</span>
-            {item.confidenceScore == null ? (
-              <span className='text-[12px] text-tertiary-token'>Manual</span>
-            ) : (
-              <ConfidenceBadge score={item.confidenceScore} size='sm' />
-            )}
-          </div>
-          <div className='flex items-center justify-between'>
-            <span className='text-[12px] text-tertiary-token'>
-              ISRC Matches
-            </span>
+            <span className='text-[12px] text-tertiary-token'>Source</span>
             <span className='text-[12px] text-primary-token'>
-              {item.matchingIsrcCount}
+              {getMatchSourceLabel(item.matchSource)}
             </span>
           </div>
+          {item.matchingIsrcCount > 0 && (
+            <div className='flex items-center justify-between'>
+              <span className='text-[12px] text-tertiary-token'>
+                Tracks Verified
+              </span>
+              <span className='text-[12px] text-primary-token'>
+                {item.matchingIsrcCount}
+              </span>
+            </div>
+          )}
           {item.confirmedAt && (
             <div className='flex items-center justify-between'>
               <span className='text-[12px] text-tertiary-token'>Confirmed</span>
@@ -149,19 +172,6 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
           )}
         </div>
       </DrawerSection>
-
-      {item.confidenceBreakdown && item.confidenceScore != null && (
-        <DrawerSection
-          title='Confidence Breakdown'
-          className='space-y-1.5'
-          surface='card'
-        >
-          <MatchConfidenceBreakdown
-            breakdown={item.confidenceBreakdown}
-            totalScore={item.confidenceScore}
-          />
-        </DrawerSection>
-      )}
 
       <DrawerSection title='Actions' className='space-y-1.5' surface='card'>
         <div className='space-y-2'>
