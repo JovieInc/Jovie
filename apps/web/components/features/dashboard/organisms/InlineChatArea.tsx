@@ -212,6 +212,7 @@ export const InlineChatArea = forwardRef<
     profileId,
     artistContext,
   });
+  const shouldVirtualizeMessages = messages.length > 12;
 
   // Virtualizer for inline chat messages
   const virtualizer = useVirtualizer({
@@ -232,12 +233,26 @@ export const InlineChatArea = forwardRef<
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (messages.length > 0 && expanded) {
-      virtualizer.scrollToIndex(messages.length - 1, {
-        align: 'end',
-        behavior: 'smooth',
-      });
+      if (shouldVirtualizeMessages) {
+        virtualizer.scrollToIndex(messages.length - 1, {
+          align: 'end',
+          behavior: 'smooth',
+        });
+      } else {
+        const scrollContainer = scrollContainerRef.current;
+        if (scrollContainer) {
+          if (typeof scrollContainer.scrollTo === 'function') {
+            scrollContainer.scrollTo({
+              top: scrollContainer.scrollHeight,
+              behavior: 'smooth',
+            });
+          } else {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          }
+        }
+      }
     }
-  }, [messages.length, expanded, virtualizer]);
+  }, [messages.length, expanded, shouldVirtualizeMessages, virtualizer]);
 
   // Expose submitMessage method via ref
   useImperativeHandle(
@@ -293,37 +308,50 @@ export const InlineChatArea = forwardRef<
             ref={scrollContainerRef}
             className='max-h-80 overflow-y-auto px-4 py-4'
           >
-            <div
-              style={{
-                position: 'relative',
-                height: virtualizer.getTotalSize(),
-              }}
-            >
-              {virtualizer.getVirtualItems().map(virtualItem => {
-                const message = messages[virtualItem.index];
-                return (
-                  <div
-                    key={message.id}
-                    data-index={virtualItem.index}
-                    ref={virtualizer.measureElement}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      transform: `translateY(${virtualItem.start}px)`,
-                    }}
-                  >
-                    <div className='pb-4'>
-                      <InlineChatMessage
-                        message={message}
-                        profileId={profileId}
-                      />
+            {shouldVirtualizeMessages ? (
+              <div
+                style={{
+                  position: 'relative',
+                  height: virtualizer.getTotalSize(),
+                }}
+              >
+                {virtualizer.getVirtualItems().map(virtualItem => {
+                  const message = messages[virtualItem.index];
+                  return (
+                    <div
+                      key={message.id}
+                      data-index={virtualItem.index}
+                      ref={virtualizer.measureElement}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualItem.start}px)`,
+                      }}
+                    >
+                      <div className='pb-4'>
+                        <InlineChatMessage
+                          message={message}
+                          profileId={profileId}
+                        />
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div>
+                {messages.map(message => (
+                  <div key={message.id} className='pb-4'>
+                    <InlineChatMessage
+                      message={message}
+                      profileId={profileId}
+                    />
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
 
             {/* Loading indicator — rendered outside virtualizer */}
             {isLoading && messages[messages.length - 1]?.role === 'user' && (
