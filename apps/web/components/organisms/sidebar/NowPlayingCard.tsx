@@ -52,7 +52,7 @@ export function NowPlayingCard() {
         <button
           type='button'
           onClick={handleToggle}
-          className='flex h-8 w-8 items-center justify-center rounded-[8px] text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          className='flex h-8 w-8 items-center justify-center rounded-full text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
           aria-label={
             playbackState.isPlaying ? 'Pause playback' : 'Resume playback'
           }
@@ -68,7 +68,7 @@ export function NowPlayingCard() {
   }
 
   return (
-    <div className='animate-in fade-in slide-in-from-bottom-2 duration-200 space-y-1.5 rounded-[8px] border border-subtle bg-surface-0/50 p-2'>
+    <div className='animate-in fade-in slide-in-from-bottom-2 duration-200 space-y-1.5 rounded-xl border border-subtle bg-surface-0/50 p-2'>
       <div className='flex items-center gap-2.5'>
         {playbackState.artworkUrl && !imgError ? (
           <Image
@@ -76,12 +76,12 @@ export function NowPlayingCard() {
             alt=''
             width={36}
             height={36}
-            className='h-9 w-9 shrink-0 rounded-[6px] object-cover'
+            className='h-9 w-9 shrink-0 rounded-lg object-cover'
             unoptimized
             onError={() => setImgError(true)}
           />
         ) : (
-          <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] bg-surface-1'>
+          <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-1'>
             <Play className='h-3.5 w-3.5 text-tertiary-token' />
           </div>
         )}

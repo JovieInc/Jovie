@@ -53,7 +53,7 @@ describe('Sidebar lower shell visual hierarchy', () => {
   it('keeps upgrade banner visually quieter than nav rows', () => {
     const { container } = render(<SidebarUpgradeBanner />);
 
-    const card = container.querySelector('[class*="rounded-[10px]"]');
+    const card = container.querySelector('[class*="rounded-xl"]');
     expect(card).toBeTruthy();
     expect(card?.className).toContain('bg-sidebar-accent/12');
 
@@ -63,7 +63,7 @@ describe('Sidebar lower shell visual hierarchy', () => {
   it('keeps install banner visually quieter than nav rows', () => {
     const { container } = render(<SidebarInstallBanner />);
 
-    const card = container.querySelector('[class*="rounded-[10px]"]');
+    const card = container.querySelector('[class*="rounded-xl"]');
     expect(card).toBeTruthy();
     expect(card?.className).toContain('bg-sidebar-accent/12');
 
