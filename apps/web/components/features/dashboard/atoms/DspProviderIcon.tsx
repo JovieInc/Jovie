@@ -24,6 +24,9 @@ const PROVIDER_LABELS: Record<DspProviderId, string> = {
   soundcloud: 'SoundCloud',
   amazon_music: 'Amazon Music',
   musicbrainz: 'MusicBrainz',
+  genius: 'Genius',
+  discogs: 'Discogs',
+  allmusic: 'AllMusic',
 };
 
 const PROVIDER_COLORS: Record<DspProviderId, string> = {
@@ -35,6 +38,9 @@ const PROVIDER_COLORS: Record<DspProviderId, string> = {
   soundcloud: '#FF5500',
   amazon_music: '#00A8E1',
   musicbrainz: '#BA478F',
+  genius: '#FFFF64',
+  discogs: '#333333',
+  allmusic: '#E0344B',
 };
 
 const SIZE_CLASSES = {
@@ -43,8 +49,12 @@ const SIZE_CLASSES = {
   lg: 'h-6 w-6',
 };
 
+/** Providers that have a dedicated ProviderIcon (streaming DSPs) */
 const DSP_PROVIDER_MAP: Partial<
-  Record<DspProviderId, Exclude<DspProviderId, 'musicbrainz'>>
+  Record<
+    DspProviderId,
+    Exclude<DspProviderId, 'musicbrainz' | 'genius' | 'discogs' | 'allmusic'>
+  >
 > = {
   spotify: 'spotify',
   apple_music: 'apple_music',
@@ -100,7 +110,7 @@ export function DspProviderIcon({
       ) : (
         <span style={{ color }}>
           <SocialIcon
-            platform='musicbrainz'
+            platform={provider}
             className={SIZE_CLASSES[size]}
             aria-label={label}
           />

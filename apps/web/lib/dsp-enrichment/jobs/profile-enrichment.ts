@@ -94,6 +94,9 @@ const DSP_AVATAR_CONFIDENCE: Record<DspProviderId, number> = {
   soundcloud: 0.7, // More indie/DIY
   amazon_music: 0.7, // Less artist-focused
   musicbrainz: 0.6, // Community-sourced, variable quality
+  genius: 0.3, // Metadata-only, no artist images
+  discogs: 0.4, // Community-sourced, variable quality
+  allmusic: 0.35, // Editorial, limited images
 };
 
 // ============================================================================
