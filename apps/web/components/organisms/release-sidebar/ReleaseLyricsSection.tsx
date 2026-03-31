@@ -224,7 +224,7 @@ export function ReleaseLyricsSection({
         </DrawerButton>
 
         {showFormatOptions && (
-          <div className='inline-flex items-center rounded-[8px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'>
+          <div className='inline-flex items-center rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'>
             <DrawerButton
               type='button'
               disabled={isActionsDisabled || isFormatting}

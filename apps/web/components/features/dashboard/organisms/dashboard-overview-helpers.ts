@@ -21,7 +21,7 @@ export function getCompletedTaskContainerClass(): string {
  * Get the container class for an incomplete setup task item.
  */
 export function getIncompleteTaskContainerClass(): string {
-  return `${TASK_CONTAINER_BASE} hover:border-subtle hover:bg-surface-0/60`;
+  return `${TASK_CONTAINER_BASE} hover:border-(--linear-app-frame-seam) hover:bg-surface-0/60`;
 }
 
 /**
@@ -35,14 +35,14 @@ export function getCompletedTaskIndicatorClass(): string {
  * Get the indicator circle class for an incomplete setup task.
  */
 export function getIncompleteTaskIndicatorClass(): string {
-  return `${TASK_INDICATOR_BASE} border border-subtle bg-surface-1 text-tertiary-token`;
+  return `${TASK_INDICATOR_BASE} border border-subtle bg-(--linear-app-content-surface) text-tertiary-token`;
 }
 
 /**
  * Get the task label text class for a completed task.
  */
 export function getCompletedTaskLabelClass(): string {
-  return `${TASK_LABEL_BASE} text-tertiary-token line-through`;
+  return `${TASK_LABEL_BASE} text-tertiary-token line-through decoration-(--linear-text-tertiary)/40`;
 }
 
 /**

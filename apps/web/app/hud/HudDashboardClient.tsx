@@ -80,7 +80,7 @@ function DeploymentRow({
   readonly run: HudMetrics['deployments']['recent'][number];
 }>) {
   return (
-    <div className='flex items-center justify-between gap-3 rounded-[10px] border border-subtle bg-surface-0 px-3 py-2.5'>
+    <div className='flex items-center justify-between gap-3 rounded-xl border border-subtle bg-surface-0 px-3 py-2.5'>
       <div className='min-w-0'>
         <p className='truncate text-[13px] font-[560] text-primary-token'>
           #{run.runNumber}

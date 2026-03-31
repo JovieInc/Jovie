@@ -5,41 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.3.107] - 2026-03-30
-
-> Dashboard surfaces and shared controls now use a flatter, more consistent visual system. This update also tightens responsive audience layouts and keeps insight generation focused on fresher, higher-signal results.
-
-### Changed
-
-- Flattened dashboard content surfaces and shared app controls so cards use quieter borders and pill geometry instead of elevated tile chrome
-- Updated analytics range tabs, dashboard header actions, settings rows, and setup/checklist affordances to use the same rounded-full control language
-- `/app/insights` now redirects to the audience dashboard, with stale route benchmarks removed from the performance manifest
-- Insight generation narrowed to the remaining high-value categories and a max of five surfaced insights per run
-- Audience rows now collapse based on the actual table container width instead of raw viewport width, so the desktop layout stays readable with the drawer open or closed
-- Audience user rows now carry a metadata subtitle when columns are hidden, preserving engagement, location, and recency context at tighter breakpoints
-
-### Added
-
-- [internal] Regression coverage for the flatter content-surface and pill-control classes across dashboard and settings UI primitives
-- Repeated insight generation now avoids recycling stale signals when the underlying metric slice has not changed
-- Cron insights concurrency test timeout increased to reflect the observed route import cost in CI-like environments
-- Analytics no longer default-opens into the full-screen mobile drawer on first load; it now opens after mount on desktop and closes when crossing down to mobile
-- Audience table unit tests now cover narrow, medium, and wide desktop layouts and mock the mobile card through the current table barrel export
-
 ## [26.4.106] - 2026-03-30
 
-### Removed
-
-- Dead ad-pixels settings page (was behind a redirect to `/settings/audience` since v26.4.46)
-- Orphaned `SettingsGroupHeading` component (replaced by `SettingsPanel`)
-
 ### Changed
 
-- Account settings sections (Email, Connected Accounts, Sessions) now use `SettingsPanel` for consistent title typography
-- Referral page rewritten with standard `SettingsPanel` components and proper loading/error states
-- Billing button uses standard `variant='secondary' size='sm'` instead of custom className overrides
-- Settings icon sizes normalized to `h-4 w-4` across all pages
-- Import paths standardized from re-export barrel (`features/dashboard/molecules/`) to source (`molecules/settings/`)
+- Flatten card elevation across all app surfaces: cards now use border-only separation (`shadow-none`) instead of layered shadows
+- Standardize card border radius to `rounded-xl` (replacing hardcoded `rounded-[10px]`) across dashboard, sidebar, drawers, chat, auth, admin, and loading skeletons
+- Round all interactive controls to pill shape (`rounded-full`): icon containers, button groups, toggle segments, badges, inputs, and action buttons
+- Round checklist items, sidebar banners, and settings icon containers to `rounded-full` for consistent pill aesthetic
+- Increase checklist checkbox and task indicator sizes for better touch targets
 
 ## [26.4.105] - 2026-03-30
 

@@ -41,7 +41,7 @@ export const FORM_LAYOUT = {
  * Keeps public flows aligned with the app-shell card and pill system.
  */
 export const AUTH_SURFACE = {
-  card: 'rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] shadow-[var(--linear-app-card-shadow)]',
+  card: 'rounded-xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] shadow-none',
   fieldShell:
     'flex w-full items-center gap-3 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-[background-color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/16',
   fieldShellError: 'border-destructive/60',
