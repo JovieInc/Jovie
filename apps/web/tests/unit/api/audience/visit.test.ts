@@ -57,6 +57,10 @@ vi.mock('@/lib/utils/ip-extraction', () => ({
   extractClientIP: vi.fn().mockReturnValue('127.0.0.1'),
 }));
 
+vi.mock('@/lib/audience/block-check', () => ({
+  isVisitorBlocked: vi.fn().mockResolvedValue(false),
+}));
+
 const { POST } = await import('@/app/api/audience/visit/route');
 
 describe('POST /api/audience/visit', () => {
