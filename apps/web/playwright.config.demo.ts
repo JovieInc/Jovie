@@ -10,17 +10,13 @@
  * - No auth-setup project (demo handles auth inline)
  *
  * Usage:
- *   doppler run -- pnpm exec playwright test --config playwright.config.demo.ts
- *
- * Or reuse an already-running dev server:
- *   DEMO_REUSE_SERVER=1 PORT=3000 doppler run -- pnpm exec playwright test --config playwright.config.demo.ts
+ *   pnpm run demo:record
  */
 
 import { defineConfig } from '@playwright/test';
 import baseConfig from './playwright.config';
 
-const reuseServer = !!process.env.DEMO_REUSE_SERVER;
-const port = Number(process.env.PORT ?? (reuseServer ? '3000' : '3100'));
+const port = Number(process.env.PORT ?? '3100');
 
 export default defineConfig({
   ...baseConfig,
@@ -32,10 +28,13 @@ export default defineConfig({
   use: {
     ...baseConfig.use,
     baseURL: `http://localhost:${port}`,
-    video: 'on',
+    video: {
+      mode: 'on',
+      size: { width: 1280, height: 720 },
+    },
     viewport: { width: 1280, height: 720 },
     storageState: { cookies: [], origins: [] },
   },
   projects: [{ name: 'demo', use: {} }],
-  ...(reuseServer ? { webServer: undefined } : {}),
+  webServer: undefined,
 });
