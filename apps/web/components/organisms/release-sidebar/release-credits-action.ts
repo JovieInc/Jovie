@@ -1,15 +1,20 @@
 'use server';
 
-import { eq } from 'drizzle-orm';
+import { auth } from '@clerk/nextjs/server';
+import { and, eq } from 'drizzle-orm';
+import { getDashboardData } from '@/app/app/(shell)/dashboard/actions';
 import { db } from '@/lib/db';
 import {
-  type ArtistRole,
   artists,
+  discogReleases,
   releaseArtists,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-
-type SmartLinkCreditRole = Exclude<ArtistRole, 'vs' | 'with'>;
+import type {
+  CreditEntry,
+  CreditGroup,
+  SmartLinkCreditRole,
+} from './credits-types';
 
 const CREDIT_ROLE_ORDER: SmartLinkCreditRole[] = [
   'main_artist',
@@ -41,23 +46,40 @@ const CREDIT_ROLE_LABELS: Record<SmartLinkCreditRole, string> = {
   other: 'Other',
 };
 
-interface CreditEntry {
-  artistId: string;
-  name: string;
-  handle: string | null;
-  role: string;
-  position: number;
-}
-
-interface CreditGroup {
-  role: string;
-  label: string;
-  entries: CreditEntry[];
-}
-
 export async function fetchReleaseCreditsAction(
   releaseId: string
 ): Promise<CreditGroup[]> {
+  const { userId } = await auth();
+  if (!userId) {
+    return [];
+  }
+
+  const dashboardData = await getDashboardData();
+  const selectedProfile = dashboardData.selectedProfile;
+
+  if (!selectedProfile) {
+    return [];
+  }
+
+  if (selectedProfile.userId !== userId) {
+    return [];
+  }
+
+  const [release] = await db
+    .select({ id: discogReleases.id })
+    .from(discogReleases)
+    .where(
+      and(
+        eq(discogReleases.id, releaseId),
+        eq(discogReleases.creatorProfileId, selectedProfile.id)
+      )
+    )
+    .limit(1);
+
+  if (!release) {
+    return [];
+  }
+
   const rows = await db
     .select({
       artistId: artists.id,

@@ -8,21 +8,8 @@ import {
 } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
+import type { CreditGroup } from './credits-types';
 import { fetchReleaseCreditsAction } from './release-credits-action';
-
-interface CreditEntry {
-  artistId: string;
-  name: string;
-  handle: string | null;
-  role: string;
-  position: number;
-}
-
-interface CreditGroup {
-  role: string;
-  label: string;
-  entries: CreditEntry[];
-}
 
 const LABEL_CLASSNAME =
   'text-[10px] font-[500] leading-[13px] tracking-[0.01em] text-quaternary-token';

@@ -158,11 +158,18 @@ function buildInlineCredits(
     parts.push(`Produced by ${producer.entries[0].name}`);
   }
 
-  const composer = credits.find(g => g.role === 'composer');
-  const lyricist = credits.find(g => g.role === 'lyricist');
-  const writer = composer ?? lyricist;
-  if (writer?.entries[0]) {
-    parts.push(`Written by ${writer.entries[0].name}`);
+  const names = new Set<string>();
+  const addEntries = (group: SmartLinkCreditGroup | undefined) => {
+    for (const entry of group?.entries ?? []) {
+      names.add(entry.name);
+    }
+  };
+
+  addEntries(credits.find(g => g.role === 'composer'));
+  addEntries(credits.find(g => g.role === 'lyricist'));
+
+  if (names.size > 0) {
+    parts.push(`Written by ${Array.from(names).join(', ')}`);
   }
 
   return parts.length > 0 ? parts.join(' · ') : null;
@@ -180,6 +187,13 @@ function SmartLinkArtistLine({
   featuredArtists?: FeaturedArtist[];
 }>) {
   const hasFeatured = featuredArtists && featuredArtists.length > 0;
+  const featuredArtistKeyCounts = new Map<string, number>();
+  const getFeaturedArtistKey = (name: string, handle: string | null) => {
+    const base = handle ?? name;
+    const count = featuredArtistKeyCounts.get(base) ?? 0;
+    featuredArtistKeyCounts.set(base, count + 1);
+    return count === 0 ? base : `${base}-${count + 1}`;
+  };
 
   const primaryName = artist.handle ? (
     <Link
@@ -201,7 +215,7 @@ function SmartLinkArtistLine({
       {primaryName}
       <span className='text-muted-foreground/60'> feat. </span>
       {featuredArtists.map((fa, i) => (
-        <span key={fa.name}>
+        <span key={getFeaturedArtistKey(fa.name, fa.handle)}>
           {i > 0 && (
             <span className='text-muted-foreground/60'>
               {i === featuredArtists.length - 1 ? ' & ' : ', '}
