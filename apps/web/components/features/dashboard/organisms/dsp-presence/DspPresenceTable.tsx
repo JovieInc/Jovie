@@ -27,20 +27,6 @@ interface DspPresenceTableProps {
 // Cell renderers (extracted to module scope to avoid re-creation on render)
 // ============================================================================
 
-function _PlatformCell({
-  providerId,
-}: Readonly<{
-  providerId: DspPresenceItem['providerId'];
-}>) {
-  const label = PROVIDER_LABELS[providerId];
-  return (
-    <div className='flex items-center gap-2'>
-      <DspProviderIcon provider={providerId} size='sm' />
-      <span className='text-[13px] text-secondary-token'>{label}</span>
-    </div>
-  );
-}
-
 function ArtistCell({ item }: Readonly<{ item: DspPresenceItem }>) {
   const label = PROVIDER_LABELS[item.providerId];
   return (
@@ -61,16 +47,9 @@ function ArtistCell({ item }: Readonly<{ item: DspPresenceItem }>) {
           <DspProviderIcon provider={item.providerId} size='sm' />
         </div>
       )}
-      <div className='flex min-w-0 items-center gap-2'>
-        <DspProviderIcon
-          provider={item.providerId}
-          size='sm'
-          className='shrink-0'
-        />
-        <span className='truncate whitespace-nowrap font-[510] text-[13px] text-primary-token'>
-          {item.externalArtistName ?? 'Unknown Artist'}
-        </span>
-      </div>
+      <span className='truncate whitespace-nowrap font-[510] text-[13px] text-primary-token'>
+        {item.externalArtistName ?? 'Unknown Artist'}
+      </span>
     </div>
   );
 }

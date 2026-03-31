@@ -4,7 +4,11 @@ import { Button } from '@jovie/ui';
 import { useId, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { addManualDspMatch } from '@/app/app/(shell)/dashboard/presence/actions';
-import { Dialog, DialogTitle } from '@/components/organisms/Dialog';
+import {
+  Dialog,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/organisms/Dialog';
 import {
   DspProviderIcon,
   PROVIDER_LABELS,
@@ -99,6 +103,9 @@ export function AddPlatformDialog({
   return (
     <Dialog open={open} onClose={handleClose} size='sm'>
       <DialogTitle>Add Platform</DialogTitle>
+      <DialogDescription className='sr-only'>
+        Link your artist profile on a streaming platform
+      </DialogDescription>
 
       <form onSubmit={handleSubmit} className='mt-5 space-y-4'>
         {/* Provider picker */}
@@ -107,7 +114,7 @@ export function AddPlatformDialog({
             All platforms are already linked
           </p>
         ) : (
-          <div className='grid grid-cols-4 gap-2'>
+          <div className='grid grid-cols-3 gap-2'>
             {availableProviders.map(id => (
               <button
                 key={id}
@@ -123,7 +130,7 @@ export function AddPlatformDialog({
                 )}
               >
                 <DspProviderIcon provider={id} size='md' />
-                <span className='truncate w-full text-center'>
+                <span className='w-full text-center'>
                   {PROVIDER_LABELS[id]}
                 </span>
               </button>
