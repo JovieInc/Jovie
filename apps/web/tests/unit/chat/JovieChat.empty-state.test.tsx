@@ -69,6 +69,20 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => mockDashboardData,
 }));
 
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: ({ count }: { count: number }) => ({
+    getTotalSize: () => count * 80,
+    getVirtualItems: () =>
+      Array.from({ length: count }, (_, index) => ({
+        index,
+        key: index,
+        start: index * 80,
+      })),
+    measureElement: () => undefined,
+    scrollToIndex: vi.fn(),
+  }),
+}));
+
 vi.mock('@/lib/queries', () => ({
   useInsightsSummaryQuery: () => mockInsightsSummaryState,
   usePlanGate: () => mockPlanGateState,
@@ -145,6 +159,10 @@ function createInsight(
 
 describe('JovieChat empty state', () => {
   beforeEach(() => {
+    mockChatState.messages = [];
+    mockChatState.hasMessages = false;
+    mockChatState.isLoading = false;
+    mockChatState.isSubmitting = false;
     mockDashboardData.profileCompletion.percentage = 100;
     mockDashboardData.tippingStats.tipClicks = 0;
     mockDashboardData.tippingStats.tipsSubmitted = 0;
@@ -158,6 +176,19 @@ describe('JovieChat empty state', () => {
     mockPlanGateState.aiCanUseTools = false;
   });
 
+  it('renders the authenticated home hero with centered examples', () => {
+    const { getByText } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' displayName='Tim' />
+    );
+
+    expect(getByText('Welcome to Jovie')).toBeTruthy();
+    expect(getByText('Ask anything or tell Jovie what you need')).toBeTruthy();
+    expect(getByText('Get Started With Some Examples')).toBeTruthy();
+    expect(getByText('Preview profile')).toBeTruthy();
+    expect(getByText('Change photo')).toBeTruthy();
+    expect(getByText('Release link')).toBeTruthy();
+  });
+
   it('shows the top insight in the greeting and keeps prompt cards skill-based', () => {
     mockInsightsSummaryState.data = {
       insights: [createInsight()],
@@ -167,6 +198,7 @@ describe('JovieChat empty state', () => {
       <JovieChat profileId='profile-1' displayName='Tim' username='timwhite' />
     );
 
+    expect(getByText('Welcome to Jovie')).toBeTruthy();
     expect(getByText('Welcome back')).toBeTruthy();
     expect(
       getByText('Your subscribers jumped 23% in LA this week.')
@@ -235,5 +267,35 @@ describe('JovieChat empty state', () => {
 
     expect(getByTestId('suggested-profiles-carousel')).toBeTruthy();
     expect(queryByText('Welcome back')).toBeNull();
+  });
+
+  it('renders chat messages after in-place message array updates', () => {
+    const messages = mockChatState.messages;
+    const { getAllByTestId, queryByText, rerender } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' displayName='Tim' />
+    );
+
+    expect(queryByText('Welcome to Jovie')).toBeTruthy();
+
+    messages.push(
+      {
+        id: 'cmd-user-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Preview my profile.' }],
+        createdAt: new Date('2026-03-08T00:00:00.000Z'),
+      },
+      {
+        id: 'cmd-assistant-1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Opening your profile in a new tab.' }],
+        createdAt: new Date('2026-03-08T00:00:01.000Z'),
+      }
+    );
+    mockChatState.hasMessages = true;
+
+    rerender(<JovieChat profileId='profile-1' displayName='Tim' />);
+
+    expect(queryByText('Welcome to Jovie')).toBeNull();
+    expect(getAllByTestId('chat-message')).toHaveLength(2);
   });
 });

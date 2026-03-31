@@ -151,6 +151,7 @@ export function useJovieChat({
     setMessages,
     stop: rawStop,
   } = useChat({
+    id: activeConversationId ?? 'new-chat',
     transport,
     onError: error => {
       captureException(error, {
