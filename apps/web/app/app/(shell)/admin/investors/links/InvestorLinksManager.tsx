@@ -441,7 +441,7 @@ function LinkActions({
                 setMenuOpen(false);
                 // Deactivates the link (soft-delete) — confirm first
                 if (
-                  window.confirm(
+                  globalThis.confirm(
                     `Delete "${link.label}"? The link will be permanently removed.`
                   )
                 ) {
@@ -576,11 +576,12 @@ export function InvestorLinksManager() {
       <ContentSurfaceCard className='overflow-hidden p-0'>
         <ContentSectionHeader
           title='Manage investor links'
-          subtitle={
-            links.length === 0
-              ? 'Create shareable entry points into the investor portal.'
-              : `${links.length} link${links.length === 1 ? '' : 's'} in your pipeline.`
-          }
+          subtitle={(() => {
+            if (links.length === 0)
+              return 'Create shareable entry points into the investor portal.';
+            const plural = links.length === 1 ? '' : 's';
+            return `${links.length} link${plural} in your pipeline.`;
+          })()}
           actions={
             <div className='flex items-center gap-2'>
               <Button variant='secondary' size='sm' asChild>

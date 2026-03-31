@@ -196,11 +196,13 @@ export function TrackSidebar({
     ];
   }, [track, isSmartLinkCopied, handleCopySmartLink, smartLinkUrl]);
 
-  const trackLabel = track
-    ? track.discNumber > 1
-      ? `${track.discNumber}-${track.trackNumber}`
-      : String(track.trackNumber)
-    : '';
+  let trackLabel = '';
+  if (track) {
+    trackLabel =
+      track.discNumber > 1
+        ? `${track.discNumber}-${track.trackNumber}`
+        : String(track.trackNumber);
+  }
 
   const trackHeaderCard = track ? (
     <DrawerSurfaceCard

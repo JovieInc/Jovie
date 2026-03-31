@@ -66,20 +66,22 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
   const incidentsLabel = summary.incidents24h.toLocaleString();
   const sentryIssuesLabel = summary.unresolvedSentryIssues24h.toLocaleString();
   const redisLabel = summary.redisAvailable ? 'Available' : 'Unavailable';
-  const deploymentLabel =
-    summary.deploymentAvailability === 'not_configured'
-      ? 'Not configured'
-      : summary.deploymentAvailability === 'error'
-        ? 'Unavailable'
-        : summary.deploymentState === null
-          ? 'Unknown'
-          : summary.deploymentState === 'in_progress'
-            ? 'In progress'
-            : summary.deploymentState === 'failure'
-              ? 'Failed'
-              : summary.deploymentState === 'success'
-                ? 'Healthy'
-                : 'Unknown';
+  let deploymentLabel: string;
+  if (summary.deploymentAvailability === 'not_configured') {
+    deploymentLabel = 'Not configured';
+  } else if (summary.deploymentAvailability === 'error') {
+    deploymentLabel = 'Unavailable';
+  } else {
+    const stateLabels: Record<string, string> = {
+      in_progress: 'In progress',
+      failure: 'Failed',
+      success: 'Healthy',
+    };
+    deploymentLabel =
+      summary.deploymentState === null
+        ? 'Unknown'
+        : (stateLabels[summary.deploymentState] ?? 'Unknown');
+  }
   const lastIncidentLabel = summary.lastIncidentAt
     ? summary.lastIncidentAt.toISOString().slice(0, 10)
     : '—';
@@ -137,10 +139,9 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
           label='Deploys'
           value={deploymentLabel}
           icon={
-            summary.deploymentAvailability === 'available'
-              ? summary.deploymentState === 'failure'
-                ? AlertTriangle
-                : Rocket
+            summary.deploymentAvailability === 'available' &&
+            summary.deploymentState !== 'failure'
+              ? Rocket
               : AlertTriangle
           }
           iconClassName={

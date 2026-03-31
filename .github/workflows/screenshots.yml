@@ -106,7 +106,41 @@ jobs:
           # Dedicated bot branch: always force-push latest generated screenshots.
           # `--force-with-lease` can fail with stale lease info when concurrent
           # screenshot runs update this branch between list + push.
-          git push --force origin "$BRANCH"
+          # Retry transient GitHub 500s, but gracefully skip when the branch is
+          # merge-queue locked (GH006) so this workflow doesn't fail.
+          PUSHED=false
+          for ATTEMPT in 1 2 3; do
+            set +e
+            PUSH_OUTPUT=$(git push --force origin "$BRANCH" 2>&1)
+            PUSH_EXIT=$?
+            set -e
+
+            if [ "$PUSH_EXIT" -eq 0 ]; then
+              PUSHED=true
+              break
+            fi
+
+            if [[ "$PUSH_OUTPUT" == *"A pull request for this branch has been added to a merge queue"* ]] || [[ "$PUSH_OUTPUT" == *"cannot be updated"* ]]; then
+              echo "$PUSH_OUTPUT"
+              echo "Screenshot branch is queued for merge; skipping update for this run."
+              exit 0
+            fi
+
+            if [[ "$PUSH_OUTPUT" == *"The requested URL returned error: 500"* ]] && [ "$ATTEMPT" -lt 3 ]; then
+              echo "$PUSH_OUTPUT"
+              echo "Transient GitHub 500 during push; retrying..."
+              sleep $((ATTEMPT * 4))
+              continue
+            fi
+
+            echo "$PUSH_OUTPUT"
+            exit "$PUSH_EXIT"
+          done
+
+          if [ "$PUSHED" != "true" ]; then
+            echo "Failed to push screenshot update branch after retries."
+            exit 1
+          fi
 
           if [ -n "$EXISTING_PR" ]; then
             echo "Updated existing PR #$EXISTING_PR via force-push"

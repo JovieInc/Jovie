@@ -42,7 +42,7 @@ function generateVCard(
     'VERSION:3.0',
     `FN:${escapeVCardText(displayName || username)}`,
     `URL:${profileUrl}`,
-    `NOTE:${escapeVCardText(`Jovie profile: @${username}`)}`,
+    `NOTE:${escapeVCardText('Jovie profile: @' + username)}`,
     'END:VCARD',
   ].join('\r\n');
 }
