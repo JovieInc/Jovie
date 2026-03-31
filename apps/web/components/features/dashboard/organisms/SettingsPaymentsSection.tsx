@@ -202,13 +202,14 @@ export function SettingsPaymentsSection() {
     <SettingsActionRow
       icon={<CheckCircle2 className='h-4 w-4' aria-hidden />}
       title='Stripe connected'
-      description={
-        status.email
-          ? `${status.payoutsEnabled ? 'Payouts are enabled and you are ready to receive payments.' : 'Account connected. Stripe is still reviewing payouts.'} Payout email: ${status.email}.`
-          : status.payoutsEnabled
-            ? 'Payouts are enabled and you are ready to receive payments.'
-            : 'Account connected. Stripe is still reviewing payouts.'
-      }
+      description={(() => {
+        const payoutStatus = status.payoutsEnabled
+          ? 'Payouts are enabled and you are ready to receive payments.'
+          : 'Account connected. Stripe is still reviewing payouts.';
+        return status.email
+          ? `${payoutStatus} Payout email: ${status.email}.`
+          : payoutStatus;
+      })()}
       action={
         <Button
           onClick={handleDisconnect}

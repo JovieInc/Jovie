@@ -362,6 +362,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         '0 1px 0 rgba(255,255,255,0.65), 0 18px 34px -28px rgba(15,23,42,0.45)';
     }
 
+    // Border style by state
+    let borderClass = 'border-black/6 dark:border-white/8';
+    if (isOverLimit) {
+      borderClass =
+        'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20';
+    } else if (isExpanded) {
+      borderClass = 'border-black/8 bg-surface-0 dark:border-white/10';
+    }
+
     return (
       <form onSubmit={handleFormSubmit}>
         <motion.div
@@ -374,11 +383,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           className={cn(
             'overflow-hidden border transition-[border-color,background-color] duration-normal',
             'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
-            isOverLimit
-              ? 'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20'
-              : isExpanded
-                ? 'border-black/8 bg-surface-0 dark:border-white/10'
-                : 'border-black/6 dark:border-white/8'
+            borderClass
           )}
           style={reducedMotion ? { borderRadius, boxShadow } : { borderRadius }}
         >
