@@ -31,6 +31,7 @@ import type { JovieChatProps, MessagePart } from './types';
 
 /** Sentinel ID for the synthetic thinking placeholder */
 const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
+const VIRTUALIZATION_THRESHOLD = 12;
 
 function deriveSessionState(
   suggestedProfiles: ReturnType<typeof useSuggestedProfiles>,
@@ -240,21 +241,19 @@ export function JovieChat({
   // ─── Synthetic thinking message (render-only) ───────────────────
   // Append a placeholder when waiting for the AI to start responding.
   // This is a displayMessages array, NOT a modification to the real messages.
-  const displayMessages = useMemo(() => {
-    const lastMsg = messages[messages.length - 1];
-    if (isLoading && lastMsg?.role === 'user') {
-      return [
-        ...messages,
-        {
-          id: THINKING_PLACEHOLDER_ID,
-          role: 'assistant' as const,
-          parts: [] as MessagePart[],
-          createdAt: new Date(),
-        },
-      ];
-    }
-    return messages;
-  }, [messages, isLoading]);
+  const lastMessage = messages[messages.length - 1];
+  const displayMessages =
+    isLoading && lastMessage?.role === 'user'
+      ? [
+          ...messages,
+          {
+            id: THINKING_PLACEHOLDER_ID,
+            role: 'assistant' as const,
+            parts: [] as MessagePart[],
+            createdAt: new Date(),
+          },
+        ]
+      : messages;
 
   // ─── Sticky scroll via ResizeObserver ────────────────────────────
   const {
@@ -273,29 +272,50 @@ export function JovieChat({
     overscan: 5,
     measureElement: el => el.getBoundingClientRect().height,
   });
+  const shouldVirtualizeMessages =
+    displayMessages.length > VIRTUALIZATION_THRESHOLD;
 
   const scrollToBottom = useCallback(() => {
     if (displayMessages.length > 0) {
-      virtualizer.scrollToIndex(displayMessages.length - 1, {
-        align: 'end',
-        behavior: 'smooth',
-      });
+      if (shouldVirtualizeMessages) {
+        virtualizer.scrollToIndex(displayMessages.length - 1, {
+          align: 'end',
+          behavior: 'smooth',
+        });
+      } else {
+        const scrollContainer = scrollContainerRef.current;
+        if (scrollContainer) {
+          if (typeof scrollContainer.scrollTo === 'function') {
+            scrollContainer.scrollTo({
+              top: scrollContainer.scrollHeight,
+              behavior: 'smooth',
+            });
+          } else {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          }
+        }
+      }
       setStuckToBottom(true);
     }
-  }, [displayMessages.length, virtualizer, setStuckToBottom]);
+  }, [
+    displayMessages.length,
+    scrollContainerRef,
+    setStuckToBottom,
+    shouldVirtualizeMessages,
+    virtualizer,
+  ]);
 
   // Find the last real assistant message index for streaming cursor
-  const lastAssistantIndex = useMemo(() => {
-    for (let i = displayMessages.length - 1; i >= 0; i--) {
-      if (
-        displayMessages[i].role === 'assistant' &&
-        displayMessages[i].id !== THINKING_PLACEHOLDER_ID
-      ) {
-        return i;
-      }
+  let lastAssistantIndex = -1;
+  for (let i = displayMessages.length - 1; i >= 0; i--) {
+    if (
+      displayMessages[i].role === 'assistant' &&
+      displayMessages[i].id !== THINKING_PLACEHOLDER_ID
+    ) {
+      lastAssistantIndex = i;
+      break;
     }
-    return -1;
-  }, [displayMessages]);
+  }
 
   const isStreaming = status === 'streaming';
 
@@ -375,32 +395,57 @@ export function JovieChat({
               className='relative flex-1 overflow-y-auto px-4 py-6 sm:px-5'
               onScroll={onScroll}
             >
-              <div
-                ref={totalSizeRef}
-                className='mx-auto max-w-[44rem]'
-                style={{
-                  position: 'relative',
-                  height: virtualizer.getTotalSize(),
-                }}
-              >
-                {virtualizer.getVirtualItems().map(virtualItem => {
-                  const message = displayMessages[virtualItem.index];
-                  const index = virtualItem.index;
-                  const isThinking = message.id === THINKING_PLACEHOLDER_ID;
-                  return (
-                    <div
-                      key={message.id}
-                      data-index={virtualItem.index}
-                      ref={virtualizer.measureElement}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        transform: `translateY(${virtualItem.start}px)`,
-                      }}
-                    >
-                      <div className='pb-7'>
+              {shouldVirtualizeMessages ? (
+                <div
+                  ref={totalSizeRef}
+                  className='mx-auto max-w-[44rem]'
+                  style={{
+                    position: 'relative',
+                    height: virtualizer.getTotalSize(),
+                  }}
+                >
+                  {virtualizer.getVirtualItems().map(virtualItem => {
+                    const message = displayMessages[virtualItem.index];
+                    const index = virtualItem.index;
+                    const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+                    return (
+                      <div
+                        key={message.id}
+                        data-index={virtualItem.index}
+                        ref={virtualizer.measureElement}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${virtualItem.start}px)`,
+                        }}
+                      >
+                        <div className='pb-7'>
+                          <ChatMessage
+                            id={message.id}
+                            role={message.role}
+                            parts={message.parts}
+                            isStreaming={
+                              isStreaming && index === lastAssistantIndex
+                            }
+                            isThinking={isThinking}
+                            avatarUrl={
+                              message.role === 'user' ? avatarUrl : undefined
+                            }
+                            profileId={profileId}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div ref={totalSizeRef} className='mx-auto max-w-[44rem]'>
+                  {displayMessages.map((message, index) => {
+                    const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+                    return (
+                      <div key={message.id} className='pb-7'>
                         <ChatMessage
                           id={message.id}
                           role={message.role}
@@ -415,10 +460,10 @@ export function JovieChat({
                           profileId={profileId}
                         />
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Scroll to bottom button */}
               <ScrollToBottom

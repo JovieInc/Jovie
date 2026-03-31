@@ -1,5 +1,4 @@
 import '../(auth)/auth-utilities.css';
-import Script from 'next/script';
 import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
 
 export const runtime = 'nodejs';
@@ -18,7 +17,8 @@ export default async function WaitlistLayout({
 }>) {
   return (
     <>
-      <Script src='/theme-init.js' strategy='beforeInteractive' />
+      {/* eslint-disable-next-line @next/next/no-sync-scripts -- next/script injects a nonce mismatch here during hydration */}
+      <script src='/theme-init.js' />
       <ResolvedClientProviders>{children}</ResolvedClientProviders>
     </>
   );

@@ -1,5 +1,4 @@
 import './auth-utilities.css';
-import Script from 'next/script';
 import { AuthClientProviders } from '@/components/providers/AuthClientProviders';
 import { shouldBypassClerk } from '@/components/providers/clerkAvailability';
 import {
@@ -28,7 +27,8 @@ export default async function AuthLayout({
       <>
         {/* Keep auth routes theme-aware without forcing the marketing homepage to
             download the theme bootstrap on first paint. */}
-        <Script src='/theme-init.js' strategy='beforeInteractive' />
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- next/script injects a nonce mismatch here during hydration */}
+        <script src='/theme-init.js' />
         <FeatureFlagsProvider>
           <main id='main-content'>
             <AuthShellLayout
@@ -46,7 +46,8 @@ export default async function AuthLayout({
 
   return (
     <>
-      <Script src='/theme-init.js' strategy='beforeInteractive' />
+      {/* eslint-disable-next-line @next/next/no-sync-scripts -- next/script injects a nonce mismatch here during hydration */}
+      <script src='/theme-init.js' />
       <AuthClientProviders publishableKey={publishableKey}>
         <FeatureFlagsProvider>
           <main id='main-content'>{children}</main>
