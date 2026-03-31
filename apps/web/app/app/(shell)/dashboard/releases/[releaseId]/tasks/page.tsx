@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 import { ReleaseTaskPage } from '@/components/features/dashboard/release-tasks';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
-import { requireProfileId } from '../../task-actions';
+import { requireProfileId } from '../../../requireProfileId';
 
 interface TasksPageProps {
   readonly params: Promise<{ releaseId: string }>;

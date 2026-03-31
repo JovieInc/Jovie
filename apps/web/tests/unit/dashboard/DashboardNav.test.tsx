@@ -10,6 +10,7 @@ import { fastRender } from '@/tests/utils/fast-render';
 
 // Mock Next.js router with controllable return value
 const mockUsePathname = vi.fn(() => '/app/chat');
+const mockUseTaskStatsQuery = vi.fn(() => ({ data: undefined }));
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
   useParams: () => ({}),
@@ -59,6 +60,10 @@ vi.mock('@/lib/hooks/useNotifications', () => ({
 
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
   useReleasesQuery: () => ({ data: undefined, isLoading: false }),
+}));
+
+vi.mock('@/lib/queries/useTasksQuery', () => ({
+  useTaskStatsQuery: (...args: unknown[]) => mockUseTaskStatsQuery(...args),
 }));
 
 // Mock @jovie/ui Tooltip components
@@ -131,6 +136,7 @@ describe('DashboardNav', () => {
 
     expect(getByRole('button', { name: 'Profile' })).toBeDefined();
     expect(getByRole('link', { name: 'Releases' })).toBeDefined();
+    expect(getByRole('link', { name: 'Tasks' })).toBeDefined();
     expect(getByRole('link', { name: 'Audience' })).toBeDefined();
   });
 
@@ -206,5 +212,46 @@ describe('DashboardNav', () => {
       getByRole('link', { name: 'Audience & Tracking' }).getAttribute('href')
     ).toBe(APP_ROUTES.SETTINGS_AUDIENCE);
     expect(queryByText('Workspace')).toBeNull();
+  });
+
+  it('disables task stats query on the demo route', () => {
+    mockUsePathname.mockReturnValueOnce(APP_ROUTES.DEMO);
+
+    renderDashboardNav({
+      selectedProfile: {
+        id: 'profile_123',
+        displayName: 'Tim White',
+        username: 'tim',
+        usernameNormalized: 'tim',
+      } as DashboardData['selectedProfile'],
+    });
+
+    expect(mockUseTaskStatsQuery).toHaveBeenCalledWith('profile_123', {
+      enabled: false,
+    });
+  });
+
+  it('renders the tasks badge when active task count is non-zero', () => {
+    mockUseTaskStatsQuery.mockReturnValueOnce({
+      data: {
+        backlog: 1,
+        todo: 2,
+        inProgress: 4,
+        done: 0,
+        cancelled: 0,
+        activeTodoCount: 7,
+      },
+    });
+
+    const { getByText } = renderDashboardNav({
+      selectedProfile: {
+        id: 'profile_123',
+        displayName: 'Tim White',
+        username: 'tim',
+        usernameNormalized: 'tim',
+      } as DashboardData['selectedProfile'],
+    });
+
+    expect(getByText('7')).toBeDefined();
   });
 });

@@ -514,6 +514,20 @@ export const releaseTaskAssigneeTypeEnum = pgEnum(
   ['human', 'ai_workflow']
 );
 
+export const taskAssigneeKindEnum = pgEnum('task_assignee_kind', [
+  'human',
+  'jovie',
+]);
+
+export const taskAgentStatusEnum = pgEnum('task_agent_status', [
+  'idle',
+  'queued',
+  'drafting',
+  'awaiting_review',
+  'approved',
+  'failed',
+]);
+
 // Referral Program Enums
 export const referralStatusEnum = pgEnum('referral_status', [
   'pending', // Referred user signed up but not yet subscribed

@@ -65,6 +65,10 @@ export function useTaskToggleMutation(releaseId: string) {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.releaseTasks.all,
       });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.tasks.stats(),
+      });
     },
   });
 }
@@ -81,6 +85,10 @@ export function useInstantiateTasksMutation(releaseId: string) {
       });
       await queryClient.invalidateQueries({
         queryKey: queryKeys.releaseTasks.all,
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.tasks.stats(),
       });
     },
   });
@@ -102,6 +110,10 @@ export function useUpdateTaskMutation(releaseId: string) {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.releaseTasks.byRelease(releaseId),
       });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.tasks.stats(),
+      });
     },
   });
 }
@@ -119,6 +131,10 @@ export function useAddTaskMutation(releaseId: string) {
       });
       await queryClient.invalidateQueries({
         queryKey: queryKeys.releaseTasks.all,
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.tasks.stats(),
       });
     },
   });
@@ -164,6 +180,10 @@ export function useDeleteTaskMutation(releaseId: string) {
       });
       await queryClient.invalidateQueries({
         queryKey: queryKeys.releaseTasks.all,
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.tasks.stats(),
       });
     },
   });

@@ -19,6 +19,7 @@ export const APP_ROUTES = {
   DASHBOARD_PROFILE: '/app/dashboard/profile',
   DASHBOARD_AUDIENCE: '/app/dashboard/audience',
   DASHBOARD_RELEASES: '/app/dashboard/releases',
+  DASHBOARD_TASKS: '/app/dashboard/tasks',
   DASHBOARD_RELEASE_TASKS: '/app/dashboard/releases/[releaseId]/tasks',
   DASHBOARD_TIPPING: '/app/dashboard/tipping',
   DASHBOARD_CONTACTS: '/app/dashboard/contacts',
@@ -30,6 +31,7 @@ export const APP_ROUTES = {
   TOUR_DATES: '/app/tour-dates',
   AUDIENCE: '/app/audience',
   EARNINGS: '/app/earnings',
+  TASKS: '/app/dashboard/tasks',
   CHAT: '/app/chat',
   CHAT_PROFILE_PANEL: '/app/chat?panel=profile',
   /** @deprecated Redirects to DASHBOARD_AUDIENCE — insights now in analytics sidebar */

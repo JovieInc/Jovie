@@ -4,6 +4,7 @@ import {
   Banknote,
   Briefcase,
   CalendarDays,
+  CheckSquare,
   FolderKanban,
   HandCoins,
   Home,
@@ -55,6 +56,13 @@ export const primaryNavigation: NavItem[] = [
     id: 'releases',
     icon: Music,
     description: 'Link out every provider with one smart link',
+  },
+  {
+    name: 'Tasks',
+    href: APP_ROUTES.TASKS,
+    id: 'tasks',
+    icon: CheckSquare,
+    description: 'Track release work and general artist operations',
   },
   {
     name: 'Audience',
@@ -227,4 +235,7 @@ export const mobilePrimaryNavigation: NavItem[] = [
 ];
 
 /** Items shown in the expanded "more" menu on mobile. */
-export const mobileExpandedNavigation: NavItem[] = [settingsNavItem];
+export const mobileExpandedNavigation: NavItem[] = [
+  primaryNavigation.find(i => i.id === 'tasks')!,
+  settingsNavItem,
+];

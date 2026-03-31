@@ -287,6 +287,8 @@ export {
   subscriptionPlanEnum,
   subscriptionStatusEnum,
   suppressionReasonEnum,
+  taskAgentStatusEnum,
+  taskAssigneeKindEnum,
   themeModeEnum,
   tipStatusEnum,
   userStatusLifecycleEnum,
@@ -588,6 +590,14 @@ export {
   type WebhookEvent,
   webhookEvents,
 } from './suppression';
+// Tasks
+export {
+  insertTaskSchema,
+  type NewTask,
+  selectTaskSchema,
+  type Task,
+  tasks,
+} from './tasks';
 // Tip Audience (Fan notifications from tips)
 export {
   insertTipAudienceSchema,
