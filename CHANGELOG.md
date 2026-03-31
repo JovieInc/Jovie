@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.3.108] - 2026-03-30
+
+> Extends the flat-elevation polish to remaining app surfaces (chat, release sidebar, onboarding, auth, admin, HUD) and cleans up stale CSS-variable references flagged by review bots.
+
+### Changed
+
+- Cards now use flatter elevation with border-only separation for a cleaner look
+- Standardized card corners across dashboard, sidebar, drawers, chat, auth, and admin areas
+- Interactive controls (buttons, badges, inputs) now use rounded pill shapes
+- Checklist items and sidebar elements updated to match the new pill aesthetic
+- Improved touch targets for checklist checkboxes and task indicators
+- Cleaned up stale hover-shadow CSS-variable references in chat input controls
+- Replaced arbitrary CSS-variable utilities with Tailwind-named tokens
+
 ## [26.3.107] - 2026-03-30
 
 > Dashboard surfaces and shared controls now use a flatter, more consistent visual system. This update also tightens responsive audience layouts and keeps insight generation focused on fresher, higher-signal results.
