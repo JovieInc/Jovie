@@ -178,7 +178,7 @@ function AttachDropdown({
           className={cn(
             'flex shrink-0 items-center justify-center rounded-full',
             'border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token transition-[background-color,border-color,color,box-shadow]',
-            'hover:border-default hover:bg-surface-1 hover:text-primary-token hover:shadow-[var(--linear-app-card-shadow)]',
+            'hover:border-default hover:bg-surface-1 hover:text-primary-token hover:shadow-none',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             isCompact ? 'h-8 w-8' : 'h-9 w-9'
           )}
@@ -465,7 +465,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     'flex shrink-0 items-center justify-center rounded-full border transition-[background-color,border-color,color,box-shadow]',
                     isListening
                       ? 'border-error/20 bg-error/10 text-error'
-                      : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token hover:shadow-[var(--linear-app-card-shadow)]',
+                      : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token hover:shadow-none',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     isCompact ? 'h-8 w-8' : 'h-9 w-9'
                   )}
