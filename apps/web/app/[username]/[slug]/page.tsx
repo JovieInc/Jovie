@@ -10,7 +10,10 @@
 import { Metadata } from 'next';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
-import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
+import {
+  type FeaturedArtist,
+  ReleaseLandingPage,
+} from '@/app/r/[slug]/ReleaseLandingPage';
 import { BASE_URL } from '@/constants/app';
 import {
   ScheduledReleasePage,
@@ -415,6 +418,12 @@ function ContentPageBody({
 }>) {
   const artistName = creator.displayName ?? creator.username;
 
+  // Extract featured artists from credits for inline display
+  const featuredArtists: FeaturedArtist[] =
+    content.credits
+      ?.find(g => g.role === 'featured_artist')
+      ?.entries.map(e => ({ name: e.name, handle: e.handle })) ?? [];
+
   if (isUnreleased && showUnreleasedHero) {
     return (
       <UnreleasedReleaseHero
@@ -473,6 +482,7 @@ function ContentPageBody({
         handle: creator.usernameNormalized,
         avatarUrl: creator.avatarUrl,
       }}
+      featuredArtists={featuredArtists}
       providers={allProviders}
       credits={content.credits}
       utmParams={utmParams}
