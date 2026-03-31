@@ -402,13 +402,14 @@ export function AdminFeedbackTable({
               />
               <div className='border-t border-subtle px-3.5 py-2'>
                 <span className='text-[12px] leading-[16px] text-tertiary-token'>
-                  {selected.status === 'dismissed'
-                    ? `Dismissed ${
-                        selected.dismissedAtIso
-                          ? new Date(selected.dismissedAtIso).toLocaleString()
-                          : ''
-                      }`
-                    : 'Marked as pending'}
+                  {(() => {
+                    if (selected.status !== 'dismissed')
+                      return 'Marked as pending';
+                    const dismissedDate = selected.dismissedAtIso
+                      ? new Date(selected.dismissedAtIso).toLocaleString()
+                      : '';
+                    return `Dismissed ${dismissedDate}`;
+                  })()}
                 </span>
               </div>
             </DrawerSurfaceCard>
