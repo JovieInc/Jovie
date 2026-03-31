@@ -5,7 +5,7 @@ export interface PressPhoto {
   readonly mediumUrl: string | null;
   readonly largeUrl: string | null;
   readonly originalFilename: string | null;
-  readonly sourcePlatform: string | null;
+  readonly sourcePlatform?: string | null;
   readonly width: number | null;
   readonly height: number | null;
   readonly status: 'draft' | 'uploading' | 'processing' | 'ready' | 'failed';
