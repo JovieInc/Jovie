@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const hoisted = vi.hoisted(() => ({
   getCachedAuthMock: vi.fn(),
   withDbSessionTxMock: vi.fn(),
+  captureErrorMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -44,6 +45,10 @@ vi.mock('drizzle-orm', () => ({
 
 vi.mock('@/lib/utils/logger', () => ({
   logger: { error: vi.fn() },
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: hoisted.captureErrorMock,
 }));
 
 describe('GET /api/dashboard/contacts', () => {
@@ -108,8 +113,9 @@ describe('GET /api/dashboard/contacts', () => {
   });
 
   it('returns 500 on unexpected error', async () => {
+    const thrownError = new Error('DB crash');
     hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'user_123' });
-    hoisted.withDbSessionTxMock.mockRejectedValue(new Error('DB crash'));
+    hoisted.withDbSessionTxMock.mockRejectedValue(thrownError);
 
     const { GET } = await import('@/app/api/dashboard/contacts/route');
     const request = new Request(
@@ -118,5 +124,13 @@ describe('GET /api/dashboard/contacts', () => {
     const response = await GET(request);
 
     expect(response.status).toBe(500);
+    expect(hoisted.captureErrorMock).toHaveBeenCalledWith(
+      'Dashboard contacts fetch failed',
+      thrownError,
+      {
+        route: '/api/dashboard/contacts',
+        method: 'GET',
+      }
+    );
   });
 });

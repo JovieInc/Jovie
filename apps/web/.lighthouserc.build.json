@@ -47,7 +47,6 @@
                 "maxNumericValue": 3000
               }
             ],
-            "forced-reflow-insight": "warn",
             "categories:performance": [
               "warn",
               {
@@ -65,7 +64,8 @@
               {
                 "minScore": 0.9
               }
-            ]
+            ],
+            "forced-reflow-insight": "warn"
           }
         }
       ]

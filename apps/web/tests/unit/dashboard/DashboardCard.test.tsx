@@ -12,6 +12,8 @@ describe('DashboardCard', () => {
     expect(card.tagName).toBe('DIV');
     expect(card.className).toContain('p-4');
     expect(card.className).toContain('bg-surface-1');
+    expect(card.className).toContain('rounded-xl');
+    expect(card.className).toContain('shadow-none');
   });
 
   it('renders a clickable card as a button', () => {

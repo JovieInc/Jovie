@@ -19,5 +19,8 @@ describe('SettingsActionRow', () => {
       screen.getByText('Open invoices and payment methods in Stripe.')
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Manage' })).toBeInTheDocument();
+    expect(screen.getByTestId('row-icon').parentElement?.className).toContain(
+      'rounded-full'
+    );
   });
 });

@@ -5,37 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.107] - 2026-03-30
-
-### Added
-
-- Compact `Signals` card in the audience analytics sidebar with top AI insights and Ask Jovie drill-down links
-- Insight data-hash freshness gate so cron and manual generation can skip unchanged insight types
-
-### Changed
-
-- `/app/insights` now redirects to the audience dashboard, with stale route benchmarks removed from the performance manifest
-- Insight generation narrowed to the remaining high-value categories and a max of five surfaced insights per run
-
-### Fixed
-
-- Repeated insight generation now avoids recycling stale signals when the underlying metric slice has not changed
-- Cron insights concurrency test timeout increased to reflect the observed route import cost in CI-like environments
-
 ## [26.4.106] - 2026-03-30
 
-### Removed
-
-- Dead ad-pixels settings page (was behind a redirect to `/settings/audience` since v26.4.46)
-- Orphaned `SettingsGroupHeading` component (replaced by `SettingsPanel`)
-
 ### Changed
 
-- Account settings sections (Email, Connected Accounts, Sessions) now use `SettingsPanel` for consistent title typography
-- Referral page rewritten with standard `SettingsPanel` components and proper loading/error states
-- Billing button uses standard `variant='secondary' size='sm'` instead of custom className overrides
-- Settings icon sizes normalized to `h-4 w-4` across all pages
-- Import paths standardized from re-export barrel (`features/dashboard/molecules/`) to source (`molecules/settings/`)
+- Flatten card elevation across all app surfaces: cards now use border-only separation (`shadow-none`) instead of layered shadows
+- Standardize card border radius to `rounded-xl` (replacing hardcoded `rounded-[10px]`) across dashboard, sidebar, drawers, chat, auth, admin, and loading skeletons
+- Round all interactive controls to pill shape (`rounded-full`): icon containers, button groups, toggle segments, badges, inputs, and action buttons
+- Round checklist items, sidebar banners, and settings icon containers to `rounded-full` for consistent pill aesthetic
+- Increase checklist checkbox and task indicator sizes for better touch targets
 
 ## [26.4.105] - 2026-03-30
 

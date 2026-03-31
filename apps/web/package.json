@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.4.99",
+  "version": "26.3.107",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -220,7 +220,7 @@
     "@typescript-eslint/parser": "^8.57.2",
     "@vitejs/plugin-react": "^5.2.0",
     "@vitest/browser": "^4.1.1",
-    "@vitest/browser-playwright": "^4.1.1",
+    "@vitest/browser-playwright": "^4.1.2",
     "@vitest/coverage-v8": "^4.1.1",
     "autoprefixer": "^10.4.27",
     "axe-core": "^4.11.1",

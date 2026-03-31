@@ -8,5 +8,6 @@ export interface PressPhoto {
   readonly width: number | null;
   readonly height: number | null;
   readonly status: string;
+  readonly sourcePlatform?: string | null;
   readonly sortOrder: number;
 }

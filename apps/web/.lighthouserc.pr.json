@@ -51,7 +51,6 @@
             "mainthread-work-breakdown": "warn",
             "render-blocking-resources": "off",
             "render-blocking-insight": "off",
-            "forced-reflow-insight": "warn",
             "legacy-javascript-insight": "warn",
             "unused-javascript": "warn",
             "categories:performance": [
@@ -79,6 +78,7 @@
               }
             ],
             "is-crawlable": "off",
+            "forced-reflow-insight": "warn",
             "network-dependency-tree-insight": "off",
             "target-size": "warn",
             "digest-mismatch": "off"

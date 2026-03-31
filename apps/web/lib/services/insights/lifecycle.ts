@@ -335,44 +335,6 @@ export async function expireStaleInsights(): Promise<number> {
 }
 
 /**
- * Fetches the latest insight per type with its metadata (for freshness hash comparison).
- */
-export async function getLatestInsightsForFreshness(
-  creatorProfileId: string
-): Promise<{ insightType: string; metadata: Record<string, unknown> }[]> {
-  const now = new Date();
-  const rows = await db
-    .select({
-      insightType: aiInsights.insightType,
-      metadata: aiInsights.metadata,
-    })
-    .from(aiInsights)
-    .where(
-      and(
-        eq(aiInsights.creatorProfileId, creatorProfileId),
-        eq(aiInsights.status, 'active'),
-        gte(aiInsights.expiresAt, now)
-      )
-    )
-    .orderBy(desc(aiInsights.createdAt));
-
-  // Keep only the latest per type
-  const seen = new Set<string>();
-  const result: { insightType: string; metadata: Record<string, unknown> }[] =
-    [];
-  for (const row of rows) {
-    if (!seen.has(row.insightType)) {
-      seen.add(row.insightType);
-      result.push({
-        insightType: row.insightType,
-        metadata: (row.metadata ?? {}) as Record<string, unknown>,
-      });
-    }
-  }
-  return result;
-}
-
-/**
  * Gets existing active insight types for a creator (for dedup in generation).
  */
 export async function getExistingInsightTypes(

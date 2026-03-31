@@ -1,10 +1,10 @@
 'use client';
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import { ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback } from 'react';
 import type { DspPresenceItem } from '@/app/app/(shell)/dashboard/presence/actions';
-import { Icon } from '@/components/atoms/Icon';
 import { UnifiedTable } from '@/components/organisms/table';
 import {
   DspProviderIcon,
@@ -27,6 +27,20 @@ interface DspPresenceTableProps {
 // Cell renderers (extracted to module scope to avoid re-creation on render)
 // ============================================================================
 
+function _PlatformCell({
+  providerId,
+}: Readonly<{
+  providerId: DspPresenceItem['providerId'];
+}>) {
+  const label = PROVIDER_LABELS[providerId];
+  return (
+    <div className='flex items-center gap-2'>
+      <DspProviderIcon provider={providerId} size='sm' />
+      <span className='text-[13px] text-secondary-token'>{label}</span>
+    </div>
+  );
+}
+
 function ArtistCell({ item }: Readonly<{ item: DspPresenceItem }>) {
   const label = PROVIDER_LABELS[item.providerId];
   return (
@@ -43,18 +57,8 @@ function ArtistCell({ item }: Readonly<{ item: DspPresenceItem }>) {
           />
         </div>
       ) : (
-        <div className='relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1'>
+        <div className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1'>
           <DspProviderIcon provider={item.providerId} size='sm' />
-          <div
-            className='absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/60'
-            role='img'
-            aria-label='Profile image missing'
-          >
-            <Icon
-              name='Camera'
-              className='h-4 w-4 text-amber-600 dark:text-amber-400'
-            />
-          </div>
         </div>
       )}
       <div className='flex min-w-0 items-center gap-2'>
@@ -92,7 +96,7 @@ function LinkCell({ item }: Readonly<{ item: DspPresenceItem }>) {
       aria-label={`View on ${label}`}
       onClick={e => e.stopPropagation()}
     >
-      <Icon name='ExternalLink' className='h-3.5 w-3.5' />
+      <ExternalLink className='h-3.5 w-3.5' />
     </a>
   );
 }

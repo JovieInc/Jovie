@@ -34,10 +34,10 @@ describe('DrawerSurfaceCard', () => {
     const className =
       screen.getByTestId('surface-card').getAttribute('class') ?? '';
 
-    expect(className).toContain('rounded-[10px]');
+    expect(className).toContain('rounded-xl');
     expect(className).toContain('border-(--linear-app-frame-seam)');
     expect(className).toContain('bg-(--linear-app-content-surface)');
-    expect(className).toContain('shadow-[var(--linear-app-card-shadow)]');
+    expect(className).toContain('shadow-[var(--linear-app-drawer-shadow)]');
   });
 
   it('LINEAR_SURFACE tokens contain no hardcoded shadow values', () => {
