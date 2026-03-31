@@ -3,22 +3,18 @@ import {
   asc,
   count,
   desc,
-  sql as drizzleSql,
   eq,
-  gte,
   isNotNull,
   isNull,
   lt,
-  ne,
   or,
 } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getAppUrl } from '@/constants/domains';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { campaignSettings } from '@/lib/db/schema/admin';
-import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
+import { leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   captureError,
@@ -26,8 +22,10 @@ import {
   getSafeErrorMessage,
 } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
-import { pushLeadToInstantly } from '@/lib/leads/instantly';
+import {
+  OUTREACH_QUEUE_CLAIM_TTL_MS,
+  processOutreachBatch,
+} from '@/lib/leads/outreach-batch';
 import { outreachListQuerySchema } from '@/lib/validation/lead-schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -37,122 +35,6 @@ export const runtime = 'nodejs';
 const queueOutreachBodySchema = z.object({
   limit: z.number().int().min(1).max(100).default(10),
 });
-
-const OUTREACH_QUEUE_CLAIM_TTL_MS = 5 * 60 * 1000;
-
-function getStartOfDay(now: Date): Date {
-  return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-  );
-}
-
-function getStartOfHour(now: Date): Date {
-  const date = new Date(now);
-  date.setUTCMinutes(0, 0, 0);
-  return date;
-}
-
-async function getSendCapacity(now: Date): Promise<{
-  dailyRemaining: number;
-  hourlyRemaining: number;
-}> {
-  if (!leadPipelineSettings?.id) {
-    return {
-      dailyRemaining: 10,
-      hourlyRemaining: 5,
-    };
-  }
-
-  try {
-    const [settings] = await db
-      .select()
-      .from(leadPipelineSettings)
-      .where(eq(leadPipelineSettings.id, 1))
-      .limit(1);
-
-    const dailySendCap = settings?.dailySendCap ?? 10;
-    const maxPerHour = settings?.maxPerHour ?? 5;
-    const startOfDay = getStartOfDay(now);
-    const startOfHour = getStartOfHour(now);
-
-    const [[dayRow], [hourRow]] = await Promise.all([
-      db
-        .select({ total: count() })
-        .from(leads)
-        .where(
-          or(
-            gte(leads.outreachQueuedAt, startOfDay),
-            gte(leads.dmSentAt, startOfDay)
-          )
-        ),
-      db
-        .select({ total: count() })
-        .from(leads)
-        .where(
-          or(
-            gte(leads.outreachQueuedAt, startOfHour),
-            gte(leads.dmSentAt, startOfHour)
-          )
-        ),
-    ]);
-
-    return {
-      dailyRemaining: Math.max(0, dailySendCap - Number(dayRow?.total ?? 0)),
-      hourlyRemaining: Math.max(0, maxPerHour - Number(hourRow?.total ?? 0)),
-    };
-  } catch (error) {
-    await captureError('Failed to compute outreach send capacity', error, {
-      route: '/api/admin/outreach',
-    });
-    return {
-      dailyRemaining: 0,
-      hourlyRemaining: 0,
-    };
-  }
-}
-
-async function hasCompetingQueuedEmailLead(
-  email: string,
-  leadId: string,
-  claimedAt: Date
-): Promise<boolean> {
-  const normalizedEmail = email.trim().toLowerCase();
-
-  try {
-    const [duplicate] = await db
-      .select({ id: leads.id })
-      .from(leads)
-      .where(
-        and(
-          drizzleSql`lower(${leads.contactEmail}) = ${normalizedEmail}`,
-          ne(leads.id, leadId),
-          or(
-            isNotNull(leads.dmSentAt),
-            eq(leads.outreachStatus, 'queued'),
-            eq(leads.outreachStatus, 'sent'),
-            eq(leads.outreachStatus, 'dm_sent'),
-            and(
-              eq(leads.outreachStatus, 'pending'),
-              isNotNull(leads.outreachQueuedAt),
-              or(
-                lt(leads.outreachQueuedAt, claimedAt),
-                drizzleSql`(${leads.outreachQueuedAt} = ${claimedAt} and ${leads.id}::text < ${leadId})`
-              )
-            )
-          )
-        )
-      )
-      .limit(1);
-
-    return Boolean(duplicate?.id);
-  } catch (error) {
-    await captureError('Failed to evaluate outreach email dedupe', error, {
-      route: '/api/admin/outreach',
-      contextData: { leadId },
-    });
-    return true;
-  }
-}
 
 function jsonError(message: string, status: number) {
   return NextResponse.json(
@@ -407,155 +289,12 @@ export async function POST(request: NextRequest) {
     }
 
     const { limit } = validated.data;
-    const now = new Date();
-    const claimCutoff = new Date(now.getTime() - OUTREACH_QUEUE_CLAIM_TTL_MS);
-    const pendingEmailWhereClause = getPendingEmailWhereClause(now);
-    const sendCapacity = await getSendCapacity(now);
-    const effectiveLimit = Math.max(
-      0,
-      Math.min(limit, sendCapacity.dailyRemaining, sendCapacity.hourlyRemaining)
-    );
-
-    if (effectiveLimit === 0) {
-      return NextResponse.json(
-        {
-          ok: true,
-          attempted: 0,
-          queued: 0,
-          failed: 0,
-          remainingPending: 0,
-        },
-        { status: 200, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const pendingEmailLeads = await db
-      .select({
-        id: leads.id,
-        linktreeHandle: leads.linktreeHandle,
-        displayName: leads.displayName,
-        contactEmail: leads.contactEmail,
-        claimToken: leads.claimToken,
-        priorityScore: leads.priorityScore,
-      })
-      .from(leads)
-      .where(pendingEmailWhereClause)
-      .orderBy(desc(leads.priorityScore), desc(leads.createdAt))
-      .limit(effectiveLimit);
-
-    let attempted = 0;
-    let queued = 0;
-    let failed = 0;
-
-    for (const lead of pendingEmailLeads) {
-      const claimedAt = new Date();
-      const [claimedLead] = await db
-        .update(leads)
-        .set({
-          outreachQueuedAt: claimedAt,
-          updatedAt: claimedAt,
-        })
-        .where(
-          and(
-            eq(leads.id, lead.id),
-            eq(leads.outreachStatus, 'pending'),
-            or(
-              isNull(leads.outreachQueuedAt),
-              lt(leads.outreachQueuedAt, claimCutoff)
-            )
-          )
-        )
-        .returning({ id: leads.id });
-
-      if (!claimedLead) {
-        continue;
-      }
-
-      attempted++;
-
-      try {
-        const hasDuplicate = await hasCompetingQueuedEmailLead(
-          lead.contactEmail!,
-          lead.id,
-          claimedAt
-        );
-        if (hasDuplicate) {
-          failed++;
-          await db
-            .update(leads)
-            .set({
-              outreachQueuedAt: null,
-              outreachStatus: 'dismissed',
-              updatedAt: new Date(),
-            })
-            .where(eq(leads.id, lead.id));
-          continue;
-        }
-
-        const instantlyLeadId = await pushLeadToInstantly({
-          email: lead.contactEmail!,
-          firstName: lead.displayName ?? lead.linktreeHandle,
-          claimLink: getAppUrl(`/claim/${lead.claimToken}`),
-          artistName: lead.displayName ?? lead.linktreeHandle,
-          priorityScore: lead.priorityScore ?? 0,
-        });
-
-        await db
-          .update(leads)
-          .set({
-            instantlyLeadId,
-            outreachStatus: 'queued',
-            firstContactedAt: claimedAt,
-            lastContactedAt: claimedAt,
-            updatedAt: claimedAt,
-          })
-          .where(eq(leads.id, lead.id));
-
-        await recordLeadFunnelEvent(
-          {
-            leadId: lead.id,
-            eventType: 'email_queued',
-            channel: 'email',
-            provider: 'instantly',
-            campaignKey: 'claim_invite',
-            metadata: {
-              instantlyLeadId,
-              claimToken: lead.claimToken,
-            },
-          },
-          { idempotent: true }
-        );
-
-        queued++;
-      } catch (error) {
-        failed++;
-        await db
-          .update(leads)
-          .set({
-            outreachQueuedAt: null,
-            updatedAt: new Date(),
-          })
-          .where(eq(leads.id, lead.id));
-        await captureError('Manual outreach queue failed', error, {
-          route: '/api/admin/outreach',
-          contextData: { leadId: lead.id },
-        });
-      }
-    }
-
-    const [remainingPending] = await db
-      .select({ total: count() })
-      .from(leads)
-      .where(pendingEmailWhereClause);
+    const result = await processOutreachBatch(limit, {
+      ignorePipelineEnabled: true,
+    });
 
     return NextResponse.json(
-      {
-        ok: true,
-        attempted,
-        queued,
-        failed,
-        remainingPending: Number(remainingPending?.total ?? 0),
-      },
+      { ok: true, ...result },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {

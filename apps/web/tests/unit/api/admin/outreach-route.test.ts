@@ -335,6 +335,7 @@ describe('GET /api/admin/outreach', () => {
       attempted: 1,
       queued: 1,
       failed: 0,
+      dismissed: 0,
       remainingPending: 0,
     });
   });
@@ -404,6 +405,7 @@ describe('GET /api/admin/outreach', () => {
       attempted: 0,
       queued: 0,
       failed: 0,
+      dismissed: 0,
       remainingPending: 1,
     });
   });
