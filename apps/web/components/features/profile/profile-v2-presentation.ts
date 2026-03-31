@@ -1,12 +1,11 @@
 import type {
   ProfileMode,
   ProfileV2OverlayMode,
-  SwipeableProfileMode,
 } from '@/features/profile/contracts';
 
 export interface ProfileV2Presentation {
-  readonly initialPane: SwipeableProfileMode;
   readonly initialOverlay: ProfileV2OverlayMode;
+  readonly scrollTarget: 'tour' | null;
 }
 
 export function resolveProfileV2Presentation(
@@ -14,19 +13,19 @@ export function resolveProfileV2Presentation(
 ): ProfileV2Presentation {
   switch (mode) {
     case 'tour':
-      return { initialPane: 'tour', initialOverlay: null };
+      return { initialOverlay: null, scrollTarget: 'tour' };
     case 'tip':
-      return { initialPane: 'tip', initialOverlay: null };
+      return { initialOverlay: 'tip', scrollTarget: null };
     case 'about':
-      return { initialPane: 'about', initialOverlay: null };
+      return { initialOverlay: null, scrollTarget: null };
     case 'listen':
-      return { initialPane: 'profile', initialOverlay: 'listen' };
+      return { initialOverlay: 'listen', scrollTarget: null };
     case 'subscribe':
-      return { initialPane: 'profile', initialOverlay: 'subscribe' };
+      return { initialOverlay: 'subscribe', scrollTarget: null };
     case 'contact':
-      return { initialPane: 'profile', initialOverlay: 'contact' };
+      return { initialOverlay: 'contact', scrollTarget: null };
     case 'profile':
     default:
-      return { initialPane: 'profile', initialOverlay: null };
+      return { initialOverlay: null, scrollTarget: null };
   }
 }

@@ -22,10 +22,6 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
   ),
 }));
 
-vi.mock('@/components/molecules/SocialLink', () => ({
-  SocialLink: () => <div data-testid='hero-social-link' />,
-}));
-
 const artist = {
   handle: 'tim',
   id: 'artist-1',
@@ -56,7 +52,7 @@ describe('profile V2 layout constraints', () => {
         artist={artist as never}
         heroImageUrl='https://example.com/hero.jpg'
         latestRelease={null}
-        headerSocialLinks={[]}
+        primaryAction={{ label: 'Listen Now', onClick: () => {} }}
         onBellClick={() => {}}
         onPlayClick={() => {}}
       />
@@ -65,6 +61,25 @@ describe('profile V2 layout constraints', () => {
     expect(screen.getByTestId('image-with-fallback')).toHaveAttribute(
       'data-sizes',
       '(max-width: 768px) 100vw, 440px'
+    );
+  });
+
+  it('uses the reduced hero height so more content fits above the fold', () => {
+    const { container } = render(
+      <ArtistHero
+        artist={artist as never}
+        heroImageUrl='https://example.com/hero.jpg'
+        latestRelease={null}
+        primaryAction={{ label: 'Listen Now', onClick: () => {} }}
+        onBellClick={() => {}}
+        onPlayClick={() => {}}
+      />
+    );
+
+    expect(container.firstChild).toHaveClass(
+      'h-[32dvh]',
+      'min-h-[260px]',
+      'max-h-[320px]'
     );
   });
 });

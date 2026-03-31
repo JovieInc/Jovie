@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import {
   ProfileNotificationsContext,
@@ -9,18 +9,20 @@ import {
 import { ContactDrawer } from '@/features/profile/artist-contacts-button/ContactDrawer';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import {
+  PROFILE_MODE_KEYS,
   type ProfileMode,
-  SWIPEABLE_MODES,
-  type SwipeableProfileMode,
+  type ProfileV2OverlayMode,
 } from '@/features/profile/contracts';
 import { ListenDrawer } from '@/features/profile/ListenDrawer';
+import { resolveFeaturedContent } from '@/features/profile/ProfileFeaturedCard';
 import { ArtistHero } from '@/features/profile/ProfileHeroCard';
-import { ProfileQuickActions } from '@/features/profile/ProfileQuickActions';
+import { ProfileScrollBody } from '@/features/profile/ProfileScrollBody';
 import { ProfileViewportShell } from '@/features/profile/ProfileViewportShell';
 import { resolveProfileV2Presentation } from '@/features/profile/profile-v2-presentation';
 import { SubscribeDrawer } from '@/features/profile/SubscribeDrawer';
-import { SwipeableModeContainer } from '@/features/profile/SwipeableModeContainer';
-import { useSwipeMode } from '@/hooks/useSwipeMode';
+import { TipDrawer } from '@/features/profile/TipDrawer';
+import { extractVenmoUsername } from '@/features/profile/utils/venmo';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import {
@@ -68,7 +70,7 @@ function unwrapNextImageUrl(url: string | null | undefined): string | null {
   }
 }
 
-function buildModeHref(mode: SwipeableProfileMode): string {
+function buildModeHref(mode: ProfileMode): string {
   const url = new URL(globalThis.location.href);
   if (mode === 'profile') {
     url.searchParams.delete('mode');
@@ -77,20 +79,16 @@ function buildModeHref(mode: SwipeableProfileMode): string {
   }
 
   const search = url.searchParams.toString();
-  const suffix = search ? `?${search}` : '';
-  return `${url.pathname}${suffix}`;
+  return `${url.pathname}${search ? `?${search}` : ''}`;
 }
 
-function getModeFromLocation(): SwipeableProfileMode {
+function getModeFromLocation(): ProfileMode {
   const searchMode = new URLSearchParams(globalThis.location.search).get(
     'mode'
   );
 
-  if (
-    searchMode &&
-    SWIPEABLE_MODES.includes(searchMode as SwipeableProfileMode)
-  ) {
-    return searchMode as SwipeableProfileMode;
+  if (searchMode && PROFILE_MODE_KEYS.includes(searchMode as ProfileMode)) {
+    return searchMode as ProfileMode;
   }
 
   return 'profile';
@@ -105,18 +103,15 @@ export function PublicProfileTemplateV2({
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   genres,
-  pressPhotos = [],
-  allowPhotoDownloads = false,
   photoDownloadSizes = [],
   tourDates,
   visitTrackingToken,
 }: PublicProfileTemplateV2Props) {
-  const [activeOverlay, setActiveOverlay] = useState<
-    'listen' | 'subscribe' | 'contact' | null
-  >(null);
-  const lastNavigationModeRef = useRef<SwipeableProfileMode | null>(null);
-  const { initialPane, initialOverlay } = resolveProfileV2Presentation(mode);
-  const initialIndex = SWIPEABLE_MODES.indexOf(initialPane);
+  const [activeOverlay, setActiveOverlay] =
+    useState<ProfileV2OverlayMode>(null);
+  const [historyMode, setHistoryMode] = useState<ProfileMode>(mode);
+  const tourSectionRef = useRef<HTMLElement | null>(null);
+  const prefersReducedMotion = useReducedMotion();
   const mergedDSPs = useMemo(
     () => getCanonicalProfileDSPs(artist, socialLinks),
     [artist, socialLinks]
@@ -129,27 +124,17 @@ export function PublicProfileTemplateV2({
     contacts,
     artistHandle: artist.handle,
   });
+  const venmoLink =
+    socialLinks.find(link => link.platform === 'venmo')?.url ?? null;
+  const venmoUsername = extractVenmoUsername(venmoLink);
   const initialSource = useMemo(() => {
-    if (globalThis.window === undefined) {
+    if (typeof window === 'undefined') {
       return null;
     }
 
     return new URLSearchParams(globalThis.location.search).get('source');
   }, []);
 
-  const {
-    activeIndex,
-    containerRef,
-    dragOffset,
-    handlers,
-    isDragging,
-    setActiveIndex,
-  } = useSwipeMode({
-    count: SWIPEABLE_MODES.length,
-    initialIndex,
-  });
-
-  const activeMode = SWIPEABLE_MODES[activeIndex] ?? 'profile';
   const heroImageUrl = useMemo(() => {
     return unwrapNextImageUrl(
       photoDownloadSizes.find(size => size.key === 'large')?.url ??
@@ -158,68 +143,115 @@ export function PublicProfileTemplateV2({
         null
     );
   }, [artist.image_url, photoDownloadSizes]);
+
   const { notificationsContextValue } = useProfileShell({
     artist,
     socialLinks,
     contacts,
     visitTrackingToken,
-    modeOverride: activeMode,
+    modeOverride: historyMode,
     sourceOverride: initialSource,
   });
 
-  useEffect(() => {
-    const presentation = resolveProfileV2Presentation(mode);
-    const nextIndex = SWIPEABLE_MODES.indexOf(presentation.initialPane);
-    setActiveIndex(nextIndex);
-    setActiveOverlay(
-      presentation.initialOverlay === 'contact' && !hasContacts
-        ? null
-        : presentation.initialOverlay
-    );
-  }, [hasContacts, mode, setActiveIndex]);
+  const scrollToTourSection = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    let frame = 0;
+    let cancelled = false;
+
+    const attemptScroll = () => {
+      if (cancelled) {
+        return;
+      }
+
+      const tourSection = tourSectionRef.current;
+      if (tourSection) {
+        tourSection.scrollIntoView({
+          behavior: prefersReducedMotion ? 'auto' : 'smooth',
+          block: 'start',
+        });
+        return;
+      }
+
+      frame += 1;
+      if (frame < 10) {
+        globalThis.requestAnimationFrame(attemptScroll);
+      }
+    };
+
+    globalThis.requestAnimationFrame(attemptScroll);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [prefersReducedMotion]);
+
+  const applyRequestedMode = useCallback(
+    (nextMode: ProfileMode) => {
+      setHistoryMode(nextMode);
+
+      const presentation = resolveProfileV2Presentation(nextMode);
+      let nextOverlay = presentation.initialOverlay;
+
+      if (nextOverlay === 'listen' && mergedDSPs.length === 0) {
+        nextOverlay = null;
+      }
+      if (nextOverlay === 'contact' && !hasContacts) {
+        nextOverlay = null;
+      }
+      if (nextOverlay === 'tip' && !venmoLink) {
+        nextOverlay = null;
+      }
+
+      setActiveOverlay(nextOverlay);
+
+      if (presentation.scrollTarget === 'tour' && tourDates.length > 0) {
+        return scrollToTourSection();
+      }
+
+      return undefined;
+    },
+    [
+      hasContacts,
+      mergedDSPs.length,
+      scrollToTourSection,
+      tourDates.length,
+      venmoLink,
+    ]
+  );
+
+  useEffect(() => applyRequestedMode(mode), [applyRequestedMode, mode]);
 
   useEffect(() => {
-    if (globalThis.window === undefined) return;
+    if (typeof window === 'undefined') {
+      return;
+    }
 
     const handlePopState = () => {
-      const nextMode = getModeFromLocation();
-      const nextIndex = SWIPEABLE_MODES.indexOf(nextMode);
-      lastNavigationModeRef.current = nextMode;
-      setActiveIndex(nextIndex);
+      void applyRequestedMode(getModeFromLocation());
     };
 
     globalThis.addEventListener('popstate', handlePopState);
     return () => globalThis.removeEventListener('popstate', handlePopState);
-  }, [setActiveIndex]);
+  }, [applyRequestedMode]);
 
   useEffect(() => {
-    if (globalThis.window === undefined) return;
+    if (typeof window === 'undefined') {
+      return;
+    }
 
-    const href = buildModeHref(activeMode);
+    const href = buildModeHref(historyMode);
     const currentHref = `${globalThis.location.pathname}${globalThis.location.search}`;
-
     if (currentHref === href) {
-      lastNavigationModeRef.current = activeMode;
       return;
     }
 
-    if (lastNavigationModeRef.current === activeMode) {
-      return;
-    }
+    globalThis.history.pushState(globalThis.history.state, '', href);
+  }, [historyMode]);
 
-    if (
-      lastNavigationModeRef.current === null &&
-      initialOverlay !== null &&
-      currentHref !== href
-    ) {
-      globalThis.history.replaceState(globalThis.history.state, '', href);
-    } else {
-      globalThis.history.pushState(globalThis.history.state, '', href);
-    }
-    lastNavigationModeRef.current = activeMode;
-  }, [activeMode, initialOverlay]);
-
-  const headerSocialLinks = useMemo(() => {
+  const visibleSocialLinks = useMemo(() => {
     if (typeof document === 'undefined') {
       return [];
     }
@@ -229,30 +261,104 @@ export function PublicProfileTemplateV2({
       new URLSearchParams(globalThis.location.search)
     );
 
-    return getHeaderSocialLinks(socialLinks, sourcePlatform);
+    return getHeaderSocialLinks(socialLinks, sourcePlatform, 4);
   }, [socialLinks]);
 
-  const handleModeSelect = (nextMode: SwipeableProfileMode) => {
-    setActiveIndex(SWIPEABLE_MODES.indexOf(nextMode));
-  };
+  const primaryActionKind = useMemo(() => {
+    const featuredContent = resolveFeaturedContent(tourDates, latestRelease);
 
-  const handlePlayClick = () => {
+    if (featuredContent.kind === 'tour') {
+      return 'tickets' as const;
+    }
+
+    if (mergedDSPs.length > 0) {
+      return 'listen' as const;
+    }
+
+    return 'subscribe' as const;
+  }, [latestRelease, mergedDSPs.length, tourDates]);
+
+  const setOverlayState = useCallback((nextOverlay: ProfileV2OverlayMode) => {
+    setActiveOverlay(nextOverlay);
+    setHistoryMode(nextOverlay ?? 'profile');
+  }, []);
+
+  const handlePlayClick = useCallback(() => {
     if (mergedDSPs.length === 0) {
-      setActiveOverlay('subscribe');
+      setOverlayState('subscribe');
       return;
     }
 
-    setActiveOverlay('listen');
-  };
+    setOverlayState('listen');
+  }, [mergedDSPs.length, setOverlayState]);
 
-  const handleBellClick = () => {
-    setActiveOverlay('subscribe');
-  };
+  const handleBellClick = useCallback(() => {
+    setOverlayState('subscribe');
+  }, [setOverlayState]);
 
-  const handleBookClick = () => {
-    if (!hasContacts) return;
-    setActiveOverlay('contact');
-  };
+  const handleContactClick = useCallback(() => {
+    if (!hasContacts) {
+      return;
+    }
+
+    setOverlayState('contact');
+  }, [hasContacts, setOverlayState]);
+
+  const handleTipClick = useCallback(() => {
+    if (!venmoLink) {
+      return;
+    }
+
+    setOverlayState('tip');
+  }, [setOverlayState, venmoLink]);
+
+  const primaryAction = useMemo(() => {
+    switch (primaryActionKind) {
+      case 'tickets': {
+        const featuredContent = resolveFeaturedContent(
+          tourDates,
+          latestRelease
+        );
+
+        return {
+          label: 'Get Tickets',
+          href:
+            featuredContent.kind === 'tour'
+              ? (featuredContent.tourDate.ticketUrl ?? null)
+              : null,
+          external:
+            featuredContent.kind === 'tour' &&
+            Boolean(featuredContent.tourDate.ticketUrl),
+          onClick: () => {
+            setHistoryMode('tour');
+            void scrollToTourSection();
+          },
+          ariaLabel: `Get tickets for ${artist.name}`,
+        };
+      }
+      case 'listen':
+        return {
+          label: 'Listen Now',
+          onClick: handlePlayClick,
+          ariaLabel: `Listen to ${artist.name}`,
+        };
+      case 'subscribe':
+      default:
+        return {
+          label: 'Get Notified',
+          onClick: handleBellClick,
+          ariaLabel: `Get notified about ${artist.name}`,
+        };
+    }
+  }, [
+    artist.name,
+    handleBellClick,
+    handlePlayClick,
+    latestRelease,
+    primaryActionKind,
+    scrollToTourSection,
+    tourDates,
+  ]);
 
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
@@ -261,63 +367,68 @@ export function PublicProfileTemplateV2({
         artistName={artist.name}
       >
         <div
-          className='relative grid h-full w-full grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden bg-base'
+          className='relative flex h-full flex-col overflow-hidden bg-base'
           data-test='public-profile-root'
         >
           <ArtistHero
             artist={artist}
             heroImageUrl={heroImageUrl}
             latestRelease={latestRelease}
-            headerSocialLinks={headerSocialLinks}
+            primaryAction={primaryAction}
             onPlayClick={handlePlayClick}
             onBellClick={handleBellClick}
           />
 
-          <ProfileQuickActions
-            activeMode={activeMode}
-            onModeSelect={handleModeSelect}
-            onBookClick={handleBookClick}
-            bookingDisabled={!hasContacts}
-          />
-
-          <SwipeableModeContainer
+          <ProfileScrollBody
             artist={artist}
-            socialLinks={socialLinks}
+            socialLinks={visibleSocialLinks}
+            contacts={available}
             latestRelease={latestRelease}
             mergedDSPs={mergedDSPs}
             enableDynamicEngagement={enableDynamicEngagement}
             genres={genres}
-            pressPhotos={pressPhotos}
-            allowPhotoDownloads={allowPhotoDownloads}
             tourDates={tourDates}
+            hasTip={Boolean(venmoLink)}
+            primaryActionKind={primaryActionKind}
             onSubscribeClick={handleBellClick}
-            modes={SWIPEABLE_MODES}
-            activeIndex={activeIndex}
-            dragOffset={dragOffset}
-            isDragging={isDragging}
-            containerRef={containerRef}
-            handlers={handlers}
+            onTipClick={handleTipClick}
+            onContactClick={handleContactClick}
+            tourSectionRef={tourSectionRef}
           />
         </div>
+
         {mergedDSPs.length > 0 ? (
           <ListenDrawer
             open={activeOverlay === 'listen'}
-            onOpenChange={open => setActiveOverlay(open ? 'listen' : null)}
+            onOpenChange={open => setOverlayState(open ? 'listen' : null)}
             artist={artist}
             dsps={mergedDSPs}
             enableDynamicEngagement={enableDynamicEngagement}
           />
         ) : null}
+
+        {venmoLink ? (
+          <TipDrawer
+            open={activeOverlay === 'tip'}
+            onOpenChange={open => setOverlayState(open ? 'tip' : null)}
+            artistName={artist.name}
+            artistHandle={artist.handle}
+            venmoLink={venmoLink}
+            venmoUsername={venmoUsername}
+          />
+        ) : null}
+
         <SubscribeDrawer
           open={activeOverlay === 'subscribe'}
-          onOpenChange={open => setActiveOverlay(open ? 'subscribe' : null)}
+          onOpenChange={open => setOverlayState(open ? 'subscribe' : null)}
           artist={artist}
           subscribeTwoStep={subscribeTwoStep}
         />
+
         {hasContacts ? (
           <ContactDrawer
             open={activeOverlay === 'contact'}
-            onOpenChange={open => setActiveOverlay(open ? 'contact' : null)}
+            onOpenChange={open => setOverlayState(open ? 'contact' : null)}
             artistName={artist.name}
             artistHandle={artist.handle}
             contacts={available}

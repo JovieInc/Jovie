@@ -3,8 +3,7 @@
 import { Bell, Play } from 'lucide-react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
-import { SocialLink } from '@/components/molecules/SocialLink';
-import type { Artist, LegacySocialLink } from '@/types/db';
+import type { Artist } from '@/types/db';
 
 type HeroRelease = {
   readonly title: string;
@@ -17,7 +16,13 @@ interface ArtistHeroProps {
   readonly artist: Artist;
   readonly heroImageUrl?: string | null;
   readonly latestRelease?: HeroRelease | null;
-  readonly headerSocialLinks: LegacySocialLink[];
+  readonly primaryAction: {
+    readonly label: string;
+    readonly href?: string | null;
+    readonly external?: boolean;
+    readonly onClick?: () => void;
+    readonly ariaLabel?: string;
+  };
   readonly onPlayClick: () => void;
   readonly onBellClick: () => void;
 }
@@ -45,15 +50,16 @@ export function ArtistHero({
   artist,
   heroImageUrl,
   latestRelease,
-  headerSocialLinks,
+  primaryAction,
   onPlayClick,
   onBellClick,
 }: ArtistHeroProps) {
   const eyebrow = getReleaseEyebrow(latestRelease);
-  const socialLinks = headerSocialLinks.slice(0, 2);
+  const primaryActionClassName =
+    'inline-flex min-h-11 items-center justify-center rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-black shadow-[0_12px_28px_rgba(0,0,0,0.28)] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
 
   return (
-    <section className='relative h-[44dvh] min-h-[320px] max-h-[440px] w-full overflow-hidden md:h-[380px]'>
+    <section className='relative h-[32dvh] min-h-[260px] max-h-[320px] w-full overflow-hidden md:h-[320px]'>
       {/* Artist photo — full bleed background */}
       <div className='absolute inset-0'>
         <ImageWithFallback
@@ -87,39 +93,49 @@ export function ArtistHero({
           </CircleIconButton>
         </div>
 
-        <div className='mt-auto flex items-end justify-between gap-4'>
-          <div className='min-w-0 space-y-3'>
-            <div className='flex items-end gap-3'>
-              <CircleIconButton
-                ariaLabel={`Listen to ${artist.name}`}
-                size='lg'
-                variant='frosted'
-                className='shrink-0'
-                onClick={onPlayClick}
-              >
-                <Play className='h-5 w-5 fill-current' aria-hidden='true' />
-              </CircleIconButton>
-              <div className='min-w-0 space-y-1.5'>
-                {eyebrow ? (
-                  <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60'>
-                    {eyebrow}
-                  </p>
-                ) : null}
-                <h1 className='line-clamp-2 text-3xl font-[680] tracking-tight text-white'>
-                  {artist.name}
-                </h1>
-              </div>
-            </div>
+        <div className='mt-auto space-y-4'>
+          <div className='min-w-0 space-y-1.5'>
+            {eyebrow ? (
+              <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60'>
+                {eyebrow}
+              </p>
+            ) : null}
+            <h1 className='line-clamp-2 text-3xl font-[680] tracking-tight text-white'>
+              {artist.name}
+            </h1>
           </div>
-          <div className='flex shrink-0 items-center justify-end gap-2 pb-0.5'>
-            {socialLinks.map(link => (
-              <SocialLink
-                key={link.id}
-                link={link}
-                handle={artist.handle}
-                artistName={artist.name}
-              />
-            ))}
+
+          <div className='flex items-center gap-3'>
+            <CircleIconButton
+              ariaLabel={`Listen to ${artist.name}`}
+              size='lg'
+              variant='frosted'
+              className='shrink-0'
+              onClick={onPlayClick}
+            >
+              <Play className='h-5 w-5 fill-current' aria-hidden='true' />
+            </CircleIconButton>
+
+            {primaryAction.href ? (
+              <a
+                href={primaryAction.href}
+                target={primaryAction.external ? '_blank' : undefined}
+                rel={primaryAction.external ? 'noopener noreferrer' : undefined}
+                aria-label={primaryAction.ariaLabel ?? primaryAction.label}
+                className={primaryActionClassName}
+              >
+                {primaryAction.label}
+              </a>
+            ) : (
+              <button
+                type='button'
+                onClick={primaryAction.onClick}
+                aria-label={primaryAction.ariaLabel ?? primaryAction.label}
+                className={primaryActionClassName}
+              >
+                {primaryAction.label}
+              </button>
+            )}
           </div>
         </div>
       </div>
