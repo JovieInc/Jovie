@@ -35,7 +35,7 @@ export function getCompletedTaskIndicatorClass(): string {
  * Get the indicator circle class for an incomplete setup task.
  */
 export function getIncompleteTaskIndicatorClass(): string {
-  return `${TASK_INDICATOR_BASE} border border-subtle bg-surface-1 text-tertiary-token`;
+  return `${TASK_INDICATOR_BASE} border border-subtle bg-surface-0 text-tertiary-token`;
 }
 
 /**
