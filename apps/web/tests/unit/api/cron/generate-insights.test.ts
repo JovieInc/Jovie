@@ -5,9 +5,7 @@ const expireStaleInsightsMock = vi.fn();
 const createGenerationRunMock = vi.fn();
 const aggregateMetricsMock = vi.fn();
 const getExistingInsightTypesMock = vi.fn();
-const getLatestInsightsForFreshnessMock = vi.fn();
 const generateInsightsMock = vi.fn();
-const findStaleTypesMock = vi.fn();
 const persistInsightsMock = vi.fn();
 const completeGenerationRunMock = vi.fn();
 
@@ -44,7 +42,6 @@ vi.mock('@/lib/services/insights/lifecycle', () => ({
   expireStaleInsights: expireStaleInsightsMock,
   createGenerationRun: createGenerationRunMock,
   getExistingInsightTypes: getExistingInsightTypesMock,
-  getLatestInsightsForFreshness: getLatestInsightsForFreshnessMock,
   persistInsights: persistInsightsMock,
   completeGenerationRun: completeGenerationRunMock,
 }));
@@ -55,7 +52,6 @@ vi.mock('@/lib/services/insights/data-aggregator', () => ({
 
 vi.mock('@/lib/services/insights/insight-generator', () => ({
   generateInsights: generateInsightsMock,
-  findStaleTypes: findStaleTypesMock,
 }));
 
 describe('GET /api/cron/generate-insights', () => {
@@ -81,8 +77,6 @@ describe('GET /api/cron/generate-insights', () => {
       comparisonPeriod: { start: '2024-12-01', end: '2024-12-31' },
     });
     getExistingInsightTypesMock.mockResolvedValue([]);
-    getLatestInsightsForFreshnessMock.mockResolvedValue([]);
-    findStaleTypesMock.mockReturnValue([]);
     generateInsightsMock.mockResolvedValue({
       insights: [],
       modelUsed: 'gpt',
@@ -122,5 +116,5 @@ describe('GET /api/cron/generate-insights', () => {
     expect(maxInFlight).toBeGreaterThan(1);
     expect(data.stats.processed).toBe(6);
     expect(data.stats.insightsGenerated).toBe(6);
-  }, 30_000);
+  });
 });

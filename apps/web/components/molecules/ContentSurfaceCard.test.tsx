@@ -12,7 +12,8 @@ describe('ContentSurfaceCard', () => {
   it('applies default surface variant', () => {
     render(<ContentSurfaceCard data-testid='card'>Content</ContentSurfaceCard>);
     const card = screen.getByTestId('card');
-    expect(card.className).toContain('rounded-[10px]');
+    expect(card.className).toContain('rounded-xl');
+    expect(card.className).toContain('shadow-none');
   });
 
   it('applies marketing surface variant', () => {
@@ -32,7 +33,19 @@ describe('ContentSurfaceCard', () => {
       </ContentSurfaceCard>
     );
     const card = screen.getByTestId('card');
+    expect(card.className).toContain('rounded-xl');
+    expect(card.className).toContain('shadow-none');
+  });
+
+  it('uses the nested surface variant for tighter inner surfaces', () => {
+    render(
+      <ContentSurfaceCard surface='nested' data-testid='nested-card'>
+        Nested body
+      </ContentSurfaceCard>
+    );
+    const card = screen.getByTestId('nested-card');
     expect(card.className).toContain('rounded-[10px]');
+    expect(card.className).toContain('shadow-none');
   });
 
   it('renders as custom element', () => {

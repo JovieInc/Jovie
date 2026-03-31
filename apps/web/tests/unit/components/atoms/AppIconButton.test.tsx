@@ -25,5 +25,7 @@ describe('AppIconButton', () => {
     const button = screen.getByRole('button', { name: 'Open details' });
     expect(button).toBeInTheDocument();
     expect(button).toBeEnabled();
+    expect(button.className).toContain('rounded-full');
+    expect(button.className).toContain('shadow-none');
   });
 });

@@ -10,16 +10,8 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => mockUseDashboardData(),
 }));
 
-vi.mock('@/features/dashboard/organisms/EarningsOverviewTab', () => ({
-  EarningsOverviewTab: () => (
-    <div data-testid='earnings-overview-tab'>Overview tab content</div>
-  ),
-}));
-
-vi.mock('@/features/dashboard/organisms/EarningsTippersTab', () => ({
-  EarningsTippersTab: () => (
-    <div data-testid='earnings-tippers-tab'>Tippers tab content</div>
-  ),
+vi.mock('@/features/dashboard/organisms/EarningsTab', () => ({
+  EarningsTab: () => <div data-testid='earnings-tab'>Earnings tab content</div>,
 }));
 
 vi.mock('@/components/organisms/Dialog', () => ({
@@ -33,21 +25,6 @@ vi.mock('@/components/organisms/Dialog', () => ({
 
 vi.mock('@/features/dashboard/dashboard-tipping/useDashboardTipping', () => ({
   useDashboardTipping: () => mockUseDashboardTipping(),
-}));
-
-vi.mock('@/lib/queries', () => ({
-  useEarningsQuery: () => ({
-    data: undefined,
-    isLoading: false,
-  }),
-}));
-
-const mockSearchParams = new URLSearchParams();
-const mockRouter = { replace: vi.fn() };
-vi.mock('next/navigation', () => ({
-  useSearchParams: () => mockSearchParams,
-  useRouter: () => mockRouter,
-  usePathname: () => '/app/dashboard/earnings',
 }));
 
 describe('DashboardTipping empty state behavior', () => {
@@ -86,12 +63,10 @@ describe('DashboardTipping empty state behavior', () => {
     expect(
       screen.getByRole('heading', { name: 'Earnings Dashboard' })
     ).toBeInTheDocument();
-    expect(
-      screen.queryByTestId('earnings-overview-tab')
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('earnings-tab')).not.toBeInTheDocument();
   });
 
-  it('shows tab control and overview content when Venmo is connected', () => {
+  it('shows earnings workspace and earnings content when Venmo is connected', () => {
     mockUseDashboardData.mockReturnValue({
       tippingStats: {
         tipClicks: 42,
@@ -119,33 +94,6 @@ describe('DashboardTipping empty state behavior', () => {
     expect(
       screen.getByRole('heading', { name: 'Earnings Dashboard' })
     ).toBeInTheDocument();
-    expect(screen.getByTestId('earnings-overview-tab')).toBeInTheDocument();
-  });
-
-  it('defaults to overview tab when no search param is set', () => {
-    mockUseDashboardData.mockReturnValue({
-      tippingStats: { tipClicks: 0, qrTipClicks: 0, linkTipClicks: 0 },
-    });
-
-    mockUseDashboardTipping.mockReturnValue({
-      artist: { handle: 'test', venmo_handle: '@test' },
-      venmoHandle: 'test',
-      setVenmoHandle: vi.fn(),
-      isEditing: false,
-      setIsEditing: vi.fn(),
-      isSaving: false,
-      saveSuccess: null,
-      hasVenmoHandle: true,
-      handleSaveVenmo: vi.fn(),
-      handleCancel: vi.fn(),
-      handleDisconnect: vi.fn(),
-    });
-
-    render(<DashboardTipping />);
-
-    expect(screen.getByTestId('earnings-overview-tab')).toBeInTheDocument();
-    expect(
-      screen.queryByTestId('earnings-tippers-tab')
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('earnings-tab')).toBeInTheDocument();
   });
 });

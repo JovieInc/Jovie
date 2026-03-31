@@ -4,16 +4,12 @@ import { getSessionContext } from '@/lib/auth/session';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { aggregateMetrics } from '@/lib/services/insights/data-aggregator';
-import {
-  findStaleTypes,
-  generateInsights,
-} from '@/lib/services/insights/insight-generator';
+import { generateInsights } from '@/lib/services/insights/insight-generator';
 import {
   canGenerateInsights,
   completeGenerationRun,
   createGenerationRun,
   getExistingInsightTypes,
-  getLatestInsightsForFreshness,
   persistInsights,
 } from '@/lib/services/insights/lifecycle';
 import { MIN_TOTAL_CLICKS } from '@/lib/services/insights/thresholds';
@@ -103,12 +99,8 @@ export async function POST() {
       // Get existing insight types to avoid duplicates
       const existingTypes = await getExistingInsightTypes(profile.id);
 
-      // Freshness gate: skip types whose underlying data hasn't changed
-      const latestInsights = await getLatestInsightsForFreshness(profile.id);
-      const staleTypes = findStaleTypes(metrics, latestInsights);
-
       // Generate insights via AI
-      const result = await generateInsights(metrics, existingTypes, staleTypes);
+      const result = await generateInsights(metrics, existingTypes);
 
       // Persist insights
       const persisted = await persistInsights(

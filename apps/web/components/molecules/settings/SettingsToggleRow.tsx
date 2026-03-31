@@ -53,7 +53,7 @@ export function SettingsToggleRow(props: Readonly<SettingsToggleRowProps>) {
     >
       <div className='flex min-w-0 items-start gap-3'>
         {icon ? (
-          <div className='mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-subtle bg-surface-0 text-secondary-token'>
+          <div className='mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
             {icon}
           </div>
         ) : null}

@@ -5,22 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.107] - 2026-03-30
+## [26.3.107] - 2026-03-30
 
-### Added
-
-- Compact `Signals` card in the audience analytics sidebar with top AI insights and Ask Jovie drill-down links
-- Insight data-hash freshness gate so cron and manual generation can skip unchanged insight types
+> Dashboard surfaces and shared controls now use a flatter, more consistent visual system. This update also tightens responsive audience layouts and keeps insight generation focused on fresher, higher-signal results.
 
 ### Changed
 
+- Flattened dashboard content surfaces and shared app controls so cards use quieter borders and pill geometry instead of elevated tile chrome
+- Updated analytics range tabs, dashboard header actions, settings rows, and setup/checklist affordances to use the same rounded-full control language
 - `/app/insights` now redirects to the audience dashboard, with stale route benchmarks removed from the performance manifest
 - Insight generation narrowed to the remaining high-value categories and a max of five surfaced insights per run
 - Audience rows now collapse based on the actual table container width instead of raw viewport width, so the desktop layout stays readable with the drawer open or closed
 - Audience user rows now carry a metadata subtitle when columns are hidden, preserving engagement, location, and recency context at tighter breakpoints
 
-### Fixed
+### Added
 
+- [internal] Regression coverage for the flatter content-surface and pill-control classes across dashboard and settings UI primitives
 - Repeated insight generation now avoids recycling stale signals when the underlying metric slice has not changed
 - Cron insights concurrency test timeout increased to reflect the observed route import cost in CI-like environments
 - Analytics no longer default-opens into the full-screen mobile drawer on first load; it now opens after mount on desktop and closes when crossing down to mobile
