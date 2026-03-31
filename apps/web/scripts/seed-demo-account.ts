@@ -17,9 +17,10 @@
 
 import { neon } from '@neondatabase/serverless';
 import { Redis } from '@upstash/redis';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
+import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
 
 const {
   users,
@@ -49,6 +50,7 @@ const {
   fanReleaseNotifications,
   preSaveTokens,
   dspArtistMatches,
+  releaseTasks,
 } = schema;
 
 // ---------------------------------------------------------------------------
@@ -58,6 +60,10 @@ const {
 const DEMO_USERNAME = 'timwhite';
 const DEMO_DISPLAY_NAME = 'Tim White';
 const DEMO_EMAIL = 'demo@jov.ie';
+const DEMO_REFERRED_EMAILS = Array.from(
+  { length: 3 },
+  (_, index) => `demo.referred.${index}@example.com`
+);
 
 // Hardcoded fallback data from Tim's real profile
 const FALLBACK_PROFILE = {
@@ -737,6 +743,28 @@ async function seedDemoProfile(userId: string): Promise<string> {
     location = timProfile.location ?? location;
   }
 
+  let spotifyIdForProfile = spotifyId;
+  let spotifyUrlForProfile = spotifyUrl;
+
+  if (spotifyId) {
+    const [spotifyOwner] = await db
+      .select({
+        id: creatorProfiles.id,
+        username: creatorProfiles.username,
+      })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.spotifyId, spotifyId))
+      .limit(1);
+
+    if (spotifyOwner && spotifyOwner.id !== existingProfile?.id) {
+      console.log(
+        `    Spotify ID already belongs to @${spotifyOwner.username ?? 'unknown'}; keeping demo profile detached from the canonical Spotify link`
+      );
+      spotifyIdForProfile = null;
+      spotifyUrlForProfile = null;
+    }
+  }
+
   const profileData = {
     userId,
     username: DEMO_USERNAME,
@@ -744,8 +772,8 @@ async function seedDemoProfile(userId: string): Promise<string> {
     displayName: DEMO_DISPLAY_NAME,
     bio: FALLBACK_PROFILE.bio,
     avatarUrl: '/images/avatars/tim-white.jpg', // Use static fallback — prevents wrong Spotify image
-    spotifyId,
-    spotifyUrl,
+    spotifyId: spotifyIdForProfile,
+    spotifyUrl: spotifyUrlForProfile,
     genres: profileGenres,
     location,
     creatorType: 'artist' as const,
@@ -829,7 +857,29 @@ async function cleanDemoChildData(profileId: string, userId: string) {
     .delete(discogReleases)
     .where(eq(discogReleases.creatorProfileId, profileId));
   // Referrals
+  const existingReferralRows = await db
+    .select({ id: referrals.id })
+    .from(referrals)
+    .where(eq(referrals.referrerUserId, userId));
+  const existingReferralIds = existingReferralRows.map(row => row.id);
+  if (existingReferralIds.length > 0) {
+    await db
+      .delete(referralCommissions)
+      .where(inArray(referralCommissions.referralId, existingReferralIds));
+    await db
+      .delete(referrals)
+      .where(inArray(referrals.id, existingReferralIds));
+  }
   await db.delete(referralCodes).where(eq(referralCodes.userId, userId));
+
+  const existingReferredUsers = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(inArray(users.email, DEMO_REFERRED_EMAILS));
+  const existingReferredUserIds = existingReferredUsers.map(row => row.id);
+  if (existingReferredUserIds.length > 0) {
+    await db.delete(users).where(inArray(users.id, existingReferredUserIds));
+  }
 
   console.log('    Cleaned all child data');
 }
@@ -1030,6 +1080,58 @@ async function seedDemoReleases(profileId: string): Promise<string[]> {
 
   console.log(`    Total releases: ${clonedReleaseIds.length}`);
   return clonedReleaseIds;
+}
+
+async function seedDemoReleaseTasks(
+  profileId: string,
+  releaseIds: string[]
+): Promise<void> {
+  console.log('  Seeding release tasks...');
+
+  for (const releaseId of releaseIds) {
+    await db.delete(releaseTasks).where(eq(releaseTasks.releaseId, releaseId));
+
+    const [release] = await db
+      .select({ releaseDate: discogReleases.releaseDate })
+      .from(discogReleases)
+      .where(eq(discogReleases.id, releaseId))
+      .limit(1);
+
+    const releaseDate = release?.releaseDate
+      ? new Date(release.releaseDate)
+      : null;
+
+    await db.insert(releaseTasks).values(
+      DEFAULT_RELEASE_TASK_TEMPLATE.map((item, index) => ({
+        releaseId,
+        creatorProfileId: profileId,
+        title: item.title,
+        description: item.description ?? null,
+        explainerText: item.explainerText ?? null,
+        learnMoreUrl: item.learnMoreUrl ?? null,
+        category: item.category,
+        status:
+          item.assigneeType === 'ai_workflow'
+            ? ('done' as const)
+            : ('todo' as const),
+        priority: item.priority,
+        position: index,
+        assigneeType: item.assigneeType,
+        aiWorkflowId: item.aiWorkflowId ?? null,
+        dueDaysOffset: item.dueDaysOffset,
+        dueDate: releaseDate
+          ? new Date(
+              releaseDate.getTime() + item.dueDaysOffset * 24 * 60 * 60 * 1000
+            )
+          : null,
+        completedAt: item.assigneeType === 'ai_workflow' ? new Date() : null,
+      }))
+    );
+  }
+
+  console.log(
+    `    Seeded ${DEFAULT_RELEASE_TASK_TEMPLATE.length} tasks across ${releaseIds.length} releases`
+  );
 }
 
 async function seedDemoSocialLinks(profileId: string): Promise<string[]> {
@@ -1996,10 +2098,19 @@ async function seedDemoReferrals(userId: string) {
     const [referredUser] = await db
       .insert(users)
       .values({
-        clerkId: `demo_referred_${i}_${Date.now()}`,
-        email: `demo.referred.${i}@example.com`,
+        clerkId: `demo_referred_${i}_${DEMO_USERNAME}`,
+        email: DEMO_REFERRED_EMAILS[i],
         name: FAN_NAMES[i + 10],
         userStatus: 'active',
+      })
+      .onConflictDoUpdate({
+        target: users.email,
+        set: {
+          clerkId: `demo_referred_${i}_${DEMO_USERNAME}`,
+          name: FAN_NAMES[i + 10],
+          userStatus: 'active',
+          updatedAt: new Date(),
+        },
       })
       .returning({ id: users.id });
     referredUserIds.push(referredUser.id);
@@ -2292,52 +2403,55 @@ async function seedDemoAccount() {
     // 5. Releases
     const releaseIds = await seedDemoReleases(profileId);
 
-    // 6. Social links
+    // 6. Release tasks
+    await seedDemoReleaseTasks(profileId, releaseIds);
+
+    // 7. Social links
     const linkIds = await seedDemoSocialLinks(profileId);
 
-    // 7. Tour dates
+    // 8. Tour dates
     await seedDemoTourDates(profileId);
 
-    // 8. Subscribers
+    // 9. Subscribers
     const subscriberIds = await seedDemoSubscribers(profileId);
 
-    // 9. Audience
+    // 10. Audience
     await seedDemoAudience(profileId);
 
-    // 10. Tips
+    // 11. Tips
     const tipData = await seedDemoTips(profileId);
 
-    // 11. Tip audience
+    // 12. Tip audience
     await seedDemoTipAudience(profileId, tipData);
 
-    // 12. Clicks
+    // 13. Clicks
     await seedDemoClicks(profileId, linkIds);
 
-    // 13. Profile views
+    // 14. Profile views
     await seedDemoProfileViews(profileId);
 
-    // 14. Inbox
+    // 15. Inbox
     await seedDemoInbox(profileId, contactIds);
 
-    // 15. Insights
+    // 16. Insights
     await seedDemoInsights(profileId);
 
-    // 16. Chat history
+    // 17. Chat history
     await seedDemoChatHistory(userId, profileId);
 
-    // 17. Referrals
+    // 18. Referrals
     await seedDemoReferrals(userId);
 
-    // 18. Email engagement
+    // 19. Email engagement
     await seedDemoEmailEngagement(profileId, subscriberIds, releaseIds);
 
-    // 19. Pre-save tokens
+    // 20. Pre-save tokens
     await seedDemoPreSaveTokens(profileId, releaseIds);
 
-    // 20. DSP matches
+    // 21. DSP matches
     await seedDemoDspMatches(profileId);
 
-    // 21. Invalidate cache
+    // 22. Invalidate cache
     await invalidateCache();
 
     console.log('\nDemo account seeded successfully!');

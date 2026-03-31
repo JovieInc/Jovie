@@ -4,6 +4,7 @@ import React from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import './globals.css';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
+import { getRootLayoutChromeState } from '@/lib/demo-recording';
 import { publicEnv } from '@/lib/env-public';
 
 const inter = localFont({
@@ -145,13 +146,18 @@ export default async function RootLayout({
     process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development';
   const devSha = (process.env.NEXT_PUBLIC_BUILD_SHA ?? '').slice(0, 7);
   const devVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? '';
+  const { isDemoRecording, shouldRenderCookieBanner, shouldRenderDevChrome } =
+    getRootLayoutChromeState({
+      devEnv,
+      isE2EClientRuntime,
+    });
 
   let devToolbar: React.ReactNode = null;
   let FlagBadgeProvider: React.ComponentType<{
     children: React.ReactNode;
   }> | null = null;
 
-  if (!(isE2EClientRuntime || devEnv === 'production')) {
+  if (shouldRenderDevChrome) {
     const { DevToolbarGate } = await import(
       '@/components/features/dev/DevToolbarGate'
     );
@@ -176,7 +182,7 @@ export default async function RootLayout({
     <>
       {children}
       {devToolbar}
-      <CookieBannerMount />
+      {shouldRenderCookieBanner ? <CookieBannerMount /> : null}
     </>
   );
 
@@ -187,6 +193,7 @@ export default async function RootLayout({
       data-clerk-mock={clerkMockEnabled ? '1' : undefined}
       data-clerk-proxy-disabled={clerkProxyDisabled ? '1' : undefined}
       data-e2e-mode={isE2EClientRuntime ? '1' : undefined}
+      data-demo-recording={isDemoRecording ? 'true' : undefined}
       data-scroll-behavior='smooth'
       suppressHydrationWarning
     >

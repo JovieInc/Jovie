@@ -58,6 +58,13 @@ export interface MultiDspEnrichmentState {
   social_link_count: number | null;
 }
 
+export interface DemoReleaseLookup {
+  id: string;
+  slug: string;
+  title: string | null;
+  releaseDate?: string | null;
+}
+
 /** Spotify IDs for known major artists with guaranteed multi-DSP coverage */
 export const MAJOR_ARTIST_IDS = new Set([
   '6M2wZ9GZgrQXHCFfjv46we', // Dua Lipa
@@ -169,6 +176,118 @@ export async function waitForMultiDspEnrichment(clerkUserId: string) {
   `) as MultiDspEnrichmentState[];
 
   return state ?? null;
+}
+
+export async function getFirstReleaseForUser(
+  clerkUserId: string
+): Promise<DemoReleaseLookup | null> {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL required for release lookup');
+  }
+
+  const sql = neon(dbUrl);
+
+  const [preferredRelease] = (await sql`
+    SELECT
+      dr.id,
+      dr.slug,
+      dr.title
+    FROM discog_releases dr
+    INNER JOIN creator_profiles cp ON cp.id = dr.creator_profile_id
+    INNER JOIN users u ON u.id = cp.user_id
+    WHERE u.clerk_id = ${clerkUserId}
+      AND (dr.release_date IS NULL OR dr.release_date <= NOW())
+      AND EXISTS (
+        SELECT 1
+        FROM provider_links pl
+        WHERE pl.release_id = dr.id
+          AND pl.owner_type = 'release'
+      )
+    ORDER BY COALESCE(dr.release_date, dr.created_at) DESC, dr.created_at DESC
+    LIMIT 1
+  `) as DemoReleaseLookup[];
+
+  if (preferredRelease) {
+    return preferredRelease;
+  }
+
+  const [fallbackRelease] = (await sql`
+    SELECT
+      dr.id,
+      dr.slug,
+      dr.title
+    FROM discog_releases dr
+    INNER JOIN creator_profiles cp ON cp.id = dr.creator_profile_id
+    INNER JOIN users u ON u.id = cp.user_id
+    WHERE u.clerk_id = ${clerkUserId}
+    ORDER BY COALESCE(dr.release_date, dr.created_at) DESC, dr.created_at DESC
+    LIMIT 1
+  `) as DemoReleaseLookup[];
+
+  return fallbackRelease ?? null;
+}
+
+export async function getTopDemoReleasesForUser(
+  clerkUserId: string,
+  limit = 3
+): Promise<DemoReleaseLookup[]> {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL required for release lookup');
+  }
+
+  const sql = neon(dbUrl);
+  const rows = (await sql`
+    SELECT
+      dr.id,
+      dr.slug,
+      dr.title,
+      dr.release_date::text AS "releaseDate"
+    FROM discog_releases dr
+    INNER JOIN creator_profiles cp ON cp.id = dr.creator_profile_id
+    INNER JOIN users u ON u.id = cp.user_id
+    WHERE u.clerk_id = ${clerkUserId}
+    ORDER BY COALESCE(dr.release_date, dr.created_at) DESC, dr.created_at DESC
+  `) as DemoReleaseLookup[];
+
+  const deduped: DemoReleaseLookup[] = [];
+  const seenTitles = new Set<string>();
+
+  for (const row of rows) {
+    const title = row.title?.trim();
+    if (!title || seenTitles.has(title)) {
+      continue;
+    }
+    seenTitles.add(title);
+    deduped.push(row);
+    if (deduped.length >= limit) {
+      break;
+    }
+  }
+
+  return deduped;
+}
+
+export async function getDemoUserHandle(
+  clerkUserId: string
+): Promise<string | null> {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL required for demo handle lookup');
+  }
+
+  const sql = neon(dbUrl);
+
+  const [row] = (await sql`
+    SELECT cp.username
+    FROM creator_profiles cp
+    INNER JOIN users u ON u.id = cp.user_id
+    WHERE u.clerk_id = ${clerkUserId}
+    LIMIT 1
+  `) as Array<{ username: string | null }>;
+
+  return row?.username ?? null;
 }
 
 /* ------------------------------------------------------------------ */
