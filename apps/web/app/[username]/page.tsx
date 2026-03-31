@@ -1,7 +1,9 @@
 import { type Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
-import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
+import { notFound, redirect } from 'next/navigation';
 import { cache } from 'react';
+import { createFingerprint } from '@/app/api/audience/lib/audience-utils';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
@@ -16,6 +18,8 @@ import {
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
+import { isVisitorBlocked } from '@/lib/audience/block-check';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for types
 import type {
@@ -661,6 +665,26 @@ export default async function ArtistPage({
 
   if (!profile) {
     notFound();
+  }
+
+  // Block check: redirect blocked visitors to jov.ie before rendering.
+  // Runs per-request (not cached). Skips if visitor is the profile owner.
+  if (!isPublicNoAuthSmoke) {
+    const headersList = await headers();
+    const ip = headersList.get('x-forwarded-for')?.split(',')[0]?.trim();
+    const ua = headersList.get('user-agent');
+    const visitorFingerprint = createFingerprint(ip, ua);
+
+    const { userId: visitorClerkId } = await getCachedAuth();
+    const isOwner =
+      visitorClerkId != null && visitorClerkId === profileResult.creatorClerkId;
+
+    if (!isOwner) {
+      const blocked = await isVisitorBlocked(profile.id, visitorFingerprint);
+      if (blocked) {
+        redirect('https://jov.ie');
+      }
+    }
   }
 
   // Convert our profile data to the Artist type expected by components
