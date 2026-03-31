@@ -61,16 +61,9 @@ function ArtistCell({ item }: Readonly<{ item: DspPresenceItem }>) {
           <DspProviderIcon provider={item.providerId} size='sm' />
         </div>
       )}
-      <div className='flex min-w-0 items-center gap-2'>
-        <DspProviderIcon
-          provider={item.providerId}
-          size='sm'
-          className='shrink-0'
-        />
-        <span className='truncate whitespace-nowrap font-[510] text-[13px] text-primary-token'>
-          {item.externalArtistName ?? 'Unknown Artist'}
-        </span>
-      </div>
+      <span className='truncate whitespace-nowrap font-[510] text-[13px] text-primary-token'>
+        {item.externalArtistName ?? 'Unknown Artist'}
+      </span>
     </div>
   );
 }
