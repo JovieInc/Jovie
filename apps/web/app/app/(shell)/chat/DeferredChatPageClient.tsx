@@ -7,6 +7,5 @@ export const DeferredChatPageClient = dynamic(
   () => import('./ChatPageClient').then(mod => mod.ChatPageClient),
   {
     loading: () => <ChatLoading />,
-    ssr: false,
   }
 );

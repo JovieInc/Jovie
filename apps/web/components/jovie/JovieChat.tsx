@@ -31,6 +31,7 @@ import type { JovieChatProps, MessagePart } from './types';
 
 /** Sentinel ID for the synthetic thinking placeholder */
 const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
+const VIRTUALIZATION_THRESHOLD = 12;
 
 function deriveSessionState(
   suggestedProfiles: ReturnType<typeof useSuggestedProfiles>,
@@ -105,6 +106,20 @@ export function JovieChat({
   const insightsSummary = useInsightsSummaryQuery({
     enabled: shouldLoadInsightSuggestions,
   });
+  const showGreetingSummary = useMemo(() => {
+    if (isFirstSession) {
+      return true;
+    }
+
+    const hasInsight = (insightsSummary.data?.insights ?? []).some(
+      insight => insight.title.trim().length > 0
+    );
+    if (hasInsight) {
+      return true;
+    }
+
+    return (tippingStats?.tipsSubmitted ?? 0) > 0;
+  }, [insightsSummary.data?.insights, isFirstSession, tippingStats]);
 
   const {
     input,
@@ -226,21 +241,19 @@ export function JovieChat({
   // ─── Synthetic thinking message (render-only) ───────────────────
   // Append a placeholder when waiting for the AI to start responding.
   // This is a displayMessages array, NOT a modification to the real messages.
-  const displayMessages = useMemo(() => {
-    const lastMsg = messages[messages.length - 1];
-    if (isLoading && lastMsg?.role === 'user') {
-      return [
-        ...messages,
-        {
-          id: THINKING_PLACEHOLDER_ID,
-          role: 'assistant' as const,
-          parts: [] as MessagePart[],
-          createdAt: new Date(),
-        },
-      ];
-    }
-    return messages;
-  }, [messages, isLoading]);
+  const lastMessage = messages[messages.length - 1];
+  const displayMessages =
+    isLoading && lastMessage?.role === 'user'
+      ? [
+          ...messages,
+          {
+            id: THINKING_PLACEHOLDER_ID,
+            role: 'assistant' as const,
+            parts: [] as MessagePart[],
+            createdAt: new Date(),
+          },
+        ]
+      : messages;
 
   // ─── Sticky scroll via ResizeObserver ────────────────────────────
   const {
@@ -259,29 +272,50 @@ export function JovieChat({
     overscan: 5,
     measureElement: el => el.getBoundingClientRect().height,
   });
+  const shouldVirtualizeMessages =
+    displayMessages.length > VIRTUALIZATION_THRESHOLD;
 
   const scrollToBottom = useCallback(() => {
     if (displayMessages.length > 0) {
-      virtualizer.scrollToIndex(displayMessages.length - 1, {
-        align: 'end',
-        behavior: 'smooth',
-      });
+      if (shouldVirtualizeMessages) {
+        virtualizer.scrollToIndex(displayMessages.length - 1, {
+          align: 'end',
+          behavior: 'smooth',
+        });
+      } else {
+        const scrollContainer = scrollContainerRef.current;
+        if (scrollContainer) {
+          if (typeof scrollContainer.scrollTo === 'function') {
+            scrollContainer.scrollTo({
+              top: scrollContainer.scrollHeight,
+              behavior: 'smooth',
+            });
+          } else {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          }
+        }
+      }
       setStuckToBottom(true);
     }
-  }, [displayMessages.length, virtualizer, setStuckToBottom]);
+  }, [
+    displayMessages.length,
+    scrollContainerRef,
+    setStuckToBottom,
+    shouldVirtualizeMessages,
+    virtualizer,
+  ]);
 
   // Find the last real assistant message index for streaming cursor
-  const lastAssistantIndex = useMemo(() => {
-    for (let i = displayMessages.length - 1; i >= 0; i--) {
-      if (
-        displayMessages[i].role === 'assistant' &&
-        displayMessages[i].id !== THINKING_PLACEHOLDER_ID
-      ) {
-        return i;
-      }
+  let lastAssistantIndex = -1;
+  for (let i = displayMessages.length - 1; i >= 0; i--) {
+    if (
+      displayMessages[i].role === 'assistant' &&
+      displayMessages[i].id !== THINKING_PLACEHOLDER_ID
+    ) {
+      lastAssistantIndex = i;
+      break;
     }
-    return -1;
-  }, [displayMessages]);
+  }
 
   const isStreaming = status === 'streaming';
 
@@ -361,32 +395,57 @@ export function JovieChat({
               className='relative flex-1 overflow-y-auto px-4 py-6 sm:px-5'
               onScroll={onScroll}
             >
-              <div
-                ref={totalSizeRef}
-                className='mx-auto max-w-[44rem]'
-                style={{
-                  position: 'relative',
-                  height: virtualizer.getTotalSize(),
-                }}
-              >
-                {virtualizer.getVirtualItems().map(virtualItem => {
-                  const message = displayMessages[virtualItem.index];
-                  const index = virtualItem.index;
-                  const isThinking = message.id === THINKING_PLACEHOLDER_ID;
-                  return (
-                    <div
-                      key={message.id}
-                      data-index={virtualItem.index}
-                      ref={virtualizer.measureElement}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        transform: `translateY(${virtualItem.start}px)`,
-                      }}
-                    >
-                      <div className='pb-7'>
+              {shouldVirtualizeMessages ? (
+                <div
+                  ref={totalSizeRef}
+                  className='mx-auto max-w-[44rem]'
+                  style={{
+                    position: 'relative',
+                    height: virtualizer.getTotalSize(),
+                  }}
+                >
+                  {virtualizer.getVirtualItems().map(virtualItem => {
+                    const message = displayMessages[virtualItem.index];
+                    const index = virtualItem.index;
+                    const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+                    return (
+                      <div
+                        key={message.id}
+                        data-index={virtualItem.index}
+                        ref={virtualizer.measureElement}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${virtualItem.start}px)`,
+                        }}
+                      >
+                        <div className='pb-7'>
+                          <ChatMessage
+                            id={message.id}
+                            role={message.role}
+                            parts={message.parts}
+                            isStreaming={
+                              isStreaming && index === lastAssistantIndex
+                            }
+                            isThinking={isThinking}
+                            avatarUrl={
+                              message.role === 'user' ? avatarUrl : undefined
+                            }
+                            profileId={profileId}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div ref={totalSizeRef} className='mx-auto max-w-[44rem]'>
+                  {displayMessages.map((message, index) => {
+                    const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+                    return (
+                      <div key={message.id} className='pb-7'>
                         <ChatMessage
                           id={message.id}
                           role={message.role}
@@ -401,10 +460,10 @@ export function JovieChat({
                           profileId={profileId}
                         />
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Scroll to bottom button */}
               <ScrollToBottom
@@ -455,78 +514,99 @@ export function JovieChat({
         ) : (
           <motion.div
             key='empty-state'
-            className='flex flex-1 flex-col'
+            className='flex flex-1 flex-col overflow-y-auto'
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.15 }}
           >
-            {/* Content area */}
-            <div className='flex flex-1 flex-col items-center justify-center px-4 py-8 sm:px-5 sm:py-10'>
-              <div className='chat-stagger w-full max-w-[46rem] space-y-4 sm:space-y-5'>
-                {showSuggestedProfiles && (
-                  <SuggestedProfilesCarousel
-                    suggestions={suggestedProfiles.suggestions}
-                    isLoading={suggestedProfiles.isLoading}
-                    currentIndex={suggestedProfiles.currentIndex}
-                    total={suggestedProfiles.total}
-                    next={suggestedProfiles.next}
-                    prev={suggestedProfiles.prev}
-                    confirm={suggestedProfiles.confirm}
-                    reject={suggestedProfiles.reject}
-                    isActioning={suggestedProfiles.isActioning}
-                    username={username}
-                    displayName={displayName}
-                    avatarUrl={avatarUrl}
+            <div className='flex flex-1 flex-col px-4 py-8 sm:px-5 sm:py-10'>
+              <div className='mx-auto flex w-full max-w-[52rem] flex-1 flex-col justify-center'>
+                <div className='relative'>
+                  <div
+                    aria-hidden='true'
+                    className='pointer-events-none absolute left-1/2 top-[5.5rem] h-56 w-56 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,color-mix(in_oklab,var(--linear-accent)_12%,transparent)_0%,transparent_72%)] blur-3xl'
                   />
-                )}
 
-                {!hasCarouselItems &&
-                  (profileCompletion?.percentage ?? 0) < 100 && (
-                    <ProfileCompletionCard />
-                  )}
+                  <div className='relative mx-auto flex max-w-[42rem] flex-col items-center text-center'>
+                    <h1 className='text-balance text-[2rem] font-[560] tracking-[-0.04em] text-primary-token sm:text-[2.75rem]'>
+                      Welcome to Jovie
+                    </h1>
+                    <p className='mt-2 max-w-[28rem] text-balance text-[14px] leading-6 text-secondary-token sm:text-[15px]'>
+                      Ask anything or tell Jovie what you need
+                    </p>
 
-                {!hasCarouselItems &&
-                  (profileCompletion?.percentage ?? 0) >= 100 && (
-                    <>
+                    {showGreetingSummary && (
                       <JovieGreeting
                         username={username}
                         isFirstSession={isFirstSession}
                         insights={insightsSummary.data?.insights ?? []}
                         tippingStats={tippingStats}
+                        variant='inline'
+                        className='mt-4'
                       />
+                    )}
+                  </div>
 
-                      <SuggestedPrompts
-                        onSelect={handleSuggestedPrompt}
-                        isFirstSession={isFirstSession}
-                        latestReleaseTitle={latestReleaseTitle}
-                        canUseAdvancedTools={aiCanUseTools}
+                  <div className='relative mx-auto mt-6 w-full max-w-[35rem] space-y-3'>
+                    {isRateLimited && (
+                      <p
+                        className='text-center text-xs text-tertiary-token'
+                        aria-live='polite'
+                      >
+                        Sending too fast. Please wait a second before your next
+                        message.
+                      </p>
+                    )}
+                    <ChatUsageAlert />
+                    <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
+
+                    {chatError && (
+                      <ErrorDisplay
+                        chatError={chatError}
+                        onRetry={handleRetry}
+                        isLoading={isLoading}
+                        isSubmitting={isSubmitting}
                       />
-                    </>
-                  )}
-              </div>
-            </div>
+                    )}
+                  </div>
 
-            {/* Input pinned at bottom */}
-            <div className='bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-6'>
-              <div className='mx-auto w-full max-w-2xl space-y-3'>
-                {isRateLimited && (
-                  <p className='text-xs text-tertiary-token' aria-live='polite'>
-                    Sending too fast. Please wait a second before your next
-                    message.
-                  </p>
-                )}
-                <ChatUsageAlert />
-                <ChatInput {...chatInputProps} />
+                  <div className='mt-5 flex flex-col items-center gap-3'>
+                    <p className='text-[11px] font-[560] tracking-[0.01em] text-tertiary-token'>
+                      Get Started With Some Examples
+                    </p>
+                    <SuggestedPrompts
+                      onSelect={handleSuggestedPrompt}
+                      isFirstSession={isFirstSession}
+                      latestReleaseTitle={latestReleaseTitle}
+                      canUseAdvancedTools={aiCanUseTools}
+                    />
+                  </div>
 
-                {chatError && (
-                  <ErrorDisplay
-                    chatError={chatError}
-                    onRetry={handleRetry}
-                    isLoading={isLoading}
-                    isSubmitting={isSubmitting}
-                  />
-                )}
+                  <div className='chat-stagger mx-auto mt-6 w-full max-w-[46rem] space-y-4 sm:space-y-5'>
+                    {showSuggestedProfiles && (
+                      <SuggestedProfilesCarousel
+                        suggestions={suggestedProfiles.suggestions}
+                        isLoading={suggestedProfiles.isLoading}
+                        currentIndex={suggestedProfiles.currentIndex}
+                        total={suggestedProfiles.total}
+                        next={suggestedProfiles.next}
+                        prev={suggestedProfiles.prev}
+                        confirm={suggestedProfiles.confirm}
+                        reject={suggestedProfiles.reject}
+                        isActioning={suggestedProfiles.isActioning}
+                        username={username}
+                        displayName={displayName}
+                        avatarUrl={avatarUrl}
+                      />
+                    )}
+
+                    {!hasCarouselItems &&
+                      (profileCompletion?.percentage ?? 0) < 100 && (
+                        <ProfileCompletionCard />
+                      )}
+                  </div>
+                </div>
               </div>
             </div>
           </motion.div>
