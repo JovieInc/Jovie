@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import { env } from '@/lib/env-client';
 import { useBillingStatusQuery } from '@/lib/queries';
@@ -50,7 +50,7 @@ export function useUserButton({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const isPassiveRuntime = env.IS_E2E;
-  const isDemoRoute = pathname === APP_ROUTES.DEMO;
+  const isDemoRoute = isDemoRoutePath(pathname);
   const { data, isLoading, error } = useBillingStatusQuery({
     enabled: !isPassiveRuntime && !isDemoRoute,
   });

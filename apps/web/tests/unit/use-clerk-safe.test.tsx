@@ -69,6 +69,7 @@ describe('useClerkSafe', () => {
     expect(result.current.auth.userId).toBe('user_creator');
     expect(result.current.user.user).toEqual(
       expect.objectContaining({
+        primaryEmailAddressId: 'email_dev_test_creator',
         username: 'browse-test-user',
         fullName: 'Browse Test User',
       })
@@ -77,6 +78,40 @@ describe('useClerkSafe', () => {
       expect.objectContaining({
         id: 'sess_dev_test_creator',
       })
+    );
+  });
+
+  it('provides Clerk-like account helpers for synthetic browse auth users', async () => {
+    const bootstrap: ClientAuthBootstrap = {
+      isAuthenticated: true,
+      userId: 'user_creator',
+      email: 'browse+clerk_test@jov.ie',
+      username: 'browse-test-user',
+      fullName: 'Browse Test User',
+      isAdmin: false,
+      persona: 'creator',
+    };
+
+    const { result } = renderWithWrapper(({ children }) => (
+      <ClerkSafeBootstrapProvider bootstrap={bootstrap}>
+        {children}
+      </ClerkSafeBootstrapProvider>
+    ));
+
+    const user = result.current.user.user;
+
+    expect(user).toBeTruthy();
+    expect(user?.emailAddresses[0]).toEqual(
+      expect.objectContaining({
+        id: 'email_dev_test_creator',
+        emailAddress: 'browse+clerk_test@jov.ie',
+      })
+    );
+    await expect(user?.getSessions()).resolves.toEqual([]);
+    await expect(
+      user?.createEmailAddress({ email: 'new@example.com' })
+    ).rejects.toThrow(
+      'Email management is unavailable in local test auth mode.'
     );
   });
 

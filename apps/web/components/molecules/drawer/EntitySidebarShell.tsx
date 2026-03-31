@@ -4,7 +4,6 @@ import type { CommonDropdownItem } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import { DrawerEmptyState } from './DrawerEmptyState';
@@ -153,8 +152,7 @@ export function EntitySidebarShell({
           >
             <div
               className={cn(
-                LINEAR_SURFACE.stickyHeader,
-                'border-b border-transparent backdrop-blur-[12px]'
+                'border-b border-transparent bg-surface-1 backdrop-blur-[12px]'
               )}
             >
               {showMinimalHeaderBar ? (

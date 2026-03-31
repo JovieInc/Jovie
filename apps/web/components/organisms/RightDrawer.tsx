@@ -103,8 +103,8 @@ export function RightDrawer({
         className={cn(
           'fixed inset-0 z-50 flex flex-col',
           'overflow-hidden',
-          'bg-(--linear-app-content-surface)',
-          'shadow-[-16px_0_40px_rgba(0,0,0,0.16)]',
+          'border-l border-(--linear-app-frame-seam) bg-surface-0',
+          'shadow-[var(--linear-app-drawer-shadow)]',
           'pb-[env(safe-area-inset-bottom)]',
           'transition-transform duration-300 ease-out',
           isOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none',
@@ -125,13 +125,13 @@ export function RightDrawer({
       aria-label={ariaLabel}
       tabIndex={isOpen ? -1 : undefined}
       className={cn(
-        'shrink-0 h-full flex flex-col',
+        'z-10 shrink-0 h-full min-h-0 flex flex-col',
         hasHydrated
           ? 'transition-[width,opacity] duration-300 ease-out'
           : 'transition-none',
         'overflow-hidden',
         isOpen
-          ? 'opacity-100 visible bg-(--linear-app-content-surface) shadow-none'
+          ? 'visible border-l border-(--linear-app-frame-seam) bg-surface-0 opacity-100 shadow-[var(--linear-app-drawer-shadow)]'
           : 'opacity-0 pointer-events-none invisible bg-transparent',
         className
       )}

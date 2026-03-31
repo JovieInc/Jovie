@@ -16,6 +16,9 @@ describe('AppShellFrame', () => {
 
     expect(mainContent).toHaveAttribute('id', 'main-content');
     expect(mainContent).not.toHaveAttribute('tabindex');
+    expect(mainContent).toHaveClass(
+      'lg:shadow-[var(--linear-app-shell-shadow)]'
+    );
     expect(screen.getByText('Sidebar')).toBeInTheDocument();
     expect(screen.getByText('Header')).toBeInTheDocument();
     expect(screen.getByText('Main Content')).toBeInTheDocument();

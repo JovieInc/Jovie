@@ -9,7 +9,7 @@ import {
   isAdminGrowthView,
   isAdminPeopleView,
 } from '@/constants/admin-navigation';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
@@ -36,7 +36,7 @@ export interface AuthRouteConfig {
 export function useAuthRouteConfig(): AuthRouteConfig {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const isDemoReleasesRoute = pathname === APP_ROUTES.DEMO;
+  const isDemoRoute = isDemoRoutePath(pathname);
 
   // Detect section based on pathname
   const section = useMemo<'admin' | 'dashboard' | 'settings'>(() => {
@@ -47,7 +47,7 @@ export function useAuthRouteConfig(): AuthRouteConfig {
 
   // Generate breadcrumbs from pathname
   const breadcrumbs = useMemo<DashboardBreadcrumbItem[]>(() => {
-    if (isDemoReleasesRoute) {
+    if (isDemoRoute) {
       return [
         {
           label: getBreadcrumbLabel('releases'),
@@ -105,7 +105,7 @@ export function useAuthRouteConfig(): AuthRouteConfig {
         href: pathname,
       },
     ];
-  }, [isDemoReleasesRoute, pathname, searchParams]);
+  }, [isDemoRoute, pathname, searchParams]);
 
   // Show mobile bottom tabs on all authenticated sections so users always
   // have persistent navigation on mobile (dashboard, settings, and admin).
@@ -116,7 +116,7 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   // between two non-table (or two table) routes.
   const isTableRoute = useMemo(
     () =>
-      isDemoReleasesRoute ||
+      isDemoRoute ||
       pathname.includes('/creators') ||
       pathname.includes('/audience') ||
       pathname.includes('/users') ||
@@ -126,7 +126,7 @@ export function useAuthRouteConfig(): AuthRouteConfig {
       pathname.includes('/people') ||
       pathname.includes('/growth') ||
       pathname.includes('/releases'),
-    [isDemoReleasesRoute, pathname]
+    [isDemoRoute, pathname]
   );
 
   // Artist profile settings page gets the preview panel sidebar
@@ -148,7 +148,7 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     showMobileTabs,
     isTableRoute,
     isArtistProfileSettings,
-    isDemoRoute: isDemoReleasesRoute,
+    isDemoRoute,
     showChatUsageIndicator,
   };
 }

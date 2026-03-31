@@ -3,6 +3,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 
+const mockUsePathname = vi.fn(() => '/app/chat');
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => mockUsePathname(),
+}));
+
 vi.mock('@/lib/env-client', () => ({
   env: {
     IS_TEST: false,
@@ -58,6 +64,14 @@ describe('Sidebar lower shell visual hierarchy', () => {
     expect(card?.className).toContain('bg-sidebar-accent/12');
 
     expect(screen.getByRole('button', { name: 'Upgrade' })).toBeInTheDocument();
+  });
+
+  it('suppresses the upgrade banner on nested demo routes', () => {
+    mockUsePathname.mockReturnValueOnce('/demo/showcase/settings');
+
+    const { container } = render(<SidebarUpgradeBanner />);
+
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('keeps install banner visually quieter than nav rows', () => {

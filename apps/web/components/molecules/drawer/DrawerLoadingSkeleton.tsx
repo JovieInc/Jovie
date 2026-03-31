@@ -38,8 +38,7 @@ export function DrawerLoadingSkeleton({
       >
         <div
           className={cn(
-            LINEAR_SURFACE.stickyHeader,
-            'sticky top-0 z-10 flex min-h-[32px] shrink-0 items-center justify-between border-b px-2 py-1 backdrop-blur-[10px]'
+            'sticky top-0 z-10 flex min-h-[32px] shrink-0 items-center justify-between border-b border-(--linear-app-frame-seam) bg-surface-1 px-2 py-1 backdrop-blur-[10px]'
           )}
         >
           <div className='h-2.5 w-28 rounded skeleton' />

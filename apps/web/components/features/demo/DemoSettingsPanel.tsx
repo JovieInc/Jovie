@@ -16,12 +16,12 @@ const PLATFORM_CONNECTIONS = [
 
 export function DemoSettingsPanel() {
   return (
-    <div className='h-full overflow-y-auto p-3'>
+    <div className='h-full overflow-y-auto'>
       <div className='space-y-3'>
         <ContentSurfaceCard className='overflow-hidden p-0'>
           <ContentSectionHeader
             title='Artist Profile'
-            subtitle='Core public-facing identity fields for your artist page.'
+            subtitle='Public profile basics.'
             className='px-4 py-3'
           />
           <div className='space-y-3 px-4 py-3'>
@@ -41,7 +41,7 @@ export function DemoSettingsPanel() {
         <ContentSurfaceCard className='overflow-hidden p-0'>
           <ContentSectionHeader
             title='Platform Connections'
-            subtitle='Link and maintain the streaming services tied to this profile.'
+            subtitle='Streaming services tied to this profile.'
             className='px-4 py-3'
           />
           <div className='space-y-2 px-4 py-3'>
@@ -87,7 +87,7 @@ export function DemoSettingsPanel() {
         <ContentSurfaceCard className='overflow-hidden p-0'>
           <ContentSectionHeader
             title='Preferences'
-            subtitle='Choose how the demo profile behaves and notifies you.'
+            subtitle='Workspace behavior and alerts.'
             className='px-4 py-3'
           />
           <div className='space-y-3 px-4 py-3'>

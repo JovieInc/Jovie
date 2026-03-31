@@ -50,7 +50,7 @@ export function ArtistProfileContent() {
       <SettingsSection
         id='artist-profile'
         title='Artist Profile'
-        description='Photo, display name, username, and branding.'
+        description='Photo, name, username, and branding.'
       >
         <div className='space-y-4'>
           <SettingsProfileSection

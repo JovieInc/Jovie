@@ -23,7 +23,7 @@ export default function SettingsPaymentsPage() {
     <SettingsSection
       id='payments'
       title='Payments'
-      description='Connect Stripe to receive payments from fans.'
+      description='Stripe payouts from fans.'
     >
       <SettingsPaymentsSection />
     </SettingsSection>

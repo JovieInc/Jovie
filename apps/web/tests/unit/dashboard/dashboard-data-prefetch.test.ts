@@ -357,6 +357,62 @@ describe('dashboard data prefetch', () => {
     expect(result.selectedProfile?.id).toBe('profile_1');
     expect(result.needsOnboarding).toBe(false);
   });
+
+  it('bypasses creator onboarding checks for admins on full dashboard data', async () => {
+    getCurrentUserEntitlementsMock.mockResolvedValue({
+      userId: 'user_123',
+      email: 'admin@example.com',
+      isAuthenticated: true,
+      isAdmin: true,
+      isPro: false,
+      hasAdvancedFeatures: false,
+      canRemoveBranding: false,
+    });
+    withDbSessionTxMock.mockResolvedValue({
+      ...baseDashboardResponse,
+      selectedProfile: {
+        id: 'admin_profile',
+        username: null,
+        displayName: 'Admin',
+        isPublic: false,
+        onboardingCompletedAt: new Date('2026-03-31T00:00:00.000Z'),
+      },
+      needsOnboarding: true,
+    });
+
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+
+    const result = await getDashboardData();
+
+    expect(result.isAdmin).toBe(true);
+    expect(result.needsOnboarding).toBe(false);
+  });
+
+  it('bypasses creator onboarding checks for admins on shell data', async () => {
+    checkAdminRoleMock.mockResolvedValue(true);
+    withDbSessionTxMock.mockResolvedValue({
+      ...baseDashboardResponse,
+      selectedProfile: {
+        id: 'admin_profile',
+        username: null,
+        displayName: 'Admin',
+        isPublic: false,
+        onboardingCompletedAt: new Date('2026-03-31T00:00:00.000Z'),
+      },
+      needsOnboarding: true,
+    });
+
+    const { getDashboardShellData } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+
+    const result = await getDashboardShellData('user_123');
+
+    expect(result.isAdmin).toBe(true);
+    expect(result.needsOnboarding).toBe(false);
+  });
 });
 
 // Separate describe block for pure utility tests — no module reset needed,

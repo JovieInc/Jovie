@@ -4,7 +4,7 @@ import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { memo } from 'react';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
 
@@ -12,7 +12,7 @@ export const HeaderChatUsageIndicator = memo(
   function HeaderChatUsageIndicator() {
     const pathname = usePathname();
     const isPassiveRuntime = env.IS_E2E;
-    const isDemoRoute = pathname === APP_ROUTES.DEMO;
+    const isDemoRoute = isDemoRoutePath(pathname);
     const { data } = useChatUsageQuery({
       enabled: !isPassiveRuntime && !isDemoRoute,
     });

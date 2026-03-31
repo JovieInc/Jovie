@@ -25,7 +25,7 @@ import {
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
 import { BASE_URL } from '@/constants/domains';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 import {
   adminSettingsNavItem,
@@ -308,8 +308,7 @@ function SidebarHeaderNav({
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
   const { isAdmin: isUserAdmin, creatorProfiles } = useDashboardData();
   const pathname = usePathname();
-  const isDemoRoute =
-    pathname === APP_ROUTES.DEMO || pathname.startsWith(`${APP_ROUTES.DEMO}/`);
+  const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
   const isAdmin = section === 'admin';
   const isDashboardOrAdmin = section !== 'settings';

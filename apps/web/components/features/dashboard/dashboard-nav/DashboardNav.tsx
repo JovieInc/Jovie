@@ -15,7 +15,7 @@ import {
   SidebarMenu,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { env } from '@/lib/env-client';
 import { useCodeFlag } from '@/lib/feature-flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
@@ -98,7 +98,7 @@ export function DashboardNav(_: DashboardNavProps) {
   // Replace "Profile" label with artist display name when available
   const artistName = selectedProfile?.displayName;
   const profileId = selectedProfile?.id ?? '';
-  const isDemo = pathname === APP_ROUTES.DEMO;
+  const isDemo = isDemoRoutePath(pathname);
   const { data: taskStats } = useTaskStatsQuery(profileId, {
     enabled: !isDemo,
   });
@@ -183,6 +183,7 @@ export function DashboardNav(_: DashboardNavProps) {
 
       // In demo mode, only Releases has real content — intercept all other nav clicks
       const demoUnavailable = isDemo && !isReleasesItem;
+      const renderAsButton = isProfileItem && !demoUnavailable;
       let onClick: (() => void) | undefined;
       if (demoUnavailable) onClick = () => handleDemoNavClick(item);
       else if (isProfileItem) onClick = handleProfileClick;
@@ -196,6 +197,8 @@ export function DashboardNav(_: DashboardNavProps) {
           prefetch={isReleasesItem ? false : undefined}
           actions={isProfileItem ? profileActions : null}
           onClick={onClick}
+          preventNavigation={demoUnavailable}
+          renderAsButton={renderAsButton}
           onNavigate={
             isReleasesItem ? () => showPendingShell('releases') : undefined
           }

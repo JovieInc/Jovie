@@ -573,7 +573,7 @@ export function JovieChat({
 
                   <div className='mt-6 flex w-full max-w-[39rem] flex-col items-center gap-3'>
                     <p className='text-[11px] font-[560] tracking-[0.01em] text-tertiary-token'>
-                      Get Started With Some Examples
+                      Examples
                     </p>
                     <SuggestedPrompts
                       onSelect={handleSuggestedPrompt}

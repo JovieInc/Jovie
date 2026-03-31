@@ -214,8 +214,8 @@ describe('DashboardNav', () => {
     expect(queryByText('Workspace')).toBeNull();
   });
 
-  it('disables task stats query on the demo route', () => {
-    mockUsePathname.mockReturnValueOnce(APP_ROUTES.DEMO);
+  it('disables task stats query on nested demo routes', () => {
+    mockUsePathname.mockReturnValueOnce('/demo/showcase/settings');
 
     renderDashboardNav({
       selectedProfile: {

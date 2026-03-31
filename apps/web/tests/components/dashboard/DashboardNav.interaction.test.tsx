@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
@@ -10,11 +10,18 @@ import { APP_ROUTES } from '@/constants/routes';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 
 const mockUsePathname = vi.fn<() => string>(() => APP_ROUTES.CHAT);
+const mockToastInfo = vi.fn();
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
   useParams: () => ({}),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+}));
+
+vi.mock('sonner', () => ({
+  toast: {
+    info: (...args: unknown[]) => mockToastInfo(...args),
+  },
 }));
 
 vi.mock('@statsig/react-bindings', () => ({
@@ -122,6 +129,10 @@ function renderDashboardNav(overrides: Partial<DashboardData> = {}) {
 }
 
 describe('DashboardNav interactions', () => {
+  beforeEach(() => {
+    mockToastInfo.mockClear();
+  });
+
   it('renders the full primary navigation config', () => {
     renderDashboardNav();
 
@@ -188,5 +199,21 @@ describe('DashboardNav interactions', () => {
 
     // Button should exist and be clickable (drawer open is tested via mock)
     expect(profileButton).toBeDefined();
+  });
+
+  it('keeps demo-disabled items as links on nested demo routes', async () => {
+    const user = userEvent.setup();
+
+    mockUsePathname.mockReturnValueOnce('/demo/showcase/settings');
+    renderDashboardNav();
+
+    const tasksLink = screen.getByRole('link', { name: 'Tasks' });
+    expect(tasksLink).toHaveAttribute('href', APP_ROUTES.DASHBOARD_TASKS);
+
+    await user.click(tasksLink);
+
+    expect(mockToastInfo).toHaveBeenCalledWith(
+      'Tasks is not available in demo mode'
+    );
   });
 });

@@ -122,3 +122,10 @@ export const APP_ROUTES = {
 } as const;
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
+
+export function isDemoRoutePath(pathname: string | null | undefined): boolean {
+  return (
+    typeof pathname === 'string' &&
+    (pathname === APP_ROUTES.DEMO || pathname.startsWith(`${APP_ROUTES.DEMO}/`))
+  );
+}

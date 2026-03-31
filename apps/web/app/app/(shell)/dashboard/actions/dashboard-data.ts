@@ -258,6 +258,20 @@ function buildProfileCompletion(
  */
 type CoreData = Omit<DashboardData, 'isAdmin'>;
 
+function applyAdminOnboardingBypass(
+  coreData: CoreData,
+  isAdmin: boolean
+): CoreData {
+  if (!isAdmin || !coreData.needsOnboarding) {
+    return coreData;
+  }
+
+  return {
+    ...coreData,
+    needsOnboarding: false,
+  };
+}
+
 /** Default empty CoreData used when user/profile is missing or on error. */
 function createEmptyCoreData(overrides?: Partial<CoreData>): CoreData {
   return {
@@ -862,7 +876,7 @@ async function resolveDashboardDataWith(
     }
 
     return {
-      ...coreData,
+      ...applyAdminOnboardingBypass(coreData, isAdmin),
       isAdmin,
       dashboardLoadError: coreData.dashboardLoadError,
     };
@@ -918,7 +932,7 @@ async function resolveDashboardShellData(
       : cachedCoreData.value;
 
     return {
-      ...coreData,
+      ...applyAdminOnboardingBypass(coreData, isAdmin),
       isAdmin,
       dashboardLoadError: coreData.dashboardLoadError,
     };

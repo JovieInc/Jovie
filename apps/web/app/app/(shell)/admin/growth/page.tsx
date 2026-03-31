@@ -116,7 +116,7 @@ export default async function AdminGrowthPage({
         <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
           <WorkspaceTabsSurface
             title='Growth operations'
-            description='A single workspace for lead discovery, outreach queues, campaigns, and creator ingest.'
+            description='Lead discovery, outreach, campaigns, and ingest.'
             primaryParam='view'
             primaryValue={view}
             primaryOptions={growthTabs}

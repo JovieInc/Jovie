@@ -1,0 +1,49 @@
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
+
+describe('AppShellContentPanel', () => {
+  it('renders a framed full-width content container by default', () => {
+    const { container } = render(
+      <AppShellContentPanel data-testid='shell-panel'>
+        <div>Panel content</div>
+      </AppShellContentPanel>
+    );
+
+    expect(screen.getByTestId('shell-panel')).toBeInTheDocument();
+    expect(screen.getByText('Panel content')).toBeInTheDocument();
+    expect(container.querySelector('[data-testid="shell-panel"]')).toHaveClass(
+      'overflow-hidden'
+    );
+    expect(container.querySelector('.rounded-xl.border')).toBeTruthy();
+  });
+
+  it('supports unframed form layouts with page scrolling', () => {
+    const { container } = render(
+      <AppShellContentPanel
+        maxWidth='form'
+        frame='none'
+        contentPadding='compact'
+        scroll='page'
+      >
+        <div>Settings content</div>
+      </AppShellContentPanel>
+    );
+
+    expect(screen.getByText('Settings content')).toBeInTheDocument();
+    expect(container.innerHTML).toContain('max-w-[52rem]');
+    expect(container.innerHTML).toContain('px-3 py-3 sm:px-4 sm:py-4');
+    expect(container.innerHTML).toContain('overflow-visible');
+  });
+
+  it('keeps panel scrolling constrained by default', () => {
+    const { container } = render(
+      <AppShellContentPanel>
+        <div>Scrollable panel</div>
+      </AppShellContentPanel>
+    );
+
+    expect(screen.getByText('Scrollable panel')).toBeInTheDocument();
+    expect(container.innerHTML).toContain('min-h-0 overflow-hidden');
+  });
+});

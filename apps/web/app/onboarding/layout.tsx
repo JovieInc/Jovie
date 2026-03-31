@@ -14,8 +14,6 @@ export default async function OnboardingLayout({
 
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-sync-scripts -- next/script injects a nonce mismatch here during hydration */}
-      <script src='/theme-init.js' />
       <ResolvedClientProviders>
         <FeatureFlagsProvider>{children}</FeatureFlagsProvider>
       </ResolvedClientProviders>

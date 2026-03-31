@@ -76,6 +76,60 @@ describe('surface elevation guardrails', () => {
     );
   });
 
+  it('routes shared shell wrappers through AppShellContentPanel', () => {
+    const pageShell = readFileSync(
+      join(ROOT, 'components/organisms/PageShell.tsx'),
+      'utf-8'
+    );
+    const dashboardPanel = readFileSync(
+      join(
+        ROOT,
+        'components/features/dashboard/organisms/DashboardWorkspacePanel.tsx'
+      ),
+      'utf-8'
+    );
+    const settingsLayout = readFileSync(
+      join(ROOT, 'app/app/(shell)/settings/layout.tsx'),
+      'utf-8'
+    );
+    const demoShowcaseSurface = readFileSync(
+      join(ROOT, 'components/features/demo/DemoShowcaseSurface.tsx'),
+      'utf-8'
+    );
+
+    expect(pageShell).toContain('AppShellContentPanel');
+    expect(dashboardPanel).toContain('AppShellContentPanel');
+    expect(settingsLayout).toContain('AppShellContentPanel');
+    expect(demoShowcaseSurface).toContain('AppShellContentPanel');
+  });
+
+  it('routes onboarding variants through OnboardingExperienceShell', () => {
+    const onboardingForm = readFileSync(
+      join(
+        ROOT,
+        'components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form.tsx'
+      ),
+      'utf-8'
+    );
+    const onboardingLoading = readFileSync(
+      join(ROOT, 'app/onboarding/loading.tsx'),
+      'utf-8'
+    );
+    const demoOnboarding = readFileSync(
+      join(ROOT, 'components/features/demo/OnboardingDemoContent.tsx'),
+      'utf-8'
+    );
+    const demoShowcaseSurface = readFileSync(
+      join(ROOT, 'components/features/demo/DemoShowcaseSurface.tsx'),
+      'utf-8'
+    );
+
+    expect(onboardingForm).toContain('OnboardingExperienceShell');
+    expect(onboardingLoading).toContain('OnboardingExperienceShell');
+    expect(demoOnboarding).toContain('OnboardingExperienceShell');
+    expect(demoShowcaseSurface).toContain('DemoOnboardingShowcase');
+  });
+
   it('keeps the tasks workspace inside a framed content panel', () => {
     const tasksPage = readFileSync(
       join(ROOT, 'components/features/dashboard/tasks/TasksPageClient.tsx'),
@@ -130,6 +184,26 @@ describe('surface elevation guardrails', () => {
         `${file} should use card/recessed surface tokens`
       ).not.toContain('bg-(--linear-app-content-surface)');
     }
+  });
+
+  it('keeps the desktop shell and drawer on distinct elevation tiers', () => {
+    const shellFrame = readFileSync(
+      join(ROOT, 'components/organisms/AppShellFrame.tsx'),
+      'utf-8'
+    );
+    const rightDrawer = readFileSync(
+      join(ROOT, 'components/organisms/RightDrawer.tsx'),
+      'utf-8'
+    );
+    const adminTableShell = readFileSync(
+      join(ROOT, 'components/features/admin/table/AdminTableShell.tsx'),
+      'utf-8'
+    );
+
+    expect(shellFrame).toContain('lg:shadow-[var(--linear-app-shell-shadow)]');
+    expect(rightDrawer).toContain('bg-surface-0');
+    expect(rightDrawer).toContain('shadow-[var(--linear-app-drawer-shadow)]');
+    expect(adminTableShell).toContain('bg-surface-1/96');
   });
 
   it('does not use semi-transparent bg-surface-1 in app shell (bg-surface-1/XX)', () => {

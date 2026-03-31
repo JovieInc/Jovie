@@ -100,7 +100,7 @@ export function OnboardingDemoProfilePanel({
       className='hidden shrink-0 overflow-y-auto overscroll-contain xl:block'
       style={{ width: ONBOARDING_PANEL_WIDTH }}
     >
-      <div className='space-y-3 px-3 py-8'>
+      <div className='sticky top-6 space-y-3 px-1 py-0'>
         {/* Identity card — always pinned */}
         <DrawerSurfaceCard variant='card' className='p-4'>
           <EntityHeaderCard

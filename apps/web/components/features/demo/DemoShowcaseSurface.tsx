@@ -2,7 +2,9 @@
 
 import { useCallback, useRef, useState } from 'react';
 import type { EnrichedProfileData } from '@/app/onboarding/actions/enrich-profile';
-import { AuthLayout } from '@/features/auth';
+import { OnboardingExperienceShell } from '@/components/features/onboarding/OnboardingExperienceShell';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 import { OnboardingDspStep } from '@/features/dashboard/organisms/onboarding/OnboardingDspStep';
 import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding/OnboardingHandleStep';
 import { OnboardingProfileReviewStep } from '@/features/dashboard/organisms/onboarding/OnboardingProfileReviewStep';
@@ -48,18 +50,45 @@ function DemoShowcasePanel({
 }>) {
   return (
     <DemoAuthShell>
-      <section className='px-6 py-6' data-testid={testId}>
-        <div className='mb-4'>
-          <p className='text-[12px] uppercase tracking-[0.14em] text-tertiary-token'>
-            Demo Surface
-          </p>
-          <h1 className='text-2xl font-[620] tracking-[-0.02em] text-primary-token'>
-            {title}
-          </h1>
-        </div>
-        {children}
-      </section>
+      <AppShellContentPanel
+        maxWidth='wide'
+        frame='none'
+        contentPadding='none'
+        scroll='page'
+        data-testid={testId}
+      >
+        <section className='space-y-4'>
+          <div className='overflow-hidden rounded-xl border border-(--linear-app-frame-seam) bg-surface-1'>
+            <ContentSectionHeader title={title} className='min-h-0 py-3' />
+            <div className='px-4 py-4 sm:px-5 sm:py-5'>{children}</div>
+          </div>
+        </section>
+      </AppShellContentPanel>
     </DemoAuthShell>
+  );
+}
+
+function DemoOnboardingShowcase({
+  children,
+  stableStageHeight = 'default',
+  testId,
+}: Readonly<{
+  children: React.ReactNode;
+  stableStageHeight?: 'default' | 'tall';
+  testId: string;
+}>) {
+  return (
+    <div data-testid={testId}>
+      <DemoClientProviders>
+        <OnboardingExperienceShell
+          mode='standalone'
+          stableStageHeight={stableStageHeight}
+          data-testid={`${testId}-shell`}
+        >
+          {children}
+        </OnboardingExperienceShell>
+      </DemoClientProviders>
+    </div>
   );
 }
 
@@ -106,81 +135,54 @@ export function DemoShowcaseSurface({
       );
     case 'onboarding-handle':
       return (
-        <div data-testid='demo-showcase-onboarding-handle'>
-          <DemoClientProviders>
-            <AuthLayout
-              formTitle='Choose your handle'
-              showFormTitle={false}
-              showFooterPrompt={false}
-              showSkipLink={false}
-              showLogo={false}
-            >
-              <OnboardingHandleStep
-                title='Choose your handle'
-                prompt='This is how fans will find and remember you.'
-                handleInput={handleInput}
-                handleValidation={HANDLE_VALIDATION_MOCK}
-                stateError={null}
-                isSubmitting={false}
-                isTransitioning={false}
-                ctaDisabledReason={null}
-                inputRef={inputRef}
-                onHandleChange={setHandleInput}
-                onSubmit={noop}
-                onSuggestionClick={setHandleInput}
-              />
-            </AuthLayout>
-          </DemoClientProviders>
-        </div>
+        <DemoOnboardingShowcase
+          stableStageHeight='tall'
+          testId='demo-showcase-onboarding-handle'
+        >
+          <OnboardingHandleStep
+            title='Choose your handle'
+            prompt='This is how fans will find and remember you.'
+            handleInput={handleInput}
+            handleValidation={HANDLE_VALIDATION_MOCK}
+            stateError={null}
+            isSubmitting={false}
+            isTransitioning={false}
+            ctaDisabledReason={null}
+            inputRef={inputRef}
+            onHandleChange={setHandleInput}
+            onSubmit={noop}
+            onSuggestionClick={setHandleInput}
+          />
+        </DemoOnboardingShowcase>
       );
     case 'onboarding-dsp':
       return (
-        <div data-testid='demo-showcase-onboarding-dsp'>
-          <DemoClientProviders>
-            <AuthLayout
-              formTitle='Connect your music'
-              showFormTitle={false}
-              showFooterPrompt={false}
-              showSkipLink={false}
-              showLogo={false}
-            >
-              <OnboardingDspStep
-                title='Connect your music'
-                prompt='Import your releases from Spotify so fans can find your music.'
-                onConnected={noop}
-                onSkip={noop}
-                isTransitioning={false}
-              />
-            </AuthLayout>
-          </DemoClientProviders>
-        </div>
+        <DemoOnboardingShowcase testId='demo-showcase-onboarding-dsp'>
+          <OnboardingDspStep
+            title='Connect your music'
+            prompt='Import your releases from Spotify so fans can find your music.'
+            onConnected={noop}
+            onSkip={noop}
+            isTransitioning={false}
+          />
+        </DemoOnboardingShowcase>
       );
     case 'onboarding-profile-review':
       return (
-        <div data-testid='demo-showcase-onboarding-profile-review'>
-          <DemoClientProviders>
-            <AuthLayout
-              formTitle='Your profile'
-              showFormTitle={false}
-              showFooterPrompt={false}
-              showSkipLink={false}
-              showLogo={false}
-            >
-              <OnboardingProfileReviewStep
-                title='Your profile'
-                prompt='Review your profile before going live.'
-                enrichedProfile={PROFILE_REVIEW_DATA}
-                handle='soravale'
-                onGoToDashboard={noop}
-                isEnriching={false}
-                existingAvatarUrl={PROFILE_REVIEW_DATA.imageUrl}
-                existingBio={PROFILE_REVIEW_DATA.bio}
-                existingGenres={PROFILE_REVIEW_DATA.genres}
-                isStepResume
-              />
-            </AuthLayout>
-          </DemoClientProviders>
-        </div>
+        <DemoOnboardingShowcase testId='demo-showcase-onboarding-profile-review'>
+          <OnboardingProfileReviewStep
+            title='Your profile'
+            prompt='Review your profile before going live.'
+            enrichedProfile={PROFILE_REVIEW_DATA}
+            handle='soravale'
+            onGoToDashboard={noop}
+            isEnriching={false}
+            existingAvatarUrl={PROFILE_REVIEW_DATA.imageUrl}
+            existingBio={PROFILE_REVIEW_DATA.bio}
+            existingGenres={PROFILE_REVIEW_DATA.genres}
+            isStepResume
+          />
+        </DemoOnboardingShowcase>
       );
     default: {
       const exhaustiveCheck: never = surface;

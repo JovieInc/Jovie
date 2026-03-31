@@ -25,10 +25,6 @@ export default async function AuthLayout({
   if (isClerkUnavailable) {
     return (
       <>
-        {/* Keep auth routes theme-aware without forcing the marketing homepage to
-            download the theme bootstrap on first paint. */}
-        {/* eslint-disable-next-line @next/next/no-sync-scripts -- next/script injects a nonce mismatch here during hydration */}
-        <script src='/theme-init.js' />
         <FeatureFlagsProvider>
           <main id='main-content'>
             <AuthShellLayout
@@ -46,8 +42,6 @@ export default async function AuthLayout({
 
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-sync-scripts -- next/script injects a nonce mismatch here during hydration */}
-      <script src='/theme-init.js' />
       <AuthClientProviders publishableKey={publishableKey}>
         <FeatureFlagsProvider>
           <main id='main-content'>{children}</main>

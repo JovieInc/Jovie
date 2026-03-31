@@ -60,10 +60,38 @@ function splitFullName(fullName: string) {
   };
 }
 
+function createMockClerkActionError(action: string) {
+  return new Error(`${action} is unavailable in local test auth mode.`);
+}
+
+function createMockEmailAddress(id: string, emailAddress: string) {
+  return {
+    id,
+    emailAddress,
+    verification: {
+      status: 'verified',
+    },
+    prepareVerification: async () => {
+      throw createMockClerkActionError('Email verification');
+    },
+    attemptVerification: async () => {
+      throw createMockClerkActionError('Email verification');
+    },
+    destroy: async () => {
+      throw createMockClerkActionError('Email removal');
+    },
+  };
+}
+
 function createBootstrapUserReturn(
   bootstrap: ClientAuthBootstrap
 ): UseUserReturn {
   const { firstName, lastName } = splitFullName(bootstrap.fullName);
+  const primaryEmailAddressId = `email_dev_test_${bootstrap.persona}`;
+  const primaryEmailAddress = createMockEmailAddress(
+    primaryEmailAddressId,
+    bootstrap.email
+  );
 
   const user = {
     id: bootstrap.userId,
@@ -72,21 +100,18 @@ function createBootstrapUserReturn(
     lastName,
     fullName: bootstrap.fullName,
     imageUrl: '/avatars/default-user.png',
-    primaryEmailAddress: {
-      emailAddress: bootstrap.email,
-      verification: {
-        status: 'verified',
-      },
-    },
-    emailAddresses: [
-      {
-        emailAddress: bootstrap.email,
-        verification: {
-          status: 'verified',
-        },
-      },
-    ],
+    primaryEmailAddressId,
+    primaryEmailAddress,
+    emailAddresses: [primaryEmailAddress],
     externalAccounts: [],
+    getSessions: async () => [],
+    createEmailAddress: async () => {
+      throw createMockClerkActionError('Email management');
+    },
+    update: async () => {
+      throw createMockClerkActionError('Account updates');
+    },
+    reload: async () => {},
     privateMetadata: {
       isAdmin: bootstrap.isAdmin,
       devTestAuthPersona: bootstrap.persona,
