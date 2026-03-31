@@ -25,7 +25,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Cron insights concurrency test timeout increased to reflect the observed route import cost in CI-like environments
 - Analytics no longer default-opens into the full-screen mobile drawer on first load; it now opens after mount on desktop and closes when crossing down to mobile
 - Audience table unit tests now cover narrow, medium, and wide desktop layouts and mock the mobile card through the current table barrel export
-
 ## [26.4.106] - 2026-03-30
 
 ### Removed

@@ -94,6 +94,9 @@ describe('DashboardOverview', () => {
 
     // Progress indicator text
     expect(screen.getByText('0 of 3 complete')).toBeInTheDocument();
+
+    const taskRow = screen.getByText(/Claim your handle/i).closest('li');
+    expect(taskRow?.className).toContain('rounded-full');
   });
 
   it('marks tasks complete based on data', () => {

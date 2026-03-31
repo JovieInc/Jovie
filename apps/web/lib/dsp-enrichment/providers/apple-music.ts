@@ -528,6 +528,41 @@ export function extractImageUrls(artwork?: {
 }
 
 /**
+ * Extract a high-resolution press photo URL from Apple Music artwork.
+ * Requests at original artwork dimensions (often 3000x3000) or at least 1200px.
+ * Apple Music serves the largest available size up to requested dimensions.
+ */
+export function extractPressPhotoUrl(artwork?: {
+  url: string;
+  width: number;
+  height: number;
+}): { url: string; width: number; height: number } | null {
+  if (
+    !artwork?.url ||
+    !artwork.url.includes('{w}') ||
+    !artwork.url.includes('{h}') ||
+    !Number.isFinite(artwork.width) ||
+    !Number.isFinite(artwork.height)
+  ) {
+    return null;
+  }
+
+  if (artwork.width < 1 || artwork.height < 1) {
+    return null;
+  }
+
+  const targetWidth = Math.max(artwork.width, 1200);
+  const targetHeight = Math.max(artwork.height, 1200);
+  return {
+    url: artwork.url
+      .replace('{w}', String(targetWidth))
+      .replace('{h}', String(targetHeight)),
+    width: targetWidth,
+    height: targetHeight,
+  };
+}
+
+/**
  * Extract external URLs from an Apple Music artist.
  *
  * @param artist - Apple Music artist object

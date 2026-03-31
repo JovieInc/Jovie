@@ -6,7 +6,6 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useInsightsSummaryQuery } from '@/lib/queries';
 import { InsightCategoryIcon } from './InsightCategoryIcon';
 
-/** @deprecated Replaced by AudienceInsightsCard in the analytics sidebar */
 export function InsightsSummaryWidget() {
   const { data, isLoading } = useInsightsSummaryQuery();
 

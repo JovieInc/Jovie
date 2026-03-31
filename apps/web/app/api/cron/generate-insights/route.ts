@@ -10,16 +10,12 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { withTimeout } from '@/lib/resilience/primitives';
 import { aggregateMetrics } from '@/lib/services/insights/data-aggregator';
-import {
-  findStaleTypes,
-  generateInsights,
-} from '@/lib/services/insights/insight-generator';
+import { generateInsights } from '@/lib/services/insights/insight-generator';
 import {
   completeGenerationRun,
   createGenerationRun,
   expireStaleInsights,
   getExistingInsightTypes,
-  getLatestInsightsForFreshness,
   persistInsights,
 } from '@/lib/services/insights/lifecycle';
 import {
@@ -59,9 +55,7 @@ async function processProfile(
   }
 
   const existingTypes = await getExistingInsightTypes(profileId);
-  const latestInsights = await getLatestInsightsForFreshness(profileId);
-  const staleTypes = findStaleTypes(metrics, latestInsights);
-  const result = await generateInsights(metrics, existingTypes, staleTypes);
+  const result = await generateInsights(metrics, existingTypes);
 
   const persisted = await persistInsights(
     profileId,

@@ -119,14 +119,16 @@ function InsightsPanelContent({
   );
 }
 
-/** @deprecated Replaced by AudienceInsightsCard in the analytics sidebar */
 const CATEGORY_FILTERS: { label: string; value: InsightCategory | 'all' }[] = [
   { label: 'All', value: 'all' },
   { label: 'Geographic', value: 'geographic' },
   { label: 'Growth', value: 'growth' },
   { label: 'Content', value: 'content' },
+  { label: 'Revenue', value: 'revenue' },
+  { label: 'Tour', value: 'tour' },
   { label: 'Platform', value: 'platform' },
   { label: 'Engagement', value: 'engagement' },
+  { label: 'Timing', value: 'timing' },
 ];
 
 export function InsightsPanel() {

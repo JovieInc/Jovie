@@ -329,7 +329,7 @@ export function OnboardingCheckoutClient({
           <div className='space-y-2.5'>
             {PRO_HIGHLIGHTS.map(item => (
               <div key={item.label} className='flex items-start gap-3'>
-                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-surface-1'>
+                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-1'>
                   <item.icon className='h-4 w-4 text-(--linear-accent)' />
                 </div>
                 <div>
