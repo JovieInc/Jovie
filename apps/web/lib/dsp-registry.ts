@@ -478,6 +478,14 @@ export const DSP_REGISTRY: readonly DspRegistryEntry[] = [
     category: 'metadata',
   }),
   dsp({
+    key: 'allmusic',
+    name: 'AllMusic',
+    musicfetchService: 'allMusic',
+    color: '#E0344B',
+    domains: ['allmusic.com', 'www.allmusic.com'],
+    category: 'metadata',
+  }),
+  dsp({
     key: 'musicbrainz',
     name: 'MusicBrainz',
     musicfetchService: 'musicBrainz',
