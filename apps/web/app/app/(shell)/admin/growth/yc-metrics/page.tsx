@@ -80,12 +80,12 @@ function FunnelBar({
       <span className='w-16 shrink-0 text-right text-[13px] font-[610] tabular-nums text-primary-token'>
         {fmt(count)}
       </span>
-      {rate != null ? (
+      {rate == null ? (
+        <span className='w-14 shrink-0' />
+      ) : (
         <span className='w-14 shrink-0 text-right text-[11px] tabular-nums text-tertiary-token'>
           {rate}
         </span>
-      ) : (
-        <span className='w-14 shrink-0' />
       )}
     </div>
   );
@@ -288,12 +288,12 @@ export default async function YcMetricsPage() {
             <div className='grid grid-cols-2 gap-2 md:grid-cols-4'>
               <ContentMetricCard
                 label='CAC'
-                value={funnel.cacUsd != null ? fmtUsd(funnel.cacUsd) : '—'}
+                value={funnel.cacUsd == null ? '—' : fmtUsd(funnel.cacUsd)}
                 subtitle='Cost per signup'
               />
               <ContentMetricCard
                 label='LTV'
-                value={funnel.ltvUsd != null ? fmtUsd(funnel.ltvUsd) : '—'}
+                value={funnel.ltvUsd == null ? '—' : fmtUsd(funnel.ltvUsd)}
                 subtitle='12-mo estimated'
               />
               <ContentMetricCard
@@ -310,9 +310,9 @@ export default async function YcMetricsPage() {
               <ContentMetricCard
                 label='Payback'
                 value={
-                  funnel.paybackPeriodMonths != null
-                    ? `${funnel.paybackPeriodMonths.toFixed(1)} mo`
-                    : '—'
+                  funnel.paybackPeriodMonths == null
+                    ? '—'
+                    : `${funnel.paybackPeriodMonths.toFixed(1)} mo`
                 }
                 subtitle='Months to recover CAC'
               />
@@ -367,9 +367,9 @@ export default async function YcMetricsPage() {
               <ContentMetricCard
                 label='Runway'
                 value={
-                  overview.runwayMonths != null
-                    ? `${overview.runwayMonths.toFixed(1)} mo`
-                    : '—'
+                  overview.runwayMonths == null
+                    ? '—'
+                    : `${overview.runwayMonths.toFixed(1)} mo`
                 }
                 subtitle='At current burn'
               />

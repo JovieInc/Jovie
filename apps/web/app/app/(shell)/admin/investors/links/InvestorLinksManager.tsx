@@ -441,7 +441,7 @@ function LinkActions({
                 setMenuOpen(false);
                 // Deactivates the link (soft-delete) — confirm first
                 if (
-                  window.confirm(
+                  globalThis.confirm(
                     `Delete "${link.label}"? The link will be permanently removed.`
                   )
                 ) {
