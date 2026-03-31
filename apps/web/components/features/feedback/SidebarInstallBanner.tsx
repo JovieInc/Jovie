@@ -92,7 +92,7 @@ export function SidebarInstallBanner() {
 
     return (
       <div className='group-data-[collapsible=icon]:hidden px-2.5 pb-1.5'>
-        <div className='relative rounded-[10px] border border-sidebar-border/70 bg-sidebar-accent/12 px-2.5 py-2 text-sidebar-muted'>
+        <div className='relative rounded-xl border border-sidebar-border/70 bg-sidebar-accent/12 px-2.5 py-2 text-sidebar-muted'>
           <button
             type='button'
             aria-label='Dismiss version update banner'
@@ -130,7 +130,7 @@ export function SidebarInstallBanner() {
 
   return (
     <div className='group-data-[collapsible=icon]:hidden px-2.5 pb-1.5'>
-      <div className='relative rounded-[10px] border border-sidebar-border/70 bg-sidebar-accent/12 px-2.5 py-2 text-sidebar-muted'>
+      <div className='relative rounded-xl border border-sidebar-border/70 bg-sidebar-accent/12 px-2.5 py-2 text-sidebar-muted'>
         <button
           type='button'
           aria-label='Dismiss install banner'

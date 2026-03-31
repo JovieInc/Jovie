@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import type {
@@ -10,6 +11,7 @@ import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
+import { useDspEnrichmentStatusQuery } from '@/lib/queries/useDspEnrichmentStatusQuery';
 import { DspPresenceEmptyState } from './DspPresenceEmptyState';
 import { DspPresenceSidebar } from './DspPresenceSidebar';
 import { DspPresenceSummary } from './DspPresenceSummary';
@@ -26,10 +28,22 @@ interface DspPresenceViewProps {
 export function DspPresenceView({ data }: DspPresenceViewProps) {
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const dashboardData = useDashboardData();
+  const router = useRouter();
 
   const profileId = dashboardData.selectedProfile?.id ?? '';
   const isAdmin = dashboardData.isAdmin;
   const spotifyId = dashboardData.selectedProfile?.spotifyId ?? null;
+
+  // Poll enrichment status and auto-refresh when discovery completes
+  const onDiscoveryComplete = useCallback(() => {
+    router.refresh();
+  }, [router]);
+
+  const { data: enrichmentStatus } = useDspEnrichmentStatusQuery({
+    profileId,
+    onComplete: onDiscoveryComplete,
+  });
+
   const existingProviderIds = useMemo(
     () => data.items.map(i => i.providerId),
     [data.items]
@@ -101,6 +115,7 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
       profileId={profileId}
       isAdmin={isAdmin}
       spotifyId={spotifyId}
+      enrichmentStatus={enrichmentStatus}
     />
   );
 

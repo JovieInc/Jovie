@@ -4,12 +4,16 @@ import { Ghost, User } from 'lucide-react';
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { getFallbackName } from '@/lib/utils/audience';
-import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
+import {
+  capitalizeFirst,
+  safeDecodeURIComponent,
+} from '@/lib/utils/string-utils';
 import type { AudienceMemberType } from '@/types';
 
 export interface AudienceUserCellProps {
   readonly displayName: string | null;
   readonly type: AudienceMemberType;
+  readonly tags?: string[];
   readonly deviceType?: string | null;
   readonly geoCity?: string | null;
   readonly geoCountry?: string | null;
@@ -58,6 +62,7 @@ function formatAnonymousVisitorLabel(
 export const AudienceUserCell = React.memo(function AudienceUserCell({
   displayName,
   type,
+  tags = [],
   deviceType,
   geoCity,
   geoCountry,
@@ -65,6 +70,7 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
   className,
 }: AudienceUserCellProps) {
   const isAnonymous = type === 'anonymous';
+  const isBot = tags.includes('bot');
 
   const primaryLabel = isAnonymous
     ? formatAnonymousVisitorLabel(deviceType, geoCity, geoCountry)
@@ -94,6 +100,11 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
       >
         {primaryLabel}
       </span>
+      {isBot ? (
+        <span className='shrink-0 rounded-full bg-amber-500/12 px-2 py-0.5 text-[11px] font-[510] text-amber-700 dark:text-amber-300'>
+          Bot
+        </span>
+      ) : null}
       {showTypeDot && !isAnonymous && (
         <span
           className={cn(
@@ -101,11 +112,7 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
             TYPE_DOT_COLORS[type]
           )}
           aria-hidden='true'
-          title={
-            type === 'sms'
-              ? 'SMS'
-              : type.charAt(0).toUpperCase() + type.slice(1)
-          }
+          title={type === 'sms' ? 'SMS' : capitalizeFirst(type)}
         />
       )}
     </div>

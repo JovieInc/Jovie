@@ -40,6 +40,7 @@ jobs:
     outputs:
       run_build: ${{ steps.detect.outputs.run_build }}
       run_test: ${{ steps.detect.outputs.run_test }}
+      run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse }}
       run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse }}
       run_e2e: ${{ steps.detect.outputs.run_e2e }}
       run_drizzle: ${{ steps.detect.outputs.run_drizzle }}
@@ -58,7 +59,7 @@ jobs:
           # Force run all if the 'testing' label is present
           if [[ "$FULL_CI_LABEL" == "true" ]]; then
             echo "Forcing full CI run due to 'testing' label"
-            for t in run_build run_test run_dashboard_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=true" >> $GITHUB_OUTPUT
             done
             exit 0
@@ -71,7 +72,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_dashboard_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=true" >> $GITHUB_OUTPUT
             done
             exit 0
@@ -82,7 +83,7 @@ jobs:
           # Check if only docs changed (exclude .github/ — workflow changes must run CI)
           if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
             echo "Only documentation files changed"
-            for t in run_build run_test run_dashboard_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=false" >> $GITHUB_OUTPUT
             done
             exit 0
@@ -108,6 +109,13 @@ jobs:
           else
             RUN_TEST=false
             echo "run_test=false" >> $GITHUB_OUTPUT
+          fi
+
+          PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.pr\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
+          if echo "$CHANGED_FILES" | grep -q -E "$PUBLIC_LIGHTHOUSE_PATTERN"; then
+            echo "run_public_lighthouse=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_public_lighthouse=false" >> $GITHUB_OUTPUT
           fi
 
           DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.dashboard\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs)$'
@@ -138,6 +146,7 @@ jobs:
             echo "Fork PR: disabling e2e and build"
             echo "run_e2e=false" >> $GITHUB_OUTPUT
             echo "run_build=false" >> $GITHUB_OUTPUT
+            echo "run_public_lighthouse=false" >> $GITHUB_OUTPUT
             echo "run_dashboard_lighthouse=false" >> $GITHUB_OUTPUT
             echo "run_test=false" >> $GITHUB_OUTPUT
           fi
@@ -691,11 +700,11 @@ jobs:
 
   ci-lighthouse-pr:
     name: Lighthouse (PR, informational)
-    needs: [ci-build-public]
+    needs: [ci-build-public, ci-path-changes]
     # Runs Lighthouse CI against the public-route build artifact on PRs.
     # Informational only — never blocks PRs or merge queue.
     # Re-added with stricter thresholds (0.75 perf, 0.85 a11y) after original removal (0.5 was too relaxed).
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true' }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -1461,7 +1470,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main'
-        uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v5
         with:
           directory: apps/web/coverage
           flags: unittests

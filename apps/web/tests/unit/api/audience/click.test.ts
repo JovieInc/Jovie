@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockPublicClickLimiterGetStatus = vi.hoisted(() => vi.fn());
 const mockPublicClickLimiterLimit = vi.hoisted(() => vi.fn());
+const capturedInsertValues = vi.hoisted(() => [] as unknown[]);
+const mockDetectBot = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit', () => ({
   publicClickLimiter: {
@@ -73,7 +75,8 @@ vi.mock('@/lib/db/schema', () => ({
 vi.mock('@/lib/ingestion/session', () => ({
   withSystemIngestionSession: vi.fn().mockImplementation(async callback => {
     const insert = vi.fn().mockImplementation(() => ({
-      values: vi.fn().mockImplementation(() => {
+      values: vi.fn().mockImplementation(value => {
+        capturedInsertValues.push(value);
         const base: any = Promise.resolve(undefined);
         base.onConflictDoNothing = vi.fn().mockReturnValue({
           returning: vi.fn().mockResolvedValue([
@@ -126,13 +129,15 @@ vi.mock('@/lib/utils/pii-encryption', () => ({
 }));
 
 vi.mock('@/lib/utils/bot-detection', () => ({
-  detectBot: vi.fn().mockReturnValue({ isBot: false }),
+  detectBot: mockDetectBot,
 }));
+
+const { POST } = await import('@/app/api/audience/click/route');
 
 describe('POST /api/audience/click', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
+    capturedInsertValues.length = 0;
     mockPublicClickLimiterGetStatus.mockReturnValue({
       blocked: false,
       retryAfterSeconds: 0,
@@ -140,6 +145,7 @@ describe('POST /api/audience/click', () => {
       remaining: 100,
     });
     mockPublicClickLimiterLimit.mockResolvedValue({ success: true });
+    mockDetectBot.mockReturnValue({ isBot: false, shouldBlock: false });
   });
 
   it('returns 429 when rate limited', async () => {
@@ -150,7 +156,6 @@ describe('POST /api/audience/click', () => {
       reset: new Date(Date.now() + 60_000),
     });
 
-    const { POST } = await import('@/app/api/audience/click/route');
     const request = new NextRequest('http://localhost/api/audience/click', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -169,7 +174,6 @@ describe('POST /api/audience/click', () => {
   });
 
   it('returns 400 for invalid payload', async () => {
-    const { POST } = await import('@/app/api/audience/click/route');
     const request = new NextRequest('http://localhost/api/audience/click', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -184,7 +188,6 @@ describe('POST /api/audience/click', () => {
   });
 
   it('records click for valid payload', async () => {
-    const { POST } = await import('@/app/api/audience/click/route');
     const request = new NextRequest('http://localhost/api/audience/click', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -200,5 +203,31 @@ describe('POST /api/audience/click', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
+  });
+
+  it('labels bot click traffic without dropping the row', async () => {
+    mockDetectBot.mockReturnValue({ isBot: true, shouldBlock: false });
+
+    const request = new NextRequest('http://localhost/api/audience/click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+        linkId: '123e4567-e89b-12d3-a456-426614174001',
+        linkType: 'social',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(capturedInsertValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ tags: ['bot'] }),
+        expect.objectContaining({ isBot: true }),
+      ])
+    );
   });
 });

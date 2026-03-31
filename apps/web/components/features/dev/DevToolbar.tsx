@@ -464,7 +464,7 @@ export function DevToolbar({
       if (data?.success) {
         if (data.synced) {
           setSyncClerkState('done');
-          setTimeout(() => window.location.reload(), 500);
+          setTimeout(() => globalThis.location.reload(), 500);
         } else {
           setSyncClerkState('noop');
           setTimeout(() => setSyncClerkState('idle'), 2000);

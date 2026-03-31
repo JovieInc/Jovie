@@ -11,6 +11,7 @@ export const creatorTypeEnum = pgEnum('creator_type', [
 export const themeModeEnum = pgEnum('theme_mode', ['system', 'light', 'dark']);
 
 export const photoStatusEnum = pgEnum('photo_status', [
+  'draft',
   'uploading',
   'processing',
   'ready',

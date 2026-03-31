@@ -68,8 +68,9 @@ describe('dashboard drawer chrome', () => {
           matchId: 'match-1',
           providerId: 'spotify',
           status: 'confirmed',
-          confidenceScore: 0.94,
+          confidenceScore: null,
           matchingIsrcCount: 3,
+          matchSource: 'musicfetch',
           confirmedAt: '2026-03-20T00:00:00.000Z',
           externalArtistName: 'Tim White',
           externalArtistUrl: 'https://open.spotify.com/artist/4u',
@@ -85,5 +86,33 @@ describe('dashboard drawer chrome', () => {
       screen.getByRole('button', { name: 'More actions' })
     ).toBeInTheDocument();
     expect(screen.queryByText('DSP profile')).not.toBeInTheDocument();
+    expect(screen.getByText('Discovered via Spotify')).toBeInTheDocument();
+    expect(screen.getByText('Tracks Verified')).toBeInTheDocument();
+    expect(screen.getByLabelText('Profile image missing')).toBeInTheDocument();
+    expect(screen.queryByText('Confidence Breakdown')).not.toBeInTheDocument();
+  });
+
+  it('presence drawer maps backfill matches to a distinct source label', () => {
+    render(
+      <DspPresenceSidebar
+        item={{
+          matchId: 'match-2',
+          providerId: 'spotify',
+          status: 'auto_confirmed',
+          confidenceScore: null,
+          matchingIsrcCount: 0,
+          matchSource: 'backfill',
+          confirmedAt: '2026-03-20T00:00:00.000Z',
+          externalArtistName: 'Tim White',
+          externalArtistUrl: 'https://open.spotify.com/artist/4u',
+          externalArtistImageUrl: null,
+          confidenceBreakdown: null,
+        }}
+        onClose={() => undefined}
+      />
+    );
+
+    expect(screen.getByText('Imported from profile')).toBeInTheDocument();
+    expect(screen.queryByText('Tracks Verified')).not.toBeInTheDocument();
   });
 });

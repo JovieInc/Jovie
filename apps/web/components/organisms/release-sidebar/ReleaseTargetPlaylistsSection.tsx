@@ -91,7 +91,7 @@ export function ReleaseTargetPlaylistsSection({
         maxLength={310}
         disabled={readOnly}
         aria-describedby={`target-playlists-helper-${releaseId}`}
-        className='h-8 w-full rounded-[8px] border-subtle bg-surface-0 text-[12px]'
+        className='h-8 w-full rounded-full border-subtle bg-surface-0 text-[12px]'
         data-testid={`target-playlists-input-${releaseId}`}
       />
     </DrawerSurfaceCard>

@@ -26,7 +26,7 @@ export default async function TasksPage({ params }: TasksPageProps) {
   );
 }
 
-async function TasksContent({ releaseId }: { releaseId: string }) {
+async function TasksContent({ releaseId }: Readonly<{ releaseId: string }>) {
   const profileId = await requireProfileId();
 
   const [release] = await db

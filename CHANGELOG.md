@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.106] - 2026-03-30
+
+### Changed
+
+- Flatten card elevation across all app surfaces: cards now use border-only separation (`shadow-none`) instead of layered shadows
+- Standardize card border radius to `rounded-xl` (replacing hardcoded `rounded-[10px]`) across dashboard, sidebar, drawers, chat, auth, admin, and loading skeletons
+- Round all interactive controls to pill shape (`rounded-full`): icon containers, button groups, toggle segments, badges, inputs, and action buttons
+- Round checklist items, sidebar banners, and settings icon containers to `rounded-full` for consistent pill aesthetic
+- Increase checklist checkbox and task indicator sizes for better touch targets
+
 ## [26.4.105] - 2026-03-30
 
 ### Fixed

@@ -163,7 +163,7 @@ export function ReleasePitchSection({
         )}
       </div>
 
-      <div className='relative min-h-[80px] rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-2.5'>
+      <div className='relative min-h-[80px] rounded-xl border border-(--linear-app-frame-seam) bg-surface-0 p-2.5'>
         {isPending && (
           <div className='animate-pulse space-y-1.5'>
             <div className='h-2.5 w-full rounded bg-surface-2' />

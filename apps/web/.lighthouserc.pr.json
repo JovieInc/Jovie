@@ -78,6 +78,7 @@
               }
             ],
             "is-crawlable": "off",
+            "forced-reflow-insight": "warn",
             "network-dependency-tree-insight": "off",
             "target-size": "warn",
             "digest-mismatch": "off"

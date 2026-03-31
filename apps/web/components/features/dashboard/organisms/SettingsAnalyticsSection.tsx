@@ -2,11 +2,11 @@
 
 import { BarChart3 } from 'lucide-react';
 import { useCallback } from 'react';
-import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
+import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
 import { useOptimisticToggle } from '@/features/dashboard/hooks/useOptimisticToggle';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
-import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
 import { useAnalyticsFilterMutation } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 
@@ -54,20 +54,20 @@ export function SettingsAnalyticsSection({
         {isPro ? (
           <SettingsToggleRow
             icon={<BarChart3 className='h-4 w-4' aria-hidden />}
-            title='Exclude your own visits'
-            description='Keep your own profile views and link clicks out of analytics so the numbers reflect your audience, not your testing.'
+            title='Traffic Quality Filtering'
+            description='Keep your own profile views and link clicks out of analytics so your numbers reflect real audience behavior. Likely bot traffic stays visible in Audience and is labeled for review.'
             checked={excludeSelf}
             onCheckedChange={handleToggle}
             disabled={isPending}
-            ariaLabel='Exclude yourself from analytics'
+            ariaLabel='Toggle Traffic Quality Filtering'
           />
         ) : (
           <SettingsToggleRow
             gated
             icon={<BarChart3 className='h-4 w-4' aria-hidden />}
-            title='Exclude your own visits'
-            description='Keep your own profile views and link clicks out of analytics so the numbers reflect your audience, not your testing.'
-            gateFeatureContext='Filter your own visits'
+            title='Traffic Quality Filtering'
+            description='Keep your own profile views and link clicks out of analytics so your numbers reflect real audience behavior. Likely bot traffic stays visible in Audience and is labeled for review.'
+            gateFeatureContext='Traffic Quality Filtering'
           />
         )}
         {isPro && excludeSelf ? (
@@ -75,11 +75,13 @@ export function SettingsAnalyticsSection({
             <BarChart3 className='mt-0.5 h-4 w-4 shrink-0 text-secondary-token' />
             <div>
               <p className='text-[13px] font-[560] tracking-[-0.02em] text-primary-token'>
-                Self-filtering active
+                Traffic Quality Filtering Active
               </p>
               <p className='mt-1 text-[13px] text-secondary-token'>
                 Your own profile views and link clicks are being excluded from
-                your analytics.
+                your analytics. Likely bot traffic remains visible in Audience
+                with a bot label so you can review it without polluting clean
+                traffic decisions.
               </p>
             </div>
           </ContentSurfaceCard>

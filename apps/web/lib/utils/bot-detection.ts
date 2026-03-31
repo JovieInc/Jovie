@@ -15,6 +15,10 @@ export interface BotDetectionResult {
   asn?: number;
 }
 
+interface DetectBotOptions {
+  readonly userAgent?: string | null;
+}
+
 // Conservative bot detection - only block obvious crawlers on sensitive endpoints
 const META_USER_AGENTS = [
   'facebookexternalhit',
@@ -46,9 +50,11 @@ const KNOWN_CRAWLERS = [
  */
 export function detectBot(
   request: NextRequest,
-  endpoint?: string
+  endpoint?: string,
+  options: DetectBotOptions = {}
 ): BotDetectionResult {
-  const userAgent = request.headers.get('user-agent') || '';
+  const userAgent =
+    options.userAgent ?? (request.headers.get('user-agent') || '');
 
   // Check for Meta crawlers
   const isMeta = META_USER_AGENTS.some(agent =>

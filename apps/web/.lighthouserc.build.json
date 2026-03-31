@@ -64,7 +64,8 @@
               {
                 "minScore": 0.9
               }
-            ]
+            ],
+            "forced-reflow-insight": "warn"
           }
         }
       ]

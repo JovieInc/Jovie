@@ -17,6 +17,7 @@ const {
   mockSucceedJob,
   mockHandleIngestionJobFailure,
   mockWithSystemIngestionSession,
+  mockProcessOutreachBatch,
 } = vi.hoisted(() => ({
   mockDbExecute: vi.fn(),
   mockDbSelect: vi.fn(),
@@ -34,6 +35,7 @@ const {
   mockSucceedJob: vi.fn(),
   mockHandleIngestionJobFailure: vi.fn(),
   mockWithSystemIngestionSession: vi.fn(),
+  mockProcessOutreachBatch: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -80,6 +82,10 @@ vi.mock('@/lib/ingestion/session', () => ({
 
 vi.mock('@/lib/leads/auto-approve', () => ({
   runAutoApprove: mockRunAutoApprove,
+}));
+
+vi.mock('@/lib/leads/outreach-batch', () => ({
+  processOutreachBatch: mockProcessOutreachBatch,
 }));
 
 vi.mock('@/lib/leads/discovery', () => ({
@@ -136,7 +142,7 @@ describe('GET /api/cron/frequent', () => {
         where: vi.fn().mockReturnValue({
           limit: vi.fn().mockResolvedValue([
             {
-              enabled: false,
+              enabled: true,
               discoveryEnabled: false,
             },
           ]),
@@ -162,6 +168,13 @@ describe('GET /api/cron/frequent', () => {
       processed: 5,
     });
     mockRunAutoApprove.mockResolvedValue({ approved: 0 });
+    mockProcessOutreachBatch.mockResolvedValue({
+      attempted: 0,
+      queued: 0,
+      failed: 0,
+      dismissed: 0,
+      remainingPending: 0,
+    });
     mockResetBudgetIfNeeded.mockImplementation(async settings => settings);
     mockWarmAlphabetCache.mockResolvedValue({ warmed: false });
     mockClaimPendingJobs.mockResolvedValue([]);
@@ -189,8 +202,19 @@ describe('GET /api/cron/frequent', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
+    expect(mockProcessOutreachBatch).toHaveBeenCalledWith(10);
     expect(mockScheduleReleaseNotifications).toHaveBeenCalledTimes(1);
     expect(mockSendPendingNotifications).toHaveBeenCalledTimes(1);
+    expect(data.results.outreach).toEqual({
+      success: true,
+      data: {
+        attempted: 0,
+        queued: 0,
+        failed: 0,
+        dismissed: 0,
+        remainingPending: 0,
+      },
+    });
     expect(data.results.scheduleNotifications.success).toBe(true);
     expect(data.results.sendNotifications.success).toBe(true);
   });

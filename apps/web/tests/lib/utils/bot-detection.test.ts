@@ -210,6 +210,16 @@ describe('Bot Detection', () => {
       expect(result.userAgent).toBe(userAgent);
     });
 
+    it('should prefer an overridden user agent when provided', () => {
+      const request = createMockRequest('Header User Agent');
+
+      const result = detectBot(request, undefined, {
+        userAgent: 'Override User Agent',
+      });
+
+      expect(result.userAgent).toBe('Override User Agent');
+    });
+
     it('should handle empty user agent', () => {
       const request = createMockRequest('');
 
