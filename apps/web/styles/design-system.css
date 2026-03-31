@@ -66,7 +66,7 @@
   /* Page bg */
   /* prettier-ignore */
   --color-bg-surface-1: var(--linear-app-content-surface);
-  /* App card surface — same semantic tier in both themes */
+  /* App shell canvas in light mode */
   /* prettier-ignore */
   --color-bg-surface-2: #f2f3f5;
   /* Cards */
@@ -197,8 +197,8 @@
   /* sidebar/page bg */
   --color-bg-surface-0: #0f1011;
   /* primary app surface — matches --linear-bg-surface-0 */
-  --color-bg-surface-1: var(--linear-app-content-surface);
-  /* App card surface — same semantic tier in both themes */
+  --color-bg-surface-1: var(--linear-bg-surface-1);
+  /* Shared card surface inside the dark app shell */
   --color-bg-surface-2: #23252a;
   /* inputs, elevated */
   --color-bg-surface-3: #2a2c32;

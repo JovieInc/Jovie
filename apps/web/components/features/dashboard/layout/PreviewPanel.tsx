@@ -77,7 +77,7 @@ function PreviewPanelEmpty({
 
               <div className='mx-auto w-full max-w-[320px]'>
                 <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>
-                  <div className='rounded-[24px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-2'>
+                  <div className='rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
                     <div className='mb-2 flex items-center justify-between px-2.5 pt-1'>
                       <div className='h-2.5 w-16 rounded skeleton' />
                       <div className='h-5 w-20 rounded-[8px] skeleton' />
@@ -361,7 +361,7 @@ export function PreviewPanel() {
 
               <div className='mx-auto w-full max-w-[320px]'>
                 <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>
-                  <div className='rounded-[24px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-2'>
+                  <div className='rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
                     <div className='mb-2 flex items-center justify-between px-2.5 pt-1 text-[10px] font-[510] tracking-[-0.01em] text-secondary-token'>
                       <span>Preview</span>
                       <span className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-[9px] tracking-[-0.01em]'>

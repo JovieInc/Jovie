@@ -36,7 +36,7 @@ describe('DrawerSurfaceCard', () => {
 
     expect(className).toContain('rounded-xl');
     expect(className).toContain('border-(--linear-app-frame-seam)');
-    expect(className).toContain('bg-(--linear-app-content-surface)');
+    expect(className).toContain('bg-surface-1');
     expect(className).toContain('shadow-[var(--linear-app-drawer-shadow)]');
   });
 

@@ -61,6 +61,11 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Rule:** Tailwind v4 utilities MUST be declared in `@theme` or `@theme inline` blocks in `globals.css`. Variables in `:root` are CSS-only; they don't generate utility classes automatically.
 
+### Shell canvas and card surfaces must stay separate
+**Mistake:** A dark-shell cleanup changed tokens, but some task/preview routes still rendered bordered cards and even full table routes directly on `bg-(--linear-app-content-surface)`. That made cards blend into the canvas and left task pages looking like one flat rectangle.
+
+**Rule:** In the app shell, `bg-(--linear-app-content-surface)` is shell chrome/canvas only. Shared cards and panels use `bg-surface-1`, recessed wells use `bg-surface-0`, and table/workspace routes must wrap primary content in `DashboardWorkspacePanel` plus `LINEAR_SURFACE.contentContainer`.
+
 ---
 
 ## Git Workflow

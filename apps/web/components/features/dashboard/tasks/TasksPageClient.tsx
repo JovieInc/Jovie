@@ -12,7 +12,9 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { DashboardWorkspacePanel } from '@/components/features/dashboard/organisms/DashboardWorkspacePanel';
 import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
+import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import { PageToolbar, UnifiedTable } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -386,171 +388,188 @@ export function TasksPageClient() {
   };
 
   return (
-    <div className='flex min-h-0 flex-1 flex-col'>
-      <div className='flex items-center justify-between gap-3 border-b border-subtle px-app-header py-3'>
-        <div className='min-w-0'>
-          <h1 className='text-[13px] font-[560] text-primary-token'>Tasks</h1>
-          <p className='text-[12px] text-secondary-token'>
-            Track release work and general artist operations.
-          </p>
-        </div>
-        <Button
-          type='button'
-          size='sm'
-          className='gap-1.5'
-          onClick={() => setIsComposerOpen(value => !value)}
+    <DashboardWorkspacePanel
+      className='overflow-hidden'
+      data-testid='tasks-workspace'
+    >
+      <div className='flex min-h-0 flex-1 flex-col px-3 py-3 sm:px-4 sm:py-4'>
+        <section
+          className={cn(
+            LINEAR_SURFACE.contentContainer,
+            'flex min-h-0 flex-1 flex-col overflow-hidden'
+          )}
+          data-testid='tasks-content-panel'
         >
-          <Plus className='h-3.5 w-3.5' />
-          New Task
-        </Button>
-      </div>
+          <div className='flex items-center justify-between gap-3 border-b border-subtle px-app-header py-3'>
+            <div className='min-w-0'>
+              <h1 className='text-[13px] font-[560] text-primary-token'>
+                Tasks
+              </h1>
+              <p className='text-[12px] text-secondary-token'>
+                Track release work and general artist operations.
+              </p>
+            </div>
+            <Button
+              type='button'
+              size='sm'
+              className='gap-1.5'
+              onClick={() => setIsComposerOpen(value => !value)}
+            >
+              <Plus className='h-3.5 w-3.5' />
+              New Task
+            </Button>
+          </div>
 
-      {isComposerOpen ? (
-        <form
-          onSubmit={handleCreateTask}
-          className='flex items-center gap-2 border-b border-subtle px-app-header py-3'
-        >
-          <Input
-            value={draftTitle}
-            onChange={event => setDraftTitle(event.target.value)}
-            placeholder='Draft press release, update bio, pitch sync supervisor...'
-            autoFocus
-          />
-          <Button
-            type='submit'
-            size='sm'
-            disabled={createTaskMutation.isPending}
-          >
-            Create
-          </Button>
-          <Button
-            type='button'
-            variant='secondary'
-            size='sm'
-            onClick={() => {
-              setDraftTitle('');
-              setIsComposerOpen(false);
-            }}
-          >
-            Cancel
-          </Button>
-        </form>
-      ) : null}
-
-      <PageToolbar
-        start={
-          <div className='flex min-w-0 flex-1 items-center gap-2'>
-            <div className='relative min-w-0 flex-1 max-w-[280px]'>
-              <Search className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
+          {isComposerOpen ? (
+            <form
+              onSubmit={handleCreateTask}
+              className='flex items-center gap-2 border-b border-subtle px-app-header py-3'
+            >
               <Input
-                value={search}
-                onChange={event => setSearch(event.target.value)}
-                placeholder='Search Tasks'
-                className='h-8 pl-8 text-[12px]'
+                value={draftTitle}
+                onChange={event => setDraftTitle(event.target.value)}
+                placeholder='Draft press release, update bio, pitch sync supervisor...'
+                autoFocus
+              />
+              <Button
+                type='submit'
+                size='sm'
+                disabled={createTaskMutation.isPending}
+              >
+                Create
+              </Button>
+              <Button
+                type='button'
+                variant='secondary'
+                size='sm'
+                onClick={() => {
+                  setDraftTitle('');
+                  setIsComposerOpen(false);
+                }}
+              >
+                Cancel
+              </Button>
+            </form>
+          ) : null}
+
+          <PageToolbar
+            start={
+              <div className='flex min-w-0 flex-1 items-center gap-2'>
+                <div className='relative min-w-0 flex-1 max-w-[280px]'>
+                  <Search className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
+                  <Input
+                    value={search}
+                    onChange={event => setSearch(event.target.value)}
+                    placeholder='Search Tasks'
+                    className='h-8 pl-8 text-[12px]'
+                  />
+                </div>
+                <select
+                  value={statusFilter}
+                  onChange={event =>
+                    setStatusFilter(event.target.value as TaskStatus | 'all')
+                  }
+                  className={FILTER_SELECT_CLASS}
+                  aria-label='Filter by status'
+                >
+                  <option value='all'>All Statuses</option>
+                  <option value='backlog'>Backlog</option>
+                  <option value='todo'>Todo</option>
+                  <option value='in_progress'>In Progress</option>
+                  <option value='done'>Done</option>
+                  <option value='cancelled'>Cancelled</option>
+                </select>
+                <select
+                  value={priorityFilter}
+                  onChange={event =>
+                    setPriorityFilter(
+                      event.target.value as TaskPriority | 'all'
+                    )
+                  }
+                  className={FILTER_SELECT_CLASS}
+                  aria-label='Filter by priority'
+                >
+                  <option value='all'>All Priorities</option>
+                  <option value='urgent'>Urgent</option>
+                  <option value='high'>High</option>
+                  <option value='medium'>Medium</option>
+                  <option value='low'>Low</option>
+                  <option value='none'>None</option>
+                </select>
+                <select
+                  value={assigneeFilter}
+                  onChange={event =>
+                    setAssigneeFilter(
+                      event.target.value as TaskAssigneeKind | 'all'
+                    )
+                  }
+                  className={FILTER_SELECT_CLASS}
+                  aria-label='Filter by assignee'
+                >
+                  <option value='all'>All Assignees</option>
+                  <option value='human'>You</option>
+                  <option value='jovie'>Jovie</option>
+                </select>
+              </div>
+            }
+          />
+
+          {isError ? (
+            <div className='flex min-h-[240px] flex-1 flex-col items-center justify-center gap-3 px-6 text-center'>
+              <div className='space-y-1'>
+                <h2 className='text-[15px] font-[560] text-primary-token'>
+                  Couldn&apos;t Load Tasks
+                </h2>
+                <p className='text-[13px] text-secondary-token'>
+                  Try reloading the task list.
+                </p>
+              </div>
+              <Button
+                type='button'
+                variant='secondary'
+                size='sm'
+                onClick={() => void refetch()}
+              >
+                Retry
+              </Button>
+            </div>
+          ) : (
+            <div className='min-h-0 flex-1'>
+              <UnifiedTable
+                data={tasks}
+                columns={columns}
+                isLoading={isLoading}
+                getRowId={row => row.id}
+                enableVirtualization={false}
+                rowHeight={38}
+                skeletonRows={8}
+                className='text-[13px]'
+                containerClassName='h-full px-2 pb-2 pt-1'
+                getRowClassName={row =>
+                  cn(
+                    'rounded-[10px] transition-colors',
+                    row.status === 'done'
+                      ? 'opacity-70'
+                      : 'hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)]'
+                  )
+                }
+                emptyState={
+                  <TaskEmptyState
+                    hasFilters={hasFilters}
+                    onClearFilters={() => {
+                      setSearch('');
+                      setStatusFilter('all');
+                      setPriorityFilter('all');
+                      setAssigneeFilter('all');
+                    }}
+                    onOpenComposer={() => setIsComposerOpen(true)}
+                  />
+                }
               />
             </div>
-            <select
-              value={statusFilter}
-              onChange={event =>
-                setStatusFilter(event.target.value as TaskStatus | 'all')
-              }
-              className={FILTER_SELECT_CLASS}
-              aria-label='Filter by status'
-            >
-              <option value='all'>All Statuses</option>
-              <option value='backlog'>Backlog</option>
-              <option value='todo'>Todo</option>
-              <option value='in_progress'>In Progress</option>
-              <option value='done'>Done</option>
-              <option value='cancelled'>Cancelled</option>
-            </select>
-            <select
-              value={priorityFilter}
-              onChange={event =>
-                setPriorityFilter(event.target.value as TaskPriority | 'all')
-              }
-              className={FILTER_SELECT_CLASS}
-              aria-label='Filter by priority'
-            >
-              <option value='all'>All Priorities</option>
-              <option value='urgent'>Urgent</option>
-              <option value='high'>High</option>
-              <option value='medium'>Medium</option>
-              <option value='low'>Low</option>
-              <option value='none'>None</option>
-            </select>
-            <select
-              value={assigneeFilter}
-              onChange={event =>
-                setAssigneeFilter(
-                  event.target.value as TaskAssigneeKind | 'all'
-                )
-              }
-              className={FILTER_SELECT_CLASS}
-              aria-label='Filter by assignee'
-            >
-              <option value='all'>All Assignees</option>
-              <option value='human'>You</option>
-              <option value='jovie'>Jovie</option>
-            </select>
-          </div>
-        }
-      />
-
-      {isError ? (
-        <div className='flex min-h-[240px] flex-col items-center justify-center gap-3 px-6 text-center'>
-          <div className='space-y-1'>
-            <h2 className='text-[15px] font-[560] text-primary-token'>
-              Couldn&apos;t Load Tasks
-            </h2>
-            <p className='text-[13px] text-secondary-token'>
-              Try reloading the task list.
-            </p>
-          </div>
-          <Button
-            type='button'
-            variant='secondary'
-            size='sm'
-            onClick={() => void refetch()}
-          >
-            Retry
-          </Button>
-        </div>
-      ) : (
-        <div className='min-h-0 flex-1'>
-          <UnifiedTable
-            data={tasks}
-            columns={columns}
-            isLoading={isLoading}
-            getRowId={row => row.id}
-            enableVirtualization={false}
-            rowHeight={38}
-            skeletonRows={8}
-            className='text-[13px]'
-            containerClassName='h-full px-2 pb-2 pt-1'
-            getRowClassName={row =>
-              cn(
-                'rounded-[10px] transition-colors',
-                row.status === 'done'
-                  ? 'opacity-70'
-                  : 'hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)]'
-              )
-            }
-            emptyState={
-              <TaskEmptyState
-                hasFilters={hasFilters}
-                onClearFilters={() => {
-                  setSearch('');
-                  setStatusFilter('all');
-                  setPriorityFilter('all');
-                  setAssigneeFilter('all');
-                }}
-                onOpenComposer={() => setIsComposerOpen(true)}
-              />
-            }
-          />
-        </div>
-      )}
-    </div>
+          )}
+        </section>
+      </div>
+    </DashboardWorkspacePanel>
   );
 }

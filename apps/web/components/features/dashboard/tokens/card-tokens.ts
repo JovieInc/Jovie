@@ -147,36 +147,36 @@ export const cardTokens = {
       text-center
     `,
 
-    // Elevated card — flat (same surface as parent, border only)
+    // Elevated card — shared card surface inside the shell
     elevated: tw`
-      bg-(--linear-app-content-surface)
+      bg-surface-1
       border border-(--linear-app-frame-seam)
       rounded-xl
       p-4 sm:p-6
       transition-[background-color,border-color] ${timing.slow} ${timing.easing}
     `,
 
-    // Floating card — flat with border (shadow only for actual modals/popovers)
+    // Floating card — shared card surface with seam border
     floating: tw`
-      bg-(--linear-app-content-surface)
+      bg-surface-1
       border border-(--linear-app-frame-seam)
       rounded-xl
       p-4 sm:p-6
       transition-[background-color,border-color] ${timing.slow} ${timing.easing}
     `,
 
-    // Onboarding card — flat with border
+    // Onboarding card — shared card surface with seam border
     onboarding: tw`
       relative
-      bg-(--linear-app-content-surface)
+      bg-surface-1
       border border-(--linear-app-frame-seam)
       rounded-2xl
       transition-[background-color,border-color] ${timing.slow} ${timing.easing}
     `,
 
-    // Feature card — flat with border
+    // Feature card — shared card surface with seam border
     feature: tw`
-      bg-(--linear-app-content-surface)
+      bg-surface-1
       border border-(--linear-app-frame-seam)
       rounded-2xl
       p-6 sm:p-8
@@ -213,25 +213,25 @@ const elevatedSidebarCardShadow = 'shadow-[var(--linear-app-drawer-shadow)]';
 
 export const LINEAR_SURFACE = {
   /** Drawer section card — border-separated section inside sidebars. */
-  drawerCard: `rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) ${elevatedSidebarCardShadow}`,
+  drawerCard: `rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 ${elevatedSidebarCardShadow}`,
 
   /** Smaller drawer section card — inline property groups. */
-  drawerCardSm: `rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) ${elevatedSidebarCardShadow}`,
+  drawerCardSm: `rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 ${elevatedSidebarCardShadow}`,
 
   /** Primary sidebar card — header/analytics cards in sidebars. */
-  sidebarCard: `rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) ${elevatedSidebarCardShadow}`,
+  sidebarCard: `rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 ${elevatedSidebarCardShadow}`,
 
   /** Content container — wraps tables, mobile lists, empty states. */
   contentContainer:
-    'rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-none',
+    'rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 shadow-none',
 
   /** Banner/callout card. */
   bannerCard:
-    'rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-none',
+    'rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 shadow-none',
 
   /** Dialog inner card — sections inside dialogs. */
   dialogCard:
-    'rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-none',
+    'rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 shadow-none',
 
   /** Sticky header — toolbar-like headers with backdrop blur. */
   stickyHeader:
@@ -242,7 +242,7 @@ export const LINEAR_SURFACE = {
 
   /** Popover container — the ONE surface that gets a shadow (floats above content). */
   popover:
-    'rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-[var(--shadow-popover)]',
+    'rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-0 shadow-[var(--shadow-popover)]',
 } as const;
 
 export const LINEAR_SURFACE_TIER = {

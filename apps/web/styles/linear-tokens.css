@@ -366,12 +366,11 @@
   --linear-bg-page: #08090a;
   --linear-bg-header: transparent;
   --linear-bg-surface-0: #0f1011;
-  /* main panels — matches Linear.app marketing panels (measured 2026-03-16) */
+  /* recessed wells / deepest app surface */
   --linear-bg-surface-1: #17171a;
-  /* inner cards/headers — between panel and elevated */
+  /* shared card surface inside the app shell */
   --linear-bg-surface-2: #1c1c1f;
-  /* elevated elements — icons, badges, skeleton loaders */
-  /* Marketing panel — matches Linear.app homepage mockups (measured 2026-03-16) */
+  /* elevated controls and stronger separation */
   --linear-panel-bg: #0f1011;
   --linear-panel-ring: #23252a;
   --linear-bg-button: #2a2a2e;
@@ -416,7 +415,8 @@
   --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.4);
   --linear-shadow-card-elevated:
     0 0 0 1px rgba(255, 255, 255, 0.06), 0px 8px 40px rgba(0, 0, 0, 0.5);
-  --linear-app-content-surface: var(--linear-bg-surface-1);
+  --linear-app-content-surface: #121316;
+  /* dedicated shell canvas — sits between page bg and card surface */
   --linear-app-card-shadow: none;
   --linear-app-shell-border: rgba(255, 255, 255, 0.05);
   --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.05);

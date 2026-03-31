@@ -27,7 +27,7 @@ const CHIP_BG_ALPHA = 0x15 / 255;
 function getChipSafeIconColor(brandHex: string, isDark: boolean): string {
   if (isDark && isBrandDark(brandHex)) return '#ffffff';
 
-  const surfaceHex = isDark ? '#101012' : '#fcfcfc';
+  const surfaceHex = isDark ? '#17171a' : '#fcfcfc';
   const brand = hexToRgb(brandHex);
   const surface = hexToRgb(surfaceHex);
   const r = Math.round(

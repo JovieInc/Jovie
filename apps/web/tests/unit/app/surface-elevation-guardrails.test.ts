@@ -5,8 +5,9 @@ import { describe, expect, it } from 'vitest';
 /**
  * Surface elevation guardrails — prevent invisible cards.
  *
- * The main content area uses bg-(--linear-app-content-surface) (= surface-1).
- * Cards that also use surface-1 WITHOUT border+shadow are invisible.
+ * The main content area uses bg-(--linear-app-content-surface), a dedicated
+ * shell canvas tone in dark mode.
+ * Shared cards should use bg-surface-1; recessed wells should use bg-surface-0.
  * Semi-transparent surface backgrounds (bg-surface-1/XX) are nearly invisible.
  *
  * @see AGENTS.md → "Surface Elevation Rules"
@@ -45,6 +46,68 @@ const APP_SHELL_GLOBS = [
 ];
 
 describe('surface elevation guardrails', () => {
+  it('keeps the dark shell canvas separate from the shared card surface', () => {
+    const designSystem = readFileSync(
+      join(ROOT, 'styles/design-system.css'),
+      'utf-8'
+    );
+    const linearTokens = readFileSync(
+      join(ROOT, 'styles/linear-tokens.css'),
+      'utf-8'
+    );
+
+    expect(designSystem).toMatch(
+      /:root\.dark[\s\S]*--color-bg-surface-1:\s*var\(--linear-bg-surface-1\);/
+    );
+    expect(linearTokens).not.toMatch(
+      /:root\.dark[\s\S]*--linear-app-content-surface:\s*var\(--linear-bg-surface-1\);/
+    );
+  });
+
+  it('keeps shared content cards on the card surface instead of the shell canvas', () => {
+    const contentSurfaceCard = readFileSync(
+      join(ROOT, 'components/molecules/ContentSurfaceCard.tsx'),
+      'utf-8'
+    );
+
+    expect(contentSurfaceCard).toContain('bg-surface-1');
+    expect(contentSurfaceCard).not.toContain(
+      'bg-(--linear-app-content-surface)'
+    );
+  });
+
+  it('keeps the tasks workspace inside a framed content panel', () => {
+    const tasksPage = readFileSync(
+      join(ROOT, 'components/features/dashboard/tasks/TasksPageClient.tsx'),
+      'utf-8'
+    );
+
+    expect(tasksPage).toContain('DashboardWorkspacePanel');
+    expect(tasksPage).toContain('LINEAR_SURFACE.contentContainer');
+    expect(tasksPage).toContain("data-testid='tasks-content-panel'");
+  });
+
+  it('keeps task and preview cards off the shell canvas token', () => {
+    const files = [
+      'components/features/dashboard/layout/PreviewPanel.tsx',
+      'components/features/dashboard/molecules/phone-mockup-preview/PhoneMockupPreview.tsx',
+      'components/features/dashboard/organisms/DashboardPreview.tsx',
+      'components/features/dashboard/organisms/ProfileEditPreviewCard.tsx',
+      'components/features/dashboard/release-tasks/ReleaseTaskEmptyState.tsx',
+      'components/features/dashboard/release-tasks/ReleaseTaskExplainerPopover.tsx',
+      'components/features/dashboard/release-tasks/ReleaseTaskPage.tsx',
+      'components/features/dashboard/tasks/TasksPageClient.tsx',
+    ] as const;
+
+    for (const file of files) {
+      const content = readFileSync(join(ROOT, file), 'utf-8');
+      expect(
+        content,
+        `${file} should use card/recessed surface tokens`
+      ).not.toContain('bg-(--linear-app-content-surface)');
+    }
+  });
+
   it('does not use semi-transparent bg-surface-1 in app shell (bg-surface-1/XX)', () => {
     // Semi-transparent surface-1 on a surface-1 parent is nearly invisible.
     // Use solid bg-surface-0 for recessed areas instead.
