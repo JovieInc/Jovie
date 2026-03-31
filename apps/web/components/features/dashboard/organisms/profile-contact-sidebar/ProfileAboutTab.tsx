@@ -3,6 +3,7 @@
 import { Badge } from '@jovie/ui';
 import {
   Calendar,
+  Check,
   Home,
   ImagePlus,
   LoaderCircle,
@@ -42,6 +43,7 @@ interface ProfileAboutTabProps {
   readonly onGenresChange?: (genres: string[]) => void;
   readonly onPressPhotoUpload?: (file: File) => Promise<PressPhoto>;
   readonly onPressPhotoDelete?: (photoId: string) => Promise<void>;
+  readonly onPressPhotoApprove?: (photoId: string) => Promise<void>;
 }
 
 /** Inline-editable textarea for bio (click-to-edit pattern). */
@@ -190,14 +192,18 @@ function PressPhotosSection({
   pressPhotos,
   onUpload,
   onDelete,
+  onApprove,
 }: {
   readonly pressPhotos: readonly PressPhoto[];
   readonly onUpload?: (file: File) => Promise<PressPhoto>;
   readonly onDelete?: (photoId: string) => Promise<void>;
+  readonly onApprove?: (photoId: string) => Promise<void>;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+  const [approvingPhotoId, setApprovingPhotoId] = useState<string | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const { handleFileUpload, isUploading, previewUrl, uploadProgress } =
     useAvatarUpload({
       onUpload: async file => {
@@ -214,6 +220,13 @@ function PressPhotosSection({
     });
 
   const canUpload = Boolean(onUpload) && pressPhotos.length < MAX_PRESS_PHOTOS;
+
+  // Split photos into drafts and published
+  const draftPhotos = pressPhotos.filter(p => p.status === 'draft');
+  const publishedPhotos = pressPhotos.filter(p => p.status === 'ready');
+  const otherStatusPhotos = pressPhotos.filter(
+    p => p.status !== 'draft' && p.status !== 'ready'
+  );
 
   const handleSelectFile = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -245,94 +258,288 @@ function PressPhotosSection({
     [onDelete]
   );
 
+  const handleApprove = useCallback(
+    async (photoId: string) => {
+      if (!onApprove) {
+        return;
+      }
+
+      setApprovingPhotoId(photoId);
+      try {
+        await onApprove(photoId);
+      } finally {
+        setApprovingPhotoId(current => (current === photoId ? null : current));
+      }
+    },
+    [onApprove]
+  );
+
+  const handleApproveAll = useCallback(async () => {
+    if (!onApprove) return;
+    setUploadError(null);
+    let failedCount = 0;
+
+    for (const photo of draftPhotos) {
+      try {
+        await handleApprove(photo.id);
+      } catch (_error) {
+        failedCount += 1;
+      }
+    }
+
+    if (failedCount > 0) {
+      setUploadError(
+        `Failed to approve ${failedCount} photo${failedCount > 1 ? 's' : ''}. Please try again.`
+      );
+    }
+  }, [onApprove, draftPhotos, handleApprove]);
+
+  const remainingSlots = MAX_PRESS_PHOTOS - pressPhotos.length;
+
   return (
     <DrawerSection className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
       <div className='flex items-center justify-between gap-3'>
         <DrawerSectionHeading>Press Photos</DrawerSectionHeading>
-        <Badge variant='secondary' className='text-[10px] tabular-nums'>
-          {pressPhotos.length}/{MAX_PRESS_PHOTOS}
-        </Badge>
+        <div className='flex items-center gap-1.5'>
+          {draftPhotos.length > 0 && (
+            <Badge variant='outline' className='text-[10px] tabular-nums'>
+              {draftPhotos.length} awaiting approval
+            </Badge>
+          )}
+          <Badge variant='secondary' className='text-[10px] tabular-nums'>
+            {pressPhotos.length}/{MAX_PRESS_PHOTOS}
+          </Badge>
+        </div>
       </div>
 
-      <div className='grid grid-cols-2 gap-2'>
-        {pressPhotos.map(photo => (
-          <div
-            key={photo.id}
-            className='group relative aspect-[4/5] overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam) bg-surface-0'
+      {/* First-import banner */}
+      {draftPhotos.length > 0 && !bannerDismissed && (
+        <div className='relative rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 px-3 py-2'>
+          <button
+            type='button'
+            onClick={() => setBannerDismissed(true)}
+            className='absolute top-1.5 right-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full text-tertiary-token hover:text-default'
+            aria-label='Dismiss'
           >
-            <Image
-              src={photo.smallUrl ?? photo.mediumUrl ?? photo.blobUrl ?? ''}
-              alt={photo.originalFilename ?? 'Press photo'}
-              fill
-              sizes='(max-width: 768px) 45vw, 160px'
-              className='object-cover'
-            />
-            {onDelete && (
-              <button
-                type='button'
-                onClick={() => {
-                  handleDelete(photo.id);
-                }}
-                disabled={deletingPhotoId === photo.id}
-                className='absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white transition hover:bg-black/70 disabled:cursor-wait disabled:opacity-70'
-                aria-label='Delete press photo'
-              >
-                {deletingPhotoId === photo.id ? (
-                  <LoaderCircle className='h-3.5 w-3.5 animate-spin' />
-                ) : (
-                  <X className='h-3.5 w-3.5' />
-                )}
-              </button>
-            )}
-          </div>
-        ))}
+            <X className='h-3 w-3' />
+          </button>
+          <p className='pr-5 text-[11px] text-secondary-token'>
+            We found {draftPhotos.length} photo
+            {draftPhotos.length > 1 ? 's' : ''} from your streaming profiles.
+            Approve the ones you want on your public profile.
+          </p>
+          {draftPhotos.length >= 2 && onApprove && (
+            <button
+              type='button'
+              onClick={handleApproveAll}
+              className='mt-1.5 text-[11px] font-medium text-accent hover:underline'
+            >
+              Approve all
+            </button>
+          )}
+        </div>
+      )}
 
-        <button
-          type='button'
-          onClick={() => fileInputRef.current?.click()}
-          disabled={!canUpload || isUploading}
-          className={cn(
-            'relative flex aspect-[4/5] flex-col items-center justify-center gap-2 rounded-[14px] border border-dashed border-(--linear-app-frame-seam) bg-surface-0 px-3 text-center transition-colors',
-            canUpload
-              ? 'hover:border-default hover:bg-surface-1'
-              : 'cursor-not-allowed opacity-60'
-          )}
-        >
-          {isUploading && previewUrl ? (
-            <>
+      {/* Drafts section (awaiting approval) */}
+      {draftPhotos.length > 0 && (
+        <div className='space-y-1.5'>
+          <p className='text-[10px] font-medium uppercase tracking-wider text-tertiary-token'>
+            Awaiting approval
+          </p>
+          <div className='grid grid-cols-2 gap-2'>
+            {draftPhotos.map(photo => (
               <div
-                className='absolute inset-0 bg-cover bg-center opacity-70'
-                style={{ backgroundImage: `url(${previewUrl})` }}
-              />
-              <div className='absolute inset-0 bg-black/35' />
-              <div className='relative z-10 flex flex-col items-center gap-1 text-white'>
-                <LoaderCircle className='h-4 w-4 animate-spin' />
-                <span className='text-[11px] font-medium'>
-                  Uploading {uploadProgress}%
+                key={photo.id}
+                className='group relative aspect-[4/5] overflow-hidden rounded-[14px] border border-dashed border-(--linear-app-frame-seam) bg-surface-0'
+              >
+                <Image
+                  src={photo.smallUrl ?? photo.mediumUrl ?? photo.blobUrl ?? ''}
+                  alt={photo.originalFilename ?? 'Imported press photo'}
+                  fill
+                  sizes='(max-width: 768px) 45vw, 160px'
+                  className='object-cover opacity-60 saturate-50'
+                />
+                {/* DSP source badge */}
+                {photo.sourcePlatform && (
+                  <span className='absolute top-2 left-2 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] font-medium capitalize text-white'>
+                    {photo.sourcePlatform.replace('_', ' ')}
+                  </span>
+                )}
+                {/* Hidden label */}
+                <span className='absolute bottom-8 left-0 right-0 text-center text-[9px] font-medium text-white drop-shadow-sm'>
+                  Hidden until approved
                 </span>
+                {/* Delete button */}
+                {onDelete && (
+                  <button
+                    type='button'
+                    onClick={() => handleDelete(photo.id)}
+                    disabled={deletingPhotoId === photo.id}
+                    className='absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white transition hover:bg-black/70 disabled:cursor-wait disabled:opacity-70'
+                    aria-label='Delete imported photo'
+                  >
+                    {deletingPhotoId === photo.id ? (
+                      <LoaderCircle className='h-3 w-3 animate-spin' />
+                    ) : (
+                      <X className='h-3 w-3' />
+                    )}
+                  </button>
+                )}
+                {/* Approve button */}
+                {onApprove && (
+                  <button
+                    type='button'
+                    onClick={() => handleApprove(photo.id)}
+                    disabled={approvingPhotoId === photo.id}
+                    className='absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-lg bg-white/90 py-1 text-[11px] font-medium text-black transition hover:bg-white disabled:cursor-wait disabled:opacity-70'
+                    aria-label='Approve press photo for public profile'
+                  >
+                    {approvingPhotoId === photo.id ? (
+                      <LoaderCircle className='h-3 w-3 animate-spin' />
+                    ) : (
+                      <>
+                        <Check className='h-3 w-3' />
+                        Approve
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
-            </>
-          ) : (
-            <>
-              <div className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-1 text-secondary-token'>
-                <ImagePlus className='h-4 w-4' />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Other status section */}
+      {otherStatusPhotos.length > 0 && (
+        <div className='space-y-1.5'>
+          <p className='text-[10px] font-medium uppercase tracking-wider text-tertiary-token'>
+            Other status
+          </p>
+          <div className='grid grid-cols-2 gap-2'>
+            {otherStatusPhotos.map(photo => (
+              <div
+                key={photo.id}
+                className='group relative aspect-[4/5] overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam) bg-surface-0'
+              >
+                <Image
+                  src={photo.smallUrl ?? photo.mediumUrl ?? photo.blobUrl ?? ''}
+                  alt={photo.originalFilename ?? 'Press photo'}
+                  fill
+                  sizes='(max-width: 768px) 45vw, 160px'
+                  className='object-cover'
+                />
+                <span className='absolute top-2 left-2 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] font-medium capitalize text-white'>
+                  {photo.status}
+                </span>
+                {onDelete && (
+                  <button
+                    type='button'
+                    onClick={() => handleDelete(photo.id)}
+                    disabled={deletingPhotoId === photo.id}
+                    className='absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white transition hover:bg-black/70 disabled:cursor-wait disabled:opacity-70'
+                    aria-label='Delete imported photo'
+                  >
+                    {deletingPhotoId === photo.id ? (
+                      <LoaderCircle className='h-3 w-3 animate-spin' />
+                    ) : (
+                      <X className='h-3 w-3' />
+                    )}
+                  </button>
+                )}
               </div>
-              <div className='space-y-0.5'>
-                <p className='text-[12px] font-medium text-secondary-token'>
-                  Add photo
-                </p>
-                <p className='text-[11px] text-tertiary-token'>
-                  AVIF, JPG, PNG, HEIC
-                </p>
-              </div>
-            </>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(publishedPhotos.length > 0 || canUpload) && (
+        <div className='space-y-1.5'>
+          {draftPhotos.length > 0 && publishedPhotos.length > 0 && (
+            <p className='text-[10px] font-medium uppercase tracking-wider text-tertiary-token'>
+              Published
+            </p>
           )}
-        </button>
-      </div>
+          <div className='grid grid-cols-2 gap-2'>
+            {publishedPhotos.map(photo => (
+              <div
+                key={photo.id}
+                className='group relative aspect-[4/5] overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam) bg-surface-0'
+              >
+                <Image
+                  src={photo.smallUrl ?? photo.mediumUrl ?? photo.blobUrl ?? ''}
+                  alt={photo.originalFilename ?? 'Press photo'}
+                  fill
+                  sizes='(max-width: 768px) 45vw, 160px'
+                  className='object-cover'
+                />
+                {onDelete && (
+                  <button
+                    type='button'
+                    onClick={() => handleDelete(photo.id)}
+                    disabled={deletingPhotoId === photo.id}
+                    className='absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white transition hover:bg-black/70 disabled:cursor-wait disabled:opacity-70'
+                    aria-label='Delete press photo'
+                  >
+                    {deletingPhotoId === photo.id ? (
+                      <LoaderCircle className='h-3.5 w-3.5 animate-spin' />
+                    ) : (
+                      <X className='h-3.5 w-3.5' />
+                    )}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            type='button'
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!canUpload || isUploading}
+            className={cn(
+              'relative flex aspect-[4/5] flex-col items-center justify-center gap-2 rounded-[14px] border border-dashed border-(--linear-app-frame-seam) bg-surface-0 px-3 text-center transition-colors',
+              canUpload
+                ? 'hover:border-default hover:bg-surface-1'
+                : 'cursor-not-allowed opacity-60'
+            )}
+          >
+            {isUploading && previewUrl ? (
+              <>
+                <div
+                  className='absolute inset-0 bg-cover bg-center opacity-70'
+                  style={{ backgroundImage: `url(${previewUrl})` }}
+                />
+                <div className='absolute inset-0 bg-black/35' />
+                <div className='relative z-10 flex flex-col items-center gap-1 text-white'>
+                  <LoaderCircle className='h-4 w-4 animate-spin' />
+                  <span className='text-[11px] font-medium'>
+                    Uploading {uploadProgress}%
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-1 text-secondary-token'>
+                  <ImagePlus className='h-4 w-4' />
+                </div>
+                <div className='space-y-0.5'>
+                  <p className='text-[12px] font-medium text-secondary-token'>
+                    Add photo
+                  </p>
+                  <p className='text-[11px] text-tertiary-token'>
+                    AVIF, JPG, PNG, HEIC
+                  </p>
+                </div>
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {!canUpload && pressPhotos.length >= MAX_PRESS_PHOTOS && (
         <p className='text-[11px] text-tertiary-token'>
-          Remove a photo to upload another.
+          {remainingSlots === 0
+            ? 'Remove a photo to upload another.'
+            : `${remainingSlots} upload slot${remainingSlots > 1 ? 's' : ''} remaining.`}
         </p>
       )}
 
@@ -365,6 +572,7 @@ export function ProfileAboutTab({
   onGenresChange,
   onPressPhotoUpload,
   onPressPhotoDelete,
+  onPressPhotoApprove,
 }: ProfileAboutTabProps) {
   const hasGenres = genres && genres.length > 0;
   const hasMetadata =
@@ -495,6 +703,7 @@ export function ProfileAboutTab({
           pressPhotos={pressPhotos}
           onUpload={onPressPhotoUpload}
           onDelete={onPressPhotoDelete}
+          onApprove={onPressPhotoApprove}
         />
       )}
 
