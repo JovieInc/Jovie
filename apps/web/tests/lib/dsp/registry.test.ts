@@ -27,8 +27,8 @@ import {
 // ============================================================================
 
 describe('DSP Registry completeness', () => {
-  it('contains 40 entries (all MusicFetch services)', () => {
-    expect(DSP_REGISTRY.length).toBe(40);
+  it('contains 41 entries (all MusicFetch services)', () => {
+    expect(DSP_REGISTRY.length).toBe(41);
   });
 
   it('every entry has required fields', () => {
