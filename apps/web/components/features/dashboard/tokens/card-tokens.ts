@@ -222,27 +222,22 @@ export const LINEAR_SURFACE = {
   sidebarCard: `rounded-[10px] border-subtle bg-surface-1 ${elevatedSidebarCardShadow}`,
 
   /** Content container — wraps tables, mobile lists, empty states. */
-  contentContainer:
-    'rounded-xl border-subtle bg-surface-1 shadow-none',
+  contentContainer: 'rounded-xl border-subtle bg-surface-1 shadow-none',
 
   /** Banner/callout card. */
-  bannerCard:
-    'rounded-xl border-subtle bg-surface-1 shadow-none',
+  bannerCard: 'rounded-xl border-subtle bg-surface-1 shadow-none',
 
   /** Dialog inner card — sections inside dialogs. */
-  dialogCard:
-    'rounded-xl border-subtle bg-surface-1 shadow-none',
+  dialogCard: 'rounded-xl border-subtle bg-surface-1 shadow-none',
 
   /** Sticky header — toolbar-like headers with backdrop blur. */
-  stickyHeader:
-    'border-subtle bg-surface-1',
+  stickyHeader: 'border-subtle bg-surface-1',
 
   /** Toolbar / popover / dropdown — same surface. */
   toolbar: 'border-subtle bg-surface-1',
 
   /** Popover container — the ONE surface that gets a shadow (floats above content). */
-  popover:
-    'rounded-[10px] border-subtle bg-surface-1 p-0 shadow-popover',
+  popover: 'rounded-[10px] border-subtle bg-surface-1 p-0 shadow-popover',
 } as const;
 
 export const LINEAR_SURFACE_TIER = {
