@@ -330,7 +330,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       <SidebarHeader
         className={cn(
           'relative justify-center gap-0 px-2.5',
-          isInSettings ? 'h-10 py-0' : 'h-10 pt-[6px] pb-0'
+          'h-(--linear-app-header-height-compact) py-0'
         )}
       >
         <SidebarHeaderNav
@@ -343,7 +343,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         />
       </SidebarHeader>
 
-      <SidebarContent className='min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2.5 pb-2'>
+      <SidebarContent className='min-h-0 flex-1 px-2.5 pb-2.5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-0.5'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (

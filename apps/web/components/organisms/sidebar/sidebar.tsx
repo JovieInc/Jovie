@@ -72,7 +72,7 @@ export const Sidebar = React.forwardRef<
         {!isMobile && (
           <div
             ref={ref}
-            className='group peer max-lg:hidden shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 data-[variant=sidebar]:lg:mt-[8px] data-[variant=sidebar]:lg:ml-1.5 data-[variant=sidebar]:lg:mr-0'
+            className='group peer max-lg:hidden shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0'
             data-state={state}
             data-collapsible={state === 'closed' ? collapsible : ''}
             data-variant={variant}

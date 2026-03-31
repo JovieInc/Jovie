@@ -177,7 +177,7 @@ describe('JovieChat empty state', () => {
   });
 
   it('renders the authenticated home hero with centered examples', () => {
-    const { getByText } = renderWithQueryClient(
+    const { getByTestId, getByText } = renderWithQueryClient(
       <JovieChat profileId='profile-1' displayName='Tim' />
     );
 
@@ -187,6 +187,7 @@ describe('JovieChat empty state', () => {
     expect(getByText('Preview profile')).toBeTruthy();
     expect(getByText('Change photo')).toBeTruthy();
     expect(getByText('Release link')).toBeTruthy();
+    expect(getByTestId('suggested-prompts-grid')).toBeTruthy();
   });
 
   it('shows the top insight in the greeting and keeps prompt cards skill-based', () => {
