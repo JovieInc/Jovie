@@ -36,9 +36,13 @@ export default async function AppShellLayout({
     const headerStore = await headers();
     const pathname = resolveAppShellRequestPath(headerStore.get('next-url'));
     const shellFallback = isChatShellRoute(pathname) ? (
-      <ChatLoading />
+      <DashboardShellSkeleton>
+        <ChatLoading />
+      </DashboardShellSkeleton>
     ) : isReleasesShellRoute(pathname) ? (
-      <ReleaseTableSkeleton />
+      <DashboardShellSkeleton>
+        <ReleaseTableSkeleton />
+      </DashboardShellSkeleton>
     ) : (
       <DashboardShellSkeleton />
     );

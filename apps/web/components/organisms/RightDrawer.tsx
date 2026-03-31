@@ -2,7 +2,7 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { CommonDropdown } from '@jovie/ui';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { cn } from '@/lib/utils';
@@ -48,6 +48,13 @@ export function RightDrawer({
 }: RightDrawerProps) {
   const asideRef = useRef<HTMLElement>(null);
   const isMobile = useBreakpointDown('lg');
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  // Suppress width/opacity transition on first paint to prevent layout shift
+  // when the right panel mounts after hydration.
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   // Prevent background scroll when mobile drawer is open
   useBodyScrollLock(isOpen, isMobile);
@@ -119,7 +126,9 @@ export function RightDrawer({
       tabIndex={isOpen ? -1 : undefined}
       className={cn(
         'shrink-0 h-full flex flex-col',
-        'transition-[width,opacity] duration-300 ease-out',
+        hasHydrated
+          ? 'transition-[width,opacity] duration-300 ease-out'
+          : 'transition-none',
         'overflow-hidden',
         isOpen
           ? 'opacity-100 visible bg-(--linear-app-content-surface) shadow-none'

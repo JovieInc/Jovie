@@ -1,6 +1,23 @@
+import type { ReactNode } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 const navLabelWidths = ['w-16', 'w-20', 'w-14', 'w-14', 'w-14'] as const;
+
+function DefaultContentSkeleton() {
+  return (
+    <div className='flex-1 min-h-0 min-w-0 overflow-hidden flex items-center justify-center'>
+      <div className='w-full max-w-2xl px-4 space-y-6'>
+        <div className='flex justify-center'>
+          <LoadingSkeleton height='h-6' width='w-48' rounded='md' />
+        </div>
+        <div className='space-y-3'>
+          <LoadingSkeleton height='h-4' width='w-full' rounded='sm' />
+          <LoadingSkeleton height='h-4' width='w-3/4' rounded='sm' />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Streaming fallback for the dashboard shell.
@@ -8,8 +25,15 @@ const navLabelWidths = ['w-16', 'w-20', 'w-14', 'w-14', 'w-14'] as const;
  * Renders immediately while DashboardShellContent resolves data.
  * Mimics the AppShellFrame layout (sidebar + header + content area)
  * so the user sees a recognizable shell shape at first byte.
+ *
+ * Accepts optional `children` to render route-specific content skeletons
+ * inside the shell frame. Without children, renders a generic placeholder.
  */
-export function DashboardShellSkeleton() {
+export function DashboardShellSkeleton({
+  children,
+}: {
+  readonly children?: ReactNode;
+} = {}) {
   return (
     <div
       className='flex h-svh w-full overflow-hidden bg-(--linear-bg-page) pt-[env(safe-area-inset-top)]'
@@ -53,18 +77,8 @@ export function DashboardShellSkeleton() {
             <LoadingSkeleton height='h-7' width='w-20' rounded='md' />
           </div>
 
-          {/* Content skeleton */}
-          <div className='flex-1 min-h-0 min-w-0 overflow-hidden flex items-center justify-center'>
-            <div className='w-full max-w-2xl px-4 space-y-6'>
-              <div className='flex justify-center'>
-                <LoadingSkeleton height='h-6' width='w-48' rounded='md' />
-              </div>
-              <div className='space-y-3'>
-                <LoadingSkeleton height='h-4' width='w-full' rounded='sm' />
-                <LoadingSkeleton height='h-4' width='w-3/4' rounded='sm' />
-              </div>
-            </div>
-          </div>
+          {/* Content area — route-specific or generic */}
+          {children ?? <DefaultContentSkeleton />}
         </div>
       </main>
     </div>
