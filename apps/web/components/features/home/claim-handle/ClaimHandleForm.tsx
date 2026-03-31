@@ -265,7 +265,7 @@ export function ClaimHandleForm({
         <>
           <span>Claim @{handle}</span>
           <ChevronRight
-            className='h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5'
+            className='h-3.5 w-3.5 transition-[transform,translate] duration-200 group-hover:translate-x-0.5'
             aria-hidden='true'
           />
         </>
@@ -303,7 +303,7 @@ export function ClaimHandleForm({
       <div
         className={cn(
           'claim-input-row',
-          'relative flex w-full items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+          'relative flex w-full items-center gap-2 transition-[border-color,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
           sizeRoundingClass,
           isAvailable && 'claim-input-row--available'
         )}
@@ -366,7 +366,7 @@ export function ClaimHandleForm({
           data-testid={submitButtonTestId}
           aria-busy={checkingAvail || navigating}
           className={cn(
-            'group shrink-0 inline-flex items-center justify-center gap-1.5 transition-all duration-200 focus-ring-themed',
+            'group shrink-0 inline-flex items-center justify-center gap-1.5 transition-[color,background-color,border-color,box-shadow,transform,filter] duration-200 focus-ring-themed',
             buttonRoundingClass,
             isDisabled
               ? 'cursor-not-allowed opacity-40'

@@ -63,13 +63,13 @@ export function DeferredSection({
       ) : (
         <div
           aria-hidden='true'
-          className={cn('w-full', placeholderClassName)}
+          className={cn(
+            'w-full bg-surface-2 opacity-40 rounded-xl',
+            placeholderClassName
+          )}
           style={{
             minHeight: placeholderHeight,
             minWidth: placeholderWidth,
-            backgroundColor: 'var(--linear-bg-surface-0)',
-            opacity: 0.4,
-            borderRadius: 'var(--linear-radius-lg)',
           }}
         />
       )}

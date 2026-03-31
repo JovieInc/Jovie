@@ -117,7 +117,7 @@ export function DemoReleasesPanel({
               >
                 <ChevronRight
                   className={cn(
-                    'size-3.5 shrink-0 text-tertiary-token transition-transform duration-fast',
+                    'size-3.5 shrink-0 text-tertiary-token transition-[transform,rotate] duration-fast',
                     !isCollapsed && 'rotate-90'
                   )}
                   aria-hidden='true'

@@ -215,7 +215,7 @@ function ReleaseEntityHeader({
               disabled={!previewUrl}
               aria-pressed={isPlaying}
               className={cn(
-                'absolute inset-0 flex items-center justify-center rounded-lg transition-all duration-160',
+                'absolute inset-0 flex items-center justify-center rounded-lg transition-[background-color,opacity] duration-160',
                 'bg-black/0 opacity-0',
                 'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
                 'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',

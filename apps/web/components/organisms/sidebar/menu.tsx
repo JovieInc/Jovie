@@ -248,7 +248,7 @@ export const SidebarMenuSkeleton = React.forwardRef<
       ref={ref}
       data-sidebar='menu-skeleton'
       className={cn(
-        'rounded-md h-7 flex gap-2 px-2 items-center transition-all duration-normal ease-interactive',
+        'rounded-md h-7 flex gap-2 px-2 items-center transition-[padding,width] duration-normal ease-interactive',
         'group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center',
         className
       )}

@@ -349,7 +349,7 @@ export function AppleStyleOnboardingForm({
           <div
             key={currentStepIndex}
             data-onboarding-client-ready={isClientReady ? 'true' : 'false'}
-            className={`w-full max-w-2xl transform transition-all duration-500 ease-in-out ${
+            className={`w-full max-w-2xl transform transition-[transform,opacity,translate] duration-500 ease-in-out ${
               isTransitioning
                 ? 'opacity-0 translate-y-4'
                 : 'opacity-100 translate-y-0'

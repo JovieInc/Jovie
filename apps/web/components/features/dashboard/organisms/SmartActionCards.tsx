@@ -48,7 +48,7 @@ function ActionCard({
         </div>
       </div>
       <ArrowRight
-        className='h-3.5 w-3.5 shrink-0 text-tertiary-token transition-transform group-hover:translate-x-0.5 group-hover:text-secondary-token'
+        className='h-3.5 w-3.5 shrink-0 text-tertiary-token transition-[transform,translate] group-hover:translate-x-0.5 group-hover:text-secondary-token'
         aria-hidden='true'
       />
     </ContentSurfaceCard>

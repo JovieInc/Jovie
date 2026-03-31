@@ -299,7 +299,7 @@ export function PhoneShowcase({
               key={mode.id}
               type='button'
               onClick={() => handleTabClick(i)}
-              className='rounded-full px-3 py-1 text-[11px] font-mono tracking-[-0.02em] transition-all duration-300'
+              className='rounded-full px-3 py-1 text-[11px] font-mono tracking-[-0.02em] transition-[color,background-color,border-color] duration-300'
               style={{
                 backgroundColor:
                   i === activeIndex

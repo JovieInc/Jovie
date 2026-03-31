@@ -58,7 +58,7 @@ export function PhoneMockupPreview({
                   'border-4 border-white/20',
                   'bg-surface-1',
                   'overflow-hidden',
-                  'transition-all duration-300',
+                  'transition-[transform,opacity,scale] duration-300',
                   isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
                 )}
               >
@@ -83,7 +83,7 @@ export function PhoneMockupPreview({
               <h1
                 className={cn(
                   'text-xl font-[590] text-white text-center',
-                  'transition-all duration-300',
+                  'transition-[transform,opacity,translate] duration-300',
                   isLoaded
                     ? 'opacity-100 translate-y-0'
                     : 'opacity-0 translate-y-2'
@@ -96,7 +96,7 @@ export function PhoneMockupPreview({
               <p
                 className={cn(
                   'text-[14px] text-white/80 text-center mt-1 max-w-xs',
-                  'transition-all duration-300 delay-100',
+                  'transition-[transform,opacity,translate] duration-300 delay-100',
                   isLoaded
                     ? 'opacity-100 translate-y-0'
                     : 'opacity-0 translate-y-2'
@@ -111,7 +111,7 @@ export function PhoneMockupPreview({
           <div
             className={cn(
               'p-4 space-y-3 h-[calc(100%-10rem)] overflow-y-auto',
-              'transition-all duration-300'
+              'transition-colors duration-300'
             )}
           >
             <AnimatePresence>
@@ -147,7 +147,7 @@ export function PhoneMockupPreview({
                     tabIndex={-1}
                     className={cn(
                       'relative block rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-4 hover:bg-surface-1',
-                      'transition-all duration-200',
+                      'transition-colors duration-200',
                       'overflow-hidden',
                       activeLink === link.id && 'ring-2 ring-primary-500/20'
                     )}
@@ -159,7 +159,7 @@ export function PhoneMockupPreview({
                           'flex items-center justify-center',
                           'bg-surface-0',
                           'text-primary-token',
-                          'transition-all duration-200'
+                          'transition-colors duration-200'
                         )}
                       >
                         <SocialIcon

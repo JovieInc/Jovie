@@ -61,7 +61,7 @@ function getLogoLinkClass(mark: string, isLinear: boolean): string {
   if (isLinear) {
     return 'rounded-md p-1 -m-1 focus-ring-themed transition-opacity duration-150 ease-out hover:opacity-80';
   }
-  return 'rounded-md p-1 -m-1 focus-ring-themed transition-all duration-150 ease-out hover:bg-surface-1';
+  return 'rounded-md p-1 -m-1 focus-ring-themed transition-colors duration-150 ease-out hover:bg-surface-1';
 }
 
 export function FooterBranding({
@@ -102,7 +102,7 @@ export function FooterBranding({
           href={signUpLink}
           className={cn(
             'text-[10px] leading-snug uppercase font-semibold tracking-[0.04em]',
-            'transition-all duration-150 ease-out text-center',
+            'transition-[color,background-color,border-color,opacity] duration-150 ease-out text-center',
             'rounded-md px-2 py-1 -mx-2 -my-1',
             !isLinear && 'text-tertiary-token hover:text-secondary-token',
             !isLinear &&

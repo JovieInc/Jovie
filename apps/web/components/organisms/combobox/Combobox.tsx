@@ -210,7 +210,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                       ) : (
                         <ChevronDown
                           className={clsx(
-                            'h-4 w-4 text-white/50 transition-transform',
+                            'h-4 w-4 text-white/50 transition-[transform,rotate]',
                             open && 'rotate-180'
                           )}
                           aria-hidden='true'

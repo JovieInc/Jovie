@@ -15,7 +15,7 @@ export type CheckboxState = 'checked' | 'unchecked' | 'indeterminate' | boolean;
 // Shared checkbox styling for consistent appearance (uses design tokens)
 const CHECKBOX_STYLES = cn(
   alignment.checkboxSize,
-  'rounded-sm border border-subtle bg-surface-0 text-secondary-token transition-all duration-100 ease-out data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-white data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-white'
+  'rounded-sm border border-subtle bg-surface-0 text-secondary-token transition-colors duration-100 ease-out data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-white data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-white'
 );
 
 // Legacy props (backwards compatibility)

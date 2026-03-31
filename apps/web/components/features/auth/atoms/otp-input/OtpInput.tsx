@@ -65,7 +65,7 @@ export function OtpInput({
           <div
             key={key}
             className={cn(
-              'h-1 w-1 rounded-full transition-all duration-200',
+              'h-1 w-1 rounded-full transition-[transform,background-color,scale] duration-200',
               i < currentValue.length
                 ? 'bg-primary-token scale-125'
                 : 'bg-subtle'
@@ -120,7 +120,7 @@ export function OtpInput({
             <div
               key={key}
               className={cn(
-                'relative flex items-center justify-center rounded-(--linear-radius-sm) border text-xl sm:text-2xl font-(--linear-caption-weight) transition-all duration-150',
+                'relative flex items-center justify-center rounded-(--linear-radius-sm) border text-xl sm:text-2xl font-(--linear-caption-weight) transition-[color,background-color,border-color,box-shadow,transform,scale] duration-150',
                 'h-(--linear-button-height-md) w-11 sm:h-(--linear-button-height-md) sm:w-10 min-h-[40px]',
                 'bg-surface-0 text-primary-token',
                 isFocused

@@ -57,7 +57,7 @@ export function SidebarCollapsibleGroup({
             ) : null}
             <ChevronRight
               className={cn(
-                'size-3 shrink-0 opacity-50 transition-transform duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)]',
+                'size-3 shrink-0 opacity-50 transition-[transform,rotate] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)]',
                 open ? 'rotate-90' : 'rotate-0'
               )}
               aria-hidden='true'

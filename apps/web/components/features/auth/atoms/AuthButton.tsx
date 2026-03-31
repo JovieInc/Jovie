@@ -14,7 +14,7 @@ const authButtonVariants = cva(
     // Mobile-optimized height matching Linear
     'h-(--linear-button-height-md) sm:h-(--linear-button-height-md) min-h-[40px]',
     // Touch-optimized transitions
-    'transition-all duration-150 ease-out',
+    'transition-[color,background-color,border-color,transform,opacity] duration-150 ease-out',
     // Active press state for mobile
     'active:scale-[0.98] active:opacity-90',
     // Prevent text selection on touch

@@ -89,7 +89,7 @@ export function BatchIngestForm({
         >
           <ChevronRight
             className={cn(
-              'h-3.5 w-3.5 shrink-0 text-tertiary-token transition-transform duration-200',
+              'h-3.5 w-3.5 shrink-0 text-tertiary-token transition-[transform,rotate] duration-200',
               isOpen && 'rotate-90'
             )}
           />

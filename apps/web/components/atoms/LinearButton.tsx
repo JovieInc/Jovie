@@ -61,7 +61,7 @@ export const LinearButton = forwardRef<HTMLAnchorElement, LinearButtonProps>(
         ref={ref}
         href={href}
         className={cn(
-          'focus-ring-themed inline-flex items-center justify-center transition-all duration-150',
+          'focus-ring-themed inline-flex items-center justify-center transition-opacity duration-150',
           variantConfig.className,
           className
         )}

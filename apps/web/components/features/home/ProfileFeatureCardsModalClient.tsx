@@ -87,7 +87,7 @@ export function ProfileFeatureCardsModalClient({
                 <h3 className='text-lg font-semibold leading-tight text-primary-token'>
                   {feature.title}
                 </h3>
-                <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-transform group-hover:rotate-45'>
+                <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[transform,rotate] group-hover:rotate-45'>
                   +
                 </span>
               </div>

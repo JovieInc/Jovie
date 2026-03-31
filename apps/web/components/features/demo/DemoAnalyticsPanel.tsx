@@ -55,7 +55,7 @@ export function DemoAnalyticsPanel() {
                   </div>
                   <div className='h-2 w-full overflow-hidden rounded-full bg-surface-1'>
                     <div
-                      className='h-full rounded-full transition-all duration-slow'
+                      className='h-full rounded-full transition-[width] duration-slow'
                       style={{
                         width: `${pct}%`,
                         backgroundColor: platform.color,

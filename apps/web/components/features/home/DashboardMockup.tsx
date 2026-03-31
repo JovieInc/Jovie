@@ -126,7 +126,7 @@ export function DashboardMockup({
               </div>
 
               <div
-                className='flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all duration-300'
+                className='flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors duration-300'
                 style={{
                   backgroundColor: isActive
                     ? 'rgba(255,255,255,0.07)'

@@ -73,7 +73,7 @@ type ProfilePrimaryCTAProps = {
 };
 
 const ctaLinkClass =
-  'inline-flex w-full items-center justify-center gap-2 rounded-xl bg-btn-primary px-8 py-3.5 text-base font-semibold text-btn-primary-foreground shadow-sm transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)';
+  'inline-flex w-full items-center justify-center gap-2 rounded-xl bg-btn-primary px-8 py-3.5 text-base font-semibold text-btn-primary-foreground shadow-sm transition-[transform,opacity,filter,scale] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)';
 
 export function ProfilePrimaryCTA({
   artist,

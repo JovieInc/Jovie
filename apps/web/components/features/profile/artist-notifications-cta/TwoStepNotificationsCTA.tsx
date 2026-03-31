@@ -434,7 +434,7 @@ export function TwoStepNotificationsCTA({
             <button
               type='button'
               onClick={handleReveal}
-              className='w-full inline-flex items-center justify-center rounded-xl bg-btn-primary px-8 py-4 text-base font-semibold text-btn-primary-foreground shadow-sm transition-[transform,opacity] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
+              className='w-full inline-flex items-center justify-center rounded-xl bg-btn-primary px-8 py-4 text-base font-semibold text-btn-primary-foreground shadow-sm transition-[transform,opacity,scale] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
               style={noFontSynthesisStyle}
             >
               Turn on notifications

@@ -119,7 +119,7 @@ export function DrawerHeaderActions({
             <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
               <DefaultIcon
                 className={cn(
-                  'absolute h-3.5 w-3.5 transition-all duration-150',
+                  'absolute h-3.5 w-3.5 transition-[transform,opacity,scale] duration-150',
                   action.isActive
                     ? 'scale-50 opacity-0'
                     : 'scale-100 opacity-100'
@@ -129,7 +129,7 @@ export function DrawerHeaderActions({
               {ActiveIcon && (
                 <ActiveIcon
                   className={cn(
-                    'absolute h-3.5 w-3.5 transition-all duration-150',
+                    'absolute h-3.5 w-3.5 transition-[transform,opacity,scale] duration-150',
                     action.isActive
                       ? 'scale-100 opacity-100'
                       : 'scale-50 opacity-0'

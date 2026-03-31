@@ -154,7 +154,7 @@ export function ProfileNavButton({
         <ArrowLeft
           className={cn(
             'h-4 w-4 text-secondary-token',
-            'transition-all duration-300 ease-out',
+            'transition-[transform,opacity] duration-300 ease-out',
             'animate-in fade-in zoom-in-90 slide-in-from-right-1 duration-300'
           )}
           aria-hidden='true'

@@ -37,7 +37,7 @@ export function CollapsibleSectionHeading({
       <span>{children}</span>
       <ChevronDown
         className={cn(
-          'h-3.5 w-3.5 transition-transform duration-150',
+          'h-3.5 w-3.5 transition-[transform,rotate] duration-150',
           !isOpen && '-rotate-90'
         )}
       />

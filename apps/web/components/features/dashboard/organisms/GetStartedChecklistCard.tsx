@@ -195,7 +195,7 @@ export function GetStartedChecklistCard({
       {/* Progress bar */}
       <div className='mx-3 mt-2 h-1 rounded-full bg-surface-0'>
         <div
-          className='h-1 rounded-full bg-[var(--linear-accent)] transition-all duration-300'
+          className='h-1 rounded-full bg-[var(--linear-accent)] transition-[width] duration-300'
           style={{
             width: `${(completedCount / CHECKLIST_ITEMS.length) * 100}%`,
           }}

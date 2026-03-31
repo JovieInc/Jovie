@@ -62,7 +62,7 @@ export function ProgressIndicator({
         </div>
         <div className='w-full bg-surface-2 rounded-full h-2 overflow-hidden'>
           <div
-            className='bg-gradient-to-r from-info/55 to-accent/55 dark:from-info/45 dark:to-accent/45 h-full rounded-full transition-all duration-300 ease-out'
+            className='bg-gradient-to-r from-info/55 to-accent/55 dark:from-info/45 dark:to-accent/45 h-full rounded-full transition-[width] duration-300 ease-out'
             style={{ width: `${progressPercentage}%` }}
           />
         </div>
@@ -79,7 +79,7 @@ export function ProgressIndicator({
               key={step.id}
               className={(() => {
                 const baseClasses =
-                  'flex flex-col items-center space-y-1 transition-all duration-200 flex-1';
+                  'flex flex-col items-center space-y-1 transition-colors duration-200 flex-1';
                 if (isCompleted) return `${baseClasses} text-success`;
                 if (isCurrent) return `${baseClasses} text-info`;
                 return `${baseClasses} text-quaternary-token`;
@@ -89,7 +89,7 @@ export function ProgressIndicator({
               <div
                 className={(() => {
                   const baseClasses =
-                    'w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-200';
+                    'w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-colors duration-200';
                   if (isCompleted) {
                     return `${baseClasses} bg-surface-1 border-success/20 text-success`;
                   }

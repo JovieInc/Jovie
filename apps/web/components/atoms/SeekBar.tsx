@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 interface SeekBarProps {
@@ -22,6 +23,11 @@ export function SeekBar({
       ? Math.min(100, Math.max(0, (currentTime / duration) * 100))
       : 0;
 
+  const seekStyle = useMemo(
+    () => ({ '--seek-pct': `${progressPercent}%` }) as React.CSSProperties,
+    [progressPercent]
+  );
+
   return (
     <input
       type='range'
@@ -38,11 +44,7 @@ export function SeekBar({
         'seek-range cursor-pointer appearance-none rounded-full accent-(--linear-accent) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) disabled:cursor-default disabled:opacity-50',
         className
       )}
-      style={
-        {
-          '--seek-pct': `${progressPercent}%`,
-        } as React.CSSProperties
-      }
+      style={seekStyle}
     />
   );
 }

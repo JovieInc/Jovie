@@ -94,7 +94,7 @@ export function FirstFanCelebration({
 
       {/* Content */}
       <div
-        className={`relative z-10 flex flex-col items-center gap-5 px-6 text-center transition-all duration-700 ease-out ${
+        className={`relative z-10 flex flex-col items-center gap-5 px-6 text-center transition-[transform,opacity,translate,scale] duration-700 ease-out ${
           isVisible
             ? 'opacity-100 translate-y-0 scale-100'
             : 'opacity-0 translate-y-8 scale-95'

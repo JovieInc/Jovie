@@ -167,7 +167,7 @@ function getOutreachErrorStatusCode(error: unknown): number | null {
   }
 
   const message = error instanceof Error ? error.message : String(error);
-  const match = message.match(/(?:api error|status)\s+(\d{3})/i);
+  const match = /(?:api error|status)\s+(\d{3})/i.exec(message);
   return match ? Number(match[1]) : null;
 }
 

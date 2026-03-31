@@ -65,7 +65,7 @@ export function AvatarProgressRing({
           strokeDasharray={strokeDasharray}
           strokeLinecap='round'
           className={cn(
-            'stroke-current transition-all duration-300 ease-out',
+            'stroke-current transition-[stroke-dasharray,color] duration-300 ease-out',
             ringColor
           )}
         />
@@ -74,17 +74,17 @@ export function AvatarProgressRing({
       {/* Status icons */}
       <div className='absolute inset-0 flex items-center justify-center'>
         {status === 'success' && (
-          <div className='rounded-full bg-surface-0 text-success ring-1 ring-success/20 shadow-sm transition-all duration-200 ease-out animate-in fade-in zoom-in motion-reduce:animate-none'>
+          <div className='rounded-full bg-surface-0 text-success ring-1 ring-success/20 shadow-sm transition-opacity duration-200 ease-out animate-in fade-in zoom-in motion-reduce:animate-none'>
             <Check size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
         {status === 'error' && (
-          <div className='rounded-full bg-surface-0 text-destructive ring-1 ring-destructive/20 shadow-sm transition-all duration-200 ease-out animate-in fade-in zoom-in motion-reduce:animate-none'>
+          <div className='rounded-full bg-surface-0 text-destructive ring-1 ring-destructive/20 shadow-sm transition-opacity duration-200 ease-out animate-in fade-in zoom-in motion-reduce:animate-none'>
             <X size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
         {status === 'uploading' && (
-          <div className='rounded-full bg-accent text-accent-foreground ring-1 ring-accent/20 shadow-sm animate-pulse motion-reduce:animate-none transition-all duration-200 ease-out'>
+          <div className='rounded-full bg-accent text-accent-foreground ring-1 ring-accent/20 shadow-sm animate-pulse motion-reduce:animate-none transition-opacity duration-200 ease-out'>
             <Upload size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}

@@ -38,7 +38,7 @@ export function FundraiseProgress({
     <div className='flex flex-1 flex-col gap-1.5'>
       {/* Progress bar — 4px thin, accent fill */}
       <progress
-        className='h-1 w-full appearance-none overflow-hidden rounded-full [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-[var(--color-accent)] [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-[var(--color-bg-surface-2)] [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-[var(--color-accent)] [&::-webkit-progress-value]:transition-all'
+        className='h-1 w-full appearance-none overflow-hidden rounded-full [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-[var(--color-accent)] [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-[var(--color-bg-surface-2)] [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-[var(--color-accent)] [&::-webkit-progress-value]:transition-[width]'
         style={{ background: 'var(--color-bg-surface-2)' }}
         value={percentage}
         max={100}

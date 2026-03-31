@@ -118,24 +118,16 @@ export function EntitySidebarShell({
   const resolvedHeaderTitle = isMinimalHeader
     ? (title ?? <span className='sr-only'>{ariaLabel}</span>)
     : title;
-  const titleBarActions = actionsInEntityHeader ? (
-    onClose ? (
-      <DrawerHeaderActions
-        primaryActions={[]}
-        overflowActions={[]}
-        onClose={onClose}
-      />
-    ) : undefined
-  ) : (
-    (headerActions ??
-    (onClose ? (
-      <DrawerHeaderActions
-        primaryActions={[]}
-        overflowActions={[]}
-        onClose={onClose}
-      />
-    ) : undefined))
-  );
+  const closeAction = onClose ? (
+    <DrawerHeaderActions
+      primaryActions={[]}
+      overflowActions={[]}
+      onClose={onClose}
+    />
+  ) : undefined;
+  const titleBarActions = actionsInEntityHeader
+    ? closeAction
+    : (headerActions ?? closeAction);
   return (
     <RightDrawer
       isOpen={isOpen}

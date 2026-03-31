@@ -178,7 +178,7 @@ export function ProfileMockup({
         <div className='relative overflow-hidden rounded-lg'>
           {/* Subscribe CTA */}
           <div
-            className='py-2.5 px-3.5 rounded-lg text-[13px] font-medium text-center transition-all duration-500'
+            className='py-2.5 px-3.5 rounded-lg text-[13px] font-medium text-center transition-[transform,opacity] duration-500'
             style={{
               opacity: isListen ? 0 : 1,
               transform: isListen ? 'translateY(-8px)' : 'translateY(0)',
@@ -193,7 +193,7 @@ export function ProfileMockup({
 
           {/* Listen CTA */}
           <div
-            className='py-2.5 px-3.5 rounded-lg text-[13px] font-medium text-center transition-all duration-500'
+            className='py-2.5 px-3.5 rounded-lg text-[13px] font-medium text-center transition-[transform,opacity] duration-500'
             style={{
               opacity: isListen ? 1 : 0,
               transform: isListen ? 'translateY(0)' : 'translateY(8px)',

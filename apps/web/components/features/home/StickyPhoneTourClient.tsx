@@ -155,7 +155,7 @@ export function StickyPhoneTourClient() {
                 </div>
 
                 <div
-                  className='flex flex-col items-end justify-center gap-4 transition-all duration-700 ease-[cubic-bezier(0.33,.01,.27,1)]'
+                  className='flex flex-col items-end justify-center gap-4 transition-[transform,opacity] duration-700 ease-[cubic-bezier(0.33,.01,.27,1)]'
                   style={{
                     opacity: 1,
                     transform: 'translateX(0)',
@@ -167,7 +167,7 @@ export function StickyPhoneTourClient() {
                     return (
                       <div
                         key={mode.id}
-                        className='text-right transition-all duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+                        className='text-right transition-transform duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
                         style={{
                           transform: isActive
                             ? 'translateX(0)'

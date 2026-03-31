@@ -143,7 +143,7 @@ export function AudienceTableHeader({
                   <>
                     <div
                       className={cn(
-                        'inline-flex items-center transition-all duration-150',
+                        'inline-flex items-center transition-[transform,opacity,translate] duration-150',
                         selectedCount > 0
                           ? 'opacity-100 translate-y-0'
                           : 'pointer-events-none opacity-0 -translate-y-0.5'
@@ -174,7 +174,7 @@ export function AudienceTableHeader({
                     </div>
                     <span
                       className={cn(
-                        'inline-flex items-center rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-[11px] font-[510] text-secondary-token tabular-nums transition-all duration-150 whitespace-nowrap',
+                        'inline-flex items-center rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-[11px] font-[510] text-secondary-token tabular-nums transition-[transform,opacity,translate] duration-150 whitespace-nowrap',
                         selectedCount > 0 &&
                           'pointer-events-none opacity-0 -translate-y-0.5'
                       )}

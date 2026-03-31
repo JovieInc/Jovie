@@ -44,7 +44,7 @@ function ToggleSwitch({
       >
         <span
           className={cn(
-            'h-3 w-3 rounded-full bg-white transition-transform',
+            'h-3 w-3 rounded-full bg-white transition-[transform,translate]',
             checked && 'translate-x-3'
           )}
         />
@@ -174,7 +174,7 @@ export function DisplayMenuDropdown({
               {/* Sliding background indicator */}
               <div
                 className={cn(
-                  'absolute inset-y-0.5 w-[calc(50%-2px)] rounded bg-surface-0 transition-all duration-200 ease-out',
+                  'absolute inset-y-0.5 w-[calc(50%-2px)] rounded bg-surface-0 transition-[left] duration-200 ease-out',
                   viewMode === 'list' ? 'left-0.5' : 'left-[calc(50%+0.5px)]'
                 )}
                 aria-hidden='true'

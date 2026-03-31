@@ -22,7 +22,7 @@ function getButtonStyles(
     // Base badge-like styles
     'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium',
     // Transition effects
-    'transition-all duration-200 ease-out',
+    'transition-colors duration-200 ease-out',
     // Focus ring
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent',
     // Cursor

@@ -83,7 +83,7 @@ function CarouselDots({
             key={index}
             aria-hidden
             className={cn(
-              'h-1.5 rounded-full transition-all duration-200',
+              'h-1.5 rounded-full transition-[width,background-color] duration-200',
               index === current
                 ? 'w-4 bg-primary-token'
                 : 'w-1.5 bg-tertiary-token/30'
@@ -193,7 +193,7 @@ function ProfileReadyCard({
       className={cn(
         'chat-card overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam)',
         'bg-(--linear-app-content-surface)',
-        'transition-all duration-300 ease-out',
+        'transition-[transform,opacity] duration-300 ease-out',
         direction === 'left' && 'animate-slide-out-left',
         direction === 'right' && 'animate-slide-out-right'
       )}
@@ -310,7 +310,7 @@ function SuggestionCard({
       className={cn(
         'chat-card overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam)',
         'bg-(--linear-app-content-surface)',
-        'transition-all duration-300 ease-out',
+        'transition-[transform,opacity] duration-300 ease-out',
         direction === 'left' && 'animate-slide-out-left',
         direction === 'right' && 'animate-slide-out-right'
       )}

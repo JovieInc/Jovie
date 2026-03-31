@@ -40,7 +40,7 @@ export function ReleaseTaskCategoryGroup({
           )}
         </span>
         <svg
-          className={`h-3 w-3 text-tertiary-token transition-transform ${
+          className={`h-3 w-3 text-tertiary-token transition-[transform,rotate] ${
             isOpen ? '' : '-rotate-90'
           }`}
           viewBox='0 0 12 12'

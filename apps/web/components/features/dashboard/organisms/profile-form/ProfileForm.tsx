@@ -131,7 +131,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
               }
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-surface-1 transition-transform ${
+                className={`inline-block h-4 w-4 transform rounded-full bg-surface-1 transition-[transform,translate] ${
                   formData.hideBranding ? 'translate-x-1' : 'translate-x-6'
                 }`}
                 aria-hidden='true'

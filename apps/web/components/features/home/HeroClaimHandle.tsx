@@ -76,7 +76,7 @@ export function HeroClaimHandle({
         </div>
 
         <button
-          className='group inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[0.8rem] px-4 transition-all duration-200 hover:brightness-110 active:scale-[0.98] focus-ring-themed'
+          className='group inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[0.8rem] px-4 transition-[transform,filter,scale] duration-200 hover:brightness-110 active:scale-[0.98] focus-ring-themed'
           data-testid={submitButtonTestId}
           style={FALLBACK_BUTTON_STYLE}
           type='submit'

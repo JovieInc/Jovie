@@ -410,12 +410,12 @@ export function UTMCopyDropdown({
     >
       <span className='relative flex h-4 w-4 items-center justify-center'>
         <Copy
-          className={`absolute h-4 w-4 transition-all duration-150 ${
+          className={`absolute h-4 w-4 transition-[transform,opacity,scale] duration-150 ${
             isCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
           }`}
         />
         <Check
-          className={`absolute h-4 w-4 text-green-500 transition-all duration-150 ${
+          className={`absolute h-4 w-4 text-green-500 transition-[transform,opacity,scale] duration-150 ${
             isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
           }`}
         />

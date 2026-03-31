@@ -44,6 +44,12 @@ const GRABBER_STYLE: React.CSSProperties = {
     'color-mix(in oklab, var(--linear-text-tertiary) 40%, transparent)',
 };
 
+// Pre-built animation delay styles to avoid per-render object allocation
+const NAV_ITEM_DELAY_STYLES: React.CSSProperties[] = Array.from(
+  { length: 10 },
+  (_, i) => ({ animationDelay: `${80 + i * 50}ms` })
+);
+
 function buildNavLinks(
   customNavLinks: ReadonlyArray<NavLink> | undefined,
   showAuthenticatedAction: boolean
@@ -80,7 +86,7 @@ function MobileNavCta({
       className={cn(
         'group flex items-center justify-center gap-2 h-[52px] rounded-xl',
         'text-[17px] font-semibold',
-        'transition-all duration-200 ease-out',
+        'transition-[transform,opacity,scale] duration-200 ease-out',
         'active:scale-[0.98]'
       )}
       style={CTA_BUTTON_STYLE}
@@ -155,7 +161,7 @@ export function MobileNav({
           'relative z-[101] inline-flex items-center justify-center size-11',
           'rounded-lg border-0 bg-transparent cursor-pointer',
           'text-primary-token',
-          'transition-all duration-200 ease-out',
+          'transition-[background-color] duration-200 ease-out',
           '[-webkit-tap-highlight-color:transparent]',
           'hover:bg-(--linear-bg-hover)',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--linear-accent)'
@@ -169,7 +175,7 @@ export function MobileNav({
           <Menu
             size={20}
             className={cn(
-              'absolute inset-0 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
+              'absolute inset-0 transition-[transform,opacity,scale,rotate] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
               isOpen
                 ? 'opacity-0 rotate-90 scale-75'
                 : 'opacity-100 rotate-0 scale-100'
@@ -178,7 +184,7 @@ export function MobileNav({
           <X
             size={20}
             className={cn(
-              'absolute inset-0 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
+              'absolute inset-0 transition-[transform,opacity,scale,rotate] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
               isOpen
                 ? 'opacity-100 rotate-0 scale-100'
                 : 'opacity-0 -rotate-90 scale-75'
@@ -197,7 +203,7 @@ export function MobileNav({
             <div
               className={cn(
                 'fixed inset-0 z-[99]',
-                'transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
+                'transition-opacity duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
                 'opacity-100 pointer-events-auto'
               )}
               onClick={close}
@@ -211,7 +217,7 @@ export function MobileNav({
               className={cn(
                 'fixed inset-x-0 bottom-0 z-[100]',
                 'rounded-t-[20px]',
-                'transition-all duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)]',
+                'transition-[transform,opacity,translate] duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)]',
                 'translate-y-0 opacity-100 pointer-events-auto'
               )}
               style={NAV_PANEL_STYLE}
@@ -235,14 +241,16 @@ export function MobileNav({
                       'flex items-center h-[52px] px-4 rounded-xl',
                       'text-[17px] font-medium',
                       'text-primary-token',
-                      'transition-all duration-150 ease-out',
+                      'transition-[transform,background-color,scale] duration-150 ease-out',
                       'active:scale-[0.98]',
                       'hover:bg-(--linear-bg-hover)',
                       'animate-[mobile-nav-item-in_400ms_ease-out_both]'
                     )}
-                    style={{
-                      animationDelay: `${80 + index * 50}ms`,
-                    }}
+                    style={
+                      NAV_ITEM_DELAY_STYLES[index] ?? {
+                        animationDelay: `${80 + index * 50}ms`,
+                      }
+                    }
                     onClick={close}
                   >
                     {link.label}
@@ -252,9 +260,11 @@ export function MobileNav({
                 {/* Primary CTA */}
                 <div
                   className='pt-2 animate-[mobile-nav-item-in_400ms_ease-out_both]'
-                  style={{
-                    animationDelay: `${80 + navLinks.length * 50}ms`,
-                  }}
+                  style={
+                    NAV_ITEM_DELAY_STYLES[navLinks.length] ?? {
+                      animationDelay: `${80 + navLinks.length * 50}ms`,
+                    }
+                  }
                 >
                   <MobileNavCta
                     showAuthenticatedAction={showAuthenticatedAction}
@@ -271,9 +281,11 @@ export function MobileNav({
                     'border-t border-subtle',
                     'animate-[mobile-nav-item-in_400ms_ease-out_both]'
                   )}
-                  style={{
-                    animationDelay: `${80 + (navLinks.length + 1) * 50}ms`,
-                  }}
+                  style={
+                    NAV_ITEM_DELAY_STYLES[navLinks.length + 1] ?? {
+                      animationDelay: `${80 + (navLinks.length + 1) * 50}ms`,
+                    }
+                  }
                 >
                   <UserButton />
                 </div>

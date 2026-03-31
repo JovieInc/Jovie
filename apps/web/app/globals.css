@@ -1358,14 +1358,14 @@ body {
   }
   /* Micro-animations */
   .card-hover {
-    @apply transform transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/25 dark:hover:shadow-gray-900/25;
+    @apply transform transition-[box-shadow,transform,translate] duration-200 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/25 dark:hover:shadow-gray-900/25;
   }
   .input-focus-glow {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:shadow-lg transition-all duration-200;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:shadow-lg transition-[box-shadow] duration-200;
     --tw-ring-color: var(--color-accent);
   }
   .btn-press {
-    @apply transform transition-transform duration-100 ease-out active:scale-95;
+    @apply transform transition-[transform,scale] duration-100 ease-out active:scale-95;
   }
   /* Chat empty state — refined depth & motion */
   .chat-logo-mark {

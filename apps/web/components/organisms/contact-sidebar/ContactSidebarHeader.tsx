@@ -46,12 +46,12 @@ function ContactTitle({
       >
         <span className='relative flex h-3 w-3 items-center justify-center'>
           <IdCard
-            className={`absolute h-3 w-3 transition-all duration-150 ${
+            className={`absolute h-3 w-3 transition-[transform,opacity,scale] duration-150 ${
               isClerkIdCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
             }`}
           />
           <Check
-            className={`absolute h-3 w-3 transition-all duration-150 ${
+            className={`absolute h-3 w-3 transition-[transform,opacity,scale] duration-150 ${
               isClerkIdCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
             }`}
           />

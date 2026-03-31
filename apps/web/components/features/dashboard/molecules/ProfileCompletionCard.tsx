@@ -93,7 +93,7 @@ export const ProfileCompletionCard = memo(
             </div>
 
             <progress
-              className='h-1.5 w-full overflow-hidden rounded-full bg-surface-0 [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-accent [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-surface-0 [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-accent [&::-webkit-progress-value]:transition-all [&::-webkit-progress-value]:duration-500'
+              className='h-1.5 w-full overflow-hidden rounded-full bg-surface-0 [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-accent [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-surface-0 [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-accent [&::-webkit-progress-value]:transition-[width] [&::-webkit-progress-value]:duration-500'
               max={100}
               value={completionPercentage}
               aria-label='Profile completion'
@@ -117,7 +117,7 @@ export const ProfileCompletionCard = memo(
                       </p>
                     </div>
                     <ArrowRight
-                      className='h-4 w-4 shrink-0 text-tertiary-token transition-transform group-hover:translate-x-0.5'
+                      className='h-4 w-4 shrink-0 text-tertiary-token transition-[transform,translate] group-hover:translate-x-0.5'
                       aria-hidden='true'
                     />
                   </Link>

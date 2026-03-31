@@ -98,7 +98,7 @@ export function OnboardingDemoContent({
             onClick={() => onStepChange(step)}
             aria-label={`Step ${index + 1}`}
             className={cn(
-              'h-1.5 rounded-full transition-all duration-300',
+              'h-1.5 rounded-full transition-[width,background-color] duration-300',
               getDotClass(index, currentIndex)
             )}
           />

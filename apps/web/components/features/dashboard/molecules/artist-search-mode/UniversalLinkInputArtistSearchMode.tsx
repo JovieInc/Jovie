@@ -58,7 +58,7 @@ export function UniversalLinkInputArtistSearchMode({
     <div className='relative w-full'>
       <div
         className={cn(
-          'relative flex w-full items-center gap-2 overflow-hidden border border-default bg-surface-1 px-2 py-1 shadow-xs transition-all',
+          'relative flex w-full items-center gap-2 overflow-hidden border border-default bg-surface-1 px-2 py-1 shadow-xs transition-[border-color,border-radius,box-shadow]',
           'focus-within:ring-2 focus-within:ring-accent',
           showResults ? 'rounded-t-3xl border-b-0' : 'rounded-full',
           disabled && 'opacity-50'

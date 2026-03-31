@@ -31,7 +31,7 @@ export const FrostedButton = React.forwardRef<
   ) => {
     const variant = toneToVariant[tone];
     const frostedClasses = cn(
-      'backdrop-blur-md transition-all duration-200 ease-out',
+      'backdrop-blur-md transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-out',
       'active:translate-y-[1px] motion-reduce:transition-none motion-reduce:transform-none',
       'focus-visible:ring-offset-2 focus-visible:ring-ring focus-visible:ring-offset-background',
       className

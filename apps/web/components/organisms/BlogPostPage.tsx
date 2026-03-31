@@ -45,7 +45,7 @@ export function BlogPostPage({
             className='inline-flex items-center gap-2 text-sm font-medium text-tertiary-token hover:text-primary-token transition-colors duration-200 mb-10 group'
           >
             <svg
-              className='w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1'
+              className='w-4 h-4 transition-[transform,translate] duration-200 group-hover:-translate-x-1'
               fill='none'
               viewBox='0 0 24 24'
               stroke='currentColor'

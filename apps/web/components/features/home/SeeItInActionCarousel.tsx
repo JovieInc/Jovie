@@ -206,7 +206,7 @@ function ReleaseCard({
                 onHoverEnd(release.id);
               }
             }}
-            className='group flex w-full flex-col rounded-xl p-6 text-left no-underline transition-all duration-[var(--linear-duration-normal)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--linear-text-secondary)]'
+            className='group flex w-full flex-col rounded-xl p-6 text-left no-underline transition-[transform,translate] duration-[var(--linear-duration-normal)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--linear-text-secondary)]'
             style={{
               backgroundColor: 'var(--linear-bg-surface-0)',
               border: '1px solid var(--linear-border-subtle)',
@@ -219,7 +219,7 @@ function ReleaseCard({
                 alt={`${release.title} artwork`}
                 fill
                 sizes='(min-width: 768px) 240px, 100vw'
-                className='object-cover transition-transform duration-[var(--linear-duration-normal)] group-hover:scale-[1.02]'
+                className='object-cover transition-[transform,scale] duration-[var(--linear-duration-normal)] group-hover:scale-[1.02]'
               />
             </div>
             <div className='mt-4'>

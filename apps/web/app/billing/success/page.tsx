@@ -151,8 +151,8 @@ export default function CheckoutSuccessPage() {
         <div
           className={
             isVisible
-              ? 'space-y-6 px-5 py-5 text-center opacity-100 translate-y-0 scale-100 transition-all duration-700 ease-out sm:px-6'
-              : 'space-y-6 px-5 py-5 text-center opacity-0 translate-y-6 scale-[0.98] transition-all duration-700 ease-out sm:px-6'
+              ? 'space-y-6 px-5 py-5 text-center opacity-100 translate-y-0 scale-100 transition-[transform,opacity,translate,scale] duration-700 ease-out sm:px-6'
+              : 'space-y-6 px-5 py-5 text-center opacity-0 translate-y-6 scale-[0.98] transition-[transform,opacity,translate,scale] duration-700 ease-out sm:px-6'
           }
         >
           <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'>

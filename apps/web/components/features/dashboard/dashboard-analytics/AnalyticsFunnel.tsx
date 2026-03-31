@@ -75,7 +75,7 @@ export function AnalyticsFunnel({
             )}
 
             <div
-              className='relative transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]'
+              className='relative transition-[width] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]'
               style={{ width: `${widthPercent}%` }}
             >
               <ContentSurfaceCard
@@ -85,7 +85,7 @@ export function AnalyticsFunnel({
                   px-6 py-5 text-center
                   ${isLast ? '' : 'hover:border-default'}
                   ${isLast ? 'border-primary/20 ring-1 ring-primary/15 bg-gradient-to-r from-[color-mix(in_srgb,var(--linear-accent)_12%,var(--linear-bg-surface-1))] to-(--linear-bg-surface-1)' : ''}
-                  transition-all duration-200
+                  transition-colors duration-200
                 `}
               >
                 <p className='mb-2 text-[13px] font-[510] tracking-normal text-secondary-token'>

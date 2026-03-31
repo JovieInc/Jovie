@@ -282,7 +282,7 @@ function PressPhotosSection({
     for (const photo of draftPhotos) {
       try {
         await handleApprove(photo.id);
-      } catch (_error) {
+      } catch {
         failedCount += 1;
       }
     }

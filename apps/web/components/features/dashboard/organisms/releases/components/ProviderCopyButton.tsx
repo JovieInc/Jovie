@@ -60,7 +60,7 @@ export function ProviderCopyButton({
         <Icon
           name='Copy'
           className={cn(
-            'absolute h-3 w-3 transition-all duration-150',
+            'absolute h-3 w-3 transition-[transform,opacity,scale] duration-150',
             isCopied
               ? 'scale-50 opacity-0'
               : 'scale-100 opacity-0 group-hover/btn:opacity-100 group-focus-visible/btn:opacity-100'
@@ -70,7 +70,7 @@ export function ProviderCopyButton({
         <Icon
           name='Check'
           className={cn(
-            'absolute h-3 w-3 transition-all duration-150',
+            'absolute h-3 w-3 transition-[transform,opacity,scale] duration-150',
             isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
           )}
           aria-hidden='true'

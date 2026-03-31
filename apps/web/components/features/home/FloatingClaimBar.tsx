@@ -40,7 +40,7 @@ export function FloatingClaimBar() {
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 z-50 flex justify-center px-4 pb-5 md:pb-6 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${shouldShow ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}
+      className={`fixed bottom-0 left-0 right-0 z-50 flex justify-center px-4 pb-5 md:pb-6 transition-[transform,opacity,translate] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${shouldShow ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}
     >
       {/* Gradient scrim behind the bar */}
       <div

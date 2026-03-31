@@ -545,7 +545,7 @@ export function DevToolbar({
     >
       {/* Expanded panel */}
       <div
-        className='overflow-hidden transition-all duration-200 ease-in-out border-t border-[var(--color-border-default)] backdrop-blur-sm bg-[var(--color-bg-surface-1)]/80'
+        className='overflow-hidden transition-[max-height,border-top-width] duration-200 ease-in-out border-t border-[var(--color-border-default)] backdrop-blur-sm bg-[var(--color-bg-surface-1)]/80'
         style={{
           maxHeight: open ? '400px' : '0px',
           borderTopWidth: open ? undefined : 0,
@@ -823,28 +823,31 @@ export function DevToolbar({
               className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Sync Clerk ID'
             >
-              {syncClerkState === 'loading' ? (
+              {syncClerkState === 'loading' && (
                 <Loader2 size={11} className='animate-spin' />
-              ) : syncClerkState === 'done' ? (
+              )}
+              {syncClerkState === 'done' && (
                 <Check size={11} className='text-[var(--color-accent)]' />
-              ) : syncClerkState === 'noop' ? (
+              )}
+              {syncClerkState === 'noop' && (
                 <Check
                   size={11}
                   className='text-[var(--color-text-quaternary-token)]'
                 />
-              ) : (
-                <RefreshCw size={11} />
               )}
+              {syncClerkState !== 'loading' &&
+                syncClerkState !== 'done' &&
+                syncClerkState !== 'noop' && <RefreshCw size={11} />}
               <span className='max-sm:hidden sm:inline text-[10px]'>
-                {syncClerkState === 'loading'
-                  ? 'Syncing...'
-                  : syncClerkState === 'done'
-                    ? 'Synced!'
-                    : syncClerkState === 'noop'
-                      ? 'In sync'
-                      : syncClerkState === 'error'
-                        ? 'Failed'
-                        : 'Sync Clerk'}
+                {
+                  {
+                    loading: 'Syncing...',
+                    done: 'Synced!',
+                    noop: 'In sync',
+                    error: 'Failed',
+                    idle: 'Sync Clerk',
+                  }[syncClerkState]
+                }
               </span>
             </button>
           )}
@@ -1028,7 +1031,7 @@ function FlagRow({
             : 'bg-[var(--color-bg-surface-3)]'
         }`}
       >
-        <Switch.Thumb className='block w-3 h-3 bg-white rounded-full transition-transform translate-x-0.5 data-[state=checked]:translate-x-3.5 shadow-sm' />
+        <Switch.Thumb className='block w-3 h-3 bg-white rounded-full transition-[transform,translate] translate-x-0.5 data-[state=checked]:translate-x-3.5 shadow-sm' />
       </Switch.Root>
       <span
         className={`flex-1 truncate ${isOverridden ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-tertiary)]'}`}

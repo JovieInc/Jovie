@@ -36,7 +36,7 @@ export const PopularityCell = memo(function PopularityCell({
           >
             <div className='h-2 w-12 overflow-hidden rounded-full bg-(--linear-border-subtle)'>
               <div
-                className='h-full rounded-full bg-brand-spotify transition-all'
+                className='h-full rounded-full bg-brand-spotify transition-[width]'
                 style={{ width: `${clampedPopularity}%` }}
               />
             </div>

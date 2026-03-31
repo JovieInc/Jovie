@@ -250,7 +250,7 @@ export function HeroSpotifySearch() {
       <div
         className={cn(
           'w-full flex items-center gap-3 rounded-xl border px-4 py-3 min-h-12 bg-surface-0',
-          'transition-all duration-200',
+          'transition-[border-color,box-shadow] duration-200',
           shouldShowDropdown
             ? 'border-focus ring-2 ring-focus/20'
             : 'border-strong hover:border-focus'

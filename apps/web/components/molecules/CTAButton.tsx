@@ -76,7 +76,7 @@ export const CTAButton = React.forwardRef<
     );
 
     const sharedClassName = cn(
-      'gap-2 rounded-lg transition-all duration-150 ease-out',
+      'gap-2 rounded-lg transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out',
       'active:translate-y-[1px] focus-visible:translate-y-[0.5px]',
       'motion-reduce:transition-none motion-reduce:transform-none',
       'will-change-transform focus-visible:ring-offset-2 focus-visible:ring-ring focus-visible:ring-offset-background',

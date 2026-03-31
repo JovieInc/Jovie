@@ -204,7 +204,7 @@ export const AvatarUploadable = React.memo(
             <Avatar
               src={previewUrl ?? src}
               className={cn(
-                'transition-all duration-200 ease-out',
+                'transition-[transform,opacity,filter,scale] duration-200 ease-out',
                 isInteractive &&
                   'group-hover/avatar:brightness-95 group-focus-visible/avatar:ring-2 group-focus-visible/avatar:ring-accent group-focus-visible/avatar:ring-offset-2 group-focus-visible/avatar:ring-offset-(--color-bg-base)',
                 isDragOver && 'scale-105',

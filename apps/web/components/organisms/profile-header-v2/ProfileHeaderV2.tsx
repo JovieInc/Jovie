@@ -114,7 +114,7 @@ export function ProfileHeaderV2({
                 aria-selected={isActive}
                 aria-label={`View ${MODE_LABELS[mode]}`}
                 aria-controls={`profile-pane-${mode}`}
-                className={`rounded-full transition-all duration-200 ease-out ${
+                className={`rounded-full transition-[width,height,background-color] duration-200 ease-out ${
                   isActive
                     ? 'h-2 w-5 bg-primary'
                     : 'h-1.5 w-1.5 bg-muted/40 hover:bg-muted/60'

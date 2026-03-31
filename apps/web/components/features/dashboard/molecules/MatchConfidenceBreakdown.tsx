@@ -114,7 +114,7 @@ function ScoreRow({ label, score, weight, description }: ScoreRowProps) {
       <div className='mt-1 h-1.5 w-full overflow-hidden rounded-full bg-surface-2'>
         <div
           className={cn(
-            'h-full rounded-full transition-all',
+            'h-full rounded-full transition-[width]',
             getPercentageColorClass(percentage)
           )}
           style={{ width: `${percentage}%` }}

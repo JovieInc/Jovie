@@ -33,7 +33,7 @@ export const AmountSelector = memo(function AmountSelector({
       disabled={disabled}
       aria-disabled={disabled}
       className={cn(
-        'group relative w-full aspect-square rounded-2xl border text-center transition-all duration-150 ease-out flex flex-col items-center justify-center gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+        'group relative w-full aspect-square rounded-2xl border text-center transition-[color,background-color,border-color,box-shadow] duration-150 ease-out flex flex-col items-center justify-center gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         isSelected
           ? 'bg-btn-primary text-btn-primary-foreground shadow-sm'

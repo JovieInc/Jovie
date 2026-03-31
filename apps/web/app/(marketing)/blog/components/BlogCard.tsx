@@ -22,7 +22,7 @@ function formatDate(dateString: string): string {
 export function BlogCard({ post, author, variant = 'default' }: BlogCardProps) {
   if (variant === 'featured') {
     return (
-      <article className='group rounded-2xl border border-border-subtle p-8 sm:p-10 transition-all duration-200 hover:border-border-default hover:-translate-y-0.5'>
+      <article className='group rounded-2xl border border-border-subtle p-8 sm:p-10 transition-[border-color,transform] duration-200 hover:border-border-default hover:-translate-y-0.5'>
         {/* Meta — category pill outside the link to avoid nested <a> */}
         <div className='flex flex-wrap items-center gap-3 mb-4'>
           <time
@@ -84,7 +84,7 @@ export function BlogCard({ post, author, variant = 'default' }: BlogCardProps) {
   }
 
   return (
-    <article className='group rounded-xl border border-border-subtle p-6 h-full transition-all duration-200 hover:border-border-default hover:-translate-y-0.5'>
+    <article className='group rounded-xl border border-border-subtle p-6 h-full transition-[border-color,transform] duration-200 hover:border-border-default hover:-translate-y-0.5'>
       {/* Meta */}
       <div className='flex flex-wrap items-center gap-2 mb-3'>
         <time

@@ -29,7 +29,7 @@ export function EngagementEngineLanding() {
             <Button asChild variant='primary' size='hero' className='group'>
               <Link href='/signup'>
                 Get started free
-                <ArrowRight className='h-4 w-4 transition-transform group-hover:translate-x-0.5' />
+                <ArrowRight className='h-4 w-4 transition-[transform,translate] group-hover:translate-x-0.5' />
               </Link>
             </Button>
             <Link

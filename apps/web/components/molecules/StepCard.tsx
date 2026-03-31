@@ -24,7 +24,7 @@ export interface StepCardProps {
 }
 
 export const cardBaseClasses =
-  'relative bg-surface-1/80 backdrop-blur-sm border border-default rounded-2xl p-8 transition-all duration-300';
+  'relative bg-surface-1/80 backdrop-blur-sm border border-default rounded-2xl p-8 transition-[border-color] duration-300';
 
 export const glowEffectClasses =
   'absolute -inset-4 bg-gradient-to-r from-white/5 to-white/10 rounded-2xl blur opacity-0 transition-opacity duration-500 group-hover:opacity-100';

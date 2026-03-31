@@ -107,7 +107,7 @@ function ProfilePreviewCard({
                 Jovie branding
               </span>
               <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-medium transition-all ${
+                className={`rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors ${
                   showBranding
                     ? 'bg-surface-2 text-tertiary-token'
                     : 'bg-(--linear-accent)/10 text-(--linear-accent)'
@@ -118,7 +118,7 @@ function ProfilePreviewCard({
             </button>
 
             <div
-              className={`mt-2 flex justify-center transition-all duration-300 ${
+              className={`mt-2 flex justify-center transition-[max-height,opacity] duration-300 ${
                 showBranding
                   ? 'max-h-8 opacity-100'
                   : 'max-h-0 overflow-hidden opacity-0'

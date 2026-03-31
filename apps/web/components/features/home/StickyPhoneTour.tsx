@@ -148,13 +148,10 @@ export function StickyPhoneTour() {
     let active = true;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    const loadEnhancement = () => {
-      void import('./StickyPhoneTourClient').then(mod => {
-        if (!active) {
-          return;
-        }
-        setEnhancedTour(() => mod.StickyPhoneTourClient);
-      });
+    const loadEnhancement = async () => {
+      const mod = await import('./StickyPhoneTourClient');
+      if (!active) return;
+      setEnhancedTour(() => mod.StickyPhoneTourClient);
     };
 
     if ('requestIdleCallback' in globalThis) {

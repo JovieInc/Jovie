@@ -90,7 +90,7 @@ function ThemeOptionGrid({
             onClick={() => onThemeChange(option.value)}
             disabled={isUpdating}
             className={cn(
-              'flex flex-col items-center justify-center rounded-lg border px-3 py-3 transition-all duration-200',
+              'flex flex-col items-center justify-center rounded-lg border px-3 py-3 transition-colors duration-200',
               theme === option.value
                 ? 'border-(--linear-border-focus) bg-surface-0 text-primary-token'
                 : 'border-subtle bg-surface-1 text-secondary-token hover:bg-surface-0',

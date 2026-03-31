@@ -141,7 +141,7 @@ export function CopyLinkInput({
           <Icon
             name='Copy'
             className={cn(
-              'absolute h-3.5 w-3.5 transition-all duration-150',
+              'absolute h-3.5 w-3.5 transition-[transform,opacity,scale] duration-150',
               isCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
             )}
             aria-hidden='true'
@@ -149,7 +149,7 @@ export function CopyLinkInput({
           <Icon
             name='Check'
             className={cn(
-              'absolute h-3.5 w-3.5 transition-all duration-150',
+              'absolute h-3.5 w-3.5 transition-[transform,opacity,scale] duration-150',
               isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
             )}
             aria-hidden='true'

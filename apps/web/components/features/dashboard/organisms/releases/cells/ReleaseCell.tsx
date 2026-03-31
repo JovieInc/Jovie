@@ -66,7 +66,7 @@ export const ReleaseCell = memo(function ReleaseCell({
     <div className='flex min-w-0 items-center gap-2.5'>
       {/* Play/status indicator — 16px column */}
       <div className='flex w-4 shrink-0 items-center justify-center'>
-        {hasPreview ? (
+        {hasPreview && (
           <DrawerInlineIconButton
             onClick={handleTogglePlayback}
             className={cn(
@@ -86,12 +86,14 @@ export const ReleaseCell = memo(function ReleaseCell({
               <Play className='h-2.5 w-2.5' />
             )}
           </DrawerInlineIconButton>
-        ) : showType && typeStyle ? (
+        )}
+        {!hasPreview && showType && typeStyle && (
           <span
             className={cn('h-2 w-2 shrink-0 rounded-full', typeStyle.dot)}
             title={typeStyle.label}
           />
-        ) : (
+        )}
+        {!hasPreview && !(showType && typeStyle) && (
           <VolumeX
             className='h-3 w-3 text-quaternary-token'
             aria-label='No preview available'

@@ -208,7 +208,7 @@ export function AuthLayout({
           <h1
             className={cn(
               formTitleClassName,
-              'transition-all duration-200 ease-out',
+              'transition-[opacity,height,margin] duration-200 ease-out',
               isKeyboardVisible && 'opacity-0 h-0 mb-0 overflow-hidden'
             )}
             aria-hidden={isKeyboardVisible}

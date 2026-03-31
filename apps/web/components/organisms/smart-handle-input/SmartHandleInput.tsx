@@ -128,7 +128,7 @@ export function SmartHandleInput({
 
       {/* Status message */}
       <output
-        className={`text-xs min-h-5 transition-all duration-300 ${getStatusClass()}`}
+        className={`text-xs min-h-5 transition-[color,opacity] duration-300 ${getStatusClass()}`}
         id={statusId}
         aria-live='polite'
       >

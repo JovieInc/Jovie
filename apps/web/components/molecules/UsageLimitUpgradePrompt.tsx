@@ -75,7 +75,7 @@ export function UsageLimitUpgradePrompt({
       {/* Progress bar */}
       <div className='mb-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-2'>
         <div
-          className={`h-full rounded-full transition-all ${
+          className={`h-full rounded-full transition-[width] ${
             isAtLimit ? 'bg-destructive' : 'bg-amber-500'
           }`}
           style={{ width: `${Math.min(percentage, 100)}%` }}
