@@ -28,6 +28,24 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.3.109] - 2026-03-31
 
+## [26.3.110] - 2026-03-31
+
+> Expanded Smart Link credits coverage for additional DSP services, redesigned release preview flows, and updated tests for the new DSP registry surface.
+
+### Added
+
+- Added icon metadata coverage for Genius, Discogs, and Allmusic in DSP icon contrast checks
+
+### Changed
+
+- Synchronized Smart Link Credits and presence data paths for expanded non-DSP platform coverage
+- Updated release audio preview and credits sidebar behavior alongside presence UI changes
+
+### Fixed
+
+- Updated DSP registry completeness test to the new service count
+- Added regression coverage for icon contrast handling of newly introduced services
+
 > Fixed duplicate platform icons and truncated names on the DSP Presence page, plus added screen-reader description to the Add Platform dialog.
 
 ### Fixed

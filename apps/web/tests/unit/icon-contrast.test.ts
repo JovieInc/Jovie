@@ -122,6 +122,9 @@ const DSP_ICONS: Record<string, { hex: string }> = {
   soundcloud: { hex: 'FF5500' },
   amazon_music: { hex: '00A8E1' },
   musicbrainz: { hex: 'BA478F' },
+  genius: { hex: 'FFFF64' },
+  discogs: { hex: '333333' },
+  allmusic: { hex: 'E0344B' },
 };
 
 // ---------------------------------------------------------------------------

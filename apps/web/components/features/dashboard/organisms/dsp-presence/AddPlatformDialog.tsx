@@ -25,6 +25,9 @@ const ALL_PROVIDERS: DspProviderId[] = [
   'soundcloud',
   'amazon_music',
   'musicbrainz',
+  'genius',
+  'discogs',
+  'allmusic',
 ];
 
 const PROVIDER_PLACEHOLDERS: Record<DspProviderId, string> = {
@@ -36,6 +39,9 @@ const PROVIDER_PLACEHOLDERS: Record<DspProviderId, string> = {
   soundcloud: 'https://soundcloud.com/...',
   amazon_music: 'https://music.amazon.com/artists/...',
   musicbrainz: 'https://musicbrainz.org/artist/...',
+  genius: 'https://genius.com/artists/...',
+  discogs: 'https://www.discogs.com/artist/...',
+  allmusic: 'https://www.allmusic.com/artist/...',
 };
 
 interface AddPlatformDialogProps {

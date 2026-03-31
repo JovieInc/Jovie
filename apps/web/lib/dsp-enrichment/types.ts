@@ -39,7 +39,10 @@ export type DspProviderId =
   | 'tidal'
   | 'soundcloud'
   | 'amazon_music'
-  | 'musicbrainz';
+  | 'musicbrainz'
+  | 'genius'
+  | 'discogs'
+  | 'allmusic';
 
 /**
  * Match status for DSP artist matches

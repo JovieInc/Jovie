@@ -46,6 +46,7 @@ import type { ProviderKey, ReleaseSidebarTrack } from '@/lib/discography/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { ReleaseCreditsSection } from './ReleaseCreditsSection';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
 import { ReleaseLyricsSection } from './ReleaseLyricsSection';
@@ -731,6 +732,7 @@ export function ReleaseSidebar({
                     canEditCanvasStatus ? handleCanvasStatusChange : undefined
                   }
                 />
+                <ReleaseCreditsSection releaseId={release.id} />
               </div>
             )}
 

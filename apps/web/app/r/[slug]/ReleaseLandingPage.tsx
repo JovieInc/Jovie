@@ -21,7 +21,6 @@ import {
 import { ReleaseCreditsDialog } from '@/features/release/ReleaseCreditsDialog';
 import { SmartLinkAudioPreview } from '@/features/release/SmartLinkAudioPreview';
 import {
-  SmartLinkArtistName,
   SmartLinkArtworkCard,
   SmartLinkPageFrame,
 } from '@/features/release/SmartLinkPagePrimitives';
@@ -37,6 +36,11 @@ interface Provider {
   url: string | null;
 }
 
+export interface FeaturedArtist {
+  readonly name: string;
+  readonly handle: string | null;
+}
+
 interface ReleaseLandingPageProps
   extends Readonly<{
     readonly release: {
@@ -50,6 +54,7 @@ interface ReleaseLandingPageProps
       readonly handle: string | null;
       readonly avatarUrl: string | null;
     };
+    readonly featuredArtists?: FeaturedArtist[];
     readonly providers: Provider[];
     readonly credits?: SmartLinkCreditGroup[];
     /** Pre-generated artwork sizes for download context menu */
@@ -137,9 +142,91 @@ function SmartLinkClaimBanner({
   );
 }
 
+/**
+ * Build an inline credit summary from credit groups.
+ * Shows "Produced by X · Written by Y" for the most interesting roles.
+ */
+function buildInlineCredits(
+  credits: SmartLinkCreditGroup[] | undefined
+): string | null {
+  if (!credits || credits.length === 0) return null;
+
+  const parts: string[] = [];
+
+  const producer = credits.find(g => g.role === 'producer');
+  if (producer?.entries[0]) {
+    parts.push(`Produced by ${producer.entries[0].name}`);
+  }
+
+  const composer = credits.find(g => g.role === 'composer');
+  const lyricist = credits.find(g => g.role === 'lyricist');
+  const writer = composer ?? lyricist;
+  if (writer?.entries[0]) {
+    parts.push(`Written by ${writer.entries[0].name}`);
+  }
+
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+/**
+ * Render the artist line with featured artists.
+ * "Tim White feat. Erica Gibson" with profile links on each name.
+ */
+function SmartLinkArtistLine({
+  artist,
+  featuredArtists,
+}: Readonly<{
+  artist: { name: string; handle: string | null };
+  featuredArtists?: FeaturedArtist[];
+}>) {
+  const hasFeatured = featuredArtists && featuredArtists.length > 0;
+
+  const primaryName = artist.handle ? (
+    <Link
+      href={`/${artist.handle}`}
+      className='text-muted-foreground hover:text-foreground transition-colors'
+    >
+      {artist.name}
+    </Link>
+  ) : (
+    <span className='text-muted-foreground'>{artist.name}</span>
+  );
+
+  if (!hasFeatured) {
+    return <p className='mt-1 text-sm'>{primaryName}</p>;
+  }
+
+  return (
+    <p className='mt-1 text-sm'>
+      {primaryName}
+      <span className='text-muted-foreground/60'> feat. </span>
+      {featuredArtists.map((fa, i) => (
+        <span key={fa.name}>
+          {i > 0 && (
+            <span className='text-muted-foreground/60'>
+              {i === featuredArtists.length - 1 ? ' & ' : ', '}
+            </span>
+          )}
+          {fa.handle ? (
+            <Link
+              href={`/${fa.handle}`}
+              className='text-muted-foreground hover:text-foreground transition-colors'
+            >
+              {fa.name}
+            </Link>
+          ) : (
+            <span className='text-muted-foreground'>{fa.name}</span>
+          )}
+        </span>
+      ))}
+    </p>
+  );
+}
+
 export function ReleaseLandingPage({
   release,
   artist,
+  featuredArtists,
   providers,
   credits,
   artworkSizes,
@@ -161,6 +248,8 @@ export function ReleaseLandingPage({
     (provider): provider is Provider & { url: string } => Boolean(provider.url)
   );
   const sizes = buildArtworkSizes(artworkSizes, release.artworkUrl);
+  const inlineCredits = buildInlineCredits(credits);
+  const hasPreview = Boolean(release.previewUrl);
 
   const handleProviderClick = useCallback(
     (providerKey: ProviderKey) => {
@@ -216,14 +305,20 @@ export function ReleaseLandingPage({
               from {parentRelease.title}
             </Link>
           )}
-          <SmartLinkArtistName
-            name={artist.name}
-            handle={artist.handle}
-            className='hover:text-foreground block text-sm transition-colors'
+          <SmartLinkArtistLine
+            artist={artist}
+            featuredArtists={featuredArtists}
           />
           {formattedDate && (
             <p className='text-muted-foreground/70 mt-0.5 text-2xs tracking-wide'>
               {formattedDate}
+            </p>
+          )}
+
+          {/* Inline credit summary */}
+          {inlineCredits && (
+            <p className='text-muted-foreground/50 mt-1 text-2xs'>
+              {inlineCredits}
             </p>
           )}
 
@@ -233,32 +328,24 @@ export function ReleaseLandingPage({
               username={claimBanner.username}
             />
           )}
+        </div>
 
-          <div
-            className={
-              claimBanner
-                ? 'mt-3 flex justify-center'
-                : 'mt-3.5 flex justify-center'
-            }
-          >
-            <ReleaseCreditsDialog credits={credits} />
+        {/* Audio Preview Player — slim inline, only when available */}
+        {hasPreview && (
+          <div className='mt-3'>
+            <SmartLinkAudioPreview
+              contentId={tracking?.contentId ?? release.title}
+              title={release.title}
+              artistName={artist.name}
+              artworkUrl={release.artworkUrl}
+              previewUrl={release.previewUrl ?? null}
+            />
           </div>
-        </div>
-
-        {/* Audio Preview Player */}
-        <div className='mt-4'>
-          <SmartLinkAudioPreview
-            contentId={tracking?.contentId ?? release.title}
-            title={release.title}
-            artistName={artist.name}
-            artworkUrl={release.artworkUrl}
-            previewUrl={release.previewUrl ?? null}
-          />
-        </div>
+        )}
       </div>
 
       {/* Streaming Platform Buttons — scrolls independently when overflowing */}
-      <div className='mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
+      <div className='mt-4 min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
         <div className='space-y-2 py-1'>
           {clickableProviders.map(provider => {
             const logoConfig = DSP_LOGO_CONFIG[provider.key];
@@ -307,6 +394,11 @@ export function ReleaseLandingPage({
             </p>
           </div>
         )}
+
+        {/* View all credits — less prominent, after streaming links */}
+        <div className='mt-3 flex justify-center'>
+          <ReleaseCreditsDialog credits={credits} />
+        </div>
       </div>
     </SmartLinkPageFrame>
   );
