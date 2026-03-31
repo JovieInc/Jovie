@@ -31,6 +31,8 @@ const getCurrentUserEntitlementsMock = vi.fn(async () => ({
   hasAdvancedFeatures: false,
   canRemoveBranding: false,
 }));
+const checkAdminRoleMock = vi.fn(async () => false);
+const resolveUserStateMock = vi.fn();
 
 const startSpanMock = vi.fn(
   async (_options: unknown, callback: () => Promise<unknown> | unknown) => {
@@ -40,6 +42,7 @@ const startSpanMock = vi.fn(
 
 // Persistent cache store that survives module resets
 const cacheStore = new Map<Function, { promise: Promise<unknown> | null }>();
+const unstableCacheStore = new Map<string, unknown>();
 
 // Override global setup's react mock with one that has a persistent cache store
 // for testing deduplication behavior across prefetch calls.
@@ -73,16 +76,22 @@ vi.mock('@sentry/nextjs', () => ({
   startSpan: startSpanMock,
 }));
 
+vi.mock('@/lib/admin/roles', () => ({
+  isAdmin: checkAdminRoleMock,
+}));
+
 vi.mock('@clerk/nextjs/server', () => ({
   auth: vi.fn(async () => ({ userId: 'user_123' })),
   currentUser: vi.fn(),
 }));
 
+vi.mock('@/lib/auth/gate', () => ({
+  resolveUserState: resolveUserStateMock,
+}));
+
 vi.mock('next/cache', async () => {
   const actual =
     await vi.importActual<typeof import('next/cache')>('next/cache');
-
-  const simpleCache = new Map<string, unknown>();
 
   return {
     ...actual,
@@ -93,10 +102,10 @@ vi.mock('next/cache', async () => {
       ) => {
         const cacheKey = JSON.stringify(keys ?? ['default']);
         return async (...args: Parameters<T>): Promise<ReturnType<T>> => {
-          if (!simpleCache.has(cacheKey)) {
-            simpleCache.set(cacheKey, fn(...args));
+          if (!unstableCacheStore.has(cacheKey)) {
+            unstableCacheStore.set(cacheKey, fn(...args));
           }
-          return simpleCache.get(cacheKey) as ReturnType<T>;
+          return unstableCacheStore.get(cacheKey) as ReturnType<T>;
         };
       }
     ),
@@ -209,7 +218,9 @@ describe('dashboard data prefetch', () => {
     vi.clearAllMocks();
     // Clear the persistent cache store
     cacheStore.clear();
+    unstableCacheStore.clear();
     withDbSessionTxMock.mockResolvedValue({ ...baseDashboardResponse });
+    checkAdminRoleMock.mockResolvedValue(false);
     getCurrentUserEntitlementsMock.mockResolvedValue({
       userId: 'user_123',
       email: 'user@example.com',
@@ -218,6 +229,18 @@ describe('dashboard data prefetch', () => {
       isPro: false,
       hasAdvancedFeatures: false,
       canRemoveBranding: false,
+    });
+    resolveUserStateMock.mockResolvedValue({
+      state: 'ACTIVE',
+      clerkUserId: 'user_123',
+      dbUserId: 'user_db_1',
+      profileId: 'profile_1',
+      redirectTo: null,
+      context: {
+        isAdmin: false,
+        isPro: false,
+        email: 'user@example.com',
+      },
     });
   });
 
@@ -234,6 +257,105 @@ describe('dashboard data prefetch', () => {
 
     expect(first).toEqual(second);
     expect(withDbSessionTxMock).toHaveBeenCalled();
+  });
+
+  it('retries shell user lookup after auth reconciliation when the clerk row is missing', async () => {
+    withDbSessionTxMock.mockImplementation(async handler => {
+      const profile = {
+        id: 'profile_1',
+        userId: 'user_db_1',
+        username: 'tim',
+        usernameNormalized: 'tim',
+        displayName: 'Tim White',
+        isPublic: true,
+        onboardingCompletedAt: new Date('2026-03-31T00:00:00.000Z'),
+        createdAt: new Date('2026-03-31T00:00:00.000Z'),
+        updatedAt: new Date('2026-03-31T00:00:00.000Z'),
+      };
+
+      const tx = {
+        select: vi
+          .fn()
+          .mockReturnValueOnce({
+            from: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue([]),
+              }),
+            }),
+          })
+          .mockReturnValueOnce({
+            from: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue([
+                  {
+                    id: 'user_db_1',
+                    email: 'user@example.com',
+                    activeProfileId: 'profile_1',
+                  },
+                ]),
+              }),
+            }),
+          })
+          .mockReturnValueOnce({
+            from: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                orderBy: vi.fn().mockResolvedValue([profile]),
+              }),
+            }),
+          }),
+      };
+
+      return handler(tx, 'user_123');
+    });
+
+    const { getDashboardShellData } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+
+    const result = await getDashboardShellData('user_123');
+
+    expect(resolveUserStateMock).toHaveBeenCalledWith({
+      createDbUserIfMissing: true,
+    });
+    expect(result.user?.id).toBe('user_db_1');
+    expect(result.selectedProfile?.id).toBe('profile_1');
+    expect(result.needsOnboarding).toBe(false);
+  });
+
+  it('refreshes shell data when the cached snapshot has no selected profile', async () => {
+    const recoveredProfile = {
+      id: 'profile_1',
+      username: 'tim',
+      displayName: 'Tim White',
+      isPublic: true,
+      onboardingCompletedAt: new Date('2026-03-31T00:00:00.000Z'),
+      createdAt: new Date('2026-03-31T00:00:00.000Z'),
+      updatedAt: new Date('2026-03-31T00:00:00.000Z'),
+    };
+
+    withDbSessionTxMock
+      .mockResolvedValueOnce({
+        ...baseDashboardResponse,
+        creatorProfiles: [],
+        selectedProfile: null,
+        needsOnboarding: true,
+      })
+      .mockResolvedValueOnce({
+        ...baseDashboardResponse,
+        creatorProfiles: [recoveredProfile],
+        selectedProfile: recoveredProfile,
+        needsOnboarding: false,
+      });
+
+    const { getDashboardShellData } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+
+    const result = await getDashboardShellData('user_123');
+
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(2);
+    expect(result.selectedProfile?.id).toBe('profile_1');
+    expect(result.needsOnboarding).toBe(false);
   });
 });
 

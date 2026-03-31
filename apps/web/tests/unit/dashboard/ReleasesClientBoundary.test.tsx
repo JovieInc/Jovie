@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ReleasesClientBoundary } from '@/app/app/(shell)/dashboard/releases/ReleasesClientBoundary';
 
@@ -13,14 +12,8 @@ vi.mock('@/components/organisms/AuthShellWrapper', () => ({
   }),
 }));
 
-vi.mock('@/lib/queries', () => ({
-  QueryErrorBoundary: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
-}));
-
 describe('ReleasesClientBoundary', () => {
-  it('renders children through the query error boundary', () => {
+  it('renders children and clears the releases pending shell', () => {
     render(
       <ReleasesClientBoundary>
         <div>ready</div>
