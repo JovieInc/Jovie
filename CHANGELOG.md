@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.3.111] - 2026-03-31
+
+> Replaced the swipe-driven profile V2 shell with a single-scroll layout, simplified legacy mode handling, and expanded the public-profile social link cap to match the new UX.
+
+### Added
+
+- Added `ProfileScrollBody` to compose profile V2 sections in a single scroll surface
+
+### Changed
+
+- Public profile V2 now renders bio, social links, featured content, tour dates, and action rows in one continuous scroll flow
+- Profile V2 hero now uses a shorter image treatment with the adaptive primary action beside the play control
+- Legacy `?mode=tour` links now scroll to the tour section while listen, subscribe, contact, and tip continue opening drawers
+
+### Fixed
+
+- Synced the shared header social-link cap helper to four links and updated regression coverage for the new limit
+
 ## [26.3.109] - 2026-03-31
 
 ## [26.3.110] - 2026-03-31
