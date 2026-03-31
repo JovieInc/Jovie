@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.107] - 2026-03-30
+## [26.3.107] - 2026-03-30
+
+> Dashboard surfaces and shared controls now use a flatter, more consistent visual system. This update also tightens responsive audience layouts and keeps insight generation focused on fresher, higher-signal results.
 
 ### Changed
 
@@ -18,7 +20,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- Regression coverage for the flatter content-surface and pill-control classes across dashboard and settings UI primitives
+- [internal] Regression coverage for the flatter content-surface and pill-control classes across dashboard and settings UI primitives
 - Repeated insight generation now avoids recycling stale signals when the underlying metric slice has not changed
 - Cron insights concurrency test timeout increased to reflect the observed route import cost in CI-like environments
 - Analytics no longer default-opens into the full-screen mobile drawer on first load; it now opens after mount on desktop and closes when crossing down to mobile

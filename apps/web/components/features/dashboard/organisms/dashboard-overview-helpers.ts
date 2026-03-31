@@ -42,7 +42,7 @@ export function getIncompleteTaskIndicatorClass(): string {
  * Get the task label text class for a completed task.
  */
 export function getCompletedTaskLabelClass(): string {
-  return `${TASK_LABEL_BASE} text-tertiary-token line-through decoration-(--linear-text-tertiary)/40`;
+  return `${TASK_LABEL_BASE} text-tertiary-token line-through`;
 }
 
 /**
