@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.3.109] - 2026-03-31
+
+> Fixed duplicate platform icons and truncated names on the DSP Presence page, plus added screen-reader description to the Add Platform dialog.
+
+### Fixed
+
+- Removed duplicate platform icon appearing in presence table rows
+- Fixed truncated platform names in the Add Platform dialog by switching to a 3-column grid
+- Added accessible description to the Add Platform dialog for screen readers
+
 ## [26.3.108] - 2026-03-30
 
 > Reduced dashboard movement during loading so the shell appears immediately, chat loads more smoothly, and the side drawer no longer jumps on first paint.
