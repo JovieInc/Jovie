@@ -183,7 +183,7 @@ describe('JovieChat empty state', () => {
 
     expect(getByText('Welcome to Jovie')).toBeTruthy();
     expect(getByText('Ask anything or tell Jovie what you need')).toBeTruthy();
-    expect(getByText('Get Started With Some Examples')).toBeTruthy();
+    expect(getByText('Examples')).toBeTruthy();
     expect(getByText('Preview profile')).toBeTruthy();
     expect(getByText('Change photo')).toBeTruthy();
     expect(getByText('Release link')).toBeTruthy();

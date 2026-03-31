@@ -10,6 +10,7 @@ import {
   DrawerSurfaceCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/types';
 
@@ -133,6 +134,13 @@ export function AdminUserDetailDrawer({
       title='User details'
       onClose={onClose}
       headerMode='minimal'
+      headerActions={
+        <DrawerHeaderActions
+          primaryActions={[]}
+          menuItems={contextMenuItems}
+          onClose={onClose}
+        />
+      }
       contextMenuItems={contextMenuItems}
       isEmpty={!hasUser}
       emptyMessage='Select a user to view details.'

@@ -239,7 +239,7 @@ export function TourDateSidebar({
         headerActions={
           <DrawerHeaderActions
             primaryActions={[]}
-            overflowActions={[]}
+            menuItems={contextMenuItems}
             onClose={onClose}
           />
         }

@@ -8,17 +8,7 @@
  */
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import {
-  Copy,
-  ExternalLink,
-  Pause,
-  Play,
-  Plus,
-  RefreshCw,
-  Settings2,
-  Sparkles,
-  X,
-} from 'lucide-react';
+import { Pause, Play, Plus, RefreshCw, Settings2 } from 'lucide-react';
 import {
   type ReactNode,
   useCallback,
@@ -42,18 +32,20 @@ import {
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
+import { convertToCommonDropdownItems } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from '@/features/release/AlbumArtworkContextMenu';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { ProviderKey, ReleaseSidebarTrack } from '@/lib/discography/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
 import { ReleaseLyricsSection } from './ReleaseLyricsSection';
@@ -292,95 +284,6 @@ function ReleaseSettingsCard({
   );
 }
 
-function buildContextMenuItems(
-  release: Release | null,
-  artistName: string | null | undefined,
-  handleCopySmartLink: () => void,
-  onRefresh: (() => void) | undefined,
-  isRefreshing: boolean
-): CommonDropdownItem[] {
-  if (!release) return [];
-
-  const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
-  const items: CommonDropdownItem[] = [];
-
-  const utmContext = buildUTMContext({
-    smartLinkUrl,
-    releaseSlug: release.slug,
-    releaseTitle: release.title,
-    artistName,
-    releaseDate: release.releaseDate,
-  });
-
-  items.push(
-    {
-      type: 'action',
-      id: 'copy-url',
-      label: 'Copy smart link',
-      icon: <Copy className='h-4 w-4' />,
-      onClick: () => {
-        handleCopySmartLink();
-      },
-    },
-    {
-      type: 'action',
-      id: 'open-release',
-      label: 'Open release',
-      icon: <ExternalLink className='h-4 w-4' />,
-      onClick: () => globalThis.open(smartLinkUrl, '_blank'),
-    },
-    // UTM share presets
-    ...getUTMShareDropdownItems({
-      smartLinkUrl,
-      context: utmContext,
-    })
-  );
-
-  // "Copy Use Sound link" — only when release has video provider links
-  if (release.hasVideoLinks) {
-    const soundsUrl = `${getBaseUrl()}${release.smartLinkPath}/sounds`;
-    items.push(
-      { type: 'separator', id: 'sep-sounds' },
-      {
-        type: 'action',
-        id: 'copy-sounds-link',
-        label: 'Copy Use Sound link',
-        icon: <Sparkles className='h-4 w-4' />,
-        onClick: () => {
-          navigator.clipboard
-            ?.writeText(soundsUrl)
-            .then(() => {
-              toast.success('Use Sound link copied');
-            })
-            .catch(() => {
-              // Silently fail
-            });
-        },
-      }
-    );
-  }
-
-  items.push(
-    { type: 'separator', id: 'sep-actions' },
-    {
-      type: 'action',
-      id: 'refresh',
-      label: isRefreshing ? 'Refreshing…' : 'Refresh',
-      icon: <RefreshCw className='h-4 w-4' />,
-      onClick: () => {
-        if (isRefreshing) return;
-        if (onRefresh) {
-          onRefresh();
-        } else {
-          globalThis.location.reload();
-        }
-      },
-    }
-  );
-
-  return items;
-}
-
 export function ReleaseSidebar({
   release,
   mode,
@@ -425,7 +328,6 @@ export function ReleaseSidebar({
     isRemovingDspLink,
     handleArtworkUpload,
     handleArtworkRevert,
-    handleCopySmartLink,
     handleAddLink,
     handleRemoveLink,
     handleNewLinkKeyDown,
@@ -557,40 +459,66 @@ export function ReleaseSidebar({
     }).catch(() => {});
   }, [toggleTrack, release]);
 
-  const contextMenuItems = useMemo<CommonDropdownItem[]>(
-    () =>
-      buildContextMenuItems(
-        release,
-        artistName,
-        handleCopySmartLink,
-        onRefresh,
-        isRefreshing
-      ),
-    [release, handleCopySmartLink, onRefresh, isRefreshing, artistName]
+  const handleCopyReleasePath = useCallback(
+    async (path: string, label: string) => {
+      const copied = await copyToClipboard(`${getBaseUrl()}${path}`);
+
+      if (copied) {
+        toast.success(`${label} copied`);
+        return `${getBaseUrl()}${path}`;
+      }
+
+      toast.error(`Failed to copy ${label.toLowerCase()}`);
+      return undefined;
+    },
+    []
   );
 
-  const { headerLabel, overflowActions } = useReleaseHeaderParts({
+  const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
+    if (!release) return [];
+
+    const items = convertToCommonDropdownItems(
+      buildReleaseActions({
+        release,
+        onEdit: () => {
+          setSelectedTrack(null);
+          setActiveTab('links');
+        },
+        onCopy: (path, label) => handleCopyReleasePath(path, label),
+        artistName,
+      })
+    );
+
+    return [
+      ...items,
+      {
+        type: 'separator',
+        id: 'release-sidebar-separator-refresh',
+      },
+      {
+        type: 'action',
+        id: 'refresh-release',
+        label: isRefreshing ? 'Refreshing release…' : 'Refresh release',
+        icon: <RefreshCw className='h-4 w-4' />,
+        onClick: () => {
+          if (isRefreshing) return;
+          if (onRefresh) {
+            onRefresh();
+            return;
+          }
+          globalThis.location.reload();
+        },
+        disabled: isRefreshing,
+      },
+    ];
+  }, [release, handleCopyReleasePath, artistName, isRefreshing, onRefresh]);
+
+  const { headerLabel } = useReleaseHeaderParts({
     release,
     hasRelease,
     onRefresh,
     isRefreshing,
   });
-
-  const cardOverflowActions = useMemo(
-    () =>
-      onClose
-        ? [
-            ...overflowActions,
-            {
-              id: 'close-drawer',
-              label: 'Close details',
-              icon: X,
-              onClick: onClose,
-            },
-          ]
-        : overflowActions,
-    [onClose, overflowActions]
-  );
 
   const availablePlatformProviders = useMemo(() => {
     if (!release) {
@@ -708,8 +636,9 @@ export function ReleaseSidebar({
               actionBar={
                 <DrawerCardActionBar
                   primaryActions={[]}
-                  overflowActions={cardOverflowActions}
+                  menuItems={contextMenuItems}
                   overflowTriggerIcon='vertical'
+                  onClose={onClose}
                   className='border-0 bg-transparent px-0 py-0'
                 />
               }

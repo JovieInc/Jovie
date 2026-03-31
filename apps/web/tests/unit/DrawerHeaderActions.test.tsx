@@ -81,4 +81,40 @@ describe('DrawerHeaderActions', () => {
       expect.objectContaining({ id: 'close-drawer', label: 'Close' }),
     ]);
   });
+
+  it('reuses shared dropdown menu items when menuItems is provided', () => {
+    render(
+      <DrawerHeaderActions
+        primaryActions={[]}
+        menuItems={[
+          {
+            type: 'submenu',
+            id: 'share',
+            label: 'Share',
+            items: [
+              {
+                type: 'action',
+                id: 'copy-link',
+                label: 'Copy link',
+                onClick: vi.fn(),
+              },
+            ],
+          },
+        ]}
+      />
+    );
+
+    expect(tableActionMenuSpy).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: 'share',
+        label: 'Share',
+        children: [
+          expect.objectContaining({
+            id: 'copy-link',
+            label: 'Copy link',
+          }),
+        ],
+      }),
+    ]);
+  });
 });

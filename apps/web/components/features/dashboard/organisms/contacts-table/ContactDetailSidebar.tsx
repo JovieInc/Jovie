@@ -219,11 +219,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     [contact, onUpdate, debouncedSave]
   );
 
-  const {
-    title: headerTitle,
-    primaryActions,
-    overflowActions,
-  } = useContactDetailHeaderParts({
+  const { title: headerTitle, primaryActions } = useContactDetailHeaderParts({
     role: contact?.role ?? 'other',
     customLabel: contact?.customLabel,
     email: contact?.email,
@@ -336,7 +332,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             </div>
             <DrawerCardActionBar
               primaryActions={primaryActions}
-              overflowActions={overflowActions}
+              menuItems={contextMenuItems}
               onClose={handleClose}
               overflowTriggerPlacement='card-top-right'
               className='mx-[-12px] mt-3'

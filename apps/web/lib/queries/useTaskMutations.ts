@@ -17,6 +17,18 @@ import type {
 import { queryKeys } from './keys';
 
 type TaskStatsStatusKey = Exclude<keyof TaskStats, 'activeTodoCount'>;
+type TaskListCacheEntry = readonly [
+  readonly unknown[],
+  TaskListResult | undefined,
+];
+type TaskDetailCacheEntry = readonly [readonly unknown[], TaskView | undefined];
+type TaskStatsCacheEntry = readonly [readonly unknown[], TaskStats | undefined];
+
+interface TaskCacheSnapshot {
+  readonly previousLists: TaskListCacheEntry[];
+  readonly previousDetails: TaskDetailCacheEntry[];
+  readonly previousStatsEntries: TaskStatsCacheEntry[];
+}
 
 function toTaskStatsStatusKey(status: TaskView['status']): TaskStatsStatusKey {
   return status === 'in_progress' ? 'inProgress' : status;
@@ -40,12 +52,8 @@ function updateTaskInList(
 }
 
 function getCachedTask(
-  previousLists: ReadonlyArray<
-    readonly [readonly unknown[], TaskListResult | undefined]
-  >,
-  previousDetails: ReadonlyArray<
-    readonly [readonly unknown[], TaskView | undefined]
-  >,
+  previousLists: ReadonlyArray<TaskListCacheEntry>,
+  previousDetails: ReadonlyArray<TaskDetailCacheEntry>,
   taskId: string
 ): TaskView | undefined {
   for (const [, detail] of previousDetails) {
@@ -62,6 +70,60 @@ function getCachedTask(
   }
 
   return undefined;
+}
+
+function getTaskCacheSnapshot(
+  queryClient: ReturnType<typeof useQueryClient>,
+  taskId: string
+): TaskCacheSnapshot {
+  return {
+    previousLists: queryClient.getQueriesData<TaskListResult>({
+      queryKey: queryKeys.tasks.list(),
+    }),
+    previousDetails: queryClient.getQueriesData<TaskView>({
+      queryKey: queryKeys.tasks.detail(taskId),
+    }),
+    previousStatsEntries: queryClient.getQueriesData<TaskStats>({
+      queryKey: queryKeys.tasks.stats(),
+    }),
+  };
+}
+
+function restoreTaskCacheSnapshot(
+  queryClient: ReturnType<typeof useQueryClient>,
+  snapshot: TaskCacheSnapshot
+) {
+  for (const [queryKey, list] of snapshot.previousLists) {
+    queryClient.setQueryData(queryKey, list);
+  }
+
+  for (const [queryKey, detail] of snapshot.previousDetails) {
+    if (detail) {
+      queryClient.setQueryData(queryKey, detail);
+    }
+  }
+
+  for (const [queryKey, stats] of snapshot.previousStatsEntries) {
+    if (stats) {
+      queryClient.setQueryData(queryKey, stats);
+    }
+  }
+}
+
+async function invalidateTaskQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  options: Readonly<{ includeStats?: boolean }> = {}
+) {
+  await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+  await queryClient.invalidateQueries({
+    queryKey: queryKeys.releaseTasks.all,
+  });
+
+  if (options.includeStats) {
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.tasks.stats(),
+    });
+  }
 }
 
 function getOptimisticCompletedAt(
@@ -137,10 +199,7 @@ export function useCreateTaskMutation() {
   return useMutation({
     mutationFn: (data: CreateTaskInput) => createTask(data),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releaseTasks.all,
-      });
+      await invalidateTaskQueries(queryClient);
     },
   });
 }
@@ -159,18 +218,10 @@ export function useUpdateTaskMutation() {
     onMutate: async ({ taskId, data }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.tasks.all });
 
-      const previousLists = queryClient.getQueriesData<TaskListResult>({
-        queryKey: queryKeys.tasks.list(),
-      });
-      const previousDetails = queryClient.getQueriesData<TaskView>({
-        queryKey: queryKeys.tasks.detail(taskId),
-      });
-      const previousStatsEntries = queryClient.getQueriesData<TaskStats>({
-        queryKey: queryKeys.tasks.stats(),
-      });
+      const snapshot = getTaskCacheSnapshot(queryClient, taskId);
       const previousTask = getCachedTask(
-        previousLists,
-        previousDetails,
+        snapshot.previousLists,
+        snapshot.previousDetails,
         taskId
       );
       const optimisticCompletedAt = getOptimisticCompletedAt(
@@ -178,7 +229,7 @@ export function useUpdateTaskMutation() {
         data.status
       );
 
-      for (const [queryKey, list] of previousLists) {
+      for (const [queryKey, list] of snapshot.previousLists) {
         queryClient.setQueryData(
           queryKey,
           updateTaskInList(list, taskId, {
@@ -188,7 +239,7 @@ export function useUpdateTaskMutation() {
         );
       }
 
-      for (const [queryKey, detail] of previousDetails) {
+      for (const [queryKey, detail] of snapshot.previousDetails) {
         if (!detail) {
           continue;
         }
@@ -204,7 +255,7 @@ export function useUpdateTaskMutation() {
       }
 
       if (previousTask && data.status) {
-        for (const [queryKey, stats] of previousStatsEntries) {
+        for (const [queryKey, stats] of snapshot.previousStatsEntries) {
           if (!stats) {
             continue;
           }
@@ -220,34 +271,17 @@ export function useUpdateTaskMutation() {
         }
       }
 
-      return { previousLists, previousDetails, previousStatsEntries };
+      return snapshot;
     },
     onError: (_error, { taskId }, context) => {
       if (!context) {
         return;
       }
 
-      for (const [queryKey, list] of context.previousLists) {
-        queryClient.setQueryData(queryKey, list);
-      }
-
-      for (const [queryKey, detail] of context.previousDetails) {
-        if (detail) {
-          queryClient.setQueryData(queryKey, detail);
-        }
-      }
-
-      for (const [queryKey, stats] of context.previousStatsEntries) {
-        if (stats) {
-          queryClient.setQueryData(queryKey, stats);
-        }
-      }
+      restoreTaskCacheSnapshot(queryClient, context);
     },
     onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releaseTasks.all,
-      });
+      await invalidateTaskQueries(queryClient);
     },
   });
 }
@@ -264,10 +298,7 @@ export function useBulkUpdateTasksMutation() {
       readonly data: UpdateTaskInput;
     }) => bulkUpdateTasks(taskIds, data),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releaseTasks.all,
-      });
+      await invalidateTaskQueries(queryClient);
     },
   });
 }
@@ -280,22 +311,14 @@ export function useDeleteTaskMutation() {
     onMutate: async taskId => {
       await queryClient.cancelQueries({ queryKey: queryKeys.tasks.all });
 
-      const previousLists = queryClient.getQueriesData<TaskListResult>({
-        queryKey: queryKeys.tasks.list(),
-      });
-      const previousDetails = queryClient.getQueriesData<TaskView>({
-        queryKey: queryKeys.tasks.detail(taskId),
-      });
-      const previousStatsEntries = queryClient.getQueriesData<TaskStats>({
-        queryKey: queryKeys.tasks.stats(),
-      });
+      const snapshot = getTaskCacheSnapshot(queryClient, taskId);
       const previousTask = getCachedTask(
-        previousLists,
-        previousDetails,
+        snapshot.previousLists,
+        snapshot.previousDetails,
         taskId
       );
 
-      for (const [queryKey, list] of previousLists) {
+      for (const [queryKey, list] of snapshot.previousLists) {
         if (!list) {
           continue;
         }
@@ -307,7 +330,7 @@ export function useDeleteTaskMutation() {
       }
 
       if (previousTask) {
-        for (const [queryKey, stats] of previousStatsEntries) {
+        for (const [queryKey, stats] of snapshot.previousStatsEntries) {
           if (!stats) {
             continue;
           }
@@ -319,37 +342,17 @@ export function useDeleteTaskMutation() {
         }
       }
 
-      return { previousLists, previousDetails, previousStatsEntries };
+      return snapshot;
     },
     onError: (_error, taskId, context) => {
       if (!context) {
         return;
       }
 
-      for (const [queryKey, list] of context.previousLists) {
-        queryClient.setQueryData(queryKey, list);
-      }
-
-      for (const [queryKey, detail] of context.previousDetails) {
-        if (detail) {
-          queryClient.setQueryData(queryKey, detail);
-        }
-      }
-
-      for (const [queryKey, stats] of context.previousStatsEntries) {
-        if (stats) {
-          queryClient.setQueryData(queryKey, stats);
-        }
-      }
+      restoreTaskCacheSnapshot(queryClient, context);
     },
     onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releaseTasks.all,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.tasks.stats(),
-      });
+      await invalidateTaskQueries(queryClient, { includeStats: true });
     },
   });
 }

@@ -101,7 +101,15 @@ describe('share-menu-items', () => {
       context,
     });
 
-    const actionableItems = items.filter(
+    const submenu = items.find(
+      item => 'id' in item && item.id === 'utm-share-submenu'
+    );
+
+    if (!submenu || !('items' in submenu)) {
+      throw new Error('Expected submenu item in UTM context menu items');
+    }
+
+    const actionableItems = submenu.items.filter(
       item => 'onClick' in item && typeof item.onClick === 'function'
     );
     const iconById = Object.fromEntries(

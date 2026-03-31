@@ -210,6 +210,18 @@ export function PreviewPanel() {
       },
       {
         type: 'action',
+        id: 'open-profile',
+        label: 'Open profile in new tab',
+        icon: <ExternalLink className='h-3.5 w-3.5' />,
+        onClick: () =>
+          globalThis.open(profileUrl, '_blank', 'noopener,noreferrer'),
+      },
+      {
+        type: 'separator',
+        id: 'preview-panel-separator-downloads',
+      },
+      {
+        type: 'action',
         id: 'download-qr',
         label: 'Download QR Code',
         icon: <QrCode className='h-3.5 w-3.5' />,
@@ -223,7 +235,7 @@ export function PreviewPanel() {
         onClick: handleDownloadVcard,
       },
     ],
-    [handleCopyUrl, handleDownloadQr, handleDownloadVcard]
+    [handleCopyUrl, handleDownloadQr, handleDownloadVcard, profileUrl]
   );
 
   // Header actions using DrawerHeaderActions for consistent styling
@@ -245,26 +257,6 @@ export function PreviewPanel() {
       },
     ],
     [handleCopyUrl, isUrlCopied, profileUrl]
-  );
-
-  const overflowActions: DrawerHeaderAction[] = useMemo(
-    () => [
-      {
-        id: 'download-qr',
-        label: 'Download QR Code',
-        icon: QrCode,
-        onClick: () => {
-          handleDownloadQr();
-        },
-      },
-      {
-        id: 'download-vcard',
-        label: 'Download vCard',
-        icon: Download,
-        onClick: handleDownloadVcard,
-      },
-    ],
-    [handleDownloadQr, handleDownloadVcard]
   );
 
   if (!previewData) {
@@ -326,7 +318,7 @@ export function PreviewPanel() {
           actions={
             <DrawerHeaderActions
               primaryActions={primaryActions}
-              overflowActions={overflowActions}
+              menuItems={contextMenuItems}
               onClose={close}
             />
           }

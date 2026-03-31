@@ -15,6 +15,7 @@ const menuIcon = (
     | 'ExternalLink'
     | 'Lock'
     | 'Clock'
+    | 'Music'
     | 'Trash2'
     | 'Copy'
 ) => <Icon name={name} className='h-3.5 w-3.5' />;
@@ -63,21 +64,10 @@ export function buildReleaseActions({
   const locked = isSmartLinkLocked?.(release.id) ?? false;
   const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
   const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
+  const shareItems: ContextMenuItemType[] = [];
 
-  // ── Edit group ──
-  const items: ContextMenuItemType[] = [
-    {
-      id: 'edit',
-      label: 'Edit release links',
-      icon: menuIcon('PencilLine'),
-      onClick: () => onEdit(release),
-    },
-    { type: 'separator' },
-  ];
-
-  // ── Copy / share group ──
   if (locked) {
-    items.push({
+    shareItems.push({
       id: 'copy-smart-link',
       label:
         lockReason === 'scheduled'
@@ -86,59 +76,104 @@ export function buildReleaseActions({
       icon: menuIcon(lockReason === 'scheduled' ? 'Clock' : 'Lock'),
       disabled: true,
       onClick: () => {},
-    } as ContextMenuItemType);
-  } else {
-    items.push(
-      {
-        id: 'copy-smart-link',
-        label: 'Copy smart link',
-        icon: menuIcon('Copy'),
-        onClick: () => {
-          void onCopy(
-            release.smartLinkPath,
-            `${release.title} smart link`,
-            `smart-link-copy-${release.id}`
-          );
-        },
-      } as ContextMenuItemType,
-      // UTM share presets
-      ...getUTMShareContextMenuItems({
-        smartLinkUrl,
-        context: buildUTMContext({
-          smartLinkUrl,
-          releaseSlug: release.slug,
-          releaseTitle: release.title,
-          artistName,
-          releaseDate: release.releaseDate,
-        }),
-      })
-    );
-  }
-
-  // ── QR code (when handler provided) ──
-  if (onCopyQrCode) {
-    items.push({
-      id: 'copy-qr-code',
-      label: 'Copy QR code',
-      icon: qrCodeIcon,
-      onClick: onCopyQrCode,
     });
+  } else {
+    shareItems.push({
+      id: 'copy-smart-link',
+      label: 'Copy smart link',
+      icon: menuIcon('Copy'),
+      onClick: () => {
+        void onCopy(
+          release.smartLinkPath,
+          `${release.title} smart link`,
+          `smart-link-copy-${release.id}`
+        );
+      },
+    });
+
+    const utmShareItems = getUTMShareContextMenuItems({
+      smartLinkUrl,
+      context: buildUTMContext({
+        smartLinkUrl,
+        releaseSlug: release.slug,
+        releaseTitle: release.title,
+        artistName,
+        releaseDate: release.releaseDate,
+      }),
+    });
+
+    if (utmShareItems.length > 0) {
+      shareItems.push({ type: 'separator' }, ...utmShareItems);
+    }
+
+    if (release.hasVideoLinks) {
+      shareItems.push(
+        { type: 'separator' },
+        {
+          id: 'copy-sounds-link',
+          label: 'Copy Use Sound link',
+          icon: menuIcon('Music'),
+          onClick: () => {
+            void onCopy(
+              `${release.smartLinkPath}/sounds`,
+              `${release.title} sounds link`,
+              `sounds-link-copy-${release.id}`
+            );
+          },
+        }
+      );
+    }
+
+    if (onCopyQrCode) {
+      shareItems.push(
+        { type: 'separator' },
+        {
+          id: 'copy-qr-code',
+          label: 'Copy QR code',
+          icon: qrCodeIcon,
+          onClick: onCopyQrCode,
+        }
+      );
+    }
   }
 
-  // ── Metadata copy group ──
-  items.push(
-    { type: 'separator' },
-    ...buildCopyMenuItems([
-      { id: 'release-id', label: 'Release ID', value: release.id },
-      release.lyrics?.trim()
-        ? { id: 'lyrics', label: 'Lyrics', value: release.lyrics.trim() }
-        : null,
-      release.upc ? { id: 'upc', label: 'UPC', value: release.upc } : null,
-      release.primaryIsrc
-        ? { id: 'isrc', label: 'ISRC', value: release.primaryIsrc }
-        : null,
-    ])
-  );
+  const metadataItems = buildCopyMenuItems([
+    { id: 'release-id', label: 'Release ID', value: release.id },
+    release.lyrics?.trim()
+      ? { id: 'lyrics', label: 'Lyrics', value: release.lyrics.trim() }
+      : null,
+    release.upc ? { id: 'upc', label: 'UPC', value: release.upc } : null,
+    release.primaryIsrc
+      ? { id: 'isrc', label: 'ISRC', value: release.primaryIsrc }
+      : null,
+  ]);
+
+  const items: ContextMenuItemType[] = [
+    {
+      id: 'edit',
+      label: 'Edit release links',
+      icon: menuIcon('PencilLine'),
+      onClick: () => onEdit(release),
+    },
+    {
+      type: 'separator',
+    },
+    {
+      id: 'share-link',
+      label: 'Share link',
+      icon: menuIcon('Link2'),
+      items: shareItems,
+    },
+    {
+      type: 'separator',
+    },
+    {
+      id: 'copy-metadata',
+      label: 'Copy metadata',
+      icon: menuIcon('Hash'),
+      items: metadataItems,
+    },
+  ];
 
   // ── External provider links ──
   const supportedProviders = new Set<ProviderKey>([
@@ -159,17 +194,22 @@ export function buildReleaseActions({
   );
 
   if (externalProviders.length > 0) {
-    items.push({ type: 'separator' });
-    for (const provider of externalProviders) {
-      items.push({
-        id: `open-${provider.key}`,
-        label: `Open in ${providerLabels[provider.key] || provider.key}`,
+    items.push(
+      { type: 'separator' },
+      {
+        id: 'open-release',
+        label: 'Open in',
         icon: menuIcon('ExternalLink'),
-        onClick: () => {
-          globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
-        },
-      });
-    }
+        items: externalProviders.map(provider => ({
+          id: `open-${provider.key}`,
+          label: `Open in ${providerLabels[provider.key] || provider.key}`,
+          icon: menuIcon('ExternalLink'),
+          onClick: () => {
+            globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
+          },
+        })),
+      }
+    );
   }
 
   // ── Destructive group ──

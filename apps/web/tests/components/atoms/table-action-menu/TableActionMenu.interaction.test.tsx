@@ -44,6 +44,41 @@ describe('TableActionMenu interactions', () => {
     expect(screen.getByRole('menuitem', { name: 'Share' })).toBeInTheDocument();
   });
 
+  it('preserves nested submenu trees', async () => {
+    const user = userEvent.setup({ delay: null });
+
+    render(
+      <TableActionMenu
+        items={[
+          {
+            id: 'share',
+            label: 'Share',
+            children: [
+              {
+                id: 'copy-with-utm',
+                label: 'Copy with UTM',
+                children: [
+                  {
+                    id: 'instagram-story',
+                    label: 'Instagram Story',
+                    onClick: vi.fn(),
+                  },
+                ],
+              },
+            ],
+          },
+        ]}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+    await user.hover(screen.getByRole('menuitem', { name: 'Share' }));
+
+    expect(
+      await screen.findByRole('menuitem', { name: 'Copy with UTM' })
+    ).toBeInTheDocument();
+  });
+
   it('supports the custom trigger variant', async () => {
     const user = userEvent.setup({ delay: null });
 

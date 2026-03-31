@@ -35,9 +35,11 @@ const AUDIENCE_TAB_OPTIONS = [
 function AudienceMemberEntityHeader({
   member,
   onClose,
+  contextMenuItems,
 }: Readonly<{
   member: NonNullable<AudienceMemberSidebarProps['member']>;
   onClose: () => void;
+  contextMenuItems?: AudienceMemberSidebarProps['contextMenuItems'];
 }>) {
   const primaryLabel =
     member.displayName?.trim() ||
@@ -58,7 +60,7 @@ function AudienceMemberEntityHeader({
         <div className='absolute right-2.5 top-2.5'>
           <DrawerHeaderActions
             primaryActions={[]}
-            overflowActions={[]}
+            menuItems={contextMenuItems}
             onClose={onClose}
           />
         </div>
@@ -109,7 +111,11 @@ export function AudienceMemberSidebar({
       hideMinimalHeaderBar
       entityHeader={
         member ? (
-          <AudienceMemberEntityHeader member={member} onClose={onClose} />
+          <AudienceMemberEntityHeader
+            member={member}
+            onClose={onClose}
+            contextMenuItems={contextMenuItems}
+          />
         ) : undefined
       }
       tabs={

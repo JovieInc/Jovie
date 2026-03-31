@@ -62,7 +62,7 @@ export function AdminProfileSidebar({
     return mapContactLinksToPreviewLinks(contact);
   }, [contact]);
 
-  const { primaryActions, overflowActions } = useProfileHeaderParts({
+  const { primaryActions } = useProfileHeaderParts({
     username: profile?.username ?? '',
     displayName: profile?.displayName ?? profile?.username ?? '',
     profilePath: profile?.username ? `/${profile.username}` : '',
@@ -121,7 +121,7 @@ export function AdminProfileSidebar({
           </div>
           <DrawerCardActionBar
             primaryActions={primaryActions}
-            overflowActions={overflowActions}
+            menuItems={contextMenuItems}
             onClose={onClose}
             overflowTriggerPlacement='card-top-right'
           />

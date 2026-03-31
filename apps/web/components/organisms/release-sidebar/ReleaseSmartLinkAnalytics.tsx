@@ -70,27 +70,31 @@ function ReleaseSmartLinkControl({
 }) {
   const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
   const smartLinkLabel = smartLinkUrl.replace(/^https?:\/\//u, '');
-  const shareItems = useMemo(
-    () =>
-      getUTMShareDropdownItems({
-        smartLinkUrl,
-        context: buildUTMContext({
-          smartLinkUrl,
-          releaseSlug: release.slug,
-          releaseTitle: release.title,
-          artistName: artistName ?? release.artistNames?.[0],
-          releaseDate: release.releaseDate,
-        }),
-      }),
-    [
-      artistName,
-      release.artistNames,
-      release.releaseDate,
-      release.slug,
-      release.title,
+  const shareItems = useMemo(() => {
+    const items = getUTMShareDropdownItems({
       smartLinkUrl,
-    ]
-  );
+      context: buildUTMContext({
+        smartLinkUrl,
+        releaseSlug: release.slug,
+        releaseTitle: release.title,
+        artistName: artistName ?? release.artistNames?.[0],
+        releaseDate: release.releaseDate,
+      }),
+    });
+
+    if (items.length === 1 && items[0]?.type === 'submenu') {
+      return items[0].items;
+    }
+
+    return items;
+  }, [
+    artistName,
+    release.artistNames,
+    release.releaseDate,
+    release.slug,
+    release.title,
+    smartLinkUrl,
+  ]);
 
   return (
     <div className='space-y-1.5'>

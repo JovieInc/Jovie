@@ -10,6 +10,41 @@ import {
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import { queryKeys } from './keys';
 
+function getReleaseTasksQueryKey(releaseId: string) {
+  return queryKeys.releaseTasks.byRelease(releaseId);
+}
+
+function restoreReleaseTasksSnapshot(
+  queryClient: ReturnType<typeof useQueryClient>,
+  releaseId: string,
+  previous: ReleaseTaskView[] | undefined
+) {
+  if (previous) {
+    queryClient.setQueryData(getReleaseTasksQueryKey(releaseId), previous);
+  }
+}
+
+async function invalidateReleaseTaskQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  releaseId: string,
+  options: Readonly<{ includeAllReleaseTasks?: boolean }> = {}
+) {
+  await queryClient.invalidateQueries({
+    queryKey: getReleaseTasksQueryKey(releaseId),
+  });
+
+  if (options.includeAllReleaseTasks ?? true) {
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.releaseTasks.all,
+    });
+  }
+
+  await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
+  await queryClient.invalidateQueries({
+    queryKey: queryKeys.tasks.stats(),
+  });
+}
+
 /**
  * Shared hook for optimistic task toggle (used by both compact and full row).
  */
@@ -24,16 +59,16 @@ export function useTaskToggleMutation(releaseId: string) {
 
     onMutate: async ({ taskId, done }) => {
       await queryClient.cancelQueries({
-        queryKey: queryKeys.releaseTasks.byRelease(releaseId),
+        queryKey: getReleaseTasksQueryKey(releaseId),
       });
 
       const previous = queryClient.getQueryData<ReleaseTaskView[]>(
-        queryKeys.releaseTasks.byRelease(releaseId)
+        getReleaseTasksQueryKey(releaseId)
       );
 
       if (previous) {
         queryClient.setQueryData(
-          queryKeys.releaseTasks.byRelease(releaseId),
+          getReleaseTasksQueryKey(releaseId),
           previous.map(task =>
             task.id === taskId
               ? {
@@ -50,25 +85,11 @@ export function useTaskToggleMutation(releaseId: string) {
     },
 
     onError: (_err, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(
-          queryKeys.releaseTasks.byRelease(releaseId),
-          context.previous
-        );
-      }
+      restoreReleaseTasksSnapshot(queryClient, releaseId, context?.previous);
     },
 
     onSettled: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releaseTasks.byRelease(releaseId),
-      });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releaseTasks.all,
-      });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.tasks.stats(),
-      });
+      await invalidateReleaseTaskQueries(queryClient, releaseId);
     },
   });
 }
@@ -80,16 +101,7 @@ export function useInstantiateTasksMutation(releaseId: string) {
     mutationFn: () => instantiateReleaseTasks(releaseId),
 
     onSettled: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releaseTasks.byRelease(releaseId),
-      });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releaseTasks.all,
-      });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.tasks.stats(),
-      });
+      await invalidateReleaseTaskQueries(queryClient, releaseId);
     },
   });
 }
@@ -107,12 +119,8 @@ export function useUpdateTaskMutation(releaseId: string) {
     }) => updateReleaseTask(taskId, data),
 
     onSettled: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releaseTasks.byRelease(releaseId),
-      });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.tasks.stats(),
+      await invalidateReleaseTaskQueries(queryClient, releaseId, {
+        includeAllReleaseTasks: false,
       });
     },
   });
@@ -126,16 +134,7 @@ export function useAddTaskMutation(releaseId: string) {
       addReleaseTask(releaseId, data),
 
     onSettled: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releaseTasks.byRelease(releaseId),
-      });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releaseTasks.all,
-      });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.tasks.stats(),
-      });
+      await invalidateReleaseTaskQueries(queryClient, releaseId);
     },
   });
 }
@@ -148,16 +147,16 @@ export function useDeleteTaskMutation(releaseId: string) {
 
     onMutate: async taskId => {
       await queryClient.cancelQueries({
-        queryKey: queryKeys.releaseTasks.byRelease(releaseId),
+        queryKey: getReleaseTasksQueryKey(releaseId),
       });
 
       const previous = queryClient.getQueryData<ReleaseTaskView[]>(
-        queryKeys.releaseTasks.byRelease(releaseId)
+        getReleaseTasksQueryKey(releaseId)
       );
 
       if (previous) {
         queryClient.setQueryData(
-          queryKeys.releaseTasks.byRelease(releaseId),
+          getReleaseTasksQueryKey(releaseId),
           previous.filter(task => task.id !== taskId)
         );
       }
@@ -166,25 +165,11 @@ export function useDeleteTaskMutation(releaseId: string) {
     },
 
     onError: (_err, _taskId, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(
-          queryKeys.releaseTasks.byRelease(releaseId),
-          context.previous
-        );
-      }
+      restoreReleaseTasksSnapshot(queryClient, releaseId, context?.previous);
     },
 
     onSettled: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releaseTasks.byRelease(releaseId),
-      });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.releaseTasks.all,
-      });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.tasks.stats(),
-      });
+      await invalidateReleaseTaskQueries(queryClient, releaseId);
     },
   });
 }

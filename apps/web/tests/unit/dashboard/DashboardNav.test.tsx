@@ -1,138 +1,21 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
-import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { APP_ROUTES } from '@/constants/routes';
-import { DashboardNav } from '@/features/dashboard/dashboard-nav';
+import {
+  mockUsePathname,
+  mockUseTaskStatsQuery,
+  renderDashboardNav,
+  resetDashboardNavTestMocks,
+} from '@/tests/utils/dashboard-nav-test-support';
 import { fastRender } from '@/tests/utils/fast-render';
 
-// Mock Next.js router with controllable return value
-const mockUsePathname = vi.fn(() => '/app/chat');
-const mockUseTaskStatsQuery = vi.fn(() => ({ data: undefined }));
-vi.mock('next/navigation', () => ({
-  usePathname: () => mockUsePathname(),
-  useParams: () => ({}),
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
-}));
-
-vi.mock('@statsig/react-bindings', () => ({
-  useFeatureGate: () => ({ value: true }),
-  StatsigContext: React.createContext({ client: {} }),
-}));
-
-// Mock chat hooks used by RecentChats
-vi.mock('@/lib/queries/useChatConversationsQuery', () => ({
-  useChatConversationsQuery: () => ({ data: undefined }),
-}));
-
-vi.mock('@/lib/queries/useChatMutations', () => ({
-  useDeleteConversationMutation: () => ({
-    mutateAsync: vi.fn(),
-    isPending: false,
-  }),
-}));
-
-vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
-  usePreviewPanelState: () => ({
-    isOpen: false,
-    open: vi.fn(),
-    close: vi.fn(),
-    toggle: vi.fn(),
-  }),
-  usePreviewPanelData: () => ({
-    data: null,
-  }),
-  usePreviewPanel: () => ({
-    isOpen: false,
-    activeTab: null,
-    data: null,
-    open: vi.fn(),
-    close: vi.fn(),
-    toggle: vi.fn(),
-  }),
-}));
-
-vi.mock('@/lib/hooks/useNotifications', () => ({
-  useNotifications: () => ({ success: vi.fn(), error: vi.fn() }),
-}));
-
-vi.mock('@/lib/queries/useReleasesQuery', () => ({
-  useReleasesQuery: () => ({ data: undefined, isLoading: false }),
-}));
-
-vi.mock('@/lib/queries/useTasksQuery', () => ({
-  useTaskStatsQuery: (...args: unknown[]) => mockUseTaskStatsQuery(...args),
-}));
-
-// Mock @jovie/ui Tooltip components
-vi.mock('@jovie/ui', async () => {
-  const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
-
-  return {
-    ...actual,
-    Tooltip: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(React.Fragment, {}, children),
-    TooltipTrigger: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(React.Fragment, {}, children),
-    TooltipContent: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(React.Fragment, {}, children),
-    TooltipProvider: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(React.Fragment, {}, children),
-  };
-});
-
-const baseDashboardData: DashboardData = {
-  user: { id: 'user_123' },
-  creatorProfiles: [],
-  selectedProfile: null,
-  needsOnboarding: false,
-  sidebarCollapsed: false,
-  hasSocialLinks: false,
-  hasMusicLinks: false,
-  isAdmin: false,
-  tippingStats: {
-    tipClicks: 0,
-    qrTipClicks: 0,
-    linkTipClicks: 0,
-    tipsSubmitted: 0,
-    totalReceivedCents: 0,
-    monthReceivedCents: 0,
-  },
-  profileCompletion: {
-    percentage: 0,
-    completedCount: 0,
-    totalCount: 6,
-    steps: [],
-    profileIsLive: false,
-  },
-};
-
-function renderDashboardNav(
-  overrides: Partial<DashboardData> = {},
-  sidebarProps: React.ComponentProps<typeof SidebarProvider> = {}
-) {
-  const value: DashboardData = { ...baseDashboardData, ...overrides };
-
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+describe('DashboardNav', () => {
+  afterEach(() => {
+    resetDashboardNavTestMocks();
   });
 
-  return fastRender(
-    <QueryClientProvider client={queryClient}>
-      <DashboardDataProvider value={value}>
-        <SidebarProvider {...sidebarProps}>
-          <DashboardNav />
-        </SidebarProvider>
-      </DashboardDataProvider>
-    </QueryClientProvider>
-  );
-}
-
-describe('DashboardNav', () => {
   it('renders primary navigation items', () => {
-    const { getByRole } = renderDashboardNav();
+    const { getByRole } = renderDashboardNav({ renderFn: fastRender });
 
     expect(getByRole('button', { name: 'Profile' })).toBeDefined();
     expect(getByRole('link', { name: 'Releases' })).toBeDefined();
@@ -142,14 +25,17 @@ describe('DashboardNav', () => {
 
   it('applies active state to current page', () => {
     mockUsePathname.mockReturnValueOnce('/app/releases');
-    const { getByRole } = renderDashboardNav();
+    const { getByRole } = renderDashboardNav({ renderFn: fastRender });
 
     const activeLink = getByRole('link', { name: 'Releases' });
     expect(activeLink.getAttribute('aria-current')).toBe('page');
   });
 
   it('handles collapsed state', () => {
-    const { container } = renderDashboardNav({}, { defaultOpen: false });
+    const { container } = renderDashboardNav({
+      renderFn: fastRender,
+      sidebarProps: { defaultOpen: false },
+    });
 
     const profileButton = container.querySelector('button[aria-pressed]');
     expect(profileButton).toBeTruthy();
@@ -157,7 +43,7 @@ describe('DashboardNav', () => {
   });
 
   it('differentiates primary and secondary nav styling', () => {
-    const { container } = renderDashboardNav();
+    const { container } = renderDashboardNav({ renderFn: fastRender });
 
     const nav = container.querySelector('nav');
     const menus = nav?.querySelectorAll('[data-sidebar="menu"]') ?? [];
@@ -172,7 +58,10 @@ describe('DashboardNav', () => {
   });
 
   it('renders full admin navigation for admin users', () => {
-    const { getByRole } = renderDashboardNav({ isAdmin: true });
+    const { getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      overrides: { isAdmin: true },
+    });
 
     expect(getByRole('link', { name: 'People' }).getAttribute('href')).toBe(
       APP_ROUTES.ADMIN_PEOPLE
@@ -188,7 +77,7 @@ describe('DashboardNav', () => {
   it('renders with different pathname', () => {
     mockUsePathname.mockReturnValueOnce('/app/audience');
 
-    const { getByRole } = renderDashboardNav();
+    const { getByRole } = renderDashboardNav({ renderFn: fastRender });
 
     const audienceLink = getByRole('link', { name: 'Audience' });
     expect(audienceLink.getAttribute('aria-current')).toBe('page');
@@ -198,12 +87,15 @@ describe('DashboardNav', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.SETTINGS_ACCOUNT);
 
     const { getAllByText, getByRole, queryByText } = renderDashboardNav({
-      selectedProfile: {
-        id: 'profile_123',
-        displayName: 'Tim White',
-        username: 'tim',
-        usernameNormalized: 'tim',
-      } as DashboardData['selectedProfile'],
+      renderFn: fastRender,
+      overrides: {
+        selectedProfile: {
+          id: 'profile_123',
+          displayName: 'Tim White',
+          username: 'tim',
+          usernameNormalized: 'tim',
+        } as DashboardData['selectedProfile'],
+      },
     });
 
     expect(getAllByText('General').length).toBeGreaterThan(0);
@@ -218,12 +110,15 @@ describe('DashboardNav', () => {
     mockUsePathname.mockReturnValueOnce('/demo/showcase/settings');
 
     renderDashboardNav({
-      selectedProfile: {
-        id: 'profile_123',
-        displayName: 'Tim White',
-        username: 'tim',
-        usernameNormalized: 'tim',
-      } as DashboardData['selectedProfile'],
+      renderFn: fastRender,
+      overrides: {
+        selectedProfile: {
+          id: 'profile_123',
+          displayName: 'Tim White',
+          username: 'tim',
+          usernameNormalized: 'tim',
+        } as DashboardData['selectedProfile'],
+      },
     });
 
     expect(mockUseTaskStatsQuery).toHaveBeenCalledWith('profile_123', {
@@ -243,14 +138,7 @@ describe('DashboardNav', () => {
       },
     });
 
-    const { getByText } = renderDashboardNav({
-      selectedProfile: {
-        id: 'profile_123',
-        displayName: 'Tim White',
-        username: 'tim',
-        usernameNormalized: 'tim',
-      } as DashboardData['selectedProfile'],
-    });
+    const { getByText } = renderDashboardNav({ renderFn: fastRender });
 
     expect(getByText('7')).toBeDefined();
   });
