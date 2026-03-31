@@ -36,6 +36,7 @@ import {
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { runAutoApprove } from '@/lib/leads/auto-approve';
 import { resetBudgetIfNeeded, runDiscovery } from '@/lib/leads/discovery';
+import { processOutreachBatch } from '@/lib/leads/outreach-batch';
 import { pipelineWarn } from '@/lib/leads/pipeline-logger';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
@@ -55,6 +56,17 @@ interface SubJobResult {
   skipped?: boolean;
   error?: string;
   data?: Record<string, unknown>;
+}
+
+function getOutreachBatchSize(startTime: number): number {
+  const remainingMs = 50_000 - (Date.now() - startTime);
+  if (remainingMs <= 10_000) {
+    return 0;
+  }
+  if (remainingMs <= 20_000) {
+    return 5;
+  }
+  return 10;
 }
 
 async function runSubJob(
@@ -199,6 +211,27 @@ export async function GET(request: Request) {
       qualification: qualificationResult,
       autoApprove: autoApproveResult,
     } as unknown as Record<string, unknown>;
+  });
+
+  // 6.5 Outreach — send a batch of pending emails after auto-approve
+  results.outreach = await runSubJob('outreach', async () => {
+    const [settings] = await db
+      .select()
+      .from(leadPipelineSettings)
+      .where(eq(leadPipelineSettings.id, 1))
+      .limit(1);
+
+    if (settings?.enabled === false) {
+      return { skipped: true, reason: 'pipeline_disabled' };
+    }
+
+    const batchSize = getOutreachBatchSize(startTime);
+    if (batchSize === 0) {
+      return { skipped: true, reason: 'insufficient_budget' };
+    }
+
+    const outreachResult = await processOutreachBatch(batchSize);
+    return outreachResult as unknown as Record<string, unknown>;
   });
 
   // 7. Warm Spotify alphabet cache — every 6 hours

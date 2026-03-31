@@ -49,7 +49,6 @@
             ],
             "max-potential-fid": "warn",
             "mainthread-work-breakdown": "warn",
-            "forced-reflow-insight": "warn",
             "render-blocking-resources": "off",
             "render-blocking-insight": "off",
             "legacy-javascript-insight": "warn",
@@ -79,6 +78,7 @@
               }
             ],
             "is-crawlable": "off",
+            "forced-reflow-insight": "warn",
             "network-dependency-tree-insight": "off",
             "target-size": "warn",
             "digest-mismatch": "off"
