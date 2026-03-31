@@ -446,19 +446,19 @@ export function ChatPageClient({
 
         clearRetryTimeout();
         setWelcomeChatBootstrapStatus('idle');
-        bootstrapWelcomeChat().catch(() => {
-          if (!controller?.signal.aborted && isActive) {
-            scheduleRetry(null);
-          }
-        });
+        attemptBootstrap();
       }, delay);
     };
 
-    bootstrapWelcomeChat().catch(() => {
-      if (!controller?.signal.aborted && isActive) {
-        scheduleRetry(null);
-      }
-    });
+    const attemptBootstrap = () => {
+      bootstrapWelcomeChat().catch(() => {
+        if (!controller?.signal.aborted && isActive) {
+          scheduleRetry(null);
+        }
+      });
+    };
+
+    attemptBootstrap();
 
     return () => {
       isActive = false;
