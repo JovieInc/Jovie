@@ -209,40 +209,40 @@ export const cardTokens = {
  * Tier-1 content surfaces stay border-defined and flat, while sidebars,
  * drawers, and popovers retain the stronger floating treatment.
  */
-const elevatedSidebarCardShadow = 'shadow-[var(--linear-app-drawer-shadow)]';
+const elevatedSidebarCardShadow = 'shadow-none';
 
 export const LINEAR_SURFACE = {
   /** Drawer section card — border-separated section inside sidebars. */
-  drawerCard: `rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) ${elevatedSidebarCardShadow}`,
+  drawerCard: `rounded-[10px] border-subtle bg-surface-1 ${elevatedSidebarCardShadow}`,
 
   /** Smaller drawer section card — inline property groups. */
-  drawerCardSm: `rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) ${elevatedSidebarCardShadow}`,
+  drawerCardSm: `rounded-[10px] border-subtle bg-surface-1 ${elevatedSidebarCardShadow}`,
 
   /** Primary sidebar card — header/analytics cards in sidebars. */
-  sidebarCard: `rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) ${elevatedSidebarCardShadow}`,
+  sidebarCard: `rounded-[10px] border-subtle bg-surface-1 ${elevatedSidebarCardShadow}`,
 
   /** Content container — wraps tables, mobile lists, empty states. */
   contentContainer:
-    'rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-none',
+    'rounded-xl border-subtle bg-surface-1 shadow-none',
 
   /** Banner/callout card. */
   bannerCard:
-    'rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-none',
+    'rounded-xl border-subtle bg-surface-1 shadow-none',
 
   /** Dialog inner card — sections inside dialogs. */
   dialogCard:
-    'rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-none',
+    'rounded-xl border-subtle bg-surface-1 shadow-none',
 
   /** Sticky header — toolbar-like headers with backdrop blur. */
   stickyHeader:
-    'border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
+    'border-subtle bg-surface-1',
 
   /** Toolbar / popover / dropdown — same surface. */
-  toolbar: 'border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
+  toolbar: 'border-subtle bg-surface-1',
 
   /** Popover container — the ONE surface that gets a shadow (floats above content). */
   popover:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-[var(--shadow-popover)]',
+    'rounded-[10px] border-subtle bg-surface-1 p-0 shadow-popover',
 } as const;
 
 export const LINEAR_SURFACE_TIER = {

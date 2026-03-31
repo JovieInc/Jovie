@@ -21,6 +21,12 @@ interface AudienceTableStableContextValue {
   readonly onSendNotification: (member: AudienceMember) => void;
   /** Get touring city info for a member (returns null if not in a touring city) */
   readonly getTouringCity: (member: AudienceMember) => TouringCityInfo | null;
+  /** Indicates which metadata columns are currently hidden from the desktop table. */
+  readonly hiddenMetadataColumns: {
+    readonly location: boolean;
+    readonly engagement: boolean;
+    readonly lastSeen: boolean;
+  };
 }
 
 /**

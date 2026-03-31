@@ -46,9 +46,9 @@ export function DashboardHeader({
         <h1 className='text-[17px] font-[560] leading-tight tracking-[-0.018em] text-primary-token'>
           {currentLabel}
         </h1>
-        <div className='flex items-center gap-2'>
+            <div className='flex items-center gap-2'>
           {action ? (
-            <div className='flex items-center gap-1 rounded-full border border-subtle bg-surface-1 p-1 [&_button]:h-8 [&_button]:rounded-full [&_button]:shadow-none [&_button>svg]:h-4 [&_button>svg]:w-4'>
+            <div className='flex items-center gap-1 rounded-full border border-subtle bg-surface-0 p-1 [&_button]:h-8 [&_button]:rounded-full [&_button]:shadow-none [&_button>svg]:h-4 [&_button>svg]:w-4'>
               {action}
             </div>
           ) : (
