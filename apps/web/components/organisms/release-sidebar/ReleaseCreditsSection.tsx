@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import type { SmartLinkCreditGroup as CreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import {
   DrawerPropertyRow,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
-import type { CreditGroup } from './credits-types';
 import { fetchReleaseCreditsAction } from './release-credits-action';
 
 const LABEL_CLASSNAME =

@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
+import { DSP_PROVIDER_IDS } from '@/lib/dsp-provider-metadata';
+import { DSP_REGISTRY } from '@/lib/dsp-registry';
 import { cn } from '@/lib/utils';
 import { getContrastSafeIconColor } from '@/lib/utils/color';
 
@@ -15,33 +17,27 @@ export interface DspProviderIconProps {
   readonly showLabel?: boolean;
 }
 
-const PROVIDER_LABELS: Record<DspProviderId, string> = {
-  spotify: 'Spotify',
-  apple_music: 'Apple Music',
-  deezer: 'Deezer',
-  youtube_music: 'YouTube Music',
-  tidal: 'Tidal',
-  soundcloud: 'SoundCloud',
-  amazon_music: 'Amazon Music',
-  musicbrainz: 'MusicBrainz',
-  genius: 'Genius',
-  discogs: 'Discogs',
-  allmusic: 'AllMusic',
-};
+const PROVIDER_LABELS: Record<DspProviderId, string> = DSP_PROVIDER_IDS.reduce(
+  (acc, providerId) => {
+    const entry = DSP_REGISTRY.find(item => item.key === providerId);
+    if (entry) {
+      acc[providerId] = entry.name;
+    }
+    return acc;
+  },
+  {} as Record<DspProviderId, string>
+);
 
-const PROVIDER_COLORS: Record<DspProviderId, string> = {
-  spotify: '#1DB954',
-  apple_music: '#FA243C',
-  deezer: '#FEAA2D',
-  youtube_music: '#FF0000',
-  tidal: '#000000',
-  soundcloud: '#FF5500',
-  amazon_music: '#00A8E1',
-  musicbrainz: '#BA478F',
-  genius: '#FFFF64',
-  discogs: '#333333',
-  allmusic: '#E0344B',
-};
+const PROVIDER_COLORS: Record<DspProviderId, string> = DSP_PROVIDER_IDS.reduce(
+  (acc, providerId) => {
+    const entry = DSP_REGISTRY.find(item => item.key === providerId);
+    if (entry) {
+      acc[providerId] = entry.color;
+    }
+    return acc;
+  },
+  {} as Record<DspProviderId, string>
+);
 
 const SIZE_CLASSES = {
   sm: 'h-4 w-4',

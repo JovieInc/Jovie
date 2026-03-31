@@ -21,6 +21,7 @@ import {
   creatorAvatarCandidates,
   creatorProfiles,
 } from '@/lib/db/schema/profiles';
+import { DSP_PROVIDER_AVATAR_CONFIDENCE } from '@/lib/dsp-provider-metadata';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { setEnrichmentJobStatus } from '../enrichment-status';
@@ -94,9 +95,9 @@ const DSP_AVATAR_CONFIDENCE: Record<DspProviderId, number> = {
   soundcloud: 0.7, // More indie/DIY
   amazon_music: 0.7, // Less artist-focused
   musicbrainz: 0.6, // Community-sourced, variable quality
-  genius: 0.3, // Metadata-only, no artist images
-  discogs: 0.4, // Community-sourced, variable quality
-  allmusic: 0.35, // Editorial, limited images
+  genius: DSP_PROVIDER_AVATAR_CONFIDENCE.genius ?? 0.3, // Metadata-only, no artist images
+  discogs: DSP_PROVIDER_AVATAR_CONFIDENCE.discogs ?? 0.4, // Community-sourced, variable quality
+  allmusic: DSP_PROVIDER_AVATAR_CONFIDENCE.allmusic ?? 0.35, // Editorial, limited images
 };
 
 // ============================================================================

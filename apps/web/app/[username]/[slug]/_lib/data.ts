@@ -17,6 +17,7 @@ import {
   discogReleaseTracks,
   discogTracks,
   providerLinks,
+  recordingArtists,
   releaseArtists,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -25,9 +26,9 @@ import { toISOStringOrNull } from '@/lib/utils/date';
 
 export type ContentType = 'release' | 'track';
 type HiddenCreditRole = 'vs' | 'with';
-type SmartLinkCreditRole = Exclude<ArtistRole, HiddenCreditRole>;
+export type SmartLinkCreditRole = Exclude<ArtistRole, HiddenCreditRole>;
 
-const CREDIT_ROLE_ORDER: SmartLinkCreditRole[] = [
+export const CREDIT_ROLE_ORDER: readonly SmartLinkCreditRole[] = [
   'main_artist',
   'featured_artist',
   'producer',
@@ -42,7 +43,7 @@ const CREDIT_ROLE_ORDER: SmartLinkCreditRole[] = [
   'other',
 ];
 
-const CREDIT_ROLE_LABELS: Record<SmartLinkCreditRole, string> = {
+export const CREDIT_ROLE_LABELS: Record<SmartLinkCreditRole, string> = {
   main_artist: 'Primary artist',
   featured_artist: 'Featured artist',
   producer: 'Producer',
@@ -57,7 +58,7 @@ const CREDIT_ROLE_LABELS: Record<SmartLinkCreditRole, string> = {
   other: 'Additional credits',
 };
 
-function normalizeCreditRole(role: ArtistRole): SmartLinkCreditRole {
+export function normalizeCreditRole(role: ArtistRole): SmartLinkCreditRole {
   if (role === 'vs' || role === 'with') {
     return 'other';
   }
@@ -65,9 +66,8 @@ function normalizeCreditRole(role: ArtistRole): SmartLinkCreditRole {
   return role;
 }
 
-function getRoleOrder(role: SmartLinkCreditRole): number {
-  return CREDIT_ROLE_ORDER.indexOf(role);
-}
+export const getRoleOrder = (role: SmartLinkCreditRole): number =>
+  CREDIT_ROLE_ORDER.indexOf(role);
 
 export interface SmartLinkCreditEntry {
   artistId: string;
@@ -83,7 +83,7 @@ export interface SmartLinkCreditGroup {
   entries: SmartLinkCreditEntry[];
 }
 
-function groupReleaseCredits(
+export function groupReleaseCredits(
   rows: Array<{
     artistId: string;
     artistName: string;
@@ -150,6 +150,27 @@ async function fetchReleaseCredits(
     .leftJoin(creatorProfiles, eq(artists.creatorProfileId, creatorProfiles.id))
     .where(eq(releaseArtists.releaseId, releaseId))
     .orderBy(releaseArtists.position);
+
+  return groupReleaseCredits(rows);
+}
+
+async function fetchRecordingCredits(
+  recordingId: string
+): Promise<SmartLinkCreditGroup[]> {
+  const rows = await db
+    .select({
+      artistId: artists.id,
+      artistName: artists.name,
+      creditName: recordingArtists.creditName,
+      handle: creatorProfiles.usernameNormalized,
+      role: recordingArtists.role,
+      position: recordingArtists.position,
+    })
+    .from(recordingArtists)
+    .innerJoin(artists, eq(recordingArtists.artistId, artists.id))
+    .leftJoin(creatorProfiles, eq(artists.creatorProfileId, creatorProfiles.id))
+    .where(eq(recordingArtists.recordingId, recordingId))
+    .orderBy(recordingArtists.position);
 
   return groupReleaseCredits(rows);
 }
@@ -375,7 +396,7 @@ const fetchContentBySlug = async (
 
     const releaseId = rt?.releaseId;
 
-    const [releaseData, links] = await Promise.all([
+    const [releaseData, links, credits] = await Promise.all([
       releaseId
         ? db
             .select({
@@ -403,6 +424,7 @@ const fetchContentBySlug = async (
               )
             )
         : Promise.resolve([]),
+      fetchRecordingCredits(recording.id),
     ]);
 
     return {
@@ -417,6 +439,7 @@ const fetchContentBySlug = async (
       releaseId: releaseId ?? null,
       releaseSlug: releaseData?.slug ?? null,
       releaseTitle: releaseData?.title ?? null,
+      credits,
     };
   }
 
