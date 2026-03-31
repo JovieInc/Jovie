@@ -252,7 +252,7 @@ function TrackItem({
   return (
     <div
       className={cn(
-        'group flex items-start gap-2 rounded-[10px] border border-transparent bg-transparent px-2 py-1.5 shadow-none transition-[background-color] duration-150 hover:bg-surface-0 focus-within:bg-surface-0'
+        'group flex items-start gap-2 rounded-xl border border-transparent bg-transparent px-2 py-1.5 shadow-none transition-[background-color] duration-150 hover:bg-surface-0 focus-within:bg-surface-0'
       )}
     >
       <span className='flex h-7 w-6 shrink-0 items-center justify-end text-right text-[10px] tabular-nums text-tertiary-token'>

@@ -51,7 +51,7 @@ export function DialogLoadingSkeleton({
               <DrawerSurfaceCard
                 key={rowId}
                 variant='card'
-                className='flex min-h-[56px] items-center gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))] px-2.5'
+                className='flex min-h-[56px] items-center gap-3 rounded-xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))] px-2.5'
               >
                 <div className='h-10 w-10 shrink-0 rounded-full skeleton' />
                 <div className='min-w-0 flex-1 space-y-1.5'>

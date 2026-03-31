@@ -36,7 +36,10 @@ export function DashboardHeader({
   return (
     <header
       data-testid='dashboard-header'
-      className={cn('z-20 border-b border-subtle bg-surface-1', className)}
+      className={cn(
+        'z-20 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
+        className
+      )}
     >
       {/* Mobile: Large page title with action buttons + profile */}
       <div className='hidden max-sm:flex items-center justify-between px-4 pb-2 pt-3'>
@@ -45,7 +48,7 @@ export function DashboardHeader({
         </h1>
         <div className='flex items-center gap-2'>
           {action ? (
-            <div className='flex items-center gap-1 rounded-full border border-subtle bg-surface-0 p-1 [&_button]:h-8 [&_button]:rounded-full [&_button]:shadow-none [&_button>svg]:h-4 [&_button>svg]:w-4'>
+            <div className='flex items-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1 [&_button]:h-8 [&_button]:rounded-full [&_button]:shadow-none [&_button>svg]:h-4 [&_button>svg]:w-4'>
               {action}
             </div>
           ) : (
