@@ -123,12 +123,14 @@ export function normalizeSoundCloudSlug(input: string): string {
   // Strip query params and hash fragments.
   const queryStart = normalized.indexOf('?');
   const hashStart = normalized.indexOf('#');
-  const firstDelimiter =
-    queryStart === -1
-      ? hashStart
-      : hashStart === -1
-        ? queryStart
-        : Math.min(queryStart, hashStart);
+  let firstDelimiter: number;
+  if (queryStart === -1) {
+    firstDelimiter = hashStart;
+  } else if (hashStart === -1) {
+    firstDelimiter = queryStart;
+  } else {
+    firstDelimiter = Math.min(queryStart, hashStart);
+  }
 
   if (firstDelimiter >= 0) {
     normalized = normalized.slice(0, firstDelimiter);

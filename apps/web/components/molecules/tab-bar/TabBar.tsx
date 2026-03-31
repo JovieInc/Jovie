@@ -296,12 +296,12 @@ function LegacyTabBar<T extends string>({
       aria-label={ariaLabel}
       className={cn(
         TAB_BAR_RAIL_CLASSNAME,
-        isScrollMode
-          ? cn(
-              'flex-nowrap',
-              usesFillDistribution ? 'min-w-full w-full' : 'min-w-max'
-            )
-          : 'w-full flex-wrap',
+        isScrollMode &&
+          cn(
+            'flex-nowrap',
+            usesFillDistribution ? 'min-w-full w-full' : 'min-w-max'
+          ),
+        !isScrollMode && 'w-full flex-wrap',
         usesFillDistribution && 'w-full',
         isScrollMode &&
           'scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
