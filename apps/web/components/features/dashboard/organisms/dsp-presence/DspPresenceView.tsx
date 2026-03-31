@@ -9,9 +9,11 @@ import type {
 } from '@/app/app/(shell)/dashboard/presence/actions';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useDspEnrichmentStatusQuery } from '@/lib/queries/useDspEnrichmentStatusQuery';
+import { cn } from '@/lib/utils';
 import { DspPresenceEmptyState } from './DspPresenceEmptyState';
 import { DspPresenceSidebar } from './DspPresenceSidebar';
 import { DspPresenceSummary } from './DspPresenceSummary';
@@ -123,10 +125,18 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
     return (
       <DashboardWorkspacePanel
         toolbar={toolbar}
-        surfaceClassName='bg-[color-mix(in_oklab,var(--linear-bg-page)_72%,var(--linear-bg-surface-1))]'
+        surfaceClassName='px-4 py-4 sm:px-5'
         data-testid='dsp-presence-workspace'
       >
-        <DspPresenceEmptyState existingProviderIds={existingProviderIds} />
+        <div
+          className={cn(
+            LINEAR_SURFACE.contentContainer,
+            'flex h-full min-h-0 flex-1 items-center justify-center'
+          )}
+          data-testid='dsp-presence-content-panel'
+        >
+          <DspPresenceEmptyState existingProviderIds={existingProviderIds} />
+        </div>
       </DashboardWorkspacePanel>
     );
   }
@@ -134,15 +144,23 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
   return (
     <DashboardWorkspacePanel
       toolbar={toolbar}
-      surfaceClassName='bg-[color-mix(in_oklab,var(--linear-bg-page)_72%,var(--linear-bg-surface-1))]'
+      surfaceClassName='px-4 py-4 sm:px-5'
       data-testid='dsp-presence-workspace'
     >
-      <div className='flex-1 min-h-0 overflow-auto'>
-        <DspPresenceTable
-          items={data.items}
-          selectedMatchId={selectedMatchId}
-          onRowSelect={handleRowSelect}
-        />
+      <div
+        className={cn(
+          LINEAR_SURFACE.contentContainer,
+          'flex min-h-0 flex-1 overflow-hidden'
+        )}
+        data-testid='dsp-presence-content-panel'
+      >
+        <div className='flex-1 min-h-0 overflow-auto'>
+          <DspPresenceTable
+            items={data.items}
+            selectedMatchId={selectedMatchId}
+            onRowSelect={handleRowSelect}
+          />
+        </div>
       </div>
     </DashboardWorkspacePanel>
   );

@@ -36,6 +36,7 @@ import { CopyToClipboardButton } from '@/features/dashboard/molecules/CopyToClip
 import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
 import { EarningsTab } from '@/features/dashboard/organisms/EarningsTab';
 import { ShopifyStoreCard } from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
 import { useDashboardTipping } from './useDashboardTipping';
 import { formatCount } from './utils';
@@ -419,92 +420,101 @@ export function DashboardTipping() {
       <h1 className='sr-only'>Earnings Dashboard</h1>
       <DashboardWorkspacePanel
         toolbar={toolbar}
+        surfaceClassName='px-4 py-4 sm:px-5'
         data-testid='dashboard-earnings-workspace'
       >
         <div className='flex-1 overflow-y-auto overflow-x-hidden'>
-          <div className='flex flex-col gap-5 px-3 py-3 sm:px-4 sm:py-4'>
-            {!hasVenmoHandle && (
-              <>
-                <ContentSurfaceCard className='px-6 py-12 sm:px-8 sm:py-14'>
-                  <div className='mx-auto flex max-w-md flex-col items-center text-center'>
-                    <div
-                      className='mb-4 flex h-11 w-11 items-center justify-center rounded-[10px] border border-accent/20 bg-accent/10'
-                      aria-hidden='true'
-                    >
-                      <Wallet className='h-5 w-5 text-accent-token' />
+          <div
+            className={cn(
+              LINEAR_SURFACE.contentContainer,
+              'mx-auto flex w-full max-w-[76rem] flex-col'
+            )}
+            data-testid='dashboard-earnings-content-panel'
+          >
+            <div className='flex flex-col gap-5 p-4 sm:p-5'>
+              {!hasVenmoHandle && (
+                <>
+                  <ContentSurfaceCard className='px-6 py-12 sm:px-8 sm:py-14'>
+                    <div className='mx-auto flex max-w-md flex-col items-center text-center'>
+                      <div
+                        className='mb-4 flex h-11 w-11 items-center justify-center rounded-[10px] border border-accent/20 bg-accent/10'
+                        aria-hidden='true'
+                      >
+                        <Wallet className='h-5 w-5 text-accent-token' />
+                      </div>
+                      <h2 className='text-[17px] font-[590] tracking-[-0.011em] text-primary-token sm:text-[18px]'>
+                        Connect Venmo to unlock earnings
+                      </h2>
+                      <p className='mt-2 text-[13px] leading-5 text-secondary-token sm:text-[14px]'>
+                        Link your Venmo once to start receiving tips and reveal
+                        your full earnings dashboard.
+                      </p>
+                      <Button
+                        onClick={() => setIsConnectOpen(true)}
+                        variant='primary'
+                        size='sm'
+                        className='mt-5 rounded-[10px] text-[11px] font-[510] tracking-[-0.01em]'
+                      >
+                        Connect Venmo
+                      </Button>
                     </div>
-                    <h2 className='text-[17px] font-[590] tracking-[-0.011em] text-primary-token sm:text-[18px]'>
-                      Connect Venmo to unlock earnings
-                    </h2>
-                    <p className='mt-2 text-[13px] leading-5 text-secondary-token sm:text-[14px]'>
-                      Link your Venmo once to start receiving tips and reveal
-                      your full earnings dashboard.
-                    </p>
-                    <Button
-                      onClick={() => setIsConnectOpen(true)}
-                      variant='primary'
-                      size='sm'
-                      className='mt-5 rounded-[10px] text-[11px] font-[510] tracking-[-0.01em]'
-                    >
-                      Connect Venmo
-                    </Button>
-                  </div>
-                </ContentSurfaceCard>
-                <VenmoConnectDialog
-                  open={isConnectOpen}
-                  onClose={handleCloseConnect}
-                  venmoHandle={venmoHandle}
-                  onVenmoHandleChange={setVenmoHandle}
-                  onSave={handleSaveVenmo}
-                  isSaving={isSaving}
-                  saveSuccess={saveSuccess}
-                />
-              </>
-            )}
-
-            {hasVenmoHandle && (
-              <>
-                <ContentSurfaceCard className='p-4 sm:p-5'>
-                  <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
-                    <StatCard
-                      label='QR scans'
-                      value={qrTipClicks}
-                      description='Fans who scanned your QR'
-                      icon={ScanLine}
-                      iconChipClassName='border border-subtle bg-surface-1'
-                      iconClassName='text-success'
-                    />
-                    <StatCard
-                      label='Link clicks'
-                      value={linkTipClicks}
-                      description='Fans who clicked your link'
-                      icon={MousePointerClick}
-                      iconChipClassName='border border-subtle bg-surface-1'
-                      iconClassName='text-info'
-                    />
-                    <StatCard
-                      label='Total visits'
-                      value={tipClicks}
-                      description='QR + link combined'
-                      icon={BarChart3}
-                      iconChipClassName='border border-subtle bg-surface-1'
-                      iconClassName='text-accent'
-                    />
-                  </div>
-                </ContentSurfaceCard>
-
-                <div className='grid gap-4 sm:grid-cols-2'>
-                  <TipLinkSection
-                    tipUrl={tipUrls.tipUrl}
-                    tipRelativePathLink={tipUrls.tipRelativePathLink}
+                  </ContentSurfaceCard>
+                  <VenmoConnectDialog
+                    open={isConnectOpen}
+                    onClose={handleCloseConnect}
+                    venmoHandle={venmoHandle}
+                    onVenmoHandleChange={setVenmoHandle}
+                    onSave={handleSaveVenmo}
+                    isSaving={isSaving}
+                    saveSuccess={saveSuccess}
                   />
-                </div>
+                </>
+              )}
 
-                <EarningsTab />
-              </>
-            )}
+              {hasVenmoHandle && (
+                <>
+                  <ContentSurfaceCard className='p-4 sm:p-5'>
+                    <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
+                      <StatCard
+                        label='QR scans'
+                        value={qrTipClicks}
+                        description='Fans who scanned your QR'
+                        icon={ScanLine}
+                        iconChipClassName='border border-subtle bg-surface-1'
+                        iconClassName='text-success'
+                      />
+                      <StatCard
+                        label='Link clicks'
+                        value={linkTipClicks}
+                        description='Fans who clicked your link'
+                        icon={MousePointerClick}
+                        iconChipClassName='border border-subtle bg-surface-1'
+                        iconClassName='text-info'
+                      />
+                      <StatCard
+                        label='Total visits'
+                        value={tipClicks}
+                        description='QR + link combined'
+                        icon={BarChart3}
+                        iconChipClassName='border border-subtle bg-surface-1'
+                        iconClassName='text-accent'
+                      />
+                    </div>
+                  </ContentSurfaceCard>
 
-            <ShopifyStoreCard />
+                  <div className='grid gap-4 sm:grid-cols-2'>
+                    <TipLinkSection
+                      tipUrl={tipUrls.tipUrl}
+                      tipRelativePathLink={tipUrls.tipRelativePathLink}
+                    />
+                  </div>
+
+                  <EarningsTab />
+                </>
+              )}
+
+              <ShopifyStoreCard />
+            </div>
           </div>
         </div>
       </DashboardWorkspacePanel>

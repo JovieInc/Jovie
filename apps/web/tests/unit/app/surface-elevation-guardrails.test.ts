@@ -87,6 +87,30 @@ describe('surface elevation guardrails', () => {
     expect(tasksPage).toContain("data-testid='tasks-content-panel'");
   });
 
+  it('keeps presence and earnings inside framed content panels', () => {
+    const presenceView = readFileSync(
+      join(
+        ROOT,
+        'components/features/dashboard/organisms/dsp-presence/DspPresenceView.tsx'
+      ),
+      'utf-8'
+    );
+    const earningsView = readFileSync(
+      join(
+        ROOT,
+        'components/features/dashboard/dashboard-tipping/DashboardTipping.tsx'
+      ),
+      'utf-8'
+    );
+
+    expect(presenceView).toContain('LINEAR_SURFACE.contentContainer');
+    expect(presenceView).toContain("data-testid='dsp-presence-content-panel'");
+    expect(earningsView).toContain('LINEAR_SURFACE.contentContainer');
+    expect(earningsView).toContain(
+      "data-testid='dashboard-earnings-content-panel'"
+    );
+  });
+
   it('keeps task and preview cards off the shell canvas token', () => {
     const files = [
       'components/features/dashboard/layout/PreviewPanel.tsx',
