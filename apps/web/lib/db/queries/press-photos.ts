@@ -11,6 +11,7 @@ const pressPhotoSelect = {
   mediumUrl: profilePhotos.mediumUrl,
   largeUrl: profilePhotos.largeUrl,
   originalFilename: profilePhotos.originalFilename,
+  sourcePlatform: profilePhotos.sourcePlatform,
   width: profilePhotos.width,
   height: profilePhotos.height,
   status: profilePhotos.status,
