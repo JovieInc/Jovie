@@ -32,8 +32,7 @@ const ROW_CLASSNAME = 'rounded-none px-0 py-1 first:pt-0 last:pb-0';
 
 export function ReleaseCreditsSection({
   releaseId,
-  variant = 'card',
-}: Readonly<{ releaseId: string; variant?: 'card' | 'flat' }>) {
+}: Readonly<{ releaseId: string }>) {
   const [credits, setCredits] = useState<CreditGroup[] | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -66,11 +65,7 @@ export function ReleaseCreditsSection({
 
   return (
     <DrawerSurfaceCard
-      variant={variant}
-      className={cn(
-        variant === 'card' && LINEAR_SURFACE.drawerCardSm,
-        'overflow-hidden'
-      )}
+      className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
       testId='release-credits-card'
     >
       <div className='p-3'>

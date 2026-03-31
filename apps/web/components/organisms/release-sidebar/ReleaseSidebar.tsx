@@ -729,15 +729,11 @@ export function ReleaseSidebar({
                 >
                   <ReleaseMetadata
                     release={release}
-                    variant='flat'
                     onCanvasStatusChange={
                       canEditCanvasStatus ? handleCanvasStatusChange : undefined
                     }
                   />
-                  <ReleaseCreditsSection
-                    releaseId={release.id}
-                    variant='flat'
-                  />
+                  <ReleaseCreditsSection releaseId={release.id} />
                 </div>
               )}
 
