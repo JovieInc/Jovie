@@ -35,17 +35,22 @@ export default async function AppShellLayout({
     }
     const headerStore = await headers();
     const pathname = resolveAppShellRequestPath(headerStore.get('next-url'));
-    const shellFallback = isChatShellRoute(pathname) ? (
-      <DashboardShellSkeleton>
-        <ChatLoading />
-      </DashboardShellSkeleton>
-    ) : isReleasesShellRoute(pathname) ? (
-      <DashboardShellSkeleton>
-        <ReleaseTableSkeleton />
-      </DashboardShellSkeleton>
-    ) : (
-      <DashboardShellSkeleton />
-    );
+    let shellFallback: React.ReactNode;
+    if (isChatShellRoute(pathname)) {
+      shellFallback = (
+        <DashboardShellSkeleton>
+          <ChatLoading />
+        </DashboardShellSkeleton>
+      );
+    } else if (isReleasesShellRoute(pathname)) {
+      shellFallback = (
+        <DashboardShellSkeleton>
+          <ReleaseTableSkeleton />
+        </DashboardShellSkeleton>
+      );
+    } else {
+      shellFallback = <DashboardShellSkeleton />;
+    }
 
     // Ban check moved inside DashboardShellContent (runs in parallel with
     // shell data fetch). Banned users are 1-in-a-million — their experience
