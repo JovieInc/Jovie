@@ -1,7 +1,14 @@
 'use client';
 
 import { type ComponentType, useEffect, useState } from 'react';
-import { MODES, MobileCard, PhoneShowcase } from './phone-showcase-primitives';
+import {
+  MODES,
+  PHONE_TOUR_CONTAINER_CLASS,
+  PHONE_TOUR_SHOWCASE_SHADOW,
+  PhoneShowcase,
+  PhoneTourDivider,
+  PhoneTourMobileSection,
+} from './phone-showcase-primitives';
 
 const SLIDE_COUNT = MODES.length;
 const VH_PER_SLIDE = 80;
@@ -13,14 +20,7 @@ function StickyPhoneTourFallback() {
         className='relative max-lg:hidden section-spacing-linear'
         style={{ height: `${SLIDE_COUNT * VH_PER_SLIDE}vh` }}
       >
-        <div
-          aria-hidden='true'
-          className='mx-auto mb-16 h-px max-w-lg'
-          style={{
-            background:
-              'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-          }}
-        />
+        <PhoneTourDivider />
         <div
           aria-hidden='true'
           className='pointer-events-none absolute inset-x-0 top-0 h-screen'
@@ -32,7 +32,7 @@ function StickyPhoneTourFallback() {
         />
 
         <div className='sticky top-0 z-10 flex h-dvh items-center justify-center'>
-          <div className='mx-auto w-full max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0'>
+          <div className={PHONE_TOUR_CONTAINER_CLASS}>
             <div className='relative'>
               <div className='grid items-center grid-cols-[1fr_auto_1fr] gap-8 xl:gap-16'>
                 <div className='relative min-h-[320px]'>
@@ -56,8 +56,7 @@ function StickyPhoneTourFallback() {
                 <div className='flex flex-col items-center gap-4'>
                   <div
                     style={{
-                      filter:
-                        'drop-shadow(0 25px 60px rgba(0,0,0,0.35)) drop-shadow(0 8px 30px rgba(94,106,210,0.15))',
+                      filter: PHONE_TOUR_SHOWCASE_SHADOW,
                     }}
                   >
                     <PhoneShowcase activeIndex={0} modes={MODES} />
@@ -103,39 +102,7 @@ function StickyPhoneTourFallback() {
         </div>
       </section>
 
-      <section className='lg:hidden section-spacing-linear'>
-        <div className='mx-auto w-full max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0'>
-          <div
-            aria-hidden='true'
-            className='mx-auto mb-16 h-px max-w-lg'
-            style={{
-              background:
-                'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-            }}
-          />
-
-          <div>
-            <div className='mb-12 flex flex-col items-center gap-6 text-center'>
-              <span className='inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
-                One profile. Every way fans support you.
-              </span>
-              <h2 className='marketing-h2-linear text-primary-token'>
-                The right action for every fan.
-              </h2>
-              <p className='max-w-[400px] marketing-lead-linear text-secondary-token'>
-                Every visitor sees the action most likely to convert in that
-                moment: listen, tip, tour, or subscribe.
-              </p>
-            </div>
-
-            <div className='grid gap-4 sm:grid-cols-2'>
-              {MODES.map(mode => (
-                <MobileCard key={mode.id} mode={mode} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+      <PhoneTourMobileSection />
     </>
   );
 }
