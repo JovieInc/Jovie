@@ -17,6 +17,28 @@ import type {
   SubmissionIssueDraft,
 } from './types';
 
+function getRequiredTargetTypes(params: {
+  providerId: string;
+  canonical: Awaited<ReturnType<typeof loadCanonicalSubmissionContext>>;
+}): string[] {
+  const requiredTargetTypes = new Set<string>();
+
+  if (params.providerId === 'xperi_allmusic_email') {
+    if (params.canonical.release) {
+      requiredTargetTypes.add('allmusic_release_page');
+    }
+
+    if (
+      params.canonical.artistBio?.trim() ||
+      params.canonical.pressPhotos.length > 0
+    ) {
+      requiredTargetTypes.add('allmusic_artist_page');
+    }
+  }
+
+  return Array.from(requiredTargetTypes);
+}
+
 function snapshotHandlerForTarget(targetType: string) {
   if (targetType.startsWith('allmusic_')) {
     return snapshotAllMusicTarget;
@@ -182,6 +204,10 @@ export async function monitorMetadataSubmissionRequests(params?: {
       profileId: request.creatorProfileId,
       releaseId: request.releaseId,
     });
+    const requiredTargetTypes = getRequiredTargetTypes({
+      providerId: request.providerId,
+      canonical,
+    });
     const existingTargets = await upsertTargets(request.id, []);
     const discoveredTargets = await discoverSubmissionTargets({
       providerId: request.providerId,
@@ -202,6 +228,7 @@ export async function monitorMetadataSubmissionRequests(params?: {
     }
 
     let aggregatedIssues: SubmissionIssueDraft[] = [];
+    const successfulTargetTypes = new Set<string>();
 
     for (const target of allTargets) {
       const snapshotHandler = snapshotHandlerForTarget(target.targetType);
@@ -217,6 +244,8 @@ export async function monitorMetadataSubmissionRequests(params?: {
       if (!liveSnapshot) {
         continue;
       }
+
+      successfulTargetTypes.add(target.targetType);
 
       const [targetRow] = await db
         .select()
@@ -240,6 +269,20 @@ export async function monitorMetadataSubmissionRequests(params?: {
       aggregatedIssues = aggregatedIssues.concat(
         provider.diff(expectedBaseline, liveSnapshot.normalizedData)
       );
+    }
+
+    const hasRequiredCoverage = requiredTargetTypes.every(targetType =>
+      successfulTargetTypes.has(targetType)
+    );
+
+    if (!hasRequiredCoverage) {
+      results.push({
+        requestId: request.id,
+        status: request.status,
+        targets: allTargets.length,
+        issues: aggregatedIssues.length,
+      });
+      continue;
     }
 
     await syncRequestIssues(request.id, aggregatedIssues);

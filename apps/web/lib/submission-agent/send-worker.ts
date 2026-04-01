@@ -7,6 +7,10 @@ import {
   loadCanonicalSubmissionContext,
 } from './service';
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unknown send failure';
+}
+
 export async function processQueuedMetadataSubmissions(params?: {
   requestIds?: string[];
   limit?: number;
@@ -36,88 +40,107 @@ export async function processQueuedMetadataSubmissions(params?: {
       continue;
     }
 
-    const provider = getSubmissionProvider(request.providerId);
-    if (!provider?.send) {
-      await db
-        .update(metadataSubmissionRequests)
-        .set({
+    try {
+      const provider = getSubmissionProvider(request.providerId);
+      if (!provider?.send) {
+        await db
+          .update(metadataSubmissionRequests)
+          .set({
+            status: 'failed',
+            lastError: `Provider ${request.providerId} does not support send`,
+            updatedAt: new Date(),
+          })
+          .where(eq(metadataSubmissionRequests.id, request.id));
+
+        results.push({
+          requestId: request.id,
           status: 'failed',
-          lastError: `Provider ${request.providerId} does not support send`,
-          updatedAt: new Date(),
-        })
-        .where(eq(metadataSubmissionRequests.id, request.id));
+          error: `Provider ${request.providerId} does not support send`,
+        });
+        continue;
+      }
 
-      results.push({
-        requestId: request.id,
-        status: 'failed',
-        error: `Provider ${request.providerId} does not support send`,
-      });
-      continue;
-    }
+      const storedPackage = await getStoredSubmissionPackage(request.id);
+      if (!storedPackage) {
+        await db
+          .update(metadataSubmissionRequests)
+          .set({
+            status: 'failed',
+            lastError: 'Prepared package artifacts are missing',
+            updatedAt: new Date(),
+          })
+          .where(eq(metadataSubmissionRequests.id, request.id));
 
-    const storedPackage = await getStoredSubmissionPackage(request.id);
-    if (!storedPackage) {
-      await db
-        .update(metadataSubmissionRequests)
-        .set({
+        results.push({
+          requestId: request.id,
           status: 'failed',
-          lastError: 'Prepared package artifacts are missing',
-          updatedAt: new Date(),
-        })
-        .where(eq(metadataSubmissionRequests.id, request.id));
+          error: 'Prepared package artifacts are missing',
+        });
+        continue;
+      }
 
-      results.push({
-        requestId: request.id,
-        status: 'failed',
-        error: 'Prepared package artifacts are missing',
+      const canonical = await loadCanonicalSubmissionContext({
+        profileId: request.creatorProfileId,
+        releaseId: request.releaseId,
       });
-      continue;
-    }
+      const sendResult = await provider.send({
+        request,
+        package: storedPackage,
+        canonical,
+      });
 
-    const canonical = await loadCanonicalSubmissionContext({
-      profileId: request.creatorProfileId,
-      releaseId: request.releaseId,
-    });
-    const sendResult = await provider.send({
-      request,
-      package: storedPackage,
-      canonical,
-    });
+      if (sendResult.status === 'sent') {
+        await db
+          .update(metadataSubmissionRequests)
+          .set({
+            status: 'sent',
+            sentAt: new Date(),
+            providerMessageId: sendResult.providerMessageId ?? null,
+            lastError: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(metadataSubmissionRequests.id, request.id));
 
-    if (sendResult.status === 'sent') {
-      await db
-        .update(metadataSubmissionRequests)
-        .set({
+        results.push({
+          requestId: request.id,
           status: 'sent',
-          sentAt: new Date(),
-          providerMessageId: sendResult.providerMessageId ?? null,
-          lastError: null,
+          providerMessageId: sendResult.providerMessageId,
+        });
+        continue;
+      }
+
+      await db
+        .update(metadataSubmissionRequests)
+        .set({
+          status: 'failed',
+          lastError: sendResult.error ?? 'Unknown send failure',
           updatedAt: new Date(),
         })
         .where(eq(metadataSubmissionRequests.id, request.id));
 
       results.push({
         requestId: request.id,
-        status: 'sent',
-        providerMessageId: sendResult.providerMessageId,
-      });
-      continue;
-    }
-
-    await db
-      .update(metadataSubmissionRequests)
-      .set({
         status: 'failed',
-        lastError: sendResult.error ?? 'Unknown send failure',
-        updatedAt: new Date(),
-      })
-      .where(eq(metadataSubmissionRequests.id, request.id));
+        error: sendResult.error ?? 'Unknown send failure',
+      });
+    } catch (error) {
+      const message = getErrorMessage(error);
 
-    results.push({
-      requestId: request.id,
-      status: 'failed',
-      error: sendResult.error ?? 'Unknown send failure',
-    });
+      await db
+        .update(metadataSubmissionRequests)
+        .set({
+          status: 'failed',
+          lastError: message,
+          updatedAt: new Date(),
+        })
+        .where(eq(metadataSubmissionRequests.id, request.id));
+
+      results.push({
+        requestId: request.id,
+        status: 'failed',
+        error: message,
+      });
+    }
   }
 
   return results;

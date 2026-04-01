@@ -3,6 +3,7 @@ import type {
   CanonicalSubmissionContext,
   DiscoveredTarget,
   ProviderSnapshot,
+  SubmissionMonitoringBaseline,
 } from '../../types';
 
 function extractMetaContent(html: string, key: string): string | null {
@@ -60,6 +61,67 @@ function extractJsonLdValue(html: string, key: string): string | null {
   return null;
 }
 
+function extractJsonLdEntityName(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value.trim();
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const extracted = extractJsonLdEntityName(entry);
+      if (extracted) {
+        return extracted;
+      }
+    }
+    return null;
+  }
+
+  if (
+    value &&
+    typeof value === 'object' &&
+    'name' in value &&
+    typeof value.name === 'string' &&
+    value.name.trim().length > 0
+  ) {
+    return value.name.trim();
+  }
+
+  return null;
+}
+
+function extractJsonLdArtistName(html: string): string | null {
+  const scripts = html.match(
+    /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+  );
+
+  if (!scripts) {
+    return null;
+  }
+
+  for (const script of scripts) {
+    const contentMatch = script.match(/>([\s\S]*?)<\/script>/i);
+    if (!contentMatch?.[1]) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(contentMatch[1]) as Record<string, unknown>;
+      const artistName =
+        extractJsonLdEntityName(parsed.byArtist) ??
+        extractJsonLdEntityName(parsed.artist) ??
+        extractJsonLdEntityName(parsed.author);
+
+      if (artistName) {
+        return artistName;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
 function extractTrackCount(html: string): number | null {
   const trackCountMatch =
     html.match(/(\d+)\s+tracks?/i) ??
@@ -78,6 +140,72 @@ function extractUpc(html: string): string | null {
   return match?.[1]?.trim() ?? null;
 }
 
+function normalizeComparableValue(
+  value: string | null | undefined
+): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+
+  return normalized.length > 0 ? normalized : null;
+}
+
+function matchesCanonicalValue(
+  observed: string | null | undefined,
+  expected: string | null | undefined
+): boolean {
+  const normalizedObserved = normalizeComparableValue(observed);
+  const normalizedExpected = normalizeComparableValue(expected);
+
+  if (!normalizedObserved || !normalizedExpected) {
+    return false;
+  }
+
+  return (
+    normalizedObserved === normalizedExpected ||
+    normalizedObserved.includes(normalizedExpected) ||
+    normalizedExpected.includes(normalizedObserved)
+  );
+}
+
+function extractHeadingFromOgTitle(ogTitle: string | null): string | null {
+  const heading = ogTitle?.split('|')[0]?.trim() ?? null;
+  return heading && heading.length > 0 ? heading : null;
+}
+
+function extractReleaseTitleFromOgTitle(ogTitle: string | null): string | null {
+  const heading = extractHeadingFromOgTitle(ogTitle);
+  if (!heading) {
+    return null;
+  }
+
+  return heading.split(' - ')[0]?.trim() || null;
+}
+
+function extractArtistNameFromOgTitle(params: {
+  ogTitle: string | null;
+  targetType: DiscoveredTarget['targetType'];
+}): string | null {
+  const heading = extractHeadingFromOgTitle(params.ogTitle);
+  if (!heading) {
+    return null;
+  }
+
+  if (params.targetType === 'allmusic_release_page') {
+    const segments = heading.split(' - ');
+    return segments.length > 1 ? segments.slice(1).join(' - ').trim() : null;
+  }
+
+  return heading;
+}
+
 function collectResultUrls(html: string): string[] {
   const urls = new Set<string>();
   const regex = /href=["'](https?:\/\/www\.allmusic\.com\/[^"']+)["']/gi;
@@ -91,59 +219,47 @@ function collectResultUrls(html: string): string[] {
   return Array.from(urls);
 }
 
-export async function discoverAllMusicTargets(
-  canonical: CanonicalSubmissionContext
-): Promise<DiscoveredTarget[]> {
-  const artistName = encodeURIComponent(canonical.artistName);
-  const releaseTitle = encodeURIComponent(canonical.release?.title ?? '');
-  const discovered: DiscoveredTarget[] = [];
+function parseAllMusicSnapshotData(params: {
+  html: string;
+  targetType: DiscoveredTarget['targetType'];
+}): SubmissionMonitoringBaseline {
+  const { html, targetType } = params;
+  const ogTitle = extractMetaContent(html, 'og:title');
+  const ogImage = extractMetaContent(html, 'og:image');
+  const description =
+    extractMetaContent(html, 'og:description') ??
+    extractMetaContent(html, 'description');
+  const jsonLdName = extractJsonLdValue(html, 'name');
+  const jsonLdArtistName = extractJsonLdArtistName(html);
+  const published = extractJsonLdValue(html, 'datePublished');
 
-  const albumSearchUrl = `https://www.allmusic.com/search/albums/${artistName}%20${releaseTitle}`;
-  const artistSearchUrl = `https://www.allmusic.com/search/artists/${artistName}`;
-
-  const [albumResponse, artistResponse] = await Promise.all([
-    serverFetch(albumSearchUrl, {
-      context: 'AllMusic album search',
-      timeoutMs: 8_000,
-      retry: { maxRetries: 2, baseDelayMs: 250, maxDelayMs: 1000 },
-    }),
-    serverFetch(artistSearchUrl, {
-      context: 'AllMusic artist search',
-      timeoutMs: 8_000,
-      retry: { maxRetries: 2, baseDelayMs: 250, maxDelayMs: 1000 },
-    }),
-  ]);
-
-  const [albumHtml, artistHtml] = await Promise.all([
-    albumResponse.text(),
-    artistResponse.text(),
-  ]);
-
-  for (const url of collectResultUrls(albumHtml)) {
-    if (url.includes('/album/')) {
-      discovered.push({
-        targetType: 'allmusic_release_page',
-        canonicalUrl: url,
-      });
-      break;
-    }
+  if (targetType === 'allmusic_release_page') {
+    return {
+      artistName:
+        jsonLdArtistName ??
+        extractArtistNameFromOgTitle({ ogTitle, targetType }) ??
+        undefined,
+      releaseTitle:
+        jsonLdName ?? extractReleaseTitleFromOgTitle(ogTitle) ?? undefined,
+      releaseDate: published?.slice(0, 10) ?? undefined,
+      upc: extractUpc(html) ?? undefined,
+      trackCount: extractTrackCount(html) ?? undefined,
+      hasCredits: /credits/i.test(html),
+      hasArtwork: Boolean(ogImage),
+    };
   }
 
-  for (const url of collectResultUrls(artistHtml)) {
-    if (url.includes('/artist/')) {
-      discovered.push({
-        targetType: 'allmusic_artist_page',
-        canonicalUrl: url,
-      });
-      break;
-    }
-  }
-
-  return discovered;
+  return {
+    artistName:
+      jsonLdName ??
+      extractArtistNameFromOgTitle({ ogTitle, targetType }) ??
+      undefined,
+    hasBio: Boolean(description),
+    hasArtistImage: Boolean(ogImage),
+  };
 }
 
-export async function snapshotAllMusicTarget(
-  canonical: CanonicalSubmissionContext,
+async function snapshotAllMusicUrl(
   target: DiscoveredTarget
 ): Promise<ProviderSnapshot | null> {
   const response = await serverFetch(target.canonicalUrl, {
@@ -157,44 +273,144 @@ export async function snapshotAllMusicTarget(
   }
 
   const html = await response.text();
-  const ogTitle = extractMetaContent(html, 'og:title');
-  const ogImage = extractMetaContent(html, 'og:image');
-  const description =
-    extractMetaContent(html, 'og:description') ??
-    extractMetaContent(html, 'description');
-  const jsonLdName = extractJsonLdValue(html, 'name');
-  const published = extractJsonLdValue(html, 'datePublished');
-
-  const releaseTitle =
-    target.targetType === 'allmusic_release_page'
-      ? (jsonLdName ??
-        ogTitle?.split(' - ')[0] ??
-        canonical.release?.title ??
-        null)
-      : (canonical.release?.title ?? null);
 
   return {
     targetType: target.targetType,
     canonicalUrl: target.canonicalUrl,
-    normalizedData: {
-      artistName:
-        target.targetType === 'allmusic_artist_page'
-          ? (jsonLdName ?? ogTitle?.split(' - ')[0] ?? canonical.artistName)
-          : canonical.artistName,
-      releaseTitle,
-      releaseDate: published?.slice(0, 10) ?? null,
-      upc: extractUpc(html),
-      trackCount: extractTrackCount(html),
-      hasCredits: /credits/i.test(html),
-      hasBio: Boolean(description),
-      hasArtistImage:
-        target.targetType === 'allmusic_artist_page'
-          ? Boolean(ogImage)
-          : canonical.pressPhotos.length > 0,
-      hasArtwork:
-        target.targetType === 'allmusic_release_page'
-          ? Boolean(ogImage)
-          : Boolean(canonical.release?.artworkUrl),
-    },
+    normalizedData: parseAllMusicSnapshotData({
+      html,
+      targetType: target.targetType,
+    }),
   };
+}
+
+function isMatchingAllMusicTarget(params: {
+  canonical: CanonicalSubmissionContext;
+  targetType: DiscoveredTarget['targetType'];
+  snapshot: ProviderSnapshot;
+}): boolean {
+  const { canonical, targetType, snapshot } = params;
+
+  if (targetType === 'allmusic_artist_page') {
+    return matchesCanonicalValue(
+      snapshot.normalizedData.artistName,
+      canonical.artistName
+    );
+  }
+
+  if (!canonical.release) {
+    return false;
+  }
+
+  const titleMatches = matchesCanonicalValue(
+    snapshot.normalizedData.releaseTitle,
+    canonical.release.title
+  );
+
+  if (!titleMatches) {
+    return false;
+  }
+
+  if (!snapshot.normalizedData.artistName) {
+    return true;
+  }
+
+  return matchesCanonicalValue(
+    snapshot.normalizedData.artistName,
+    canonical.artistName
+  );
+}
+
+async function resolveMatchingTarget(params: {
+  canonical: CanonicalSubmissionContext;
+  targetType: DiscoveredTarget['targetType'];
+  candidateUrls: string[];
+}): Promise<DiscoveredTarget | null> {
+  for (const canonicalUrl of params.candidateUrls.slice(0, 5)) {
+    const target: DiscoveredTarget = {
+      targetType: params.targetType,
+      canonicalUrl,
+    };
+    const snapshot = await snapshotAllMusicUrl(target);
+
+    if (
+      snapshot &&
+      isMatchingAllMusicTarget({
+        canonical: params.canonical,
+        targetType: params.targetType,
+        snapshot,
+      })
+    ) {
+      return target;
+    }
+  }
+
+  return null;
+}
+
+export async function discoverAllMusicTargets(
+  canonical: CanonicalSubmissionContext
+): Promise<DiscoveredTarget[]> {
+  const discovered: DiscoveredTarget[] = [];
+  const artistName = encodeURIComponent(canonical.artistName);
+  const artistSearchUrl = `https://www.allmusic.com/search/artists/${artistName}`;
+  const albumSearchRequest = canonical.release
+    ? serverFetch(
+        `https://www.allmusic.com/search/albums/${artistName}%20${encodeURIComponent(canonical.release.title)}`,
+        {
+          context: 'AllMusic album search',
+          timeoutMs: 8_000,
+          retry: { maxRetries: 2, baseDelayMs: 250, maxDelayMs: 1000 },
+        }
+      )
+    : Promise.resolve(null);
+
+  const [albumResponse, artistResponse] = await Promise.all([
+    albumSearchRequest,
+    serverFetch(artistSearchUrl, {
+      context: 'AllMusic artist search',
+      timeoutMs: 8_000,
+      retry: { maxRetries: 2, baseDelayMs: 250, maxDelayMs: 1000 },
+    }),
+  ]);
+
+  const [albumHtml, artistHtml] = await Promise.all([
+    albumResponse?.ok ? albumResponse.text() : Promise.resolve(''),
+    artistResponse.ok ? artistResponse.text() : Promise.resolve(''),
+  ]);
+
+  if (canonical.release) {
+    const releaseTarget = await resolveMatchingTarget({
+      canonical,
+      targetType: 'allmusic_release_page',
+      candidateUrls: collectResultUrls(albumHtml).filter(url =>
+        url.includes('/album/')
+      ),
+    });
+
+    if (releaseTarget) {
+      discovered.push(releaseTarget);
+    }
+  }
+
+  const artistTarget = await resolveMatchingTarget({
+    canonical,
+    targetType: 'allmusic_artist_page',
+    candidateUrls: collectResultUrls(artistHtml).filter(url =>
+      url.includes('/artist/')
+    ),
+  });
+
+  if (artistTarget) {
+    discovered.push(artistTarget);
+  }
+
+  return discovered;
+}
+
+export async function snapshotAllMusicTarget(
+  _canonical: CanonicalSubmissionContext,
+  target: DiscoveredTarget
+): Promise<ProviderSnapshot | null> {
+  return snapshotAllMusicUrl(target);
 }
