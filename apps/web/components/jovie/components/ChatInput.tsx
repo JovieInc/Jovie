@@ -387,7 +387,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           }
           className={cn(
             'overflow-hidden border transition-[border-color,background-color] duration-normal',
-            'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
+            // Light mode: white surface, dark mode: surface-2
+            'bg-white dark:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
+            // Elevation: subtle in light, stronger in dark
+            'shadow-[0_2px_8px_rgba(0,0,0,0.08)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)]',
             borderClass
           )}
           style={reducedMotion ? { borderRadius, boxShadow } : { borderRadius }}
@@ -412,7 +415,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           >
             {/* Hidden measurement div */}
             <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
-
             {hasAttachButton && onImageAttach && (
               <AttachDropdown
                 isCompact={isCompact}
