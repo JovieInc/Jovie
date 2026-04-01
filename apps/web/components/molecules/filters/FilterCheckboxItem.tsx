@@ -42,6 +42,9 @@ export function FilterCheckboxItem({
           // At first item, go back to search input
           searchInputRef?.current?.focus();
         }
+      } else if (e.key === 'Escape') {
+        // Return focus to search input on Escape
+        searchInputRef?.current?.focus();
       } else if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         onCheckedChange();
