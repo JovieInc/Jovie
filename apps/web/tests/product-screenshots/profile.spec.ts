@@ -56,6 +56,14 @@ test.describe('Product Screenshots – Public Profile', () => {
       .first()
       .waitFor({ state: 'visible', timeout: TIMEOUTS.CONTENT_VISIBLE });
 
+    // Wait for subscribe section to settle if present
+    const subscribeSection = page.locator('section[aria-labelledby="profile-subscribe-heading"]').first();
+    if (await subscribeSection.isVisible().catch(() => false)) {
+      await subscribeSection.waitFor({ state: 'visible' });
+      // Small delay for form to fully hydrate
+      await page.waitForTimeout(300);
+    }
+
     // Wait for avatar and release artwork images to load
     await waitForImages(page).catch(() => {
       // Profile may have no images (e.g. no avatar set) — that's OK
@@ -87,6 +95,13 @@ test.describe('Product Screenshots – Public Profile', () => {
       .locator('[data-testid="profile-header"], h1, main img[alt]:visible')
       .first()
       .waitFor({ state: 'visible', timeout: TIMEOUTS.CONTENT_VISIBLE });
+
+    // Wait for subscribe section to settle if present
+    const subscribeSection = page.locator('section[aria-labelledby="profile-subscribe-heading"]').first();
+    if (await subscribeSection.isVisible().catch(() => false)) {
+      await subscribeSection.waitFor({ state: 'visible' });
+      await page.waitForTimeout(300);
+    }
 
     await waitForImages(page).catch(() => {
       console.log('⚠ Some images may not have loaded, continuing...');

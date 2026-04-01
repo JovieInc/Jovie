@@ -157,6 +157,48 @@ describeProfile('Profile - Core Rendering', () => {
     await expect(page.getByText(/Pop artist|Artist/).first()).toBeVisible();
   });
 
+  test('has no layout overlap at mobile viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    // Get bounding boxes for key elements
+    const hero = page.locator('section').first();
+    const subscribeSection = page.locator('section[aria-labelledby="profile-subscribe-heading"]').first();
+    const mainContent = page.locator('main').first();
+
+    const heroBox = await hero.boundingBox();
+    const subscribeBox = await subscribeSection.boundingBox();
+
+    if (heroBox && subscribeBox) {
+      // Ensure subscribe section doesn't overlap hero
+      expect(subscribeBox.y).toBeGreaterThanOrEqual(heroBox.y + heroBox.height - 2); // 2px tolerance
+    }
+
+    // Ensure no horizontal overflow
+    const bodyWidth = await page.evaluate(() => document.body.scrollWidth);
+    const viewportWidth = await page.evaluate(() => window.innerWidth);
+    expect(bodyWidth).toBeLessThanOrEqual(viewportWidth + 1); // 1px tolerance
+  });
+
+  test('subscribe CTA is fully visible and readable at mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    const subscribeSection = page.locator('section[aria-labelledby="profile-subscribe-heading"]').first();
+    await expect(subscribeSection).toBeVisible();
+
+    // Check that subscribe section is within viewport bounds
+    const box = await subscribeSection.boundingBox();
+    if (box) {
+      const viewportHeight = await page.evaluate(() => window.innerHeight);
+      // Subscribe section should start within viewport
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.y).toBeLessThan(viewportHeight * 0.8); // Should start in upper 80%
+    }
+
+    // Verify form elements are visible
+    const subscribeHeading = page.locator('#profile-subscribe-heading').first();
+    await expect(subscribeHeading).toBeVisible();
+  });
+
   test('has proper heading structure with single h1', async ({ page }) => {
     const h1Count = await page.locator('h1').count();
     expect(h1Count).toBe(1);

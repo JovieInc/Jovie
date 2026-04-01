@@ -454,7 +454,7 @@ export function ArtistNotificationsCTA({
     otpStep === 'verify' ? handleVerifyOtp : handleSubscribe;
 
   return (
-    <div className='space-y-3'>
+    <div className='space-y-4'>
       <p
         className='text-center text-[13px] font-[550] tracking-[0.01em] text-primary-token/88'
         style={noFontSynthesisStyle}

@@ -67,7 +67,7 @@ export function ArtistHero({
     'inline-flex min-h-12 items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-[590] text-black shadow-[0_18px_45px_rgba(0,0,0,0.34)] transition-[transform,opacity] duration-200 hover:opacity-92 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
 
   return (
-    <section className='relative h-[48dvh] min-h-[420px] max-h-[620px] w-full overflow-hidden md:h-[56dvh] md:min-h-[520px] md:rounded-t-[30px]'>
+    <section className='relative h-[44dvh] min-h-[360px] max-h-[560px] w-full overflow-hidden md:h-[52dvh] md:min-h-[480px] md:rounded-t-[30px]'>
       <div className='absolute inset-0'>
         <ImageWithFallback
           src={heroImageUrl ?? artist.image_url}
@@ -84,7 +84,7 @@ export function ArtistHero({
       <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.22),transparent_30%),linear-gradient(180deg,rgba(4,6,10,0.06)_0%,rgba(5,7,12,0.18)_30%,rgba(7,8,10,0.82)_76%,rgba(7,8,10,0.98)_100%)]' />
       <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,transparent_48%,rgba(6,7,10,0.6)_68%,rgba(5,6,8,0.96)_100%)]' />
 
-      <div className='relative flex h-full flex-col justify-between px-5 pb-6 pt-[max(env(safe-area-inset-top),1rem)] md:px-7 md:pb-8 md:pt-6'>
+      <div className='relative flex h-full flex-col justify-between px-5 pb-6 pt-[max(env(safe-area-inset-top),1rem)] md:px-7 md:pb-8 md:pt-6 overflow-hidden'>
         <div className='flex justify-between gap-3'>
           <div className='flex items-start gap-2'>
             {spotlightLabel && spotlightValue ? (

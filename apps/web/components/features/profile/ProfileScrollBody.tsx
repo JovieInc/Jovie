@@ -382,7 +382,7 @@ export function ProfileScrollBody({
       className='min-h-0 flex-1 overflow-y-auto'
       aria-label='Artist profile'
     >
-      <div className='space-y-7 px-5 pb-[max(env(safe-area-inset-bottom),28px)] pt-6 md:space-y-8 md:px-7 md:pb-8 md:pt-7'>
+      <div className='space-y-8 px-5 pb-[max(env(safe-area-inset-bottom),32px)] pt-8 md:space-y-10 md:px-7 md:pb-10 md:pt-10'>
         <SubscribeSection
           artist={artist}
           subscribeTwoStep={subscribeTwoStep}
