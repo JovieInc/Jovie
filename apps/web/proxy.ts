@@ -198,6 +198,147 @@ function analyzeHost(hostname: string): HostInfo {
 const DASHBOARD_URL = '/app';
 
 // ============================================================================
+// Public Profile Audience Block Check
+// ============================================================================
+// Runs in middleware so ISR-cached profile pages don't need headers() in the
+// page component. On Vercel, middleware executes before the CDN cache is served,
+// so this gate applies even to cache hits.
+// ============================================================================
+
+/**
+ * Mask an IP address for fingerprinting.
+ * Mirrors maskIpAddress() in app/api/audience/lib/audience-utils.ts.
+ * Edge-compatible (no Node.js modules).
+ */
+function maskIpForFingerprint(ip: string | null): string {
+  if (!ip) return 'unknown_ip';
+  if (ip.includes(':')) {
+    // IPv6: keep first 4 groups
+    return ip
+      .split(':')
+      .slice(0, 4)
+      .map(segment => segment || '0')
+      .join(':');
+  }
+  const parts = ip.split('.');
+  if (parts.length >= 3) {
+    return `${parts.slice(0, 3).join('.')}.0`;
+  }
+  return ip;
+}
+
+/**
+ * Create visitor fingerprint using the Web Crypto API (edge-compatible).
+ * Produces the same hex digest as createFingerprint() in audience-utils.ts.
+ */
+async function createFingerprintEdge(
+  ip: string | null,
+  ua: string | null
+): Promise<string> {
+  const maskedIp = maskIpForFingerprint(ip);
+  const uaStr = (ua || 'unknown_ua').slice(0, 128);
+  const input = `${maskedIp}|${uaStr}`;
+  const encoded = new TextEncoder().encode(input);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoded);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Single-segment path segments that are Next.js / system routes, not usernames.
+// Complements the RESERVED_USERNAMES list in lib/validation/username-core.ts
+// which prevents these being registered as profile handles in the first place.
+const MIDDLEWARE_SYSTEM_SEGMENTS = new Set([
+  '_next',
+  'favicon.ico',
+  'og',
+  'go',
+  'out',
+  '__clerk',
+  'clerk',
+  'sidebar-demo',
+  'sentry-example-page',
+  'sentry-example-api',
+  'investor-portal',
+]);
+
+/**
+ * Returns the username for public profile paths (/username) or null for
+ * non-profile paths. Uses a length-and-character pre-filter; the DB query
+ * will naturally return no rows for non-existent usernames.
+ */
+function extractPublicProfileUsername(pathname: string): string | null {
+  const parts = pathname.split('/').filter(Boolean);
+  // Profile routes are a single path segment (no subroutes like /username/claim)
+  if (parts.length !== 1) return null;
+
+  const segment = parts[0];
+  if (MIDDLEWARE_SYSTEM_SEGMENTS.has(segment)) return null;
+
+  // Username bounds from lib/validation/username-core.ts
+  if (segment.length < 3 || segment.length > 30) return null;
+
+  // Basic character check (mirrors USERNAME_PATTERN) — no content filter needed
+  // here; invalid/non-existent usernames simply return no DB rows.
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]{3}$/.test(segment))
+    return null;
+
+  return segment;
+}
+
+/**
+ * Check if a public profile visitor should be blocked.
+ *
+ * Uses a single JOIN query (creator_profiles ⋈ audience_blocks) so no round-trip
+ * is wasted when the profile exists but the visitor isn't blocked (the common case).
+ *
+ * Fails open on any error — a blocked user slipping through once is preferable
+ * to locking out all visitors during a DB hiccup.
+ */
+async function checkProfileVisitorBlocked(
+  username: string,
+  ip: string | null,
+  ua: string | null
+): Promise<boolean> {
+  // Skip in unit-test environments and public smoke-test mode
+  if (process.env.NODE_ENV === 'test') return false;
+  if (process.env.PUBLIC_NOAUTH_SMOKE === '1') return false;
+
+  try {
+    const fingerprint = await createFingerprintEdge(ip, ua);
+
+    // Lazy imports mirror the investor-portal pattern in this file.
+    const { db } = await import('@/lib/db');
+    const { and, eq, isNull } = await import('drizzle-orm');
+    const { audienceBlocks } = await import('@/lib/db/schema/analytics');
+    const { creatorProfiles } = await import('@/lib/db/schema/profiles');
+
+    // Single round-trip: join profile + block table. Returns a row only when
+    // the username exists AND the fingerprint is in the block list.
+    // Profile owners cannot block themselves, so no owner-skip is needed here.
+    const [result] = await db
+      .select({ blockId: audienceBlocks.id })
+      .from(creatorProfiles)
+      .innerJoin(
+        audienceBlocks,
+        eq(audienceBlocks.creatorProfileId, creatorProfiles.id)
+      )
+      .where(
+        and(
+          eq(creatorProfiles.username, username.toLowerCase()),
+          eq(audienceBlocks.fingerprint, fingerprint),
+          isNull(audienceBlocks.unblockedAt)
+        )
+      )
+      .limit(1);
+
+    return !!result;
+  } catch {
+    // Fail open: don't lock out visitors on DB errors.
+    return false;
+  }
+}
+
+// ============================================================================
 // Investor Portal — Path-based token auth (/investor-portal?t=TOKEN)
 // ============================================================================
 // Bypasses Clerk entirely. Auth is via a secret token in URL param or cookie.
@@ -466,6 +607,15 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       ensureSentry().catch(() => {});
     }
 
+    // Inject the resolved Clerk publishable key so server components can read
+    // it from a single pre-resolved header instead of re-parsing the hostname.
+    // ResolvedClientProviders reads x-clerk-publishable-key first, then falls
+    // back to hostname-based resolution for environments without middleware.
+    const { publishableKey: resolvedClerkPk } = resolveClerkKeys(hostname);
+    if (resolvedClerkPk) {
+      requestHeaders.set('x-clerk-publishable-key', resolvedClerkPk);
+    }
+
     // ========================================================================
     // Early exits that don't need CSP or user state (no DB/Redis calls)
     // ========================================================================
@@ -504,6 +654,38 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       const targetUrl = new URL('/support', 'https://jov.ie');
       targetUrl.search = req.nextUrl.search;
       return NextResponse.redirect(targetUrl, 308);
+    }
+
+    // ========================================================================
+    // Audience block check for public profile routes
+    //
+    // Runs here — after domain redirects, before any auth/routing logic — so it
+    // applies to both authenticated and unauthenticated visitors.
+    //
+    // On Vercel, middleware executes before the CDN cache is consulted, meaning
+    // this gate is enforced even for ISR-cached responses. This lets the profile
+    // page avoid calling headers() (which opts the page into dynamic rendering).
+    // ========================================================================
+    if (isNavigationMethod) {
+      const profileUsername = extractPublicProfileUsername(pathname);
+      if (profileUsername) {
+        // Mirror extractClientIP() priority: cf-connecting-ip > x-real-ip > x-forwarded-for > true-client-ip
+        const rawIp =
+          req.headers.get('cf-connecting-ip') ||
+          req.headers.get('x-real-ip') ||
+          (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() ||
+          req.headers.get('true-client-ip') ||
+          null;
+        const ua = req.headers.get('user-agent');
+        const isBlocked = await checkProfileVisitorBlocked(
+          profileUsername,
+          rawIp,
+          ua
+        );
+        if (isBlocked) {
+          return NextResponse.redirect('https://jov.ie');
+        }
+      }
     }
 
     // ========================================================================
@@ -847,7 +1029,10 @@ function buildFinalResponse(
 
   if (normalizedCountryCode && currentCountryCode !== normalizedCountryCode) {
     res.cookies.set(COUNTRY_CODE_COOKIE, normalizedCountryCode, {
-      httpOnly: true,
+      // httpOnly: false so StaticArtistPage can read country code on mount
+      // for DSP geo-sorting, replacing the server-side headers() read that
+      // prevented ISR caching of public profile pages.
+      httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 30,

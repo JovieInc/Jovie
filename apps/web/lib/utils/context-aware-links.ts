@@ -186,7 +186,8 @@ export function sortSocialLinksByGeoPopularity(
 export function getHeaderSocialLinks(
   links: LegacySocialLink[],
   countryCode?: string | null,
-  maxCount = MAX_HEADER_SOCIAL_LINKS
+  maxCount = MAX_HEADER_SOCIAL_LINKS,
+  excludePlatform?: string | null
 ): LegacySocialLink[] {
   const seenPlatforms = new Set<string>();
   const priorityIndexMap = getPriorityIndexMap(countryCode);
@@ -203,6 +204,11 @@ export function getHeaderSocialLinks(
       }
 
       if (seenPlatforms.has(platform)) {
+        return false;
+      }
+      
+      // Exclude source platform if specified
+      if (excludePlatform && platform === excludePlatform.toLowerCase()) {
         return false;
       }
 

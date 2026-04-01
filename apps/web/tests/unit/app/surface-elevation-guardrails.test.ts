@@ -88,10 +88,7 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
     const dashboardPanel = readFileSync(
-      join(
-        ROOT,
-        'components/features/dashboard/organisms/DashboardWorkspacePanel.tsx'
-      ),
+      join(ROOT, 'components/organisms/AppShellContentPanel.tsx'),
       'utf-8'
     );
     const settingsLayout = readFileSync(
@@ -157,14 +154,11 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
     const dashboardPanel = readFileSync(
-      join(
-        ROOT,
-        'components/features/dashboard/organisms/DashboardWorkspacePanel.tsx'
-      ),
+      join(ROOT, 'components/organisms/AppShellContentPanel.tsx'),
       'utf-8'
     );
 
-    expect(tasksPage).toContain('DashboardWorkspacePanel');
+    expect(tasksPage).toContain('PageShell');
     expect(dashboardPanel).toContain("frame='none'");
     expect(tasksPage).toContain("data-testid='tasks-content-panel'");
   });
@@ -185,9 +179,9 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
 
-    expect(presenceView).toContain('DashboardWorkspacePanel');
+    expect(presenceView).toContain('PageShell');
     expect(presenceView).toContain("data-testid='dsp-presence-content-panel'");
-    expect(earningsView).toContain('DashboardWorkspacePanel');
+    expect(earningsView).toContain('PageShell');
     expect(earningsView).toContain(
       "data-testid='dashboard-earnings-content-panel'"
     );
