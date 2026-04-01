@@ -26,23 +26,21 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
       {/* Hero text — left aligned, same max-width + padding as header nav */}
       <div className='relative z-10 flex flex-1 flex-col justify-center pb-6 pt-10 md:pb-8 md:pt-12'>
         <div className='mx-auto w-full max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0'>
-          <div className='hero-stagger max-w-[44rem]'>
+          <div className='hero-stagger'>
             <p className='homepage-section-eyebrow'>
               Built for independent artists
             </p>
-
             <h1
               id='hero-heading'
-              className='marketing-h1-linear mt-5 text-primary-token leading-[1]'
+              className='marketing-h1-linear mt-4 text-primary-token leading-[1]'
               data-testid='hero-heading'
             >
               Drop More Music.
               <br />
               Crush Every Release.
             </h1>
-
             <p
-              className='mt-[31px] max-w-[31rem]'
+              className='mt-5'
               style={{
                 fontSize: '15px',
                 fontWeight: 400,
@@ -54,8 +52,7 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
               Smart links, release automation, and fan insight that keep every
               launch moving.
             </p>
-
-            <div className='mt-8'>
+            <div className='mt-6'>
               <Link
                 href='/signup'
                 className='inline-flex items-center justify-center rounded-[4px] text-[13px] font-[510] tracking-normal transition-colors duration-150 hover:brightness-110 focus-ring-themed'
@@ -69,8 +66,7 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
                 Get Started Free
               </Link>
             </div>
-
-            <p className='mt-3.5 text-[11px] tracking-[0.01em] text-quaternary-token md:mt-4'>
+            <p className='mt-3 text-[11px] tracking-[0.01em] text-quaternary-token'>
               Free forever. No credit card required.
             </p>
           </div>
