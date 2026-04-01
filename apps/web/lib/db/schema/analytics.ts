@@ -371,3 +371,41 @@ export type NewNotificationSubscription =
 
 export type Tip = typeof tips.$inferSelect;
 export type NewTip = typeof tips.$inferInsert;
+
+// Audience blocks table — creators can block individual audience members
+// from viewing their public profile. Blocked visitors are silently redirected.
+export const audienceBlocks = pgTable(
+  'audience_blocks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    audienceMemberId: uuid('audience_member_id').references(
+      () => audienceMembers.id,
+      { onDelete: 'set null' }
+    ),
+    fingerprint: text('fingerprint').notNull(),
+    email: text('email'), // stored lowercase for case-insensitive matching
+    displayName: text('display_name'), // snapshotted at block time
+    geoCity: text('geo_city'), // snapshotted at block time
+    geoCountry: text('geo_country'), // snapshotted at block time
+    reason: text('reason'),
+    blockedAt: timestamp('blocked_at').defaultNow().notNull(),
+    unblockedAt: timestamp('unblocked_at'),
+  },
+  table => [
+    uniqueIndex('audience_blocks_profile_fingerprint_active')
+      .on(table.creatorProfileId, table.fingerprint)
+      .where(drizzleSql`unblocked_at IS NULL`),
+    index('idx_audience_blocks_profile_email_active')
+      .on(table.creatorProfileId, table.email)
+      .where(drizzleSql`email IS NOT NULL AND unblocked_at IS NULL`),
+  ]
+);
+
+export const insertAudienceBlockSchema = createInsertSchema(audienceBlocks);
+export const selectAudienceBlockSchema = createSelectSchema(audienceBlocks);
+
+export type AudienceBlock = typeof audienceBlocks.$inferSelect;
+export type NewAudienceBlock = typeof audienceBlocks.$inferInsert;
