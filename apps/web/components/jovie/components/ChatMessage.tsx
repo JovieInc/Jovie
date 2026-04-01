@@ -225,7 +225,7 @@ export function ChatMessage({
             </div>
           )}
           {messageText && (
-            <div className='whitespace-pre-wrap text-[15px] leading-7 tracking-[-0.01em]'>
+            <div className='whitespace-pre-wrap text-[15px] leading-6 tracking-[-0.01em]'>
               {messageText}
             </div>
           )}
@@ -309,17 +309,14 @@ export function ChatMessage({
           })}
 
           {!isStreaming && messageText && (
-            <div className='mt-2 flex items-center gap-2 pl-1.5'>
-              <span className='text-[10px] font-medium uppercase tracking-[0.14em] text-tertiary-token'>
-                Response
-              </span>
-              <SimpleTooltip content={isSuccess ? 'Copied!' : 'Copy'}>
+            <div className='mt-2 flex items-center gap-1.5 pl-1.5'>
+              <SimpleTooltip content={isSuccess ? 'Copied!' : 'Copy response'}>
                 <button
                   type='button'
                   onClick={() => copy(messageText)}
                   className={cn(
                     APP_CONTROL_BUTTON_CLASS,
-                    'h-7 px-2.5 text-secondary-token'
+                    'h-7 gap-1.5 px-2.5 text-tertiary-token hover:text-secondary-token'
                   )}
                   aria-label={
                     isSuccess ? 'Copied to clipboard' : 'Copy message'
@@ -330,7 +327,7 @@ export function ChatMessage({
                   ) : (
                     <Copy className='h-3.5 w-3.5' />
                   )}
-                  <span className='text-[11px] font-medium uppercase tracking-[0.12em]'>
+                  <span className='text-[11px] font-[450]'>
                     {isSuccess ? 'Copied' : 'Copy'}
                   </span>
                 </button>

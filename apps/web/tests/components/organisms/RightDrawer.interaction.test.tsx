@@ -47,12 +47,9 @@ describe('RightDrawer', () => {
 
     expect(aside).toHaveAttribute('aria-hidden', 'false');
     expect(aside).toHaveStyle({ width: '360px' });
-    expect(aside).toHaveClass(
-      'lg:border',
-      'lg:rounded-[var(--linear-app-shell-radius)]',
-      'bg-surface-0',
-      'shadow-[var(--linear-app-drawer-shadow)]'
-    );
+    expect(aside).toHaveClass('bg-surface-0');
+    expect(aside).not.toHaveClass('lg:border');
+    expect(aside).not.toHaveClass('shadow-[var(--linear-app-drawer-shadow)]');
   });
 
   it('calls keyboard handler only when focus is inside the drawer', () => {
@@ -141,9 +138,11 @@ describe('RightDrawer', () => {
     expect(desktopAside).toHaveClass(
       'transition-[width,opacity]',
       'opacity-100',
-      'lg:border',
-      'lg:rounded-[var(--linear-app-shell-radius)]',
       'bg-surface-0'
+    );
+    expect(desktopAside).not.toHaveClass('lg:border');
+    expect(desktopAside).not.toHaveClass(
+      'lg:rounded-[var(--linear-app-shell-radius)]'
     );
     expect(desktopAside).toHaveStyle({ width: '420px' });
     expect(mockUseBreakpointDown).toHaveBeenCalledWith('lg');

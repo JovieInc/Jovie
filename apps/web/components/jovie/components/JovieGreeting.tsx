@@ -55,7 +55,7 @@ export function JovieGreeting({
   return (
     <div
       className={cn(
-        'mx-auto max-w-[42rem] rounded-[22px] border border-black/6 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] px-5 py-3.5 text-center shadow-[0_1px_0_rgba(255,255,255,0.6)] dark:border-white/8 sm:px-6',
+        'mx-auto max-w-[42rem] rounded-[22px] border border-black/6 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] px-5 py-3.5 text-center dark:border-white/8 sm:px-6',
         className
       )}
     >

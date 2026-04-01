@@ -11,7 +11,7 @@ export const CHAT_PROMPT_RAIL_MASK_STYLE = {
 } as const;
 
 const CHAT_PROMPT_PILL_BASE_CLASS =
-  'group inline-flex items-center gap-2 rounded-full border border-black/6 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] text-left text-secondary-token shadow-[0_1px_0_rgba(255,255,255,0.55),0_8px_18px_-18px_rgba(15,23,42,0.55)] transition-[background-color,border-color,color,box-shadow,transform] duration-150 hover:border-black/10 hover:bg-surface-0 hover:text-primary-token hover:shadow-[0_1px_0_rgba(255,255,255,0.7),0_12px_22px_-18px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/12 active:translate-y-px active:bg-surface-1 dark:border-white/8 dark:hover:border-white/12';
+  'group inline-flex items-center gap-2 rounded-full border border-black/6 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] text-left text-secondary-token shadow-[0_1px_3px_rgba(15,23,42,0.06)] transition-[background-color,border-color,color,box-shadow,transform] duration-150 hover:border-black/10 hover:bg-surface-0 hover:text-primary-token hover:shadow-[0_1px_4px_rgba(15,23,42,0.09)] focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/12 active:translate-y-px active:bg-surface-1 dark:border-white/[0.07] dark:shadow-[0_1px_3px_rgba(0,0,0,0.18)] dark:hover:border-white/[0.10] dark:hover:shadow-[0_1px_4px_rgba(0,0,0,0.24)]';
 
 const CHAT_PROMPT_PILL_DEFAULT_CLASS =
   'min-w-[168px] max-w-[228px] px-3 py-1.5 text-[12px]';
