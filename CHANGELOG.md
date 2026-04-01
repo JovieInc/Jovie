@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.109] - 2026-04-01
+
+> Polished the Jovie chat interface and dashboard shell visual design: flattened the right drawer to match Linear's app-shell elevation, elevated entity cards so they read clearly on the flat surface, cleaned up bevel shadows from the chat input and suggestion pills, and vertically centered the chat welcome state.
+
+### Changed
+
+- Chat input and suggestion pills no longer have the bevel highlight shadow that created a false border effect
+- Welcome screen text is smaller and tighter, vertically centered as a single composed block
+- Right drawer on desktop is now flat — no border, no radius, no shadow — matching the main content surface
+- Entity header card inside the drawer shell is now visibly elevated with an ambient shadow
+- [internal] Removed "Response" label and uppercase tracking from chat message metadata
+
+### Fixed
+
+- [internal] Welcome state gradient position adjusted to stay within the centered content block
+- [internal] Updated surface-elevation guardrail tests to reflect the intentional flat-drawer design
+
 ## [26.4.108] - 2026-04-01
 
 ### Fixed
