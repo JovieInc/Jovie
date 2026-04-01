@@ -496,58 +496,55 @@ export function JovieChat({
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.15 }}
           >
-            <div className='flex flex-1 flex-col px-4 py-6 sm:px-6 sm:py-8'>
-              <div className='mx-auto flex w-full max-w-[50rem] flex-1 flex-col'>
-                <div className='relative mx-auto flex w-full max-w-[36rem] flex-1 flex-col items-center pt-[clamp(2.75rem,10vh,6rem)] text-center'>
+            <div className='flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-6 sm:py-8'>
+              <div className='mx-auto flex w-full max-w-[50rem] flex-col items-center gap-8'>
+                <div className='relative flex w-full max-w-[36rem] flex-col items-center gap-1.5 text-center'>
                   <div
                     aria-hidden='true'
-                    className='pointer-events-none absolute left-1/2 top-10 h-48 w-48 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,color-mix(in_oklab,var(--linear-accent)_10%,transparent)_0%,transparent_74%)] blur-3xl'
+                    className='pointer-events-none absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,color-mix(in_oklab,var(--linear-accent)_10%,transparent)_0%,transparent_74%)] blur-3xl'
                   />
-
-                  <div className='relative flex w-full flex-col items-center gap-2.5'>
-                    <h1 className='text-balance text-[2rem] font-[560] tracking-[-0.04em] text-primary-token sm:text-[2.75rem]'>
-                      Welcome to Jovie
-                    </h1>
-                    <p className='max-w-[28rem] text-balance text-[14px] leading-6 text-secondary-token sm:text-[15px]'>
-                      Ask anything or tell Jovie what you need
-                    </p>
-                  </div>
-
-                  <div className='relative mt-6 w-full max-w-[35rem] space-y-3'>
-                    {isRateLimited && (
-                      <p
-                        className='text-center text-xs text-tertiary-token'
-                        aria-live='polite'
-                      >
-                        Sending too fast. Please wait a second before your next
-                        message.
-                      </p>
-                    )}
-                    <ChatUsageAlert />
-                    <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
-
-                    {chatError && (
-                      <ErrorDisplay
-                        chatError={chatError}
-                        onRetry={handleRetry}
-                        isLoading={isLoading}
-                        isSubmitting={isSubmitting}
-                      />
-                    )}
-                  </div>
-
-                  <div className='mt-5 flex w-full max-w-[39rem] flex-col items-center gap-2'>
-                    <SuggestedPrompts
-                      onSelect={handleSuggestedPrompt}
-                      isFirstSession={isFirstSession}
-                      latestReleaseTitle={latestReleaseTitle}
-                      canUseAdvancedTools={aiCanUseTools}
-                      layout='rail'
-                    />
-                  </div>
+                  <h1 className='text-balance text-[1.375rem] font-[560] tracking-[-0.03em] text-primary-token sm:text-[1.625rem]'>
+                    Welcome to Jovie
+                  </h1>
+                  <p className='max-w-[28rem] text-balance text-[13px] leading-5 text-secondary-token'>
+                    Ask anything or tell Jovie what you need
+                  </p>
                 </div>
 
-                <div className='chat-stagger mx-auto mt-8 w-full max-w-[42rem] space-y-4 sm:space-y-5'>
+                <div className='relative w-full max-w-[35rem] space-y-3'>
+                  {isRateLimited && (
+                    <p
+                      className='text-center text-xs text-tertiary-token'
+                      aria-live='polite'
+                    >
+                      Sending too fast. Please wait a second before your next
+                      message.
+                    </p>
+                  )}
+                  <ChatUsageAlert />
+                  <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
+
+                  {chatError && (
+                    <ErrorDisplay
+                      chatError={chatError}
+                      onRetry={handleRetry}
+                      isLoading={isLoading}
+                      isSubmitting={isSubmitting}
+                    />
+                  )}
+                </div>
+
+                <div className='flex w-full max-w-[39rem] flex-col items-center gap-2'>
+                  <SuggestedPrompts
+                    onSelect={handleSuggestedPrompt}
+                    isFirstSession={isFirstSession}
+                    latestReleaseTitle={latestReleaseTitle}
+                    canUseAdvancedTools={aiCanUseTools}
+                    layout='rail'
+                  />
+                </div>
+
+                <div className='chat-stagger w-full max-w-[42rem] space-y-4 sm:space-y-5'>
                   {showSuggestedProfiles && (
                     <SuggestedProfilesCarousel
                       suggestions={suggestedProfiles.suggestions}
