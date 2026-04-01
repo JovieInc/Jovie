@@ -30,23 +30,23 @@ const artist = {
 } as const;
 
 describe('profile V2 layout constraints', () => {
-  it('keeps the desktop shell boxed to a mobile-width card', () => {
+  it('keeps the desktop shell centered without forcing a two-column split', () => {
     render(
       <ProfileViewportShell
         ambientImageUrl='https://example.com/ambient.jpg'
         artistName='Tim White'
+        header={<div>Hero</div>}
       >
         <div>Profile content</div>
       </ProfileViewportShell>
     );
 
     expect(screen.getByTestId('profile-viewport-shell')).toHaveClass(
-      'md:max-w-[440px]',
-      'md:rounded-xl'
+      'md:rounded-[30px]'
     );
   });
 
-  it('constrains hero image sizing instead of requesting desktop 100vw', () => {
+  it('requests a responsive editorial hero image size on desktop', () => {
     render(
       <ArtistHero
         artist={artist as never}
@@ -55,16 +55,18 @@ describe('profile V2 layout constraints', () => {
         primaryAction={{ label: 'Listen Now', onClick: () => {} }}
         onBellClick={() => {}}
         onPlayClick={() => {}}
+        spotlightLabel='Latest release'
+        spotlightValue='Mar 31'
       />
     );
 
     expect(screen.getByTestId('image-with-fallback')).toHaveAttribute(
       'data-sizes',
-      '(max-width: 768px) 100vw, 440px'
+      '(max-width: 767px) 100vw, (max-width: 1280px) 46vw, 620px'
     );
   });
 
-  it('uses the reduced hero height so more content fits above the fold', () => {
+  it('uses a taller immersive hero instead of the compressed banner height', () => {
     const { container } = render(
       <ArtistHero
         artist={artist as never}
@@ -73,13 +75,15 @@ describe('profile V2 layout constraints', () => {
         primaryAction={{ label: 'Listen Now', onClick: () => {} }}
         onBellClick={() => {}}
         onPlayClick={() => {}}
+        spotlightLabel='Latest release'
+        spotlightValue='Mar 31'
       />
     );
 
     expect(container.firstChild).toHaveClass(
-      'h-[32dvh]',
-      'min-h-[260px]',
-      'max-h-[320px]'
+      'h-[48dvh]',
+      'min-h-[420px]',
+      'max-h-[620px]'
     );
   });
 });

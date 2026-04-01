@@ -360,25 +360,64 @@ export function PublicProfileTemplateV2({
     tourDates,
   ]);
 
+  const heroSpotlight = useMemo(() => {
+    const featuredContent = resolveFeaturedContent(tourDates, latestRelease);
+
+    if (featuredContent.kind === 'tour') {
+      return {
+        label: 'Next show',
+        value: new Intl.DateTimeFormat('en-US', {
+          month: 'short',
+          day: 'numeric',
+        }).format(new Date(featuredContent.tourDate.startDate)),
+      };
+    }
+
+    if (
+      featuredContent.kind === 'release' &&
+      featuredContent.release.releaseDate
+    ) {
+      return {
+        label: 'Latest release',
+        value: new Intl.DateTimeFormat('en-US', {
+          month: 'short',
+          day: 'numeric',
+        }).format(new Date(featuredContent.release.releaseDate)),
+      };
+    }
+
+    return {
+      label: mergedDSPs.length > 0 ? 'Listen now' : 'Profile',
+      value:
+        mergedDSPs.length > 0
+          ? `${mergedDSPs.length} platforms`
+          : artist.handle,
+    };
+  }, [artist.handle, latestRelease, mergedDSPs.length, tourDates]);
+
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <ProfileViewportShell
         ambientImageUrl={heroImageUrl}
         artistName={artist.name}
-      >
-        <div
-          className='relative flex h-full flex-col overflow-hidden bg-base'
-          data-test='public-profile-root'
-        >
+        header={
           <ArtistHero
             artist={artist}
             heroImageUrl={heroImageUrl}
             latestRelease={latestRelease}
             primaryAction={primaryAction}
+            primaryActionKind={primaryActionKind}
+            spotlightLabel={heroSpotlight.label}
+            spotlightValue={heroSpotlight.value}
             onPlayClick={handlePlayClick}
             onBellClick={handleBellClick}
           />
-
+        }
+      >
+        <div
+          className='relative flex h-full flex-col overflow-hidden'
+          data-test='public-profile-root'
+        >
           <ProfileScrollBody
             artist={artist}
             socialLinks={visibleSocialLinks}

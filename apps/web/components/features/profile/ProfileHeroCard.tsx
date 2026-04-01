@@ -1,7 +1,6 @@
 'use client';
 
-import { Bell, Play } from 'lucide-react';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import { Bell, Play, Ticket } from 'lucide-react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import type { Artist } from '@/types/db';
 
@@ -25,6 +24,9 @@ interface ArtistHeroProps {
   };
   readonly onPlayClick: () => void;
   readonly onBellClick: () => void;
+  readonly spotlightLabel?: string | null;
+  readonly spotlightValue?: string | null;
+  readonly primaryActionKind?: 'tickets' | 'listen' | 'subscribe';
 }
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -53,69 +55,88 @@ export function ArtistHero({
   primaryAction,
   onPlayClick,
   onBellClick,
+  spotlightLabel,
+  spotlightValue,
+  primaryActionKind = 'listen',
 }: ArtistHeroProps) {
   const eyebrow = getReleaseEyebrow(latestRelease);
+  const secondaryAction =
+    primaryActionKind === 'listen'
+      ? {
+          label: 'Get Notified',
+          icon: <Bell className='mr-2 h-4 w-4' aria-hidden='true' />,
+          onClick: onBellClick,
+          ariaLabel: `Get notified about ${artist.name}`,
+        }
+      : {
+          label: 'Listen',
+          icon: (
+            <Play className='mr-2 h-4 w-4 fill-current' aria-hidden='true' />
+          ),
+          onClick: onPlayClick,
+          ariaLabel: `Listen to ${artist.name}`,
+        };
   const primaryActionClassName =
-    'inline-flex min-h-11 items-center justify-center rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-black shadow-[0_12px_28px_rgba(0,0,0,0.28)] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+    'inline-flex min-h-12 items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-[590] text-black shadow-[0_18px_45px_rgba(0,0,0,0.34)] transition-[transform,opacity] duration-200 hover:opacity-92 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
 
   return (
-    <section className='relative h-[32dvh] min-h-[260px] max-h-[320px] w-full overflow-hidden md:h-[320px]'>
-      {/* Artist photo — full bleed background */}
+    <section className='relative h-[48dvh] min-h-[420px] max-h-[620px] w-full overflow-hidden md:h-[56dvh] md:min-h-[520px] md:rounded-t-[30px]'>
       <div className='absolute inset-0'>
         <ImageWithFallback
           src={heroImageUrl ?? artist.image_url}
           alt={artist.name}
           fill
-          priority
-          sizes='(max-width: 768px) 100vw, 440px'
-          className='object-cover object-[center_24%]'
+          priority={true}
+          sizes='(max-width: 767px) 100vw, (max-width: 1280px) 46vw, 620px'
+          className='object-cover object-center md:scale-[1.02]'
           fallbackVariant='avatar'
           fallbackClassName='bg-surface-2'
         />
       </div>
 
-      {/* Top vignette — subtle contrast for floating buttons */}
-      <div className='pointer-events-none absolute inset-0 bg-gradient-to-b from-black/30 via-black/8 via-35% to-transparent' />
+      <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.22),transparent_30%),linear-gradient(180deg,rgba(4,6,10,0.06)_0%,rgba(5,7,12,0.18)_30%,rgba(7,8,10,0.82)_76%,rgba(7,8,10,0.98)_100%)]' />
+      <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,transparent_48%,rgba(6,7,10,0.6)_68%,rgba(5,6,8,0.96)_100%)]' />
 
-      {/* Bottom gradient — readable text zone, fades into bg-base */}
-      <div className='pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--color-bg-base)] via-[var(--color-bg-base)]/68 via-28% to-transparent' />
+      <div className='relative flex h-full flex-col justify-between px-5 pb-6 pt-[max(env(safe-area-inset-top),1rem)] md:px-7 md:pb-8 md:pt-6'>
+        <div className='flex justify-between gap-3'>
+          <div className='flex items-start gap-2'>
+            {spotlightLabel && spotlightValue ? (
+              <div className='rounded-full border border-white/12 bg-black/20 px-3 py-1.5 backdrop-blur-md'>
+                <p className='text-[0.65rem] font-[590] uppercase tracking-[0.18em] text-white/52'>
+                  {spotlightLabel}
+                </p>
+                <p className='mt-0.5 text-xs font-[590] text-white/90 md:text-sm'>
+                  {spotlightValue}
+                </p>
+              </div>
+            ) : null}
+          </div>
 
-      {/* Content overlay */}
-      <div className='relative flex h-full flex-col justify-between px-4 pb-5 pt-[max(env(safe-area-inset-top),0.75rem)] md:px-5'>
-        <div className='flex justify-end pt-2'>
-          <CircleIconButton
-            ariaLabel={`Get notified about ${artist.name}`}
-            size='md'
-            variant='frosted'
+          <button
+            type='button'
             onClick={onBellClick}
+            className='inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-white/12 bg-black/20 px-4 text-sm font-[590] text-white/88 backdrop-blur-md transition-[background-color,border-color,color] hover:border-white/20 hover:bg-black/28 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+            aria-label={`Get notified about ${artist.name}`}
           >
             <Bell className='h-4 w-4' aria-hidden='true' />
-          </CircleIconButton>
+            <span className='sr-only md:not-sr-only md:inline'>Notify</span>
+          </button>
         </div>
 
-        <div className='mt-auto space-y-4'>
-          <div className='min-w-0 space-y-1.5'>
+        <div className='mt-auto max-w-[32rem] space-y-4 md:space-y-5'>
+          <div className='space-y-2'>
             {eyebrow ? (
-              <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60'>
+              <p className='text-[0.72rem] font-[590] uppercase tracking-[0.18em] text-white/58'>
                 {eyebrow}
               </p>
             ) : null}
-            <h1 className='line-clamp-2 text-3xl font-[680] tracking-tight text-white'>
+
+            <h1 className='line-clamp-3 max-w-[20rem] text-[2.4rem] font-[680] tracking-[-0.05em] text-white md:max-w-[30rem] md:text-[3.8rem] md:leading-[0.94]'>
               {artist.name}
             </h1>
           </div>
 
-          <div className='flex items-center gap-3'>
-            <CircleIconButton
-              ariaLabel={`Listen to ${artist.name}`}
-              size='lg'
-              variant='frosted'
-              className='shrink-0'
-              onClick={onPlayClick}
-            >
-              <Play className='h-5 w-5 fill-current' aria-hidden='true' />
-            </CircleIconButton>
-
+          <div className='flex flex-wrap items-center gap-3'>
             {primaryAction.href ? (
               <a
                 href={primaryAction.href}
@@ -124,6 +145,14 @@ export function ArtistHero({
                 aria-label={primaryAction.ariaLabel ?? primaryAction.label}
                 className={primaryActionClassName}
               >
+                {primaryActionKind === 'tickets' ? (
+                  <Ticket className='mr-2 h-4 w-4' aria-hidden='true' />
+                ) : (
+                  <Play
+                    className='mr-2 h-4 w-4 fill-current'
+                    aria-hidden='true'
+                  />
+                )}
                 {primaryAction.label}
               </a>
             ) : (
@@ -133,9 +162,27 @@ export function ArtistHero({
                 aria-label={primaryAction.ariaLabel ?? primaryAction.label}
                 className={primaryActionClassName}
               >
+                {primaryActionKind === 'tickets' ? (
+                  <Ticket className='mr-2 h-4 w-4' aria-hidden='true' />
+                ) : (
+                  <Play
+                    className='mr-2 h-4 w-4 fill-current'
+                    aria-hidden='true'
+                  />
+                )}
                 {primaryAction.label}
               </button>
             )}
+
+            <button
+              type='button'
+              onClick={secondaryAction.onClick}
+              className='inline-flex min-h-12 items-center justify-center rounded-full border border-white/12 bg-white/8 px-5 py-3 text-sm font-[590] text-white/90 backdrop-blur-md transition-[background-color,border-color,color] hover:border-white/20 hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+              aria-label={secondaryAction.ariaLabel}
+            >
+              {secondaryAction.icon}
+              {secondaryAction.label}
+            </button>
           </div>
         </div>
       </div>

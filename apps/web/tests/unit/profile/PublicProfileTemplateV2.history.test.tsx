@@ -52,8 +52,17 @@ vi.mock('@/features/profile/ProfileScrollBody', () => ({
 }));
 
 vi.mock('@/features/profile/ProfileViewportShell', () => ({
-  ProfileViewportShell: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
+  ProfileViewportShell: ({
+    header,
+    children,
+  }: {
+    header: React.ReactNode;
+    children: React.ReactNode;
+  }) => (
+    <div>
+      {header}
+      {children}
+    </div>
   ),
 }));
 
