@@ -493,7 +493,7 @@ function TaskDocumentPanel({
         </div>
 
         <div className='min-h-0 flex-1 overflow-y-auto'>
-          <div className='mx-auto flex w-full max-w-[58rem] flex-col gap-6 px-6 py-6 sm:px-8 sm:py-8'>
+          <div className='mx-auto flex w-full max-w-[52rem] flex-col gap-8 px-6 py-6 sm:px-8 sm:py-8'>
             <div className='space-y-3'>
               <TaskTitleEditor value={title} onChange={onTitleChange} />
               <p className='max-w-[42rem] text-[14px] leading-[22px] text-secondary-token'>
@@ -502,7 +502,7 @@ function TaskDocumentPanel({
               </p>
             </div>
 
-            <div className='grid gap-4 xl:grid-cols-[minmax(0,1fr)_17rem]'>
+            <div className='space-y-6'>
               <div
                 className={cn(
                   PAGE_SHELL_SURFACE_CLASSNAMES.workspace,
@@ -524,11 +524,11 @@ function TaskDocumentPanel({
                   value={description}
                   onChange={event => onDescriptionChange(event.target.value)}
                   placeholder='Write the brief, constraints, notes, deliverables, and any context an assignee or agent should keep in mind.'
-                  className='mt-5 min-h-[420px] w-full resize-none border-0 bg-transparent px-0 text-[15px] leading-[1.85] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
+                  className='mt-5 min-h-[320px] w-full resize-none border-0 bg-transparent px-0 text-[15px] leading-[1.85] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
                 />
               </div>
 
-              <aside className='space-y-4'>
+              <div className='space-y-4'>
                 <div
                   className={cn(
                     PAGE_SHELL_SURFACE_CLASSNAMES.inspector,
@@ -560,7 +560,7 @@ function TaskDocumentPanel({
                     <li>Make agent expectations explicit.</li>
                   </ul>
                 </div>
-              </aside>
+              </div>
             </div>
           </div>
         </div>
@@ -693,6 +693,8 @@ export function TasksPageClient() {
   );
   const [editorTitle, setEditorTitle] = useState('');
   const [editorDescription, setEditorDescription] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const deferredSearch = useDeferredValue(search);
   const profileId = selectedProfile?.id;
   const createTaskMutation = useCreateTaskMutation();
@@ -803,6 +805,12 @@ export function TasksPageClient() {
     setEditorTitle(selectedTask.title);
     setEditorDescription(selectedTask.description ?? '');
   }, [selectedTask]);
+
+  useEffect(() => {
+    if (isSearchOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isSearchOpen]);
 
   const openReleaseSidebar = useCallback((task: TaskView) => {
     if (task.releaseId) {
@@ -1106,20 +1114,48 @@ export function TasksPageClient() {
 
         <PageToolbar
           start={
-            <div className='flex min-w-0 flex-1 items-center gap-2'>
-              <div className='relative min-w-0 flex-1 max-w-[320px]'>
-                <Search className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
-                <Input
-                  value={search}
-                  onChange={event => setSearch(event.target.value)}
-                  placeholder='Search Tasks'
-                  className='h-8 pl-8 text-[12px]'
+            <div className='flex min-w-0 flex-1 items-center justify-between gap-2'>
+              <div className='flex items-center gap-2'>
+                {isSearchOpen ? (
+                  <div className='relative flex items-center'>
+                    <Search className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
+                    <Input
+                      ref={searchInputRef}
+                      value={search}
+                      onChange={event => setSearch(event.target.value)}
+                      placeholder='Search Tasks'
+                      className='h-8 w-[240px] pl-8 text-[12px]'
+                      onBlur={() => {
+                        if (!search.trim()) {
+                          setIsSearchOpen(false);
+                        }
+                      }}
+                      onKeyDown={event => {
+                        if (event.key === 'Escape') {
+                          setIsSearchOpen(false);
+                          setSearch('');
+                        }
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    type='button'
+                    onClick={() => setIsSearchOpen(true)}
+                    className='inline-flex h-8 w-8 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
+                    aria-label='Search tasks'
+                  >
+                    <Search className='h-4 w-4' />
+                  </button>
+                )}
+              </div>
+              <div className='flex items-center gap-2'>
+                <TableFilterDropdown
+                  categories={taskFilterCategories}
+                  onClearAll={clearFilters}
+                  iconOnly
                 />
               </div>
-              <TableFilterDropdown
-                categories={taskFilterCategories}
-                onClearAll={clearFilters}
-              />
             </div>
           }
         />
@@ -1147,9 +1183,9 @@ export function TasksPageClient() {
           <div className='flex min-h-0 flex-1 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--linear-app-content-surface)_38%,transparent),transparent_20%)]'>
             <div
               className={cn(
-                'min-h-0 min-w-0 shrink-0 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_54%,transparent)]',
+                'min-h-0 min-w-0 shrink-0 overflow-x-hidden bg-[color-mix(in_oklab,var(--linear-app-content-surface)_54%,transparent)]',
                 selectedTask || showTaskWorkbenchEmptyState
-                  ? 'w-[clamp(20rem,34vw,34rem)] border-r border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
+                  ? 'w-[clamp(18rem,32vw,30rem)] border-r border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
                   : 'flex-1'
               )}
             >
