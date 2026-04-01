@@ -191,6 +191,7 @@ describe('performance route resolvers', () => {
 
   it('falls back to the authenticated releases UI when DB release lookup is unavailable', async () => {
     vi.unstubAllEnvs();
+    vi.stubEnv('DATABASE_URL', ''); // Doppler injects a real DATABASE_URL; explicitly clear to simulate unavailability
 
     const click = vi.fn().mockResolvedValue(undefined);
     const goto = vi.fn().mockResolvedValue(undefined);
