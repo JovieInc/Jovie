@@ -67,6 +67,56 @@ export const MODES: ModeData[] = [
   },
 ] as const;
 
+export const PHONE_TOUR_CONTAINER_CLASS =
+  'mx-auto w-full max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0';
+
+export const PHONE_TOUR_SHOWCASE_SHADOW =
+  'drop-shadow(0 25px 60px rgba(0,0,0,0.35)) drop-shadow(0 8px 30px rgba(94,106,210,0.15))';
+
+export function PhoneTourDivider() {
+  return (
+    <div
+      aria-hidden='true'
+      className='mx-auto mb-16 h-px max-w-lg'
+      style={{
+        background:
+          'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
+      }}
+    />
+  );
+}
+
+export function PhoneTourMobileSection() {
+  return (
+    <section className='lg:hidden section-spacing-linear'>
+      <div className={PHONE_TOUR_CONTAINER_CLASS}>
+        <PhoneTourDivider />
+
+        <div>
+          <div className='mb-12 flex flex-col items-center gap-6 text-center'>
+            <span className='inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
+              One profile. Every way fans support you.
+            </span>
+            <h2 className='marketing-h2-linear text-primary-token'>
+              The right action for every fan.
+            </h2>
+            <p className='max-w-[400px] marketing-lead-linear text-secondary-token'>
+              Every visitor sees the action most likely to convert in that
+              moment: listen, tip, tour, or subscribe.
+            </p>
+          </div>
+
+          <div className='grid gap-4 sm:grid-cols-2'>
+            {MODES.map(mode => (
+              <MobileCard key={mode.id} mode={mode} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Scroll-to-index pure function (testable)                           */
 /* ------------------------------------------------------------------ */

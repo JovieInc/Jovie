@@ -83,9 +83,9 @@ export const FEATURE_FLAGS = {
   /** PWA install banner in the sidebar */
   PWA_INSTALL_BANNER: false,
   /** Sticky phone tour on marketing homepage */
-  SHOW_PHONE_TOUR: false,
+  SHOW_PHONE_TOUR: true,
   /** Logo bar ("Trusted by artists on") on marketing homepage */
-  SHOW_LOGO_BAR: false,
+  SHOW_LOGO_BAR: true,
   /** Feature showcase bento grid on marketing homepage */
   SHOW_FEATURE_SHOWCASE: false,
   /** Final CTA section on marketing homepage */

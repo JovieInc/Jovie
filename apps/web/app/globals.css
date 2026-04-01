@@ -650,6 +650,15 @@ body {
   .hero-stagger > *:nth-child(5) {
     animation-delay: 240ms;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-stagger,
+    .hero-stagger > * {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+    }
+  }
 }
 
 /* ============================================

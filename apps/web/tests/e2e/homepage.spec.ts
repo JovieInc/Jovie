@@ -28,20 +28,20 @@ test.describe('Homepage', () => {
     await waitForHydration(page);
   });
 
-  test('hero renders with current headline, lead, and claim form', async ({
+  test('hero renders with current headline, lead, and CTA button', async ({
     page,
   }) => {
-    await expect(page.locator('h1')).toContainText(
-      'The link your music deserves.'
-    );
+    await expect(page.locator('h1')).toContainText('Drop More Music.');
+    await expect(page.locator('h1')).toContainText('Crush Every Release.');
     await expect(
       page.getByText(
         'Smart links, release automation, and fan insight that keep every launch moving.'
       )
     ).toBeVisible();
 
-    const heroSection = page.locator('main section').first();
-    await expect(heroSection.locator('input').first()).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: /get started free/i })
+    ).toBeVisible();
   });
 
   test('header shows auth actions without marketing nav links', async ({
@@ -60,12 +60,6 @@ test.describe('Homepage', () => {
   test('core homepage sections render in order', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: 'The right action for every fan.' })
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Release day, automated.' })
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Know every fan by name.' })
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Claim your handle.' })
@@ -87,12 +81,9 @@ test.describe('Homepage', () => {
   test('is responsive on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
 
-    await expect(page.locator('h1')).toContainText(
-      'The link your music deserves.',
-      {
-        timeout: SMOKE_TIMEOUTS.VISIBILITY,
-      }
-    );
+    await expect(page.locator('h1')).toContainText('Drop More Music.', {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
     await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
@@ -101,8 +92,9 @@ test.describe('Homepage', () => {
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
 
-    const heroSection = page.locator('main section').first();
-    await expect(heroSection.locator('input').first()).toBeVisible({
+    await expect(
+      page.getByRole('link', { name: /get started free/i })
+    ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   });
