@@ -194,8 +194,21 @@ export const queryKeys = {
     all: ['releases'] as const,
     recent: (profileId: string) =>
       [...queryKeys.releases.all, 'recent', profileId] as const,
+    /**
+     * Release matrix key. Filtering is client-side via filterReleases(),
+     * so filters are intentionally excluded from the key to avoid
+     * duplicate cache entries for identical server data.
+     */
     matrix: (profileId: string) =>
       [...queryKeys.releases.all, 'matrix', profileId] as const,
+    /** For future server-side filtering. Not used by useReleasesQuery yet. */
+    matrixFiltered: (profileId: string, filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.releases.all,
+        'matrix',
+        profileId,
+        ...(filters ? [filters] : []),
+      ] as const,
     tracks: (releaseId: string) =>
       [...queryKeys.releases.all, 'tracks', releaseId] as const,
     dspStatus: (releaseId: string) =>
@@ -306,6 +319,7 @@ export const queryKeys = {
   // Audience infinite scroll
   audience: {
     all: ['audience'] as const,
+    /** Includes sort, direction, segments, and view in the filters object for cache granularity. */
     members: (profileId: string, filters?: Record<string, unknown>) =>
       [
         ...queryKeys.audience.all,

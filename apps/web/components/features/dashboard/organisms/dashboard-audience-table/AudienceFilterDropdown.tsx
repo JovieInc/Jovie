@@ -11,6 +11,7 @@ import {
 } from '@jovie/ui';
 import { type ReactNode, useCallback, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { ActiveFilterPill } from '@/components/molecules/filters';
 import {
   PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
@@ -90,39 +91,6 @@ type SegmentId =
   | 'frequent'
   | 'recent24h'
   | 'touringCity';
-
-interface ActiveFilterPillProps {
-  readonly groupLabel: string;
-  readonly values: string[];
-  readonly onClear: () => void;
-}
-
-function ActiveFilterPill({
-  groupLabel,
-  values,
-  onClear,
-}: ActiveFilterPillProps) {
-  const displayValue =
-    values.length > 1 ? `${values.length} selected` : values[0];
-
-  return (
-    <div className='flex items-center gap-0.5 rounded bg-surface-1 text-[11px]'>
-      <div className='flex items-center gap-1.5 py-0.5 pl-1.5 pr-0.5'>
-        <span className='text-tertiary-token'>{groupLabel}</span>
-        <span className='text-tertiary-token'>is</span>
-        <span className='font-[510] text-primary-token'>{displayValue}</span>
-      </div>
-      <button
-        type='button'
-        onClick={onClear}
-        className='flex h-full items-center rounded-r px-1 py-0.5 text-tertiary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-0'
-        aria-label={`Clear ${groupLabel} filter`}
-      >
-        <Icon name='X' className='h-3 w-3' strokeWidth={2} />
-      </button>
-    </div>
-  );
-}
 
 interface AudienceFilterDropdownProps {
   readonly filters: AudienceFilters;

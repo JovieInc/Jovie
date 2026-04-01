@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { STANDARD_CACHE } from './cache-strategies';
+import { STANDARD_NO_REMOUNT_CACHE } from './cache-strategies';
 import { createMutationFn, createQueryFn, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -52,10 +52,7 @@ export function useDashboardProfileQuery() {
   return useQuery({
     queryKey: queryKeys.user.profile(),
     queryFn: fetchDashboardProfile,
-    // Use STANDARD_CACHE preset (5 min stale time) to prevent frequent refetches
-    ...STANDARD_CACHE,
-    // Profile data is stable within the stale window — skip mount refetch
-    refetchOnMount: false,
+    ...STANDARD_NO_REMOUNT_CACHE,
   });
 }
 
