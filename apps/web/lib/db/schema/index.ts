@@ -19,9 +19,11 @@ export {
   selectCampaignSettingsSchema,
 } from './admin';
 
-// Analytics (Clicks, Audience, Tips)
+// Analytics (Clicks, Audience, Tips, Blocks)
 export {
+  type AudienceBlock,
   type AudienceMember,
+  audienceBlocks,
   audienceMembers,
   type ClickEvent,
   clickEvents,
@@ -30,9 +32,11 @@ export {
   FAN_NOTIFICATION_CONTENT_TYPES,
   type FanNotificationContentType,
   type FanNotificationPreferences,
+  insertAudienceBlockSchema,
   insertClickEventSchema,
   insertNotificationSubscriptionSchema,
   insertTipSchema,
+  type NewAudienceBlock,
   type NewAudienceMember,
   type NewClickEvent,
   type NewDailyProfileView,
@@ -40,6 +44,7 @@ export {
   type NewTip,
   type NotificationSubscription,
   notificationSubscriptions,
+  selectAudienceBlockSchema,
   selectClickEventSchema,
   selectNotificationSubscriptionSchema,
   selectTipSchema,
