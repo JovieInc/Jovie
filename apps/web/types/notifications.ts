@@ -89,6 +89,13 @@ export interface EmailMessage {
   replyTo?: string;
   headers?: Record<string, string>;
   from?: string;
+  attachments?: EmailAttachment[];
+}
+
+export interface EmailAttachment {
+  filename: string;
+  content: string;
+  contentType?: string;
 }
 
 export interface EmailProvider {

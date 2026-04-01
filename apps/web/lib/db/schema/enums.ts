@@ -365,6 +365,27 @@ export const dspBioSyncStatusEnum = pgEnum('dsp_bio_sync_status', [
   'unsupported',
 ]);
 
+export const metadataSubmissionStatusEnum = pgEnum(
+  'metadata_submission_status',
+  [
+    'draft',
+    'awaiting_approval',
+    'queued',
+    'sent',
+    'acknowledged',
+    'live',
+    'drifted',
+    'failed',
+    'manual_followup_needed',
+    'cancelled',
+  ]
+);
+
+export const metadataSubmissionIssueStatusEnum = pgEnum(
+  'metadata_submission_issue_status',
+  ['open', 'resolved', 'ignored']
+);
+
 // Chat Enums
 export const chatMessageRoleEnum = pgEnum('chat_message_role', [
   'user',
