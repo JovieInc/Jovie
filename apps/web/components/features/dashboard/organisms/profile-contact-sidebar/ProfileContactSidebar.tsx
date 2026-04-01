@@ -156,7 +156,7 @@ function ProfileSidebarHeaderCard({
 }>) {
   return (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
+      className='overflow-hidden'
       testId='profile-contact-header-card'
     >
       <div className='relative'>
@@ -168,7 +168,7 @@ function ProfileSidebarHeaderCard({
           />
         </div>
         <ProfileEntityHeader previewData={previewData} />
-        <div className='border-t border-(--linear-app-frame-seam)'>
+        <div>
           <ProfileSmartLinkAnalytics profileUrl={profileUrl} variant='flat' />
         </div>
       </div>
@@ -525,7 +525,7 @@ export function ProfileContactSidebar() {
         hideMinimalHeaderBar
       >
         <div className='flex min-h-full flex-col gap-2.5 pt-0.5'>
-          <div className={cn(LINEAR_SURFACE.sidebarCard, 'space-y-2.5 p-3')}>
+          <div className='space-y-2.5 p-3'>
             <div className='grid grid-cols-2 gap-3'>
               <div className='space-y-1'>
                 <div className='h-[9px] w-12 rounded skeleton' />
@@ -596,6 +596,7 @@ export function ProfileContactSidebar() {
         <div className='min-h-0 flex-1'>
           <DrawerTabbedCard
             testId='profile-contact-tabbed-card'
+            className='mt-2.5'
             tabs={
               <DrawerTabs
                 value={resolvedCategory}
