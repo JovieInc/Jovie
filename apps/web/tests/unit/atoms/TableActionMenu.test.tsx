@@ -81,8 +81,7 @@ describe('TableActionMenu', () => {
 
   it('converts separator items to dropdown separators', () => {
     render(<TableActionMenu items={sampleItems} />);
-    // Separator gets an auto-generated id prefixed with "separator-"
-    expect(screen.getByTestId('item-separator-1')).toBeInTheDocument();
+    expect(screen.getByTestId('item-menu-separator-1')).toBeInTheDocument();
   });
 
   it('renders destructive items', () => {

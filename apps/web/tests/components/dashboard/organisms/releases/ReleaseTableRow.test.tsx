@@ -25,12 +25,18 @@ vi.mock('@/components/atoms/table-action-menu', () => ({
   TableActionMenu: ({
     items,
   }: {
-    items: Array<{ id: string; label: string }>;
+    items: Array<{
+      id: string;
+      label?: string;
+      children?: Array<{ id: string; label?: string }>;
+    }>;
   }) => (
     <div data-testid='table-action-menu'>
-      {items.map(item => (
-        <span key={item.id}>{item.label}</span>
-      ))}
+      {items
+        .flatMap(item => [item, ...(item.children ?? [])])
+        .map(item =>
+          item.label ? <span key={item.id}>{item.label}</span> : null
+        )}
     </div>
   ),
 }));
@@ -46,7 +52,7 @@ vi.mock('@/lib/utm', () => ({
 }));
 
 describe('ReleaseTableRow', () => {
-  it('includes Copy QR code action in the row action menu', () => {
+  it('groups share and metadata actions in the row action menu', () => {
     const release: ReleaseViewModel = {
       profileId: 'profile-1',
       id: 'release-1',
@@ -82,6 +88,7 @@ describe('ReleaseTableRow', () => {
       </table>
     );
 
-    expect(screen.getByText('Copy QR code')).toBeInTheDocument();
+    expect(screen.getByText('Share link')).toBeInTheDocument();
+    expect(screen.getByText('Copy metadata')).toBeInTheDocument();
   });
 });
