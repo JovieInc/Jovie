@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.108] - 2026-04-01
+
+### Fixed
+
+- [internal] Fixed performance route resolver test to correctly simulate unavailable database in Doppler-injected environments
+
 ## [26.4.107] - 2026-04-01
 
 > Reworked the marketing homepage with a sharper hero, a clearer artist profiles landing page, and smoother motion behavior. Internal route/config alignment and test updates shipped alongside the visual refresh.
