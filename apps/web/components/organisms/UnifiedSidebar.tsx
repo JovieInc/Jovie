@@ -25,7 +25,7 @@ import {
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
 import { BASE_URL } from '@/constants/domains';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 import {
   adminSettingsNavItem,
@@ -308,8 +308,7 @@ function SidebarHeaderNav({
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
   const { isAdmin: isUserAdmin, creatorProfiles } = useDashboardData();
   const pathname = usePathname();
-  const isDemoRoute =
-    pathname === APP_ROUTES.DEMO || pathname.startsWith(`${APP_ROUTES.DEMO}/`);
+  const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
   const isAdmin = section === 'admin';
   const isDashboardOrAdmin = section !== 'settings';
@@ -330,7 +329,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       <SidebarHeader
         className={cn(
           'relative justify-center gap-0 px-2.5',
-          isInSettings ? 'h-10 py-0' : 'h-10 pt-[6px] pb-0'
+          'h-(--linear-app-header-height-compact) py-0'
         )}
       >
         <SidebarHeaderNav
@@ -343,7 +342,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         />
       </SidebarHeader>
 
-      <SidebarContent className='min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2.5 pb-2'>
+      <SidebarContent className='min-h-0 flex-1 px-2.5 pb-2.5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-0.5'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (

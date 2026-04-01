@@ -6,6 +6,7 @@ import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelC
 import {
   DrawerCardActionBar,
   DrawerSurfaceCard,
+  DrawerTabbedCard,
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
@@ -62,7 +63,7 @@ export function AdminProfileSidebar({
     return mapContactLinksToPreviewLinks(contact);
   }, [contact]);
 
-  const { primaryActions, overflowActions } = useProfileHeaderParts({
+  const { primaryActions } = useProfileHeaderParts({
     username: profile?.username ?? '',
     displayName: profile?.displayName ?? profile?.username ?? '',
     profilePath: profile?.username ? `/${profile.username}` : '',
@@ -121,38 +122,44 @@ export function AdminProfileSidebar({
           </div>
           <DrawerCardActionBar
             primaryActions={primaryActions}
-            overflowActions={overflowActions}
+            menuItems={contextMenuItems}
             onClose={onClose}
             overflowTriggerPlacement='card-top-right'
           />
         </DrawerSurfaceCard>
       }
-      tabs={
-        <DrawerTabs
-          value={selectedCategory}
-          onValueChange={value =>
-            setSelectedCategory(value as CategoryOption | 'about')
-          }
-          options={PROFILE_TAB_OPTIONS}
-          ariaLabel='Creator profile sidebar view'
-        />
-      }
     >
-      {selectedCategory === 'about' ? (
-        <ProfileAboutTab
-          bio={profile.bio ?? null}
-          genres={profile.genres ?? null}
-          location={profile.location ?? null}
-          hometown={profile.hometown ?? null}
-          activeSinceYear={profile.activeSinceYear ?? null}
-          allowPhotoDownloads={false}
-        />
-      ) : (
-        <ProfileLinkList
-          links={links}
-          selectedCategory={selectedCategory as CategoryOption}
-        />
-      )}
+      <DrawerTabbedCard
+        testId='admin-profile-tabbed-card'
+        tabs={
+          <DrawerTabs
+            value={selectedCategory}
+            onValueChange={value =>
+              setSelectedCategory(value as CategoryOption | 'about')
+            }
+            options={PROFILE_TAB_OPTIONS}
+            ariaLabel='Creator profile sidebar view'
+          />
+        }
+        contentClassName='pt-2'
+      >
+        {selectedCategory === 'about' ? (
+          <ProfileAboutTab
+            bio={profile.bio ?? null}
+            genres={profile.genres ?? null}
+            location={profile.location ?? null}
+            hometown={profile.hometown ?? null}
+            activeSinceYear={profile.activeSinceYear ?? null}
+            allowPhotoDownloads={false}
+          />
+        ) : (
+          <ProfileLinkList
+            links={links}
+            selectedCategory={selectedCategory as CategoryOption}
+            surface='plain'
+          />
+        )}
+      </DrawerTabbedCard>
     </EntitySidebarShell>
   );
 }

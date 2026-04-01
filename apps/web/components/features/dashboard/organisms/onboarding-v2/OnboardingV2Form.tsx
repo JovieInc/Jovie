@@ -27,6 +27,7 @@ import {
 import { connectOnboardingSpotifyArtist } from '@/app/onboarding/actions/connect-spotify';
 import { enrichProfileFromDsp } from '@/app/onboarding/actions/enrich-profile';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { OnboardingExperienceShell } from '@/components/features/onboarding/OnboardingExperienceShell';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthBackButton } from '@/features/auth';
@@ -50,7 +51,6 @@ import {
 } from '@/lib/onboarding/session-keys';
 import type { AvatarQuality } from '@/lib/profile/avatar-quality';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
-import { cn } from '@/lib/utils';
 
 const DISCOVERY_POLL_INTERVAL_MS = 1200;
 const DISCOVERY_STAGE_TIMEOUT_MS = 10000;
@@ -1966,25 +1966,19 @@ export function OnboardingV2Form({
   })();
 
   return (
-    <div className='min-h-screen bg-page text-primary-token [color-scheme:dark]'>
-      <div className='mx-auto flex min-h-screen w-full max-w-[1440px] gap-10 px-4 py-8 sm:px-6 lg:px-8'>
-        <div className='min-w-0 flex-1'>
-          {(currentStep === 'spotify' ||
-            currentStep === 'artist-confirm' ||
-            currentStep === 'upgrade') && (
+    <OnboardingExperienceShell
+      mode='standalone'
+      stableStageHeight={currentStep === 'handle' ? 'tall' : 'default'}
+      topBar={
+        currentStep === 'spotify' ||
+        currentStep === 'artist-confirm' ||
+        currentStep === 'upgrade' ? (
+          <div className='pb-2'>
             <AuthBackButton onClick={handleGoBack} ariaLabel='Go back' />
-          )}
-
-          <div
-            className={cn(
-              'rounded-[32px] border border-(--linear-app-frame-seam) bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] px-5 py-6 shadow-[0_24px_60px_rgba(0,0,0,0.18)] sm:px-8 sm:py-8',
-              currentStep === 'handle' ? 'min-h-[560px]' : 'min-h-[520px]'
-            )}
-          >
-            {stepContent}
           </div>
-        </div>
-
+        ) : null
+      }
+      sidePanel={
         <PreviewPanel
           avatarQuality={existingAvatarQuality}
           discoverySnapshot={discoverySnapshot}
@@ -1993,7 +1987,10 @@ export function OnboardingV2Form({
           existingGenres={existingGenres}
           selectedArtist={selectedArtist}
         />
-      </div>
-    </div>
+      }
+      data-testid='onboarding-experience-shell'
+    >
+      {stepContent}
+    </OnboardingExperienceShell>
   );
 }

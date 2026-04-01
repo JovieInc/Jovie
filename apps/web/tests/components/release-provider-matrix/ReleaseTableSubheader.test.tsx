@@ -133,7 +133,7 @@ const { ReleaseTableSubheader, DEFAULT_RELEASE_FILTERS } = await import(
 );
 
 describe('ReleaseTableSubheader', () => {
-  it('attaches the divider to the top edge of the subheader shell', () => {
+  it('renders the flattened subheader shell without a duplicated top divider', () => {
     render(
       <ReleaseTableSubheader
         releases={[] as ReleaseViewModel[]}
@@ -147,9 +147,8 @@ describe('ReleaseTableSubheader', () => {
       />
     );
 
-    expect(screen.getByTestId('page-toolbar')).toHaveAttribute(
-      'data-top-divider',
-      'true'
+    expect(screen.getByTestId('page-toolbar')).not.toHaveAttribute(
+      'data-top-divider'
     );
   });
 

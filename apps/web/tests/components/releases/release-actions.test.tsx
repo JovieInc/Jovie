@@ -12,7 +12,13 @@ vi.mock('@/lib/utils/platform-detection', () => ({
 
 vi.mock('@/lib/utm', () => ({
   buildUTMContext: () => ({}),
-  getUTMShareContextMenuItems: () => [],
+  getUTMShareContextMenuItems: () => [
+    {
+      id: 'utm-share-submenu',
+      label: 'Copy with UTM',
+      items: [],
+    },
+  ],
 }));
 
 function createRelease(
@@ -52,8 +58,23 @@ describe('buildReleaseActions', () => {
     });
     expect(items[1]).toEqual({ type: 'separator' });
     expect(items[2]).toMatchObject({
-      id: 'copy-smart-link',
-      label: 'Copy smart link',
+      id: 'share-link',
+      label: 'Share link',
+    });
+    if (!('items' in items[2])) {
+      throw new Error('Expected share submenu');
+    }
+    expect(items[2].items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'copy-smart-link',
+          label: 'Copy smart link',
+        }),
+      ])
+    );
+    expect(items[4]).toMatchObject({
+      id: 'copy-metadata',
+      label: 'Copy metadata',
     });
   });
 
@@ -67,6 +88,13 @@ describe('buildReleaseActions', () => {
     });
 
     expect(items[2]).toMatchObject({
+      id: 'share-link',
+      label: 'Share link',
+    });
+    if (!('items' in items[2])) {
+      throw new Error('Expected share submenu');
+    }
+    expect(items[2].items[0]).toMatchObject({
       id: 'copy-smart-link',
       label: 'Scheduled smart link (Pro)',
       disabled: true,
@@ -92,7 +120,20 @@ describe('buildReleaseActions', () => {
       onCopy: vi.fn(),
     });
 
-    expect(items).toEqual(
+    const openMenu = items.find(
+      item => 'id' in item && item.id === 'open-release'
+    );
+
+    expect(openMenu).toMatchObject({
+      id: 'open-release',
+      label: 'Open in',
+    });
+
+    if (!openMenu || !('items' in openMenu)) {
+      throw new Error('Expected open submenu');
+    }
+
+    expect(openMenu.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: 'open-spotify',

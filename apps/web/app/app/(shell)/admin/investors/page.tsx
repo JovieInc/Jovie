@@ -3,7 +3,6 @@ import { desc, sql as drizzleSql } from 'drizzle-orm';
 import {
   CheckCircle2,
   CircleSlash,
-  Copy,
   Link2,
   Plus,
   Settings2,
@@ -18,6 +17,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import { investorLinks } from '@/lib/db/schema/investors';
 import { cn } from '@/lib/utils';
+import { TokenCopyButton } from './TokenCopyButton';
 
 export const metadata: Metadata = {
   title: 'Investor Pipeline',
@@ -290,21 +290,7 @@ function SummaryCard({
 }
 
 function TokenDisplay({ token }: { readonly token: string }) {
-  return (
-    <button
-      type='button'
-      onClick={() => {
-        navigator.clipboard.writeText(token).catch(() => {
-          // Fallback for HTTP contexts
-        });
-      }}
-      className='inline-flex items-center gap-1 text-[11px] text-tertiary-token transition-colors hover:text-secondary-token'
-      title='Click to copy full token'
-    >
-      {token.slice(0, 8)}&hellip;{' '}
-      <Copy className='h-3 w-3' aria-hidden='true' />
-    </button>
-  );
+  return <TokenCopyButton token={token} />;
 }
 
 const TABLE_SKELETON_KEYS = [

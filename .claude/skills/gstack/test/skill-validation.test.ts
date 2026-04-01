@@ -1305,38 +1305,49 @@ describe('Codex skill', () => {
     expect(content).toContain('mktemp');
   });
 
-  test('adversarial review in /review auto-scales by diff size', () => {
+  test('adversarial review in /review always runs both passes', () => {
     const content = fs.readFileSync(path.join(ROOT, 'review', 'SKILL.md'), 'utf-8');
-    expect(content).toContain('Adversarial review (auto-scaled)');
-    // Diff size thresholds
-    expect(content).toContain('< 50');
-    expect(content).toContain('50–199');
-    expect(content).toContain('200+');
-    // All three tiers present
-    expect(content).toContain('Small');
-    expect(content).toContain('Medium tier');
-    expect(content).toContain('Large tier');
+    expect(content).toContain('Adversarial review (always-on)');
+    // Always-on: both Claude and Codex adversarial
+    expect(content).toContain('Claude adversarial subagent (always runs)');
+    expect(content).toContain('Codex adversarial challenge (always runs when available)');
     // Claude adversarial subagent dispatch
     expect(content).toContain('Agent tool');
     expect(content).toContain('FIXABLE');
     expect(content).toContain('INVESTIGATE');
-    // Codex fallback logic
+    // Codex availability check
     expect(content).toContain('CODEX_NOT_AVAILABLE');
-    expect(content).toContain('fall back to the Claude adversarial subagent');
-    // Review log uses new skill name
+    // OLD_CFG only gates Codex, not Claude
+    expect(content).toContain('skip Codex passes only');
+    // Review log
     expect(content).toContain('adversarial-review');
-    expect(content).toContain('xhigh');
+    expect(content).toContain('reasoning_effort="high"');
     expect(content).toContain('ADVERSARIAL REVIEW SYNTHESIS');
+    // Large diff structured review still gated
+    expect(content).toContain('Codex structured review (large diffs only');
+    expect(content).toContain('200');
   });
 
-  test('adversarial review in /ship auto-scales by diff size', () => {
+  test('adversarial review in /ship always runs both passes', () => {
     const content = fs.readFileSync(path.join(ROOT, 'ship', 'SKILL.md'), 'utf-8');
-    expect(content).toContain('Adversarial review (auto-scaled)');
-    expect(content).toContain('< 50');
-    expect(content).toContain('200+');
+    expect(content).toContain('Adversarial review (always-on)');
     expect(content).toContain('adversarial-review');
-    expect(content).toContain('xhigh');
+    expect(content).toContain('reasoning_effort="high"');
     expect(content).toContain('Investigate and fix');
+    expect(content).toContain('Claude adversarial subagent (always runs)');
+  });
+
+  test('scope drift detection in /review and /ship', () => {
+    const reviewContent = fs.readFileSync(path.join(ROOT, 'review', 'SKILL.md'), 'utf-8');
+    const shipContent = fs.readFileSync(path.join(ROOT, 'ship', 'SKILL.md'), 'utf-8');
+    // Both should contain scope drift from the shared resolver
+    for (const content of [reviewContent, shipContent]) {
+      expect(content).toContain('Scope Check:');
+      expect(content).toContain('DRIFT DETECTED');
+      expect(content).toContain('SCOPE CREEP');
+      expect(content).toContain('MISSING REQUIREMENTS');
+      expect(content).toContain('stated intent');
+    }
   });
 
   test('codex-host ship/review do NOT contain adversarial review step', () => {
@@ -1367,11 +1378,6 @@ describe('Codex skill', () => {
     expect(content).toContain('"skill":"review"');
     expect(content).toContain('"issues_found":N');
     expect(content).toContain('Persist Eng Review result');
-  });
-
-  test('/ship gate suggests /review or /plan-eng-review when Eng Review is missing', () => {
-    const content = fs.readFileSync(path.join(ROOT, 'ship', 'SKILL.md'), 'utf-8');
-    expect(content).toContain('Abort — run /review or /plan-eng-review first');
   });
 
   test('Review Readiness Dashboard includes Adversarial Review row', () => {
@@ -1414,13 +1420,13 @@ describe('Skill trigger phrases', () => {
   ];
 
   for (const skill of SKILLS_REQUIRING_PROACTIVE) {
-    test(`${skill}/SKILL.md has "Proactively suggest" phrase`, () => {
+    test(`${skill}/SKILL.md has proactive routing phrase`, () => {
       const skillPath = path.join(ROOT, skill, 'SKILL.md');
       if (!fs.existsSync(skillPath)) return;
       const content = fs.readFileSync(skillPath, 'utf-8');
       const frontmatterEnd = content.indexOf('---', 4);
       const frontmatter = content.slice(0, frontmatterEnd);
-      expect(frontmatter).toMatch(/Proactively suggest/i);
+      expect(frontmatter).toMatch(/Proactively (suggest|invoke)/i);
     });
   }
 });
@@ -1550,5 +1556,33 @@ describe('Test failure triage in ship skill', () => {
   test('ship/SKILL.md uses in-branch language for stop condition', () => {
     const content = fs.readFileSync(path.join(ROOT, 'ship', 'SKILL.md'), 'utf-8');
     expect(content).toContain('In-branch test failures');
+  });
+});
+
+describe('sidebar agent (#584)', () => {
+  // #584 — Sidebar Write: sidebar-agent.ts allowedTools includes Write
+  test('sidebar-agent.ts allowedTools includes Write', () => {
+    const content = fs.readFileSync(path.join(ROOT, 'browse', 'src', 'sidebar-agent.ts'), 'utf-8');
+    // Find the allowedTools line in the askClaude function
+    const match = content.match(/--allowedTools['"]\s*,\s*['"]([^'"]+)['"]/);
+    expect(match).not.toBeNull();
+    expect(match![1]).toContain('Write');
+  });
+
+  // #584 — Server Write: server.ts allowedTools includes Write (DRY parity)
+  test('server.ts allowedTools excludes Write (agent is read-only + Bash)', () => {
+    const content = fs.readFileSync(path.join(ROOT, 'browse', 'src', 'server.ts'), 'utf-8');
+    // Find the sidebar allowedTools in the headed-mode path
+    const match = content.match(/--allowedTools['"]\s*,\s*['"]([^'"]+)['"]/);
+    expect(match).not.toBeNull();
+    expect(match![1]).toContain('Bash');
+    expect(match![1]).not.toContain('Write');
+  });
+
+  // #584 — Sidebar stderr: stderr handler is not empty
+  test('sidebar-agent.ts stderr handler is not empty', () => {
+    const content = fs.readFileSync(path.join(ROOT, 'browse', 'src', 'sidebar-agent.ts'), 'utf-8');
+    // The stderr handler should NOT be an empty arrow function
+    expect(content).not.toContain("proc.stderr.on('data', () => {})");
   });
 });

@@ -357,6 +357,7 @@ vi.mock('@/lib/utils/platform-detection', () => ({
 }));
 vi.mock('@/lib/utm', () => ({
   buildUTMContext: () => ({}),
+  getUTMShareContextMenuItems: () => [],
   getUTMShareDropdownItems: () => [],
 }));
 

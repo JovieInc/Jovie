@@ -34,7 +34,7 @@ export function PhoneMockupPreview({
         className={cn(
           'relative w-full max-w-[300px] mx-auto',
           'aspect-9/19 rounded-[28px]',
-          'bg-(--linear-app-content-surface) border border-(--linear-app-frame-seam)',
+          'bg-surface-1 border border-(--linear-app-frame-seam)',
           'overflow-hidden'
         )}
       >

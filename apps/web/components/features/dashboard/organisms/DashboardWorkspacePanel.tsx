@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { cn } from '@/lib/utils';
+import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 
 interface DashboardWorkspacePanelProps {
   readonly toolbar?: ReactNode;
@@ -21,29 +21,18 @@ export function DashboardWorkspacePanel({
   'data-testid': testId,
 }: Readonly<DashboardWorkspacePanelProps>) {
   return (
-    <section
-      className={cn(
-        'flex h-full min-h-0 flex-1 flex-col overflow-hidden',
-        className
-      )}
+    <AppShellContentPanel
+      toolbar={toolbar}
+      maxWidth='full'
+      frame='none'
+      contentPadding='none'
+      scroll='panel'
+      className={className}
+      surfaceClassName={surfaceClassName}
+      contentClassName={contentClassName}
       data-testid={testId}
     >
-      {toolbar ? <div className='shrink-0'>{toolbar}</div> : null}
-      <div
-        className={cn(
-          'flex min-h-0 flex-1 flex-col overflow-hidden bg-(--linear-app-content-surface)',
-          surfaceClassName
-        )}
-      >
-        <div
-          className={cn(
-            'flex min-h-0 flex-1 flex-col overflow-hidden',
-            contentClassName
-          )}
-        >
-          {children}
-        </div>
-      </div>
-    </section>
+      {children}
+    </AppShellContentPanel>
   );
 }

@@ -32,6 +32,27 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Synced the shared header social-link cap helper to four links and updated regression coverage for the new limit
 - Added missing Escape key handler in filter checkbox items for keyboard navigation
 
+## [26.3.110] - 2026-03-31
+
+> Added the Linear-style tasks foundation and unified the app, demo, and onboarding shell framing so pages, drawers, and tables share one consistent layout system.
+
+### Added
+
+- First-class `tasks` schema, migration backfill from release tasks, and a top-level tasks workspace with filtering and status controls
+- Shared `AppShellContentPanel` and `OnboardingExperienceShell` primitives with guardrail tests for shell elevation and onboarding stability
+
+### Changed
+
+- Unified chat, dashboard, admin, settings, and shell-backed demo routes onto one framed content-panel system with consistent spacing, drawer elevation, and table chrome
+- Updated demo showcase and onboarding surfaces to reuse the real shell and onboarding layout rules instead of bespoke wrappers
+- Trimmed redundant helper copy across home, settings, admin, and demo surfaces while keeping billing and onboarding guidance intact
+
+### Fixed
+
+- Recovered from stale shell/profile state, missing local mock-Clerk fields, and admin users being redirected into onboarding
+- Fixed nested `/demo/*` routes so they no longer trigger auth-only queries or hydrate sidebar nav items into mismatched button/link markup
+- Corrected task query scoping and optimistic task-cache updates so badges, stats, and list/detail caches stay in sync
+
 ## [26.3.109] - 2026-03-31
 
 ## [26.3.110] - 2026-03-31

@@ -1,11 +1,16 @@
 'use client';
 
+import type { CommonDropdownItem } from '@jovie/ui';
 import { Button } from '@jovie/ui';
-import { MoreHorizontal, MoreVertical, X } from 'lucide-react';
+import { MoreHorizontal, MoreVertical } from 'lucide-react';
 import Link from 'next/link';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
+import {
+  appendCloseActionMenuItem,
+  commonDropdownItemsToTableActionMenuItems,
+} from '@/components/molecules/drawer/menu-items';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DRAWER_HEADER_ICON_BUTTON_CLASSNAME } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { cn } from '@/lib/utils';
@@ -13,6 +18,7 @@ import { cn } from '@/lib/utils';
 export interface DrawerCardActionBarProps {
   readonly primaryActions: readonly DrawerHeaderAction[];
   readonly overflowActions?: readonly DrawerHeaderAction[];
+  readonly menuItems?: readonly CommonDropdownItem[];
   readonly className?: string;
   readonly onClose?: () => void;
   readonly overflowTriggerPlacement?: 'inline' | 'card-top-right';
@@ -44,6 +50,7 @@ function toMenuItems(
 export function DrawerCardActionBar({
   primaryActions,
   overflowActions = [],
+  menuItems,
   className,
   onClose,
   overflowTriggerPlacement = 'inline',
@@ -51,33 +58,27 @@ export function DrawerCardActionBar({
 }: DrawerCardActionBarProps) {
   const displayActions = primaryActions.slice(0, 3);
   const baseMenuItems = toMenuItems(overflowActions);
-  const menuItems = onClose
-    ? [
-        ...baseMenuItems,
-        ...(baseMenuItems.length > 0
-          ? [{ id: 'separator-close', label: '' }]
-          : []),
-        {
-          id: 'close-card',
-          label: 'Close',
-          icon: X,
-          onClick: onClose,
-        },
-      ]
-    : baseMenuItems;
+  const resolvedBaseMenuItems =
+    menuItems && menuItems.length > 0
+      ? commonDropdownItemsToTableActionMenuItems(menuItems)
+      : baseMenuItems;
+  const resolvedMenuItems = appendCloseActionMenuItem(
+    resolvedBaseMenuItems,
+    onClose
+  );
   const resolvedTriggerIcon =
     overflowTriggerIcon ??
     (overflowTriggerPlacement === 'card-top-right' ? 'vertical' : 'horizontal');
   const TriggerIcon =
     resolvedTriggerIcon === 'vertical' ? MoreVertical : MoreHorizontal;
 
-  if (displayActions.length === 0 && menuItems.length === 0) {
+  if (displayActions.length === 0 && resolvedMenuItems.length === 0) {
     return null;
   }
 
   const overflowTrigger =
-    menuItems.length > 0 ? (
-      <TableActionMenu items={menuItems} trigger='custom' align='end'>
+    resolvedMenuItems.length > 0 ? (
+      <TableActionMenu items={resolvedMenuItems} trigger='custom' align='end'>
         <AppIconButton
           ariaLabel='More actions'
           className={cn(

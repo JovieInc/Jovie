@@ -81,4 +81,34 @@ describe('DrawerCardActionBar', () => {
       'Close'
     );
   });
+
+  it('reuses shared menu items when menuItems is provided', () => {
+    render(
+      <div className='relative'>
+        <DrawerCardActionBar
+          primaryActions={[]}
+          menuItems={[
+            {
+              type: 'submenu',
+              id: 'share',
+              label: 'Share',
+              items: [
+                {
+                  type: 'action',
+                  id: 'copy-link',
+                  label: 'Copy link',
+                  onClick: vi.fn(),
+                },
+              ],
+            },
+          ]}
+          overflowTriggerPlacement='inline'
+        />
+      </div>
+    );
+
+    expect(screen.getByTestId('table-action-menu-items')).toHaveTextContent(
+      'Share'
+    );
+  });
 });

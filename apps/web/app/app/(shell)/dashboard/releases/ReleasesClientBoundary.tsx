@@ -3,7 +3,6 @@
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { usePendingShell } from '@/components/organisms/AuthShellWrapper';
-import { QueryErrorBoundary } from '@/lib/queries';
 
 interface ReleasesClientBoundaryProps {
   readonly children: ReactNode;
@@ -18,5 +17,5 @@ export function ReleasesClientBoundary({
     clearPendingShell('releases');
   }, [clearPendingShell]);
 
-  return <QueryErrorBoundary>{children}</QueryErrorBoundary>;
+  return <>{children}</>;
 }

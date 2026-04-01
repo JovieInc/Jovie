@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { getDemoBreadcrumbSegment } from '@/hooks/useAuthRouteConfig';
 import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
 
 describe('getBreadcrumbLabel', () => {
@@ -8,6 +9,10 @@ describe('getBreadcrumbLabel', () => {
 
   it('returns "Dashboard" for the dashboard segment', () => {
     expect(getBreadcrumbLabel('dashboard')).toBe('Dashboard');
+  });
+
+  it('returns "New thread" for the app root segment', () => {
+    expect(getBreadcrumbLabel('app')).toBe('New thread');
   });
 
   it('converts unknown kebab-case to sentence case', () => {
@@ -49,5 +54,21 @@ describe('UUID regex for breadcrumb route segments', () => {
 
   it('does not match UUIDs without dashes', () => {
     expect(UUID_REGEX.test('550e8400e29b41d4a716446655440000')).toBe(false);
+  });
+});
+
+describe('getDemoBreadcrumbSegment', () => {
+  it('defaults /demo to releases', () => {
+    expect(getDemoBreadcrumbSegment('/demo')).toBe('releases');
+  });
+
+  it('uses the route segment for direct demo pages', () => {
+    expect(getDemoBreadcrumbSegment('/demo/audience')).toBe('audience');
+  });
+
+  it('uses the last segment for showcase pages', () => {
+    expect(getDemoBreadcrumbSegment('/demo/showcase/settings')).toBe(
+      'settings'
+    );
   });
 });

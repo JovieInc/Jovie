@@ -6,6 +6,7 @@ export interface ContentSectionHeaderProps {
   readonly subtitle?: ReactNode;
   readonly actions?: ReactNode;
   readonly density?: 'default' | 'compact';
+  readonly variant?: 'default' | 'plain';
   readonly className?: string;
   readonly bodyClassName?: string;
   readonly titleClassName?: string;
@@ -18,6 +19,7 @@ export function ContentSectionHeader({
   subtitle,
   actions,
   density = 'default',
+  variant = 'default',
   className,
   bodyClassName,
   titleClassName,
@@ -27,7 +29,8 @@ export function ContentSectionHeader({
   return (
     <div
       className={cn(
-        'flex min-w-0 shrink-0 items-center justify-between gap-2 border-b border-subtle bg-surface-1 px-(--linear-app-header-padding-x)',
+        'flex min-w-0 shrink-0 items-center justify-between gap-2 px-(--linear-app-header-padding-x)',
+        variant === 'default' && 'border-b border-subtle bg-transparent',
         density === 'compact'
           ? 'min-h-[34px] py-1'
           : 'min-h-(--linear-app-header-height) py-1.5',

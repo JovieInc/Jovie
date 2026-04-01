@@ -253,11 +253,20 @@ describe('ChatPageClient', () => {
   it('registers header actions on mount', () => {
     renderChatPage('conv-123');
 
-    expect(mockSetHeaderActions).toHaveBeenCalledWith(
+    const headerActions = mockSetHeaderActions.mock.calls.at(-1)?.[0];
+
+    expect(headerActions).toEqual(
       expect.objectContaining({
         type: expect.anything(),
       })
     );
+    expect(React.Children.count(headerActions.props.children)).toBe(1);
+  });
+
+  it('does not register chat header actions on the new-thread route', () => {
+    renderChatPage();
+
+    expect(mockSetHeaderActions).toHaveBeenCalledWith(null);
   });
 
   it('cleans up header actions on unmount', () => {

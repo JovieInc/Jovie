@@ -40,14 +40,19 @@ interface SuggestedPromptsProps {
   readonly isFirstSession?: boolean;
   readonly latestReleaseTitle?: string | null;
   readonly canUseAdvancedTools?: boolean;
+  readonly layout?: 'rail' | 'grid';
 }
 
 function SuggestionPill({
   suggestion,
   onSelect,
+  className,
+  density = 'default',
 }: {
   readonly suggestion: ChatSuggestion;
   readonly onSelect: (prompt: string) => void;
+  readonly className?: string;
+  readonly density?: 'default' | 'compact';
 }) {
   const IconComponent = ICON_MAP[suggestion.icon];
 
@@ -57,7 +62,8 @@ function SuggestionPill({
       onClick={() => onSelect(suggestion.prompt)}
       className={cn(
         'chat-pill cursor-pointer',
-        getChatPromptPillClass('default')
+        getChatPromptPillClass(density),
+        className
       )}
       aria-label={suggestion.label}
     >
@@ -76,6 +82,7 @@ export function SuggestedPrompts({
   isFirstSession = false,
   latestReleaseTitle,
   canUseAdvancedTools = false,
+  layout = 'rail',
 }: SuggestedPromptsProps) {
   const promptSuggestions = isFirstSession
     ? FIRST_SESSION_SUGGESTIONS.map(suggestion => {
@@ -114,6 +121,52 @@ export function SuggestedPrompts({
           return PITCH_SUGGESTION;
         })()
       : null;
+
+  const allSuggestions = [
+    ...promptSuggestions,
+    ...(pitchSuggestion ? [pitchSuggestion] : []),
+    FEEDBACK_SUGGESTION,
+  ];
+
+  if (layout === 'grid') {
+    const primarySuggestions = promptSuggestions.slice(0, 3);
+    const secondarySuggestions = allSuggestions.filter(
+      suggestion =>
+        !primarySuggestions.some(primary => primary.label === suggestion.label)
+    );
+
+    return (
+      <div
+        className='mx-auto w-full max-w-[35rem]'
+        data-testid='suggested-prompts-grid'
+      >
+        <div className='grid grid-cols-[repeat(auto-fit,minmax(10.75rem,1fr))] gap-2'>
+          {primarySuggestions.map(suggestion => (
+            <SuggestionPill
+              key={suggestion.label}
+              suggestion={suggestion}
+              onSelect={onSelect}
+              className='min-w-0 max-w-none justify-start px-3.5 py-2'
+            />
+          ))}
+        </div>
+
+        {secondarySuggestions.length > 0 ? (
+          <div className='mt-2 flex flex-wrap items-center justify-center gap-1.5'>
+            {secondarySuggestions.map(suggestion => (
+              <SuggestionPill
+                key={suggestion.label}
+                suggestion={suggestion}
+                onSelect={onSelect}
+                density='compact'
+                className='min-w-0 max-w-none px-3'
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className='w-full max-w-[46rem]'>

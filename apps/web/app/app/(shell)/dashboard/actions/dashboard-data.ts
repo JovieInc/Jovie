@@ -17,6 +17,7 @@ import {
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
+import { resolveUserState } from '@/lib/auth/gate';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
 import { type DbOrTransaction } from '@/lib/db';
@@ -257,6 +258,20 @@ function buildProfileCompletion(
  */
 type CoreData = Omit<DashboardData, 'isAdmin'>;
 
+function applyAdminOnboardingBypass(
+  coreData: CoreData,
+  isAdmin: boolean
+): CoreData {
+  if (!isAdmin || !coreData.needsOnboarding) {
+    return coreData;
+  }
+
+  return {
+    ...coreData,
+    needsOnboarding: false,
+  };
+}
+
 /** Default empty CoreData used when user/profile is missing or on error. */
 function createEmptyCoreData(overrides?: Partial<CoreData>): CoreData {
   return {
@@ -287,19 +302,42 @@ async function fetchDashboardBaseWithSession(
     readonly includeSettings?: boolean;
   }
 ): Promise<CoreData> {
-  const [userData] = await dashboardQuery(
-    () =>
-      tx
-        .select({
-          id: users.id,
-          email: users.email,
-          activeProfileId: users.activeProfileId,
-        })
-        .from(users)
-        .where(eq(users.clerkId, sessionUserId))
-        .limit(1),
-    'User lookup query'
-  );
+  const selectUser = () =>
+    tx
+      .select({
+        id: users.id,
+        email: users.email,
+        activeProfileId: users.activeProfileId,
+      })
+      .from(users)
+      .where(eq(users.clerkId, sessionUserId))
+      .limit(1);
+
+  let [userData] = await dashboardQuery(selectUser, 'User lookup query');
+
+  if (!userData?.id) {
+    try {
+      const resolvedUserState = await resolveUserState({
+        createDbUserIfMissing: true,
+      });
+
+      if (
+        resolvedUserState.clerkUserId === sessionUserId &&
+        resolvedUserState.dbUserId
+      ) {
+        [userData] = await dashboardQuery(
+          selectUser,
+          'User lookup query after auth reconciliation'
+        );
+      }
+    } catch (error) {
+      Sentry.captureException(error, {
+        level: 'warning',
+        tags: { context: 'dashboard_auth_reconciliation' },
+        extra: { sessionUserId },
+      });
+    }
+  }
 
   if (!userData?.id) {
     return createEmptyCoreData();
@@ -661,6 +699,7 @@ async function resolveDashboardData(): Promise<DashboardData> {
   return resolveDashboardDataWith(
     'dashboard.getCoreData',
     getCachedDashboardCore,
+    fetchDashboardCoreWithSession,
     'get_dashboard_data'
   );
 }
@@ -802,6 +841,10 @@ const getCachedDashboardCore = unstableCache(
   }
 );
 
+function shouldRefreshUnstableDashboardState(data: CoreData): boolean {
+  return Boolean(data.dashboardLoadError) || !data.selectedProfile;
+}
+
 /**
  * Shared resolver: fetches entitlements, calls the provided cache function,
  * and handles the no-userId / error fallback. Used by both full and essential paths.
@@ -809,6 +852,7 @@ const getCachedDashboardCore = unstableCache(
 async function resolveDashboardDataWith(
   spanName: string,
   fetchFn: (userId: string) => Promise<CoreData>,
+  fetchFreshFn: (userId: string) => Promise<CoreData>,
   context: string
 ): Promise<DashboardData> {
   noStore();
@@ -822,13 +866,17 @@ async function resolveDashboardDataWith(
   }
 
   try {
-    const coreData = await Sentry.startSpan(
+    let coreData = await Sentry.startSpan(
       { op: 'task', name: spanName },
       async () => fetchFn(userId)
     );
 
+    if (shouldRefreshUnstableDashboardState(coreData)) {
+      coreData = await fetchFreshFn(userId);
+    }
+
     return {
-      ...coreData,
+      ...applyAdminOnboardingBypass(coreData, isAdmin),
       isAdmin,
       dashboardLoadError: coreData.dashboardLoadError,
     };
@@ -854,6 +902,7 @@ async function resolveDashboardDataEssential(): Promise<DashboardData> {
   return resolveDashboardDataWith(
     'dashboard.getEssentialData',
     getCachedDashboardEssential,
+    fetchDashboardEssentialWithSession,
     'get_dashboard_data_essential'
   );
 }
@@ -866,7 +915,7 @@ async function resolveDashboardShellData(
   // from serving cached results on subsequent requests.
 
   try {
-    const [adminResult, coreData] = await Promise.allSettled([
+    const [adminResult, cachedCoreData] = await Promise.allSettled([
       checkAdminRole(clerkUserId),
       Sentry.startSpan(
         { op: 'task', name: 'dashboard.getShellData' },
@@ -874,15 +923,18 @@ async function resolveDashboardShellData(
       ),
     ]);
 
-    if (coreData.status === 'rejected') throw coreData.reason;
+    if (cachedCoreData.status === 'rejected') throw cachedCoreData.reason;
 
     const isAdmin =
       adminResult.status === 'fulfilled' ? adminResult.value : false;
+    const coreData = shouldRefreshUnstableDashboardState(cachedCoreData.value)
+      ? await fetchDashboardShellWithSession(clerkUserId)
+      : cachedCoreData.value;
 
     return {
-      ...coreData.value,
+      ...applyAdminOnboardingBypass(coreData, isAdmin),
       isAdmin,
-      dashboardLoadError: coreData.value.dashboardLoadError,
+      dashboardLoadError: coreData.dashboardLoadError,
     };
   } catch (error) {
     Sentry.captureException(error, {

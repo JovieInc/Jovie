@@ -5,8 +5,9 @@ import { describe, expect, it } from 'vitest';
 /**
  * Surface elevation guardrails — prevent invisible cards.
  *
- * The main content area uses bg-(--linear-app-content-surface) (= surface-1).
- * Cards that also use surface-1 WITHOUT border+shadow are invisible.
+ * The main content area uses bg-(--linear-app-content-surface), a dedicated
+ * shell canvas tone in dark mode.
+ * Shared cards should use bg-surface-1; recessed wells should use bg-surface-0.
  * Semi-transparent surface backgrounds (bg-surface-1/XX) are nearly invisible.
  *
  * @see AGENTS.md → "Surface Elevation Rules"
@@ -45,6 +46,211 @@ const APP_SHELL_GLOBS = [
 ];
 
 describe('surface elevation guardrails', () => {
+  it('keeps the dark shell canvas separate from the shared card surface', () => {
+    const designSystem = readFileSync(
+      join(ROOT, 'styles/design-system.css'),
+      'utf-8'
+    );
+    const linearTokens = readFileSync(
+      join(ROOT, 'styles/linear-tokens.css'),
+      'utf-8'
+    );
+
+    expect(designSystem).toMatch(
+      /:root\.dark[\s\S]*--color-bg-surface-1:\s*var\(--linear-bg-surface-1\);/
+    );
+    expect(designSystem).toMatch(
+      /:root\.dark[\s\S]*--sidebar-background:\s*var\(--linear-app-sidebar-background-rgb\);/
+    );
+    expect(linearTokens).toMatch(
+      /:root\.dark[\s\S]*--linear-app-content-surface:\s*var\(--linear-bg-surface-0\);/
+    );
+    expect(linearTokens).toMatch(
+      /:root\.dark[\s\S]*--linear-app-sidebar-background-rgb:\s*8 9 10;/
+    );
+  });
+
+  it('keeps shared content cards on the card surface instead of the shell canvas', () => {
+    const contentSurfaceCard = readFileSync(
+      join(ROOT, 'components/molecules/ContentSurfaceCard.tsx'),
+      'utf-8'
+    );
+
+    expect(contentSurfaceCard).toContain('bg-surface-1');
+    expect(contentSurfaceCard).not.toContain(
+      'bg-(--linear-app-content-surface)'
+    );
+  });
+
+  it('routes shared shell wrappers through AppShellContentPanel', () => {
+    const pageShell = readFileSync(
+      join(ROOT, 'components/organisms/PageShell.tsx'),
+      'utf-8'
+    );
+    const dashboardPanel = readFileSync(
+      join(
+        ROOT,
+        'components/features/dashboard/organisms/DashboardWorkspacePanel.tsx'
+      ),
+      'utf-8'
+    );
+    const settingsLayout = readFileSync(
+      join(ROOT, 'app/app/(shell)/settings/layout.tsx'),
+      'utf-8'
+    );
+    const demoShowcaseSurface = readFileSync(
+      join(ROOT, 'components/features/demo/DemoShowcaseSurface.tsx'),
+      'utf-8'
+    );
+    const chatSurface = readFileSync(
+      join(ROOT, 'components/jovie/ChatWorkspaceSurface.tsx'),
+      'utf-8'
+    );
+    const demoAudience = readFileSync(
+      join(ROOT, 'components/features/demo/DemoAudienceSection.tsx'),
+      'utf-8'
+    );
+
+    expect(pageShell).toContain('AppShellContentPanel');
+    expect(pageShell).toContain("frame='none'");
+    expect(dashboardPanel).toContain('AppShellContentPanel');
+    expect(dashboardPanel).toContain("frame='none'");
+    expect(settingsLayout).toContain('AppShellContentPanel');
+    expect(settingsLayout).toContain("frame='none'");
+    expect(chatSurface).toContain("frame='none'");
+    expect(demoShowcaseSurface).toContain('AppShellContentPanel');
+    expect(demoShowcaseSurface).toContain("frame='none'");
+    expect(demoAudience).toContain('AppShellContentPanel');
+    expect(demoAudience).toContain("frame='none'");
+  });
+
+  it('routes onboarding variants through OnboardingExperienceShell', () => {
+    const onboardingForm = readFileSync(
+      join(
+        ROOT,
+        'components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form.tsx'
+      ),
+      'utf-8'
+    );
+    const onboardingLoading = readFileSync(
+      join(ROOT, 'app/onboarding/loading.tsx'),
+      'utf-8'
+    );
+    const demoOnboarding = readFileSync(
+      join(ROOT, 'components/features/demo/OnboardingDemoContent.tsx'),
+      'utf-8'
+    );
+    const demoShowcaseSurface = readFileSync(
+      join(ROOT, 'components/features/demo/DemoShowcaseSurface.tsx'),
+      'utf-8'
+    );
+
+    expect(onboardingForm).toContain('OnboardingExperienceShell');
+    expect(onboardingLoading).toContain('OnboardingExperienceShell');
+    expect(demoOnboarding).toContain('OnboardingExperienceShell');
+    expect(demoShowcaseSurface).toContain('DemoOnboardingShowcase');
+  });
+
+  it('keeps the tasks workspace inside a framed content panel', () => {
+    const tasksPage = readFileSync(
+      join(ROOT, 'components/features/dashboard/tasks/TasksPageClient.tsx'),
+      'utf-8'
+    );
+    const dashboardPanel = readFileSync(
+      join(
+        ROOT,
+        'components/features/dashboard/organisms/DashboardWorkspacePanel.tsx'
+      ),
+      'utf-8'
+    );
+
+    expect(tasksPage).toContain('DashboardWorkspacePanel');
+    expect(dashboardPanel).toContain("frame='none'");
+    expect(tasksPage).toContain("data-testid='tasks-content-panel'");
+  });
+
+  it('keeps presence and earnings inside framed content panels', () => {
+    const presenceView = readFileSync(
+      join(
+        ROOT,
+        'components/features/dashboard/organisms/dsp-presence/DspPresenceView.tsx'
+      ),
+      'utf-8'
+    );
+    const earningsView = readFileSync(
+      join(
+        ROOT,
+        'components/features/dashboard/dashboard-tipping/DashboardTipping.tsx'
+      ),
+      'utf-8'
+    );
+
+    expect(presenceView).toContain('DashboardWorkspacePanel');
+    expect(presenceView).toContain("data-testid='dsp-presence-content-panel'");
+    expect(earningsView).toContain('DashboardWorkspacePanel');
+    expect(earningsView).toContain(
+      "data-testid='dashboard-earnings-content-panel'"
+    );
+  });
+
+  it('keeps task and preview cards off the shell canvas token', () => {
+    const files = [
+      'components/features/dashboard/layout/PreviewPanel.tsx',
+      'components/features/dashboard/molecules/phone-mockup-preview/PhoneMockupPreview.tsx',
+      'components/features/dashboard/organisms/DashboardPreview.tsx',
+      'components/features/dashboard/organisms/ProfileEditPreviewCard.tsx',
+      'components/features/dashboard/release-tasks/ReleaseTaskEmptyState.tsx',
+      'components/features/dashboard/release-tasks/ReleaseTaskExplainerPopover.tsx',
+      'components/features/dashboard/release-tasks/ReleaseTaskPage.tsx',
+      'components/features/dashboard/tasks/TasksPageClient.tsx',
+    ] as const;
+
+    for (const file of files) {
+      const content = readFileSync(join(ROOT, file), 'utf-8');
+      expect(
+        content,
+        `${file} should use card/recessed surface tokens`
+      ).not.toContain('bg-(--linear-app-content-surface)');
+    }
+  });
+
+  it('keeps the desktop shell and drawer on distinct elevation tiers', () => {
+    const shellFrame = readFileSync(
+      join(ROOT, 'components/organisms/AppShellFrame.tsx'),
+      'utf-8'
+    );
+    const sidebar = readFileSync(
+      join(ROOT, 'components/organisms/sidebar/sidebar.tsx'),
+      'utf-8'
+    );
+    const rightDrawer = readFileSync(
+      join(ROOT, 'components/organisms/RightDrawer.tsx'),
+      'utf-8'
+    );
+    const linearTokens = readFileSync(
+      join(ROOT, 'styles/linear-tokens.css'),
+      'utf-8'
+    );
+    const adminTableShell = readFileSync(
+      join(ROOT, 'components/features/admin/table/AdminTableShell.tsx'),
+      'utf-8'
+    );
+
+    expect(shellFrame).toContain('lg:shadow-[var(--linear-app-shell-shadow)]');
+    expect(shellFrame).toContain('lg:ml-[var(--linear-app-shell-gap)]');
+    expect(sidebar).toContain(
+      'group-data-[variant=sidebar]:lg:shadow-[var(--linear-app-sidebar-shadow)]'
+    );
+    expect(linearTokens).toContain('--linear-app-sidebar-shadow:');
+    expect(rightDrawer).toContain('bg-surface-0');
+    expect(rightDrawer).toContain(
+      'lg:rounded-[var(--linear-app-shell-radius)]'
+    );
+    expect(rightDrawer).toContain('lg:border');
+    expect(rightDrawer).toContain('shadow-[var(--linear-app-drawer-shadow)]');
+    expect(adminTableShell).toContain('bg-surface-1/96');
+  });
+
   it('does not use semi-transparent bg-surface-1 in app shell (bg-surface-1/XX)', () => {
     // Semi-transparent surface-1 on a surface-1 parent is nearly invisible.
     // Use solid bg-surface-0 for recessed areas instead.

@@ -127,6 +127,18 @@ vi.mock('@/components/molecules/drawer', () => ({
       ))}
     </div>
   ),
+  DrawerTabbedCard: ({
+    children,
+    tabs,
+  }: {
+    children?: React.ReactNode;
+    tabs?: React.ReactNode;
+  }) => (
+    <div>
+      {tabs}
+      {children}
+    </div>
+  ),
 }));
 
 // Mock ContactSidebarHeader — useContactHeaderParts hook

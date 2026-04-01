@@ -37,7 +37,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   feedback: 'Feedback',
 
   // Root routes
-  app: 'Dashboard',
+  app: 'New thread',
 } as const;
 
 /**

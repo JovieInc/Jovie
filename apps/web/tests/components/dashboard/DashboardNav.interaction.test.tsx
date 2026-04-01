@@ -1,129 +1,22 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
-import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { APP_ROUTES } from '@/constants/routes';
-import { DashboardNav } from '@/features/dashboard/dashboard-nav';
-
-const mockUsePathname = vi.fn<() => string>(() => APP_ROUTES.CHAT);
-
-vi.mock('next/navigation', () => ({
-  usePathname: () => mockUsePathname(),
-  useParams: () => ({}),
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
-}));
-
-vi.mock('@statsig/react-bindings', () => ({
-  useFeatureGate: () => ({ value: true }),
-  StatsigContext: React.createContext({ client: {} }),
-}));
-
-vi.mock('@/lib/queries/useChatConversationsQuery', () => ({
-  useChatConversationsQuery: () => ({ data: undefined }),
-}));
-
-vi.mock('@/lib/queries/useChatMutations', () => ({
-  useDeleteConversationMutation: () => ({
-    mutateAsync: vi.fn(),
-    isPending: false,
-  }),
-}));
-
-vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
-  usePreviewPanelState: () => ({
-    isOpen: false,
-    open: vi.fn(),
-    close: vi.fn(),
-    toggle: vi.fn(),
-  }),
-  usePreviewPanelData: () => ({
-    data: null,
-  }),
-  usePreviewPanel: () => ({
-    isOpen: false,
-    activeTab: null,
-    data: null,
-    open: vi.fn(),
-    close: vi.fn(),
-    toggle: vi.fn(),
-  }),
-}));
-
-vi.mock('@/lib/hooks/useNotifications', () => ({
-  useNotifications: () => ({ success: vi.fn(), error: vi.fn() }),
-}));
-
-vi.mock('@/lib/queries/useReleasesQuery', () => ({
-  useReleasesQuery: () => ({ data: undefined, isLoading: false }),
-}));
-
-vi.mock('@jovie/ui', async () => {
-  const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
-
-  return {
-    ...actual,
-    Tooltip: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(React.Fragment, {}, children),
-    TooltipTrigger: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(React.Fragment, {}, children),
-    TooltipContent: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(React.Fragment, {}, children),
-    TooltipProvider: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(React.Fragment, {}, children),
-  };
-});
-
-const baseDashboardData: DashboardData = {
-  user: { id: 'user_123' },
-  creatorProfiles: [],
-  selectedProfile: null,
-  needsOnboarding: false,
-  sidebarCollapsed: false,
-  hasSocialLinks: false,
-  hasMusicLinks: false,
-  isAdmin: false,
-  tippingStats: {
-    tipClicks: 0,
-    qrTipClicks: 0,
-    linkTipClicks: 0,
-    tipsSubmitted: 0,
-    totalReceivedCents: 0,
-    monthReceivedCents: 0,
-  },
-  profileCompletion: {
-    percentage: 0,
-    completedCount: 0,
-    totalCount: 6,
-    steps: [],
-    profileIsLive: false,
-  },
-};
-
-function renderDashboardNav(overrides: Partial<DashboardData> = {}) {
-  const value: DashboardData = { ...baseDashboardData, ...overrides };
-
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <DashboardDataProvider value={value}>
-        <SidebarProvider>
-          <DashboardNav />
-        </SidebarProvider>
-      </DashboardDataProvider>
-    </QueryClientProvider>
-  );
-}
+import {
+  mockToastInfo,
+  mockUsePathname,
+  renderDashboardNav,
+  resetDashboardNavTestMocks,
+} from '@/tests/utils/dashboard-nav-test-support';
 
 describe('DashboardNav interactions', () => {
+  afterEach(() => {
+    resetDashboardNavTestMocks();
+  });
+
   it('renders the full primary navigation config', () => {
-    renderDashboardNav();
+    renderDashboardNav({ renderFn: render });
 
     expect(screen.getByRole('button', { name: 'Profile' })).toBeDefined();
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
@@ -137,7 +30,10 @@ describe('DashboardNav interactions', () => {
   });
 
   it('shows grouped admin navigation with growth links for admin users', () => {
-    renderDashboardNav({ isAdmin: true });
+    renderDashboardNav({
+      renderFn: render,
+      overrides: { isAdmin: true },
+    });
 
     expect(screen.getByRole('button', { name: 'Admin' })).toBeDefined();
     expect(screen.getByRole('link', { name: 'Growth' })).toHaveAttribute(
@@ -153,7 +49,7 @@ describe('DashboardNav interactions', () => {
   it('highlights the active route based on pathname', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.RELEASES);
 
-    renderDashboardNav();
+    renderDashboardNav({ renderFn: render });
 
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
       'aria-current',
@@ -166,7 +62,7 @@ describe('DashboardNav interactions', () => {
   });
 
   it('exposes icon and label content for each navigation item', () => {
-    renderDashboardNav();
+    renderDashboardNav({ renderFn: render });
 
     const profileButton = screen.getByRole('button', { name: 'Profile' });
     const iconNode = profileButton.querySelector('[data-sidebar-icon]');
@@ -181,12 +77,37 @@ describe('DashboardNav interactions', () => {
     const user = userEvent.setup();
 
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.CHAT);
-    renderDashboardNav();
+    renderDashboardNav({ renderFn: render });
 
     const profileButton = screen.getByRole('button', { name: 'Profile' });
     await user.click(profileButton);
 
-    // Button should exist and be clickable (drawer open is tested via mock)
     expect(profileButton).toBeDefined();
+  });
+
+  it('keeps demo-disabled items as links on nested demo routes', async () => {
+    const user = userEvent.setup();
+
+    mockUsePathname.mockReturnValueOnce('/demo/showcase/settings');
+    renderDashboardNav({
+      renderFn: render,
+      overrides: {
+        selectedProfile: {
+          id: 'profile_123',
+          displayName: 'Tim White',
+          username: 'tim',
+          usernameNormalized: 'tim',
+        } as DashboardData['selectedProfile'],
+      },
+    });
+
+    const tasksLink = screen.getByRole('link', { name: 'Tasks' });
+    expect(tasksLink).toHaveAttribute('href', APP_ROUTES.DASHBOARD_TASKS);
+
+    await user.click(tasksLink);
+
+    expect(mockToastInfo).toHaveBeenCalledWith(
+      'Tasks is not available in demo mode'
+    );
   });
 });

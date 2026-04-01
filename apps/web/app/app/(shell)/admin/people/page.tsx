@@ -204,7 +204,7 @@ export default async function AdminPeoplePage({
         <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
           <WorkspaceTabsSurface
             title='People operations'
-            description='One shared workspace for waitlist triage, creator management, signed-up users, releases, and feedback.'
+            description='Waitlist, creators, users, releases, and feedback.'
             primaryParam='view'
             primaryValue={view}
             primaryOptions={peopleTabs}

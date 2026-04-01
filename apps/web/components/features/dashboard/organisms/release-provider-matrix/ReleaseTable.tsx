@@ -141,13 +141,13 @@ export function ReleaseTable({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-row-selected)_24%,var(--linear-bg-surface-0))] shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_14%,var(--linear-app-frame-seam))] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_28%,var(--linear-bg-surface-0))] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_32%,var(--linear-bg-surface-0))]';
+          'bg-[color-mix(in_oklab,var(--linear-row-selected)_20%,transparent)] shadow-[inset_2px_0_0_0_var(--linear-border-focus)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_24%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_28%,transparent)]';
       } else if (isRowExpanded) {
         baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,var(--linear-bg-surface-0))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_64%,var(--linear-bg-surface-0))] focus-within:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_68%,var(--linear-bg-surface-0))]';
+          'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_52%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_58%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_62%,transparent)]';
       } else {
         baseClassName =
-          'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)] hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_84%,transparent)] focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_28%,transparent)] transition-[background-color,box-shadow,color] duration-150 ease-out [&:hover_span]:text-primary-token [&:hover_p]:text-primary-token';
+          'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_84%,transparent)] transition-[background-color,box-shadow,color] duration-150 ease-out [&:hover_span]:text-primary-token [&:hover_p]:text-primary-token';
       }
 
       const refreshClassName = isRefreshing
@@ -158,8 +158,7 @@ export function ReleaseTable({
         : '';
 
       return [
-        'rounded-[10px] transition-[background-color,box-shadow] duration-150 ease-out',
-        'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_30%,transparent)]',
+        'rounded-none transition-[background-color,box-shadow] duration-150 ease-out',
         baseClassName,
         refreshClassName,
         flashClassName,
@@ -357,7 +356,7 @@ export function ReleaseTable({
       minWidth={minWidth}
       hideHeader
       className='text-[12.5px] text-primary-token'
-      containerClassName='h-full px-2.5 pb-2.5 pt-1 md:px-3 md:pb-3 md:pt-1.5'
+      containerClassName='h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
       columnVisibility={tanstackColumnVisibility}
       onFocusedRowChange={handleFocusedRowChange}
       skeletonRows={14}

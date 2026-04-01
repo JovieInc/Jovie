@@ -345,6 +345,30 @@ export const queryKeys = {
       [...queryKeys.releaseTasks.all, 'summary', profileId] as const,
   },
 
+  tasks: {
+    all: ['tasks'] as const,
+    list: (profileId?: string, filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.tasks.all,
+        'list',
+        ...(profileId === undefined ? [] : [profileId]),
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
+    detail: (taskId: string, profileId?: string) =>
+      [
+        ...queryKeys.tasks.all,
+        'detail',
+        taskId,
+        ...(profileId === undefined ? [] : [profileId]),
+      ] as const,
+    stats: (profileId?: string) =>
+      [
+        ...queryKeys.tasks.all,
+        'stats',
+        ...(profileId === undefined ? [] : [profileId]),
+      ] as const,
+  },
+
   // Ad pixel settings
   pixels: {
     all: ['pixels'] as const,
