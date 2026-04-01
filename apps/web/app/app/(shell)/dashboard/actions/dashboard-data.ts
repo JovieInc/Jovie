@@ -10,10 +10,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { and, asc, sql as drizzleSql, eq, or } from 'drizzle-orm';
-import {
-  unstable_noStore as noStore,
-  unstable_cache as unstableCache,
-} from 'next/cache';
+import { unstable_cache as unstableCache } from 'next/cache';
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
@@ -855,8 +852,6 @@ async function resolveDashboardDataWith(
   fetchFreshFn: (userId: string) => Promise<CoreData>,
   context: string
 ): Promise<DashboardData> {
-  noStore();
-
   const entitlements = await getCurrentUserEntitlements();
   const isAdmin = entitlements.isAdmin;
   const userId = entitlements.userId;

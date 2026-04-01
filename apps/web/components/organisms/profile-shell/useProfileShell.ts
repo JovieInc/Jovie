@@ -11,10 +11,7 @@ import {
 import type { ProfileMode } from '@/features/profile/contracts';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { applyPublicProfileLinkCaps } from '@/lib/profile/social-link-limits';
-import {
-  detectSourcePlatform,
-  getContextAwareLinks,
-} from '@/lib/utils/context-aware-links';
+import { sortSocialLinksByGeoPopularity } from '@/lib/utils/context-aware-links';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import type { LegacySocialLink } from '@/types/db';
@@ -70,13 +67,18 @@ export interface UseProfileShellReturn {
 export function useProfileShell({
   artist,
   socialLinks,
+  viewerCountryCode,
   contacts = [],
   visitTrackingToken,
   modeOverride,
   sourceOverride,
 }: Pick<
   ProfileShellProps,
-  'artist' | 'socialLinks' | 'contacts' | 'visitTrackingToken'
+  | 'artist'
+  | 'socialLinks'
+  | 'viewerCountryCode'
+  | 'contacts'
+  | 'visitTrackingToken'
 > & {
   modeOverride?: ProfileMode;
   sourceOverride?: string | null;
@@ -204,16 +206,8 @@ export function useProfileShell({
     const visibleLinks = socialLinks.filter(
       link => link.is_visible !== false && isSafePublicSocialLink(link)
     );
-
-    // Detect source platform from referrer or UTM params
-    const referrer = typeof document === 'undefined' ? '' : document.referrer;
-    const params = searchParams
-      ? new URLSearchParams(searchParams.toString())
-      : new URLSearchParams();
-    const sourcePlatform = detectSourcePlatform(referrer, params);
-
-    return getContextAwareLinks(visibleLinks, sourcePlatform);
-  }, [socialLinks, searchParams]);
+    return sortSocialLinksByGeoPopularity(visibleLinks, viewerCountryCode);
+  }, [socialLinks, viewerCountryCode]);
   const cappedLinks = useMemo(
     () => applyPublicProfileLinkCaps(socialNetworkLinks),
     [socialNetworkLinks]

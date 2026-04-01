@@ -452,8 +452,10 @@ export {
   useRescanIsrcLinksMutation,
   useResetProviderOverrideMutation,
   useSaveCanvasStatusMutation,
+  useSavePrimaryIsrcMutation,
   useSaveProviderOverrideMutation,
   useSaveReleaseLyricsMutation,
+  useSaveReleaseMetadataMutation,
   useSaveReleaseTargetPlaylistsMutation,
   useSyncReleasesFromSpotifyMutation,
 } from './useReleaseMutations';

@@ -39,6 +39,8 @@ describe('ChatMessage analytics cards', () => {
     fastRender(<ChatMessage {...messageProps} />);
 
     expect(screen.getByTestId('chat-message-reply-bubble')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copy message' })).toBeTruthy();
+    expect(screen.queryByText('Copy')).toBeNull();
   });
 
   it('renders a chat analytics card for showTopInsights tool results', () => {

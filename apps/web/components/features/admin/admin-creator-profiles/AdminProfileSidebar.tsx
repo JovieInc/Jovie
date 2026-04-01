@@ -8,13 +8,14 @@ import {
   DrawerSurfaceCard,
   DrawerTabbedCard,
   DrawerTabs,
+  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { BASE_URL } from '@/constants/domains';
 import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { ProfileAboutTab } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab';
-import { ProfileContactHeader } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileContactHeader';
 import {
   type CategoryOption,
   ProfileLinkList,
@@ -95,37 +96,53 @@ export function AdminProfileSidebar({
       headerMode='minimal'
       entityHeader={
         <DrawerSurfaceCard variant='card' className='relative overflow-hidden'>
-          <div className='border-b border-subtle px-3 py-2'>
-            <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-              Creator profile
-            </p>
-          </div>
-          <div className='space-y-3 p-3.5'>
-            <ProfileContactHeader
-              displayName={profile.displayName ?? profile.username}
-              username={profile.username}
-              avatarUrl={profile.avatarUrl}
-            />
-            <div className='pt-0.5'>
-              <div className='grid grid-cols-[88px,minmax(0,1fr)] items-center gap-3'>
-                <Label className='text-xs font-medium text-secondary-token'>
-                  Profile link
-                </Label>
-                <CopyLinkInput
-                  url={`${BASE_URL}/${profile.username}`}
-                  size='md'
-                  className='flex-1'
-                  inputClassName='h-7 rounded-md border-subtle bg-surface-0 px-2 py-1 text-[11px]'
+          <div className='space-y-3 p-3'>
+            <EntityHeaderCard
+              eyebrow='Creator profile'
+              title={profile.displayName ?? profile.username}
+              subtitle={`@${profile.username}`}
+              image={
+                <AvatarUploadable
+                  src={profile.avatarUrl}
+                  alt={`${profile.displayName ?? profile.username} avatar`}
+                  name={profile.displayName ?? profile.username}
+                  size='2xl'
+                  rounded='md'
                 />
-              </div>
-            </div>
+              }
+              actions={
+                <DrawerCardActionBar
+                  primaryActions={primaryActions}
+                  menuItems={contextMenuItems}
+                  onClose={onClose}
+                  overflowTriggerPlacement='card-top-right'
+                />
+              }
+              meta={
+                <div className='flex flex-wrap items-center gap-2 text-[11px] text-tertiary-token'>
+                  <span>
+                    {links.length} linked destination
+                    {links.length === 1 ? '' : 's'}
+                  </span>
+                  {profile.location ? <span>{profile.location}</span> : null}
+                </div>
+              }
+              footer={
+                <div className='grid grid-cols-[72px,minmax(0,1fr)] items-center gap-3'>
+                  <Label className='text-[11px] font-medium text-secondary-token'>
+                    Profile link
+                  </Label>
+                  <CopyLinkInput
+                    url={`${BASE_URL}/${profile.username}`}
+                    size='md'
+                    className='flex-1'
+                    inputClassName='h-7 rounded-md border-subtle bg-surface-0 px-2 py-1 text-[11px]'
+                  />
+                </div>
+              }
+              bodyClassName='pr-9'
+            />
           </div>
-          <DrawerCardActionBar
-            primaryActions={primaryActions}
-            menuItems={contextMenuItems}
-            onClose={onClose}
-            overflowTriggerPlacement='card-top-right'
-          />
         </DrawerSurfaceCard>
       }
     >

@@ -66,6 +66,11 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Rule:** In the app shell, `bg-(--linear-app-content-surface)` is shell chrome/canvas only. Shared cards and panels use `bg-surface-1`, recessed wells use `bg-surface-0`, and table/workspace routes must wrap primary content in `DashboardWorkspacePanel` plus `LINEAR_SURFACE.contentContainer`.
 
+### AI-generated UI defaults drift toward all-caps and border-heavy layouts
+**Mistake:** Agents produced generic AI-looking product UI with uppercase eyebrow labels, long explanatory copy, and bordered cards used as the main hierarchy device. The result felt cheap and off-brand instead of Linear-inspired and premium.
+
+**Rule:** For Jovie product UI, default to small type, normal Title Case labels, restrained emphasis, and minimal chrome. Do not use uppercase labels or extra borders as the default way to make something feel designed. Solve hierarchy with spacing, typography, and surface contrast first.
+
 ---
 
 ## Git Workflow

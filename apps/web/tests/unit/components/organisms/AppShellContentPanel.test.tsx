@@ -31,8 +31,8 @@ describe('AppShellContentPanel', () => {
     );
 
     expect(screen.getByText('Settings content')).toBeInTheDocument();
-    expect(container.innerHTML).toContain('max-w-[52rem]');
-    expect(container.innerHTML).toContain('px-3 py-3 sm:px-4 sm:py-4');
+    expect(container.innerHTML).toContain('max-w-[50rem]');
+    expect(container.innerHTML).toContain('px-3 py-3 sm:px-3.5 sm:py-3.5');
     expect(container.innerHTML).toContain('overflow-visible');
   });
 
@@ -45,7 +45,7 @@ describe('AppShellContentPanel', () => {
 
     expect(screen.getByText('Toolbar')).toBeInTheDocument();
     expect(screen.getByText('Panel content')).toBeInTheDocument();
-    expect(container.innerHTML).toContain('px-3 py-3 sm:px-3 sm:py-3 lg:px-3');
+    expect(container.innerHTML).toContain('px-2.5 py-2.5 sm:px-3 sm:py-3');
   });
 
   it('keeps panel scrolling constrained by default', () => {

@@ -41,12 +41,21 @@ export function resolveClerkKeys(hostname: string): ClerkKeys {
 
 /**
  * Resolve the publishable key for dynamic server component layouts.
- * Uses headers() to detect hostname — only call from force-dynamic routes.
+ *
+ * Prefers the x-clerk-publishable-key request header injected by middleware
+ * (proxy.ts) which resolves the correct key for staging vs production based
+ * on hostname — avoiding duplicate hostname-parsing in every layout render.
+ *
+ * Falls back to hostname-based resolution for environments running without
+ * the middleware (e.g., direct Node.js server, some test setups).
  */
 export async function resolvePublishableKeyFromHeaders(): Promise<
   string | undefined
 > {
   const hdrs = await headers();
+  const preResolved = hdrs.get('x-clerk-publishable-key');
+  if (preResolved) return preResolved;
+  // Fallback: resolve from the Host header directly
   const host = hdrs.get('host') || hdrs.get('x-forwarded-host') || '';
   const hostname = host.split(':')[0];
   return resolveClerkKeys(hostname).publishableKey;

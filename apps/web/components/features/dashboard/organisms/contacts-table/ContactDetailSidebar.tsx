@@ -19,6 +19,7 @@ import {
   DrawerSurfaceCard,
   DrawerTabbedCard,
   DrawerTabs,
+  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
@@ -305,27 +306,32 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       emptyMessage='Select a contact to view details'
       entityHeader={
         contact ? (
-          <DrawerSurfaceCard
-            variant='card'
-            className='relative overflow-hidden p-3'
-          >
-            <p className='mb-2 text-[10.5px] font-[510] leading-none text-tertiary-token'>
-              Contact
-            </p>
-            <div className='space-y-1'>
-              <p className='text-[15px] font-[520] leading-5 text-primary-token'>
-                {contactDisplayName}
-              </p>
-              <p className='mt-1 text-[12px] text-secondary-token'>
-                {roleLabel}
-              </p>
-            </div>
-            <DrawerCardActionBar
-              primaryActions={primaryActions}
-              menuItems={contextMenuItems}
-              onClose={handleClose}
-              overflowTriggerPlacement='card-top-right'
-              className='mx-[-12px] mt-3'
+          <DrawerSurfaceCard variant='card' className='overflow-hidden p-3'>
+            <EntityHeaderCard
+              eyebrow='Contact'
+              title={contactDisplayName}
+              subtitle={roleLabel}
+              actions={
+                <DrawerCardActionBar
+                  primaryActions={primaryActions}
+                  menuItems={contextMenuItems}
+                  onClose={handleClose}
+                  overflowTriggerPlacement='card-top-right'
+                />
+              }
+              meta={
+                territorySummary ? (
+                  <div className='flex flex-wrap items-center gap-1.5 text-[11px] text-tertiary-token'>
+                    <Badge
+                      size='sm'
+                      className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 text-[10px] text-secondary-token'
+                    >
+                      {territorySummary}
+                    </Badge>
+                  </div>
+                ) : null
+              }
+              bodyClassName='pr-9'
             />
           </DrawerSurfaceCard>
         ) : undefined

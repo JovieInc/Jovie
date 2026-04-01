@@ -268,7 +268,7 @@ export function ChatMessage({
           )}
 
           {!isThinking && messageText && (
-            <div className='space-y-2'>
+            <div className='space-y-1.5'>
               <div className='flex items-center gap-2 pl-0.5'>
                 <span className='flex h-5.5 w-5.5 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
                   <BrandLogo size={10} tone='auto' rounded={false} />
@@ -282,7 +282,7 @@ export function ChatMessage({
               </div>
               <div
                 data-testid='chat-message-reply-bubble'
-                className='rounded-[18px] border border-subtle bg-surface-1 px-4 py-3.5 text-primary-token shadow-card'
+                className='rounded-[18px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_70%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-surface))] px-4 py-3.5 text-primary-token shadow-none'
               >
                 <ChatMarkdown
                   content={messageText}
@@ -309,14 +309,14 @@ export function ChatMessage({
           })}
 
           {!isStreaming && messageText && (
-            <div className='mt-2 flex items-center gap-1.5 pl-1.5'>
+            <div className='mt-1.5 flex items-center justify-end pr-0.5'>
               <SimpleTooltip content={isSuccess ? 'Copied!' : 'Copy response'}>
                 <button
                   type='button'
                   onClick={() => copy(messageText)}
                   className={cn(
                     APP_CONTROL_BUTTON_CLASS,
-                    'h-7 gap-1.5 px-2.5 text-tertiary-token hover:text-secondary-token'
+                    'h-7 w-7 rounded-full px-0 text-tertiary-token hover:text-secondary-token'
                   )}
                   aria-label={
                     isSuccess ? 'Copied to clipboard' : 'Copy message'
@@ -327,9 +327,6 @@ export function ChatMessage({
                   ) : (
                     <Copy className='h-3.5 w-3.5' />
                   )}
-                  <span className='text-[11px] font-[450]'>
-                    {isSuccess ? 'Copied' : 'Copy'}
-                  </span>
                 </button>
               </SimpleTooltip>
             </div>

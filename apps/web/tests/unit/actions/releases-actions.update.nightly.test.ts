@@ -17,9 +17,13 @@ const {
   mockGetProviderLink,
   mockValidateProviderUrl,
   mockThrowIfRedirect,
+  mockDbInsert,
   mockDbSelect,
   mockDbUpdate,
   mockDbDelete,
+  mockGetTracksForRelease,
+  mockUpsertRecording,
+  mockUpsertReleaseTrack,
   mockCaptureError,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
@@ -35,9 +39,13 @@ const {
   mockGetProviderLink: vi.fn(),
   mockValidateProviderUrl: vi.fn(),
   mockThrowIfRedirect: vi.fn(),
+  mockDbInsert: vi.fn(),
   mockDbSelect: vi.fn(),
   mockDbUpdate: vi.fn(),
   mockDbDelete: vi.fn(),
+  mockGetTracksForRelease: vi.fn(),
+  mockUpsertRecording: vi.fn(),
+  mockUpsertReleaseTrack: vi.fn(),
   mockCaptureError: vi.fn(),
 }));
 
@@ -66,6 +74,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: {
+    insert: mockDbInsert,
     select: mockDbSelect,
     update: mockDbUpdate,
     delete: mockDbDelete,
@@ -74,6 +83,12 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/db/schema/content', () => ({
   discogReleases: { id: 'id' },
+  discogRecordings: {
+    id: 'recordingId',
+    creatorProfileId: 'creatorProfileId',
+    isrc: 'isrc',
+  },
+  discogTracks: { id: 'trackId', isrc: 'isrc' },
 }));
 
 vi.mock('@/lib/db/schema/profiles', () => ({
@@ -95,9 +110,13 @@ vi.mock('@/lib/discography/provider-domains', () => ({
 
 vi.mock('@/lib/discography/queries', () => ({
   getReleaseById: mockGetReleaseById,
+  getReleaseTracksForReleaseWithProviders: mockGetTracksForReleaseWithProviders,
   getReleasesForProfile: mockGetReleasesForProfile,
   getTracksForReleaseWithProviders: mockGetTracksForReleaseWithProviders,
+  getTracksForRelease: mockGetTracksForRelease,
   upsertProviderLink: mockUpsertProviderLink,
+  upsertRecording: mockUpsertRecording,
+  upsertReleaseTrack: mockUpsertReleaseTrack,
   resetProviderLink: mockResetProviderLinkDb,
   getProviderLink: mockGetProviderLink,
 }));
@@ -112,6 +131,15 @@ vi.mock('@/lib/discography/utils', () => ({
   buildSmartLinkPath: vi.fn(
     (handle: string, slug: string, provider?: string) =>
       `/${handle}/${slug}${provider ? `/${provider}` : ''}`
+  ),
+  buildTrackDeepLinkPath: vi.fn(
+    (
+      handle: string,
+      releaseSlug: string,
+      trackSlug: string,
+      provider?: string
+    ) =>
+      `/${handle}/${releaseSlug}/${trackSlug}${provider ? `/${provider}` : ''}`
   ),
 }));
 
@@ -288,9 +316,13 @@ function setupDbDeleteChain() {
 describe('@critical releases/actions.ts — update/edit operations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDbInsert.mockReset();
     mockDbSelect.mockReset();
     mockDbUpdate.mockReset();
     mockDbDelete.mockReset();
+    mockGetTracksForRelease.mockReset();
+    mockUpsertRecording.mockReset();
+    mockUpsertReleaseTrack.mockReset();
     mockGetCachedAuth.mockResolvedValue({ userId: MOCK_USER_ID });
     mockGetDashboardData.mockResolvedValue(makeDashboardData());
     mockRedirect.mockImplementation((url: string) => {
@@ -774,6 +806,146 @@ describe('@critical releases/actions.ts — update/edit operations', () => {
 
       await expect(revertReleaseArtwork('rel_001')).rejects.toThrow(
         'Release not found'
+      );
+    });
+  });
+
+  describe('saveReleaseMetadata', () => {
+    it('saves UPC and label on the release row', async () => {
+      setupDbUpdateChain();
+      mockGetReleaseById.mockResolvedValue(makeRelease());
+
+      const { saveReleaseMetadata } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await saveReleaseMetadata({
+        profileId: MOCK_PROFILE.id,
+        releaseId: 'rel_001',
+        upc: ' 555666777888 ',
+        label: '  New Label  ',
+      });
+
+      expect(result.id).toBe('rel_001');
+      expect(mockDbUpdate).toHaveBeenCalled();
+      expect(mockRevalidateTag).toHaveBeenCalled();
+    });
+
+    it('rejects invalid UPC input', async () => {
+      const { saveReleaseMetadata } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+
+      await expect(
+        saveReleaseMetadata({
+          profileId: MOCK_PROFILE.id,
+          releaseId: 'rel_001',
+          upc: 'ABC123',
+          label: null,
+        })
+      ).rejects.toThrow('UPC must contain only digits');
+    });
+  });
+
+  describe('savePrimaryIsrc', () => {
+    it('updates an existing primary recording ISRC', async () => {
+      setupDbUpdateChain();
+      mockGetReleaseById.mockResolvedValue(makeRelease());
+      mockGetTracksForReleaseWithProviders.mockResolvedValue({
+        tracks: [{ recordingId: 'rec_001' }],
+        total: 1,
+        hasMore: false,
+      });
+      mockGetTracksForRelease.mockResolvedValue([]);
+      setupDbSelectChain([]);
+
+      const { savePrimaryIsrc } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await savePrimaryIsrc({
+        profileId: MOCK_PROFILE.id,
+        releaseId: 'rel_001',
+        isrc: 'us-abc-1234567',
+      });
+
+      expect(result.id).toBe('rel_001');
+      expect(mockDbUpdate).toHaveBeenCalled();
+    });
+
+    it('creates the first recording and release track for manual releases without tracks', async () => {
+      setupDbUpdateChain();
+      mockGetReleaseById.mockResolvedValue(
+        makeRelease({
+          sourceType: 'manual',
+          totalTracks: 0,
+          trackSummary: undefined,
+        })
+      );
+      mockGetTracksForReleaseWithProviders.mockResolvedValue({
+        tracks: [],
+        total: 0,
+        hasMore: false,
+      });
+      mockGetTracksForRelease.mockResolvedValue([]);
+      setupDbSelectChain([]);
+      mockUpsertRecording.mockResolvedValue({ id: 'rec_new' });
+      mockUpsertReleaseTrack.mockResolvedValue({ id: 'rt_new' });
+
+      const { savePrimaryIsrc } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      await savePrimaryIsrc({
+        profileId: MOCK_PROFILE.id,
+        releaseId: 'rel_001',
+        isrc: 'USABC1234567',
+      });
+
+      expect(mockUpsertRecording).toHaveBeenCalledWith(
+        expect.objectContaining({
+          creatorProfileId: MOCK_PROFILE.id,
+          title: 'Test Album',
+          isrc: 'USABC1234567',
+          sourceType: 'manual',
+        })
+      );
+      expect(mockUpsertReleaseTrack).toHaveBeenCalledWith(
+        expect.objectContaining({
+          releaseId: 'rel_001',
+          recordingId: 'rec_new',
+          trackNumber: 1,
+          discNumber: 1,
+          sourceType: 'manual',
+        })
+      );
+    });
+
+    it('rejects trackless non-manual releases', async () => {
+      mockGetReleaseById.mockResolvedValue(
+        makeRelease({
+          sourceType: 'spotify',
+          totalTracks: 0,
+          trackSummary: undefined,
+        })
+      );
+      mockGetTracksForReleaseWithProviders.mockResolvedValue({
+        tracks: [],
+        total: 0,
+        hasMore: false,
+      });
+      mockGetTracksForRelease.mockResolvedValue([]);
+      setupDbSelectChain([]);
+
+      const { savePrimaryIsrc } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+
+      await expect(
+        savePrimaryIsrc({
+          profileId: MOCK_PROFILE.id,
+          releaseId: 'rel_001',
+          isrc: 'USABC1234567',
+        })
+      ).rejects.toThrow(
+        'ISRC can only be edited automatically for manual releases without tracks'
       );
     });
   });

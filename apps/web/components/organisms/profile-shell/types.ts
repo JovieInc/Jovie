@@ -36,6 +36,7 @@ export interface ProfileNotificationsContextValue {
 export interface ProfileShellProps {
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
+  readonly viewerCountryCode?: string | null;
   readonly contacts?: PublicContact[];
   readonly subtitle?: string;
   readonly children?: React.ReactNode;

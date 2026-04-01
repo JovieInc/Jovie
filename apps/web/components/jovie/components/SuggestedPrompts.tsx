@@ -40,7 +40,7 @@ interface SuggestedPromptsProps {
   readonly isFirstSession?: boolean;
   readonly latestReleaseTitle?: string | null;
   readonly canUseAdvancedTools?: boolean;
-  readonly layout?: 'rail' | 'grid';
+  readonly layout?: 'rail' | 'grid' | 'flat';
 }
 
 function SuggestionPill({
@@ -164,6 +164,36 @@ export function SuggestedPrompts({
             ))}
           </div>
         ) : null}
+      </div>
+    );
+  }
+
+  if (layout === 'flat') {
+    return (
+      <div
+        className='mx-auto flex w-full max-w-[35rem] flex-col gap-1.5'
+        data-testid='suggested-prompts-flat'
+      >
+        {allSuggestions.map(suggestion => {
+          const IconComponent = ICON_MAP[suggestion.icon];
+
+          return (
+            <button
+              key={suggestion.label}
+              type='button'
+              onClick={() => onSelect(suggestion.prompt)}
+              className='group flex w-full items-center gap-2 rounded-full bg-transparent px-3 py-2 text-left text-[12.5px] text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/12'
+              aria-label={suggestion.label}
+            >
+              <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-150 group-hover:text-primary-token'>
+                {IconComponent ? (
+                  <IconComponent className='h-3.5 w-3.5 shrink-0' />
+                ) : null}
+              </span>
+              <span className='min-w-0 truncate'>{suggestion.label}</span>
+            </button>
+          );
+        })}
       </div>
     );
   }

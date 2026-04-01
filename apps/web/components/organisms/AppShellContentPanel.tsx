@@ -17,16 +17,16 @@ export interface AppShellContentPanelProps {
 
 const PANEL_MAX_WIDTH_CLASSNAME = {
   full: 'max-w-none',
-  wide: 'max-w-[88rem]',
+  wide: 'max-w-[84rem]',
   reading: 'max-w-[56rem]',
-  form: 'max-w-[52rem]',
+  form: 'max-w-[50rem]',
 } as const;
 
-const PANEL_OUTER_INSET_CLASSNAME = 'px-3 py-3 sm:px-3 sm:py-3 lg:px-3';
+const PANEL_OUTER_INSET_CLASSNAME = 'px-2.5 py-2.5 sm:px-3 sm:py-3';
 
 const PANEL_CONTENT_PADDING_CLASSNAME = {
   none: '',
-  compact: 'px-3 py-3 sm:px-4 sm:py-4',
+  compact: 'px-3 py-3 sm:px-3.5 sm:py-3.5',
   default:
     'px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)',
 } as const;

@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import {
   DrawerSection,
   DrawerSurfaceCard,
+  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -147,43 +148,39 @@ export function AdminUserDetailDrawer({
       entityHeader={
         user ? (
           <DrawerSurfaceCard variant='card' className='p-3'>
-            <p className='mb-2 text-[10.5px] font-[510] leading-none text-tertiary-token'>
-              User
-            </p>
-            <div className='space-y-1.5'>
-              <div className='space-y-1'>
-                <p className='text-[15px] font-semibold text-primary-token'>
-                  {user.name ?? 'Unnamed user'}
-                </p>
-                {user.email ? (
+            <EntityHeaderCard
+              eyebrow='User'
+              title={user.name ?? 'Unnamed user'}
+              subtitle={
+                user.email ? (
                   <div className='flex items-center gap-1.5'>
-                    <p className='truncate text-[12px] text-secondary-token'>
-                      {user.email}
-                    </p>
+                    <span className='truncate'>{user.email}</span>
                     <CopyButton value={user.email} label='Email' />
                   </div>
                 ) : (
-                  <p className='text-[12px] text-secondary-token'>No email</p>
-                )}
-              </div>
-              <div className='flex flex-wrap gap-1.5'>
-                <Badge
-                  size='sm'
-                  variant={user.plan === 'pro' ? 'primary' : 'secondary'}
-                >
-                  {user.plan}
-                </Badge>
-                {user.deletedAt ? (
-                  <Badge size='sm' variant='warning'>
-                    Deleted
+                  'No email'
+                )
+              }
+              meta={
+                <div className='flex flex-wrap gap-1.5'>
+                  <Badge
+                    size='sm'
+                    variant={user.plan === 'pro' ? 'primary' : 'secondary'}
+                  >
+                    {user.plan}
                   </Badge>
-                ) : (
-                  <Badge size='sm' variant='success'>
-                    Active
-                  </Badge>
-                )}
-              </div>
-            </div>
+                  {user.deletedAt ? (
+                    <Badge size='sm' variant='warning'>
+                      Deleted
+                    </Badge>
+                  ) : (
+                    <Badge size='sm' variant='success'>
+                      Active
+                    </Badge>
+                  )}
+                </div>
+              }
+            />
           </DrawerSurfaceCard>
         ) : undefined
       }

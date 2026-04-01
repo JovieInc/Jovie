@@ -28,7 +28,7 @@ import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/Dashboard
 import { AnalyticsSidebar } from '@/features/dashboard/organisms/AnalyticsSidebar';
 import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelContext';
 import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar';
-import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
+import { PageShell } from '@/components/organisms/PageShell';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { queryKeys } from '@/lib/queries';
@@ -661,7 +661,7 @@ export const DashboardAudienceTableUnified = memo(
     return (
       <AudienceTableStableProvider value={stableContextValue}>
         <AudienceTableVolatileProvider value={volatileContextValue}>
-          <DashboardWorkspacePanel
+          <PageShell
             className='overflow-hidden'
             data-testid='dashboard-audience-table'
             toolbar={
@@ -752,7 +752,7 @@ export const DashboardAudienceTableUnified = memo(
               {selectedCount > 0 &&
                 `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
             </div>
-          </DashboardWorkspacePanel>
+          </PageShell>
         </AudienceTableVolatileProvider>
       </AudienceTableStableProvider>
     );

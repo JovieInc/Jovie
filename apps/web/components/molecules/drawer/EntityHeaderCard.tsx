@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 export interface EntityHeaderCardProps {
   /** Image slot — Avatar, AvatarUploadable, artwork, etc. */
   readonly image?: ReactNode;
+  /** Optional small label above the title */
+  readonly eyebrow?: ReactNode;
   /** Primary display name / title */
   readonly title: string;
   /** Secondary line — username, artist name, etc. */
@@ -13,6 +15,10 @@ export interface EntityHeaderCardProps {
   readonly meta?: ReactNode;
   /** Optional badge rendered inline after the title (e.g. verified icon) */
   readonly badge?: ReactNode;
+  /** Optional top-right action slot */
+  readonly actions?: ReactNode;
+  /** Optional footer rendered below the meta block */
+  readonly footer?: ReactNode;
   readonly className?: string;
   readonly bodyClassName?: string;
   readonly 'data-testid'?: string;
@@ -27,33 +33,43 @@ export interface EntityHeaderCardProps {
  */
 export function EntityHeaderCard({
   image,
+  eyebrow,
   title,
   subtitle,
   meta,
   badge,
+  actions,
+  footer,
   className,
   bodyClassName,
   'data-testid': testId,
 }: EntityHeaderCardProps) {
   return (
     <div
-      className={cn('flex items-start gap-2.5', className)}
+      className={cn('relative flex items-start gap-3', className)}
       data-testid={testId}
     >
+      {actions ? <div className='absolute right-0 top-0'>{actions}</div> : null}
       {image ?? null}
-      <div className={cn('min-w-0 flex-1 space-y-px', bodyClassName)}>
+      <div className={cn('min-w-0 flex-1 space-y-1', bodyClassName)}>
+        {eyebrow ? (
+          <div className='text-[10.5px] font-[510] leading-none tracking-[0.03em] text-tertiary-token'>
+            {eyebrow}
+          </div>
+        ) : null}
         <div className='flex items-center gap-1'>
-          <span className='truncate text-[13px] font-[590] leading-[15px] tracking-[-0.01em] text-primary-token'>
+          <span className='truncate text-[14px] font-[590] leading-[18px] tracking-[-0.015em] text-primary-token'>
             {title}
           </span>
           {badge}
         </div>
         {subtitle && (
-          <div className='truncate text-[11px] leading-[14px] tracking-[-0.005em] text-secondary-token'>
+          <div className='truncate text-[12px] leading-[16px] tracking-[-0.005em] text-secondary-token'>
             {subtitle}
           </div>
         )}
-        {meta ? <div>{meta}</div> : null}
+        {meta ? <div className='pt-0.5'>{meta}</div> : null}
+        {footer ? <div className='pt-1'>{footer}</div> : null}
       </div>
     </div>
   );

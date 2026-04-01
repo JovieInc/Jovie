@@ -187,7 +187,7 @@ function ChannelInputRow({
   };
 
   return (
-    <div className='rounded-2xl bg-surface-0 backdrop-blur-md ring-1 ring-(--color-border-subtle) shadow-sm focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] transition-[box-shadow,ring] overflow-hidden'>
+    <div className='overflow-hidden rounded-[2rem] bg-surface-0/95 shadow-sm ring-1 ring-(--color-border-subtle) backdrop-blur-md transition-[box-shadow,ring] focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))]'>
       <div className='flex items-center'>
         {shouldShowCountrySelector ? (
           <CountrySelector
@@ -199,7 +199,7 @@ function ChannelInputRow({
         ) : (
           <button
             type='button'
-            className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
+            className='flex h-14 items-center bg-transparent pl-5 pr-3.5 text-tertiary-token transition-colors hover:bg-surface-2 focus-visible:outline-none'
             aria-label={getChannelToggleLabel(channel)}
             onClick={() =>
               handleChannelChange(channel === 'sms' ? 'email' : 'sms')
@@ -224,7 +224,7 @@ function ChannelInputRow({
             aria-describedby={disclaimerId}
             type={inputConfig.type}
             inputMode={inputConfig.inputMode}
-            className='w-full h-12 px-4 bg-transparent text-[15px] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 border-none focus-visible:outline-none focus-visible:ring-0'
+            className='h-14 w-full bg-transparent px-4 text-[17px] font-medium text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 focus-visible:outline-none focus-visible:ring-0'
             placeholder={inputConfig.placeholder}
             value={inputValue}
             onChange={handleInputChange}
@@ -245,7 +245,7 @@ function ChannelInputRow({
           type='button'
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className='mr-1.5 inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-btn-primary px-3 text-sm font-medium text-btn-primary-foreground transition-opacity duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed'
+          className='mr-2 inline-flex h-11 shrink-0 items-center justify-center rounded-[1rem] bg-btn-primary px-5 text-[15px] font-semibold text-btn-primary-foreground transition-opacity duration-150 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed'
           style={noFontSynthesisStyle}
         >
           {getSubmitLabel(isSubmitting, otpStep)}
@@ -420,9 +420,9 @@ export function TwoStepNotificationsCTA({
       : emailInput;
 
   return (
-    <div className='space-y-3'>
+    <div className='space-y-5 sm:space-y-6'>
       <p
-        className='text-center text-sm font-semibold text-primary-token'
+        className='text-center text-[1.75rem] font-[640] tracking-[-0.04em] text-primary-token sm:text-[2rem]'
         style={noFontSynthesisStyle}
       >
         Never miss a release.
@@ -446,7 +446,7 @@ export function TwoStepNotificationsCTA({
             initial={enterVariant.initial}
             animate={enterVariant.animate}
           >
-            <div className='space-y-3'>
+            <div className='space-y-4 sm:space-y-5'>
               <ChannelInputRow
                 shouldShowCountrySelector={shouldShowCountrySelector}
                 country={country}
@@ -471,10 +471,10 @@ export function TwoStepNotificationsCTA({
                 handleSubscribe={handleSubscribe}
               />
 
-              <div className='flex items-center justify-center gap-2'>
+              <div className='flex min-h-5 items-center justify-center gap-2'>
                 <p
                   id={disclaimerId}
-                  className={`text-center text-[11px] leading-4 font-normal tracking-wide text-muted-foreground/80 transition-opacity duration-200 ${
+                  className={`text-center text-[12px] leading-5 font-normal tracking-[-0.01em] text-muted-foreground/80 transition-opacity duration-200 ${
                     isInputFocused && !error ? 'opacity-100' : 'opacity-0'
                   }`}
                   style={noFontSynthesisStyle}

@@ -58,6 +58,14 @@ export interface ReleaseExperienceAdapter {
   ) => Promise<void>;
   readonly onRescanIsrc?: (releaseId: string) => void;
   readonly onSaveLyrics?: (releaseId: string, lyrics: string) => Promise<void>;
+  readonly onSaveMetadata?: (
+    releaseId: string,
+    values: { upc: string | null; label: string | null }
+  ) => Promise<void>;
+  readonly onSavePrimaryIsrc?: (
+    releaseId: string,
+    isrc: string | null
+  ) => Promise<void>;
   readonly onSaveTargetPlaylists?: (
     releaseId: string,
     targetPlaylists: string[]
@@ -124,6 +132,14 @@ export interface UseReleaseProviderMatrixReturn {
     releaseId: string,
     provider: ProviderKey,
     url: string
+  ) => Promise<void>;
+  handleSaveMetadata: (
+    releaseId: string,
+    values: { upc: string | null; label: string | null }
+  ) => Promise<void>;
+  handleSavePrimaryIsrc: (
+    releaseId: string,
+    isrc: string | null
   ) => Promise<void>;
   handleSaveLyrics: (releaseId: string, lyrics: string) => Promise<void>;
   handleSaveTargetPlaylists: (

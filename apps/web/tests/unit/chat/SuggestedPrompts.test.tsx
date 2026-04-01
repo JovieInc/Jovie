@@ -28,6 +28,15 @@ describe('SuggestedPrompts', () => {
     expect(getByTestId('suggested-prompts-grid')).toBeTruthy();
   });
 
+  it('renders a flat layout when requested', () => {
+    const onSelect = vi.fn();
+    const { getByTestId } = fastRender(
+      <SuggestedPrompts onSelect={onSelect} layout='flat' />
+    );
+
+    expect(getByTestId('suggested-prompts-flat')).toBeTruthy();
+  });
+
   it('renders first-session prompts including all suggestions', () => {
     const onSelect = vi.fn();
     const { getByRole } = fastRender(

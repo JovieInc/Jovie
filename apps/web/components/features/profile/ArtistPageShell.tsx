@@ -10,6 +10,7 @@ import { Artist, LegacySocialLink } from '@/types/db';
 type ArtistPageShellProps = {
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
+  readonly viewerCountryCode?: string | null;
   readonly contacts: PublicContact[];
   readonly subtitle?: string;
   readonly children?: React.ReactNode;
@@ -36,6 +37,7 @@ type ArtistPageShellProps = {
 const ArtistPageShell = React.memo(function ArtistPageShell({
   artist,
   socialLinks,
+  viewerCountryCode,
   contacts = [],
   subtitle,
   children,
@@ -58,6 +60,7 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
     <ProfileShell
       artist={artist}
       socialLinks={socialLinks}
+      viewerCountryCode={viewerCountryCode}
       contacts={contacts}
       subtitle={subtitle}
       showSocialBar={showSocialBar}

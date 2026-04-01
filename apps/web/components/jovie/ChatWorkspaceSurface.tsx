@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
+import { PageShell } from '@/components/organisms/PageShell';
 
 interface ChatWorkspaceSurfaceProps {
   readonly children: ReactNode;
@@ -13,14 +13,14 @@ export function ChatWorkspaceSurface({
   className,
 }: ChatWorkspaceSurfaceProps) {
   return (
-    <AppShellContentPanel
+    <PageShell
       maxWidth='wide'
       frame='none'
       contentPadding='none'
-      scroll='panel'
+      scroll='page'
       className={className}
     >
       {children}
-    </AppShellContentPanel>
+    </PageShell>
   );
 }
