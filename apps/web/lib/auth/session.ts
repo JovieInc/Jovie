@@ -8,6 +8,13 @@ import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
+/** Shared error messages for auth/profile resolution. Used by route guards. */
+export const SESSION_ERRORS = {
+  USER_NOT_FOUND: 'User not found',
+  PROFILE_NOT_FOUND: 'Profile not found',
+  UNAUTHORIZED: 'Unauthorized',
+} as const;
+
 /**
  * Validates that a userId is a safe Clerk ID format
  * Clerk IDs follow the pattern: user_[a-zA-Z0-9]+
@@ -40,7 +47,7 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new Error(SESSION_ERRORS.UNAUTHORIZED);
   }
 
   // Validate userId format to prevent SQL injection
@@ -125,7 +132,7 @@ export async function withDbSession<T>(
 ): Promise<T> {
   const { userId } = await setupDbSession(options?.clerkUserId);
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new Error(SESSION_ERRORS.UNAUTHORIZED);
   }
   return operation(userId);
 }
@@ -179,7 +186,7 @@ export async function withDbSessionTx<T>(
 export async function requireAuth() {
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new Error(SESSION_ERRORS.UNAUTHORIZED);
   }
   return userId;
 }
@@ -348,7 +355,7 @@ export async function getSessionContext(options?: {
 
   // User not found
   if (!result && requireUser) {
-    throw new TypeError('User not found');
+    throw new TypeError(SESSION_ERRORS.USER_NOT_FOUND);
   }
 
   if (!result) {
@@ -385,7 +392,7 @@ export async function getSessionContext(options?: {
     : null;
 
   if (!profile && requireProfile) {
-    throw new TypeError('Profile not found');
+    throw new TypeError(SESSION_ERRORS.PROFILE_NOT_FOUND);
   }
 
   return {
