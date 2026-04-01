@@ -49,8 +49,8 @@ vi.mock('@/components/providers/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: { children: ReactNode }) => children,
 }));
 
-vi.mock('@/hooks/useSequentialShortcuts', () => ({
-  useSequentialShortcuts: vi.fn(),
+vi.mock('@/hooks/useDashboardShortcuts', () => ({
+  useDashboardShortcuts: vi.fn(),
 }));
 
 vi.mock('@/components/organisms/keyboard-shortcuts-sheet', () => ({

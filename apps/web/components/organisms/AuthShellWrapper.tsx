@@ -27,7 +27,7 @@ import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatU
 import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileProgress';
 import { ReleaseTablePendingShell } from '@/features/dashboard/organisms/ReleaseTablePendingShell';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
-import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
+import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { AuthShell } from './AuthShell';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
 
@@ -110,7 +110,7 @@ export interface AuthShellWrapperProps {
  */
 function KeyboardShortcutsHandler() {
   const { open } = useKeyboardShortcuts();
-  useSequentialShortcuts({ onOpenShortcutsModal: open });
+  useDashboardShortcuts({ onOpenShortcutsModal: open });
   return <KeyboardShortcutsSheet />;
 }
 
