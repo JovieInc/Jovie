@@ -13,7 +13,6 @@ import {
   TooltipShortcut,
 } from '@jovie/ui';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { X } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { DropdownEmptyState } from '@/components/molecules/DropdownEmptyState';
@@ -436,7 +435,7 @@ export function ReleaseFilterDropdown({
                     });
                   }}
                 >
-                  <X className='h-3.5 w-3.5' />
+                  <Icon name='X' className='h-3.5 w-3.5' />
                   <span>Clear all filters</span>
                 </DropdownMenuItem>
               </>

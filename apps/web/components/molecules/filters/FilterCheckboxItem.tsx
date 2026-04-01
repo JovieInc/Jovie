@@ -43,6 +43,8 @@ export function FilterCheckboxItem({
           searchInputRef?.current?.focus();
         }
       } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
         // Return focus to search input on Escape
         searchInputRef?.current?.focus();
       } else if (e.key === 'Enter' || e.key === ' ') {

@@ -6,6 +6,7 @@ import {
   type DbUserContext,
   getSessionContext,
   type ProfileContext,
+  SESSION_ERRORS,
 } from '@/lib/auth/session';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -80,22 +81,25 @@ export function withDashboardRoute(
 
       // Handle known auth/profile errors as structured responses
       if (error instanceof TypeError) {
-        if (error.message === 'User not found') {
+        if (error.message === SESSION_ERRORS.USER_NOT_FOUND) {
           return NextResponse.json(
-            { error: 'User not found' },
+            { error: SESSION_ERRORS.USER_NOT_FOUND },
             { status: 404, headers: NO_STORE_HEADERS }
           );
         }
-        if (error.message === 'Profile not found') {
+        if (error.message === SESSION_ERRORS.PROFILE_NOT_FOUND) {
           return NextResponse.json(
-            { error: 'Profile not found' },
+            { error: SESSION_ERRORS.PROFILE_NOT_FOUND },
             { status: 404, headers: NO_STORE_HEADERS }
           );
         }
       }
 
       // Handle unauthorized from withDbSession/resolveClerkUserId
-      if (error instanceof Error && error.message === 'Unauthorized') {
+      if (
+        error instanceof Error &&
+        error.message === SESSION_ERRORS.UNAUTHORIZED
+      ) {
         return NextResponse.json(
           { error: 'Unauthorized' },
           { status: 401, headers: NO_STORE_HEADERS }

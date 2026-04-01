@@ -17,6 +17,8 @@ export function ActiveFilterPill({
   icon,
   onClear,
 }: ActiveFilterPillProps) {
+  if (values.length === 0) return null;
+
   const displayValue =
     values.length > 1 ? `${values.length} selected` : values[0];
 

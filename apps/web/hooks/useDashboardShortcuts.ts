@@ -1,6 +1,5 @@
 'use client';
 
-import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
 
 interface UseDashboardShortcutsOptions {
@@ -32,11 +31,6 @@ export function useDashboardShortcuts({
     enabled,
     onOpenShortcutsModal,
   });
-
-  // Single-key action shortcuts are handled by useSequentialShortcuts
-  // since it already processes the KEYBOARD_SHORTCUTS registry.
-  // Only add shortcuts here that aren't in the registry.
-  useKeyboardShortcuts([], { allowInInputs: false });
 
   return { clearSequence };
 }
