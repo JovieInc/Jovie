@@ -20,7 +20,7 @@ vi.mock('@/components/organisms/RightDrawer', () => ({
 }));
 
 describe('EntitySidebarShell', () => {
-  it('moves entity header and tabs into the scrollable stack in minimal mode', () => {
+  it('keeps the entity header pinned and leaves minimal-mode tab composition to the body', () => {
     render(
       <EntitySidebarShell
         isOpen
@@ -40,9 +40,7 @@ describe('EntitySidebarShell', () => {
     expect(
       screen.getByTestId('entity-sidebar-entity-header')
     ).toHaveTextContent('Entity header content');
-    expect(screen.getByTestId('entity-sidebar-tabs-card')).toHaveTextContent(
-      'Drawer tabs'
-    );
+    expect(screen.queryByText('Drawer tabs')).not.toBeInTheDocument();
     expect(screen.getByText('Body content')).toBeInTheDocument();
   });
 
@@ -87,9 +85,6 @@ describe('EntitySidebarShell', () => {
       </EntitySidebarShell>
     );
 
-    expect(
-      screen.queryByTestId('entity-sidebar-tabs-card')
-    ).not.toBeInTheDocument();
     expect(screen.getByText('Drawer tabs')).toBeInTheDocument();
     expect(screen.getByText('Body content')).toBeInTheDocument();
   });

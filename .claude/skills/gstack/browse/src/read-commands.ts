@@ -380,11 +380,9 @@ export async function handleReadCommand(
 
       // If no selector given, check for stored inspector data
       if (!selector) {
-        // Access stored inspector data from the server's in-memory state
-        // The server stores this when the extension picks an element via POST /inspector/pick
-        const stored = (bm as any)._inspectorData;
-        const storedTs = (bm as any)._inspectorTimestamp;
-        if (stored) {
+        const inspectorState = bm.getInspectorState();
+        if (inspectorState) {
+          const { data: stored, timestamp: storedTs } = inspectorState;
           const stale = storedTs && (Date.now() - storedTs > 60000);
           let output = formatInspectorResult(stored, { includeUA });
           if (stale) output = '⚠ Data may be stale (>60s old)\n\n' + output;
@@ -396,8 +394,7 @@ export async function handleReadCommand(
       // Direct inspection by selector
       const result = await inspectElement(page, selector, { includeUA });
       // Store for later retrieval
-      (bm as any)._inspectorData = result;
-      (bm as any)._inspectorTimestamp = Date.now();
+      bm.setInspectorState(result);
       return formatInspectorResult(result, { includeUA });
     }
 

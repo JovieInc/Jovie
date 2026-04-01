@@ -221,7 +221,7 @@ Note which direction was approved. This becomes the visual reference for all sub
 
 **Multiple variants/screens:** If the user asked for multiple variants (e.g., "5 versions of the homepage"), generate ALL as separate variant sets with their own comparison boards. Each screen/variant set gets its own subdirectory under `designs/`. Complete all mockup generation and user selection before starting review passes.
 
-**If `DESIGN_NOT_AVAILABLE`:** Tell the user: "The gstack designer isn't set up yet. Run `$D setup` to enable visual mockups. Proceeding with text-only review, but you're missing the best part." Then proceed to review passes with text-based review.
+**If `DESIGN_NOT_AVAILABLE`:** Tell the user: "The gstack designer isn't set up yet. Run `cd .claude/skills/gstack && ./setup` to build the binary and register skills. Proceeding with text-only review, but you're missing the best part." Then proceed to review passes with text-based review.
 
 {{DESIGN_OUTSIDE_VOICES}}
 
@@ -245,7 +245,8 @@ If `DESIGN_READY` was printed during setup AND a dimension rates below 7/10,
 offer to generate a visual mockup showing what the improved version would look like:
 
 ```bash
-$D generate --brief "<description of what 10/10 looks like for this dimension>" --output /tmp/gstack-ideal-<dimension>.png
+mkdir -p "$_DESIGN_DIR"
+$D generate --brief "<description of what 10/10 looks like for this dimension>" --output "$_DESIGN_DIR/ideal-<dimension>.png"
 ```
 
 Show the mockup to the user via the Read tool. This makes the gap between

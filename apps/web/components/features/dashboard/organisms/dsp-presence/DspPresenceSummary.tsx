@@ -68,7 +68,7 @@ export function DspPresenceSummary({
     <>
       <PageToolbar
         start={
-          <div className='flex min-w-0 items-center gap-2.5 text-[11px] text-tertiary-token'>
+          <div className='flex min-w-0 items-center gap-2 text-[11px] text-tertiary-token'>
             <span>
               {confirmedCount} matched platform
               {confirmedCount === 1 ? '' : 's'}
@@ -78,7 +78,7 @@ export function DspPresenceSummary({
                 <span className='text-quaternary-token'>&middot;</span>
                 <span className='inline-flex items-center gap-1.5'>
                   <span className='h-1.5 w-1.5 rounded-full bg-amber-500' />
-                  {suggestedCount} pending review
+                  {suggestedCount} pending
                 </span>
               </>
             )}
@@ -111,16 +111,16 @@ export function DspPresenceSummary({
                 tooltipLabel={refreshTooltip}
               />
             )}
+            <DrawerToggleButton
+              chrome='page-toolbar'
+              ariaLabel='Toggle presence details sidebar'
+            />
             <PageToolbarActionButton
               label='Add Platform'
               icon={<Plus className='h-3.5 w-3.5' />}
               onClick={() => setDialogOpen(true)}
               iconOnly
               tooltipLabel='Add platform'
-            />
-            <DrawerToggleButton
-              chrome='page-toolbar'
-              ariaLabel='Toggle presence details sidebar'
             />
           </div>
         }

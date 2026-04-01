@@ -7,12 +7,14 @@ printf "%-16s %-10s %-40s %s\n" "-----" "-------" "----------" "------"
 for entry in "claude:claude" "codex:codex" "droid:factory" "kiro-cli:kiro"; do
   bin="${entry%%:*}"; label="${entry##*:}"
   if command -v "$bin" >/dev/null 2>&1; then
-    ver=$("$bin" --version 2>/dev/null | head -1 || echo "unknown")
+    ver="$("$bin" --version 2>/dev/null | head -1)"
+    ver="${ver:-unknown}"
     case "$label" in
       claude)  spath="$HOME/.claude/skills/gstack" ;;
       codex)   spath="$HOME/.codex/skills/gstack" ;;
       factory) spath="$HOME/.factory/skills/gstack" ;;
       kiro)    spath="$HOME/.kiro/skills/gstack" ;;
+      *)       spath="unknown" ;;
     esac
     status=$([ -d "$spath" ] && echo "INSTALLED" || echo "NOT INSTALLED")
     printf "%-16s %-10s %-40s %s\n" "$label" "$ver" "$spath" "$status"

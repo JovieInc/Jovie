@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
-import type { InsightResponse } from '@/types/insights';
 
 const mockDashboardData = {
   profileCompletion: {
@@ -57,10 +56,6 @@ const mockChatState = {
   stop: vi.fn(),
 };
 
-const mockInsightsSummaryState: {
-  data?: { insights: InsightResponse[] };
-} = {};
-
 const mockPlanGateState = {
   aiCanUseTools: false,
 };
@@ -84,7 +79,6 @@ vi.mock('@tanstack/react-virtual', () => ({
 }));
 
 vi.mock('@/lib/queries', () => ({
-  useInsightsSummaryQuery: () => mockInsightsSummaryState,
   usePlanGate: () => mockPlanGateState,
 }));
 
@@ -136,27 +130,6 @@ vi.mock('@/features/dashboard/molecules/ProfileCompletionCard', () => ({
   ProfileCompletionCard: () => <div data-testid='profile-completion-card' />,
 }));
 
-function createInsight(
-  overrides: Partial<InsightResponse> = {}
-): InsightResponse {
-  return {
-    id: 'insight-1',
-    insightType: 'subscriber_surge',
-    category: 'growth',
-    priority: 'high',
-    title: 'Your subscribers jumped 23% in LA this week',
-    description: 'Insight description',
-    actionSuggestion: null,
-    confidence: '0.92',
-    status: 'active',
-    periodStart: '2026-03-01T00:00:00.000Z',
-    periodEnd: '2026-03-08T00:00:00.000Z',
-    createdAt: '2026-03-08T00:00:00.000Z',
-    expiresAt: '2026-03-15T00:00:00.000Z',
-    ...overrides,
-  };
-}
-
 describe('JovieChat empty state', () => {
   beforeEach(() => {
     mockChatState.messages = [];
@@ -172,62 +145,39 @@ describe('JovieChat empty state', () => {
     mockSuggestedProfilesState.suggestions = [];
     mockSuggestedProfilesState.isLoading = false;
     mockSuggestedProfilesState.starterContext.conversationCount = 1;
-    mockInsightsSummaryState.data = { insights: [] };
     mockPlanGateState.aiCanUseTools = false;
   });
 
-  it('renders the authenticated home hero with centered examples', () => {
+  it('renders the authenticated home hero with a compact prompt rail', () => {
     const { getByTestId, getByText } = renderWithQueryClient(
       <JovieChat profileId='profile-1' displayName='Tim' />
     );
 
     expect(getByText('Welcome to Jovie')).toBeTruthy();
     expect(getByText('Ask anything or tell Jovie what you need')).toBeTruthy();
-    expect(getByText('Examples')).toBeTruthy();
     expect(getByText('Preview profile')).toBeTruthy();
     expect(getByText('Change photo')).toBeTruthy();
     expect(getByText('Release link')).toBeTruthy();
-    expect(getByTestId('suggested-prompts-grid')).toBeTruthy();
+    expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
   });
 
-  it('shows the top insight in the greeting and keeps prompt cards skill-based', () => {
-    mockInsightsSummaryState.data = {
-      insights: [createInsight()],
-    };
-
-    const { getByText, queryByRole } = renderWithQueryClient(
+  it('keeps prompt cards skill-based without extra helper copy', () => {
+    const { getByText, queryByRole, queryByText } = renderWithQueryClient(
       <JovieChat profileId='profile-1' displayName='Tim' username='timwhite' />
     );
 
     expect(getByText('Welcome to Jovie')).toBeTruthy();
-    expect(getByText('Welcome back')).toBeTruthy();
-    expect(
-      getByText('Your subscribers jumped 23% in LA this week.')
-    ).toBeTruthy();
     expect(getByText('Preview profile')).toBeTruthy();
     expect(getByText('Change photo')).toBeTruthy();
     expect(getByText('Release link')).toBeTruthy();
+    expect(queryByRole('heading', { name: 'Welcome back' })).toBeNull();
     expect(
-      queryByRole('button', {
-        name: 'Your subscribers jumped 23% in LA this week',
-      })
+      queryByText("You've received 2 tips since your last check-in.")
     ).toBeNull();
   });
 
-  it('falls back to tip activity when no insights are available', () => {
-    mockDashboardData.tippingStats.tipsSubmitted = 2;
-
-    const { getByText } = renderWithQueryClient(
-      <JovieChat profileId='profile-1' displayName='Tim' />
-    );
-
-    expect(
-      getByText("You've received 2 tips since your last check-in.")
-    ).toBeTruthy();
-  });
-
-  it('preserves the first-session profile link greeting', () => {
-    const { getByRole, getByText } = renderWithQueryClient(
+  it('keeps the first-session prompt rail focused on setup actions', () => {
+    const { getByText, queryByRole } = renderWithQueryClient(
       <JovieChat
         profileId='profile-1'
         displayName='Tim'
@@ -236,10 +186,9 @@ describe('JovieChat empty state', () => {
       />
     );
 
-    expect(getByText('Artist ready')).toBeTruthy();
-    expect(
-      getByRole('link', { name: 'jov.ie/timwhite' }).getAttribute('href')
-    ).toBe('https://jov.ie/timwhite');
+    expect(getByText('Preview profile')).toBeTruthy();
+    expect(getByText('Getting paid')).toBeTruthy();
+    expect(queryByRole('link', { name: 'jov.ie/timwhite' })).toBeNull();
   });
 
   it('keeps the profile completion card for incomplete profiles', () => {

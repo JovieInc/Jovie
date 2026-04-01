@@ -28,7 +28,6 @@ import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
@@ -838,12 +837,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             className='mx-3 lg:mx-4 mt-2.5'
             data-testid='release-table-shell'
           >
-            <div
-              className={cn(
-                LINEAR_SURFACE.contentContainer,
-                'flex min-h-[260px] w-full flex-1 flex-col items-center justify-center px-4 py-12 text-center'
-              )}
-            >
+            <div className='flex min-h-[260px] w-full flex-1 flex-col items-center justify-center px-4 py-12 text-center'>
               <div className='flex h-12 w-12 items-center justify-center rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-1'>
                 <Icon
                   name='Disc3'

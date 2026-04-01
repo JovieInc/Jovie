@@ -35,7 +35,9 @@ function getBaseUrl() {
 async function loadAuthToken() {
   if (authToken) return;
   try {
-    const resp = await fetch(chrome.runtime.getURL('.auth.json'));
+    const base = getBaseUrl();
+    if (!base) return;
+    const resp = await fetch(`${base}/extension/auth`, { signal: AbortSignal.timeout(3000) });
     if (resp.ok) {
       const data = await resp.json();
       if (data.token) authToken = data.token;
@@ -88,7 +90,7 @@ function setConnected(healthData) {
 function setDisconnected() {
   const wasConnected = isConnected;
   isConnected = false;
-  // Keep authToken — it comes from .auth.json, not /health
+  // Keep authToken — it comes from the local bootstrap endpoint, not /health
   chrome.action.setBadgeText({ text: '' });
 
   chrome.runtime.sendMessage({ type: 'health', data: null }).catch(() => {});

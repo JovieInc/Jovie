@@ -34,6 +34,11 @@ export interface BrowserState {
   }>;
 }
 
+export interface InspectorState {
+  data: unknown;
+  timestamp: number;
+}
+
 export class BrowserManager {
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
@@ -70,8 +75,16 @@ export class BrowserManager {
   // ─── Headed State ────────────────────────────────────────
   private connectionMode: 'launched' | 'headed' = 'launched';
   private intentionalDisconnect = false;
+  private inspectorState: InspectorState | null = null;
 
   getConnectionMode(): 'launched' | 'headed' { return this.connectionMode; }
+  getInspectorState(): InspectorState | null { return this.inspectorState; }
+  setInspectorState(data: unknown, timestamp = Date.now()): void {
+    this.inspectorState = { data, timestamp };
+  }
+  clearInspectorState(): void {
+    this.inspectorState = null;
+  }
 
   // ─── Watch Mode Methods ─────────────────────────────────
   isWatching(): boolean { return this.watching; }
@@ -211,7 +224,7 @@ export class BrowserManager {
    * The browser launches headed with a visible window — the user sees
    * every action Claude takes in real time.
    */
-  async launchHeaded(authToken?: string): Promise<void> {
+  async launchHeaded(): Promise<void> {
     // Clear old state before repopulating
     this.pages.clear();
     this.refMap.clear();
@@ -223,17 +236,6 @@ export class BrowserManager {
     if (extensionPath) {
       launchArgs.push(`--disable-extensions-except=${extensionPath}`);
       launchArgs.push(`--load-extension=${extensionPath}`);
-      // Write auth token for extension bootstrap (read via chrome.runtime.getURL)
-      if (authToken) {
-        const fs = require('fs');
-        const path = require('path');
-        const authFile = path.join(extensionPath, '.auth.json');
-        try {
-          fs.writeFileSync(authFile, JSON.stringify({ token: authToken }), { mode: 0o600 });
-        } catch (err: any) {
-          console.warn(`[browse] Could not write .auth.json: ${err.message}`);
-        }
-      }
     }
 
     // Launch headed Chromium via Playwright's persistent context.
@@ -358,6 +360,24 @@ export class BrowserManager {
         ]).catch(() => {});
       }
       this.browser = null;
+      this.context = null;
+      this.pages.clear();
+      this.clearRefs();
+      this.clearInspectorState();
+      this.activeTabId = 0;
+      this.activeFrame = null;
+      this.connectionMode = 'launched';
+      this.isHeaded = false;
+      this.dialogAutoAccept = true;
+      this.dialogPromptText = null;
+      this.intentionalDisconnect = false;
+      if (this.watchInterval) {
+        clearInterval(this.watchInterval);
+        this.watchInterval = null;
+      }
+      this.watching = false;
+      this.watchSnapshots = [];
+      this.watchStartTime = 0;
     }
   }
 
@@ -825,20 +845,6 @@ export class BrowserManager {
       if (extensionPath) {
         launchArgs.push(`--disable-extensions-except=${extensionPath}`);
         launchArgs.push(`--load-extension=${extensionPath}`);
-        // Write auth token for extension bootstrap during handoff
-        if (this.serverPort) {
-          try {
-            const { resolveConfig } = require('./config');
-            const config = resolveConfig();
-            const stateFile = path.join(config.stateDir, 'browse.json');
-            if (fs.existsSync(stateFile)) {
-              const stateData = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
-              if (stateData.token) {
-                fs.writeFileSync(path.join(extensionPath, '.auth.json'), JSON.stringify({ token: stateData.token }), { mode: 0o600 });
-              }
-            }
-          } catch {}
-        }
         console.log(`[browse] Handoff: loading extension from ${extensionPath}`);
       } else {
         console.log('[browse] Handoff: extension not found — headed mode without side panel');

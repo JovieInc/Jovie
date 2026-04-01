@@ -209,21 +209,22 @@ export const cardTokens = {
  * Tier-1 content surfaces stay border-defined and flat, while sidebars,
  * drawers, and popovers retain the stronger floating treatment.
  */
-const elevatedSidebarCardShadow = 'shadow-[var(--linear-app-drawer-shadow)]';
+const elevatedSidebarCardShadow =
+  'shadow-[0_10px_28px_-22px_rgba(0,0,0,0.6),0_1px_0_rgba(255,255,255,0.03)_inset]';
 
 export const LINEAR_SURFACE = {
   /** Drawer section card — border-separated section inside sidebars. */
-  drawerCard: `rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 ${elevatedSidebarCardShadow}`,
+  drawerCard: `rounded-xl border border-(--linear-app-shell-border) bg-surface-1 ${elevatedSidebarCardShadow}`,
 
   /** Smaller drawer section card — inline property groups. */
-  drawerCardSm: `rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 ${elevatedSidebarCardShadow}`,
+  drawerCardSm: `rounded-xl border border-(--linear-app-shell-border) bg-surface-1 ${elevatedSidebarCardShadow}`,
 
   /** Primary sidebar card — header/analytics cards in sidebars. */
-  sidebarCard: `rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 ${elevatedSidebarCardShadow}`,
+  sidebarCard: `rounded-xl border border-(--linear-app-shell-border) bg-surface-1 ${elevatedSidebarCardShadow}`,
 
   /** Content container — wraps tables, mobile lists, empty states. */
   contentContainer:
-    'rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 shadow-none',
+    'rounded-xl border border-(--linear-app-shell-border) bg-surface-1 shadow-none',
 
   /** Banner/callout card. */
   bannerCard:

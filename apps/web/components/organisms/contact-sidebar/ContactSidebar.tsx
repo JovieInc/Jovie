@@ -4,7 +4,11 @@ import type { CommonDropdownItem } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 
-import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
+import {
+  DrawerTabbedCard,
+  DrawerTabs,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import {
   type ContextMenuItemType,
@@ -147,19 +151,20 @@ export const ContactSidebar = memo(function ContactSidebar({
       }
       isEmpty={!contact}
       emptyMessage='Select a row in the table to view contact details.'
-      tabs={
-        contact ? (
-          <DrawerTabs
-            value={activeTab}
-            onValueChange={value => setActiveTab(value as SidebarTab)}
-            options={SIDEBAR_TAB_OPTIONS}
-            ariaLabel='Contact sidebar view'
-          />
-        ) : undefined
-      }
     >
       {contact && (
-        <>
+        <DrawerTabbedCard
+          testId='contact-tabbed-card'
+          tabs={
+            <DrawerTabs
+              value={activeTab}
+              onValueChange={value => setActiveTab(value as SidebarTab)}
+              options={SIDEBAR_TAB_OPTIONS}
+              ariaLabel='Contact sidebar view'
+            />
+          }
+          contentClassName='pt-2'
+        >
           {activeTab === 'details' && (
             <ContactFields
               name={displayName ?? ''}
@@ -182,7 +187,7 @@ export const ContactSidebar = memo(function ContactSidebar({
               onNewLinkKeyDown={handleNewLinkKeyDown}
             />
           )}
-        </>
+        </DrawerTabbedCard>
       )}
     </EntitySidebarShell>
   );

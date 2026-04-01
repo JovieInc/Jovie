@@ -1,5 +1,9 @@
 import type { TemplateContext } from './types';
 
+function isNonInteractiveSkill(ctx: TemplateContext): boolean {
+  return ctx.skillName === 'ship';
+}
+
 /**
  * Preamble architecture — why every skill needs this
  *
@@ -15,6 +19,7 @@ import type { TemplateContext } from './types';
 
 function generatePreambleBash(ctx: TemplateContext): string {
   const hostConfigDir: Record<string, string> = { codex: '.codex', factory: '.factory' };
+  const binDir = ctx.paths.binDir.replace(/^~/, '$HOME');
   const runtimeRoot = (ctx.host !== 'claude')
     ? `_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 GSTACK_ROOT="$HOME/${hostConfigDir[ctx.host]}/skills/gstack"
@@ -28,27 +33,29 @@ GSTACK_DESIGN="$GSTACK_ROOT/design/dist"
   return `## Preamble (run first)
 
 \`\`\`bash
-${runtimeRoot}_UPD=$(${ctx.paths.binDir}/gstack-update-check 2>/dev/null || ${ctx.paths.localSkillRoot}/bin/gstack-update-check 2>/dev/null || true)
+${runtimeRoot}_UPD=$(${binDir}/gstack-update-check 2>/dev/null || ${ctx.paths.localSkillRoot}/bin/gstack-update-check 2>/dev/null || true)
 [ -n "$_UPD" ] && echo "$_UPD" || true
 mkdir -p ~/.gstack/sessions
 touch ~/.gstack/sessions/"$PPID"
 _SESSIONS=$(find ~/.gstack/sessions -mmin -120 -type f 2>/dev/null | wc -l | tr -d ' ')
 find ~/.gstack/sessions -mmin +120 -type f -exec rm {} + 2>/dev/null || true
-_CONTRIB=$(${ctx.paths.binDir}/gstack-config get gstack_contributor 2>/dev/null || true)
-_PROACTIVE=$(${ctx.paths.binDir}/gstack-config get proactive 2>/dev/null || echo "true")
+_CONTRIB=$(${binDir}/gstack-config get gstack_contributor 2>/dev/null || true)
+_PROACTIVE=$(${binDir}/gstack-config get proactive 2>/dev/null || echo "true")
 _PROACTIVE_PROMPTED=$([ -f ~/.gstack/.proactive-prompted ] && echo "yes" || echo "no")
 _BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 echo "BRANCH: $_BRANCH"
-_SKILL_PREFIX=$(${ctx.paths.binDir}/gstack-config get skill_prefix 2>/dev/null || echo "false")
+_SKILL_PREFIX=$(${binDir}/gstack-config get skill_prefix 2>/dev/null || echo "false")
+_PFX=$([ "$_SKILL_PREFIX" = "true" ] && echo "gstack-" || echo "")
 echo "PROACTIVE: $_PROACTIVE"
 echo "PROACTIVE_PROMPTED: $_PROACTIVE_PROMPTED"
 echo "SKILL_PREFIX: $_SKILL_PREFIX"
-source <(${ctx.paths.binDir}/gstack-repo-mode 2>/dev/null) || true
+echo "SKILL_PREFIX_VALUE: $_PFX"
+source <(${binDir}/gstack-repo-mode 2>/dev/null) || true
 REPO_MODE=\${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
-_TEL=$(${ctx.paths.binDir}/gstack-config get telemetry 2>/dev/null || true)
+_TEL=$(${binDir}/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
 _SESSION_ID="$$-$(date +%s)"
@@ -61,8 +68,8 @@ fi
 # zsh-compatible: use find instead of glob to avoid NOMATCH error
 for _PF in $(find ~/.gstack/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do
   if [ -f "$_PF" ]; then
-    if [ "$_TEL" != "off" ] && [ -x "${ctx.paths.binDir}/gstack-telemetry-log" ]; then
-      ${ctx.paths.binDir}/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true
+    if [ "\${_TEL:-off}" != "off" ] && [ -x "${binDir}/gstack-telemetry-log" ]; then
+      ${binDir}/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true
     fi
     rm -f "$_PF" 2>/dev/null || true
   fi
@@ -82,7 +89,7 @@ _HAS_ROUTING="no"
 if [ -f CLAUDE.md ] && grep -q "## Skill routing" CLAUDE.md 2>/dev/null; then
   _HAS_ROUTING="yes"
 fi
-_ROUTING_DECLINED=$(${ctx.paths.binDir}/gstack-config get routing_declined 2>/dev/null || echo "false")
+_ROUTING_DECLINED=$(${binDir}/gstack-config get routing_declined 2>/dev/null || echo "false")
 echo "HAS_ROUTING: $_HAS_ROUTING"
 echo "ROUTING_DECLINED: $_ROUTING_DECLINED"
 \`\`\``;
@@ -118,6 +125,10 @@ Only run \`open\` if the user says yes. Always run \`touch\` to mark as seen. Th
 }
 
 function generateTelemetryPrompt(ctx: TemplateContext): string {
+  if (isNonInteractiveSkill(ctx)) {
+    return `If \`TEL_PROMPTED\` is \`no\`, do **not** ask telemetry questions or write prompt-state markers from this skill. \`/ship\` stays non-interactive. Defer telemetry onboarding to an interactive skill and continue immediately.`;
+  }
+  const binDir = ctx.paths.binDir.replace(/^~/, '$HOME');
   return `If \`TEL_PROMPTED\` is \`no\` AND \`LAKE_INTRO\` is \`yes\`: After the lake intro is handled,
 ask the user about telemetry. Use AskUserQuestion:
 
@@ -130,7 +141,7 @@ Options:
 - A) Help gstack get better! (recommended)
 - B) No thanks
 
-If A: run \`${ctx.paths.binDir}/gstack-config set telemetry community\`
+If A: run \`${binDir}/gstack-config set telemetry community\`
 
 If B: ask a follow-up AskUserQuestion:
 
@@ -141,8 +152,8 @@ Options:
 - A) Sure, anonymous is fine
 - B) No thanks, fully off
 
-If B→A: run \`${ctx.paths.binDir}/gstack-config set telemetry anonymous\`
-If B→B: run \`${ctx.paths.binDir}/gstack-config set telemetry off\`
+If B→A: run \`${binDir}/gstack-config set telemetry anonymous\`
+If B→B: run \`${binDir}/gstack-config set telemetry off\`
 
 Always run:
 \`\`\`bash
@@ -153,6 +164,10 @@ This only happens once. If \`TEL_PROMPTED\` is \`yes\`, skip this entirely.`;
 }
 
 function generateProactivePrompt(ctx: TemplateContext): string {
+  if (isNonInteractiveSkill(ctx)) {
+    return `If \`PROACTIVE_PROMPTED\` is \`no\`, do **not** ask proactive-behavior questions or write prompt-state markers from this skill. \`/ship\` stays non-interactive. Defer this onboarding to an interactive skill and continue immediately.`;
+  }
+  const binDir = ctx.paths.binDir.replace(/^~/, '$HOME');
   return `If \`PROACTIVE_PROMPTED\` is \`no\` AND \`TEL_PROMPTED\` is \`yes\`: After telemetry is handled,
 ask the user about proactive behavior. Use AskUserQuestion:
 
@@ -164,8 +179,8 @@ Options:
 - A) Keep it on (recommended)
 - B) Turn it off — I'll type /commands myself
 
-If A: run \`${ctx.paths.binDir}/gstack-config set proactive true\`
-If B: run \`${ctx.paths.binDir}/gstack-config set proactive false\`
+If A: run \`${binDir}/gstack-config set proactive true\`
+If B: run \`${binDir}/gstack-config set proactive false\`
 
 Always run:
 \`\`\`bash
@@ -176,6 +191,10 @@ This only happens once. If \`PROACTIVE_PROMPTED\` is \`yes\`, skip this entirely
 }
 
 function generateRoutingInjection(ctx: TemplateContext): string {
+  if (isNonInteractiveSkill(ctx)) {
+    return `If \`HAS_ROUTING\` is \`no\` AND \`ROUTING_DECLINED\` is \`false\`, do **not** ask routing-setup questions, write \`CLAUDE.md\`, or change routing config from this skill. \`/ship\` stays non-interactive. Defer routing onboarding to an interactive skill and continue immediately.`;
+  }
+  const binDir = ctx.paths.binDir.replace(/^~/, '$HOME');
   return `If \`HAS_ROUTING\` is \`no\` AND \`ROUTING_DECLINED\` is \`false\` AND \`PROACTIVE_PROMPTED\` is \`yes\`:
 Check if a CLAUDE.md file exists in the project root. If it does not exist, create it.
 
@@ -191,6 +210,9 @@ Options:
 
 If A: Append this section to the end of CLAUDE.md:
 
+- If you are in plan mode, or the current skill is read-only/non-interactive, do **not** write or stage files automatically. Instead, show the user the exact section below and tell them to add it manually after leaving plan mode.
+- Otherwise, append this section, substituting \`$_PFX\` before every gstack skill name so prefixed installs get the correct routing rules:
+
 \`\`\`markdown
 
 ## Skill routing
@@ -200,21 +222,21 @@ tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
 The skill has specialized workflows that produce better results than ad-hoc answers.
 
 Key routing rules:
-- Product ideas, "is this worth building", brainstorming → invoke office-hours
-- Bugs, errors, "why is this broken", 500 errors → invoke investigate
-- Ship, deploy, push, create PR → invoke ship
-- QA, test the site, find bugs → invoke qa
-- Code review, check my diff → invoke review
-- Update docs after shipping → invoke document-release
-- Weekly retro → invoke retro
-- Design system, brand → invoke design-consultation
-- Visual audit, design polish → invoke design-review
-- Architecture review → invoke plan-eng-review
+- Product ideas, "is this worth building", brainstorming → invoke $_PFXoffice-hours
+- Bugs, errors, "why is this broken", 500 errors → invoke $_PFXinvestigate
+- Ship, deploy, push, create PR → invoke $_PFXship
+- QA, test the site, find bugs → invoke $_PFXqa
+- Code review, check my diff → invoke $_PFXreview
+- Update docs after shipping → invoke $_PFXdocument-release
+- Weekly retro → invoke $_PFXretro
+- Design system, brand → invoke $_PFXdesign-consultation
+- Visual audit, design polish → invoke $_PFXdesign-review
+- Architecture review → invoke $_PFXplan-eng-review
 \`\`\`
 
-Then commit the change: \`git add CLAUDE.md && git commit -m "chore: add gstack skill routing rules to CLAUDE.md"\`
+After writing the file, tell the user the change is ready for review and should be committed manually later (for example with \`/ship\`). Do **not** run \`git add\` or \`git commit\` automatically from this flow.
 
-If B: run \`${ctx.paths.binDir}/gstack-config set routing_declined true\`
+If B: tell the user to run \`${binDir}/gstack-config set routing_declined true\`
 Say "No problem. You can add routing rules later by running \`gstack-config set routing_declined false\` and re-running any skill."
 
 This only happens once per project. If \`HAS_ROUTING\` is \`yes\` or \`ROUTING_DECLINED\` is \`true\`, skip this entirely.`;
@@ -399,7 +421,8 @@ If \`_CONTRIB\` is \`true\`: you are in **contributor mode**. At the end of each
 Slug: lowercase hyphens, max 60 chars. Skip if exists. Max 3/session. File inline, don't stop.`;
 }
 
-function generateCompletionStatus(): string {
+function generateCompletionStatus(ctx: TemplateContext): string {
+  const binDir = ctx.paths.binDir.replace(/^~/, '$HOME');
   return `## Completion Status Protocol
 
 When completing a skill workflow, report status using one of:
@@ -444,10 +467,10 @@ _TEL_END=$(date +%s)
 _TEL_DUR=$(( _TEL_END - _TEL_START ))
 rm -f ~/.gstack/analytics/.pending-"$_SESSION_ID" 2>/dev/null || true
 # Local + remote telemetry (both gated by _TEL setting)
-if [ "$_TEL" != "off" ]; then
+if [ "\${_TEL:-off}" != "off" ]; then
   echo '{"skill":"SKILL_NAME","duration_s":"'"$_TEL_DUR"'","outcome":"OUTCOME","browse":"USED_BROWSE","session":"'"$_SESSION_ID"'","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
-  if [ -x ~/.claude/skills/gstack/bin/gstack-telemetry-log ]; then
-    ~/.claude/skills/gstack/bin/gstack-telemetry-log \\
+  if [ -x "${binDir}/gstack-telemetry-log" ]; then
+    "${binDir}/gstack-telemetry-log" \\
       --skill "SKILL_NAME" --duration "$_TEL_DUR" --outcome "OUTCOME" \\
       --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
   fi
@@ -598,7 +621,7 @@ export function generatePreamble(ctx: TemplateContext): string {
     ...(tier >= 2 ? [generateAskUserFormat(ctx), generateCompletenessSection()] : []),
     ...(tier >= 3 ? [generateRepoModeSection(), generateSearchBeforeBuildingSection(ctx)] : []),
     generateContributorMode(),
-    generateCompletionStatus(),
+    generateCompletionStatus(ctx),
   ];
   return sections.join('\n\n');
 }

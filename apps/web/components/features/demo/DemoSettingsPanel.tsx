@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import type { ReactNode } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { runDemoAction } from './demo-actions';
@@ -17,13 +18,8 @@ const PLATFORM_CONNECTIONS = [
 export function DemoSettingsPanel() {
   return (
     <div className='h-full overflow-y-auto'>
-      <div className='space-y-3'>
-        <ContentSurfaceCard className='overflow-hidden p-0'>
-          <ContentSectionHeader
-            title='Artist Profile'
-            subtitle='Public profile basics.'
-            className='px-4 py-3'
-          />
+      <ContentSurfaceCard className='overflow-hidden p-0'>
+        <SettingsSection title='Artist Profile'>
           <div className='space-y-3 px-4 py-3'>
             <SettingsRow label='Name' value='Sora Vale' />
             <SettingsRow
@@ -36,19 +32,14 @@ export function DemoSettingsPanel() {
             />
             <SettingsRow label='Handle' value='@soravale' />
           </div>
-        </ContentSurfaceCard>
+        </SettingsSection>
 
-        <ContentSurfaceCard className='overflow-hidden p-0'>
-          <ContentSectionHeader
-            title='Platform Connections'
-            subtitle='Streaming services tied to this profile.'
-            className='px-4 py-3'
-          />
-          <div className='space-y-2 px-4 py-3'>
+        <SettingsSection title='Platform Connections' bordered>
+          <div className='px-4 py-3'>
             {PLATFORM_CONNECTIONS.map(platform => (
-              <ContentSurfaceCard
+              <div
                 key={platform.name}
-                className='flex items-center justify-between border-0 shadow-none px-2.5 py-2'
+                className='flex items-center justify-between gap-4 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-2 py-2.5 last:border-b-0'
               >
                 <div className='flex min-w-0 items-center gap-2'>
                   <span
@@ -69,6 +60,7 @@ export function DemoSettingsPanel() {
                 <Button
                   size='sm'
                   variant='secondary'
+                  className='rounded-full'
                   onClick={() =>
                     runDemoAction({
                       successMessage: platform.connected
@@ -79,18 +71,13 @@ export function DemoSettingsPanel() {
                 >
                   {platform.connected ? 'Reconnect' : 'Connect'}
                 </Button>
-              </ContentSurfaceCard>
+              </div>
             ))}
           </div>
-        </ContentSurfaceCard>
+        </SettingsSection>
 
-        <ContentSurfaceCard className='overflow-hidden p-0'>
-          <ContentSectionHeader
-            title='Preferences'
-            subtitle='Workspace behavior and alerts.'
-            className='px-4 py-3'
-          />
-          <div className='space-y-3 px-4 py-3'>
+        <SettingsSection title='Preferences' bordered>
+          <div className='px-4 py-3'>
             <ToggleRow
               label='Auto-sync new releases'
               description='Automatically create smart links when new releases are detected'
@@ -107,9 +94,36 @@ export function DemoSettingsPanel() {
               defaultChecked={false}
             />
           </div>
-        </ContentSurfaceCard>
-      </div>
+        </SettingsSection>
+      </ContentSurfaceCard>
     </div>
+  );
+}
+
+function SettingsSection({
+  title,
+  children,
+  bordered = false,
+}: {
+  readonly title: string;
+  readonly children: ReactNode;
+  readonly bordered?: boolean;
+}) {
+  return (
+    <section
+      className={
+        bordered
+          ? 'border-t border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)]'
+          : ''
+      }
+    >
+      <ContentSectionHeader
+        title={title}
+        variant='plain'
+        className='px-4 py-3'
+      />
+      {children}
+    </section>
   );
 }
 
@@ -140,7 +154,7 @@ function ToggleRow({
   return (
     <label
       aria-label={label}
-      className='flex cursor-pointer items-start justify-between gap-3 rounded-md bg-surface-0 px-2.5 py-2'
+      className='flex cursor-pointer items-start justify-between gap-3 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] py-2.5 last:border-b-0'
     >
       <div>
         <p className='text-[13px] font-[510] text-primary-token'>{label}</p>

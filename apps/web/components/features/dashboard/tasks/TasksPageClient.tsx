@@ -1,8 +1,15 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  Input,
+} from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { Plus, Search } from 'lucide-react';
+import { Check, ChevronDown, Plus, Search } from 'lucide-react';
 import {
   type FormEvent,
   startTransition,
@@ -14,8 +21,12 @@ import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { DashboardWorkspacePanel } from '@/components/features/dashboard/organisms/DashboardWorkspacePanel';
 import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
-import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
-import { PageToolbar, UnifiedTable } from '@/components/organisms/table';
+import {
+  PAGE_TOOLBAR_MENU_TRIGGER_CLASS,
+  PageToolbar,
+  PageToolbarActionButton,
+  UnifiedTable,
+} from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   useCreateTaskMutation,
@@ -28,6 +39,10 @@ import type {
   TaskStatus,
   TaskView,
 } from '@/lib/tasks/types';
+import {
+  type AccentPaletteName,
+  getAccentCssVars,
+} from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
 
 const columnHelper = createColumnHelper<TaskView>();
@@ -36,34 +51,28 @@ const STATUS_META: Record<
   TaskStatus,
   {
     readonly label: string;
-    readonly dotClassName: string;
-    readonly badgeClassName: string;
+    readonly accent: AccentPaletteName;
   }
 > = {
   backlog: {
     label: 'Backlog',
-    dotClassName: 'bg-tertiary-token/60',
-    badgeClassName: 'bg-surface-1 text-tertiary-token',
+    accent: 'gray',
   },
   todo: {
     label: 'Todo',
-    dotClassName: 'bg-sky-500',
-    badgeClassName: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
+    accent: 'blue',
   },
   in_progress: {
     label: 'In Progress',
-    dotClassName: 'bg-amber-500',
-    badgeClassName: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    accent: 'purple',
   },
   done: {
     label: 'Done',
-    dotClassName: 'bg-emerald-500',
-    badgeClassName: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+    accent: 'green',
   },
   cancelled: {
     label: 'Cancelled',
-    dotClassName: 'bg-red-500',
-    badgeClassName: 'bg-red-500/10 text-red-700 dark:text-red-300',
+    accent: 'red',
   },
 };
 
@@ -72,30 +81,27 @@ const PRIORITY_META: Record<
   {
     readonly label: string;
     readonly symbol: string;
-    readonly className: string;
+    readonly accent: AccentPaletteName;
   }
 > = {
   urgent: {
     label: 'Urgent',
     symbol: '!!!',
-    className: 'text-red-600 dark:text-red-400',
+    accent: 'red',
   },
   high: {
     label: 'High',
     symbol: '!!',
-    className: 'text-orange-600 dark:text-orange-400',
+    accent: 'orange',
   },
   medium: {
     label: 'Medium',
     symbol: '!',
-    className: 'text-amber-600 dark:text-amber-400',
+    accent: 'purple',
   },
-  low: { label: 'Low', symbol: '-', className: 'text-tertiary-token' },
-  none: { label: 'None', symbol: '', className: 'text-tertiary-token' },
+  low: { label: 'Low', symbol: '-', accent: 'teal' },
+  none: { label: 'None', symbol: '', accent: 'gray' },
 };
-
-const FILTER_SELECT_CLASS =
-  'h-8 rounded-md border border-subtle bg-surface-0 px-2.5 text-[12px] font-[510] text-secondary-token outline-none transition-colors focus:border-default focus:text-primary-token';
 
 function StatusDotCell({
   task,
@@ -105,6 +111,7 @@ function StatusDotCell({
   onToggle: (task: TaskView) => void;
 }>) {
   const meta = STATUS_META[task.status];
+  const accent = getAccentCssVars(meta.accent);
 
   return (
     <button
@@ -117,20 +124,79 @@ function StatusDotCell({
       aria-label={`Status: ${meta.label}`}
       title={meta.label}
     >
-      <span className={cn('h-2 w-2 rounded-full', meta.dotClassName)} />
+      <span
+        className='h-2 w-2 rounded-full'
+        style={{ backgroundColor: accent.solid }}
+      />
     </button>
+  );
+}
+
+function ToolbarFilterMenu<TValue extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  ariaLabel,
+}: Readonly<{
+  label: string;
+  value: TValue | 'all';
+  options: readonly { value: TValue | 'all'; label: string }[];
+  onChange: (value: TValue | 'all') => void;
+  ariaLabel: string;
+}>) {
+  const selectedLabel =
+    options.find(option => option.value === value)?.label ?? label;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type='button'
+          variant='ghost'
+          size='sm'
+          aria-label={ariaLabel}
+          className={cn(
+            PAGE_TOOLBAR_MENU_TRIGGER_CLASS,
+            'h-7 min-w-[132px] rounded-full'
+          )}
+        >
+          <span className='truncate'>{selectedLabel}</span>
+          <ChevronDown className='h-3.5 w-3.5 text-tertiary-token' />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='start' sideOffset={8}>
+        {options.map(option => {
+          const active = option.value === value;
+          return (
+            <DropdownMenuItem
+              key={option.value}
+              onSelect={() => onChange(option.value)}
+            >
+              <span className='mr-2 inline-flex w-4 items-center justify-center'>
+                {active ? <Check className='h-3.5 w-3.5' /> : null}
+              </span>
+              {option.label}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
 function StatusBadgeCell({ status }: Readonly<{ status: TaskStatus }>) {
   const meta = STATUS_META[status];
+  const accent = getAccentCssVars(meta.accent);
 
   return (
     <span
-      className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-[560]',
-        meta.badgeClassName
-      )}
+      className='inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-[560]'
+      style={{
+        backgroundColor: accent.subtle,
+        borderColor: `color-mix(in oklab, ${accent.solid} 24%, var(--linear-app-frame-seam))`,
+        color: accent.solid,
+      }}
     >
       {meta.label}
     </span>
@@ -139,6 +205,7 @@ function StatusBadgeCell({ status }: Readonly<{ status: TaskStatus }>) {
 
 function PriorityCell({ priority }: Readonly<{ priority: TaskPriority }>) {
   const meta = PRIORITY_META[priority];
+  const accent = getAccentCssVars(meta.accent);
 
   if (!meta.symbol) {
     return <span className='text-[12px] text-tertiary-token'>-</span>;
@@ -147,7 +214,8 @@ function PriorityCell({ priority }: Readonly<{ priority: TaskPriority }>) {
   return (
     <span
       role='img'
-      className={cn('text-[12px] font-[560] tracking-[0.04em]', meta.className)}
+      className='text-[12px] font-[560] tracking-[0.04em]'
+      style={{ color: accent.solid }}
       aria-label={`Priority: ${meta.label}`}
       title={`Priority: ${meta.label}`}
     >
@@ -159,15 +227,23 @@ function PriorityCell({ priority }: Readonly<{ priority: TaskPriority }>) {
 function AssigneeCell({
   assigneeKind,
 }: Readonly<{ assigneeKind: TaskAssigneeKind }>) {
+  const jovieAccent = getAccentCssVars('pink');
+
   return (
     <span
       role='img'
       className={cn(
         'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-[560]',
-        assigneeKind === 'jovie'
-          ? 'bg-[var(--linear-accent,#5e6ad2)]/10 text-[var(--linear-accent,#5e6ad2)]'
-          : 'bg-surface-1 text-secondary-token'
+        assigneeKind === 'jovie' ? '' : 'bg-surface-1 text-secondary-token'
       )}
+      style={
+        assigneeKind === 'jovie'
+          ? {
+              backgroundColor: jovieAccent.subtle,
+              color: jovieAccent.solid,
+            }
+          : undefined
+      }
       aria-label={`Assignee: ${assigneeKind === 'jovie' ? 'Jovie' : 'You'}`}
     >
       {assigneeKind === 'jovie' ? 'Jovie' : 'You'}
@@ -306,11 +382,11 @@ export function TasksPageClient() {
           size: 9999,
           cell: info => (
             <div className='min-w-0'>
-              <p className='truncate text-[13px] font-[510] text-primary-token'>
+              <p className='truncate text-[13px] font-[510] leading-[17px] text-primary-token'>
                 {info.getValue()}
               </p>
               {info.row.original.description ? (
-                <p className='truncate text-[12px] text-secondary-token'>
+                <p className='truncate pt-0.5 text-[11.5px] leading-[15px] text-secondary-token'>
                   {info.row.original.description}
                 </p>
               ) : null}
@@ -357,7 +433,7 @@ export function TasksPageClient() {
           header: 'Release',
           size: 180,
           cell: info => (
-            <span className='truncate text-[12px] text-secondary-token'>
+            <span className='truncate text-[11.5px] leading-[15px] text-secondary-token'>
               {info.getValue() ?? 'General'}
             </span>
           ),
@@ -392,184 +468,169 @@ export function TasksPageClient() {
       className='overflow-hidden'
       data-testid='tasks-workspace'
     >
-      <div className='flex min-h-0 flex-1 flex-col px-3 py-3 sm:px-4 sm:py-4'>
-        <section
-          className={cn(
-            LINEAR_SURFACE.contentContainer,
-            'flex min-h-0 flex-1 flex-col overflow-hidden'
-          )}
-          data-testid='tasks-content-panel'
-        >
-          <div className='flex items-center justify-between gap-3 border-b border-subtle px-app-header py-3'>
-            <div className='min-w-0'>
-              <h1 className='text-[13px] font-[560] text-primary-token'>
-                Tasks
-              </h1>
-              <p className='text-[12px] text-secondary-token'>
-                Track release work and general artist operations.
+      <section
+        className='flex min-h-0 flex-1 flex-col overflow-hidden'
+        data-testid='tasks-content-panel'
+      >
+        {isComposerOpen ? (
+          <form
+            onSubmit={handleCreateTask}
+            className='flex items-center gap-2 border-b border-subtle px-app-header py-2.5'
+          >
+            <Input
+              value={draftTitle}
+              onChange={event => setDraftTitle(event.target.value)}
+              placeholder='Draft press release, update bio, pitch sync supervisor...'
+              autoFocus
+            />
+            <Button
+              type='submit'
+              size='sm'
+              disabled={createTaskMutation.isPending}
+            >
+              Create
+            </Button>
+            <Button
+              type='button'
+              variant='secondary'
+              size='sm'
+              onClick={() => {
+                setDraftTitle('');
+                setIsComposerOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+          </form>
+        ) : null}
+
+        <PageToolbar
+          start={
+            <div className='flex min-w-0 flex-1 items-center gap-2'>
+              <div className='relative min-w-0 flex-1 max-w-[320px]'>
+                <Search className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
+                <Input
+                  value={search}
+                  onChange={event => setSearch(event.target.value)}
+                  placeholder='Search Tasks'
+                  className='h-8 pl-8 text-[12px]'
+                />
+              </div>
+              <ToolbarFilterMenu
+                label='Status'
+                value={statusFilter}
+                ariaLabel='Filter by status'
+                onChange={value => setStatusFilter(value as TaskStatus | 'all')}
+                options={[
+                  { value: 'all', label: 'All Statuses' },
+                  { value: 'backlog', label: 'Backlog' },
+                  { value: 'todo', label: 'Todo' },
+                  { value: 'in_progress', label: 'In Progress' },
+                  { value: 'done', label: 'Done' },
+                  { value: 'cancelled', label: 'Cancelled' },
+                ]}
+              />
+              <ToolbarFilterMenu
+                label='Priority'
+                value={priorityFilter}
+                ariaLabel='Filter by priority'
+                onChange={value =>
+                  setPriorityFilter(value as TaskPriority | 'all')
+                }
+                options={[
+                  { value: 'all', label: 'All Priorities' },
+                  { value: 'urgent', label: 'Urgent' },
+                  { value: 'high', label: 'High' },
+                  { value: 'medium', label: 'Medium' },
+                  { value: 'low', label: 'Low' },
+                  { value: 'none', label: 'None' },
+                ]}
+              />
+              <ToolbarFilterMenu
+                label='Assignee'
+                value={assigneeFilter}
+                ariaLabel='Filter by assignee'
+                onChange={value =>
+                  setAssigneeFilter(value as TaskAssigneeKind | 'all')
+                }
+                options={[
+                  { value: 'all', label: 'All Assignees' },
+                  { value: 'human', label: 'You' },
+                  { value: 'jovie', label: 'Jovie' },
+                ]}
+              />
+            </div>
+          }
+          end={
+            <PageToolbarActionButton
+              label='New Task'
+              icon={<Plus className='h-3.5 w-3.5' />}
+              iconOnly
+              tooltipLabel={isComposerOpen ? 'Close task composer' : 'New Task'}
+              ariaLabel={
+                isComposerOpen ? 'Close task composer' : 'Create new task'
+              }
+              active={isComposerOpen}
+              onClick={() => setIsComposerOpen(value => !value)}
+            />
+          }
+        />
+
+        {isError ? (
+          <div className='flex min-h-[240px] flex-1 flex-col items-center justify-center gap-3 px-6 text-center'>
+            <div className='space-y-1'>
+              <h2 className='text-[15px] font-[560] text-primary-token'>
+                Couldn&apos;t Load Tasks
+              </h2>
+              <p className='text-[13px] text-secondary-token'>
+                Try reloading the task list.
               </p>
             </div>
             <Button
               type='button'
+              variant='secondary'
               size='sm'
-              className='gap-1.5'
-              onClick={() => setIsComposerOpen(value => !value)}
+              onClick={() => void refetch()}
             >
-              <Plus className='h-3.5 w-3.5' />
-              New Task
+              Retry
             </Button>
           </div>
-
-          {isComposerOpen ? (
-            <form
-              onSubmit={handleCreateTask}
-              className='flex items-center gap-2 border-b border-subtle px-app-header py-3'
-            >
-              <Input
-                value={draftTitle}
-                onChange={event => setDraftTitle(event.target.value)}
-                placeholder='Draft press release, update bio, pitch sync supervisor...'
-                autoFocus
-              />
-              <Button
-                type='submit'
-                size='sm'
-                disabled={createTaskMutation.isPending}
-              >
-                Create
-              </Button>
-              <Button
-                type='button'
-                variant='secondary'
-                size='sm'
-                onClick={() => {
-                  setDraftTitle('');
-                  setIsComposerOpen(false);
-                }}
-              >
-                Cancel
-              </Button>
-            </form>
-          ) : null}
-
-          <PageToolbar
-            start={
-              <div className='flex min-w-0 flex-1 items-center gap-2'>
-                <div className='relative min-w-0 flex-1 max-w-[280px]'>
-                  <Search className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
-                  <Input
-                    value={search}
-                    onChange={event => setSearch(event.target.value)}
-                    placeholder='Search Tasks'
-                    className='h-8 pl-8 text-[12px]'
-                  />
-                </div>
-                <select
-                  value={statusFilter}
-                  onChange={event =>
-                    setStatusFilter(event.target.value as TaskStatus | 'all')
-                  }
-                  className={FILTER_SELECT_CLASS}
-                  aria-label='Filter by status'
-                >
-                  <option value='all'>All Statuses</option>
-                  <option value='backlog'>Backlog</option>
-                  <option value='todo'>Todo</option>
-                  <option value='in_progress'>In Progress</option>
-                  <option value='done'>Done</option>
-                  <option value='cancelled'>Cancelled</option>
-                </select>
-                <select
-                  value={priorityFilter}
-                  onChange={event =>
-                    setPriorityFilter(
-                      event.target.value as TaskPriority | 'all'
-                    )
-                  }
-                  className={FILTER_SELECT_CLASS}
-                  aria-label='Filter by priority'
-                >
-                  <option value='all'>All Priorities</option>
-                  <option value='urgent'>Urgent</option>
-                  <option value='high'>High</option>
-                  <option value='medium'>Medium</option>
-                  <option value='low'>Low</option>
-                  <option value='none'>None</option>
-                </select>
-                <select
-                  value={assigneeFilter}
-                  onChange={event =>
-                    setAssigneeFilter(
-                      event.target.value as TaskAssigneeKind | 'all'
-                    )
-                  }
-                  className={FILTER_SELECT_CLASS}
-                  aria-label='Filter by assignee'
-                >
-                  <option value='all'>All Assignees</option>
-                  <option value='human'>You</option>
-                  <option value='jovie'>Jovie</option>
-                </select>
-              </div>
-            }
-          />
-
-          {isError ? (
-            <div className='flex min-h-[240px] flex-1 flex-col items-center justify-center gap-3 px-6 text-center'>
-              <div className='space-y-1'>
-                <h2 className='text-[15px] font-[560] text-primary-token'>
-                  Couldn&apos;t Load Tasks
-                </h2>
-                <p className='text-[13px] text-secondary-token'>
-                  Try reloading the task list.
-                </p>
-              </div>
-              <Button
-                type='button'
-                variant='secondary'
-                size='sm'
-                onClick={() => void refetch()}
-              >
-                Retry
-              </Button>
-            </div>
-          ) : (
-            <div className='min-h-0 flex-1'>
-              <UnifiedTable
-                data={tasks}
-                columns={columns}
-                isLoading={isLoading}
-                getRowId={row => row.id}
-                enableVirtualization={false}
-                rowHeight={38}
-                skeletonRows={8}
-                className='text-[13px]'
-                containerClassName='h-full px-2 pb-2 pt-1'
-                getRowClassName={row =>
-                  cn(
-                    'rounded-[10px] transition-colors',
-                    row.status === 'done'
-                      ? 'opacity-70'
-                      : 'hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)]'
-                  )
-                }
-                emptyState={
-                  <TaskEmptyState
-                    hasFilters={hasFilters}
-                    onClearFilters={() => {
-                      setSearch('');
-                      setStatusFilter('all');
-                      setPriorityFilter('all');
-                      setAssigneeFilter('all');
-                    }}
-                    onOpenComposer={() => setIsComposerOpen(true)}
-                  />
-                }
-              />
-            </div>
-          )}
-        </section>
-      </div>
+        ) : (
+          <div className='min-h-0 flex-1'>
+            <UnifiedTable
+              data={tasks}
+              columns={columns}
+              isLoading={isLoading}
+              getRowId={row => row.id}
+              enableVirtualization={false}
+              rowHeight={38}
+              skeletonRows={8}
+              className='text-[13px]'
+              containerClassName='h-full px-2 pb-2 pt-0.5'
+              getRowClassName={row =>
+                cn(
+                  'rounded-none border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_56%,transparent)] transition-colors',
+                  row.status === 'done'
+                    ? 'opacity-72'
+                    : 'hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_72%,transparent)]'
+                )
+              }
+              emptyState={
+                <TaskEmptyState
+                  hasFilters={hasFilters}
+                  onClearFilters={() => {
+                    setSearch('');
+                    setStatusFilter('all');
+                    setPriorityFilter('all');
+                    setAssigneeFilter('all');
+                  }}
+                  onOpenComposer={() => setIsComposerOpen(true)}
+                />
+              }
+            />
+          </div>
+        )}
+      </section>
     </DashboardWorkspacePanel>
   );
 }

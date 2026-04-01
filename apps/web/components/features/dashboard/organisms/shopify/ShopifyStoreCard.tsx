@@ -113,8 +113,8 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
       padding='none'
       className='divide-y divide-subtle/60 overflow-hidden'
     >
-      <div className='px-4 py-3 sm:px-5'>
-        <div className='mb-3 flex items-center gap-2'>
+      <div className='px-4 py-2.5 sm:px-5 sm:py-3'>
+        <div className='mb-2.5 flex items-center gap-2'>
           <div
             className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0'
             aria-hidden='true'
@@ -126,13 +126,13 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
           </h3>
         </div>
 
-        <p className='text-[13px] leading-5 text-secondary-token'>
+        <p className='text-[12.5px] leading-5 text-secondary-token'>
           Link your Shopify store to add a shop button on your public profile.
           Fans will be redirected to your store with Jovie attribution.
         </p>
       </div>
 
-      <div className='space-y-3 px-4 py-3 sm:px-5'>
+      <div className='space-y-3 px-4 py-2.5 sm:px-5 sm:py-3'>
         <div>
           <label
             htmlFor='shopify-url'

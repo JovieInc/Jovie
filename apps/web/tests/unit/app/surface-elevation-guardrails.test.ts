@@ -59,8 +59,14 @@ describe('surface elevation guardrails', () => {
     expect(designSystem).toMatch(
       /:root\.dark[\s\S]*--color-bg-surface-1:\s*var\(--linear-bg-surface-1\);/
     );
-    expect(linearTokens).not.toMatch(
-      /:root\.dark[\s\S]*--linear-app-content-surface:\s*var\(--linear-bg-surface-1\);/
+    expect(designSystem).toMatch(
+      /:root\.dark[\s\S]*--sidebar-background:\s*var\(--linear-app-sidebar-background-rgb\);/
+    );
+    expect(linearTokens).toMatch(
+      /:root\.dark[\s\S]*--linear-app-content-surface:\s*var\(--linear-bg-surface-0\);/
+    );
+    expect(linearTokens).toMatch(
+      /:root\.dark[\s\S]*--linear-app-sidebar-background-rgb:\s*8 9 10;/
     );
   });
 
@@ -96,11 +102,26 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'components/features/demo/DemoShowcaseSurface.tsx'),
       'utf-8'
     );
+    const chatSurface = readFileSync(
+      join(ROOT, 'components/jovie/ChatWorkspaceSurface.tsx'),
+      'utf-8'
+    );
+    const demoAudience = readFileSync(
+      join(ROOT, 'components/features/demo/DemoAudienceSection.tsx'),
+      'utf-8'
+    );
 
     expect(pageShell).toContain('AppShellContentPanel');
+    expect(pageShell).toContain("frame='none'");
     expect(dashboardPanel).toContain('AppShellContentPanel');
+    expect(dashboardPanel).toContain("frame='none'");
     expect(settingsLayout).toContain('AppShellContentPanel');
+    expect(settingsLayout).toContain("frame='none'");
+    expect(chatSurface).toContain("frame='none'");
     expect(demoShowcaseSurface).toContain('AppShellContentPanel');
+    expect(demoShowcaseSurface).toContain("frame='none'");
+    expect(demoAudience).toContain('AppShellContentPanel');
+    expect(demoAudience).toContain("frame='none'");
   });
 
   it('routes onboarding variants through OnboardingExperienceShell', () => {
@@ -135,9 +156,16 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'components/features/dashboard/tasks/TasksPageClient.tsx'),
       'utf-8'
     );
+    const dashboardPanel = readFileSync(
+      join(
+        ROOT,
+        'components/features/dashboard/organisms/DashboardWorkspacePanel.tsx'
+      ),
+      'utf-8'
+    );
 
     expect(tasksPage).toContain('DashboardWorkspacePanel');
-    expect(tasksPage).toContain('LINEAR_SURFACE.contentContainer');
+    expect(dashboardPanel).toContain("frame='none'");
     expect(tasksPage).toContain("data-testid='tasks-content-panel'");
   });
 
@@ -157,9 +185,9 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
 
-    expect(presenceView).toContain('LINEAR_SURFACE.contentContainer');
+    expect(presenceView).toContain('DashboardWorkspacePanel');
     expect(presenceView).toContain("data-testid='dsp-presence-content-panel'");
-    expect(earningsView).toContain('LINEAR_SURFACE.contentContainer');
+    expect(earningsView).toContain('DashboardWorkspacePanel');
     expect(earningsView).toContain(
       "data-testid='dashboard-earnings-content-panel'"
     );
@@ -191,8 +219,16 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'components/organisms/AppShellFrame.tsx'),
       'utf-8'
     );
+    const sidebar = readFileSync(
+      join(ROOT, 'components/organisms/sidebar/sidebar.tsx'),
+      'utf-8'
+    );
     const rightDrawer = readFileSync(
       join(ROOT, 'components/organisms/RightDrawer.tsx'),
+      'utf-8'
+    );
+    const linearTokens = readFileSync(
+      join(ROOT, 'styles/linear-tokens.css'),
       'utf-8'
     );
     const adminTableShell = readFileSync(
@@ -201,7 +237,16 @@ describe('surface elevation guardrails', () => {
     );
 
     expect(shellFrame).toContain('lg:shadow-[var(--linear-app-shell-shadow)]');
+    expect(shellFrame).toContain('lg:ml-[var(--linear-app-shell-gap)]');
+    expect(sidebar).toContain(
+      'group-data-[variant=sidebar]:lg:shadow-[var(--linear-app-sidebar-shadow)]'
+    );
+    expect(linearTokens).toContain('--linear-app-sidebar-shadow:');
     expect(rightDrawer).toContain('bg-surface-0');
+    expect(rightDrawer).toContain(
+      'lg:rounded-[var(--linear-app-shell-radius)]'
+    );
+    expect(rightDrawer).toContain('lg:border');
     expect(rightDrawer).toContain('shadow-[var(--linear-app-drawer-shadow)]');
     expect(adminTableShell).toContain('bg-surface-1/96');
   });

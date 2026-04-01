@@ -81,18 +81,30 @@
   --linear-btn-secondary-bg: oklch(94% 0.005 282);
   --linear-btn-secondary-fg: oklch(20% 0.005 282);
   --linear-btn-secondary-hover: oklch(90% 0.005 282);
-  /* Accent button — purple (same in both modes, extracted 2026-03-16) */
-  --linear-btn-accent-bg: #7170ff;
+  /* Accent button — palette purple */
+  --linear-btn-accent-bg: #8b1eff;
   --linear-btn-accent-fg: oklch(100% 0 0);
-  --linear-btn-accent-hover: #828fff;
+  --linear-btn-accent-hover: #9a46ff;
   /* ============================================
      ACCENT COLORS (mode-independent)
      ============================================ */
-  --linear-success: oklch(72% 0.2 145);
-  --linear-warning: oklch(82% 0.17 85);
-  --linear-warning-subtle: oklch(82% 0.17 85 / 0.15);
-  --linear-error: oklch(65% 0.2 25);
-  --linear-accent: #7170ff;
+  --linear-accent-gray: #7f7f85;
+  --linear-accent-blue: #2563ff;
+  --linear-accent-purple: #8b1eff;
+  --linear-accent-pink: #d61a7f;
+  --linear-accent-red: #f3122d;
+  --linear-accent-orange: #ff9800;
+  --linear-accent-green: #2f9e44;
+  --linear-accent-teal: #0f9b8e;
+  --linear-success: var(--linear-accent-green);
+  --linear-success-subtle: rgb(47 158 68 / 0.14);
+  --linear-warning: var(--linear-accent-orange);
+  --linear-warning-subtle: rgb(255 152 0 / 0.15);
+  --linear-error: var(--linear-accent-red);
+  --linear-error-subtle: rgb(243 18 45 / 0.14);
+  --linear-info: var(--linear-accent-blue);
+  --linear-info-subtle: rgb(37 99 255 / 0.14);
+  --linear-accent: var(--linear-accent-purple);
   /* ============================================
      HERO-SPECIFIC TOKENS
      Used by RedesignedHero for theme-aware gradients
@@ -202,13 +214,15 @@
   /* App UI tokens (distinct from marketing page tokens) */
   --linear-app-radius-item: 8px;
   --linear-app-radius-menu: 8px;
-  --linear-app-shell-gap: 6px;
-  --linear-app-shell-radius: 14px;
-  --linear-app-shell-border: rgba(0, 0, 0, 0.065);
+  --linear-app-shell-gap: 8px;
+  --linear-app-shell-radius: 12px;
+  --linear-app-shell-border: rgba(0, 0, 0, 0.05);
   --linear-app-shell-sidebar-seam: rgba(0, 0, 0, 0.05);
-  --linear-app-frame-seam: rgba(0, 0, 0, 0.055);
+  --linear-app-frame-seam: rgba(0, 0, 0, 0.045);
   --linear-app-shell-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.045), 0 18px 42px rgba(0, 0, 0, 0.055);
+    0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 30px rgba(0, 0, 0, 0.045);
+  --linear-app-sidebar-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.022), 0 14px 28px rgba(0, 0, 0, 0.035);
   --linear-app-header-height: 40px;
   /* Desktop breadcrumb/header bar uses a slightly tighter height than content headers. */
   --linear-app-header-height-compact: 36px;
@@ -222,7 +236,7 @@
   --linear-app-content-surface: var(--linear-bg-surface-0);
   --linear-app-card-shadow: none;
   --linear-app-drawer-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.035), 0 12px 28px rgba(0, 0, 0, 0.045);
+    0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 32px rgba(0, 0, 0, 0.05);
   --linear-row-hover: oklch(96.2% 0.003 282);
   --linear-row-selected: oklch(94.8% 0.006 282);
   --linear-app-sidebar-width: 244px;
@@ -378,9 +392,9 @@
   --linear-border-footer: #2a2a2e;
   --linear-bg-hover: rgba(255, 255, 255, 0.06);
   /* Borders — extracted 2026-03-17 */
-  --linear-border-subtle: rgba(255, 255, 255, 0.05);
-  --linear-border-default: rgba(255, 255, 255, 0.08);
-  --linear-border-strong: rgba(255, 255, 255, 0.14);
+  --linear-border-subtle: rgba(255, 255, 255, 0.04);
+  --linear-border-default: rgba(255, 255, 255, 0.07);
+  --linear-border-strong: rgba(255, 255, 255, 0.12);
   --linear-border-focus: oklch(60% 0.12 282);
   /* Buttons — white primary on dark bg, matching Linear.app */
   --linear-btn-primary-bg: #ffffff;
@@ -415,19 +429,21 @@
   --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.4);
   --linear-shadow-card-elevated:
     0 0 0 1px rgba(255, 255, 255, 0.06), 0px 8px 40px rgba(0, 0, 0, 0.5);
-  --linear-app-content-surface: #121316;
-  /* dedicated shell canvas — sits between page bg and card surface */
+  --linear-app-content-surface: var(--linear-bg-surface-0);
+  /* primary framed main-pane surface */
   --linear-app-card-shadow: none;
-  --linear-app-shell-border: rgba(255, 255, 255, 0.05);
-  --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.05);
-  --linear-app-frame-seam: rgba(255, 255, 255, 0.04);
+  --linear-app-shell-border: rgba(255, 255, 255, 0.045);
+  --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.075);
+  --linear-app-frame-seam: rgba(255, 255, 255, 0.05);
   --linear-app-shell-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.045), 0 18px 42px rgba(0, 0, 0, 0.28);
+    0 0 0 1px rgba(255, 255, 255, 0.04), 0 14px 36px rgba(0, 0, 0, 0.24);
+  --linear-app-sidebar-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.025), 0 12px 28px rgba(0, 0, 0, 0.22);
   --linear-app-drawer-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.035), -12px 0 24px rgba(0, 0, 0, 0.2);
+    0 0 0 1px rgba(255, 255, 255, 0.042), 0 18px 42px rgba(0, 0, 0, 0.3);
   --linear-row-hover: rgba(255, 255, 255, 0.022);
   --linear-row-selected: rgba(255, 255, 255, 0.048);
-  --linear-app-sidebar-background-rgb: 15 16 17;
+  --linear-app-sidebar-background-rgb: 8 9 10;
   --linear-app-sidebar-foreground-rgb: 227 228 229;
   --linear-app-sidebar-border-rgb: 255 255 255 / 0.06;
   --linear-app-sidebar-accent-rgb: 255 255 255 / 0.03;

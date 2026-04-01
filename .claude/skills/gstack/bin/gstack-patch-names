@@ -17,6 +17,7 @@ for skill_dir in "$GSTACK_DIR"/*/; do
   cur=$(grep -m1 '^name:' "$skill_dir/SKILL.md" 2>/dev/null | sed 's/^name:[[:space:]]*//' | tr -d '[:space:]' || true)
   [ -z "$cur" ] && continue
   [ "$cur" = "gstack" ] && continue  # never prefix root skill
+  escaped_cur="$(printf '%s' "$cur" | sed 's/[][\\/.*^$+?{}|()]/\\&/g')"
   if [ "$DO_PREFIX" -eq 1 ]; then
     case "$cur" in gstack-*) continue ;; esac
     new="gstack-$cur"
@@ -26,7 +27,7 @@ for skill_dir in "$GSTACK_DIR"/*/; do
     new="${cur#gstack-}"
   fi
   tmp="$(mktemp "${skill_dir}/SKILL.md.XXXXXX")"
-  sed "1,/^---$/s/^name:[[:space:]]*${cur}/name: ${new}/" "$skill_dir/SKILL.md" > "$tmp" && mv "$tmp" "$skill_dir/SKILL.md"
+  sed "1,/^---$/s/^name:[[:space:]]*${escaped_cur}/name: ${new}/" "$skill_dir/SKILL.md" > "$tmp" && mv "$tmp" "$skill_dir/SKILL.md"
   PATCHED=$((PATCHED + 1))
 done
 if [ "$PATCHED" -gt 0 ]; then

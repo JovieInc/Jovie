@@ -48,7 +48,8 @@ describe('RightDrawer', () => {
     expect(aside).toHaveAttribute('aria-hidden', 'false');
     expect(aside).toHaveStyle({ width: '360px' });
     expect(aside).toHaveClass(
-      'border-l',
+      'lg:border',
+      'lg:rounded-[var(--linear-app-shell-radius)]',
       'bg-surface-0',
       'shadow-[var(--linear-app-drawer-shadow)]'
     );
@@ -140,7 +141,8 @@ describe('RightDrawer', () => {
     expect(desktopAside).toHaveClass(
       'transition-[width,opacity]',
       'opacity-100',
-      'border-l',
+      'lg:border',
+      'lg:rounded-[var(--linear-app-shell-radius)]',
       'bg-surface-0'
     );
     expect(desktopAside).toHaveStyle({ width: '420px' });

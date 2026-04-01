@@ -33,9 +33,11 @@ _PROACTIVE_PROMPTED=$([ -f ~/.gstack/.proactive-prompted ] && echo "yes" || echo
 _BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 echo "BRANCH: $_BRANCH"
 _SKILL_PREFIX=$($GSTACK_BIN/gstack-config get skill_prefix 2>/dev/null || echo "false")
+_PFX=$([ "$_SKILL_PREFIX" = "true" ] && echo "gstack-" || echo "")
 echo "PROACTIVE: $_PROACTIVE"
 echo "PROACTIVE_PROMPTED: $_PROACTIVE_PROMPTED"
 echo "SKILL_PREFIX: $_SKILL_PREFIX"
+echo "SKILL_PREFIX_VALUE: $_PFX"
 source <($GSTACK_BIN/gstack-repo-mode 2>/dev/null) || true
 REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
@@ -54,7 +56,7 @@ fi
 # zsh-compatible: use find instead of glob to avoid NOMATCH error
 for _PF in $(find ~/.gstack/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do
   if [ -f "$_PF" ]; then
-    if [ "$_TEL" != "off" ] && [ -x "$GSTACK_BIN/gstack-telemetry-log" ]; then
+    if [ "${_TEL:-off}" != "off" ] && [ -x "$GSTACK_BIN/gstack-telemetry-log" ]; then
       $GSTACK_BIN/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true
     fi
     rm -f "$_PF" 2>/dev/null || true
@@ -174,6 +176,9 @@ Options:
 
 If A: Append this section to the end of CLAUDE.md:
 
+- If you are in plan mode, or the current skill is read-only/non-interactive, do **not** write or stage files automatically. Instead, show the user the exact section below and tell them to add it manually after leaving plan mode.
+- Otherwise, append this section, substituting `$_PFX` before every gstack skill name so prefixed installs get the correct routing rules:
+
 ```markdown
 
 ## Skill routing
@@ -183,21 +188,21 @@ tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
 The skill has specialized workflows that produce better results than ad-hoc answers.
 
 Key routing rules:
-- Product ideas, "is this worth building", brainstorming → invoke office-hours
-- Bugs, errors, "why is this broken", 500 errors → invoke investigate
-- Ship, deploy, push, create PR → invoke ship
-- QA, test the site, find bugs → invoke qa
-- Code review, check my diff → invoke review
-- Update docs after shipping → invoke document-release
-- Weekly retro → invoke retro
-- Design system, brand → invoke design-consultation
-- Visual audit, design polish → invoke design-review
-- Architecture review → invoke plan-eng-review
+- Product ideas, "is this worth building", brainstorming → invoke $_PFXoffice-hours
+- Bugs, errors, "why is this broken", 500 errors → invoke $_PFXinvestigate
+- Ship, deploy, push, create PR → invoke $_PFXship
+- QA, test the site, find bugs → invoke $_PFXqa
+- Code review, check my diff → invoke $_PFXreview
+- Update docs after shipping → invoke $_PFXdocument-release
+- Weekly retro → invoke $_PFXretro
+- Design system, brand → invoke $_PFXdesign-consultation
+- Visual audit, design polish → invoke $_PFXdesign-review
+- Architecture review → invoke $_PFXplan-eng-review
 ```
 
-Then commit the change: `git add CLAUDE.md && git commit -m "chore: add gstack skill routing rules to CLAUDE.md"`
+After writing the file, tell the user the change is ready for review and should be committed manually later (for example with `/ship`). Do **not** run `git add` or `git commit` automatically from this flow.
 
-If B: run `$GSTACK_BIN/gstack-config set routing_declined true`
+If B: tell the user to run `$GSTACK_BIN/gstack-config set routing_declined true`
 Say "No problem. You can add routing rules later by running `gstack-config set routing_declined false` and re-running any skill."
 
 This only happens once per project. If `HAS_ROUTING` is `yes` or `ROUTING_DECLINED` is `true`, skip this entirely.
@@ -355,10 +360,10 @@ _TEL_END=$(date +%s)
 _TEL_DUR=$(( _TEL_END - _TEL_START ))
 rm -f ~/.gstack/analytics/.pending-"$_SESSION_ID" 2>/dev/null || true
 # Local + remote telemetry (both gated by _TEL setting)
-if [ "$_TEL" != "off" ]; then
+if [ "${_TEL:-off}" != "off" ]; then
   echo '{"skill":"SKILL_NAME","duration_s":"'"$_TEL_DUR"'","outcome":"OUTCOME","browse":"USED_BROWSE","session":"'"$_SESSION_ID"'","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
-  if [ -x $GSTACK_ROOT/bin/gstack-telemetry-log ]; then
-    $GSTACK_ROOT/bin/gstack-telemetry-log \
+  if [ -x "$GSTACK_BIN/gstack-telemetry-log" ]; then
+    "$GSTACK_BIN/gstack-telemetry-log" \
       --skill "SKILL_NAME" --duration "$_TEL_DUR" --outcome "OUTCOME" \
       --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
   fi
@@ -800,7 +805,7 @@ Note which direction was approved. This becomes the visual reference for all sub
 
 **Multiple variants/screens:** If the user asked for multiple variants (e.g., "5 versions of the homepage"), generate ALL as separate variant sets with their own comparison boards. Each screen/variant set gets its own subdirectory under `designs/`. Complete all mockup generation and user selection before starting review passes.
 
-**If `DESIGN_NOT_AVAILABLE`:** Tell the user: "The gstack designer isn't set up yet. Run `$D setup` to enable visual mockups. Proceeding with text-only review, but you're missing the best part." Then proceed to review passes with text-based review.
+**If `DESIGN_NOT_AVAILABLE`:** Tell the user: "The gstack designer isn't set up yet. Run `cd .claude/skills/gstack && ./setup` to build the binary and register skills. Proceeding with text-only review, but you're missing the best part." Then proceed to review passes with text-based review.
 
 
 
@@ -824,7 +829,8 @@ If `DESIGN_READY` was printed during setup AND a dimension rates below 7/10,
 offer to generate a visual mockup showing what the improved version would look like:
 
 ```bash
-$D generate --brief "<description of what 10/10 looks like for this dimension>" --output /tmp/gstack-ideal-<dimension>.png
+mkdir -p "$_DESIGN_DIR"
+$D generate --brief "<description of what 10/10 looks like for this dimension>" --output "$_DESIGN_DIR/ideal-<dimension>.png"
 ```
 
 Show the mockup to the user via the Read tool. This makes the gap between

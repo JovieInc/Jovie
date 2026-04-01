@@ -30,11 +30,11 @@ export function SettingsPanel({
   const hasHeader = Boolean(title || description || actions);
 
   return (
-    <div className={cn('space-y-2.5', className)}>
+    <div className={cn('space-y-2', className)}>
       {hasHeader ? (
         <div
           className={cn(
-            'flex flex-wrap items-start justify-between gap-2 sm:gap-3',
+            'flex flex-wrap items-start justify-between gap-2 sm:gap-2.5',
             headerClassName
           )}
         >
@@ -42,7 +42,7 @@ export function SettingsPanel({
             {title ? (
               <h3
                 className={cn(
-                  'text-[13px] font-[560] tracking-[-0.02em] text-primary-token',
+                  'text-[13px] font-[540] tracking-[-0.015em] text-primary-token',
                   titleClassName
                 )}
               >
@@ -52,7 +52,7 @@ export function SettingsPanel({
             {description ? (
               <p
                 className={cn(
-                  'max-w-[56ch] text-[12px] leading-[17px] text-secondary-token',
+                  'max-w-[56ch] text-[12px] leading-[16px] text-secondary-token',
                   descriptionClassName
                 )}
               >

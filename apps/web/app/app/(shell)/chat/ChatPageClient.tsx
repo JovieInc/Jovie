@@ -2,9 +2,10 @@
 
 import { Button, SimpleTooltip } from '@jovie/ui';
 import { AlertCircle, Check, Copy, RefreshCw } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChatEntityPanelProvider } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
+import { ChatEntityRightPanelHost } from '@/app/app/(shell)/chat/ChatEntityRightPanelHost';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   type PreviewPanelLink,
@@ -19,9 +20,7 @@ import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
-import { PreviewToggleButton } from '@/features/dashboard/layout/PreviewToggleButton';
 import { useClipboard } from '@/hooks/useClipboard';
-import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { env } from '@/lib/env-client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
@@ -31,16 +30,6 @@ import {
 import { useDashboardSocialLinksQuery } from '@/lib/queries';
 import { addBreadcrumb, captureMessage } from '@/lib/sentry/client-lite';
 import { getHometownFromSettings } from '@/types/db';
-
-// Code-split ProfileContactSidebar — it's a sidebar panel with mutation hooks
-// and a tab system. Not on the critical path, doesn't need to load immediately.
-const ProfileContactSidebar = dynamic(
-  () =>
-    import('@/features/dashboard/organisms/profile-contact-sidebar').then(
-      mod => ({ default: mod.ProfileContactSidebar })
-    ),
-  { ssr: false }
-);
 
 interface ChatPageClientProps {
   readonly conversationId?: string;
@@ -156,15 +145,6 @@ export function ChatPageClient({
     };
   }, []);
 
-  // Register ProfileContactSidebar in the unified right panel system
-  useRegisterRightPanel(
-    shouldHydratePreviewPanel ? (
-      <ErrorBoundary fallback={null}>
-        <ProfileContactSidebar />
-      </ErrorBoundary>
-    ) : null
-  );
-
   // Fetch social links for the selected profile
   const profileId = shouldHydratePreviewPanel ? (activeProfile?.id ?? '') : '';
   const { data: socialLinks } = useDashboardSocialLinksQuery(profileId);
@@ -257,38 +237,33 @@ export function ChatPageClient({
     copySessionId(conversationId);
   }, [conversationId, notifications, copySessionId]);
 
-  const headerActions = useMemo(
-    () => (
+  const headerActions = useMemo(() => {
+    if (!conversationId) {
+      return null;
+    }
+
+    return (
       <div className='flex items-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0.5'>
-        {conversationId && (
-          <SimpleTooltip
-            content={sessionIdCopied ? 'Copied!' : 'Copy session ID'}
-          >
-            <DashboardHeaderActionButton
-              ariaLabel={
-                sessionIdCopied ? 'Session ID copied' : 'Copy session ID'
-              }
-              onClick={handleCopyConversationId}
-              icon={
-                sessionIdCopied ? (
-                  <Check aria-hidden='true' className='size-4' />
-                ) : (
-                  <Copy aria-hidden='true' className='size-4' />
-                )
-              }
-            />
-          </SimpleTooltip>
-        )}
-        {enablePreviewPanel ? <PreviewToggleButton /> : null}
+        <SimpleTooltip
+          content={sessionIdCopied ? 'Copied!' : 'Copy session ID'}
+        >
+          <DashboardHeaderActionButton
+            ariaLabel={
+              sessionIdCopied ? 'Session ID copied' : 'Copy session ID'
+            }
+            onClick={handleCopyConversationId}
+            icon={
+              sessionIdCopied ? (
+                <Check aria-hidden='true' className='size-4' />
+              ) : (
+                <Copy aria-hidden='true' className='size-4' />
+              )
+            }
+          />
+        </SimpleTooltip>
       </div>
-    ),
-    [
-      conversationId,
-      enablePreviewPanel,
-      sessionIdCopied,
-      handleCopyConversationId,
-    ]
-  );
+    );
+  }, [conversationId, sessionIdCopied, handleCopyConversationId]);
 
   const handleConversationCreate = useCallback(
     (newConversationId: string) => {
@@ -596,42 +571,47 @@ export function ChatPageClient({
   }
 
   return (
-    <ErrorBoundary
-      fallback={
+    <ChatEntityPanelProvider resetKey={conversationId ?? null}>
+      <ChatEntityRightPanelHost
+        enablePreviewPanel={shouldHydratePreviewPanel}
+      />
+      <ErrorBoundary
+        fallback={
+          <ChatWorkspaceSurface>
+            <div className='flex h-full items-center justify-center p-6'>
+              <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
+                <AlertCircle className='h-8 w-8 text-tertiary-token' />
+                <p className='text-sm text-secondary-token'>
+                  Something went wrong loading chat. Please try again.
+                </p>
+                <Button
+                  onClick={() => router.refresh()}
+                  variant='secondary'
+                  size='sm'
+                  className='gap-2'
+                >
+                  <RefreshCw className='h-4 w-4' />
+                  Retry
+                </Button>
+              </ContentSurfaceCard>
+            </div>
+          </ChatWorkspaceSurface>
+        }
+      >
         <ChatWorkspaceSurface>
-          <div className='flex h-full items-center justify-center p-6'>
-            <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-              <AlertCircle className='h-8 w-8 text-tertiary-token' />
-              <p className='text-sm text-secondary-token'>
-                Something went wrong loading chat. Please try again.
-              </p>
-              <Button
-                onClick={() => router.refresh()}
-                variant='secondary'
-                size='sm'
-                className='gap-2'
-              >
-                <RefreshCw className='h-4 w-4' />
-                Retry
-              </Button>
-            </ContentSurfaceCard>
-          </div>
+          <JovieChat
+            profileId={activeProfile.id}
+            conversationId={conversationId}
+            onConversationCreate={handleConversationCreate}
+            onTitleChange={handleTitleChange}
+            initialQuery={initialQuery ?? undefined}
+            displayName={activeProfile.displayName ?? undefined}
+            avatarUrl={activeProfile.avatarUrl}
+            username={activeProfile.username ?? undefined}
+            isFirstSession={isFirstSession || dashboardIsFirstSession || false}
+          />
         </ChatWorkspaceSurface>
-      }
-    >
-      <ChatWorkspaceSurface>
-        <JovieChat
-          profileId={activeProfile.id}
-          conversationId={conversationId}
-          onConversationCreate={handleConversationCreate}
-          onTitleChange={handleTitleChange}
-          initialQuery={initialQuery ?? undefined}
-          displayName={activeProfile.displayName ?? undefined}
-          avatarUrl={activeProfile.avatarUrl}
-          username={activeProfile.username ?? undefined}
-          isFirstSession={isFirstSession || dashboardIsFirstSession || false}
-        />
-      </ChatWorkspaceSurface>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </ChatEntityPanelProvider>
   );
 }

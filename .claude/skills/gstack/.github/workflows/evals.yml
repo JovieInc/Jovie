@@ -53,7 +53,6 @@ jobs:
           push: true
           tags: |
             ${{ steps.meta.outputs.tag }}
-            ${{ env.IMAGE }}:latest
 
   evals:
     runs-on: ${{ matrix.suite.runner || 'ubicloud-standard-2' }}

@@ -9,11 +9,9 @@ import type {
 } from '@/app/app/(shell)/dashboard/presence/actions';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useDspEnrichmentStatusQuery } from '@/lib/queries/useDspEnrichmentStatusQuery';
-import { cn } from '@/lib/utils';
 import { DspPresenceEmptyState } from './DspPresenceEmptyState';
 import { DspPresenceSidebar } from './DspPresenceSidebar';
 import { DspPresenceSummary } from './DspPresenceSummary';
@@ -125,14 +123,10 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
     return (
       <DashboardWorkspacePanel
         toolbar={toolbar}
-        surfaceClassName='px-4 py-4 sm:px-5'
         data-testid='dsp-presence-workspace'
       >
         <div
-          className={cn(
-            LINEAR_SURFACE.contentContainer,
-            'flex h-full min-h-0 flex-1 items-center justify-center'
-          )}
+          className='flex h-full min-h-0 flex-1 items-center justify-center'
           data-testid='dsp-presence-content-panel'
         >
           <DspPresenceEmptyState existingProviderIds={existingProviderIds} />
@@ -144,14 +138,10 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
   return (
     <DashboardWorkspacePanel
       toolbar={toolbar}
-      surfaceClassName='px-4 py-4 sm:px-5'
       data-testid='dsp-presence-workspace'
     >
       <div
-        className={cn(
-          LINEAR_SURFACE.contentContainer,
-          'flex min-h-0 flex-1 overflow-hidden'
-        )}
+        className='flex min-h-0 flex-1 overflow-hidden'
         data-testid='dsp-presence-content-panel'
       >
         <div className='flex-1 min-h-0 overflow-auto'>

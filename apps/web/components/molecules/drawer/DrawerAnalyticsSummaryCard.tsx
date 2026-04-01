@@ -19,6 +19,7 @@ export interface DrawerAnalyticsSummaryCardProps {
   readonly emptyMessage?: string;
   readonly errorMessage?: string;
   readonly testId?: string;
+  readonly variant?: 'card' | 'flat';
 }
 
 const METRIC_TILE_CLASSNAME = 'px-3 py-2.5';
@@ -63,6 +64,7 @@ export function DrawerAnalyticsSummaryCard({
   emptyMessage,
   errorMessage = 'Analytics unavailable',
   testId,
+  variant = 'card',
 }: Readonly<DrawerAnalyticsSummaryCardProps>) {
   const tileCount = metrics.length > 0 ? metrics.length : 2;
   const gridClassName = tileCount === 1 ? 'grid-cols-1' : 'grid-cols-2';
@@ -74,7 +76,7 @@ export function DrawerAnalyticsSummaryCard({
 
   return (
     <DrawerSurfaceCard
-      variant='card'
+      variant={variant}
       testId={testId}
       className='overflow-hidden'
       aria-busy={isBusy ? true : undefined}

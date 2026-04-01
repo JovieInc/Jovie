@@ -1,8 +1,8 @@
 # Changelog
 
 ## [0.14.5.0] - 2026-03-31 — Ship Idempotency + Skill Prefix Fix
-
-Re-running `/ship` after a failed push or PR creation no longer double-bumps your version or duplicates your CHANGELOG. And if you use `--prefix` mode, your skill names actually work now.
+> Re-running `/ship` after a failed push or PR creation no longer double-bumps your version or duplicates your changelog.
+> Prefix-mode installs also now expose the correct skill names instead of broken aliases.
 
 ### Fixed
 
@@ -18,14 +18,14 @@ Re-running `/ship` after a failed push or PR creation no longer double-bumps you
 
 ### For contributors
 
-- 4 unit tests for name: patching in `relink.test.ts`
-- 2 tests for gen-skill-docs prefix warning
-- 1 E2E test for ship idempotency (periodic tier)
-- Updated `setupMockInstall` to write SKILL.md with proper frontmatter
+- [internal] 4 unit tests for name: patching in `relink.test.ts`
+- [internal] 2 tests for gen-skill-docs prefix warning
+- [internal] 1 E2E test for ship idempotency (periodic tier)
+- [internal] Updated `setupMockInstall` to write SKILL.md with proper frontmatter
 
 ## [0.14.4.0] - 2026-03-31 — Review Army: Parallel Specialist Reviewers
-
-Every `/review` now dispatches specialist subagents in parallel. Instead of one agent applying one giant checklist, you get focused reviewers for testing gaps, maintainability, security, performance, data migrations, API contracts, and adversarial red-teaming. Each specialist reads the diff independently with fresh context, outputs structured JSON findings, and the main agent merges, deduplicates, and boosts confidence when multiple specialists flag the same issue. Small diffs (<50 lines) skip specialists entirely for speed. Large diffs (200+ lines) activate the Red Team for adversarial analysis on top.
+> `/review` now dispatches focused specialist reviewers in parallel instead of relying on one giant checklist.
+> That gives you stronger coverage on testing, security, performance, migrations, and API contracts, with confidence boosted when multiple reviewers agree.
 
 ### Added
 
@@ -44,8 +44,8 @@ Every `/review` now dispatches specialist subagents in parallel. Instead of one 
 - **Delivery Integrity enhanced.** The existing plan completion audit now investigates WHY items are missing (not just that they're missing) and logs plan-file discrepancies as learnings. Commit-message inference is informational only, never persisted.
 
 ## [0.14.3.0] - 2026-03-31 — Always-On Adversarial Review + Scope Drift + Plan Mode Design Tools
-
-Every code review now runs adversarial analysis from both Claude and Codex, regardless of diff size. A 5-line auth change gets the same cross-model scrutiny as a 500-line feature. The old "skip adversarial for small diffs" heuristic is gone... diff size was never a good proxy for risk.
+> Every code review now runs adversarial analysis from both Claude and Codex, regardless of diff size.
+> Small auth changes get the same cross-model scrutiny as large feature branches, and `/ship` now checks for scope drift before it opens a PR.
 
 ### Added
 
@@ -291,7 +291,7 @@ The browse server runs on localhost and requires a token for access, so these is
 
 ### Fixed
 
-- **Auth token removed from `/health` endpoint.** Token now distributed via `.auth.json` file (0o600 permissions) instead of an unauthenticated HTTP response.
+- **Auth token removed from `/health` endpoint.** Token now bootstraps through a localhost extension endpoint instead of an unauthenticated HTTP response.
 - **Cookie picker data routes now require Bearer auth.** The HTML picker page is still open (it's the UI shell), but all data and action endpoints check the token.
 - **CORS tightened on `/refs` and `/activity/*`.** Removed wildcard origin header so websites can't read browse activity cross-origin.
 - **State files auto-expire after 7 days.** Cookie state files now include a timestamp and warn on load if stale. Server startup cleans up files older than 7 days.

@@ -42,6 +42,10 @@ let HOST: Host = HOST_ARG_VAL === 'all' ? 'claude' : HOST_ARG_VAL;
 
 // HostPaths, HOST_PATHS, and TemplateContext imported from ./resolvers/types (line 7-8)
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // ─── Shared Design Constants ────────────────────────────────
 
 /** gstack's 10 AI slop anti-patterns — shared between DESIGN_METHODOLOGY and DESIGN_HARD_RULES */
@@ -299,6 +303,12 @@ function processExternalHost(
   result = result.replace(/\.claude\/skills\/gstack/g, ctx.paths.localSkillRoot);
   result = result.replace(/\.claude\/skills\/review/g, `${config.hostSubdir}/skills/gstack/review`);
   result = result.replace(/\.claude\/skills/g, `${config.hostSubdir}/skills`);
+
+  // Keep setup/bootstrap instructions pinned to the vendored gstack root.
+  result = result.replace(
+    new RegExp(`cd ${escapeRegex(ctx.paths.localSkillRoot)} && \\./setup`, 'g'),
+    'cd .claude/skills/gstack && ./setup',
+  );
 
   // Factory-only: translate Claude Code tool names to generic phrasing
   if (host === 'factory') {

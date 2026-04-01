@@ -10,6 +10,11 @@ eval "$("$SCRIPT_DIR/gstack-slug" 2>/dev/null)"
 GSTACK_HOME="${GSTACK_HOME:-$HOME/.gstack}"
 mkdir -p "$GSTACK_HOME/projects/$SLUG"
 
+if [ $# -eq 0 ]; then
+  echo "Usage: gstack-learnings-log '<json>'" >&2
+  exit 1
+fi
+
 INPUT="$1"
 
 # Validate: input must be parseable JSON
@@ -18,13 +23,15 @@ if ! printf '%s' "$INPUT" | bun -e "JSON.parse(await Bun.stdin.text())" 2>/dev/n
   exit 1
 fi
 
-# Inject timestamp if not present
-if ! printf '%s' "$INPUT" | bun -e "const j=JSON.parse(await Bun.stdin.text()); if(!j.ts) process.exit(1)" 2>/dev/null; then
-  INPUT=$(printf '%s' "$INPUT" | bun -e "
+INPUT="$(
+  printf '%s' "$INPUT" | bun -e "
     const j = JSON.parse(await Bun.stdin.text());
-    j.ts = new Date().toISOString();
-    console.log(JSON.stringify(j));
-  " 2>/dev/null) || true
-fi
+    if (!j.ts) j.ts = new Date().toISOString();
+    process.stdout.write(JSON.stringify(j));
+  " 2>/dev/null
+)" || {
+  echo "gstack-learnings-log: failed to normalize JSON, skipping" >&2
+  exit 1
+}
 
-echo "$INPUT" >> "$GSTACK_HOME/projects/$SLUG/learnings.jsonl"
+printf '%s\n' "$INPUT" >> "$GSTACK_HOME/projects/$SLUG/learnings.jsonl"

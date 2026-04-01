@@ -36,6 +36,18 @@ describe('AppShellContentPanel', () => {
     expect(container.innerHTML).toContain('overflow-visible');
   });
 
+  it('keeps the toolbar and content on the same outer inset contract', () => {
+    const { container } = render(
+      <AppShellContentPanel toolbar={<div>Toolbar</div>}>
+        <div>Panel content</div>
+      </AppShellContentPanel>
+    );
+
+    expect(screen.getByText('Toolbar')).toBeInTheDocument();
+    expect(screen.getByText('Panel content')).toBeInTheDocument();
+    expect(container.innerHTML).toContain('px-3 py-3 sm:px-3 sm:py-3 lg:px-3');
+  });
+
   it('keeps panel scrolling constrained by default', () => {
     const { container } = render(
       <AppShellContentPanel>

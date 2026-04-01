@@ -108,6 +108,7 @@ BATCH="$BATCH]"
 
 # ─── POST to edge function ───────────────────────────────────
 RESP_FILE="$(mktemp /tmp/gstack-sync-XXXXXX 2>/dev/null || echo "/tmp/gstack-sync-$$")"
+trap 'rm -f "$RESP_FILE" 2>/dev/null || true' EXIT
 HTTP_CODE="$(curl -s -w '%{http_code}' --max-time 10 \
   -X POST "${SUPABASE_URL}/functions/v1/telemetry-ingest" \
   -H "Content-Type: application/json" \
@@ -128,8 +129,6 @@ case "$HTTP_CODE" in
     fi
     ;;
 esac
-
-rm -f "$RESP_FILE" 2>/dev/null || true
 
 # Update rate limit marker
 touch "$RATE_FILE" 2>/dev/null || true

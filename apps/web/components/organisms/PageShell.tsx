@@ -47,7 +47,7 @@ export function PageShell({ children, className }: PageShellProps) {
   return (
     <AppShellContentPanel
       maxWidth='full'
-      frame='content-container'
+      frame='none'
       contentPadding='none'
       scroll='panel'
       className={className}
@@ -117,6 +117,7 @@ export function PageHeader({
         ) : undefined
       }
       actions={action}
+      variant='plain'
       density='compact'
       actionsClassName='flex shrink-0 items-center gap-(--linear-app-toolbar-gap)'
       className={className}

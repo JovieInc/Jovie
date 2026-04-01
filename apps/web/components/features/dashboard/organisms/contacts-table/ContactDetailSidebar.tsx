@@ -17,6 +17,7 @@ import {
   DrawerCardActionBar,
   DrawerPropertyRow,
   DrawerSurfaceCard,
+  DrawerTabbedCard,
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
@@ -302,17 +303,6 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       contextMenuItems={contextMenuItems}
       isEmpty={!hasContact}
       emptyMessage='Select a contact to view details'
-      tabs={
-        <DrawerTabs
-          value={activeTab}
-          onValueChange={v => setActiveTab(v as 'info' | 'territories')}
-          options={[
-            { value: 'info' as const, label: 'Info' },
-            { value: 'territories' as const, label: 'Territories' },
-          ]}
-          ariaLabel='Contact tabs'
-        />
-      }
       entityHeader={
         contact ? (
           <DrawerSurfaceCard
@@ -342,7 +332,21 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       }
     >
       {contact && (
-        <>
+        <DrawerTabbedCard
+          testId='contact-detail-tabbed-card'
+          tabs={
+            <DrawerTabs
+              value={activeTab}
+              onValueChange={v => setActiveTab(v as 'info' | 'territories')}
+              options={[
+                { value: 'info' as const, label: 'Info' },
+                { value: 'territories' as const, label: 'Territories' },
+              ]}
+              ariaLabel='Contact tabs'
+            />
+          }
+          contentClassName='pt-2'
+        >
           {activeTab === 'info' && (
             <>
               <DrawerSection title='Role' className='space-y-2' surface='card'>
@@ -493,7 +497,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
               Saving...
             </div>
           )}
-        </>
+        </DrawerTabbedCard>
       )}
     </EntitySidebarShell>
   );

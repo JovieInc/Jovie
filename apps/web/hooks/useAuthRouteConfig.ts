@@ -23,6 +23,18 @@ export interface AuthRouteConfig {
   showChatUsageIndicator: boolean;
 }
 
+export function getDemoBreadcrumbSegment(pathname: string): string {
+  const parts = pathname.split('/').filter(Boolean);
+  const demoIndex = parts.indexOf('demo');
+
+  if (demoIndex === -1) return '';
+
+  const afterDemo = parts.slice(demoIndex + 1);
+  if (afterDemo.length === 0) return 'releases';
+
+  return afterDemo.at(-1) ?? 'releases';
+}
+
 /**
  * useAuthRouteConfig - Encapsulates ALL routing logic for post-auth pages
  *
@@ -48,9 +60,11 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   // Generate breadcrumbs from pathname
   const breadcrumbs = useMemo<DashboardBreadcrumbItem[]>(() => {
     if (isDemoRoute) {
+      const label = getBreadcrumbLabel(getDemoBreadcrumbSegment(pathname));
+
       return [
         {
-          label: getBreadcrumbLabel('releases'),
+          label,
           href: pathname,
         },
       ];

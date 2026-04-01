@@ -46,10 +46,10 @@ export const AppShellFrame = memo(function AppShellFrame({
 
       <main
         id='main-content'
-        className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:ml-px lg:rounded-[12px] lg:border lg:border-(--linear-app-shell-border) lg:border-l-(--linear-app-shell-sidebar-seam) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)] lg:peer-data-[state=open]:ml-0 lg:peer-data-[state=open]:rounded-l-[10px] lg:peer-data-[state=open]:border-l-0 lg:peer-data-[state=closed]:rounded-l-[12px]'
+        className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:ml-[var(--linear-app-shell-gap)] lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'
       >
         {header}
-        <div className='flex flex-1 min-h-0 min-w-0 overflow-hidden'>
+        <div className='flex flex-1 min-h-0 min-w-0 overflow-hidden lg:gap-[var(--linear-app-shell-gap)]'>
           <div
             className={cn(
               'flex-1 min-h-0 min-w-0 pb-[var(--dev-toolbar-height,0px)]',

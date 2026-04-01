@@ -431,7 +431,13 @@ async function sendCommand(state: ServerState, command: string, args: string[], 
       if (oldState && oldState.pid) {
         await killServer(oldState.pid);
       }
-      const newState = await startServer();
+      const newState = state.mode === 'headed'
+        ? await startServer({
+            BROWSE_HEADED: '1',
+            BROWSE_PORT: '34567',
+            BROWSE_SIDEBAR_CHAT: '1',
+          })
+        : await startServer();
       return sendCommand(newState, command, args, retries + 1);
     }
     throw err;
@@ -506,12 +512,8 @@ Refs:           After 'snapshot', use @e1, @e2... as selectors:
 
     // Kill ANY existing server (SIGTERM → wait 2s → SIGKILL)
     if (existingState && isProcessAlive(existingState.pid)) {
-      try { process.kill(existingState.pid, 'SIGTERM'); } catch {}
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      if (isProcessAlive(existingState.pid)) {
-        try { process.kill(existingState.pid, 'SIGKILL'); } catch {}
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+      await killServer(existingState.pid);
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     // Kill orphaned Chromium processes that may still hold the profile lock.
@@ -523,12 +525,8 @@ Refs:           After 'snapshot', use @e1, @e2... as selectors:
       const lockTarget = fs.readlinkSync(singletonLock); // e.g. "hostname-12345"
       const orphanPid = parseInt(lockTarget.split('-').pop() || '', 10);
       if (orphanPid && isProcessAlive(orphanPid)) {
-        try { process.kill(orphanPid, 'SIGTERM'); } catch {}
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        if (isProcessAlive(orphanPid)) {
-          try { process.kill(orphanPid, 'SIGKILL'); } catch {}
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
+        await killServer(orphanPid);
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     } catch {
       // No lock symlink or not readable — nothing to kill
@@ -646,11 +644,7 @@ Refs:           After 'snapshot', use @e1, @e2... as selectors:
     }
     // Force kill + cleanup
     if (isProcessAlive(existingState.pid)) {
-      try { process.kill(existingState.pid, 'SIGTERM'); } catch {}
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      if (isProcessAlive(existingState.pid)) {
-        try { process.kill(existingState.pid, 'SIGKILL'); } catch {}
-      }
+      await killServer(existingState.pid);
     }
     // Clean profile locks and state file
     const profileDir = path.join(process.env.HOME || '/tmp', '.gstack', 'chromium-profile');

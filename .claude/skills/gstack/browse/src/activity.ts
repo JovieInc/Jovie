@@ -53,14 +53,10 @@ const SENSITIVE_PARAM_PATTERN = /\b(password|token|secret|key|auth|bearer|api[_-
 export function filterArgs(command: string, args: string[]): string[] {
   if (!args || args.length === 0) return args;
 
-  // fill: redact the value (last arg) for password-type fields
+  // fill: treat all values as sensitive; keep only the selector for context
   if (command === 'fill' && args.length >= 2) {
     const selector = args[0];
-    // If the selector suggests a password field, redact the value
-    if (/password|passwd|secret|token/i.test(selector)) {
-      return [selector, '[REDACTED]'];
-    }
-    return args;
+    return [selector, ...args.slice(1).map(() => '[REDACTED]')];
   }
 
   // header: redact Authorization and other sensitive headers

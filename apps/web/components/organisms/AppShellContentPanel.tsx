@@ -22,10 +22,7 @@ const PANEL_MAX_WIDTH_CLASSNAME = {
   form: 'max-w-[52rem]',
 } as const;
 
-const PANEL_OUTER_INSET_CLASSNAME = {
-  'content-container': 'px-3 py-3 sm:px-4 sm:py-4 lg:px-5',
-  none: 'px-4 py-4 sm:px-5 sm:py-5 lg:px-6',
-} as const;
+const PANEL_OUTER_INSET_CLASSNAME = 'px-3 py-3 sm:px-3 sm:py-3 lg:px-3';
 
 const PANEL_CONTENT_PADDING_CLASSNAME = {
   none: '',
@@ -58,38 +55,32 @@ export function AppShellContentPanel({
       )}
       data-testid={testId}
     >
-      {toolbar ? <div className='shrink-0'>{toolbar}</div> : null}
       <div
         className={cn(
-          'flex min-h-0 min-w-0 flex-1 flex-col',
+          'mx-auto flex min-h-0 w-full flex-1 flex-col',
+          PANEL_MAX_WIDTH_CLASSNAME[maxWidth],
+          PANEL_OUTER_INSET_CLASSNAME,
           panelScrollClassName,
           surfaceClassName
         )}
       >
+        {toolbar ? <div className='shrink-0'>{toolbar}</div> : null}
         <div
           className={cn(
-            'mx-auto flex min-h-0 w-full flex-1 flex-col',
-            PANEL_MAX_WIDTH_CLASSNAME[maxWidth],
-            PANEL_OUTER_INSET_CLASSNAME[frame]
+            'flex min-h-0 min-w-0 flex-1 flex-col',
+            frame === 'content-container' &&
+              cn(LINEAR_SURFACE.contentContainer, 'overflow-hidden')
           )}
         >
           <div
             className={cn(
               'flex min-h-0 min-w-0 flex-1 flex-col',
-              frame === 'content-container' &&
-                cn(LINEAR_SURFACE.contentContainer, 'overflow-hidden')
+              panelScrollClassName,
+              PANEL_CONTENT_PADDING_CLASSNAME[contentPadding],
+              contentClassName
             )}
           >
-            <div
-              className={cn(
-                'flex min-h-0 min-w-0 flex-1 flex-col',
-                panelScrollClassName,
-                PANEL_CONTENT_PADDING_CLASSNAME[contentPadding],
-                contentClassName
-              )}
-            >
-              {children}
-            </div>
+            {children}
           </div>
         </div>
       </div>

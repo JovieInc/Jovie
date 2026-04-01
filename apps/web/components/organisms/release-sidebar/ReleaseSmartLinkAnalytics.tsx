@@ -35,6 +35,7 @@ interface ReleaseSmartLinkAnalyticsProps {
   readonly release: Release;
   readonly analyticsOverride?: ReleaseSidebarAnalytics | null;
   readonly artistName?: string | null;
+  readonly variant?: 'card' | 'flat';
 }
 
 function getReleaseAnalyticsState({
@@ -165,6 +166,7 @@ export function ReleaseSmartLinkAnalytics({
   release,
   analyticsOverride,
   artistName,
+  variant = 'card',
 }: ReleaseSmartLinkAnalyticsProps) {
   const [data, setData] = useState<ReleaseSidebarAnalytics | null>(
     analyticsOverride ?? null
@@ -232,13 +234,10 @@ export function ReleaseSmartLinkAnalytics({
       dimmed={isSwitching}
       errorMessage='Analytics unavailable'
       testId='release-smart-link-analytics'
+      variant={variant}
       footer={
         release.smartLinkPath ? (
-          <ReleaseSmartLinkControl
-            release={release}
-            artistName={artistName}
-            helperText='Share your smart link to start tracking clicks.'
-          />
+          <ReleaseSmartLinkControl release={release} artistName={artistName} />
         ) : undefined
       }
     />

@@ -8,7 +8,6 @@ bin/gstack-global-discover
 .agents/
 .factory/
 .context/
-extension/.auth.json
 .gstack-worktrees/
 /tmp/
 *.log

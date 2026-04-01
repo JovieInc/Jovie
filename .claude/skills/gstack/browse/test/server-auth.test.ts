@@ -23,11 +23,17 @@ function sliceBetween(source: string, startMarker: string, endMarker: string): s
 describe('Server auth security', () => {
   // Test 1: /health response must not leak the auth token
   test('/health response must not contain token field', () => {
-    const healthBlock = sliceBetween(SERVER_SRC, "url.pathname === '/health'", "url.pathname === '/refs'");
+    const healthBlock = sliceBetween(SERVER_SRC, "url.pathname === '/health'", "url.pathname === '/extension/auth'");
     // The old pattern was: token: AUTH_TOKEN
     // The new pattern should have a comment indicating token was removed
     expect(healthBlock).not.toContain('token: AUTH_TOKEN');
     expect(healthBlock).toContain('token removed');
+  });
+
+  test('/extension/auth is the dedicated bootstrap route', () => {
+    const authBlock = sliceBetween(SERVER_SRC, "url.pathname === '/extension/auth'", "url.pathname === '/refs'");
+    expect(authBlock).toContain('token: AUTH_TOKEN');
+    expect(authBlock).toContain("Cache-Control': 'no-store'");
   });
 
   // Test 2: /refs endpoint requires auth via validateAuth

@@ -30,13 +30,11 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
-import { PageToolbar } from '@/components/organisms/table';
 import { BASE_URL } from '@/constants/domains';
 import { CopyToClipboardButton } from '@/features/dashboard/molecules/CopyToClipboardButton';
 import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
 import { EarningsTab } from '@/features/dashboard/organisms/EarningsTab';
 import { ShopifyStoreCard } from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
 import { useDashboardTipping } from './useDashboardTipping';
 import { formatCount } from './utils';
@@ -56,6 +54,7 @@ interface StatCardProps {
   readonly icon: React.ComponentType<{ className?: string }>;
   readonly iconChipClassName: string;
   readonly iconClassName: string;
+  readonly bordered?: boolean;
 }
 
 const StatCard = memo(function StatCard({
@@ -65,9 +64,17 @@ const StatCard = memo(function StatCard({
   icon: Icon,
   iconChipClassName,
   iconClassName,
+  bordered = true,
 }: StatCardProps) {
   return (
-    <section aria-label={`${label} metric`}>
+    <ContentSurfaceCard
+      className={cn(
+        'p-3.5 sm:p-4',
+        !bordered && 'border-0 bg-transparent shadow-none',
+        bordered && 'overflow-hidden'
+      )}
+      aria-label={`${label} metric`}
+    >
       <dl className='flex h-full flex-col'>
         <div className='flex items-center gap-2'>
           <div
@@ -90,7 +97,7 @@ const StatCard = memo(function StatCard({
           {description}
         </dd>
       </dl>
-    </section>
+    </ContentSurfaceCard>
   );
 });
 
@@ -311,8 +318,8 @@ const TipLinkSection = memo(function TipLinkSection({
   tipRelativePathLink,
 }: TipLinkSectionProps) {
   return (
-    <ContentSurfaceCard className='p-4 sm:p-5'>
-      <div className='flex items-center gap-2 mb-3'>
+    <div>
+      <div className='mb-3 flex items-center gap-2'>
         <div
           className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border border-subtle bg-surface-1'
           aria-hidden='true'
@@ -338,7 +345,7 @@ const TipLinkSection = memo(function TipLinkSection({
       <p className='mt-2 text-[11px] text-tertiary-token sm:text-[13px]'>
         Share this link anywhere to receive tips.
       </p>
-    </ContentSurfaceCard>
+    </div>
   );
 });
 
@@ -398,40 +405,29 @@ export function DashboardTipping() {
     return null;
   }
 
-  const toolbar =
-    hasVenmoHandle && !isEditing ? (
-      <PageToolbar
-        start={null}
-        end={
-          <VenmoConnectedBadge
-            venmoHandle={artist.venmo_handle?.replace(/^@/, '') ?? ''}
-            onEdit={() => {
-              setIsEditing(true);
-              setIsEditDialogOpen(true);
-            }}
-            onDisconnect={handleDisconnect}
-          />
-        }
-      />
-    ) : undefined;
-
   return (
     <>
       <h1 className='sr-only'>Earnings Dashboard</h1>
-      <DashboardWorkspacePanel
-        toolbar={toolbar}
-        surfaceClassName='px-4 py-4 sm:px-5'
-        data-testid='dashboard-earnings-workspace'
-      >
+      <DashboardWorkspacePanel data-testid='dashboard-earnings-workspace'>
         <div className='flex-1 overflow-y-auto overflow-x-hidden'>
           <div
-            className={cn(
-              LINEAR_SURFACE.contentContainer,
-              'mx-auto flex w-full max-w-[76rem] flex-col'
-            )}
+            className='mx-auto flex w-full max-w-[76rem] flex-col'
             data-testid='dashboard-earnings-content-panel'
           >
-            <div className='flex flex-col gap-5 p-4 sm:p-5'>
+            <div className='flex flex-col gap-4 p-3 sm:p-4'>
+              {hasVenmoHandle && !isEditing ? (
+                <div className='flex justify-end'>
+                  <VenmoConnectedBadge
+                    venmoHandle={artist.venmo_handle?.replace(/^@/, '') ?? ''}
+                    onEdit={() => {
+                      setIsEditing(true);
+                      setIsEditDialogOpen(true);
+                    }}
+                    onDisconnect={handleDisconnect}
+                  />
+                </div>
+              ) : null}
+
               {!hasVenmoHandle && (
                 <>
                   <ContentSurfaceCard className='px-6 py-12 sm:px-8 sm:py-14'>
@@ -473,41 +469,45 @@ export function DashboardTipping() {
 
               {hasVenmoHandle && (
                 <>
-                  <ContentSurfaceCard className='p-4 sm:p-5'>
-                    <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
-                      <StatCard
-                        label='QR scans'
-                        value={qrTipClicks}
-                        description='Fans who scanned your QR'
-                        icon={ScanLine}
-                        iconChipClassName='border border-subtle bg-surface-1'
-                        iconClassName='text-success'
-                      />
-                      <StatCard
-                        label='Link clicks'
-                        value={linkTipClicks}
-                        description='Fans who clicked your link'
-                        icon={MousePointerClick}
-                        iconChipClassName='border border-subtle bg-surface-1'
-                        iconClassName='text-info'
-                      />
-                      <StatCard
-                        label='Total visits'
-                        value={tipClicks}
-                        description='QR + link combined'
-                        icon={BarChart3}
-                        iconChipClassName='border border-subtle bg-surface-1'
-                        iconClassName='text-accent'
-                      />
+                  <ContentSurfaceCard className='overflow-hidden p-0'>
+                    <div className='grid grid-cols-1 gap-0 sm:grid-cols-[minmax(0,1fr)_320px]'>
+                      <div className='grid grid-cols-2 gap-0 [&>*]:border-b [&>*]:border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] sm:grid-cols-3 sm:[&>*]:border-b-0 sm:[&>*]:border-r sm:[&>*:last-child]:border-r-0'>
+                        <StatCard
+                          label='QR scans'
+                          value={qrTipClicks}
+                          description='Fans who scanned your QR'
+                          icon={ScanLine}
+                          iconChipClassName='border border-subtle bg-surface-1'
+                          iconClassName='text-success'
+                          bordered={false}
+                        />
+                        <StatCard
+                          label='Link clicks'
+                          value={linkTipClicks}
+                          description='Fans who clicked your link'
+                          icon={MousePointerClick}
+                          iconChipClassName='border border-subtle bg-surface-1'
+                          iconClassName='text-info'
+                          bordered={false}
+                        />
+                        <StatCard
+                          label='Total visits'
+                          value={tipClicks}
+                          description='QR + link combined'
+                          icon={BarChart3}
+                          iconChipClassName='border border-subtle bg-surface-1'
+                          iconClassName='text-accent'
+                          bordered={false}
+                        />
+                      </div>
+                      <div className='border-t border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-4 py-4 sm:border-l sm:border-t-0 sm:px-5'>
+                        <TipLinkSection
+                          tipUrl={tipUrls.tipUrl}
+                          tipRelativePathLink={tipUrls.tipRelativePathLink}
+                        />
+                      </div>
                     </div>
                   </ContentSurfaceCard>
-
-                  <div className='grid gap-4 sm:grid-cols-2'>
-                    <TipLinkSection
-                      tipUrl={tipUrls.tipUrl}
-                      tipRelativePathLink={tipUrls.tipRelativePathLink}
-                    />
-                  </div>
 
                   <EarningsTab />
                 </>

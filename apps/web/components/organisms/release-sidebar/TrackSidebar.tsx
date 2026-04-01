@@ -19,6 +19,7 @@ import {
   DrawerCardActionBar,
   DrawerMediaThumb,
   DrawerSurfaceCard,
+  DrawerTabbedCard,
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
@@ -306,17 +307,20 @@ export function TrackSidebar({
           </div>
         ) : undefined
       }
-      tabs={
-        <DrawerTabs
-          value={activeTab}
-          onValueChange={value => setActiveTab(value as TrackSidebarTab)}
-          options={TRACK_SIDEBAR_TAB_OPTIONS}
-          ariaLabel='Track sidebar tabs'
-        />
-      }
     >
       {track && (
-        <>
+        <DrawerTabbedCard
+          testId='track-tabbed-card'
+          tabs={
+            <DrawerTabs
+              value={activeTab}
+              onValueChange={value => setActiveTab(value as TrackSidebarTab)}
+              options={TRACK_SIDEBAR_TAB_OPTIONS}
+              ariaLabel='Track sidebar tabs'
+            />
+          }
+          contentClassName='pt-2'
+        >
           {activeTab === 'details' && (
             <div className='space-y-2'>
               {track.isrc && (
@@ -395,7 +399,7 @@ export function TrackSidebar({
           {activeTab === 'platforms' && (
             <TrackPlatformLinksSection providers={streamingProviders} />
           )}
-        </>
+        </DrawerTabbedCard>
       )}
     </EntitySidebarShell>
   );

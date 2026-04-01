@@ -12,13 +12,12 @@ import { MapPin } from 'lucide-react';
 import { useState } from 'react';
 import {
   DrawerSurfaceCard,
+  DrawerTabbedCard,
   DrawerTabs,
   EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
-import { cn } from '@/lib/utils';
 import { AudienceMemberActivityFeed } from './AudienceMemberActivityFeed';
 import { AudienceMemberDetails } from './AudienceMemberDetails';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
@@ -53,10 +52,11 @@ function AudienceMemberEntityHeader({
 
   return (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
+      variant='flat'
+      className='overflow-hidden'
       testId='audience-member-header-card'
     >
-      <div className='relative p-3.5'>
+      <div className='relative border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-3 py-2.5'>
         <div className='absolute right-2.5 top-2.5'>
           <DrawerHeaderActions
             primaryActions={[]}
@@ -81,7 +81,7 @@ function AudienceMemberEntityHeader({
             </div>
           }
           image={
-            <div className='flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border border-subtle bg-surface-0 text-[15px] font-[590] text-secondary-token'>
+            <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-subtle bg-surface-0 text-[14px] font-[590] text-secondary-token'>
               {primaryLabel.charAt(0).toUpperCase()}
             </div>
           }
@@ -118,53 +118,41 @@ export function AudienceMemberSidebar({
           />
         ) : undefined
       }
-      tabs={
-        member ? (
-          <DrawerTabs
-            value={activeTab}
-            onValueChange={value => setActiveTab(value as AudienceTab)}
-            options={AUDIENCE_TAB_OPTIONS}
-            ariaLabel='Audience member tabs'
-            distribution='intrinsic'
-          />
-        ) : undefined
-      }
       isEmpty={!member}
       emptyMessage='Select a row in the table to view contact details.'
     >
       {member && (
-        <div className='flex min-h-full flex-col gap-2.5 pt-0.5'>
+        <div className='flex min-h-full flex-col gap-2 pt-0.5'>
           <div className='min-h-0 flex-1'>
-            {activeTab === 'details' && (
-              <DrawerSurfaceCard
-                className={LINEAR_SURFACE.drawerCardSm}
-                testId='audience-details-card'
-              >
-                <div className='p-2.5'>
+            <DrawerTabbedCard
+              testId='audience-member-tabbed-card'
+              tabs={
+                <DrawerTabs
+                  value={activeTab}
+                  onValueChange={value => setActiveTab(value as AudienceTab)}
+                  options={AUDIENCE_TAB_OPTIONS}
+                  ariaLabel='Audience member tabs'
+                  distribution='intrinsic'
+                />
+              }
+              contentClassName='pt-2'
+            >
+              {activeTab === 'details' && (
+                <div data-testid='audience-details-card'>
                   <AudienceMemberDetails member={member} />
                 </div>
-              </DrawerSurfaceCard>
-            )}
-            {activeTab === 'activity' && (
-              <DrawerSurfaceCard
-                className={LINEAR_SURFACE.drawerCardSm}
-                testId='audience-activity-card'
-              >
-                <div className='p-2.5'>
+              )}
+              {activeTab === 'activity' && (
+                <div data-testid='audience-activity-card'>
                   <AudienceMemberActivityFeed member={member} />
                 </div>
-              </DrawerSurfaceCard>
-            )}
-            {activeTab === 'referrers' && (
-              <DrawerSurfaceCard
-                className={LINEAR_SURFACE.drawerCardSm}
-                testId='audience-referrers-card'
-              >
-                <div className='p-2.5'>
+              )}
+              {activeTab === 'referrers' && (
+                <div data-testid='audience-referrers-card'>
                   <AudienceMemberReferrers member={member} />
                 </div>
-              </DrawerSurfaceCard>
-            )}
+              )}
+            </DrawerTabbedCard>
           </div>
         </div>
       )}

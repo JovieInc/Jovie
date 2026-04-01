@@ -3,7 +3,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { EnrichedProfileData } from '@/app/onboarding/actions/enrich-profile';
 import { OnboardingExperienceShell } from '@/components/features/onboarding/OnboardingExperienceShell';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 import { OnboardingDspStep } from '@/features/dashboard/organisms/onboarding/OnboardingDspStep';
 import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding/OnboardingHandleStep';
@@ -40,11 +39,9 @@ const PROFILE_REVIEW_DATA: EnrichedProfileData = {
 };
 
 function DemoShowcasePanel({
-  title,
   testId,
   children,
 }: Readonly<{
-  title: string;
   testId: string;
   children: React.ReactNode;
 }>) {
@@ -57,11 +54,8 @@ function DemoShowcasePanel({
         scroll='page'
         data-testid={testId}
       >
-        <section className='space-y-4'>
-          <div className='overflow-hidden rounded-xl border border-(--linear-app-frame-seam) bg-surface-1'>
-            <ContentSectionHeader title={title} className='min-h-0 py-3' />
-            <div className='px-4 py-4 sm:px-5 sm:py-5'>{children}</div>
-          </div>
+        <section className='overflow-hidden px-4 py-4 sm:px-5 sm:py-5'>
+          {children}
         </section>
       </AppShellContentPanel>
     </DemoAuthShell>
@@ -102,34 +96,25 @@ export function DemoShowcaseSurface({
   switch (surface) {
     case 'analytics':
       return (
-        <DemoShowcasePanel
-          title='Analytics Overview'
-          testId='demo-showcase-analytics'
-        >
+        <DemoShowcasePanel testId='demo-showcase-analytics'>
           <DashboardAnalyticsDemo />
         </DemoShowcasePanel>
       );
     case 'earnings':
       return (
-        <DemoShowcasePanel
-          title='Earnings Overview'
-          testId='demo-showcase-earnings'
-        >
+        <DemoShowcasePanel testId='demo-showcase-earnings'>
           <DashboardEarningsDemo />
         </DemoShowcasePanel>
       );
     case 'links':
       return (
-        <DemoShowcasePanel title='Links Manager' testId='demo-showcase-links'>
+        <DemoShowcasePanel testId='demo-showcase-links'>
           <DashboardLinksDemo />
         </DemoShowcasePanel>
       );
     case 'settings':
       return (
-        <DemoShowcasePanel
-          title='Artist Profile Settings'
-          testId='demo-showcase-settings'
-        >
+        <DemoShowcasePanel testId='demo-showcase-settings'>
           <DemoSettingsPanel />
         </DemoShowcasePanel>
       );

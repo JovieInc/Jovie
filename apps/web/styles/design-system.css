@@ -106,19 +106,35 @@
   --color-logo-muted-hover: rgba(0, 0, 0, 0.65);
 
   /* Border system - semi-transparent for flexibility */
-  --color-border-subtle: oklch(0% 0 0 / 6%);
-  --color-border-default: oklch(0% 0 0 / 10%);
-  --color-border-strong: oklch(0% 0 0 / 18%);
+  --color-border-subtle: oklch(0% 0 0 / 5%);
+  --color-border-default: oklch(0% 0 0 / 8%);
+  --color-border-strong: oklch(0% 0 0 / 15%);
   --color-border-focus: #7170ff;
   /* Linear accent for focus */
 
-  /* Accent — Linear's purple: #7170ff (extracted 2026-03-16) */
-  --color-accent: #7170ff;
-  /* #7170ff — Linear exact */
-  --color-accent-hover: #828fff;
-  /* Linear: --color-accent-hover */
-  --color-accent-active: #5a59e6;
-  --color-accent-subtle: lch(92% 20 288.421);
+  /* Accent palette rotation */
+  --color-accent-gray: #7f7f85;
+  --color-accent-gray-subtle: #efeff2;
+  --color-accent-blue: #2563ff;
+  --color-accent-blue-subtle: #edf3ff;
+  --color-accent-purple: #8b1eff;
+  --color-accent-purple-subtle: #f3ebff;
+  --color-accent-pink: #d61a7f;
+  --color-accent-pink-subtle: #fde9f4;
+  --color-accent-red: #f3122d;
+  --color-accent-red-subtle: #ffeaee;
+  --color-accent-orange: #ff9800;
+  --color-accent-orange-subtle: #fff3e6;
+  --color-accent-green: #2f9e44;
+  --color-accent-green-subtle: #ecf8ee;
+  --color-accent-teal: #0f9b8e;
+  --color-accent-teal-subtle: #e8f7f5;
+
+  /* Default product accent uses the palette purple */
+  --color-accent: var(--color-accent-purple);
+  --color-accent-hover: #9a46ff;
+  --color-accent-active: #7612df;
+  --color-accent-subtle: var(--color-accent-purple-subtle);
   --color-accent-foreground: oklch(100% 0 0);
 
   /* Primary button - high contrast */
@@ -255,18 +271,35 @@
      Subtle:  rgba(255,255,255,0.05) — card borders, dividers
      Default: rgba(255,255,255,0.08) — frame borders, input borders
      Strong:  rgba(255,255,255,0.10) — panel outlines */
-  --color-border-subtle: rgba(255, 255, 255, 0.05);
-  --color-border-default: rgba(255, 255, 255, 0.08);
-  --color-border-strong: rgba(255, 255, 255, 0.1);
+  --color-border-subtle: rgba(255, 255, 255, 0.04);
+  --color-border-default: rgba(255, 255, 255, 0.07);
+  --color-border-strong: rgba(255, 255, 255, 0.12);
   --color-border-focus: #7170ff;
   /* Linear accent for focus */
 
-  /* Accent — Linear's purple: #7170ff (extracted 2026-03-16) */
-  --color-accent: #7170ff;
-  /* #7170ff — Linear exact */
-  --color-accent-hover: #828fff;
-  --color-accent-active: #5a59e6;
-  --color-accent-subtle: lch(20% 30 288.421);
+  /* Accent palette rotation */
+  --color-accent-gray: #8d8d93;
+  --color-accent-gray-subtle: rgb(127 127 133 / 0.18);
+  --color-accent-blue: #4d7dff;
+  --color-accent-blue-subtle: rgb(37 99 255 / 0.18);
+  --color-accent-purple: #9b4dff;
+  --color-accent-purple-subtle: rgb(139 30 255 / 0.18);
+  --color-accent-pink: #ea4a9c;
+  --color-accent-pink-subtle: rgb(214 26 127 / 0.18);
+  --color-accent-red: #ff4d5f;
+  --color-accent-red-subtle: rgb(243 18 45 / 0.18);
+  --color-accent-orange: #ffab2e;
+  --color-accent-orange-subtle: rgb(255 152 0 / 0.18);
+  --color-accent-green: #43b85c;
+  --color-accent-green-subtle: rgb(47 158 68 / 0.18);
+  --color-accent-teal: #22b8a7;
+  --color-accent-teal-subtle: rgb(15 155 142 / 0.18);
+
+  /* Default product accent uses the palette purple */
+  --color-accent: var(--color-accent-purple);
+  --color-accent-hover: #b06bff;
+  --color-accent-active: #8a37f4;
+  --color-accent-subtle: var(--color-accent-purple-subtle);
 
   /* Primary button - inverted for dark mode (Linear: rgb(230,230,230)) */
   --color-btn-primary-bg: #e6e6e6;
@@ -598,42 +631,42 @@
    ============================================ */
 :root {
   /* Success */
-  --color-success: oklch(65% 0.18 145);
-  --color-success-subtle: oklch(95% 0.05 145);
+  --color-success: var(--color-accent-green);
+  --color-success-subtle: var(--color-accent-green-subtle);
   --color-success-foreground: oklch(100% 0 0);
 
   /* Warning */
-  --color-warning: oklch(75% 0.15 80);
-  --color-warning-subtle: oklch(95% 0.05 80);
+  --color-warning: var(--color-accent-orange);
+  --color-warning-subtle: var(--color-accent-orange-subtle);
   --color-warning-foreground: oklch(20% 0 0);
 
   /* Error/Destructive */
-  --color-error: oklch(60% 0.2 25);
-  --color-error-subtle: oklch(95% 0.05 25);
+  --color-error: var(--color-accent-red);
+  --color-error-subtle: var(--color-accent-red-subtle);
   --color-error-foreground: oklch(100% 0 0);
 
   /* Info */
-  --color-info: oklch(60% 0.15 240);
-  --color-info-subtle: oklch(95% 0.05 240);
+  --color-info: var(--color-accent-blue);
+  --color-info-subtle: var(--color-accent-blue-subtle);
   --color-info-foreground: oklch(100% 0 0);
 }
 
 :root.dark {
   /* Success - brighter in dark mode */
-  --color-success: oklch(70% 0.18 145);
-  --color-success-subtle: oklch(20% 0.08 145);
+  --color-success: var(--color-accent-green);
+  --color-success-subtle: var(--color-accent-green-subtle);
 
   /* Warning */
-  --color-warning: oklch(80% 0.15 80);
-  --color-warning-subtle: oklch(20% 0.08 80);
+  --color-warning: var(--color-accent-orange);
+  --color-warning-subtle: var(--color-accent-orange-subtle);
 
   /* Error */
-  --color-error: oklch(70% 0.2 25);
-  --color-error-subtle: oklch(20% 0.08 25);
+  --color-error: var(--color-accent-red);
+  --color-error-subtle: var(--color-accent-red-subtle);
 
   /* Info */
-  --color-info: oklch(70% 0.15 240);
-  --color-info-subtle: oklch(20% 0.08 240);
+  --color-info: var(--color-accent-blue);
+  --color-info-subtle: var(--color-accent-blue-subtle);
 }
 
 /* ============================================
@@ -644,20 +677,13 @@
    All have ~same perceived brightness
 */
 :root {
-  --accent-conv: oklch(55% 0.2 285);
-  /* Conversion - purple */
-  --accent-analytics: oklch(65% 0.15 230);
-  /* Analytics - blue */
-  --accent-speed: oklch(65% 0.2 145);
-  /* Speed - green */
-  --accent-beauty: oklch(75% 0.15 70);
-  /* Beauty - amber */
-  --accent-seo: oklch(60% 0.2 25);
-  /* SEO - red */
-  --accent-links: oklch(60% 0.2 300);
-  /* Links - violet */
-  --accent-pro: oklch(65% 0.15 180);
-  /* Pro - teal */
+  --accent-conv: var(--color-accent-purple);
+  --accent-analytics: var(--color-accent-blue);
+  --accent-speed: var(--color-accent-green);
+  --accent-beauty: var(--color-accent-pink);
+  --accent-seo: var(--color-accent-red);
+  --accent-links: var(--color-accent-teal);
+  --accent-pro: var(--color-accent-orange);
 }
 
 /* ============================================
@@ -897,9 +923,9 @@
 
 :root.dark {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
-  /* Pull the shell closer to the app surface to avoid a hard seam. */
-  --sidebar-background: 18 19 21;
-  /* Linear: --linear-app-sidebar-background-rgb (elevated from page bg) */
+  /* Keep the sidebar on the darker shell canvas so the framed main pane reads above it. */
+  --sidebar-background: var(--linear-app-sidebar-background-rgb);
+  /* Linear: --linear-app-sidebar-background-rgb */
   --sidebar-foreground: 227 228 229;
   /* Linear: --linear-app-sidebar-foreground-rgb */
   --sidebar-primary: 227 228 229;
@@ -915,7 +941,7 @@
   --sidebar-muted: 107 111 118;
   /* Linear: --linear-app-sidebar-muted-rgb */
   --sidebar-muted-foreground: 107 111 118;
-  --sidebar-surface: 18 19 21;
+  --sidebar-surface: var(--linear-app-sidebar-background-rgb);
   /* Matches sidebar background */
   --sidebar-surface-hover: 255 255 255 / 0.04;
   /* Matches sidebar accent */
