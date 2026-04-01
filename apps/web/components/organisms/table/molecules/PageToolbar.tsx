@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { ACTION_BAR_BUTTON_CLASS, ActionBar } from './ActionBar';
 
 export const PAGE_TOOLBAR_CONTAINER_CLASS =
-  'flex min-w-0 items-center gap-1 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-transparent px-app-header py-1 md:min-h-[36px]';
+  'flex min-w-0 items-center gap-1.5 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-transparent px-app-header py-1.5 md:min-h-[40px]';
 
 export const PAGE_TOOLBAR_START_CLASS =
   'flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
@@ -23,7 +23,7 @@ export const PAGE_TOOLBAR_META_TEXT_CLASS =
 
 export const PAGE_TOOLBAR_TAB_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'h-7 rounded-full px-2.5 text-[11.5px] font-[510] text-secondary-token [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-7.5 rounded-[10px] px-2.5 text-[11.5px] font-[540] text-secondary-token [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
@@ -31,11 +31,11 @@ export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
 
 export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
-  'h-7 rounded-full px-2 text-[11.5px] font-[510] text-tertiary-token [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-7.5 rounded-[10px] px-2.5 text-[11.5px] font-[540] text-tertiary-token [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS =
-  'w-7 justify-center px-0 text-tertiary-token';
+  'w-7.5 justify-center px-0 text-tertiary-token';
 
 export const PAGE_TOOLBAR_MENU_TRIGGER_CLASS = cn(
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,

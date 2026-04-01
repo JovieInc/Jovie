@@ -8,7 +8,7 @@ import {
   PageToolbar,
   PageToolbarActionButton,
 } from '@/components/organisms/table';
-import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
+import { PageShell } from '@/components/organisms/PageShell';
 import { useGenerateInsightsMutation, useInsightsQuery } from '@/lib/queries';
 import type { InsightCategory, InsightResponse } from '@/types/insights';
 import { InsightCard } from './InsightCard';
@@ -178,7 +178,7 @@ export function InsightsPanel() {
   );
 
   return (
-    <DashboardWorkspacePanel
+    <PageShell
       toolbar={toolbar}
       data-testid='dashboard-insights-workspace'
     >
@@ -204,6 +204,6 @@ export function InsightsPanel() {
           />
         </div>
       </div>
-    </DashboardWorkspacePanel>
+    </PageShell>
   );
 }

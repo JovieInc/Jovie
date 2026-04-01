@@ -32,7 +32,7 @@ export function ContentSectionHeader({
         'flex min-w-0 shrink-0 items-center justify-between gap-2 px-(--linear-app-header-padding-x)',
         variant === 'default' && 'border-b border-subtle bg-transparent',
         density === 'compact'
-          ? 'min-h-[34px] py-1'
+          ? 'min-h-[38px] py-1.5'
           : 'min-h-(--linear-app-header-height) py-1.5',
         className
       )}
@@ -40,7 +40,7 @@ export function ContentSectionHeader({
       <div className={cn('min-w-0 flex-1 space-y-0', bodyClassName)}>
         <h2
           className={cn(
-            'truncate text-[12px] font-[550] tracking-[-0.01em] text-primary-token',
+            'truncate text-[12.5px] font-[560] tracking-[-0.012em] text-primary-token',
             titleClassName
           )}
         >
@@ -49,7 +49,7 @@ export function ContentSectionHeader({
         {subtitle ? (
           <p
             className={cn(
-              'text-[12px] leading-[16px] text-tertiary-token',
+              'text-[11.5px] leading-[15px] text-tertiary-token',
               subtitleClassName
             )}
           >

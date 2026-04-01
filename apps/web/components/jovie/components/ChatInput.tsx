@@ -351,9 +351,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const hasQuickActions =
       Boolean(onQuickActionSelect) && (quickActions?.length ?? 0) > 0;
 
-    // Both collapsed and expanded resolve to 24px radius, avoiding
-    // the jarring 9999px→24px transition of the old rounded-full approach.
-    const borderRadius = 24;
+    // Both collapsed and expanded resolve to 32px radius for a pill shape.
+    const borderRadius = isCompact ? 26 : 30;
 
     // Shadow states
     let boxShadow = isDark
@@ -386,11 +385,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               : { duration: 0.15, ease: EASE_INTERACTIVE }
           }
           className={cn(
-            'overflow-hidden border transition-[border-color,background-color] duration-normal',
-            // Light mode: white surface, dark mode: surface-2
-            'bg-white dark:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
-            // Elevation: subtle in light, stronger in dark
-            'shadow-[0_2px_8px_rgba(0,0,0,0.08)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)]',
+            'overflow-hidden border transition-[border-color,background-color,box-shadow] duration-normal',
+            // Light mode: bright shell inset, dark mode: content surface
+            'bg-[color-mix(in_oklab,white_94%,var(--linear-app-content-surface))] dark:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
+            'shadow-[0_6px_18px_-16px_rgba(15,23,42,0.38),0_1px_0_rgba(255,255,255,0.4)_inset] dark:shadow-[0_8px_18px_-14px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.05)]',
             borderClass
           )}
           style={reducedMotion ? { borderRadius, boxShadow } : { borderRadius }}
@@ -409,8 +407,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           <div
             ref={containerRef}
             className={cn(
-              'relative flex items-end gap-2 px-3 py-2.5',
-              isExpanded && 'pb-2'
+              'relative flex items-center gap-2 px-4 py-3',
+              isExpanded && 'pb-3'
             )}
           >
             {/* Hidden measurement div */}

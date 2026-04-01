@@ -498,7 +498,8 @@ function mapProfileResultToCreatorProfile(result: {
 
 async function renderListenMode(
   username: string,
-  isPublicNoAuthSmoke: boolean
+  isPublicNoAuthSmoke: boolean,
+  viewerCountryCode: string | null
 ) {
   const profileResult = await getLightweightProfile(username);
   if (!profileResult) {
@@ -554,6 +555,7 @@ async function renderListenMode(
         mode='listen'
         artist={artist}
         socialLinks={socialLinks}
+        viewerCountryCode={viewerCountryCode}
         contacts={[]}
         subtitle={subtitle}
         showTipButton={profileResult.hasVenmoLink}
@@ -614,12 +616,13 @@ export default async function ArtistPage({
   const profileV2Enabled = isDevProfileV2OverrideEnabled(resolvedSearchParams)
     ? true
     : getProfileV2Gate();
+  const headersList = await headers();
+  const viewerCountryCode = headersList.get('x-vercel-ip-country') ?? null;
 
   // Block check: redirect blocked visitors to jov.ie before any rendering path.
   // Must run before listen-mode early return to prevent bypass via ?mode=listen.
   // Uses fingerprint-only check (no owner skip) since profile isn't loaded yet.
   if (!isPublicNoAuthSmoke) {
-    const headersList = await headers();
     const ip = extractClientIP(headersList);
     const ua = headersList.get('user-agent');
     const visitorFingerprint = createFingerprint(ip, ua);
@@ -650,7 +653,8 @@ export default async function ArtistPage({
   if (mode === 'listen' && !profileV2Enabled) {
     const { schemas, body } = await renderListenMode(
       username,
-      isPublicNoAuthSmoke
+      isPublicNoAuthSmoke,
+      viewerCountryCode
     );
     return (
       <>
@@ -771,6 +775,7 @@ export default async function ArtistPage({
         mode={mode}
         artist={artist}
         socialLinks={links}
+        viewerCountryCode={viewerCountryCode}
         contacts={publicContacts}
         subtitle={subtitle}
         showTipButton={showTipButton}

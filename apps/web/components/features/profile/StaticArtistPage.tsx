@@ -23,6 +23,7 @@ import VenmoTipSelector from '@/features/profile/VenmoTipSelector';
 import { buildProfilePublicViewModel } from '@/features/profile/view-models';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { AvailableDSP } from '@/lib/dsp';
+import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
@@ -59,14 +60,22 @@ export interface StaticArtistPageProps {
   readonly showSubscriptionConfirmedBanner?: boolean;
   readonly showShopButton?: boolean;
   readonly profileV2Enabled?: boolean;
+  readonly viewerCountryCode?: string | null;
 }
 
 /**
  * Merge artist-level DSPs with social-link-derived DSPs, deduped by key.
  * Artist DSPs take priority (listed first).
  */
-function getMergedDSPs(artist: Artist, socialLinks: LegacySocialLink[]) {
-  return getCanonicalProfileDSPs(artist, socialLinks);
+function getMergedDSPs(
+  artist: Artist,
+  socialLinks: LegacySocialLink[],
+  viewerCountryCode?: string | null
+) {
+  return sortDSPsByGeoPopularity(
+    getCanonicalProfileDSPs(artist, socialLinks),
+    viewerCountryCode
+  );
 }
 
 interface RenderContentOptions {
@@ -200,8 +209,9 @@ export function StaticArtistPage({
   showSubscriptionConfirmedBanner = true,
   showShopButton = false,
   profileV2Enabled = false,
+  viewerCountryCode,
 }: StaticArtistPageProps) {
-  const mergedDSPs = getMergedDSPs(artist, socialLinks);
+  const mergedDSPs = getMergedDSPs(artist, socialLinks, viewerCountryCode);
   const viewModel = buildProfilePublicViewModel({
     mode,
     artist,
@@ -242,12 +252,16 @@ export function StaticArtistPage({
         photoDownloadSizes={photoDownloadSizes}
         tourDates={tourDates}
         visitTrackingToken={visitTrackingToken}
+        viewerCountryCode={viewerCountryCode}
       />
     );
   }
 
   return (
-    <PublicProfileTemplate viewModel={viewModel}>
+    <PublicProfileTemplate
+      viewModel={viewModel}
+      viewerCountryCode={viewerCountryCode}
+    >
       <div>
         {viewModel.showSubscriptionConfirmedBanner ? (
           <Suspense>

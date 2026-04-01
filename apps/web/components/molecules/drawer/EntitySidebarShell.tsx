@@ -109,6 +109,7 @@ export function EntitySidebarShell({
   emptyMessage = 'Select an item to view details.',
 }: EntitySidebarShellProps) {
   const isMinimalHeader = headerMode === 'minimal';
+  const drawerSectionGapClassName = 'space-y-2.5';
   const showMinimalHeaderBar = !(isMinimalHeader && hideMinimalHeaderBar);
   const renderMinimalTabsInHeader =
     isMinimalHeader && minimalTabsPlacement === 'header';
@@ -134,8 +135,8 @@ export function EntitySidebarShell({
       contextMenuItems={contextMenuItems}
       data-testid={testId}
     >
-      <div className='flex h-full min-h-0 flex-col gap-0.5 px-1.5 py-1.5 lg:px-0 lg:py-0'>
-        <div className='shrink-0 space-y-0.5'>
+      <div className='flex h-full min-h-0 flex-col gap-2 px-1.5 py-1.5 lg:px-0 lg:py-0'>
+        <div className={cn('shrink-0', drawerSectionGapClassName)}>
           <DrawerSurfaceCard
             variant='card'
             className='overflow-hidden lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none'
@@ -157,7 +158,7 @@ export function EntitySidebarShell({
               ) : null}
 
               {!isMinimalHeader && entityHeader ? (
-                <div className='overflow-visible px-3 pb-2.5 pt-2.5'>
+                <div className='overflow-visible px-3 pb-3 pt-3'>
                   {actionsInEntityHeader && headerActions ? (
                     <div className='mb-2 flex items-center justify-end gap-1'>
                       {headerActions}
@@ -170,7 +171,7 @@ export function EntitySidebarShell({
               {!isMinimalHeader && tabs ? (
                 <div
                   className={cn(
-                    'overflow-visible border-t border-(--linear-app-frame-seam) px-3 py-2 [&>*]:w-full',
+                    'overflow-visible border-t border-(--linear-app-frame-seam) px-3 py-2.5 [&>*]:w-full',
                     tabsContainerClassName
                   )}
                 >
@@ -183,7 +184,7 @@ export function EntitySidebarShell({
                   className={cn(
                     showMinimalHeaderBar &&
                       'border-t border-(--linear-app-frame-seam)',
-                    'overflow-visible px-3 py-2 [&>*]:w-full',
+                    'overflow-visible px-3 py-2.5 [&>*]:w-full',
                     tabsContainerClassName
                   )}
                 >
@@ -197,7 +198,7 @@ export function EntitySidebarShell({
             <DrawerSurfaceCard
               testId='entity-sidebar-entity-header'
               variant='card'
-              className='overflow-hidden lg:mx-1.5'
+              className='overflow-hidden lg:mx-1.5 lg:mt-1.5'
             >
               {entityHeader}
             </DrawerSurfaceCard>
@@ -205,19 +206,22 @@ export function EntitySidebarShell({
         </div>
 
         {isEmpty ? (
-          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5'>
+          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5 lg:pt-1.5'>
             <DrawerSurfaceCard variant='card' className='p-4'>
               <DrawerEmptyState message={emptyMessage} />
             </DrawerSurfaceCard>
           </div>
         ) : (
           <>
-            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5'>
-              <div className='space-y-0.5'>{children}</div>
+            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5 lg:pt-1.5'>
+              <div className={drawerSectionGapClassName}>{children}</div>
             </div>
 
             {footer ? (
-              <DrawerSurfaceCard variant='card' className='shrink-0 px-3 py-2'>
+              <DrawerSurfaceCard
+                variant='card'
+                className='shrink-0 px-3 py-2.5 lg:mx-1.5'
+              >
                 {footer}
               </DrawerSurfaceCard>
             ) : null}

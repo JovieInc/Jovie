@@ -32,7 +32,7 @@ import {
 } from '@/components/organisms/Dialog';
 import { BASE_URL } from '@/constants/domains';
 import { CopyToClipboardButton } from '@/features/dashboard/molecules/CopyToClipboardButton';
-import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
+import { PageShell } from '@/components/organisms/PageShell';
 import { EarningsTab } from '@/features/dashboard/organisms/EarningsTab';
 import { ShopifyStoreCard } from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
 import { cn } from '@/lib/utils';
@@ -408,7 +408,7 @@ export function DashboardTipping() {
   return (
     <>
       <h1 className='sr-only'>Earnings Dashboard</h1>
-      <DashboardWorkspacePanel data-testid='dashboard-earnings-workspace'>
+      <PageShell data-testid='dashboard-earnings-workspace'>
         <div className='flex-1 overflow-y-auto overflow-x-hidden'>
           <div
             className='mx-auto flex w-full max-w-[76rem] flex-col'
@@ -517,7 +517,7 @@ export function DashboardTipping() {
             </div>
           </div>
         </div>
-      </DashboardWorkspacePanel>
+      </PageShell>
 
       <Dialog
         open={isEditDialogOpen}

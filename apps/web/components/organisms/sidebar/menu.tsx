@@ -35,20 +35,20 @@ SidebarMenuItem.displayName = 'SidebarMenuItem';
 
 const sidebarMenuButtonVariants = cva(
   [
-    // Base layout — 13px / weight 500 / pill radius / -0.01em tracking matching Linear
-    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-full border border-transparent px-2.5 text-left text-[13px] leading-[1.15] tracking-normal outline-none',
+    // Base layout — tighter and calmer so the rail reads as one system.
+    'peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-[10px] border border-transparent px-2.5 text-left text-[12.5px] leading-[1.15] tracking-normal outline-none',
     // Font weight 500 — Linear's --font-weight-medium for sidebar nav
     '[font-weight:var(--font-weight-nav)]',
     // Transitions — Linear: instant for background, colors
-    'transition-[background-color,color] duration-0 ease-interactive',
+    'transition-[background-color,border-color,color,box-shadow] duration-fast ease-interactive',
     // Default text color — token-driven contrast, no extra opacity dampening
     'text-sidebar-item-foreground',
     // Hover state — Linear: rgba(255,255,255,0.02) bg
-    'hover:border-transparent hover:bg-sidebar-accent hover:text-sidebar-item-foreground',
+    'hover:border-[color-mix(in_oklab,var(--linear-app-frame-seam)_58%,transparent)] hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] hover:text-sidebar-item-foreground',
     // Active state — soft emphasis while keeping shell understated
-    'data-[active=true]:bg-sidebar-accent-active data-[active=true]:text-sidebar-item-foreground data-[active=true]:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_82%,transparent)]',
+    'data-[active=true]:border-[color-mix(in_oklab,var(--linear-app-frame-seam)_80%,transparent)] data-[active=true]:bg-[color-mix(in_oklab,var(--color-sidebar-accent-active)_88%,var(--linear-app-content-surface))] data-[active=true]:text-sidebar-item-foreground data-[active=true]:shadow-[inset_0_1px_0_rgba(255,255,255,0.03),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_62%,transparent)]',
     // Focus state - subtle bg like Linear (no rings)
-    'focus-visible:bg-sidebar-accent focus-visible:outline-none',
+    'focus-visible:border-[color-mix(in_oklab,var(--linear-border-focus)_62%,transparent)] focus-visible:bg-sidebar-accent focus-visible:outline-none',
     // Disabled state
     'disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
     // Menu action spacing
@@ -75,7 +75,7 @@ const sidebarMenuButtonVariants = cva(
           'bg-sidebar-background border border-sidebar-border hover:border-sidebar-accent',
       },
       size: {
-        default: 'h-7',
+        default: 'h-6.5',
         sm: 'h-6 text-xs',
         lg: 'h-8 group-data-[collapsible=icon]:!size-8',
       },

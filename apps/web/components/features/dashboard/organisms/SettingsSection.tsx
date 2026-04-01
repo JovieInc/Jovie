@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { PageHeader } from '@/components/organisms/PageShell';
 import { cn } from '@/lib/utils';
 
 export interface SettingsSectionProps {
@@ -30,32 +31,21 @@ export function SettingsSection({
       id={id}
       aria-labelledby={headingId}
       aria-describedby={descriptionId}
-      className={cn('scroll-mt-6 space-y-5', className)}
+      className={cn('scroll-mt-6', className)}
     >
-      <div className='space-y-1'>
-        <h2
-          id={headingId}
-          className={cn(
-            'dashboard-heading text-[24px] font-[590] tracking-[-0.035em] text-primary-token sm:text-[28px]',
-            titleClassName
-          )}
-        >
-          {title}
-        </h2>
-        {description ? (
-          <p
-            id={descriptionId}
-            data-testid={`${id}-description`}
-            className={cn(
-              'dashboard-body max-w-[60ch] text-[13px] leading-[19px] text-secondary-token',
-              descriptionClassName
-            )}
-          >
-            {description}
-          </p>
-        ) : null}
+      <PageHeader
+        title={title}
+        description={description}
+        className={cn('border-b border-subtle/80', titleClassName)}
+      />
+      <div
+        className={cn(
+          'space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)',
+          descriptionClassName
+        )}
+      >
+        {children}
       </div>
-      <div className='space-y-4'>{children}</div>
     </section>
   );
 }

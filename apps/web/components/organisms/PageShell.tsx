@@ -1,10 +1,34 @@
+import type { ReactNode } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 import { cn } from '@/lib/utils';
 
+export const PAGE_SHELL_SURFACE_CLASSNAMES = {
+  workspace:
+    'rounded-[22px] border border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-surface))] shadow-none',
+  document:
+    'rounded-[24px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-surface-elevated)_88%,var(--linear-surface))] shadow-none',
+  inspector:
+    'rounded-[18px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_68%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_86%,var(--linear-surface))] shadow-none',
+  emptyState:
+    'rounded-[24px] border border-dashed border-[color-mix(in_oklab,var(--linear-app-shell-border)_68%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_76%,transparent)] shadow-none',
+  toolbarRail:
+    'rounded-[14px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_70%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] shadow-none',
+  metaRow:
+    'rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_74%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_88%,transparent)] shadow-none',
+} as const;
+
 export interface PageShellProps {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
+  readonly toolbar?: ReactNode;
+  readonly maxWidth?: 'full' | 'wide' | 'reading' | 'form';
+  readonly frame?: 'none' | 'content-container';
+  readonly contentPadding?: 'none' | 'compact' | 'default';
+  readonly scroll?: 'panel' | 'page';
   readonly className?: string;
+  readonly surfaceClassName?: string;
+  readonly contentClassName?: string;
+  readonly 'data-testid'?: string;
 }
 
 /**
@@ -43,14 +67,29 @@ export interface PageShellProps {
  * }
  * ```
  */
-export function PageShell({ children, className }: PageShellProps) {
+export function PageShell({
+  children,
+  toolbar,
+  maxWidth = 'full',
+  frame = 'none',
+  contentPadding = 'none',
+  scroll = 'panel',
+  className,
+  surfaceClassName,
+  contentClassName,
+  'data-testid': testId,
+}: PageShellProps) {
   return (
     <AppShellContentPanel
-      maxWidth='full'
-      frame='none'
-      contentPadding='none'
-      scroll='panel'
+      toolbar={toolbar}
+      maxWidth={maxWidth}
+      frame={frame}
+      contentPadding={contentPadding}
+      scroll={scroll}
       className={className}
+      surfaceClassName={surfaceClassName}
+      contentClassName={contentClassName}
+      data-testid={testId}
     >
       {children}
     </AppShellContentPanel>
@@ -60,12 +99,12 @@ export function PageShell({ children, className }: PageShellProps) {
 export interface PageHeaderProps {
   readonly title: string;
   readonly description?: string;
-  readonly action?: React.ReactNode;
-  readonly breadcrumbs?: React.ReactNode;
+  readonly action?: ReactNode;
+  readonly breadcrumbs?: ReactNode;
   /** Mobile sidebar trigger for dashboard pages */
-  readonly mobileSidebarTrigger?: React.ReactNode;
+  readonly mobileSidebarTrigger?: ReactNode;
   /** Desktop sidebar trigger for dashboard pages */
-  readonly sidebarTrigger?: React.ReactNode;
+  readonly sidebarTrigger?: ReactNode;
   readonly className?: string;
 }
 
@@ -127,7 +166,7 @@ export function PageHeader({
 }
 
 export interface PageContentProps {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
   readonly className?: string;
   /** If true, removes default padding */
   readonly noPadding?: boolean;

@@ -134,29 +134,71 @@ const HEADER_SOCIAL_PRIORITY = [
   'facebook',
 ] as const;
 
-const HEADER_SOCIAL_PRIORITY_INDEX = new Map<string, number>(
-  HEADER_SOCIAL_PRIORITY.map((platform, index) => [platform, index])
-);
+const COUNTRY_HEADER_SOCIAL_PRIORITY: Record<string, readonly string[]> = {
+  BR: ['instagram', 'youtube', 'tiktok', 'twitter', 'facebook'],
+  DE: ['instagram', 'tiktok', 'youtube', 'twitter', 'facebook'],
+  GB: ['instagram', 'tiktok', 'youtube', 'twitter', 'facebook'],
+  JP: ['youtube', 'instagram', 'twitter', 'tiktok', 'facebook'],
+  MX: ['instagram', 'youtube', 'tiktok', 'facebook', 'twitter'],
+  US: ['instagram', 'tiktok', 'youtube', 'twitter', 'facebook'],
+};
 
-function getHeaderPriority(platform: string): number {
-  return HEADER_SOCIAL_PRIORITY_INDEX.get(platform) ?? Number.MAX_SAFE_INTEGER;
+function getPriorityIndexMap(countryCode?: string | null) {
+  const priority =
+    (countryCode
+      ? COUNTRY_HEADER_SOCIAL_PRIORITY[countryCode.toUpperCase()]
+      : null) ?? HEADER_SOCIAL_PRIORITY;
+
+  return new Map(priority.map((platform, index) => [platform, index]));
+}
+
+function getHeaderPriority(
+  platform: string,
+  countryCode?: string | null
+): number {
+  return (
+    getPriorityIndexMap(countryCode).get(platform) ?? Number.MAX_SAFE_INTEGER
+  );
+}
+
+export function sortSocialLinksByGeoPopularity(
+  links: LegacySocialLink[],
+  countryCode?: string | null
+): LegacySocialLink[] {
+  const priorityIndexMap = getPriorityIndexMap(countryCode);
+
+  return [...links].sort((a, b) => {
+    const aPlatform = a.platform?.toLowerCase() ?? '';
+    const bPlatform = b.platform?.toLowerCase() ?? '';
+    const aPriority =
+      priorityIndexMap.get(aPlatform) ?? Number.MAX_SAFE_INTEGER;
+    const bPriority =
+      priorityIndexMap.get(bPlatform) ?? Number.MAX_SAFE_INTEGER;
+
+    if (aPriority !== bPriority) {
+      return aPriority - bPriority;
+    }
+
+    return aPlatform.localeCompare(bPlatform);
+  });
 }
 
 export function getHeaderSocialLinks(
   links: LegacySocialLink[],
-  sourcePlatform: string | null,
+  countryCode?: string | null,
   maxCount = MAX_HEADER_SOCIAL_LINKS
 ): LegacySocialLink[] {
   const seenPlatforms = new Set<string>();
+  const priorityIndexMap = getPriorityIndexMap(countryCode);
 
   return links
     .filter(link => {
       const platform = link.platform?.toLowerCase() ?? '';
-      if (!platform || platform === sourcePlatform) {
+      if (!platform) {
         return false;
       }
 
-      if (!HEADER_SOCIAL_PRIORITY_INDEX.has(platform)) {
+      if (!priorityIndexMap.has(platform)) {
         return false;
       }
 
@@ -171,7 +213,10 @@ export function getHeaderSocialLinks(
       const aPlatform = a.platform?.toLowerCase() ?? '';
       const bPlatform = b.platform?.toLowerCase() ?? '';
 
-      return getHeaderPriority(aPlatform) - getHeaderPriority(bPlatform);
+      return (
+        getHeaderPriority(aPlatform, countryCode) -
+        getHeaderPriority(bPlatform, countryCode)
+      );
     })
     .slice(0, maxCount);
 }
