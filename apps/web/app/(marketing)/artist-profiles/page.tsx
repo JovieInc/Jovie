@@ -5,10 +5,14 @@ import { HeroCinematic } from '@/features/home/HeroCinematic';
 
 export const revalidate = false;
 
+const ARTIST_PROFILES_TITLE = `Artist Profiles | ${APP_NAME}`;
+const ARTIST_PROFILES_DESCRIPTION =
+  'Claim your free artist profile on Jovie. Smart links, fan engagement, and release automation — all in one link-in-bio built for musicians.';
+const ARTIST_PROFILES_URL = `${BASE_URL}/artist-profiles`;
+
 export const metadata: Metadata = {
-  title: `Artist Profiles | ${APP_NAME}`,
-  description:
-    'Claim your free artist profile on Jovie. Smart links, fan engagement, and release automation — all in one link-in-bio built for musicians.',
+  title: ARTIST_PROFILES_TITLE,
+  description: ARTIST_PROFILES_DESCRIPTION,
   keywords: [
     'artist profile',
     'link in bio for musicians',
@@ -20,21 +24,19 @@ export const metadata: Metadata = {
     'artist bio',
   ],
   alternates: {
-    canonical: `${BASE_URL}/artist-profiles`,
+    canonical: ARTIST_PROFILES_URL,
   },
   openGraph: {
-    title: `Artist Profiles | ${APP_NAME}`,
-    description:
-      'Claim your free artist profile on Jovie. Smart links, fan engagement, and release automation — all in one link-in-bio built for musicians.',
-    url: `${BASE_URL}/artist-profiles`,
+    title: ARTIST_PROFILES_TITLE,
+    description: ARTIST_PROFILES_DESCRIPTION,
+    url: ARTIST_PROFILES_URL,
     siteName: APP_NAME,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: `Artist Profiles | ${APP_NAME}`,
-    description:
-      'Claim your free artist profile on Jovie. Smart links, fan engagement, and release automation — all in one link-in-bio built for musicians.',
+    title: ARTIST_PROFILES_TITLE,
+    description: ARTIST_PROFILES_DESCRIPTION,
     creator: '@meetjovie',
     site: '@meetjovie',
   },
