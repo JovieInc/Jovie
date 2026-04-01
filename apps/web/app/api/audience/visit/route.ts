@@ -8,6 +8,7 @@ import {
   isTrackingTokenEnabled,
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
+import { isVisitorBlocked } from '@/lib/audience/block-check';
 import { type DbOrTransaction, db, doesTableExist } from '@/lib/db';
 import { audienceMembers, dailyProfileViews } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -286,6 +287,16 @@ export async function POST(request: NextRequest) {
     }
 
     const fingerprint = createFingerprint(resolvedIpAddress, resolvedUserAgent);
+
+    // Block check: reject visits from blocked fingerprints
+    const blocked = await isVisitorBlocked(profile.id, fingerprint);
+    if (blocked) {
+      return NextResponse.json(
+        { status: 'blocked' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const normalizedDevice =
       deviceType ?? inferDeviceType(resolvedUserAgent ?? null);
     const now = new Date();
