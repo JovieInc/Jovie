@@ -190,6 +190,32 @@
   --shadow-button-inset:
     0px 4px 4px -1px oklch(0% 0 0 / 6%), 0px 1px 1px 0px oklch(0% 0 0 / 12%);
 
+  /* Public profile premium surfaces */
+  --profile-stage-bg: #f2f3f5;
+  --profile-content-bg: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.92),
+    rgba(255, 255, 255, 0.88)
+  );
+  --profile-panel-border: rgba(255, 255, 255, 0.62);
+  --profile-panel-shadow:
+    0 28px 90px rgba(15, 17, 24, 0.14), 0 8px 24px rgba(15, 17, 24, 0.08);
+  --profile-panel-gradient: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.24),
+    rgba(255, 255, 255, 0.04) 22%,
+    transparent 100%
+  );
+  --profile-drawer-bg: rgba(248, 249, 251, 0.9);
+  --profile-drawer-shadow:
+    0 -10px 28px rgba(12, 12, 18, 0.08), 0 -28px 70px rgba(12, 12, 18, 0.18);
+  --profile-drawer-highlight: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.55),
+    rgba(255, 255, 255, 0.06) 42%,
+    transparent 100%
+  );
+
   /* Skeleton/loading states */
   --color-skeleton-base: oklch(
     95% var(--theme-base-chroma) var(--theme-base-hue)
@@ -359,6 +385,32 @@
     rgba(0, 0, 0, 0.04) 0px 3px 2px 0px,
     rgba(0, 0, 0, 0.07) 0px 1px 1px 0px,
     rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
+
+  /* Public profile premium surfaces */
+  --profile-stage-bg: #060709;
+  --profile-content-bg: linear-gradient(
+    180deg,
+    rgba(14, 16, 21, 0.96),
+    rgba(11, 13, 18, 0.92)
+  );
+  --profile-panel-border: rgba(255, 255, 255, 0.08);
+  --profile-panel-shadow:
+    0 40px 120px rgba(0, 0, 0, 0.42), 0 18px 36px rgba(0, 0, 0, 0.22);
+  --profile-panel-gradient: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02) 18%,
+    transparent 100%
+  );
+  --profile-drawer-bg: rgba(16, 18, 24, 0.92);
+  --profile-drawer-shadow:
+    0 -14px 34px rgba(0, 0, 0, 0.26), 0 -32px 100px rgba(0, 0, 0, 0.5);
+  --profile-drawer-highlight: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.12),
+    rgba(255, 255, 255, 0.03) 38%,
+    transparent 100%
+  );
 
   /* Skeleton/loading states */
   --color-skeleton-base: oklch(

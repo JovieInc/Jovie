@@ -34,6 +34,7 @@ export function supportsProfileV2Mode(
 
 export const PROFILE_V2_OVERLAY_MODES = [
   'listen',
+  'tip',
   'subscribe',
   'contact',
 ] as const;

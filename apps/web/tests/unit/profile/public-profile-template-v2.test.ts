@@ -13,19 +13,31 @@ const PUBLIC_PROFILE_TEMPLATE_V2_SOURCE = readFileSync(
   'utf8'
 );
 
-describe('PublicProfileTemplateV2 history handling', () => {
-  it('pushes a new history entry for mode changes', () => {
+describe('PublicProfileTemplateV2 source structure', () => {
+  it('pushes history entries for overlay mode changes', () => {
     expect(PUBLIC_PROFILE_TEMPLATE_V2_SOURCE).toContain('history.pushState');
   });
 
-  it('replaces history for the initial overlay navigation', () => {
-    expect(PUBLIC_PROFILE_TEMPLATE_V2_SOURCE).toContain('history.replaceState');
-  });
-
-  it('syncs active mode from browser back/forward navigation', () => {
+  it('syncs active state from browser back/forward navigation', () => {
     expect(PUBLIC_PROFILE_TEMPLATE_V2_SOURCE).toContain(
       "addEventListener('popstate'"
     );
     expect(PUBLIC_PROFILE_TEMPLATE_V2_SOURCE).toContain('getModeFromLocation');
+  });
+
+  it('scrolls to the tour section for legacy tour mode URLs', () => {
+    expect(PUBLIC_PROFILE_TEMPLATE_V2_SOURCE).toContain('scrollIntoView');
+    expect(PUBLIC_PROFILE_TEMPLATE_V2_SOURCE).toContain(
+      'requestAnimationFrame'
+    );
+  });
+
+  it('removes the swipe-specific V2 composition', () => {
+    expect(PUBLIC_PROFILE_TEMPLATE_V2_SOURCE).not.toContain(
+      'ProfileQuickActions'
+    );
+    expect(PUBLIC_PROFILE_TEMPLATE_V2_SOURCE).not.toContain(
+      'SwipeableModeContainer'
+    );
   });
 });
