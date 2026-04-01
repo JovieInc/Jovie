@@ -47,7 +47,7 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new Error(SESSION_ERRORS.UNAUTHORIZED);
   }
 
   // Validate userId format to prevent SQL injection
@@ -132,7 +132,7 @@ export async function withDbSession<T>(
 ): Promise<T> {
   const { userId } = await setupDbSession(options?.clerkUserId);
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new Error(SESSION_ERRORS.UNAUTHORIZED);
   }
   return operation(userId);
 }
@@ -186,7 +186,7 @@ export async function withDbSessionTx<T>(
 export async function requireAuth() {
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new Error(SESSION_ERRORS.UNAUTHORIZED);
   }
   return userId;
 }

@@ -4,16 +4,16 @@ import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
 
 interface UseDashboardShortcutsOptions {
   /** Callback when shortcuts modal should open (Cmd+/) */
-  onOpenShortcutsModal?: () => void;
+  readonly onOpenShortcutsModal?: () => void;
   /** Whether shortcuts are enabled */
-  enabled?: boolean;
+  readonly enabled?: boolean;
 }
 
 /**
  * Single entry point for all dashboard-level keyboard shortcuts.
  *
- * Composes `useSequentialShortcuts` (G-then-X navigation + Cmd+/)
- * with `useKeyboardShortcuts` (single-key action shortcuts like T for theme).
+ * Wraps `useSequentialShortcuts` for G-then-X navigation shortcuts
+ * and Cmd+/ for the shortcuts modal.
  *
  * Component-level shortcuts (like filter 'F' key) remain in their
  * respective components — this hook handles shell-level shortcuts only.
