@@ -109,7 +109,9 @@ export async function unblockAudienceMember(blockId: string) {
     )
     .returning({ profileId: audienceBlocks.creatorProfileId });
 
-  if (result[0]) {
-    revalidateTag(createAudienceDataTag(result[0].profileId), 'max');
+  if (!result[0]) {
+    throw new Error('Block not found');
   }
+
+  revalidateTag(createAudienceDataTag(result[0].profileId), 'max');
 }

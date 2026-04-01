@@ -163,6 +163,37 @@ describe('POST /api/audience/visit', () => {
     );
   });
 
+  it('returns 403 when visitor is blocked', async () => {
+    const { isVisitorBlocked } = await import('@/lib/audience/block-check');
+    vi.mocked(isVisitorBlocked).mockResolvedValueOnce(true);
+
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'profile_123', isPublic: true }]),
+        }),
+      }),
+    });
+
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.status).toBe('blocked');
+    // Verify no downstream writes occurred
+    expect(mockWithSystemIngestionSession).not.toHaveBeenCalled();
+  });
+
   it('uses the resolved user agent for bot detection', async () => {
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({

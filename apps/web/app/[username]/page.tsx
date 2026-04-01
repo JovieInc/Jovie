@@ -43,6 +43,7 @@ import { isDspPlatform } from '@/lib/services/social-links/types';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringOrFallback, toISOStringSafe } from '@/lib/utils/date';
+import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import {
   USERNAME_MAX_LENGTH,
@@ -614,6 +615,35 @@ export default async function ArtistPage({
     ? true
     : getProfileV2Gate();
 
+  // Block check: redirect blocked visitors to jov.ie before any rendering path.
+  // Must run before listen-mode early return to prevent bypass via ?mode=listen.
+  // Uses fingerprint-only check (no owner skip) since profile isn't loaded yet.
+  if (!isPublicNoAuthSmoke) {
+    const headersList = await headers();
+    const ip = extractClientIP(headersList);
+    const ua = headersList.get('user-agent');
+    const visitorFingerprint = createFingerprint(ip, ua);
+
+    // Resolve profile ID for the block check — uses the cached profile fetch
+    const blockCheckResult = await getCachedProfileAndLinks(username);
+    if (blockCheckResult.status === 'ok' && blockCheckResult.profile) {
+      const { userId: visitorClerkId } = await getCachedAuth();
+      const isOwner =
+        visitorClerkId != null &&
+        visitorClerkId === blockCheckResult.creatorClerkId;
+
+      if (!isOwner) {
+        const blocked = await isVisitorBlocked(
+          blockCheckResult.profile.id,
+          visitorFingerprint
+        );
+        if (blocked) {
+          redirect('https://jov.ie');
+        }
+      }
+    }
+  }
+
   // NOTE: Cookie access removed from server component to enable static optimization.
   // User-specific behavior (isIdentified, spotifyPreferred) is now handled client-side
   // via the StaticArtistPage component which reads cookies on hydration.
@@ -665,26 +695,6 @@ export default async function ArtistPage({
 
   if (!profile) {
     notFound();
-  }
-
-  // Block check: redirect blocked visitors to jov.ie before rendering.
-  // Runs per-request (not cached). Skips if visitor is the profile owner.
-  if (!isPublicNoAuthSmoke) {
-    const headersList = await headers();
-    const ip = headersList.get('x-forwarded-for')?.split(',')[0]?.trim();
-    const ua = headersList.get('user-agent');
-    const visitorFingerprint = createFingerprint(ip, ua);
-
-    const { userId: visitorClerkId } = await getCachedAuth();
-    const isOwner =
-      visitorClerkId != null && visitorClerkId === profileResult.creatorClerkId;
-
-    if (!isOwner) {
-      const blocked = await isVisitorBlocked(profile.id, visitorFingerprint);
-      if (blocked) {
-        redirect('https://jov.ie');
-      }
-    }
   }
 
   // Convert our profile data to the Artist type expected by components
