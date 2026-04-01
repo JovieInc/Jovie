@@ -9,6 +9,7 @@ const ARTIST_PROFILES_TITLE = `Artist Profiles | ${APP_NAME}`;
 const ARTIST_PROFILES_DESCRIPTION =
   'Claim your free artist profile on Jovie. Smart links, fan engagement, and release automation — all in one link-in-bio built for musicians.';
 const ARTIST_PROFILES_URL = `${BASE_URL}/artist-profiles`;
+const ARTIST_PROFILES_OG_IMAGE = `${BASE_URL}/og/default.png`;
 
 export const metadata: Metadata = {
   title: ARTIST_PROFILES_TITLE,
@@ -32,11 +33,22 @@ export const metadata: Metadata = {
     url: ARTIST_PROFILES_URL,
     siteName: APP_NAME,
     type: 'website',
+    images: [
+      {
+        url: ARTIST_PROFILES_OG_IMAGE,
+        secureUrl: ARTIST_PROFILES_OG_IMAGE,
+        width: 1200,
+        height: 630,
+        alt: ARTIST_PROFILES_TITLE,
+        type: 'image/png',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: ARTIST_PROFILES_TITLE,
     description: ARTIST_PROFILES_DESCRIPTION,
+    images: [ARTIST_PROFILES_OG_IMAGE],
     creator: '@meetjovie',
     site: '@meetjovie',
   },

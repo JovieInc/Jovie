@@ -39,29 +39,14 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
               <br />
               Crush Every Release.
             </h1>
-            <p
-              className='mt-5'
-              style={{
-                fontSize: '16px',
-                fontWeight: 400,
-                lineHeight: '24px',
-                letterSpacing: '-0.011em',
-                color: 'rgb(138, 143, 152)',
-              }}
-            >
+            <p className='mt-5 text-base font-normal leading-6 tracking-[-0.011em] text-tertiary-token'>
               Smart links, release automation, and fan insight that keep every
               launch moving.
             </p>
             <div className='mt-6'>
               <Link
                 href='/signup'
-                className='inline-flex items-center justify-center rounded-[4px] text-[13px] font-[510] tracking-normal transition-colors duration-150 hover:brightness-110 focus-ring-themed'
-                style={{
-                  backgroundColor: 'rgb(230, 230, 230)',
-                  color: 'rgb(8, 9, 10)',
-                  padding: '0 16px',
-                  height: '36px',
-                }}
+                className='btn-linear-signup focus-ring-themed h-9 px-4'
               >
                 Get Started Free
               </Link>

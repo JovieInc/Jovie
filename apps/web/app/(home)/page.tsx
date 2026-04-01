@@ -149,36 +149,16 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   sameAs: ['https://instagram.com/meetjovie'],
 });
 
-const heroOnly =
-  !FEATURE_FLAGS.SHOW_PHONE_TOUR &&
-  !FEATURE_FLAGS.SHOW_LOGO_BAR &&
-  !FEATURE_FLAGS.SHOW_FEATURE_SHOWCASE &&
-  !FEATURE_FLAGS.SHOW_FINAL_CTA;
-
 export default function HomePage() {
   return (
-    <div
-      className={
-        heroOnly
-          ? 'relative h-[calc(100dvh-var(--linear-header-height))] overflow-hidden'
-          : 'relative min-h-screen'
-      }
-    >
+    <div className='relative min-h-screen'>
       <AuthRedirectHandler />
 
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      {heroOnly && (
-        <style>
-          {
-            'html,body{overflow:hidden!important;height:100dvh!important}footer{display:none!important}'
-          }
-        </style>
-      )}
-
-      <HeroLinear fullScreen={heroOnly} />
+      <HeroLinear />
 
       <LogoBar />
 
