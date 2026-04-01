@@ -61,6 +61,24 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.3.110] - 2026-03-31
 
+> Expanded Smart Link coverage now includes richer credit and platform metadata so release pages can surface additional providers and improved preview behavior.
+
+### Added
+
+- [internal] Added icon metadata coverage for Genius, Discogs, and AllMusic in DSP icon contrast checks
+
+### Changed
+
+- [internal] Synchronized Smart Link Credits and presence data paths for expanded non-DSP platform coverage
+- [internal] Updated release audio preview and credits sidebar behavior alongside presence UI changes
+
+### Fixed
+
+- [internal] Updated DSP registry completeness test to the new service count
+- [internal] Added regression coverage for icon contrast handling of newly introduced services
+
+## [26.3.110] - 2026-03-31
+
 > Added the Linear-style tasks foundation and unified the app, demo, and onboarding shell framing so pages, drawers, and tables share one consistent layout system.
 
 ### Added
@@ -81,24 +99,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Corrected task query scoping and optimistic task-cache updates so badges, stats, and list/detail caches stay in sync
 
 ## [26.3.109] - 2026-03-31
-
-## [26.3.110] - 2026-03-31
-
-> Expanded Smart Link credits coverage for additional DSP services, redesigned release preview flows, and updated tests for the new DSP registry surface.
-
-### Added
-
-- Added icon metadata coverage for Genius, Discogs, and Allmusic in DSP icon contrast checks
-
-### Changed
-
-- Synchronized Smart Link Credits and presence data paths for expanded non-DSP platform coverage
-- Updated release audio preview and credits sidebar behavior alongside presence UI changes
-
-### Fixed
-
-- Updated DSP registry completeness test to the new service count
-- Added regression coverage for icon contrast handling of newly introduced services
 
 > Fixed duplicate platform icons and truncated names on the DSP Presence page, plus added screen-reader description to the Add Platform dialog.
 

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import type { SmartLinkCreditGroup as CreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import {
   DrawerPropertyRow,
   DrawerSurfaceCard,
@@ -9,20 +10,6 @@ import {
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
 import { fetchReleaseCreditsAction } from './release-credits-action';
-
-interface CreditEntry {
-  artistId: string;
-  name: string;
-  handle: string | null;
-  role: string;
-  position: number;
-}
-
-interface CreditGroup {
-  role: string;
-  label: string;
-  entries: CreditEntry[];
-}
 
 const LABEL_CLASSNAME =
   'text-[10px] font-[500] leading-[13px] tracking-[0.01em] text-quaternary-token';
@@ -32,8 +19,7 @@ const ROW_CLASSNAME = 'rounded-none px-0 py-1 first:pt-0 last:pb-0';
 
 export function ReleaseCreditsSection({
   releaseId,
-  variant = 'card',
-}: Readonly<{ releaseId: string; variant?: 'card' | 'flat' }>) {
+}: Readonly<{ releaseId: string }>) {
   const [credits, setCredits] = useState<CreditGroup[] | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -66,11 +52,7 @@ export function ReleaseCreditsSection({
 
   return (
     <DrawerSurfaceCard
-      variant={variant}
-      className={cn(
-        variant === 'card' && LINEAR_SURFACE.drawerCardSm,
-        'overflow-hidden'
-      )}
+      className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
       testId='release-credits-card'
     >
       <div className='p-3'>

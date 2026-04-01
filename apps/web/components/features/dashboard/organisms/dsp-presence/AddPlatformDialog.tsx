@@ -14,23 +14,15 @@ import {
   PROVIDER_LABELS,
 } from '@/features/dashboard/atoms/DspProviderIcon';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
+import {
+  DSP_PROVIDER_IDS,
+  DSP_PROVIDER_PLACEHOLDERS,
+} from '@/lib/dsp-provider-metadata';
 import { cn } from '@/lib/utils';
 
-const ALL_PROVIDERS: DspProviderId[] = [
-  'spotify',
-  'apple_music',
-  'deezer',
-  'youtube_music',
-  'tidal',
-  'soundcloud',
-  'amazon_music',
-  'musicbrainz',
-  'genius',
-  'discogs',
-  'allmusic',
-];
+const ALL_PROVIDERS: readonly DspProviderId[] = [...DSP_PROVIDER_IDS];
 
-const PROVIDER_PLACEHOLDERS: Record<DspProviderId, string> = {
+const PROVIDER_PLACEHOLDERS = {
   spotify: 'https://open.spotify.com/artist/...',
   apple_music: 'https://music.apple.com/artist/...',
   deezer: 'https://www.deezer.com/artist/...',
@@ -39,10 +31,17 @@ const PROVIDER_PLACEHOLDERS: Record<DspProviderId, string> = {
   soundcloud: 'https://soundcloud.com/...',
   amazon_music: 'https://music.amazon.com/artists/...',
   musicbrainz: 'https://musicbrainz.org/artist/...',
-  genius: 'https://genius.com/artists/...',
-  discogs: 'https://www.discogs.com/artist/...',
-  allmusic: 'https://www.allmusic.com/artist/...',
-};
+} as Record<DspProviderId, string>;
+
+if (DSP_PROVIDER_PLACEHOLDERS.genius) {
+  PROVIDER_PLACEHOLDERS.genius = DSP_PROVIDER_PLACEHOLDERS.genius;
+}
+if (DSP_PROVIDER_PLACEHOLDERS.discogs) {
+  PROVIDER_PLACEHOLDERS.discogs = DSP_PROVIDER_PLACEHOLDERS.discogs;
+}
+if (DSP_PROVIDER_PLACEHOLDERS.allmusic) {
+  PROVIDER_PLACEHOLDERS.allmusic = DSP_PROVIDER_PLACEHOLDERS.allmusic;
+}
 
 interface AddPlatformDialogProps {
   readonly open: boolean;

@@ -15,6 +15,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { PROVIDER_COLORS } from '@/features/dashboard/atoms/DspProviderIcon';
+import { DSP_PROVIDER_SOCIAL_ICONS } from '@/lib/dsp-provider-metadata';
 import {
   contrastRatio,
   darkenHex,
@@ -110,22 +112,21 @@ const SOCIAL_ICONS: Record<string, { hex: string }> = {
   rumble: { hex: '85C742' },
   twitch: { hex: '9146FF' },
   tidal: { hex: '000000' },
+  ...Object.fromEntries(
+    Object.entries(DSP_PROVIDER_SOCIAL_ICONS).map(([providerId, metadata]) => [
+      providerId,
+      { hex: metadata.hex },
+    ])
+  ),
 };
 
 /** DSP provider colors (mirrored from DspProviderIcon.tsx PROVIDER_COLORS). */
-const DSP_ICONS: Record<string, { hex: string }> = {
-  spotify: { hex: '1DB954' },
-  apple_music: { hex: 'FA243C' },
-  deezer: { hex: 'FEAA2D' },
-  youtube_music: { hex: 'FF0000' },
-  tidal: { hex: '000000' },
-  soundcloud: { hex: 'FF5500' },
-  amazon_music: { hex: '00A8E1' },
-  musicbrainz: { hex: 'BA478F' },
-  genius: { hex: 'FFFF64' },
-  discogs: { hex: '333333' },
-  allmusic: { hex: 'E0344B' },
-};
+const DSP_ICONS: Record<string, { hex: string }> = Object.fromEntries(
+  Object.entries(PROVIDER_COLORS).map(([provider, color]) => [
+    provider,
+    { hex: String(color).replace(/^#/, '') },
+  ])
+);
 
 // ---------------------------------------------------------------------------
 // WCAG thresholds
