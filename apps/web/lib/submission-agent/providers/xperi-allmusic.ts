@@ -1,5 +1,6 @@
 import { serverFetch } from '@/lib/http/server-fetch';
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import { logger } from '@/lib/utils/logger';
 import {
   validateSubmissionImageAsset,
   validateXperiArtworkAttachment,
@@ -112,6 +113,12 @@ async function materializeAttachment(
   });
 
   if (!response.ok) {
+    logger.warn('Attachment download failed', {
+      filename: attachment.filename,
+      status: response.status,
+      statusText: response.statusText,
+      url: attachment.blobUrl,
+    });
     throw new Error(
       `Failed to download attachment ${attachment.filename}: ${response.status}`
     );

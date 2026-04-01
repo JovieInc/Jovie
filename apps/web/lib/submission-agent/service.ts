@@ -687,8 +687,12 @@ export async function getMetadataSubmissionStatus(params: {
         artifact => artifact.requestId === request.id && artifact.textBody
       )
       .flatMap(artifact => {
+        if (typeof artifact.textBody !== 'string') {
+          return [];
+        }
+
         try {
-          return [JSON.parse(artifact.textBody!) as SubmissionMissingField];
+          return [JSON.parse(artifact.textBody) as SubmissionMissingField];
         } catch {
           return [];
         }

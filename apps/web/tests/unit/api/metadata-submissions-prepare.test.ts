@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   getCachedAuthMock: vi.fn(),
+  getCurrentUserEntitlementsMock: vi.fn(),
   verifyOwnershipMock: vi.fn(),
   prepareMock: vi.fn(),
   captureErrorMock: vi.fn(),
@@ -9,6 +10,10 @@ const hoisted = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: hoisted.getCachedAuthMock,
+}));
+
+vi.mock('@/lib/entitlements/server', () => ({
+  getCurrentUserEntitlements: hoisted.getCurrentUserEntitlementsMock,
 }));
 
 vi.mock('@/lib/submission-agent/service', () => ({
@@ -24,6 +29,10 @@ describe('POST /api/metadata-submissions/prepare', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'clerk_123' });
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
+      isAdmin: false,
+      canAccessMetadataSubmissionAgent: true,
+    });
     hoisted.verifyOwnershipMock.mockResolvedValue({ id: 'profile_123' });
     hoisted.prepareMock.mockResolvedValue({
       canonical: { artistName: 'Test Artist' },
@@ -76,5 +85,27 @@ describe('POST /api/metadata-submissions/prepare', () => {
     );
 
     expect(response.status).toBe(404);
+  });
+
+  it('returns 403 when the user plan cannot access metadata submissions', async () => {
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
+      isAdmin: false,
+      canAccessMetadataSubmissionAgent: false,
+    });
+
+    const { POST } = await import(
+      '@/app/api/metadata-submissions/prepare/route'
+    );
+
+    const response = await POST(
+      new Request('http://localhost/api/metadata-submissions/prepare', {
+        method: 'POST',
+        body: JSON.stringify({
+          profileId: '11111111-1111-4111-8111-111111111111',
+        }),
+      })
+    );
+
+    expect(response.status).toBe(403);
   });
 });

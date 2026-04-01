@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   getCachedAuthMock: vi.fn(),
+  getCurrentUserEntitlementsMock: vi.fn(),
   getAuthenticatedSubmissionRequestMock: vi.fn(),
   approveAndQueueMetadataSubmissionMock: vi.fn(),
   processQueuedMetadataSubmissionsMock: vi.fn(),
@@ -11,6 +12,10 @@ const hoisted = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: hoisted.getCachedAuthMock,
+}));
+
+vi.mock('@/lib/entitlements/server', () => ({
+  getCurrentUserEntitlements: hoisted.getCurrentUserEntitlementsMock,
 }));
 
 vi.mock('@/lib/submission-agent/service', () => ({
@@ -34,6 +39,10 @@ describe('POST /api/metadata-submissions/approve-send', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'clerk_123' });
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
+      isAdmin: false,
+      canAccessMetadataSubmissionAgent: true,
+    });
     hoisted.getAuthenticatedSubmissionRequestMock.mockResolvedValue({
       request: {
         id: '33333333-3333-4333-8333-333333333333',
@@ -95,5 +104,87 @@ describe('POST /api/metadata-submissions/approve-send', () => {
     const payload = await response.json();
     expect(payload.error).toContain('awaiting approval');
     expect(hoisted.captureErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when the user is not authenticated', async () => {
+    hoisted.getCachedAuthMock.mockResolvedValue({ userId: null });
+
+    const { POST } = await import(
+      '@/app/api/metadata-submissions/approve-send/route'
+    );
+
+    const response = await POST(
+      new Request('http://localhost/api/metadata-submissions/approve-send', {
+        method: 'POST',
+        body: JSON.stringify({
+          requestId: '33333333-3333-4333-8333-333333333333',
+          confirmSend: true,
+        }),
+      })
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 400 when the request body is invalid', async () => {
+    const { POST } = await import(
+      '@/app/api/metadata-submissions/approve-send/route'
+    );
+
+    const response = await POST(
+      new Request('http://localhost/api/metadata-submissions/approve-send', {
+        method: 'POST',
+        body: JSON.stringify({
+          confirmSend: true,
+        }),
+      })
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it('returns 403 when the user plan cannot access metadata submissions', async () => {
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
+      isAdmin: false,
+      canAccessMetadataSubmissionAgent: false,
+    });
+
+    const { POST } = await import(
+      '@/app/api/metadata-submissions/approve-send/route'
+    );
+
+    const response = await POST(
+      new Request('http://localhost/api/metadata-submissions/approve-send', {
+        method: 'POST',
+        body: JSON.stringify({
+          requestId: '33333333-3333-4333-8333-333333333333',
+          confirmSend: true,
+        }),
+      })
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it('returns 404 when the submission request is not found', async () => {
+    hoisted.getAuthenticatedSubmissionRequestMock.mockResolvedValue(null);
+
+    const { POST } = await import(
+      '@/app/api/metadata-submissions/approve-send/route'
+    );
+
+    const response = await POST(
+      new Request('http://localhost/api/metadata-submissions/approve-send', {
+        method: 'POST',
+        body: JSON.stringify({
+          requestId: '33333333-3333-4333-8333-333333333333',
+          confirmSend: true,
+        }),
+      })
+    );
+
+    expect(response.status).toBe(404);
+    const payload = await response.json();
+    expect(payload.error).toBe('Submission request not found');
   });
 });

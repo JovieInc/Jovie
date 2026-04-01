@@ -39,7 +39,7 @@ const canonical = {
 
 describe('AllMusic provider helpers', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it('skips mismatched search results and keeps the canonical AllMusic targets', async () => {

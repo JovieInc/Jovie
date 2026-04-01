@@ -96,10 +96,15 @@ export function buildXperiReleaseSheetAttachment(
   const worksheet = utils.aoa_to_sheet(rows);
   const workbook = utils.book_new();
   utils.book_append_sheet(workbook, worksheet, 'AlbumTrack');
-  const buffer = write(workbook, {
+  const workbookBuffer = write(workbook, {
     bookType: 'xlsx',
     type: 'buffer',
-  }) as Buffer;
+  });
+  if (!Buffer.isBuffer(workbookBuffer)) {
+    throw new TypeError('Expected xlsx write to return a Buffer');
+  }
+
+  const buffer = workbookBuffer;
   const contentBase64 = buffer.toString('base64');
 
   return {

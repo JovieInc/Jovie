@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { processQueuedMetadataSubmissions } from '@/lib/submission-agent/send-worker';
 import {
@@ -19,6 +20,21 @@ export async function POST(request: Request) {
     const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const entitlements = await getCurrentUserEntitlements();
+    if (
+      !entitlements.isAdmin &&
+      !entitlements.canAccessMetadataSubmissionAgent
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Metadata submission workflows require a Pro plan. Upgrade to unlock this feature.',
+        },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
