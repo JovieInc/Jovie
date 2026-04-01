@@ -71,6 +71,7 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
             fill
             sizes='(max-width: 768px) 100vw, (max-width: 1200px) 96vw, 1200px'
             priority
+            fetchPriority='high'
             quality={85}
             className='object-cover object-top'
           />

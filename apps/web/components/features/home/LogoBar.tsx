@@ -28,7 +28,7 @@ export function LogoBar() {
         />
 
         <div className='flex flex-col items-center justify-center py-6 md:py-8'>
-          <p className='mb-5 text-center text-[11px] tracking-[0.06em] uppercase text-quaternary-token'>
+          <p className='mb-5 text-center text-[11px] tracking-[0.06em] uppercase text-tertiary-token'>
             Trusted by artists on
           </p>
 
