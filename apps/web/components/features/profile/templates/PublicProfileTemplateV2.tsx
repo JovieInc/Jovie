@@ -19,7 +19,6 @@ import { ArtistHero } from '@/features/profile/ProfileHeroCard';
 import { ProfileScrollBody } from '@/features/profile/ProfileScrollBody';
 import { ProfileViewportShell } from '@/features/profile/ProfileViewportShell';
 import { resolveProfileV2Presentation } from '@/features/profile/profile-v2-presentation';
-import { SubscribeDrawer } from '@/features/profile/SubscribeDrawer';
 import { TipDrawer } from '@/features/profile/TipDrawer';
 import { extractVenmoUsername } from '@/features/profile/utils/venmo';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
@@ -110,6 +109,7 @@ export function PublicProfileTemplateV2({
   const [activeOverlay, setActiveOverlay] =
     useState<ProfileV2OverlayMode>(null);
   const [historyMode, setHistoryMode] = useState<ProfileMode>(mode);
+  const subscribeSectionRef = useRef<HTMLElement | null>(null);
   const tourSectionRef = useRef<HTMLElement | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const mergedDSPs = useMemo(
@@ -188,6 +188,22 @@ export function PublicProfileTemplateV2({
     };
   }, [prefersReducedMotion]);
 
+  const scrollToSubscribeSection = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const subscribeSection = subscribeSectionRef.current;
+    if (!subscribeSection) {
+      return;
+    }
+
+    subscribeSection.scrollIntoView({
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  }, [prefersReducedMotion]);
+
   const applyRequestedMode = useCallback(
     (nextMode: ProfileMode) => {
       setHistoryMode(nextMode);
@@ -204,8 +220,16 @@ export function PublicProfileTemplateV2({
       if (nextOverlay === 'tip' && !venmoLink) {
         nextOverlay = null;
       }
+      if (nextMode === 'subscribe') {
+        nextOverlay = null;
+      }
 
       setActiveOverlay(nextOverlay);
+
+      if (nextMode === 'subscribe') {
+        scrollToSubscribeSection();
+        return undefined;
+      }
 
       if (presentation.scrollTarget === 'tour' && tourDates.length > 0) {
         return scrollToTourSection();
@@ -216,6 +240,7 @@ export function PublicProfileTemplateV2({
     [
       hasContacts,
       mergedDSPs.length,
+      scrollToSubscribeSection,
       scrollToTourSection,
       tourDates.length,
       venmoLink,
@@ -264,9 +289,12 @@ export function PublicProfileTemplateV2({
     return getHeaderSocialLinks(socialLinks, sourcePlatform, 4);
   }, [socialLinks]);
 
-  const primaryActionKind = useMemo(() => {
-    const featuredContent = resolveFeaturedContent(tourDates, latestRelease);
+  const featuredContent = useMemo(
+    () => resolveFeaturedContent(tourDates, latestRelease),
+    [latestRelease, tourDates]
+  );
 
+  const primaryActionKind = useMemo(() => {
     if (featuredContent.kind === 'tour') {
       return 'tickets' as const;
     }
@@ -276,7 +304,7 @@ export function PublicProfileTemplateV2({
     }
 
     return 'subscribe' as const;
-  }, [latestRelease, mergedDSPs.length, tourDates]);
+  }, [featuredContent.kind, mergedDSPs.length]);
 
   const setOverlayState = useCallback((nextOverlay: ProfileV2OverlayMode) => {
     setActiveOverlay(nextOverlay);
@@ -285,16 +313,20 @@ export function PublicProfileTemplateV2({
 
   const handlePlayClick = useCallback(() => {
     if (mergedDSPs.length === 0) {
-      setOverlayState('subscribe');
+      setHistoryMode('subscribe');
+      setActiveOverlay(null);
+      scrollToSubscribeSection();
       return;
     }
 
     setOverlayState('listen');
-  }, [mergedDSPs.length, setOverlayState]);
+  }, [mergedDSPs.length, scrollToSubscribeSection, setOverlayState]);
 
   const handleBellClick = useCallback(() => {
-    setOverlayState('subscribe');
-  }, [setOverlayState]);
+    setHistoryMode('subscribe');
+    setActiveOverlay(null);
+    scrollToSubscribeSection();
+  }, [scrollToSubscribeSection]);
 
   const handleContactClick = useCallback(() => {
     if (!hasContacts) {
@@ -314,12 +346,7 @@ export function PublicProfileTemplateV2({
 
   const primaryAction = useMemo(() => {
     switch (primaryActionKind) {
-      case 'tickets': {
-        const featuredContent = resolveFeaturedContent(
-          tourDates,
-          latestRelease
-        );
-
+      case 'tickets':
         return {
           label: 'Get Tickets',
           href:
@@ -329,40 +356,23 @@ export function PublicProfileTemplateV2({
           external:
             featuredContent.kind === 'tour' &&
             Boolean(featuredContent.tourDate.ticketUrl),
+          // When no external ticket URL exists, ProfileHeroCard renders a
+          // button and uses this handler to jump down to the tour section.
           onClick: () => {
             setHistoryMode('tour');
             void scrollToTourSection();
           },
           ariaLabel: `Get tickets for ${artist.name}`,
         };
-      }
       case 'listen':
-        return {
-          label: 'Listen Now',
-          onClick: handlePlayClick,
-          ariaLabel: `Listen to ${artist.name}`,
-        };
+        return null;
       case 'subscribe':
       default:
-        return {
-          label: 'Get Notified',
-          onClick: handleBellClick,
-          ariaLabel: `Get notified about ${artist.name}`,
-        };
+        return null;
     }
-  }, [
-    artist.name,
-    handleBellClick,
-    handlePlayClick,
-    latestRelease,
-    primaryActionKind,
-    scrollToTourSection,
-    tourDates,
-  ]);
+  }, [artist.name, featuredContent, primaryActionKind, scrollToTourSection]);
 
   const heroSpotlight = useMemo(() => {
-    const featuredContent = resolveFeaturedContent(tourDates, latestRelease);
-
     if (featuredContent.kind === 'tour') {
       return {
         label: 'Next show',
@@ -393,7 +403,7 @@ export function PublicProfileTemplateV2({
           ? `${mergedDSPs.length} platforms`
           : artist.handle,
     };
-  }, [artist.handle, latestRelease, mergedDSPs.length, tourDates]);
+  }, [artist.handle, featuredContent, mergedDSPs.length]);
 
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
@@ -429,7 +439,9 @@ export function PublicProfileTemplateV2({
             tourDates={tourDates}
             hasTip={Boolean(venmoLink)}
             primaryActionKind={primaryActionKind}
-            onSubscribeClick={handleBellClick}
+            subscribeTwoStep={subscribeTwoStep}
+            subscribeSectionRef={subscribeSectionRef}
+            subscribeModeActive={historyMode === 'subscribe'}
             onTipClick={handleTipClick}
             onContactClick={handleContactClick}
             tourSectionRef={tourSectionRef}
@@ -456,13 +468,6 @@ export function PublicProfileTemplateV2({
             venmoUsername={venmoUsername}
           />
         ) : null}
-
-        <SubscribeDrawer
-          open={activeOverlay === 'subscribe'}
-          onOpenChange={open => setOverlayState(open ? 'subscribe' : null)}
-          artist={artist}
-          subscribeTwoStep={subscribeTwoStep}
-        />
 
         {hasContacts ? (
           <ContactDrawer

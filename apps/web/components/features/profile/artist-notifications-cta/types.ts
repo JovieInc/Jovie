@@ -12,4 +12,14 @@ export interface ArtistNotificationsCTAProps {
    * Used for /handle/subscribe route.
    */
   readonly autoOpen?: boolean;
+  /**
+   * When true, keep the subscription form visible instead of rendering the
+   * listen fallback CTA.
+   */
+  readonly forceExpanded?: boolean;
+  /**
+   * When true, suppress the inline listen fallback for conversion-first
+   * profile surfaces.
+   */
+  readonly hideListenFallback?: boolean;
 }

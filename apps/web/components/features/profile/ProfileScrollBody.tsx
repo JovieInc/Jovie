@@ -5,9 +5,10 @@ import { type RefObject, useMemo, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { SocialLink } from '@/components/molecules/SocialLink';
 import {
-  ProfileFeaturedCard,
-  resolveFeaturedContent,
-} from '@/features/profile/ProfileFeaturedCard';
+  ArtistNotificationsCTA,
+  TwoStepNotificationsCTA,
+} from '@/features/profile/artist-notifications-cta';
+import { ProfileFeaturedCard } from '@/features/profile/ProfileFeaturedCard';
 import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import type { AvailableDSP } from '@/lib/dsp';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
@@ -35,7 +36,9 @@ interface ProfileScrollBodyProps {
   readonly tourDates: TourDateViewModel[];
   readonly hasTip: boolean;
   readonly primaryActionKind: PrimaryActionKind;
-  readonly onSubscribeClick: () => void;
+  readonly subscribeTwoStep?: boolean;
+  readonly subscribeSectionRef: RefObject<HTMLElement | null>;
+  readonly subscribeModeActive?: boolean;
   readonly onTipClick: () => void;
   readonly onContactClick: () => void;
   readonly tourSectionRef: RefObject<HTMLElement | null>;
@@ -318,24 +321,39 @@ function UtilityRail({
 }
 
 function SubscribeSection({
-  onSubscribeClick,
+  artist,
+  subscribeTwoStep = false,
+  subscribeSectionRef,
+  subscribeModeActive = false,
 }: {
-  readonly onSubscribeClick: () => void;
+  readonly artist: Artist;
+  readonly subscribeTwoStep?: boolean;
+  readonly subscribeSectionRef: RefObject<HTMLElement | null>;
+  readonly subscribeModeActive?: boolean;
 }) {
   return (
-    <section aria-labelledby='profile-subscribe-heading' className='space-y-3'>
-      <SectionLabel>Notify</SectionLabel>
+    <section
+      ref={subscribeSectionRef}
+      aria-labelledby='profile-subscribe-heading'
+      className='space-y-3'
+    >
+      <SectionLabel>Get Notified</SectionLabel>
       <div
         id='profile-subscribe-heading'
         className='rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] px-5 py-4 shadow-[0_16px_50px_rgba(0,0,0,0.12)]'
       >
-        <button
-          type='button'
-          className='inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-4 py-2.5 text-sm font-[590] text-primary-foreground transition-opacity hover:opacity-90'
-          onClick={onSubscribeClick}
-        >
-          Get notified
-        </button>
+        {subscribeTwoStep ? (
+          <TwoStepNotificationsCTA artist={artist} />
+        ) : (
+          <ArtistNotificationsCTA
+            key={subscribeModeActive ? 'subscribe-focus' : 'subscribe-default'}
+            artist={artist}
+            variant='button'
+            autoOpen={true}
+            forceExpanded={true}
+            hideListenFallback={true}
+          />
+        )}
       </div>
     </section>
   );
@@ -350,14 +368,13 @@ export function ProfileScrollBody({
   genres,
   tourDates,
   hasTip,
-  primaryActionKind,
-  onSubscribeClick,
+  subscribeTwoStep = false,
+  subscribeSectionRef,
+  subscribeModeActive = false,
   onTipClick,
   onContactClick,
   tourSectionRef,
 }: ProfileScrollBodyProps) {
-  const featuredContent = resolveFeaturedContent(tourDates, latestRelease);
-  const hasFeaturedContent = featuredContent.kind !== 'fallback';
   const hasContacts = contacts.length > 0;
 
   return (
@@ -366,22 +383,35 @@ export function ProfileScrollBody({
       aria-label='Artist profile'
     >
       <div className='space-y-7 px-5 pb-[max(env(safe-area-inset-bottom),28px)] pt-6 md:space-y-8 md:px-7 md:pb-8 md:pt-7'>
-        {hasFeaturedContent ? (
+        <SubscribeSection
+          artist={artist}
+          subscribeTwoStep={subscribeTwoStep}
+          subscribeSectionRef={subscribeSectionRef}
+          subscribeModeActive={subscribeModeActive}
+        />
+
+        {latestRelease ? (
           <section
             aria-labelledby='profile-featured-heading'
             className='space-y-3'
           >
-            <SectionLabel>Featured</SectionLabel>
+            <SectionLabel>Latest Release</SectionLabel>
             <div id='profile-featured-heading'>
               <ProfileFeaturedCard
                 artist={artist}
                 latestRelease={latestRelease}
-                tourDates={tourDates}
+                tourDates={[]}
                 dsps={mergedDSPs}
               />
             </div>
           </section>
         ) : null}
+
+        <TourSection
+          artist={artist}
+          tourDates={tourDates}
+          tourSectionRef={tourSectionRef}
+        />
 
         <UtilityRail
           hasTip={hasTip}
@@ -391,16 +421,7 @@ export function ProfileScrollBody({
         />
 
         <ArtistBioSection artist={artist} genres={genres} />
-        <TourSection
-          artist={artist}
-          tourDates={tourDates}
-          tourSectionRef={tourSectionRef}
-        />
         <SocialLinksSection artist={artist} socialLinks={socialLinks} />
-
-        {primaryActionKind !== 'subscribe' ? (
-          <SubscribeSection onSubscribeClick={onSubscribeClick} />
-        ) : null}
       </div>
     </main>
   );

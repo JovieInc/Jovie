@@ -296,8 +296,14 @@ function FormFooter({
 function shouldShowFallbackCTA(
   notificationsEnabled: boolean,
   notificationsState: string,
-  autoOpen: boolean
+  autoOpen: boolean,
+  forceExpanded: boolean,
+  hideListenFallback: boolean
 ): boolean {
+  if (hideListenFallback || forceExpanded) {
+    return false;
+  }
+
   return !notificationsEnabled || (notificationsState === 'idle' && !autoOpen);
 }
 
@@ -305,10 +311,21 @@ function shouldShowFallbackCTA(
 function isSubscribeFormVisible(
   notificationsEnabled: boolean,
   notificationsState: string,
-  autoOpen: boolean
+  autoOpen: boolean,
+  forceExpanded: boolean,
+  hideListenFallback: boolean
 ): boolean {
-  if (shouldShowFallbackCTA(notificationsEnabled, notificationsState, autoOpen))
+  if (
+    shouldShowFallbackCTA(
+      notificationsEnabled,
+      notificationsState,
+      autoOpen,
+      forceExpanded,
+      hideListenFallback
+    )
+  ) {
     return false;
+  }
   return (
     notificationsState !== 'success' &&
     notificationsState !== 'pending_confirmation'
@@ -319,6 +336,8 @@ export function ArtistNotificationsCTA({
   artist,
   variant = 'link',
   autoOpen = false,
+  forceExpanded = false,
+  hideListenFallback = false,
 }: ArtistNotificationsCTAProps) {
   const {
     country,
@@ -366,7 +385,9 @@ export function ArtistNotificationsCTA({
   const showsSubscribeForm = isSubscribeFormVisible(
     notificationsEnabled,
     notificationsState,
-    autoOpen
+    autoOpen,
+    forceExpanded,
+    hideListenFallback
   );
   useImpressionTracking(showsSubscribeForm, artist.handle, variant);
 
@@ -386,7 +407,13 @@ export function ArtistNotificationsCTA({
   }
 
   if (
-    shouldShowFallbackCTA(notificationsEnabled, notificationsState, autoOpen)
+    shouldShowFallbackCTA(
+      notificationsEnabled,
+      notificationsState,
+      autoOpen,
+      forceExpanded,
+      hideListenFallback
+    )
   ) {
     return <ListenNowCTA variant={variant} handle={artist.handle} />;
   }

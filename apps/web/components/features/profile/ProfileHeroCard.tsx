@@ -15,13 +15,13 @@ interface ArtistHeroProps {
   readonly artist: Artist;
   readonly heroImageUrl?: string | null;
   readonly latestRelease?: HeroRelease | null;
-  readonly primaryAction: {
+  readonly primaryAction?: {
     readonly label: string;
     readonly href?: string | null;
     readonly external?: boolean;
     readonly onClick?: () => void;
     readonly ariaLabel?: string;
-  };
+  } | null;
   readonly onPlayClick: () => void;
   readonly onBellClick: () => void;
   readonly spotlightLabel?: string | null;
@@ -60,22 +60,6 @@ export function ArtistHero({
   primaryActionKind = 'listen',
 }: ArtistHeroProps) {
   const eyebrow = getReleaseEyebrow(latestRelease);
-  const secondaryAction =
-    primaryActionKind === 'listen'
-      ? {
-          label: 'Get Notified',
-          icon: <Bell className='mr-2 h-4 w-4' aria-hidden='true' />,
-          onClick: onBellClick,
-          ariaLabel: `Get notified about ${artist.name}`,
-        }
-      : {
-          label: 'Listen',
-          icon: (
-            <Play className='mr-2 h-4 w-4 fill-current' aria-hidden='true' />
-          ),
-          onClick: onPlayClick,
-          ariaLabel: `Listen to ${artist.name}`,
-        };
   const primaryActionClassName =
     'inline-flex min-h-12 items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-[590] text-black shadow-[0_18px_45px_rgba(0,0,0,0.34)] transition-[transform,opacity] duration-200 hover:opacity-92 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
 
@@ -137,52 +121,47 @@ export function ArtistHero({
           </div>
 
           <div className='flex flex-wrap items-center gap-3'>
-            {primaryAction.href ? (
-              <a
-                href={primaryAction.href}
-                target={primaryAction.external ? '_blank' : undefined}
-                rel={primaryAction.external ? 'noopener noreferrer' : undefined}
-                aria-label={primaryAction.ariaLabel ?? primaryAction.label}
-                className={primaryActionClassName}
-              >
-                {primaryActionKind === 'tickets' ? (
-                  <Ticket className='mr-2 h-4 w-4' aria-hidden='true' />
-                ) : (
-                  <Play
-                    className='mr-2 h-4 w-4 fill-current'
-                    aria-hidden='true'
-                  />
-                )}
-                {primaryAction.label}
-              </a>
-            ) : (
-              <button
-                type='button'
-                onClick={primaryAction.onClick}
-                aria-label={primaryAction.ariaLabel ?? primaryAction.label}
-                className={primaryActionClassName}
-              >
-                {primaryActionKind === 'tickets' ? (
-                  <Ticket className='mr-2 h-4 w-4' aria-hidden='true' />
-                ) : (
-                  <Play
-                    className='mr-2 h-4 w-4 fill-current'
-                    aria-hidden='true'
-                  />
-                )}
-                {primaryAction.label}
-              </button>
-            )}
-
             <button
               type='button'
-              onClick={secondaryAction.onClick}
+              onClick={onPlayClick}
               className='inline-flex min-h-12 items-center justify-center rounded-full border border-white/12 bg-white/8 px-5 py-3 text-sm font-[590] text-white/90 backdrop-blur-md transition-[background-color,border-color,color] hover:border-white/20 hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
-              aria-label={secondaryAction.ariaLabel}
+              aria-label={`Listen to ${artist.name}`}
             >
-              {secondaryAction.icon}
-              {secondaryAction.label}
+              <Play className='mr-2 h-4 w-4 fill-current' aria-hidden='true' />
+              Play
             </button>
+
+            {primaryAction ? (
+              primaryAction.href ? (
+                <a
+                  href={primaryAction.href}
+                  target={primaryAction.external ? '_blank' : undefined}
+                  rel={
+                    primaryAction.external ? 'noopener noreferrer' : undefined
+                  }
+                  onClick={primaryAction.onClick}
+                  aria-label={primaryAction.ariaLabel ?? primaryAction.label}
+                  className={primaryActionClassName}
+                >
+                  {primaryActionKind === 'tickets' ? (
+                    <Ticket className='mr-2 h-4 w-4' aria-hidden='true' />
+                  ) : null}
+                  {primaryAction.label}
+                </a>
+              ) : (
+                <button
+                  type='button'
+                  onClick={primaryAction.onClick}
+                  aria-label={primaryAction.ariaLabel ?? primaryAction.label}
+                  className={primaryActionClassName}
+                >
+                  {primaryActionKind === 'tickets' ? (
+                    <Ticket className='mr-2 h-4 w-4' aria-hidden='true' />
+                  ) : null}
+                  {primaryAction.label}
+                </button>
+              )
+            ) : null}
           </div>
         </div>
       </div>

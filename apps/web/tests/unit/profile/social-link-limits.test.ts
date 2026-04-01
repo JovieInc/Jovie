@@ -95,7 +95,7 @@ describe('context-aware link ordering', () => {
     ]);
   });
 
-  it('caps header social links to four high-priority platforms and excludes the source platform', () => {
+  it('caps header social links at four high-priority platforms and excludes the source platform', () => {
     const links = [
       createLink('1', 'twitter', 'https://x.com/artist'),
       createLink('2', 'instagram', 'https://instagram.com/artist'),

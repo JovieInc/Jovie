@@ -22,9 +22,11 @@ vi.mock('@/features/profile/ProfileHeroCard', () => ({
       <button type='button' onClick={onBellClick}>
         Bell
       </button>
-      <button type='button' onClick={primaryAction.onClick}>
-        {primaryAction.label}
-      </button>
+      {primaryAction ? (
+        <button type='button' onClick={primaryAction.onClick}>
+          {primaryAction.label}
+        </button>
+      ) : null}
     </div>
   ),
 }));
@@ -32,20 +34,18 @@ vi.mock('@/features/profile/ProfileHeroCard', () => ({
 vi.mock('@/features/profile/ProfileScrollBody', () => ({
   ProfileScrollBody: ({
     tourSectionRef,
+    subscribeSectionRef,
     onTipClick,
     onContactClick,
-    onSubscribeClick,
   }: any) => (
     <main>
+      <section ref={subscribeSectionRef}>Subscribe Section</section>
       <section ref={tourSectionRef}>Tour Section</section>
       <button type='button' onClick={onTipClick}>
         Tip
       </button>
       <button type='button' onClick={onContactClick}>
         Contact
-      </button>
-      <button type='button' onClick={onSubscribeClick}>
-        Subscribe
       </button>
     </main>
   ),
@@ -75,12 +75,6 @@ vi.mock('@/features/profile/ListenDrawer', () => ({
 vi.mock('@/features/profile/TipDrawer', () => ({
   TipDrawer: ({ open }: { open: boolean }) => (
     <div data-testid='tip-drawer'>{open ? 'open' : 'closed'}</div>
-  ),
-}));
-
-vi.mock('@/features/profile/SubscribeDrawer', () => ({
-  SubscribeDrawer: ({ open }: { open: boolean }) => (
-    <div data-testid='subscribe-drawer'>{open ? 'open' : 'closed'}</div>
   ),
 }));
 
@@ -205,7 +199,7 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     });
   });
 
-  it('maps legacy subscribe mode to the subscribe drawer', async () => {
+  it('maps legacy subscribe mode to the inline subscribe section', async () => {
     render(
       <PublicProfileTemplateV2
         mode='subscribe'
@@ -217,7 +211,8 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('subscribe-drawer')).toHaveTextContent('open');
+      expect(window.location.search).toContain('mode=subscribe');
+      expect(scrollIntoViewMock).toHaveBeenCalled();
     });
   });
 
@@ -281,7 +276,7 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     });
   });
 
-  it('opens the subscribe drawer when Play is tapped without DSP links', async () => {
+  it('routes Play to inline subscribe when no DSP links exist', async () => {
     mockMergedDSPs.length = 0;
 
     render(
@@ -297,8 +292,8 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Play' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('subscribe-drawer')).toHaveTextContent('open');
       expect(window.location.search).toContain('mode=subscribe');
+      expect(scrollIntoViewMock).toHaveBeenCalled();
     });
 
     mockMergedDSPs.push({ key: 'spotify' });
