@@ -60,12 +60,15 @@ export {
 export { useAudienceInfiniteQuery } from './audience-infinite';
 // Cache strategy presets
 export {
+  FREQUENT_BACKGROUND_CACHE,
   FREQUENT_CACHE,
   PAGINATED_CACHE,
   REALTIME_CACHE,
+  RETRY_BACKOFF,
   SEARCH_CACHE,
   STABLE_CACHE,
   STANDARD_CACHE,
+  STANDARD_NO_REMOUNT_CACHE,
   STATIC_CACHE,
 } from './cache-strategies';
 // Fetch utilities (Edge-compatible)
