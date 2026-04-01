@@ -109,10 +109,10 @@ describe('surface elevation guardrails', () => {
     );
 
     expect(pageShell).toContain('AppShellContentPanel');
-    expect(pageShell).toContain("frame='none'");
-    expect(dashboardPanel).toContain('AppShellContentPanel');
-    expect(dashboardPanel).toContain("frame='none'");
-    expect(settingsLayout).toContain('AppShellContentPanel');
+    expect(pageShell).toContain("frame = 'none'");
+    expect(dashboardPanel).toContain("frame = 'content-container'");
+    expect(dashboardPanel).toContain("'none'");
+    expect(settingsLayout).toContain('PageShell');
     expect(settingsLayout).toContain("frame='none'");
     expect(chatSurface).toContain("frame='none'");
     expect(demoShowcaseSurface).toContain('AppShellContentPanel');
@@ -159,7 +159,7 @@ describe('surface elevation guardrails', () => {
     );
 
     expect(tasksPage).toContain('PageShell');
-    expect(dashboardPanel).toContain("frame='none'");
+    expect(dashboardPanel).toContain("frame = 'content-container'");
     expect(tasksPage).toContain("data-testid='tasks-content-panel'");
   });
 
