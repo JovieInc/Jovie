@@ -131,7 +131,7 @@ export function RightDrawer({
           : 'transition-none',
         'overflow-hidden',
         isOpen
-          ? 'visible opacity-100 lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) bg-surface-0 shadow-[var(--linear-app-drawer-shadow)]'
+          ? 'visible opacity-100 bg-surface-0'
           : 'opacity-0 pointer-events-none invisible bg-transparent',
         className
       )}

@@ -210,7 +210,7 @@ export const cardTokens = {
  * drawers, and popovers retain the stronger floating treatment.
  */
 const elevatedSidebarCardShadow =
-  'shadow-[0_10px_28px_-22px_rgba(0,0,0,0.6),0_1px_0_rgba(255,255,255,0.03)_inset]';
+  'shadow-[0_1px_2px_rgba(0,0,0,0.06),0_3px_8px_-2px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_3px_8px_-2px_rgba(0,0,0,0.22)]';
 
 export const LINEAR_SURFACE = {
   /** Drawer section card — border-separated section inside sidebars. */

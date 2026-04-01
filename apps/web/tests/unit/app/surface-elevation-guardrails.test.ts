@@ -243,11 +243,14 @@ describe('surface elevation guardrails', () => {
     );
     expect(linearTokens).toContain('--linear-app-sidebar-shadow:');
     expect(rightDrawer).toContain('bg-surface-0');
-    expect(rightDrawer).toContain(
+    // Mobile overlay retains shadow; desktop drawer is flat so elevation
+    // comes from DrawerSurfaceCard cards inside the shell, not the outer aside.
+    expect(rightDrawer).toContain('shadow-[var(--linear-app-drawer-shadow)]');
+    // Desktop-only classes: no border, no radius — flat inline sidebar
+    expect(rightDrawer).not.toContain(
       'lg:rounded-[var(--linear-app-shell-radius)]'
     );
-    expect(rightDrawer).toContain('lg:border');
-    expect(rightDrawer).toContain('shadow-[var(--linear-app-drawer-shadow)]');
+    expect(rightDrawer).not.toContain('lg:border');
     expect(adminTableShell).toContain('bg-surface-1/96');
   });
 
