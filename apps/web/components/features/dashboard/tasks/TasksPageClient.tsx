@@ -303,61 +303,67 @@ function TaskTitleCellContent({
   onOpenRelease: (task: TaskView) => void;
   artistName?: string | null;
 }>) {
+  const hasDueDate = Boolean(task.dueAt);
+  const hasRelease = Boolean(task.releaseTitle);
+  
   return (
-    <div className='min-w-0 py-1'>
-      <div className='flex min-w-0 items-start gap-3'>
-        <div className='shrink-0 pt-0.5'>
-          <ProgressRing status={task.status} />
-        </div>
-        <div className='min-w-0 flex-1'>
-          <p className='truncate text-[12.75px] font-[570] leading-[17px] text-primary-token'>
-            {task.title}
-          </p>
-          <div className='mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] text-secondary-token'>
-            <span className='shrink-0 font-[560] text-tertiary-token'>
+    <div className='flex min-w-0 items-start gap-3 py-1.5'>
+      <div className='flex h-[18px] w-8 shrink-0 items-center justify-center'>
+        <ProgressRing status={task.status} />
+      </div>
+      <div className='min-w-0 flex-1'>
+        <p className='truncate text-[12.75px] font-[570] leading-[18px] text-primary-token'>
+          {task.title}
+        </p>
+        <div className='mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1'>
+          {/* Fixed metadata section - always present */}
+          <div className='flex items-center gap-2 text-[10.5px]'>
+            <span className='font-[560] text-tertiary-token'>
               J-{task.taskNumber}
             </span>
-            <span className='inline-flex items-center gap-1'>
-              <Flag className='h-3 w-3 text-tertiary-token' />
-              <PriorityCell priority={task.priority} compact />
-            </span>
-            <span className='inline-flex items-center gap-1'>
-              <AssigneeCell
-                assigneeKind={task.assigneeKind}
-                artistName={artistName}
-                compact
+            <span className='text-tertiary-token/40'>·</span>
+            <PriorityCell priority={task.priority} compact />
+            <span className='text-tertiary-token/40'>·</span>
+            <AssigneeCell
+              assigneeKind={task.assigneeKind}
+              artistName={artistName}
+              compact
+            />
+          </div>
+          
+          {/* Optional metadata - only show when present */}
+          {hasDueDate && (
+            <div className='flex items-center gap-2 text-[10.5px]'>
+              <span className='text-tertiary-token/40'>·</span>
+              <ReleaseTaskDueBadge
+                dueDate={task.dueAt!}
+                dueDaysOffset={null}
+                isCompleted={task.status === 'done'}
               />
-            </span>
-            {task.dueAt ? (
-              <span className='inline-flex items-center gap-1'>
-                <CalendarDays className='h-3 w-3 text-tertiary-token' />
-                <ReleaseTaskDueBadge
-                  dueDate={task.dueAt}
-                  dueDaysOffset={null}
-                  isCompleted={task.status === 'done'}
-                />
-              </span>
-            ) : null}
-            {task.releaseTitle ? (
+            </div>
+          )}
+          
+          {hasRelease && (
+            <div className='flex min-w-0 items-center gap-2 text-[10.5px] text-secondary-token'>
+              <span className='text-tertiary-token/40'>·</span>
               <button
                 type='button'
                 onClick={event => {
                   event.stopPropagation();
                   onOpenRelease(task);
                 }}
-                className='inline-flex min-w-0 items-center gap-1 rounded-full px-1.5 py-0.5 transition-colors hover:bg-surface-1 hover:text-primary-token'
+                className='truncate transition-colors hover:text-primary-token'
               >
-                <Disc3 className='h-3 w-3 text-tertiary-token' />
-                <span className='truncate'>{task.releaseTitle}</span>
+                {task.releaseTitle}
               </button>
-            ) : null}
-          </div>
-          {task.description ? (
-            <p className='truncate pt-1 text-[11px] leading-[15px] text-secondary-token'>
-              {task.description}
-            </p>
-          ) : null}
+            </div>
+          )}
         </div>
+        {task.description ? (
+          <p className='mt-1 truncate text-[11px] leading-[15px] text-secondary-token/70'>
+            {task.description}
+          </p>
+        ) : null}
       </div>
     </div>
   );
