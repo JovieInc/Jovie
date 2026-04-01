@@ -9,6 +9,7 @@ import {
 } from '@jovie/ui';
 import { ArrowUp, ImagePlus, Loader2, Mic, MicOff, Plus } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useTheme } from 'next-themes';
 import {
   forwardRef,
   useCallback,
@@ -270,6 +271,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     const [plusMenuOpen, setPlusMenuOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
+    const { resolvedTheme } = useTheme();
+    const isDark = resolvedTheme === 'dark';
 
     const isCompact = variant === 'compact';
     const maxHeight = isCompact ? 128 : 192;
@@ -353,22 +356,24 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const borderRadius = 24;
 
     // Shadow states
-    let boxShadow =
-      '0 1px 0 rgba(255,255,255,0.72), 0 10px 22px -20px rgba(15,23,42,0.42)';
+    let boxShadow = isDark
+      ? '0 2px 8px -4px rgba(0,0,0,0.28)'
+      : '0 2px 8px -4px rgba(15,23,42,0.07)';
     if (isOverLimit) {
       boxShadow = 'none';
     } else if (isExpanded) {
-      boxShadow =
-        '0 1px 0 rgba(255,255,255,0.65), 0 18px 34px -28px rgba(15,23,42,0.45)';
+      boxShadow = isDark
+        ? '0 4px 16px -6px rgba(0,0,0,0.32)'
+        : '0 4px 16px -6px rgba(15,23,42,0.09)';
     }
 
     // Border style by state
-    let borderClass = 'border-black/6 dark:border-white/8';
+    let borderClass = 'border-black/6 dark:border-white/[0.07]';
     if (isOverLimit) {
       borderClass =
         'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20';
     } else if (isExpanded) {
-      borderClass = 'border-black/8 bg-surface-0 dark:border-white/10';
+      borderClass = 'border-black/8 bg-surface-0 dark:border-white/[0.09]';
     }
 
     return (
