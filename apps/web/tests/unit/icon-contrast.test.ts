@@ -55,11 +55,11 @@ const SURFACES = {
     'surface-3': '#e6e6e6',
   },
   dark: {
-    base: '#090909',
-    'surface-0': '#090909',
-    'surface-1': '#101012',
-    'surface-2': '#1b1d21',
-    'surface-3': '#21242a',
+    base: '#08090a',
+    'surface-0': '#0f1011',
+    'surface-1': '#17171a',
+    'surface-2': '#23252a',
+    'surface-3': '#2a2c32',
   },
 } as const;
 
@@ -176,7 +176,7 @@ function socialLinkColors(
   }
 
   // hover and active: mirrors SocialLink.tsx hoverColor logic
-  const hoverBg = isDark ? '#101012' : '#fcfcfc';
+  const hoverBg = isDark ? '#17171a' : '#fcfcfc';
   const effectiveColor =
     isDark && isBrandDark(brandHex)
       ? '#ffffff'
@@ -201,7 +201,7 @@ function dspIconColors(
   surface: 'surface-1' | 'surface-2'
 ): ColorPair {
   const isDark = theme === 'dark';
-  const bgHex = isDark ? '#101012' : '#fcfcfc';
+  const bgHex = isDark ? '#17171a' : '#fcfcfc';
   const effectiveColor =
     isDark && isBrandDark(`#${brandHex}`)
       ? '#ffffff'

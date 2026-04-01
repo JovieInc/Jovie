@@ -47,6 +47,12 @@ describe('RightDrawer', () => {
 
     expect(aside).toHaveAttribute('aria-hidden', 'false');
     expect(aside).toHaveStyle({ width: '360px' });
+    expect(aside).toHaveClass(
+      'lg:border',
+      'lg:rounded-[var(--linear-app-shell-radius)]',
+      'bg-surface-0',
+      'shadow-[var(--linear-app-drawer-shadow)]'
+    );
   });
 
   it('calls keyboard handler only when focus is inside the drawer', () => {
@@ -109,7 +115,12 @@ describe('RightDrawer', () => {
     );
 
     const mobileAside = screen.getByLabelText('Responsive drawer');
-    expect(mobileAside).toHaveClass('fixed', 'inset-0', 'translate-x-full');
+    expect(mobileAside).toHaveClass(
+      'fixed',
+      'inset-0',
+      'translate-x-full',
+      'bg-surface-0'
+    );
 
     rerender(
       <RightDrawer isOpen={true} width={360} ariaLabel='Responsive drawer'>
@@ -129,7 +140,10 @@ describe('RightDrawer', () => {
     const desktopAside = screen.getByLabelText('Responsive drawer');
     expect(desktopAside).toHaveClass(
       'transition-[width,opacity]',
-      'opacity-100'
+      'opacity-100',
+      'lg:border',
+      'lg:rounded-[var(--linear-app-shell-radius)]',
+      'bg-surface-0'
     );
     expect(desktopAside).toHaveStyle({ width: '420px' });
     expect(mockUseBreakpointDown).toHaveBeenCalledWith('lg');

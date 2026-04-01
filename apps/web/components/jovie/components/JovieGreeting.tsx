@@ -32,10 +32,7 @@ export function JovieGreeting({
   if (variant === 'inline') {
     return (
       <div className={cn('mx-auto max-w-[34rem] text-center', className)}>
-        <p className='text-[11px] font-[560] tracking-[0.01em] text-tertiary-token'>
-          {greeting.label}
-        </p>
-        <p className='mt-1 text-balance text-[13px] leading-6 text-secondary-token'>
+        <p className='text-balance text-[12.5px] leading-5 text-secondary-token sm:text-[13px]'>
           {greeting.body}{' '}
           {greeting.profileHref && greeting.profileLabel ? (
             <>

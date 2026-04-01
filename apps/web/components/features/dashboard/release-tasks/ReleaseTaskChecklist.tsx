@@ -111,7 +111,14 @@ export function ReleaseTaskChecklist({
   // Empty state
   if (!tasks || tasks.length === 0) {
     return (
-      <div className={variant === 'compact' ? 'px-2 py-2' : ''}>
+      <div
+        className={variant === 'compact' ? 'px-2 py-2' : ''}
+        data-testid={
+          variant === 'compact'
+            ? 'release-task-empty-state-compact'
+            : 'release-task-empty-state'
+        }
+      >
         {isPastRelease(releaseDate) ? (
           <ReleaseTaskPastReleaseState
             onSetUpAnyway={() => instantiate.mutate()}
@@ -133,6 +140,7 @@ export function ReleaseTaskChecklist({
         'space-y-1',
         isCompact && 'flex h-full min-h-0 flex-col space-y-0'
       )}
+      data-testid={isCompact ? undefined : 'release-task-checklist'}
     >
       {/* Progress bar + optional link to full page */}
       <div className='flex shrink-0 items-center gap-2 px-4 py-2'>

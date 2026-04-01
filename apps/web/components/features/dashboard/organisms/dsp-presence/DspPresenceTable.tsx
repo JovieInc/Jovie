@@ -158,8 +158,9 @@ export function DspPresenceTable({
       hideHeader
       enableVirtualization={false}
       rowHeight={44}
+      minWidth='720px'
       className='text-[12.5px] text-primary-token'
-      containerClassName='h-full px-2.5 pb-2.5 pt-1 md:px-3 md:pb-3 md:pt-1.5'
+      containerClassName='h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
     />
   );
 }

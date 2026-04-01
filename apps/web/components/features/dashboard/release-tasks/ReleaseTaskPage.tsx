@@ -54,7 +54,10 @@ export function ReleaseTaskPage({
   };
 
   return (
-    <div className='mx-auto max-w-2xl px-4 py-6'>
+    <div
+      className='mx-auto max-w-2xl px-4 py-6'
+      data-testid='release-task-page'
+    >
       {/* Breadcrumb */}
       <nav className='mb-4 text-[12px] text-tertiary-token'>
         <span className='hover:text-secondary-token cursor-pointer'>
@@ -74,7 +77,7 @@ export function ReleaseTaskPage({
           <h3 className='px-4 text-[11px] font-medium uppercase tracking-wider text-tertiary-token mb-2'>
             Up Next
           </h3>
-          <div className='rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'>
+          <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1'>
             {upNextTasks.map(task => (
               <ReleaseTaskRow
                 key={task.id}

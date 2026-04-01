@@ -98,6 +98,7 @@ function ReleaseTypeBadges({ release }: { readonly release: Release }) {
 interface ReleaseMetadataProps {
   readonly release: Release;
   readonly onCanvasStatusChange?: (status: CanvasStatus) => void;
+  readonly variant?: 'card' | 'flat';
 }
 
 function formatCopyrightLine(line: string, symbol: '℗' | '©'): string {
@@ -136,6 +137,7 @@ function MetadataFallbackValue({ children }: { readonly children: string }) {
 export function ReleaseMetadata({
   release,
   onCanvasStatusChange,
+  variant = 'card',
 }: ReleaseMetadataProps) {
   const canvasStatus: CanvasStatus = release.canvasStatus ?? 'not_set';
   const selectionStatus: CanvasStatus =
@@ -147,7 +149,11 @@ export function ReleaseMetadata({
 
   return (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
+      variant={variant}
+      className={cn(
+        variant === 'card' && LINEAR_SURFACE.drawerCardSm,
+        'overflow-hidden'
+      )}
       testId='release-metadata-card'
     >
       <div className='p-3'>

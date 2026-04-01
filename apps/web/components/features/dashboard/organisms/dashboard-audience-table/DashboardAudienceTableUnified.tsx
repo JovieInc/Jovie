@@ -739,6 +739,7 @@ export const DashboardAudienceTableUnified = memo(
                         hasNextPage={hasNextPage}
                         isFetchingNextPage={isFetchingNextPage}
                         onLoadMore={onLoadMore}
+                        containerClassName='h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
                       />
                     </div>
                   </>

@@ -15,10 +15,11 @@ import {
   SidebarMenu,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { env } from '@/lib/env-client';
 import { useCodeFlag } from '@/lib/feature-flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
+import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   adminNavigationSections,
   artistSettingsNavigation,
@@ -97,8 +98,10 @@ export function DashboardNav(_: DashboardNavProps) {
   // Replace "Profile" label with artist display name when available
   const artistName = selectedProfile?.displayName;
   const profileId = selectedProfile?.id ?? '';
-
-  const isDemo = pathname === APP_ROUTES.DEMO;
+  const isDemo = isDemoRoutePath(pathname);
+  const { data: taskStats } = useTaskStatsQuery(profileId, {
+    enabled: !isDemo,
+  });
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
 
   // Settings nav: "General" (user) and artist name (or "Artist") groups
@@ -106,8 +109,25 @@ export function DashboardNav(_: DashboardNavProps) {
 
   // Memoize nav sections for dashboard (non-settings) mode
   const navSections = useMemo(
-    () => [{ key: 'primary', items: primaryNavigation }],
-    []
+    () => [
+      {
+        key: 'primary',
+        items: primaryNavigation.map(item =>
+          item.id === 'tasks'
+            ? {
+                ...item,
+                badge:
+                  taskStats && taskStats.activeTodoCount > 0
+                    ? taskStats.activeTodoCount > 99
+                      ? '99+'
+                      : taskStats.activeTodoCount
+                    : undefined,
+              }
+            : item
+        ),
+      },
+    ],
+    [taskStats]
   );
 
   // Profile nav item opens the preview drawer instead of navigating to a separate page.
@@ -163,6 +183,7 @@ export function DashboardNav(_: DashboardNavProps) {
 
       // In demo mode, only Releases has real content — intercept all other nav clicks
       const demoUnavailable = isDemo && !isReleasesItem;
+      const renderAsButton = isProfileItem && !demoUnavailable;
       let onClick: (() => void) | undefined;
       if (demoUnavailable) onClick = () => handleDemoNavClick(item);
       else if (isProfileItem) onClick = handleProfileClick;
@@ -176,6 +197,8 @@ export function DashboardNav(_: DashboardNavProps) {
           prefetch={isReleasesItem ? false : undefined}
           actions={isProfileItem ? profileActions : null}
           onClick={onClick}
+          preventNavigation={demoUnavailable}
+          renderAsButton={renderAsButton}
           onNavigate={
             isReleasesItem ? () => showPendingShell('releases') : undefined
           }

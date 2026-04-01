@@ -156,4 +156,18 @@ describe('ProfileCompletionRedirect', () => {
 
     expect(mockReplace).toHaveBeenCalledWith('/onboarding');
   });
+
+  it('does NOT redirect admins when their profile is incomplete', () => {
+    mockReplace.mockClear();
+    renderGuard({
+      ...baseDashboardData,
+      isAdmin: true,
+      selectedProfile: {
+        ...baseDashboardData.selectedProfile!,
+        isPublic: false,
+      },
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
 });

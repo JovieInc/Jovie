@@ -168,7 +168,7 @@ export function DemoReleasesPanel({
                     className={cn(
                       'flex h-[32px] cursor-pointer items-center gap-3 border-b border-(--linear-app-frame-seam) px-4 text-app',
                       isSelected &&
-                        'bg-accent/8 shadow-[inset_2px_0_0_var(--color-accent)]',
+                        'bg-[color-mix(in_oklab,var(--linear-row-selected)_20%,transparent)] shadow-[inset_2px_0_0_var(--color-accent)]',
                       isFocused && !isSelected && 'bg-surface-2',
                       !isSelected && !isFocused && ''
                     )}

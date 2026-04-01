@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
+import Script from 'next/script';
 import React from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import './globals.css';
@@ -197,7 +198,13 @@ export default async function RootLayout({
       data-scroll-behavior='smooth'
       suppressHydrationWarning
     >
-      <head />
+      <head>
+        <Script
+          id='theme-init'
+          src='/theme-init.js'
+          strategy='beforeInteractive'
+        />
+      </head>
       <body className={bodyClassName}>
         {FlagBadgeProvider ? (
           <FlagBadgeProvider>{content}</FlagBadgeProvider>

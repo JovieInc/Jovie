@@ -23,6 +23,7 @@ const RANGE_OPTIONS: { value: AnalyticsRange; label: string }[] = [
 
 interface ProfileSmartLinkAnalyticsProps {
   readonly profileUrl: string;
+  readonly variant?: 'card' | 'flat';
 }
 
 function ProfileSmartLinkControl({
@@ -78,6 +79,7 @@ function ProfileSmartLinkControl({
 
 export function ProfileSmartLinkAnalytics({
   profileUrl,
+  variant = 'card',
 }: ProfileSmartLinkAnalyticsProps) {
   const [range] = useState<AnalyticsRange>('30d');
   const { data, isLoading, isFetching, isError } = useDashboardAnalyticsQuery({
@@ -93,11 +95,8 @@ export function ProfileSmartLinkAnalytics({
   const currentRangeLabel =
     RANGE_OPTIONS.find(o => o.value === range)?.label ?? '30 days';
 
-  return (
-    <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
-      testId='profile-smart-link-analytics'
-    >
+  const content = (
+    <>
       {/* Analytics metrics */}
       <div className='px-3 pb-3 pt-3'>
         {showSkeleton && (
@@ -149,6 +148,19 @@ export function ProfileSmartLinkAnalytics({
       <div className='px-3 pb-3 pt-0'>
         <ProfileSmartLinkControl profileUrl={profileUrl} />
       </div>
+    </>
+  );
+
+  if (variant === 'flat') {
+    return <div data-testid='profile-smart-link-analytics'>{content}</div>;
+  }
+
+  return (
+    <DrawerSurfaceCard
+      className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
+      testId='profile-smart-link-analytics'
+    >
+      {content}
     </DrawerSurfaceCard>
   );
 }

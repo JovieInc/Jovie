@@ -1,15 +1,20 @@
 'use client';
 
+import type { CommonDropdownItem } from '@jovie/ui';
 import type { LucideIcon } from 'lucide-react';
-import { MoreVertical, X } from 'lucide-react';
+import { MoreVertical } from 'lucide-react';
 import Link from 'next/link';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
+import {
+  appendCloseActionMenuItem,
+  commonDropdownItemsToTableActionMenuItems,
+} from '@/components/molecules/drawer/menu-items';
 import { cn } from '@/lib/utils';
 
 export const DRAWER_HEADER_ICON_BUTTON_CLASSNAME =
-  'h-7 w-7 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-none hover:bg-surface-0 focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 active:bg-surface-1';
+  'h-7 w-7 rounded-full border border-(--linear-app-frame-seam) bg-surface-1 shadow-[var(--linear-app-drawer-shadow)] hover:bg-surface-1 focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 active:bg-surface-1';
 
 export interface DrawerHeaderAction {
   readonly id: string;
@@ -28,6 +33,7 @@ export interface DrawerHeaderAction {
 export interface DrawerHeaderActionsProps {
   readonly primaryActions: DrawerHeaderAction[]; // Max 2, shown inline
   readonly overflowActions?: DrawerHeaderAction[]; // Rest in ellipsis menu
+  readonly menuItems?: readonly CommonDropdownItem[]; // Shared menu items, usually from contextMenuItems
   readonly onClose?: () => void;
 }
 
@@ -38,6 +44,7 @@ export interface DrawerHeaderActionsProps {
 export function DrawerHeaderActions({
   primaryActions,
   overflowActions = [],
+  menuItems,
   onClose,
 }: DrawerHeaderActionsProps) {
   // Ensure max 2 primary actions
@@ -58,20 +65,14 @@ export function DrawerHeaderActions({
           : () => {}),
     }));
 
-  const menuItems: TableActionMenuItem[] = onClose
-    ? [
-        ...baseMenuItems,
-        ...(baseMenuItems.length > 0
-          ? [{ id: 'separator-close', label: '' }]
-          : []),
-        {
-          id: 'close-drawer',
-          label: 'Close',
-          icon: X,
-          onClick: onClose,
-        },
-      ]
-    : baseMenuItems;
+  const resolvedBaseMenuItems: TableActionMenuItem[] =
+    menuItems && menuItems.length > 0
+      ? commonDropdownItemsToTableActionMenuItems(menuItems)
+      : baseMenuItems;
+  const resolvedMenuItems = appendCloseActionMenuItem(
+    resolvedBaseMenuItems,
+    onClose
+  );
 
   return (
     <div className='flex items-center gap-0.5'>
@@ -143,8 +144,8 @@ export function DrawerHeaderActions({
       })}
 
       {/* Overflow menu - only shown if there are overflow actions */}
-      {menuItems.length > 0 && (
-        <TableActionMenu items={menuItems} trigger='custom' align='end'>
+      {resolvedMenuItems.length > 0 && (
+        <TableActionMenu items={resolvedMenuItems} trigger='custom' align='end'>
           <AppIconButton
             className={cn(
               DRAWER_HEADER_ICON_BUTTON_CLASSNAME,

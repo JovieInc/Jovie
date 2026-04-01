@@ -1078,14 +1078,19 @@ useQuery({
 
 #### Surface Elevation Rules (Card/Background Consistency)
 
-The main content area (`<main>`) uses `bg-(--linear-app-content-surface)` which maps to `surface-1` (white in light, #17171a in dark). All card-like elements inside it must create visible contrast.
+The main content area (`<main>`) uses `bg-(--linear-app-content-surface)`, a dedicated shell canvas tone. In dark mode it must stay distinct from both recessed wells (`bg-surface-0`) and shared cards (`bg-surface-1`).
 
 **Allowed patterns:**
-- Card on surface-1 parent → use `bg-surface-0` for recessed/"well" look (e.g., skeleton containers, empty states)
+- Card on app-shell canvas parent → use `bg-surface-1` for shared cards and panels
+- Recessed/"well" element inside the shell or a card → use `bg-surface-0` (e.g., skeleton containers, empty states, input wells)
+- Sticky shell chrome (toolbars, table headers, shell frame) → use `bg-(--linear-app-content-surface)`
 - Card with elevation → use `Card` component as-is (has `bg-surface-1 border border-subtle shadow-card`)
 - Nested card inside card → use `bg-surface-0` for the inner element
+- Table/workspace routes → wrap the primary content in `DashboardWorkspacePanel` plus a bordered `LINEAR_SURFACE.contentContainer`; do not render route content directly on the shell canvas
 
 **Banned patterns (will cause invisible cards):**
+- `bg-(--linear-app-content-surface)` on card-like elements inside the shell unless the element is shell chrome (toolbar/header/frame)
+- Table/task routes that place their main list or empty state directly on the shell canvas instead of inside a framed content container
 - `bg-surface-1` on elements inside a `surface-1` parent WITHOUT border+shadow — same color on same color
 - `bg-surface-1/XX` (semi-transparent) — low opacity surface-1 on surface-1 parent is nearly invisible
 - `Card className='border-0 shadow-none'` — strips all elevation from a surface-1 card, making it invisible on surface-1 parent

@@ -9,7 +9,7 @@ import {
 } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import { type ReactNode, useCallback, useMemo } from 'react';
+import { type MouseEvent, type ReactNode, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
   SidebarMenuBadge,
@@ -29,8 +29,12 @@ interface NavMenuItemProps {
   readonly actions?: ReactNode;
   readonly children?: ReactNode;
   readonly onNavigate?: () => void;
-  /** When provided, renders a button instead of a link */
+  /** Optional click side effect for links or buttons */
   readonly onClick?: () => void;
+  /** When true, keeps link markup but prevents navigation on click */
+  readonly preventNavigation?: boolean;
+  /** When true, renders a button instead of a link */
+  readonly renderAsButton?: boolean;
   /** Hover/focus prefetch handler — wired by DashboardNav, not this component */
   readonly onPrefetch?: () => void;
 }
@@ -89,6 +93,8 @@ export function NavMenuItem({
   children,
   onNavigate,
   onClick,
+  preventNavigation = false,
+  renderAsButton = false,
   onPrefetch,
 }: NavMenuItemProps) {
   // Memoize tooltip to prevent creating new objects on every render,
@@ -131,18 +137,31 @@ export function NavMenuItem({
     </>
   );
 
+  const handleButtonClick = useCallback(() => {
+    onNavigate?.();
+    onClick?.();
+  }, [onClick, onNavigate]);
+
+  const handleLinkClick = useCallback(
+    (event: MouseEvent<HTMLAnchorElement>) => {
+      if (preventNavigation) {
+        event.preventDefault();
+      }
+      onNavigate?.();
+      onClick?.();
+    },
+    [onClick, onNavigate, preventNavigation]
+  );
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <SidebarMenuItem>
           <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
-            {onClick ? (
+            {renderAsButton ? (
               <button
                 type='button'
-                onClick={() => {
-                  onNavigate?.();
-                  onClick();
-                }}
+                onClick={handleButtonClick}
                 onMouseDown={onPrefetch}
                 onMouseEnter={onPrefetch}
                 onFocus={onPrefetch}
@@ -155,11 +174,12 @@ export function NavMenuItem({
               <Link
                 href={item.href}
                 prefetch={prefetch}
-                onClick={onNavigate}
+                onClick={handleLinkClick}
                 onMouseDown={onPrefetch}
                 onMouseEnter={onPrefetch}
                 onFocus={onPrefetch}
                 aria-current={isActive ? 'page' : undefined}
+                aria-disabled={preventNavigation || undefined}
                 className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
               >
                 {innerContent}

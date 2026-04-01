@@ -54,8 +54,8 @@ describe('Badge', () => {
         </Badge>
       );
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('bg-(--linear-success)/15');
-      expect(badge.className).toContain('text-(--linear-success)');
+      expect(badge.className).toContain('bg-(--color-success-subtle)');
+      expect(badge.className).toContain('text-success');
     });
 
     it('applies warning variant', () => {
@@ -65,8 +65,8 @@ describe('Badge', () => {
         </Badge>
       );
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('bg-(--linear-warning)/15');
-      expect(badge.className).toContain('text-(--linear-warning)');
+      expect(badge.className).toContain('bg-(--color-warning-subtle)');
+      expect(badge.className).toContain('text-warning');
     });
 
     it('applies error variant', () => {
@@ -76,8 +76,8 @@ describe('Badge', () => {
         </Badge>
       );
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('bg-(--linear-error)/15');
-      expect(badge.className).toContain('text-(--linear-error)');
+      expect(badge.className).toContain('bg-(--color-error-subtle)');
+      expect(badge.className).toContain('text-error');
     });
   });
 

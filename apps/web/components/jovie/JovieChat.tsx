@@ -8,14 +8,13 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
-import { useInsightsSummaryQuery, usePlanGate } from '@/lib/queries';
+import { usePlanGate } from '@/lib/queries';
 
 import {
   ChatInput,
   ChatMessage,
   ChatMessageSkeleton,
   ErrorDisplay,
-  JovieGreeting,
   ScrollToBottom,
   SuggestedProfilesCarousel,
   SuggestedPrompts,
@@ -77,7 +76,7 @@ export function JovieChat({
   isFirstSession: isFirstSessionProp = false,
   latestReleaseTitle: latestReleaseTitleProp = null,
 }: JovieChatProps) {
-  const { profileCompletion, tippingStats } = useDashboardData();
+  const { profileCompletion } = useDashboardData();
   const { aiCanUseTools } = usePlanGate();
   const initialQuerySubmitted = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
@@ -98,29 +97,6 @@ export function JovieChat({
     latestReleaseTitleProp,
     profileId
   );
-  const shouldLoadInsightSuggestions =
-    Boolean(profileId) &&
-    !isFirstSession &&
-    !hasCarouselItems &&
-    (profileCompletion?.percentage ?? 0) >= 100;
-  const insightsSummary = useInsightsSummaryQuery({
-    enabled: shouldLoadInsightSuggestions,
-  });
-  const showGreetingSummary = useMemo(() => {
-    if (isFirstSession) {
-      return true;
-    }
-
-    const hasInsight = (insightsSummary.data?.insights ?? []).some(
-      insight => insight.title.trim().length > 0
-    );
-    if (hasInsight) {
-      return true;
-    }
-
-    return (tippingStats?.tipsSubmitted ?? 0) > 0;
-  }, [insightsSummary.data?.insights, isFirstSession, tippingStats]);
-
   const {
     input,
     setInput,
@@ -520,35 +496,24 @@ export function JovieChat({
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.15 }}
           >
-            <div className='flex flex-1 flex-col px-4 py-8 sm:px-5 sm:py-10'>
-              <div className='mx-auto flex w-full max-w-[52rem] flex-1 flex-col justify-center'>
-                <div className='relative'>
+            <div className='flex flex-1 flex-col px-4 py-6 sm:px-6 sm:py-8'>
+              <div className='mx-auto flex w-full max-w-[50rem] flex-1 flex-col'>
+                <div className='relative mx-auto flex w-full max-w-[36rem] flex-1 flex-col items-center pt-[clamp(2.75rem,10vh,6rem)] text-center'>
                   <div
                     aria-hidden='true'
-                    className='pointer-events-none absolute left-1/2 top-[5.5rem] h-56 w-56 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,color-mix(in_oklab,var(--linear-accent)_12%,transparent)_0%,transparent_72%)] blur-3xl'
+                    className='pointer-events-none absolute left-1/2 top-10 h-48 w-48 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,color-mix(in_oklab,var(--linear-accent)_10%,transparent)_0%,transparent_74%)] blur-3xl'
                   />
 
-                  <div className='relative mx-auto flex max-w-[42rem] flex-col items-center text-center'>
+                  <div className='relative flex w-full flex-col items-center gap-2.5'>
                     <h1 className='text-balance text-[2rem] font-[560] tracking-[-0.04em] text-primary-token sm:text-[2.75rem]'>
                       Welcome to Jovie
                     </h1>
-                    <p className='mt-2 max-w-[28rem] text-balance text-[14px] leading-6 text-secondary-token sm:text-[15px]'>
+                    <p className='max-w-[28rem] text-balance text-[14px] leading-6 text-secondary-token sm:text-[15px]'>
                       Ask anything or tell Jovie what you need
                     </p>
-
-                    {showGreetingSummary && (
-                      <JovieGreeting
-                        username={username}
-                        isFirstSession={isFirstSession}
-                        insights={insightsSummary.data?.insights ?? []}
-                        tippingStats={tippingStats}
-                        variant='inline'
-                        className='mt-4'
-                      />
-                    )}
                   </div>
 
-                  <div className='relative mx-auto mt-6 w-full max-w-[35rem] space-y-3'>
+                  <div className='relative mt-6 w-full max-w-[35rem] space-y-3'>
                     {isRateLimited && (
                       <p
                         className='text-center text-xs text-tertiary-token'
@@ -571,41 +536,39 @@ export function JovieChat({
                     )}
                   </div>
 
-                  <div className='mt-5 flex flex-col items-center gap-3'>
-                    <p className='text-[11px] font-[560] tracking-[0.01em] text-tertiary-token'>
-                      Get Started With Some Examples
-                    </p>
+                  <div className='mt-5 flex w-full max-w-[39rem] flex-col items-center gap-2'>
                     <SuggestedPrompts
                       onSelect={handleSuggestedPrompt}
                       isFirstSession={isFirstSession}
                       latestReleaseTitle={latestReleaseTitle}
                       canUseAdvancedTools={aiCanUseTools}
+                      layout='rail'
                     />
                   </div>
+                </div>
 
-                  <div className='chat-stagger mx-auto mt-6 w-full max-w-[46rem] space-y-4 sm:space-y-5'>
-                    {showSuggestedProfiles && (
-                      <SuggestedProfilesCarousel
-                        suggestions={suggestedProfiles.suggestions}
-                        isLoading={suggestedProfiles.isLoading}
-                        currentIndex={suggestedProfiles.currentIndex}
-                        total={suggestedProfiles.total}
-                        next={suggestedProfiles.next}
-                        prev={suggestedProfiles.prev}
-                        confirm={suggestedProfiles.confirm}
-                        reject={suggestedProfiles.reject}
-                        isActioning={suggestedProfiles.isActioning}
-                        username={username}
-                        displayName={displayName}
-                        avatarUrl={avatarUrl}
-                      />
+                <div className='chat-stagger mx-auto mt-8 w-full max-w-[42rem] space-y-4 sm:space-y-5'>
+                  {showSuggestedProfiles && (
+                    <SuggestedProfilesCarousel
+                      suggestions={suggestedProfiles.suggestions}
+                      isLoading={suggestedProfiles.isLoading}
+                      currentIndex={suggestedProfiles.currentIndex}
+                      total={suggestedProfiles.total}
+                      next={suggestedProfiles.next}
+                      prev={suggestedProfiles.prev}
+                      confirm={suggestedProfiles.confirm}
+                      reject={suggestedProfiles.reject}
+                      isActioning={suggestedProfiles.isActioning}
+                      username={username}
+                      displayName={displayName}
+                      avatarUrl={avatarUrl}
+                    />
+                  )}
+
+                  {!hasCarouselItems &&
+                    (profileCompletion?.percentage ?? 0) < 100 && (
+                      <ProfileCompletionCard />
                     )}
-
-                    {!hasCarouselItems &&
-                      (profileCompletion?.percentage ?? 0) < 100 && (
-                        <ProfileCompletionCard />
-                      )}
-                  </div>
                 </div>
               </div>
             </div>

@@ -2,9 +2,7 @@
 
 import { Icon } from '@/components/atoms/Icon';
 import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { AggregateEnrichmentStatus } from '@/lib/dsp-enrichment/enrichment-status';
-import { cn } from '@/lib/utils';
 
 interface ReleasesEmptyStateProps {
   readonly onConnectSpotify: () => void;
@@ -17,10 +15,8 @@ export function ReleasesEmptyState({
   enrichmentStatus,
   onRetryEnrichment,
 }: ReleasesEmptyStateProps) {
-  const emptyCardClassName = cn(
-    LINEAR_SURFACE.contentContainer,
-    'flex min-h-[212px] flex-col items-center justify-center px-5 py-9 text-center'
-  );
+  const emptyCardClassName =
+    'flex min-h-[212px] flex-col items-center justify-center px-5 py-9 text-center';
 
   // During enrichment: show progress message
   if (enrichmentStatus === 'enriching') {
@@ -111,10 +107,7 @@ export function ReleasesEmptyState({
   return (
     <DrawerSurfaceCard
       variant='card'
-      className={cn(
-        LINEAR_SURFACE.contentContainer,
-        'flex min-h-[204px] flex-col items-center justify-center px-5 py-8 text-center'
-      )}
+      className='flex min-h-[204px] flex-col items-center justify-center px-5 py-8 text-center'
       data-testid='releases-empty-state-disconnected'
     >
       <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[11px] border border-(--linear-app-frame-seam) bg-surface-1'>

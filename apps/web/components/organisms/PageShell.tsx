@@ -1,4 +1,5 @@
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 import { cn } from '@/lib/utils';
 
 export interface PageShellProps {
@@ -44,14 +45,15 @@ export interface PageShellProps {
  */
 export function PageShell({ children, className }: PageShellProps) {
   return (
-    <div
-      className={cn(
-        'flex h-full min-h-0 flex-col overflow-hidden overflow-x-hidden bg-(--linear-app-content-surface) text-primary-token',
-        className
-      )}
+    <AppShellContentPanel
+      maxWidth='full'
+      frame='none'
+      contentPadding='none'
+      scroll='panel'
+      className={className}
     >
       {children}
-    </div>
+    </AppShellContentPanel>
   );
 }
 
@@ -115,6 +117,7 @@ export function PageHeader({
         ) : undefined
       }
       actions={action}
+      variant='plain'
       density='compact'
       actionsClassName='flex shrink-0 items-center gap-(--linear-app-toolbar-gap)'
       className={className}

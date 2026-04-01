@@ -3,7 +3,7 @@
 import { BadgeCheck } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
-import { APP_ROUTES } from '@/constants/routes';
+import { isDemoRoutePath } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import {
   formatVerifiedPriceLabel,
@@ -19,7 +19,7 @@ import {
 export function SidebarUpgradeBanner() {
   const pathname = usePathname();
   const isPassiveRuntime = env.IS_TEST || env.IS_E2E;
-  const isDemoRoute = pathname === APP_ROUTES.DEMO;
+  const isDemoRoute = isDemoRoutePath(pathname);
 
   const billingStatus = useBillingStatusQuery({
     enabled: !isPassiveRuntime && !isDemoRoute,

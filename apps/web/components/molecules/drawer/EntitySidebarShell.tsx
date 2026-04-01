@@ -4,7 +4,6 @@ import type { CommonDropdownItem } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import { DrawerEmptyState } from './DrawerEmptyState';
@@ -37,14 +36,14 @@ export interface EntitySidebarShellProps {
   readonly hideMinimalHeaderBar?: boolean;
 
   /**
-   * Persistent pre-tab region — pinned above tabs in both standard and minimal modes.
-   * Typically contains the entity identity card (image + name). Can accept a fragment
-   * with multiple elements (e.g., entity card + analytics) — they stack with space-y-2.
+   * Persistent pre-tab region — pinned above tabs in standard mode and above the
+   * scrollable region in minimal mode. Can accept a fragment with multiple
+   * elements (e.g., entity card + analytics) — they stack with space-y-2.
    */
   readonly entityHeader?: ReactNode;
   /** When true, header actions render inside the entity header card instead of the title bar */
   readonly actionsInEntityHeader?: boolean;
-  /** Tabs slot — SegmentControl rendered below entity header */
+  /** Tabs slot — SegmentControl rendered below entity header in standard mode */
   readonly tabs?: ReactNode;
   /** Controls where tabs render when headerMode is minimal. */
   readonly minimalTabsPlacement?: 'card' | 'header';
@@ -70,8 +69,9 @@ export interface EntitySidebarShellProps {
  * Profile, and other detail sidebars with standardized spacing
  * and scroll behavior.
  *
- * Layout rule: persistent content → tabs → tab content.
- * Entity header and tabs are ALWAYS pinned (shrink-0) in both modes.
+ * Standard layout rule: persistent content → tabs → tab content.
+ * In minimal mode, the entity header stays pinned above the scrollable region,
+ * while callers compose tab controls into the main content card.
  * Only tab-specific children scroll.
  *
  *  ┌─────────────────────────┐
@@ -79,9 +79,6 @@ export interface EntitySidebarShellProps {
  *  │ actions + close)        │
  *  ├─────────────────────────┤
  *  │ Entity header (image +  │  shrink-0  (optional, pinned)
- *  │ name / metadata)        │
- *  ├─────────────────────────┤
- *  │ Tabs (SegmentControl)   │  shrink-0  (optional, pinned)
  *  ├─────────────────────────┤
  *  │ Scrollable content      │  flex-1 overflow
  *  │                         │
@@ -137,16 +134,15 @@ export function EntitySidebarShell({
       contextMenuItems={contextMenuItems}
       data-testid={testId}
     >
-      <div className='flex h-full min-h-0 flex-col gap-1 px-1.5 py-1.5 lg:px-0 lg:py-0'>
-        <div className='shrink-0 space-y-1'>
+      <div className='flex h-full min-h-0 flex-col gap-0.5 px-1.5 py-1.5 lg:px-0 lg:py-0'>
+        <div className='shrink-0 space-y-0.5'>
           <DrawerSurfaceCard
             variant='card'
             className='overflow-hidden lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none'
           >
             <div
               className={cn(
-                LINEAR_SURFACE.stickyHeader,
-                'border-b border-transparent backdrop-blur-[12px]'
+                'border-b border-transparent bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,transparent)] backdrop-blur-[12px]'
               )}
             >
               {showMinimalHeaderBar ? (
@@ -205,18 +201,6 @@ export function EntitySidebarShell({
               {entityHeader}
             </div>
           ) : null}
-
-          {isMinimalHeader && !isEmpty && tabs && !renderMinimalTabsInHeader ? (
-            <div
-              className={cn(
-                'px-3 py-1 lg:px-[18px] [&>*]:w-full',
-                tabsContainerClassName
-              )}
-              data-testid='entity-sidebar-tabs-card'
-            >
-              {tabs}
-            </div>
-          ) : null}
         </div>
 
         {isEmpty ? (
@@ -228,7 +212,7 @@ export function EntitySidebarShell({
         ) : (
           <>
             <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5'>
-              <div className='space-y-1'>{children}</div>
+              <div className='space-y-0.5'>{children}</div>
             </div>
 
             {footer ? (

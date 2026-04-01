@@ -204,6 +204,7 @@ export const creatorProfiles = pgTable(
     stripePayoutsEnabled: boolean('stripe_payouts_enabled')
       .default(false)
       .notNull(),
+    nextTaskNumber: integer('next_task_number').default(1).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },

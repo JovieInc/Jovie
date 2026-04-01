@@ -19,6 +19,15 @@ describe('SuggestedPrompts', () => {
     expect(queryByText('Getting paid')).toBeNull();
   });
 
+  it('renders a grid layout when requested', () => {
+    const onSelect = vi.fn();
+    const { getByTestId } = fastRender(
+      <SuggestedPrompts onSelect={onSelect} layout='grid' />
+    );
+
+    expect(getByTestId('suggested-prompts-grid')).toBeTruthy();
+  });
+
   it('renders first-session prompts including all suggestions', () => {
     const onSelect = vi.fn();
     const { getByRole } = fastRender(

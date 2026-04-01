@@ -14,11 +14,6 @@ import type { InsightCategory, InsightResponse } from '@/types/insights';
 import { InsightCard } from './InsightCard';
 import { InsightEmptyState } from './InsightEmptyState';
 
-function getSubtitle(total: number): string {
-  if (total <= 0) return 'AI-powered analytics recommendations';
-  return `${total} active insight${total === 1 ? '' : 's'}`;
-}
-
 interface PrioritySectionProps {
   readonly label: string;
   readonly colorClass: string;
@@ -150,8 +145,6 @@ export function InsightsPanel() {
     useGenerateInsightsMutation();
 
   const insights = useMemo(() => data?.insights ?? [], [data?.insights]);
-  const total = data?.total ?? 0;
-
   // Group insights by priority
   const grouped = useMemo(() => {
     const high = insights.filter(i => i.priority === 'high');
@@ -162,11 +155,7 @@ export function InsightsPanel() {
 
   const toolbar = (
     <PageToolbar
-      start={
-        <span className='text-[11px] text-tertiary-token'>
-          {getSubtitle(total)}
-        </span>
-      }
+      start={null}
       end={
         <PageToolbarActionButton
           ariaLabel={isGenerating ? 'Generating insights' : 'Generate insights'}
@@ -194,7 +183,7 @@ export function InsightsPanel() {
       data-testid='dashboard-insights-workspace'
     >
       <div className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden'>
-        <div className='flex flex-col gap-5 px-3 py-3 sm:px-4 sm:py-4'>
+        <div className='flex flex-col gap-4 px-3 py-2.5 sm:px-4 sm:py-3.5'>
           {/* Category filter pills */}
           <AppSegmentControl
             value={selectedCategory}

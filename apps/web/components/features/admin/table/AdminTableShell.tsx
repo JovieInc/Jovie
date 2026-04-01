@@ -127,7 +127,7 @@ export function AdminTableShell({
           <div
             ref={toolbarRef}
             className={cn(
-              'sticky top-0 z-30 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)/96 backdrop-blur-[12px] supports-backdrop-filter:bg-(--linear-app-content-surface)/88',
+              'sticky top-0 z-30 border-b border-(--linear-app-frame-seam) bg-surface-1/96 backdrop-blur-[12px] supports-backdrop-filter:bg-surface-1/88',
               headerElevated && 'dark:shadow-inset-highlight'
             )}
           >

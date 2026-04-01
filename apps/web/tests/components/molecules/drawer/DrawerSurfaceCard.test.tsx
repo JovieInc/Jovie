@@ -35,21 +35,20 @@ describe('DrawerSurfaceCard', () => {
       screen.getByTestId('surface-card').getAttribute('class') ?? '';
 
     expect(className).toContain('rounded-xl');
-    expect(className).toContain('border-(--linear-app-frame-seam)');
-    expect(className).toContain('bg-(--linear-app-content-surface)');
-    expect(className).toContain('shadow-[var(--linear-app-drawer-shadow)]');
+    expect(className).toContain('border-(--linear-app-shell-border)');
+    expect(className).toContain('bg-surface-1');
+    expect(className).toContain('shadow-[');
   });
 
-  it('LINEAR_SURFACE tokens contain no hardcoded shadow values', () => {
-    for (const [key, value] of Object.entries(LINEAR_SURFACE)) {
-      expect(value, `LINEAR_SURFACE.${key} has hardcoded shadow`).not.toMatch(
-        /shadow-\[\d/
-      );
-      expect(
-        value,
-        `LINEAR_SURFACE.${key} has hardcoded rgba shadow`
-      ).not.toMatch(/shadow-\[rgba/);
-    }
+  it('keeps elevated shadows scoped to floating sidebar and drawer surfaces', () => {
+    expect(LINEAR_SURFACE.drawerCard).toContain('shadow-[');
+    expect(LINEAR_SURFACE.drawerCardSm).toContain('shadow-[');
+    expect(LINEAR_SURFACE.sidebarCard).toContain('shadow-[');
+
+    expect(LINEAR_SURFACE.contentContainer).toContain('shadow-none');
+    expect(LINEAR_SURFACE.bannerCard).toContain('shadow-none');
+    expect(LINEAR_SURFACE.dialogCard).toContain('shadow-none');
+    expect(LINEAR_SURFACE.popover).toContain('shadow-[var(--shadow-popover)]');
   });
 
   it('keeps drawer and sidebar cards on a higher elevation tier than main content containers', () => {

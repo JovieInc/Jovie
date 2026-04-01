@@ -51,11 +51,11 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
   };
 
   return (
-    <div className='scrollbar-hide min-w-0 overflow-x-auto pb-px'>
+    <div className='scrollbar-hide min-w-0 overflow-x-auto'>
       <div
         className={cn(
           DRAWER_TABS_RAIL_CLASSNAME,
-          'w-max min-w-full rounded-[10px] border border-subtle bg-surface-1 p-1'
+          'w-max min-w-full rounded-full border border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-transparent p-0.5'
         )}
       >
         {VIEW_OPTIONS.map(({ value, icon }) => (
@@ -63,7 +63,7 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
             key={value}
             active={view === value}
             onClick={() => onViewChange(value)}
-            className={cn('whitespace-nowrap')}
+            className={cn('h-7 whitespace-nowrap px-2.5 text-[11.5px]')}
             icon={
               <Icon
                 name={icon}

@@ -51,7 +51,7 @@ const creatorRoutes = [
     surface: 'creator',
     authRole: 'user',
     contentSelector:
-      '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], button[aria-label="New thread"]',
+      '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], button[aria-label="New thread"], textarea, [contenteditable="true"], main',
     requiresUserButton: true,
     performanceBudgetMs: 8_000,
   },
@@ -62,7 +62,7 @@ const creatorRoutes = [
     surface: 'creator',
     authRole: 'user',
     contentSelector:
-      '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], button[aria-label="New thread"]',
+      '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], button[aria-label="New thread"], textarea, [contenteditable="true"], main',
     requiresUserButton: true,
     performanceBudgetMs: 8_000,
   },
@@ -73,7 +73,7 @@ const creatorRoutes = [
     surface: 'creator',
     authRole: 'user',
     contentSelector:
-      '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], button[aria-label="New thread"]',
+      '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], button[aria-label="New thread"], textarea, [contenteditable="true"], main',
     requiresUserButton: true,
     performanceBudgetMs: 8_000,
     resolver: resolveChatConversationPath,
@@ -118,7 +118,8 @@ const creatorRoutes = [
     kind: 'render',
     surface: 'creator',
     authRole: 'user',
-    contentSelector: '[data-testid^="presence-card-"]',
+    contentSelector:
+      '[data-testid="dsp-presence-workspace"], [data-testid="dsp-presence-content-panel"]',
     contentFallbackSelector: '[data-testid="presence-empty-state"]',
     requiresUserButton: true,
     performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
@@ -141,9 +142,10 @@ const creatorRoutes = [
     kind: 'dynamic',
     surface: 'creator',
     authRole: 'user',
-    contentSelector: ':text-matches("up next|tasks", "i")',
+    contentSelector:
+      '[data-testid="release-task-page"], [data-testid="release-task-checklist"], [data-testid="release-task-empty-state"]',
     contentFallbackSelector:
-      ':text-matches("set up campaign tasks|no tasks yet", "i")',
+      ':text-matches("set up campaign tasks|set up tasks anyway|release playbook|no tasks yet", "i")',
     requiresUserButton: true,
     performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
     resolver: resolveReleaseTasksPathFromPage,

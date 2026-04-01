@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 describe('app route layout', () => {
-  it('keeps the theme init script outside the client provider boundary', async () => {
+  it('only renders the route client providers', async () => {
     const { default: AppLayout } = await import('./layout');
 
     render(
@@ -25,15 +25,5 @@ describe('app route layout', () => {
     const provider = screen.getByTestId('resolved-client-providers');
     expect(provider).toBeInTheDocument();
     expect(screen.getByTestId('app-child')).toBeInTheDocument();
-
-    const themeInitScript = document.querySelector(
-      'script[src=\"/theme-init.js\"]'
-    );
-    expect(themeInitScript).toBeInstanceOf(HTMLScriptElement);
-    if (!(themeInitScript instanceof HTMLScriptElement)) {
-      throw new Error('Expected theme init script to be rendered');
-    }
-    expect(provider).not.toContainElement(themeInitScript);
-    expect(themeInitScript.nextElementSibling).toBe(provider);
   });
 });

@@ -4,6 +4,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_COOKIE,
+  TEST_PERSONA_COOKIE,
   TEST_USER_ID_COOKIE,
 } from '@/lib/auth/test-mode';
 import { smokeNavigateWithRetry } from '../e2e/utils/smoke-test-utils';
@@ -20,8 +21,60 @@ function getTestAuthBypassUserId(): string | null {
   return userId && userId.length > 0 ? userId : null;
 }
 
+function getRequestedBypassPersona(): 'creator' | 'admin' | null {
+  const persona = process.env.E2E_TEST_AUTH_PERSONA?.trim();
+  if (persona === 'creator' || persona === 'admin') {
+    return persona;
+  }
+  return null;
+}
+
+async function resolveBypassUserId(
+  baseUrl: string,
+  fallbackUserId: string,
+  persona: 'creator' | 'admin' | null
+): Promise<string> {
+  if (!persona) {
+    return fallbackUserId;
+  }
+
+  const response = await fetch(new URL('/api/dev/test-auth/session', baseUrl), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ persona }),
+  });
+
+  if (!response.ok) {
+    throw new ClerkTestError(
+      `Failed to resolve ${persona} test auth persona.`,
+      'CLERK_SETUP_FAILED'
+    );
+  }
+
+  const payload = (await response.json()) as { userId?: string | null };
+  return payload.userId?.trim() || fallbackUserId;
+}
+
 async function enableTestAuthBypass(page: Page): Promise<void> {
-  const userId = getTestAuthBypassUserId();
+  const existingCookies = await page.context().cookies();
+  const existingMode = existingCookies.find(
+    cookie => cookie.name === TEST_MODE_COOKIE
+  )?.value;
+  const existingUserId = existingCookies.find(
+    cookie => cookie.name === TEST_USER_ID_COOKIE
+  )?.value;
+  const existingPersona = existingCookies.find(
+    cookie => cookie.name === TEST_PERSONA_COOKIE
+  )?.value;
+
+  const defaultUserId = getTestAuthBypassUserId();
+  const requestedPersona = getRequestedBypassPersona();
+  const userId = existingUserId?.trim() || defaultUserId;
+  const persona =
+    (existingPersona === 'creator' || existingPersona === 'admin'
+      ? existingPersona
+      : null) ?? requestedPersona;
+
   if (!userId) {
     throw new ClerkTestError(
       'E2E_CLERK_USER_ID is required when test auth bypass is enabled.',
@@ -30,6 +83,10 @@ async function enableTestAuthBypass(page: Page): Promise<void> {
   }
 
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  const resolvedUserId =
+    existingMode === TEST_AUTH_BYPASS_MODE && existingUserId?.trim()
+      ? existingUserId.trim()
+      : await resolveBypassUserId(baseUrl, userId, persona);
   await page.context().addCookies([
     {
       name: TEST_MODE_COOKIE,
@@ -39,11 +96,66 @@ async function enableTestAuthBypass(page: Page): Promise<void> {
     },
     {
       name: TEST_USER_ID_COOKIE,
-      value: userId,
+      value: resolvedUserId,
       url: baseUrl,
       sameSite: 'Lax',
     },
+    ...(persona
+      ? [
+          {
+            name: TEST_PERSONA_COOKIE,
+            value: persona,
+            url: baseUrl,
+            sameSite: 'Lax' as const,
+          },
+        ]
+      : []),
   ]);
+}
+
+export async function setTestAuthBypassSession(
+  page: Page,
+  persona: 'creator' | 'admin' | null,
+  overrideUserId?: string | null
+): Promise<void> {
+  const userId = overrideUserId?.trim() || getTestAuthBypassUserId();
+  if (!userId) {
+    throw new ClerkTestError(
+      'E2E_CLERK_USER_ID is required when test auth bypass is enabled.',
+      'MISSING_CREDENTIALS'
+    );
+  }
+
+  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  const resolvedUserId = await resolveBypassUserId(baseUrl, userId, persona);
+  await page.context().addCookies([
+    {
+      name: TEST_MODE_COOKIE,
+      value: TEST_AUTH_BYPASS_MODE,
+      url: baseUrl,
+      sameSite: 'Lax',
+    },
+    {
+      name: TEST_USER_ID_COOKIE,
+      value: resolvedUserId,
+      url: baseUrl,
+      sameSite: 'Lax',
+    },
+    ...(persona
+      ? [
+          {
+            name: TEST_PERSONA_COOKIE,
+            value: persona,
+            url: baseUrl,
+            sameSite: 'Lax' as const,
+          },
+        ]
+      : []),
+  ]);
+
+  if (!persona) {
+    await page.context().clearCookies({ name: TEST_PERSONA_COOKIE });
+  }
 }
 
 async function waitForShellReadyAfterAuth(page: Page): Promise<void> {

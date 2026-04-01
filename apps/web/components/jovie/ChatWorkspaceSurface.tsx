@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { cn } from '@/lib/utils';
+import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 
 interface ChatWorkspaceSurfaceProps {
   readonly children: ReactNode;
@@ -13,13 +13,14 @@ export function ChatWorkspaceSurface({
   className,
 }: ChatWorkspaceSurfaceProps) {
   return (
-    <div
-      className={cn(
-        'flex h-full min-h-0 flex-1 flex-col overflow-hidden',
-        className
-      )}
+    <AppShellContentPanel
+      maxWidth='wide'
+      frame='none'
+      contentPadding='none'
+      scroll='panel'
+      className={className}
     >
       {children}
-    </div>
+    </AppShellContentPanel>
   );
 }

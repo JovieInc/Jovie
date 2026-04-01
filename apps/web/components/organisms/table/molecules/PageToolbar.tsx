@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { ACTION_BAR_BUTTON_CLASS, ActionBar } from './ActionBar';
 
 export const PAGE_TOOLBAR_CONTAINER_CLASS =
-  'flex min-w-0 items-center gap-1 bg-surface-1 px-app-header py-1 md:min-h-[36px]';
+  'flex min-w-0 items-center gap-1 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-transparent px-app-header py-1 md:min-h-[36px]';
 
 export const PAGE_TOOLBAR_START_CLASS =
   'flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
@@ -27,7 +27,7 @@ export const PAGE_TOOLBAR_TAB_BUTTON_CLASS = cn(
 );
 
 export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
-  'border-default bg-surface-0 text-primary-token shadow-[0_1px_1px_rgba(0,0,0,0.05),0_6px_12px_-8px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.04)]';
+  'border-default bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,white_4%)] text-primary-token shadow-[0_1px_1px_rgba(0,0,0,0.04),0_6px_12px_-10px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.03)]';
 
 export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
@@ -43,7 +43,7 @@ export const PAGE_TOOLBAR_MENU_TRIGGER_CLASS = cn(
 );
 
 export const PAGE_TOOLBAR_ACTION_ACTIVE_CLASS =
-  'border-default bg-surface-0 text-primary-token shadow-[0_1px_1px_rgba(0,0,0,0.05),0_6px_12px_-8px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.04)]';
+  'border-default bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,white_4%)] text-primary-token shadow-[0_1px_1px_rgba(0,0,0,0.04),0_6px_12px_-10px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.03)]';
 
 export const PAGE_TOOLBAR_ICON_CLASS = 'h-3.5 w-3.5';
 export const PAGE_TOOLBAR_ICON_STROKE_WIDTH = 2;

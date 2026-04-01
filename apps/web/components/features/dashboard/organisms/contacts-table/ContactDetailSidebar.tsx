@@ -17,6 +17,7 @@ import {
   DrawerCardActionBar,
   DrawerPropertyRow,
   DrawerSurfaceCard,
+  DrawerTabbedCard,
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
@@ -219,11 +220,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     [contact, onUpdate, debouncedSave]
   );
 
-  const {
-    title: headerTitle,
-    primaryActions,
-    overflowActions,
-  } = useContactDetailHeaderParts({
+  const { title: headerTitle, primaryActions } = useContactDetailHeaderParts({
     role: contact?.role ?? 'other',
     customLabel: contact?.customLabel,
     email: contact?.email,
@@ -306,17 +303,6 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       contextMenuItems={contextMenuItems}
       isEmpty={!hasContact}
       emptyMessage='Select a contact to view details'
-      tabs={
-        <DrawerTabs
-          value={activeTab}
-          onValueChange={v => setActiveTab(v as 'info' | 'territories')}
-          options={[
-            { value: 'info' as const, label: 'Info' },
-            { value: 'territories' as const, label: 'Territories' },
-          ]}
-          ariaLabel='Contact tabs'
-        />
-      }
       entityHeader={
         contact ? (
           <DrawerSurfaceCard
@@ -336,7 +322,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             </div>
             <DrawerCardActionBar
               primaryActions={primaryActions}
-              overflowActions={overflowActions}
+              menuItems={contextMenuItems}
               onClose={handleClose}
               overflowTriggerPlacement='card-top-right'
               className='mx-[-12px] mt-3'
@@ -346,7 +332,21 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       }
     >
       {contact && (
-        <>
+        <DrawerTabbedCard
+          testId='contact-detail-tabbed-card'
+          tabs={
+            <DrawerTabs
+              value={activeTab}
+              onValueChange={v => setActiveTab(v as 'info' | 'territories')}
+              options={[
+                { value: 'info' as const, label: 'Info' },
+                { value: 'territories' as const, label: 'Territories' },
+              ]}
+              ariaLabel='Contact tabs'
+            />
+          }
+          contentClassName='pt-2'
+        >
           {activeTab === 'info' && (
             <>
               <DrawerSection title='Role' className='space-y-2' surface='card'>
@@ -497,7 +497,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
               Saving...
             </div>
           )}
-        </>
+        </DrawerTabbedCard>
       )}
     </EntitySidebarShell>
   );

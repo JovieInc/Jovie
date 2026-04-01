@@ -393,7 +393,11 @@ test.describe('Content Gate — Public Pages', () => {
 
     if (!(await navigateSafe(page, '/blog', { timeout: 120_000 }))) return;
 
-    const firstPostLink = page.locator('a[href^="/blog/"]').first();
+    const firstPostLink = page
+      .locator(
+        'article a[href^="/blog/"]:not([href^="/blog/category/"]):not([href^="/blog/authors/"])'
+      )
+      .first();
     const hasPostLink = await firstPostLink
       .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
       .catch(() => false);

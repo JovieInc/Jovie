@@ -122,8 +122,8 @@ export const presets = {
   stickyHeader: cn(
     'sticky top-0',
     zIndex.tableHeader,
-    'bg-(--linear-app-content-surface) backdrop-blur-[12px]',
-    'shadow-[inset_0_-1px_0_var(--linear-app-frame-seam)]',
+    'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,transparent)] backdrop-blur-[14px]',
+    'shadow-[inset_0_-1px_0_color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]',
     'align-middle'
   ),
   stickyGroupHeader: cn(

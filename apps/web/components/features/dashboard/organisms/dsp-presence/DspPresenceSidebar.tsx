@@ -64,8 +64,8 @@ function SidebarEntityHeader({
   const label = PROVIDER_LABELS[item.providerId];
 
   return (
-    <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-      <div className='relative p-3.5'>
+    <DrawerSurfaceCard variant='flat' className='overflow-hidden'>
+      <div className='relative border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-3 py-2.5'>
         <div className='absolute right-2.5 top-2.5'>
           <DrawerHeaderActions
             primaryActions={[]}
@@ -135,12 +135,8 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
   const label = PROVIDER_LABELS[item.providerId];
 
   return (
-    <div className='space-y-3'>
-      <DrawerSection
-        title='Match Status'
-        className='space-y-1.5'
-        surface='card'
-      >
+    <div className='space-y-2'>
+      <DrawerSection title='Match Status' className='space-y-1.5'>
         <div className='space-y-2'>
           <div className='flex items-center justify-between'>
             <span className='text-[12px] text-tertiary-token'>Status</span>
@@ -173,7 +169,10 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
         </div>
       </DrawerSection>
 
-      <DrawerSection title='Actions' className='space-y-1.5' surface='card'>
+      <DrawerSection
+        title='Actions'
+        className='space-y-1.5 border-t border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] pt-2.5'
+      >
         <div className='space-y-2'>
           {item.externalArtistUrl && (
             <a
