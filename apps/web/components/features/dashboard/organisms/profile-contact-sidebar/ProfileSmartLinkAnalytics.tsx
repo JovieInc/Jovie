@@ -157,7 +157,7 @@ export function ProfileSmartLinkAnalytics({
 
   return (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
+      className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden border-0')}
       testId='profile-smart-link-analytics'
     >
       {content}

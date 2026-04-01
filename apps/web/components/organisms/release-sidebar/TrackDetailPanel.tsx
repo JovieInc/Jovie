@@ -56,7 +56,7 @@ export function TrackDetailPanel({
       <DrawerBackButton label={releaseTitle} onClick={onBack} />
 
       <DrawerSurfaceCard
-        className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden')}
+        className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden border-0')}
       >
         <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
           <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
@@ -78,7 +78,7 @@ export function TrackDetailPanel({
       </DrawerSurfaceCard>
 
       <DrawerSurfaceCard
-        className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden')}
+        className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden border-0')}
       >
         <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
           <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
@@ -105,7 +105,7 @@ export function TrackDetailPanel({
 
       {track.isrc && (
         <DrawerSurfaceCard
-          className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden')}
+          className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden border-0')}
         >
           <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
             <p className='text-[11px] font-[510] leading-none text-tertiary-token'>

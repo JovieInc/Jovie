@@ -223,7 +223,7 @@ export function ProfileLinkList({
   // the tab already labels the category, and the + button is inline with tabs)
   if (selectedCategory !== 'all') {
     const sectionSurfaceClassName =
-      surface === 'card' ? LINEAR_SURFACE.drawerCard : '';
+      surface === 'card' ? cn(LINEAR_SURFACE.drawerCard, 'border-0') : '';
 
     if (selectedCategory === 'dsp' && dspConnections) {
       const hasDspContent =

@@ -51,7 +51,7 @@ export function DrawerLoadingSkeleton({
         <div className='shrink-0 overflow-hidden px-3 pt-2.5 pb-1.5'>
           <div className='space-y-2.5'>
             <div
-              className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden p-3.5')}
+              className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden border-0 p-3.5')}
               data-testid='drawer-loading-header-card'
             >
               <div className='mb-2 h-2.5 w-14 rounded skeleton' />
@@ -70,7 +70,7 @@ export function DrawerLoadingSkeleton({
             </div>
 
             <div
-              className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden')}
+              className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden border-0')}
               data-testid='drawer-loading-analytics-card'
             >
               <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
@@ -95,7 +95,7 @@ export function DrawerLoadingSkeleton({
         {showTabs ? (
           <div className='shrink-0 bg-surface-0 px-3 py-1'>
             <div
-              className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden p-2')}
+              className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden border-0 p-2')}
               data-testid='drawer-loading-tabs-card'
             >
               <div className='flex w-full gap-1'>
@@ -117,7 +117,7 @@ export function DrawerLoadingSkeleton({
               data-testid='drawer-loading-content-row'
               className={cn(
                 LINEAR_SURFACE.drawerCardSm,
-                'items-center gap-2 px-3 py-2',
+                'items-center gap-2 border-0 px-3 py-2',
                 index < 4
                   ? 'grid grid-cols-[76px_minmax(0,1fr)]'
                   : 'grid grid-cols-1'

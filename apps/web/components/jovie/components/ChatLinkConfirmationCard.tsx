@@ -146,7 +146,7 @@ export function ChatLinkConfirmationCard({
         <span
           className={cn(
             LINEAR_SURFACE.drawerCardSm,
-            'flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border-accent/20 bg-[color-mix(in_oklab,var(--linear-accent)_10%,var(--linear-app-content-surface))]'
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border-0 border-accent/20 bg-[color-mix(in_oklab,var(--linear-accent)_10%,var(--linear-app-content-surface))]'
           )}
         >
           <SocialIcon

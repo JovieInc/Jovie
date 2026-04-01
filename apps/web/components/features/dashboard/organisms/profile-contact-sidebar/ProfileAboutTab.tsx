@@ -297,7 +297,7 @@ function PressPhotosSection({
   const remainingSlots = MAX_PRESS_PHOTOS - pressPhotos.length;
 
   return (
-    <DrawerSection className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
+    <DrawerSection className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 border-0 p-3')}>
       <div className='flex items-center justify-between gap-3'>
         <DrawerSectionHeading>Press Photos</DrawerSectionHeading>
         <div className='flex items-center gap-1.5'>
@@ -584,7 +584,7 @@ export function ProfileAboutTab({
       <DrawerSection
         title='Bio'
         collapsible={false}
-        className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-3')}
+        className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 border-0 p-3')}
       >
         {onBioChange && <EditableBio value={bio} onChange={onBioChange} />}
         {!onBioChange && bio && (
@@ -603,7 +603,7 @@ export function ProfileAboutTab({
         <DrawerSection
           title='Location'
           collapsible={false}
-          className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-3')}
+          className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 border-0 p-3')}
         >
           <div className='space-y-1.5'>
             <LocationField
@@ -634,7 +634,7 @@ export function ProfileAboutTab({
       <DrawerSection
         title='Genres'
         collapsible={false}
-        className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-3')}
+        className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 border-0 p-3')}
       >
         {hasGenres && (
           <div className='flex flex-wrap gap-1.5'>
@@ -710,7 +710,7 @@ export function ProfileAboutTab({
       <DrawerSection
         title='Settings'
         collapsible={false}
-        className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-3')}
+        className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 border-0 p-3')}
       >
         <DrawerAsyncToggle
           label='Photo downloads'

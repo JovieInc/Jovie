@@ -44,7 +44,7 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
             key={insight.id}
             className={cn(
               LINEAR_SURFACE.drawerCardSm,
-              'flex items-start gap-2.5 p-3'
+              'flex items-start gap-2.5 border-0 p-3'
             )}
           >
             <span className='mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0'>

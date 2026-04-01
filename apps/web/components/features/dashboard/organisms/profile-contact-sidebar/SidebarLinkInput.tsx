@@ -145,7 +145,7 @@ export function SidebarLinkInput({
   return (
     <div
       ref={refs.setReference}
-      className={cn('relative', LINEAR_SURFACE.drawerCard, 'p-2')}
+      className={cn('relative', LINEAR_SURFACE.drawerCard, 'border-0 p-2')}
     >
       <Input
         ref={urlInputRef}

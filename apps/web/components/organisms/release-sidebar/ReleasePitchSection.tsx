@@ -148,7 +148,7 @@ export function ReleasePitchSection({
 
   return (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.drawerCardSm, 'space-y-2.5 p-3')}
+      className={cn(LINEAR_SURFACE.drawerCardSm, 'space-y-2.5 border-0 p-3')}
       testId='release-pitch-card'
     >
       <div className='flex items-center justify-between'>

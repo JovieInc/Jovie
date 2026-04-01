@@ -83,7 +83,7 @@ const SIDEBAR_TAB_OPTIONS = [
 
 const RELEASE_SIDEBAR_CARD_CLASSNAME = cn(
   LINEAR_SURFACE.sidebarCard,
-  'overflow-hidden'
+  'overflow-hidden border-0'
 );
 const PLATFORM_RESCAN_COOLDOWN_MS = 5 * 60 * 1000;
 
@@ -267,7 +267,7 @@ function ReleaseSettingsCard({
 }) {
   return (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
+      className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden border-0')}
       testId='release-settings-card'
     >
       <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>

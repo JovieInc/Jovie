@@ -339,7 +339,7 @@ export function ReleaseMetadata({
       variant={variant}
       className={cn(
         variant === 'card' && LINEAR_SURFACE.drawerCardSm,
-        'overflow-hidden'
+        'overflow-hidden border-0'
       )}
       testId='release-metadata-card'
     >

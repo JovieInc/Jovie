@@ -164,7 +164,7 @@ export function ChatAvatarUploadCard() {
                 <span
                   className={cn(
                     LINEAR_SURFACE.drawerCardSm,
-                    'flex h-10 w-10 items-center justify-center rounded-[8px]'
+                    'flex h-10 w-10 items-center justify-center rounded-[8px] border-0'
                   )}
                 >
                   <ImagePlus

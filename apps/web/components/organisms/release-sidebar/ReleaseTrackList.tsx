@@ -98,7 +98,7 @@ export function ReleaseTrackList({
                 key={id}
                 className={cn(
                   LINEAR_SURFACE.drawerCardSm,
-                  'flex items-start gap-2.5 px-2.5 py-2'
+                  'flex items-start gap-2.5 border-0 px-2.5 py-2'
                 )}
               >
                 <div className='w-7 shrink-0 pt-0.5'>

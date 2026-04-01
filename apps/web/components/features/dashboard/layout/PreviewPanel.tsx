@@ -62,7 +62,7 @@ function PreviewPanelEmpty({
 
         <div className='flex-1 min-h-0 overflow-y-auto px-4 py-3'>
           <div className='space-y-3 pb-5'>
-            <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
+            <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 border-0 p-3')}>
               <div className='space-y-0.5'>
                 <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
                   Live preview
@@ -326,7 +326,7 @@ export function PreviewPanel() {
 
         <div className='flex-1 min-h-0 overflow-y-auto px-4 py-3'>
           <div className='space-y-3 pb-5'>
-            <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
+            <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 border-0 p-3')}>
               <div className='flex items-center justify-between gap-3'>
                 <div>
                   <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>

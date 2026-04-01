@@ -178,7 +178,7 @@ export function ReleaseLyricsSection({
 
   return (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
+      className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden border-0')}
     >
       <div className='space-y-2.5 p-3'>
         <Textarea

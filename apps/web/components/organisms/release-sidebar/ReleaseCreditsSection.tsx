@@ -52,7 +52,7 @@ export function ReleaseCreditsSection({
 
   return (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
+      className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden border-0')}
       testId='release-credits-card'
     >
       <div className='p-3'>

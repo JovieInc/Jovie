@@ -119,7 +119,7 @@ export function ChatLinkRemovalCard({
         <span
           className={cn(
             LINEAR_SURFACE.drawerCardSm,
-            'flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border-error/20 bg-[color-mix(in_oklab,var(--color-error)_8%,var(--linear-app-content-surface))]'
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border-0 border-error/20 bg-[color-mix(in_oklab,var(--color-error)_8%,var(--linear-app-content-surface))]'
           )}
         >
           <SocialIcon

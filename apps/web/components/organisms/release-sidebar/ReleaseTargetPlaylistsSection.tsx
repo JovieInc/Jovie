@@ -60,7 +60,7 @@ export function ReleaseTargetPlaylistsSection({
 
   return (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.drawerCardSm, 'space-y-2.5 p-3')}
+      className={cn(LINEAR_SURFACE.drawerCardSm, 'space-y-2.5 border-0 p-3')}
       testId='release-target-playlists-card'
     >
       <div className='flex items-center justify-between'>

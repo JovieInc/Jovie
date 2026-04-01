@@ -39,7 +39,7 @@ const RELEASE_TYPE_OPTIONS = [
 
 const ADD_RELEASE_CARD_CLASSNAME = cn(
   LINEAR_SURFACE.sidebarCard,
-  'overflow-hidden'
+  'overflow-hidden border-0'
 );
 
 type ReleaseType = (typeof RELEASE_TYPE_OPTIONS)[number]['value'];
