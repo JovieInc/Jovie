@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
 import { HeroCinematic } from '@/features/home/HeroCinematic';
 
@@ -8,7 +9,7 @@ export const revalidate = false;
 const ARTIST_PROFILES_TITLE = `Artist Profiles | ${APP_NAME}`;
 const ARTIST_PROFILES_DESCRIPTION =
   'Claim your free artist profile on Jovie. Smart links, fan engagement, and release automation — all in one link-in-bio built for musicians.';
-const ARTIST_PROFILES_URL = `${BASE_URL}/artist-profiles`;
+const ARTIST_PROFILES_URL = `${BASE_URL}${APP_ROUTES.ARTIST_PROFILES}`;
 const ARTIST_PROFILES_OG_IMAGE = `${BASE_URL}/og/default.png`;
 
 export const metadata: Metadata = {

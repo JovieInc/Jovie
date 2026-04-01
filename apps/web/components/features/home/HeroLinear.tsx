@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { APP_ROUTES } from '@/constants/routes';
 
 interface HeroLinearProps {
   readonly fullScreen?: boolean;
@@ -45,7 +46,7 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
             </p>
             <div className='mt-6'>
               <Link
-                href='/signup'
+                href={APP_ROUTES.SIGNUP}
                 className='btn-linear-signup focus-ring-themed h-9 px-4'
               >
                 Get Started Free

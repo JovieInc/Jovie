@@ -7,22 +7,23 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.107] - 2026-04-01
 
-> Reworked the marketing homepage around a Linear-style hero and phone-tour layout, added a dedicated artist profiles landing page, and refreshed homepage accessibility and E2E coverage.
+> Reworked the marketing homepage with a sharper hero, a clearer artist profiles landing page, and smoother motion behavior. Internal route/config alignment and test updates shipped alongside the visual refresh.
 
 ### Added
 
-- Added a static `/artist-profiles` marketing page for the artist profile funnel
-- Added the new `HeroLinear` homepage hero variant
+- Added a dedicated artist profiles landing page
+- Added a new homepage hero experience with refreshed messaging
 
 ### Changed
 
 - Reworked the homepage hero copy, logo bar layout, and phone-tour spacing around the new Linear-inspired marketing direction
-- Reserved `/artist-profiles` in shared route and username validation constants to prevent profile collisions
+- [internal] Added route protections so artist profile handles cannot conflict with the new artist profiles page
 - Homepage staggered animations now respect reduced-motion preferences
+- [internal] Aligned homepage feature-flag defaults with the shipped marketing layout
 
 ### Fixed
 
-- Homepage E2E coverage now matches the active flag-controlled section layout
+- [internal] Homepage E2E coverage now matches the active section layout
 - Increased the new hero body copy size to 16px for better readability
 
 ## [26.3.111] - 2026-03-31
