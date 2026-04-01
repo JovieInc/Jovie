@@ -7,13 +7,13 @@ import { resolveProfileV2Presentation } from '@/features/profile/profile-v2-pres
 
 describe('resolveProfileV2Presentation', () => {
   it.each([
-    ['profile', { initialPane: 'profile', initialOverlay: null }],
-    ['tour', { initialPane: 'tour', initialOverlay: null }],
-    ['tip', { initialPane: 'tip', initialOverlay: null }],
-    ['about', { initialPane: 'about', initialOverlay: null }],
-    ['listen', { initialPane: 'profile', initialOverlay: 'listen' }],
-    ['subscribe', { initialPane: 'profile', initialOverlay: 'subscribe' }],
-    ['contact', { initialPane: 'profile', initialOverlay: 'contact' }],
+    ['profile', { initialOverlay: null, scrollTarget: null }],
+    ['tour', { initialOverlay: null, scrollTarget: 'tour' }],
+    ['tip', { initialOverlay: 'tip', scrollTarget: null }],
+    ['about', { initialOverlay: null, scrollTarget: null }],
+    ['listen', { initialOverlay: 'listen', scrollTarget: null }],
+    ['subscribe', { initialOverlay: 'subscribe', scrollTarget: null }],
+    ['contact', { initialOverlay: 'contact', scrollTarget: null }],
   ] satisfies ReadonlyArray<
     readonly [ProfileMode, unknown]
   >)('maps %s into the expected pane and overlay', (mode, expected) => {

@@ -69,7 +69,7 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
       target='_blank'
       rel='noopener noreferrer'
       onClick={handleClick}
-      className='group flex h-10 w-10 items-center justify-center rounded-full border border-subtle/40 bg-transparent text-secondary-token transition-[background-color,border-color,color] hover:border-subtle hover:bg-surface-1 hover:text-primary-token cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+      className='group flex h-11 min-w-11 items-center justify-center rounded-full border border-white/8 bg-white/[0.045] text-secondary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition-[background-color,border-color,color,transform] hover:border-white/14 hover:bg-white/[0.08] hover:text-primary-token active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
       title={`Follow on ${link.platform}`}
       aria-label={`Follow ${artistName} on ${link.platform}`}
     >
