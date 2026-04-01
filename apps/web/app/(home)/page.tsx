@@ -3,7 +3,7 @@ import { APP_NAME, BASE_URL } from '@/constants/app';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { FeatureShowcase } from '@/features/home/FeatureShowcase';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
-import { HeroCinematic } from '@/features/home/HeroCinematic';
+import { HeroLinear } from '@/features/home/HeroLinear';
 import { LogoBar } from '@/features/home/LogoBar';
 import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
 import {
@@ -17,9 +17,11 @@ import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = { absolute: `${APP_NAME} | Release More Music.` };
+  const title = {
+    absolute: `${APP_NAME} | Drop More Music. Crush Every Release.`,
+  };
   const description =
-    'Release more music. Do less release work. Jovie gives independent artists smart links, artist profiles, audience intelligence, and release automation built for every drop.';
+    'Drop more music. Crush every release. Jovie gives independent artists smart links, artist profiles, audience intelligence, and release automation — all from one Spotify connection.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -85,7 +87,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${BASE_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - Release More Music.`,
+          alt: `${APP_NAME} - Drop More Music. Crush Every Release.`,
           type: 'image/png',
         },
       ],
@@ -97,7 +99,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${BASE_URL}/og/default.png`,
-          alt: `${APP_NAME} - Release More Music.`,
+          alt: `${APP_NAME} - Drop More Music. Crush Every Release.`,
           width: 1200,
           height: 630,
         },
@@ -133,11 +135,11 @@ export async function generateMetadata(): Promise<Metadata> {
 const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'Release more music. Do less release work. Jovie gives independent artists smart links, artist profiles, audience intelligence, and release automation built for every drop.',
+    'Drop more music. Crush every release. Jovie gives independent artists smart links, artist profiles, audience intelligence, and release automation — all from one Spotify connection.',
 });
 
 const SOFTWARE_SCHEMA = buildSoftwareSchema(
-  'Release more music with smart links, audience intelligence, paid release notifications, and AI support built for independent musicians.'
+  'Drop more music with smart links, audience intelligence, release automation, and AI support built for independent musicians.'
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
@@ -176,11 +178,11 @@ export default function HomePage() {
         </style>
       )}
 
-      <HeroCinematic fullScreen={heroOnly} />
+      <HeroLinear fullScreen={heroOnly} />
 
-      {FEATURE_FLAGS.SHOW_PHONE_TOUR && <StickyPhoneTour />}
+      <LogoBar />
 
-      {FEATURE_FLAGS.SHOW_LOGO_BAR && <LogoBar />}
+      <StickyPhoneTour />
 
       {FEATURE_FLAGS.SHOW_FEATURE_SHOWCASE && (
         <>

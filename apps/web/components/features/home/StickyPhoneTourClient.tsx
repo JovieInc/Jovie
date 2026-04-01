@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Container } from '@/components/site/Container';
 import {
   CrossfadeBlock,
   MODES,
@@ -118,8 +117,8 @@ export function StickyPhoneTourClient() {
         />
 
         <div className='sticky top-0 z-10 flex h-dvh items-center justify-center'>
-          <Container size='homepage'>
-            <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
+          <div className='mx-auto w-full max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0'>
+            <div className='relative'>
               <div className='grid items-center grid-cols-[1fr_auto_1fr] gap-8 xl:gap-16'>
                 <div className='relative min-h-[320px]'>
                   <span className='inline-flex items-center gap-1.5 self-start rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
@@ -205,12 +204,12 @@ export function StickyPhoneTourClient() {
                 </div>
               </div>
             </div>
-          </Container>
+          </div>
         </div>
       </section>
 
       <section className='lg:hidden section-spacing-linear'>
-        <Container size='homepage'>
+        <div className='mx-auto w-full max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0'>
           <div
             aria-hidden='true'
             className='mx-auto mb-16 h-px max-w-lg'
@@ -220,7 +219,7 @@ export function StickyPhoneTourClient() {
             }}
           />
 
-          <div className='mx-auto max-w-[var(--linear-content-max)]'>
+          <div>
             <div className='mb-12 flex flex-col items-center gap-6 text-center'>
               <span className='inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
                 One profile. Every way fans support you.
@@ -240,7 +239,7 @@ export function StickyPhoneTourClient() {
               ))}
             </div>
           </div>
-        </Container>
+        </div>
       </section>
     </>
   );

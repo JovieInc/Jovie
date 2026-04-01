@@ -89,6 +89,7 @@ export const APP_ROUTES = {
   UNAVAILABLE: '/unavailable',
 
   // Marketing
+  ARTIST_PROFILES: '/artist-profiles',
   DEMO: '/demo',
   LANDING_NEW: '/new',
   PRICING: '/pricing',

@@ -44,6 +44,7 @@ export const RESERVED_USERNAMES = [
   'mail',
   'changelog',
   'engagement-engine',
+  'artist-profiles',
 
   // Legal/company pages
   'about',
