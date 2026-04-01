@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.3.111] - 2026-03-31
+
+> Extracted shared dashboard primitives: reusable filter UI components, standardized query cache strategies, consolidated keyboard shortcuts, and a shared API route guard.
+
+### Changed
+
+- Extracted `ActiveFilterPill`, `FilterCheckboxItem`, and `FilterSearchInput` into reusable `molecules/filters` primitives
+- Refactored `FilterSubmenu` into a generic, searchable checkbox submenu component
+- Consolidated `AudienceFilterDropdown` and `ReleaseFilterDropdown` onto shared filter primitives
+- Standardized query hook options via `cache-strategies.ts` presets (`STANDARD_CACHE`, `FREQUENT_BACKGROUND_CACHE`, `RETRY_BACKOFF`, etc.)
+- Extended query key factories with filter/sort parameterization for cache granularity
+- Consolidated dashboard keyboard shortcuts into a single `useDashboardShortcuts` orchestrator
+
+### Added
+
+- Shared API route guard `withDashboardRoute` centralizing auth/profile resolution and error responses
+- Keyboard shortcut registry validation tests (no duplicate keys, no overlapping bindings)
+
+### Fixed
+
+- Added missing Escape key handler in filter checkbox items for keyboard navigation
+
 ## [26.3.110] - 2026-03-31
 
 > Added the Linear-style tasks foundation and unified the app, demo, and onboarding shell framing so pages, drawers, and tables share one consistent layout system.

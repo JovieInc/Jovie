@@ -14,8 +14,8 @@ vi.mock('@/hooks/useAuthRouteConfig', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useSequentialShortcuts', () => ({
-  useSequentialShortcuts: vi.fn(),
+vi.mock('@/hooks/useDashboardShortcuts', () => ({
+  useDashboardShortcuts: vi.fn(),
 }));
 
 vi.mock('@/components/organisms/AuthShell', () => ({

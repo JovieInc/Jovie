@@ -10,7 +10,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { track } from '@/lib/analytics';
-import { STANDARD_CACHE } from './cache-strategies';
+import { STANDARD_NO_REMOUNT_CACHE } from './cache-strategies';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import { handleMutationError, handleMutationSuccess } from './mutation-utils';
@@ -113,8 +113,7 @@ export function useDashboardSocialLinksQuery(profileId: string) {
     queryKey: queryKeys.dashboard.socialLinks(profileId),
     queryFn: ({ signal }) => fetchSocialLinks(profileId, signal),
     enabled: Boolean(profileId),
-    ...STANDARD_CACHE,
-    refetchOnMount: false,
+    ...STANDARD_NO_REMOUNT_CACHE,
   });
 }
 
