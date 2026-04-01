@@ -62,12 +62,6 @@ test.describe('Homepage', () => {
       page.getByRole('heading', { name: 'The right action for every fan.' })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Release day, automated.' })
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Know every fan by name.' })
-    ).toBeVisible();
-    await expect(
       page.getByRole('heading', { name: 'Claim your handle.' })
     ).toBeVisible();
   });

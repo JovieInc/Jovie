@@ -42,7 +42,7 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
             <p
               className='mt-5'
               style={{
-                fontSize: '15px',
+                fontSize: '16px',
                 fontWeight: 400,
                 lineHeight: '24px',
                 letterSpacing: '-0.011em',
