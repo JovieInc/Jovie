@@ -139,7 +139,9 @@ export function ArtistHero({
                   rel={
                     primaryAction.external ? 'noopener noreferrer' : undefined
                   }
-                  onClick={primaryAction.onClick}
+                  onClick={
+                    primaryAction.external ? undefined : primaryAction.onClick
+                  }
                   aria-label={primaryAction.ariaLabel ?? primaryAction.label}
                   className={primaryActionClassName}
                 >
