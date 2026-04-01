@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.107] - 2026-04-01
+
+> Reworked the marketing homepage around a Linear-style hero and phone-tour layout, added a dedicated artist profiles landing page, and refreshed homepage accessibility and E2E coverage.
+
+### Added
+
+- Added a static `/artist-profiles` marketing page for the artist profile funnel
+- Added the new `HeroLinear` homepage hero variant
+
+### Changed
+
+- Reworked the homepage hero copy, logo bar layout, and phone-tour spacing around the new Linear-inspired marketing direction
+- Reserved `/artist-profiles` in shared route and username validation constants to prevent profile collisions
+- Homepage staggered animations now respect reduced-motion preferences
+
+### Fixed
+
+- Homepage E2E coverage now matches the active flag-controlled section layout
+- Increased the new hero body copy size to 16px for better readability
+
 ## [26.3.111] - 2026-03-31
 
 > Extracted shared dashboard primitives: reusable filter UI components, standardized query cache strategies, consolidated keyboard shortcuts, and a shared API route guard.
