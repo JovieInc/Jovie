@@ -54,7 +54,10 @@ export function ReleaseTaskPage({
   };
 
   return (
-    <div className='mx-auto max-w-2xl px-4 py-6'>
+    <div
+      className='mx-auto max-w-2xl px-4 py-6'
+      data-testid='release-task-page'
+    >
       {/* Breadcrumb */}
       <nav className='mb-4 text-[12px] text-tertiary-token'>
         <span className='hover:text-secondary-token cursor-pointer'>

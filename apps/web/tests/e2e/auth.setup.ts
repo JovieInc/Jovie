@@ -4,6 +4,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_COOKIE,
+  TEST_PERSONA_COOKIE,
   TEST_USER_ID_COOKIE,
 } from '@/lib/auth/test-mode';
 import { primeVercelBypassCookie } from '../helpers/vercel-preview';
@@ -11,6 +12,40 @@ import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 
 const AUTH_FILE = 'tests/.auth/user.json';
 const AUTH_READY_ROUTE = APP_ROUTES.DASHBOARD;
+
+function getRequestedBypassPersona(): 'creator' | 'admin' | null {
+  const persona = process.env.E2E_TEST_AUTH_PERSONA?.trim();
+  if (persona === 'creator' || persona === 'admin') {
+    return persona;
+  }
+  return null;
+}
+
+async function resolveBypassUserId(
+  cookieBaseUrl: string,
+  fallbackUserId: string,
+  persona: 'creator' | 'admin' | null
+): Promise<string> {
+  if (!persona) {
+    return fallbackUserId;
+  }
+
+  const response = await fetch(
+    new URL('/api/dev/test-auth/session', cookieBaseUrl),
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ persona }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to resolve ${persona} test-auth session`);
+  }
+
+  const payload = (await response.json()) as { userId?: string | null };
+  return payload.userId?.trim() || fallbackUserId;
+}
 
 setup.describe.configure({ mode: 'serial' });
 
@@ -20,12 +55,18 @@ setup('authenticate', async ({ page, baseURL }) => {
   if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
     console.log('  Test auth bypass enabled, skipping Clerk auth bootstrap');
     const testUserId = process.env.E2E_CLERK_USER_ID?.trim();
+    const persona = getRequestedBypassPersona();
     const cookieBaseUrl = baseURL ?? process.env.BASE_URL;
     if (!cookieBaseUrl || !testUserId) {
       throw new Error(
         'E2E_USE_TEST_AUTH_BYPASS requires both baseURL/BASE_URL and E2E_CLERK_USER_ID.'
       );
     }
+    const resolvedUserId = await resolveBypassUserId(
+      cookieBaseUrl,
+      testUserId,
+      persona
+    );
     await page.context().addCookies([
       {
         name: TEST_MODE_COOKIE,
@@ -35,10 +76,20 @@ setup('authenticate', async ({ page, baseURL }) => {
       },
       {
         name: TEST_USER_ID_COOKIE,
-        value: testUserId,
+        value: resolvedUserId,
         url: cookieBaseUrl,
         sameSite: 'Lax',
       },
+      ...(persona
+        ? [
+            {
+              name: TEST_PERSONA_COOKIE,
+              value: persona,
+              url: cookieBaseUrl,
+              sameSite: 'Lax' as const,
+            },
+          ]
+        : []),
     ]);
     await page.context().storageState({ path: AUTH_FILE });
     return;

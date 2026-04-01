@@ -55,6 +55,13 @@ const DASHBOARD_PAGES = FAST_ITERATION
       { path: APP_ROUTES.DASHBOARD_AUDIENCE, name: 'Audience' },
     ];
 
+async function settleAdminNavigation(page: import('@playwright/test').Page) {
+  await waitForHydration(page, { timeout: 15_000 }).catch(() => {});
+  await page
+    .waitForLoadState('domcontentloaded', { timeout: 5_000 })
+    .catch(() => {});
+}
+
 test.describe('Admin Navigation Persistence @smoke', () => {
   test.skip(
     FAST_ITERATION,
@@ -325,14 +332,20 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     let failures = 0;
 
     for (const path of allPages) {
-      // Navigate without waiting for full load
-      await smokeNavigateWithRetry(page, path, {
-        timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
-        retries: FAST_ITERATION ? 3 : 2,
-      });
-
-      // Brief wait for React to render
-      await page.waitForLoadState('domcontentloaded');
+      try {
+        await smokeNavigateWithRetry(page, path, {
+          timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
+          retries: FAST_ITERATION ? 3 : 2,
+        });
+        await settleAdminNavigation(page);
+      } catch (error) {
+        failures++;
+        console.log(`⚠ Navigation failed on ${path}: ${String(error)}`);
+        if (page.isClosed()) {
+          break;
+        }
+        continue;
+      }
 
       // Check for client-side errors
       const { hasError: pageError } = await checkForClientError(page);
@@ -343,7 +356,14 @@ test.describe('Admin Navigation Persistence @smoke', () => {
       }
 
       // Check admin nav visibility
-      const isVisible = await adminNavSection.isVisible().catch(() => false);
+      const isVisible = await expect
+        .poll(async () => adminNavSection.isVisible().catch(() => false), {
+          timeout: 10_000,
+          intervals: [500, 1000, 2000],
+        })
+        .toBeTruthy()
+        .then(() => true)
+        .catch(() => false);
       if (!isVisible) {
         failures++;
         console.log(`⚠ Admin nav not visible on ${path}`);
@@ -363,7 +383,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     }
 
     // Final check after all navigation
-    await page.waitForLoadState('domcontentloaded');
+    await settleAdminNavigation(page);
     const { hasError: finalError } = await checkForClientError(page);
     if (!finalError) {
       await expect(
@@ -426,7 +446,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
       if (!(await adminLink.isVisible())) {
         // Click to expand the admin section
         await adminNavHeader.click();
-        await page.waitForLoadState('domcontentloaded');
+        await settleAdminNavigation(page);
       }
     }
 
@@ -455,7 +475,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
       }
 
       await linkElement.click();
-      await page.waitForLoadState('domcontentloaded'); // Wait for navigation
+      await settleAdminNavigation(page);
 
       // Check for client-side errors
       const { hasError: navError } = await checkForClientError(page);

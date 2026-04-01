@@ -2,7 +2,12 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
+import { cookies, headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import {
+  isTestAuthBypassEnabled,
+  resolveTestBypassUserId,
+} from '@/lib/auth/test-mode';
 import { captureWarning } from '@/lib/error-tracking';
 import { isAdmin } from './roles';
 
@@ -40,7 +45,29 @@ function maskUserIdForLog(userId: string): string {
  * @returns NextResponse with 403 status if not admin, null if authorized
  */
 export async function requireAdmin(): Promise<NextResponse | null> {
-  const { userId } = await auth();
+  let userId: string | null = null;
+
+  if (isTestAuthBypassEnabled()) {
+    try {
+      const headerStore = await headers();
+      const cookieStore = await cookies();
+      userId = resolveTestBypassUserId(headerStore, cookieStore);
+    } catch {
+      // Ignore missing request context in local test paths.
+    }
+  }
+
+  if (!userId) {
+    try {
+      const authResult = await auth();
+      userId = authResult.userId;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('clerkMiddleware')) {
+        throw error;
+      }
+    }
+  }
 
   // User not authenticated
   if (!userId) {
@@ -90,7 +117,30 @@ export async function requireAdmin(): Promise<NextResponse | null> {
  * @returns Promise<boolean> - True if user is admin
  */
 export async function checkIsAdmin(): Promise<boolean> {
-  const { userId } = await auth();
+  let userId: string | null = null;
+
+  if (isTestAuthBypassEnabled()) {
+    try {
+      const headerStore = await headers();
+      const cookieStore = await cookies();
+      userId = resolveTestBypassUserId(headerStore, cookieStore);
+    } catch {
+      // Ignore missing request context in local test paths.
+    }
+  }
+
+  if (!userId) {
+    try {
+      const authResult = await auth();
+      userId = authResult.userId;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('clerkMiddleware')) {
+        throw error;
+      }
+    }
+  }
+
   if (!userId) return false;
   return isAdmin(userId);
 }

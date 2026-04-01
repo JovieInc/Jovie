@@ -1,3 +1,4 @@
+import { neon } from '@neondatabase/serverless';
 import {
   expect,
   type Locator,
@@ -11,6 +12,7 @@ import {
   getAdminCredentials,
   hasClerkCredentials,
   isProductionTarget,
+  setTestAuthBypassSession,
   signInUser,
 } from '../helpers/clerk-auth';
 import {
@@ -65,6 +67,22 @@ const HEALTH_NAVIGATION_TIMEOUT = FAST_ITERATION
   ? 90_000
   : SMOKE_TIMEOUTS.NAVIGATION;
 const DASHBOARD_ROUTING_TIMEOUT = FAST_ITERATION ? 180_000 : 300_000;
+
+async function resolveSeededCreatorClerkId(): Promise<string | null> {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  if (!databaseUrl) return null;
+
+  const sql = neon(databaseUrl);
+  const rows = await sql<Array<{ clerk_id: string | null }>>`
+    select u.clerk_id
+    from users u
+    inner join creator_profiles p on p.user_id = u.id
+    where p.username = 'e2e-test-user'
+    limit 1
+  `;
+
+  return rows[0]?.clerk_id?.trim() || null;
+}
 
 function getComparableUrlValue(urlString: string): string {
   const url = new URL(urlString);
@@ -531,6 +549,10 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
     await stubPassiveTracking(page);
 
     try {
+      if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
+        const creatorClerkId = await resolveSeededCreatorClerkId();
+        await setTestAuthBypassSession(page, null, creatorClerkId);
+      }
       await ensureSignedInUser(page);
     } catch (error) {
       console.error('Failed to sign in test user:', error);
@@ -596,6 +618,9 @@ test.describe('Admin Pages Health Check @smoke', () => {
     await stubPassiveTracking(page);
 
     try {
+      if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
+        await setTestAuthBypassSession(page, 'admin');
+      }
       await ensureSignedInUser(page, getAdminCredentials());
     } catch (error) {
       console.error('Failed to sign in admin or fallback user:', error);
