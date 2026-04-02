@@ -14,7 +14,11 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { CACHE_TTL, createSmartLinkContentTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
-import { discogReleases } from '@/lib/db/schema/content';
+import {
+  discogRecordings,
+  discogReleases,
+  discogTracks,
+} from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
@@ -23,9 +27,13 @@ import {
   getProviderLink,
   getReleaseById,
   getReleasesForProfile as getReleasesFromDb,
+  getReleaseTracksForReleaseWithProviders,
+  getTracksForRelease,
   type ReleaseWithProviders,
   resetProviderLink as resetProviderLinkDb,
   upsertProviderLink,
+  upsertRecording,
+  upsertReleaseTrack,
 } from '@/lib/discography/queries';
 import { loadReleaseTracksForProfile } from '@/lib/discography/release-track-loader';
 import {
@@ -79,9 +87,66 @@ import { getDashboardData, getDashboardShellData } from '../actions';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
   'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
+const EDITABLE_ISRC_REGEX = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
 
 function isSpotifyIdUniqueViolation(error: unknown): boolean {
   return isUniqueViolation(error, 'creator_profiles_spotify_id_unique');
+}
+
+function normalizeEditableText(
+  value: string | null | undefined
+): string | null {
+  const trimmed = value?.trim() ?? '';
+  return trimmed ? trimmed : null;
+}
+
+function normalizeEditableUpc(value: string | null | undefined): string | null {
+  const normalized = normalizeEditableText(value);
+  if (!normalized) return null;
+  if (!/^\d+$/u.test(normalized)) {
+    throw new Error('UPC must contain only digits');
+  }
+  return normalized;
+}
+
+function normalizeEditableIsrc(
+  value: string | null | undefined
+): string | null {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return null;
+
+  const normalized = trimmed.replaceAll(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (!EDITABLE_ISRC_REGEX.test(normalized)) {
+    throw new Error('ISRC must be 12 letters and digits');
+  }
+
+  return normalized;
+}
+
+function rethrowReleaseMetadataError(
+  error: unknown,
+  field: 'upc' | 'isrc'
+): never {
+  if (
+    isUniqueViolation(
+      error,
+      field === 'upc'
+        ? 'discog_releases_creator_upc_unique'
+        : 'discog_recordings_creator_isrc_unique'
+    )
+  ) {
+    throw new Error(
+      field === 'upc'
+        ? 'This UPC is already used on another release'
+        : 'This ISRC is already used on another track'
+    );
+  }
+
+  if (error instanceof Error) {
+    throw error;
+  }
+
+  throw new Error(`Failed to save ${field.toUpperCase()}`);
 }
 
 function normalizeSpotifyArtistUrl(rawUrl: string, spotifyArtistId: string) {
@@ -557,6 +622,139 @@ export async function saveCanvasStatus(params: {
     await updateReleaseColumns(releaseId, profileId, {
       metadata: nextMetadata,
     });
+  });
+}
+
+export async function saveReleaseMetadata(params: {
+  profileId: string;
+  releaseId: string;
+  upc: string | null;
+  label: string | null;
+}): Promise<ReleaseViewModel> {
+  const normalizedUpc = normalizeEditableUpc(params.upc);
+  const normalizedLabel = normalizeEditableText(params.label);
+
+  return mutateRelease(params, async (releaseId, profileId) => {
+    try {
+      await updateReleaseColumns(releaseId, profileId, {
+        upc: normalizedUpc,
+        label: normalizedLabel,
+      });
+    } catch (error) {
+      rethrowReleaseMetadataError(error, 'upc');
+    }
+  });
+}
+
+export async function savePrimaryIsrc(params: {
+  profileId: string;
+  releaseId: string;
+  isrc: string | null;
+}): Promise<ReleaseViewModel> {
+  const normalizedIsrc = normalizeEditableIsrc(params.isrc);
+
+  return mutateRelease(params, async (releaseId, profileId) => {
+    const release = await getReleaseById(releaseId);
+    if (!release) {
+      throw new TypeError('Release not found');
+    }
+
+    const [releaseTrackResult, legacyTracks, existingRecording] =
+      await Promise.all([
+        getReleaseTracksForReleaseWithProviders(releaseId, {
+          limit: 1,
+          offset: 0,
+        }),
+        getTracksForRelease(releaseId),
+        normalizedIsrc
+          ? db
+              .select({ id: discogRecordings.id })
+              .from(discogRecordings)
+              .where(
+                and(
+                  eq(discogRecordings.creatorProfileId, profileId),
+                  eq(discogRecordings.isrc, normalizedIsrc)
+                )
+              )
+              .limit(1)
+          : Promise.resolve([]),
+      ]);
+
+    const primaryReleaseTrack = releaseTrackResult.tracks[0] ?? null;
+    const primaryLegacyTrack = legacyTracks[0] ?? null;
+    const existingRecordingId = existingRecording[0]?.id ?? null;
+
+    if (
+      normalizedIsrc &&
+      existingRecordingId &&
+      existingRecordingId !== primaryReleaseTrack?.recordingId
+    ) {
+      throw new Error('This ISRC is already used on another track');
+    }
+
+    if (primaryReleaseTrack?.recordingId) {
+      try {
+        await db
+          .update(discogRecordings)
+          .set({ isrc: normalizedIsrc, updatedAt: new Date() })
+          .where(eq(discogRecordings.id, primaryReleaseTrack.recordingId));
+      } catch (error) {
+        rethrowReleaseMetadataError(error, 'isrc');
+      }
+      return;
+    }
+
+    if (primaryLegacyTrack?.id) {
+      try {
+        await db
+          .update(discogTracks)
+          .set({ isrc: normalizedIsrc, updatedAt: new Date() })
+          .where(eq(discogTracks.id, primaryLegacyTrack.id));
+      } catch (error) {
+        rethrowReleaseMetadataError(error, 'isrc');
+      }
+      return;
+    }
+
+    if (normalizedIsrc == null) {
+      return;
+    }
+
+    if (release.sourceType !== 'manual') {
+      throw new Error(
+        'ISRC can only be edited automatically for manual releases without tracks'
+      );
+    }
+
+    const baseSlug = slugify(release.title) || `${release.slug}-track-1`;
+
+    try {
+      const recording = await upsertRecording({
+        creatorProfileId: profileId,
+        title: release.title,
+        slug: baseSlug,
+        isrc: normalizedIsrc,
+        isExplicit: release.isExplicit,
+        sourceType: 'manual',
+      });
+
+      await upsertReleaseTrack({
+        releaseId,
+        recordingId: recording.id,
+        title: release.title,
+        slug: baseSlug,
+        trackNumber: 1,
+        discNumber: 1,
+        isExplicit: release.isExplicit,
+        sourceType: 'manual',
+      });
+
+      if ((release.totalTracks ?? 0) < 1) {
+        await updateReleaseColumns(releaseId, profileId, { totalTracks: 1 });
+      }
+    } catch (error) {
+      rethrowReleaseMetadataError(error, 'isrc');
+    }
   });
 }
 

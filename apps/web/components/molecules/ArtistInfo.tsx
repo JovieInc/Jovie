@@ -18,6 +18,7 @@ interface ArtistInfoProps {
   readonly photoDownloadSizes?: AvatarSize[];
   /** Whether profile photo downloads are allowed */
   readonly allowPhotoDownloads?: boolean;
+  readonly align?: 'center' | 'start';
 }
 
 export function ArtistInfo({
@@ -29,6 +30,7 @@ export function ArtistInfo({
   linkToProfile = true,
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
+  align = 'center',
 }: ArtistInfoProps) {
   const resolvedSubtitle =
     subtitle ?? artist.tagline ?? DEFAULT_PROFILE_TAGLINE;
@@ -79,7 +81,9 @@ export function ArtistInfo({
 
   return (
     <div
-      className={`flex flex-col items-center space-y-2.5 sm:space-y-3 text-center ${className}`}
+      className={`flex flex-col space-y-2.5 sm:space-y-3 ${
+        align === 'start' ? 'items-start text-left' : 'items-center text-center'
+      } ${className}`}
     >
       <ProfilePhotoContextMenu
         name={artist.name}
@@ -100,7 +104,11 @@ export function ArtistInfo({
         )}
       </ProfilePhotoContextMenu>
 
-      <div className='space-y-1.5 sm:space-y-2 max-w-md'>
+      <div
+        className={`max-w-md space-y-1.5 sm:space-y-2 ${
+          align === 'start' ? 'text-left' : 'text-center'
+        }`}
+      >
         <ArtistName
           name={artist.name}
           handle={artist.handle}

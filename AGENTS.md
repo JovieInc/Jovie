@@ -269,6 +269,26 @@ These rules are enforced by `.claude/hooks/` and will **block your changes** if 
 - Never lowercase the first word of a visible label or heading
 - Use `capitalizeFirst()` from `apps/web/lib/utils/string-utils.ts` for dynamic data from the database
 
+### 4b. Subtraction Principle (Tim White Canon)
+
+- UI cleanup must follow the subtraction principle: remove before adding
+- When a screen feels messy, agents should first look for duplicated labels, redundant helper text, nested containers, extra borders, repeated actions, and unnecessary variants
+- Prefer one clear heading, one clear action cluster, and one clear surface hierarchy instead of layering multiple decorative cues
+- If an existing label, icon, placeholder, or layout already communicates the action, remove the extra explanatory UI around it
+- Agents should not "solve" weak hierarchy by adding more badges, more cards, more copy, or more controls unless subtraction has clearly failed
+- During refactors and polish passes, explicitly audit for what can be deleted, merged, flattened, or simplified before introducing anything new
+
+### 4c. No AI-Slop Product UI
+
+- Jovie product UI must feel closer to Linear than generic AI-generated dashboards: compact, quiet, precise, and premium
+- Default to small typography, restrained weight changes, and clean spacing before adding decorative treatment
+- Do **NOT** use all-caps labels, eyebrow text, or section headers as a default styling move; use normal Title Case labels unless an existing canonical pattern explicitly calls for something else
+- Do **NOT** wrap every block in rounded cards or bordered boxes just to create structure; first solve hierarchy with spacing, alignment, type, and surface contrast
+- Borders are a supporting tool, not the main design language; if a border can be removed without losing meaning, remove it
+- Avoid the common AI mockup pattern of tiny uppercase eyebrow + long explanatory paragraph inside a large rounded bordered card
+- Prefer one compact, well-set label and one clear body line over stacked label, headline, description, and chrome all saying the same thing
+- When implementing or revising UI, compare the result against this smell test: if it looks like a generic AI admin template, it is off-style and should be simplified
+
 ### 5. Conventional Commits Required
 
 ```bash

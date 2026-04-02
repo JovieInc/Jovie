@@ -24,6 +24,8 @@ interface ProductScreenshotProps {
   readonly skipCheck?: boolean;
   /** Stable test selector for screenshot wrapper assertions. */
   readonly testId?: string;
+  /** Visual frame treatment around the screenshot. */
+  readonly chrome?: 'window' | 'minimal';
 }
 
 /**
@@ -40,6 +42,7 @@ export function ProductScreenshot({
   className,
   skipCheck = false,
   testId,
+  chrome = 'window',
 }: ProductScreenshotProps) {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(
     skipCheck ? true : null
@@ -83,7 +86,6 @@ export function ProductScreenshot({
           '0 0 0 1px var(--linear-app-shell-border), 0 28px 70px rgba(0,0,0,0.28), 0 10px 22px rgba(0,0,0,0.18)',
       }}
     >
-      {/* Top shine */}
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-x-0 top-0 z-10 h-px'
@@ -93,18 +95,19 @@ export function ProductScreenshot({
         }}
       />
 
-      {/* Mac window chrome */}
-      <div className='flex h-10 items-center border-b border-subtle bg-surface-1 px-4 sm:px-5'>
-        <div className='flex gap-2' aria-hidden='true'>
-          <div className='h-3 w-3 rounded-full border border-black/10 bg-[#ED6A5E]' />
-          <div className='h-3 w-3 rounded-full border border-black/10 bg-[#F4BF4F]' />
-          <div className='h-3 w-3 rounded-full border border-black/10 bg-[#61C554]' />
+      {chrome === 'window' ? (
+        <div className='flex h-10 items-center border-b border-subtle bg-surface-1 px-4 sm:px-5'>
+          <div className='flex gap-2' aria-hidden='true'>
+            <div className='h-3 w-3 rounded-full border border-black/10 bg-[#ED6A5E]' />
+            <div className='h-3 w-3 rounded-full border border-black/10 bg-[#F4BF4F]' />
+            <div className='h-3 w-3 rounded-full border border-black/10 bg-[#61C554]' />
+          </div>
+          <div className='flex-1 text-center text-xs text-tertiary-token'>
+            {title}
+          </div>
+          <div className='w-[52px]' />
         </div>
-        <div className='flex-1 text-center text-xs text-tertiary-token'>
-          {title}
-        </div>
-        <div className='w-[52px]' />
-      </div>
+      ) : null}
 
       {/* Screenshot image */}
       {(() => {

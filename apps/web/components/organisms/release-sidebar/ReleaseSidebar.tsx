@@ -312,6 +312,8 @@ export function ReleaseSidebar({
   isRescanningIsrc = false,
   onSaveTargetPlaylists,
   onSaveLyrics,
+  onSaveMetadata,
+  onSavePrimaryIsrc,
   onFormatLyrics,
   isLyricsSaving = false,
   allowDownloads = false,
@@ -729,6 +731,9 @@ export function ReleaseSidebar({
                 >
                   <ReleaseMetadata
                     release={release}
+                    isEditable={isEditable}
+                    onSaveMetadata={readOnly ? undefined : onSaveMetadata}
+                    onSavePrimaryIsrc={readOnly ? undefined : onSavePrimaryIsrc}
                     onCanvasStatusChange={
                       canEditCanvasStatus ? handleCanvasStatusChange : undefined
                     }

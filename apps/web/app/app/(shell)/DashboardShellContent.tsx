@@ -1,4 +1,4 @@
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { UnavailablePage } from '@/components/UnavailablePage';
@@ -17,7 +17,6 @@ import {
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
 import { ProfileCompletionRedirect } from './ProfileCompletionRedirect';
 import {
-  resolveAppShellRequestPath,
   shouldRedirectToOnboarding,
   shouldUseEssentialShellData,
 } from './shell-route-matches';
@@ -37,22 +36,24 @@ import {
  */
 export async function DashboardShellContent({
   userId,
+  pathname,
   children,
 }: {
   readonly userId: string;
+  readonly pathname: string | null;
   readonly children: React.ReactNode;
 }) {
   // Keep the shell fast on the chat-first landing path and releases.
   // Other dashboard/settings routes still receive the full dashboard context
   // because they rely on supplementary fields from the slower fetch.
-  const headerStore = await headers();
-  const pathname = resolveAppShellRequestPath(headerStore.get('next-url'));
   const useEssentialShell = shouldUseEssentialShellData(pathname);
+  const cookieStorePromise = cookies();
 
   // Run ban check in parallel with dashboard data fetch
-  const [dashboardData, banStatus] = await Promise.all([
+  const [dashboardData, banStatus, cookieStore] = await Promise.all([
     useEssentialShell ? getDashboardShellData(userId) : getDashboardData(),
     getUserBanStatus(userId),
+    cookieStorePromise,
   ]);
 
   if (banStatus.isBanned) {
@@ -68,7 +69,6 @@ export async function DashboardShellContent({
   }
 
   // Read sidebar cookie server-side so SSR matches client state (no flash)
-  const cookieStore = await cookies();
   const sidebarCookie = cookieStore.get('sidebar:state');
   const sidebarDefaultOpen = sidebarCookie?.value !== 'false';
 

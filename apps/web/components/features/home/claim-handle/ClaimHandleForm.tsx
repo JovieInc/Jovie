@@ -167,6 +167,7 @@ export function ClaimHandleForm({
   onHandleChange,
   size = 'default',
   submitButtonTestId,
+  hideHelperText = false,
   submitTracking,
 }: Readonly<ClaimHandleFormProps>) {
   const isHero = size === 'hero';
@@ -381,7 +382,7 @@ export function ClaimHandleForm({
       </div>
 
       {/* Helper text — minimal, surgical */}
-      {helperState.text && (
+      {!hideHelperText && helperState.text && (
         <p
           id='handle-hint'
           className={cn(
@@ -401,7 +402,7 @@ export function ClaimHandleForm({
       )}
 
       {/* Error summary for form validation */}
-      {formSubmitted && handleError && (
+      {!hideHelperText && formSubmitted && handleError && (
         <p
           className='mt-1.5 pl-1'
           style={{

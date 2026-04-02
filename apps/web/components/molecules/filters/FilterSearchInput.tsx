@@ -51,7 +51,7 @@ export function FilterSearchInput({
   );
 
   return (
-    <div className='sticky top-0 z-10 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2 py-2'>
+    <div className='sticky top-0 z-10 bg-(--linear-app-content-surface)'>
       <div className='relative'>
         <Icon
           name='Search'
@@ -65,7 +65,7 @@ export function FilterSearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           className={cn(
-            'w-full rounded-[6px] border border-transparent bg-surface-0 py-1.5 pl-7 pr-6 text-[13px]',
+            'w-full rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 py-1.5 pl-7 pr-6 text-[12px]',
             'text-primary-token placeholder:text-tertiary-token',
             'transition-[background-color,border-color,box-shadow] duration-150',
             'focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'

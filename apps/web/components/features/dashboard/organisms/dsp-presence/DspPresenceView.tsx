@@ -8,7 +8,7 @@ import type {
   DspPresenceItem,
 } from '@/app/app/(shell)/dashboard/presence/actions';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
-import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
+import { PageShell } from '@/components/organisms/PageShell';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useDspEnrichmentStatusQuery } from '@/lib/queries/useDspEnrichmentStatusQuery';
@@ -121,7 +121,7 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
 
   if (data.items.length === 0) {
     return (
-      <DashboardWorkspacePanel
+      <PageShell
         toolbar={toolbar}
         data-testid='dsp-presence-workspace'
       >
@@ -131,12 +131,12 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
         >
           <DspPresenceEmptyState existingProviderIds={existingProviderIds} />
         </div>
-      </DashboardWorkspacePanel>
+      </PageShell>
     );
   }
 
   return (
-    <DashboardWorkspacePanel
+    <PageShell
       toolbar={toolbar}
       data-testid='dsp-presence-workspace'
     >
@@ -152,6 +152,6 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
           />
         </div>
       </div>
-    </DashboardWorkspacePanel>
+    </PageShell>
   );
 }

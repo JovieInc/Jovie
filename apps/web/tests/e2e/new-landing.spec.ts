@@ -63,6 +63,16 @@ test.describe('/new landing page', () => {
     await expect(page.getByTestId('homepage-shell')).toBeVisible();
     await expect(page.getByTestId('hero-heading')).toBeVisible();
     await expect(page.getByTestId('landing-hero-cta')).toBeVisible();
+    await expect(page.getByTestId('landing-hero-screenshot')).toBeVisible();
+
+    await expect(
+      page.getByRole('heading', { name: /drop more music/i })
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        /smart links, artist profiles, release automation, and audience proof/i
+      )
+    ).toBeVisible();
 
     await expect(page.getByTestId('landing-release-section')).toBeVisible();
     await expect(
@@ -114,6 +124,10 @@ test.describe('/new landing page', () => {
     ).toBeVisible();
     await expect(
       page.getByTestId('landing-profile-proof-top-source')
+    ).toBeVisible();
+    await expect(page.getByTestId('landing-release-screenshot')).toBeVisible();
+    await expect(
+      page.getByTestId('landing-profile-desktop-screenshot')
     ).toBeVisible();
     await expect(page.locator('body')).not.toContainText('Page not found');
 
@@ -169,6 +183,34 @@ test.describe('/new landing page', () => {
         handle: 'releasefanclub',
         ts: expect.any(Number),
       })
+    );
+  });
+
+  test('uses pill-styled hero CTA and stable release proof layout', async ({
+    page,
+  }) => {
+    await gotoLanding(page);
+
+    const heroCta = page.getByTestId('landing-hero-cta');
+    await expect(heroCta).toHaveClass(/rounded-full/);
+
+    const releaseSection = page.getByTestId('landing-release-section');
+    await expect(releaseSection).toBeVisible();
+    await expect(releaseSection).toHaveScreenshot(
+      'landing-release-section.png'
+    );
+  });
+
+  test('keeps the hero layout sharp on mobile', async ({ page }) => {
+    await blockAnalytics(page);
+    await page.setViewportSize({ width: 375, height: 812 });
+    await gotoLanding(page);
+
+    await expect(page.getByTestId('homepage-shell')).toBeVisible();
+    await expect(page.getByTestId('landing-hero-cta')).toBeVisible();
+    await expect(page.getByTestId('landing-hero-screenshot')).toBeVisible();
+    await expect(page.getByTestId('homepage-shell')).toHaveScreenshot(
+      'landing-hero-mobile.png'
     );
   });
 });

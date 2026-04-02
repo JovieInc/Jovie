@@ -111,6 +111,16 @@ export interface ReleaseSidebarProps {
     releaseId: string,
     status: CanvasStatus
   ) => Promise<void>;
+  /** Persist release-level UPC and label fields */
+  readonly onSaveMetadata?: (
+    releaseId: string,
+    values: { upc: string | null; label: string | null }
+  ) => Promise<void>;
+  /** Persist the release's primary ISRC */
+  readonly onSavePrimaryIsrc?: (
+    releaseId: string,
+    isrc: string | null
+  ) => Promise<void>;
   /** Format lyrics for the specified platform */
   readonly onFormatLyrics?: (
     releaseId: string,

@@ -1,27 +1,22 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
-import { FeatureShowcase } from '@/features/home/FeatureShowcase';
-import { FinalCTASection } from '@/features/home/FinalCTASection';
-import { HeroLinear } from '@/features/home/HeroLinear';
-import { LogoBar } from '@/features/home/LogoBar';
-import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
+import { HomePageNarrative } from '@/features/home/HomePageNarrative';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = {
-    absolute: `${APP_NAME} | Drop More Music. Crush Every Release.`,
+    absolute: `${APP_NAME} | Drop More Music. Run Every Release.`,
   };
   const description =
-    'Drop more music. Crush every release. Jovie gives independent artists smart links, artist profiles, audience intelligence, and release automation — all from one Spotify connection.';
+    'Profiles, smart links, release AI, catalog monitoring, and task planning for independent artists, all in one system.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -87,7 +82,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${BASE_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - Drop More Music. Crush Every Release.`,
+          alt: `${APP_NAME} - Drop More Music. Run Every Release.`,
           type: 'image/png',
         },
       ],
@@ -99,7 +94,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${BASE_URL}/og/default.png`,
-          alt: `${APP_NAME} - Drop More Music. Crush Every Release.`,
+          alt: `${APP_NAME} - Drop More Music. Run Every Release.`,
           width: 1200,
           height: 630,
         },
@@ -135,17 +130,17 @@ export async function generateMetadata(): Promise<Metadata> {
 const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'Drop more music. Crush every release. Jovie gives independent artists smart links, artist profiles, audience intelligence, and release automation — all from one Spotify connection.',
+    'Profiles, smart links, release AI, catalog monitoring, and task planning for independent artists, all in one system.',
 });
 
 const SOFTWARE_SCHEMA = buildSoftwareSchema(
-  'Drop more music with smart links, audience intelligence, release automation, and AI support built for independent musicians.'
+  'Run every release with artist profiles, smart links, release AI, catalog monitoring, and task planning built for independent musicians.'
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: 'Jovie Technology Inc.',
   description:
-    'Jovie is the release platform for independent musicians, combining smart links, artist profiles, audience insights, paid release notifications, and AI support.',
+    'Jovie is the release platform for independent musicians, combining artist profiles, smart links, release AI, monitoring, and task planning.',
   sameAs: ['https://instagram.com/meetjovie'],
 });
 
@@ -158,20 +153,7 @@ export default function HomePage() {
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <HeroLinear />
-
-      <LogoBar />
-
-      <StickyPhoneTour />
-
-      {FEATURE_FLAGS.SHOW_FEATURE_SHOWCASE && (
-        <>
-          <FeatureShowcase />
-          <div aria-hidden='true' className='section-gradient-divider' />
-        </>
-      )}
-
-      {FEATURE_FLAGS.SHOW_FINAL_CTA && <FinalCTASection />}
+      <HomePageNarrative />
     </div>
   );
 }

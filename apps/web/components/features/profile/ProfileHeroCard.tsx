@@ -2,7 +2,8 @@
 
 import { Bell, Play, Ticket } from 'lucide-react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
-import type { Artist } from '@/types/db';
+import { SocialLink } from '@/components/molecules/SocialLink';
+import type { Artist, LegacySocialLink } from '@/types/db';
 
 type HeroRelease = {
   readonly title: string;
@@ -27,6 +28,7 @@ interface ArtistHeroProps {
   readonly spotlightLabel?: string | null;
   readonly spotlightValue?: string | null;
   readonly primaryActionKind?: 'tickets' | 'listen' | 'subscribe';
+  readonly socialLinks?: LegacySocialLink[];
 }
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -58,6 +60,7 @@ export function ArtistHero({
   spotlightLabel,
   spotlightValue,
   primaryActionKind = 'listen',
+  socialLinks = [],
 }: ArtistHeroProps) {
   const eyebrow = getReleaseEyebrow(latestRelease);
   const primaryActionClassName =
@@ -96,15 +99,25 @@ export function ArtistHero({
             ) : null}
           </div>
 
-          <button
-            type='button'
-            onClick={onBellClick}
-            className='inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-white/12 bg-black/20 px-4 text-sm font-[590] text-white/88 backdrop-blur-md transition-[background-color,border-color,color] hover:border-white/20 hover:bg-black/28 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
-            aria-label={`Get notified about ${artist.name}`}
-          >
-            <Bell className='h-4 w-4' aria-hidden='true' />
-            <span className='sr-only md:not-sr-only md:inline'>Notify</span>
-          </button>
+          <div className='flex items-center gap-2'>
+            {socialLinks.map(link => (
+              <SocialLink
+                key={link.id}
+                link={link}
+                handle={artist.handle}
+                artistName={artist.name}
+              />
+            ))}
+            <button
+              type='button'
+              onClick={onBellClick}
+              className='inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-white/12 bg-black/20 px-4 text-sm font-[590] text-white/88 backdrop-blur-md transition-[background-color,border-color,color] hover:border-white/20 hover:bg-black/28 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+              aria-label={`Get notified about ${artist.name}`}
+            >
+              <Bell className='h-4 w-4' aria-hidden='true' />
+              <span className='sr-only md:not-sr-only md:inline'>Notify</span>
+            </button>
+          </div>
         </div>
 
         <div className='mt-auto max-w-[32rem] space-y-4 md:space-y-5'>

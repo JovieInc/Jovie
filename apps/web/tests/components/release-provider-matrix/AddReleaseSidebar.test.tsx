@@ -92,6 +92,9 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerSurfaceCard: ({ children }: { children: ReactNode }) => (
     <div data-testid='drawer-surface-card'>{children}</div>
   ),
+  DrawerSection: ({ children }: { children: ReactNode }) => (
+    <div data-testid='drawer-section'>{children}</div>
+  ),
   EntityHeaderCard: ({
     title,
     subtitle,

@@ -7,11 +7,13 @@ import { getProfileModeDefinition } from '@/features/profile/registry';
 
 interface PublicProfileTemplateProps {
   readonly viewModel: ProfilePublicViewModel;
+  readonly viewerCountryCode?: string | null;
   readonly children: ReactNode;
 }
 
 export function PublicProfileTemplate({
   viewModel,
+  viewerCountryCode,
   children,
 }: PublicProfileTemplateProps) {
   const definition = getProfileModeDefinition(viewModel.mode);
@@ -21,6 +23,7 @@ export function PublicProfileTemplate({
       <ArtistPageShell
         artist={viewModel.artist}
         socialLinks={viewModel.socialLinks}
+        viewerCountryCode={viewerCountryCode}
         contacts={viewModel.contacts}
         subtitle={viewModel.subtitle}
         mode={viewModel.mode}

@@ -77,6 +77,92 @@ See the [Surface Classification](#canonical-surface-split) section below for ful
 font-feature-settings: "cv01", "ss03";
 ```
 
+## Copywriting
+
+Jovie copy should feel precise, calm, and inevitable.
+
+### Core Standard
+
+- Be concise by default
+- Say the thing once
+- Earn every word
+- Prefer clarity over warmth when they conflict
+- Prefer usefulness over personality when they conflict
+
+### Product Copy Rules
+
+- One clear line is better than a headline plus explanatory filler
+- Avoid stacked copy that repeats the same idea in an eyebrow, headline, and body sentence
+- If an input placeholder or control label already explains the action, remove redundant supporting text nearby
+- Use concrete verbs and specific nouns
+- Cut throat-clearing phrases like "tell Jovie what you need", "get started", "welcome", "you can", and other generic setup copy unless they add real information
+- Avoid anthropomorphic filler and assistant self-description unless it is functionally necessary
+
+### Voice
+
+- Apple-level polish: spare, exact, controlled, never chatty for the sake of it
+- YC-grade communication: direct, legible, high-signal, no fluff, no fake grandeur
+- Launch-stage honesty: do not overclaim, oversell, or add decorative marketing language to product surfaces
+
+### UI Hierarchy
+
+- Labels and placeholders should carry more of the instructional load than paragraphs
+- Default empty states to a single headline or a single sentence, not both, unless both are necessary
+- Prefer short action language:
+  - `Ask Jovie`
+  - `Search Tasks`
+  - `Filter`
+- Avoid redundant combinations like:
+  - eyebrow: `Jovie Assistant`
+  - headline: `Welcome to Jovie`
+  - body: `Ask anything or tell Jovie what you need`
+
+The example above says one thing three times. Jovie should say it once.
+
+### Anti-Patterns To Avoid
+
+- Generic AI-dashboard styling: oversized rounded cards, visible borders on every container, repeated chrome, and stacked explanatory copy
+- All-caps eyebrows or section labels as a default hierarchy tool
+- Long helper paragraphs inside cards when a short label or one sentence would do
+- Multiple nested surfaces whose only job is to create the feeling of "designed"
+- Treating borders as the primary way to separate content instead of using spacing, alignment, contrast, and typography
+
+### Product UI Taste
+
+- Jovie app surfaces should feel calm, dense, and expensive, not loud or overcomposed
+- Linear is the baseline: small text, tight vertical rhythm, restrained emphasis, and very selective use of borders
+- Hierarchy should come primarily from layout and typography, not from uppercase text or extra boxes
+- If a section still reads clearly after removing its border or eyebrow label, that simpler version is usually the right one
+- Before shipping a UI, run this check: does it look like a generic AI-generated SaaS mockup? If yes, remove chrome until it feels native to Jovie
+
+---
+
+## Subtraction Principle
+
+This is part of the Tim White canon for Jovie product taste:
+
+- When a surface feels off, remove before adding
+- Prefer one strong signal over three medium ones
+- Repetition is usually a design bug, not reinforcement
+- If a label, layout, or icon already explains the action, remove the extra helper copy or chrome around it
+- Fewer containers, fewer borders, fewer badges, fewer variants
+- Empty space should create focus, not deadness
+
+### Practical Rules
+
+- Remove duplicated titles, headings, and section labels
+- Collapse nested cards when a single surface can carry the structure
+- Avoid stacked explanation patterns like eyebrow + headline + helper text unless each layer adds distinct information
+- Default to one primary action per region
+- When auditing a UI, ask:
+  - what can be deleted?
+  - what can be merged?
+  - what is repeating work already done by another element?
+
+### Canonical Test
+
+If removing an element makes the screen clearer and does not reduce comprehension, that element should stay removed.
+
 ---
 
 ## Color System

@@ -25,7 +25,7 @@ export function LandingFinalCTA() {
       />
 
       <MarketingContainer width='landing'>
-        <div className='reveal-on-scroll relative mx-auto max-w-[32rem] text-center'>
+        <div className='relative mx-auto max-w-[40rem] text-center'>
           <h2
             id='landing-final-cta-heading'
             className='marketing-h2-linear text-primary-token'
@@ -34,11 +34,13 @@ export function LandingFinalCTA() {
           </h2>
 
           <p className='mt-4 text-[15px] leading-[1.6] text-secondary-token sm:text-[16px]'>
-            Claim your handle.
+            Claim your handle, launch with a cleaner system, and let the public
+            side finally match the quality of the product you built.
           </p>
 
-          <div className='mx-auto mt-6 w-full max-w-[27rem]'>
+          <div className='mx-auto mt-7 w-full max-w-[27rem]'>
             <ClaimHandleForm
+              hideHelperText
               submitButtonTestId='landing-claim-submit'
               submitTracking={{
                 eventName: 'landing_cta_claim_handle',
@@ -46,10 +48,6 @@ export function LandingFinalCTA() {
               }}
             />
           </div>
-
-          <p className='mt-4 text-[11px] tracking-[0.01em] text-quaternary-token'>
-            Free forever.
-          </p>
         </div>
       </MarketingContainer>
     </section>

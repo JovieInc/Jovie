@@ -1,5 +1,4 @@
 import { BarChart3, Users } from 'lucide-react';
-import Image from 'next/image';
 import { Container } from '@/components/site/Container';
 import { PhoneFrame } from '@/features/home/PhoneFrame';
 
@@ -23,15 +22,21 @@ export function LandingProfileSection() {
     >
       <Container size='homepage'>
         <div className='homepage-section-shell mx-auto max-w-[1120px]'>
-          <div className='homepage-section-intro-compact reveal-on-scroll'>
-            <div>
+          <div className='homepage-section-intro'>
+            <div className='homepage-section-copy'>
               <p className='homepage-section-eyebrow'>Artist profile</p>
               <h2
                 id='landing-profile-heading'
-                className='marketing-h2-linear mt-5 max-w-[9ch] text-primary-token'
+                className='marketing-h2-linear mt-5 max-w-[10ch] text-primary-token'
               >
                 One page. Every fan.
               </h2>
+              <p className='mt-4 max-w-[34rem] text-[15px] leading-[1.65] text-secondary-token sm:text-[16px]'>
+                The public artist page should feel like the product already
+                solved the problem. Clean destination, clear actions, and
+                audience signal that does not make the artist look like they
+                stitched together five tools.
+              </p>
 
               <div className='mt-5 flex flex-wrap gap-2.5'>
                 {PROOF_POINTS.map(point => (
@@ -45,12 +50,39 @@ export function LandingProfileSection() {
                 ))}
               </div>
             </div>
+
+            <div className='grid gap-3 sm:grid-cols-2 lg:justify-self-end'>
+              <div className='homepage-surface-card rounded-[1rem] px-4 py-3.5'>
+                <div className='flex items-center gap-2 text-[12px] font-medium text-secondary-token'>
+                  <Users className='h-3.5 w-3.5 text-primary-token' />
+                  Audience signal
+                </div>
+                <p className='mt-2 text-[1.45rem] font-medium tracking-[-0.04em] text-primary-token'>
+                  4,218
+                </p>
+                <p className='mt-1 text-[12px] leading-5 text-tertiary-token'>
+                  Owned contacts, not borrowed followers.
+                </p>
+              </div>
+              <div className='homepage-surface-card rounded-[1rem] px-4 py-3.5'>
+                <div className='flex items-center gap-2 text-[12px] font-medium text-secondary-token'>
+                  <BarChart3 className='h-3.5 w-3.5 text-primary-token' />
+                  Top source
+                </div>
+                <div className='mt-2 flex items-end justify-between gap-4'>
+                  <p className='text-[1.45rem] font-medium tracking-[-0.04em] text-primary-token'>
+                    IG / social
+                  </p>
+                  <p className='pb-1 text-[12px] text-tertiary-token'>38%</p>
+                </div>
+                <p className='mt-1 text-[12px] leading-5 text-tertiary-token'>
+                  See which channel actually drives the fan relationship.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div
-            className='homepage-section-stack reveal-on-scroll'
-            data-delay='80'
-          >
+          <div className='homepage-section-stack'>
             <div className='homepage-surface-card relative overflow-hidden rounded-[1rem] p-4 sm:p-5 lg:p-6'>
               <div
                 aria-hidden='true'
@@ -61,50 +93,25 @@ export function LandingProfileSection() {
                 }}
               />
 
-              <div className='relative overflow-hidden rounded-[1rem] border border-subtle bg-surface-0 px-3 pt-3 sm:px-5 sm:pt-5 lg:px-6 lg:pt-6'>
+              <div className='relative overflow-hidden rounded-[1rem] border border-subtle bg-surface-0 px-3 pb-3 pt-3 sm:px-5 sm:pb-5 sm:pt-5 lg:px-6 lg:pb-6 lg:pt-6'>
                 <div className='relative'>
-                  <div className='rounded-t-[1rem] border border-subtle overflow-hidden'>
-                    <Image
+                  <figure
+                    aria-label='Desktop artist profile showing smart links, fan capture, tour dates, and tipping'
+                    data-testid='landing-profile-desktop-screenshot'
+                    className='overflow-hidden rounded-[1rem] border border-subtle bg-surface-0 shadow-[0_28px_70px_rgba(0,0,0,0.28),0_10px_22px_rgba(0,0,0,0.18)]'
+                  >
+                    <img
                       src='/product-screenshots/profile-desktop.png'
                       alt='Desktop artist profile showing smart links, fan capture, tour dates, and tipping'
-                      width={2880}
-                      height={1800}
-                      sizes='(min-width: 1280px) 900px, (min-width: 768px) 78vw, 100vw'
                       className='h-auto w-full'
                     />
-                  </div>
-
-                  <div className='pointer-events-none absolute left-4 top-4 hidden w-[14rem] rounded-[1rem] border border-subtle bg-[rgba(10,11,16,0.84)] p-4 shadow-[0_24px_55px_rgba(0,0,0,0.32)] backdrop-blur-xl md:block'>
-                    <div className='flex items-center gap-2 text-[12px] font-medium text-secondary-token'>
-                      <Users className='h-3.5 w-3.5 text-primary-token' />
-                      Audience signal
-                    </div>
-                    <p className='mt-2 text-[1.55rem] font-medium tracking-[-0.04em] text-primary-token'>
-                      4,218
-                    </p>
-                    <p className='mt-1 text-[12px] text-tertiary-token'>
-                      owned contacts
-                    </p>
-                    <div className='mt-3 grid gap-2 border-t border-subtle pt-3 text-[12px] text-secondary-token'>
-                      <div className='flex items-center justify-between gap-3'>
-                        <span>IG / social</span>
-                        <span className='text-primary-token'>38%</span>
-                      </div>
-                      <div className='flex items-center justify-between gap-3'>
-                        <span>Direct</span>
-                        <span className='text-primary-token'>25%</span>
-                      </div>
-                    </div>
-                  </div>
+                  </figure>
 
                   <div className='pointer-events-none absolute bottom-4 right-4 hidden drop-shadow-[0_25px_60px_rgba(0,0,0,0.34)] sm:block lg:right-8'>
                     <PhoneFrame className='h-[440px] w-[210px] lg:h-[500px] lg:w-[238px]'>
-                      <Image
+                      <img
                         src='/product-screenshots/profile-phone.png'
                         alt='Mobile artist profile preview with fan actions and listening destinations'
-                        width={780}
-                        height={1688}
-                        sizes='(min-width: 1280px) 238px, 210px'
                         className='h-full w-full object-cover object-top'
                       />
                     </PhoneFrame>
@@ -114,42 +121,41 @@ export function LandingProfileSection() {
                 <div className='grid gap-3 border-t border-subtle px-1 py-4 sm:hidden'>
                   <div className='mx-auto drop-shadow-[0_22px_48px_rgba(0,0,0,0.32)]'>
                     <PhoneFrame className='h-[360px] w-[172px]'>
-                      <Image
+                      <img
                         src='/product-screenshots/profile-phone.png'
                         alt='Mobile artist profile preview with fan actions and listening destinations'
-                        width={780}
-                        height={1688}
-                        sizes='172px'
                         className='h-full w-full object-cover object-top'
                       />
                     </PhoneFrame>
                   </div>
 
-                  <div className='rounded-[0.95rem] border border-subtle bg-[rgba(10,11,16,0.82)] px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl'>
-                    <div className='flex items-center gap-2 text-[12px] font-medium text-secondary-token'>
-                      <Users className='h-3.5 w-3.5 text-primary-token' />
-                      Audience signal
+                  <div className='grid gap-3 sm:grid-cols-2'>
+                    <div className='homepage-surface-card rounded-[0.95rem] px-4 py-3'>
+                      <div className='flex items-center gap-2 text-[12px] font-medium text-secondary-token'>
+                        <Users className='h-3.5 w-3.5 text-primary-token' />
+                        Audience signal
+                      </div>
+                      <div className='mt-2 flex items-end justify-between gap-4'>
+                        <p className='text-[1.35rem] font-medium tracking-[-0.04em] text-primary-token'>
+                          4,218
+                        </p>
+                        <p className='text-[12px] text-tertiary-token'>
+                          owned contacts
+                        </p>
+                      </div>
                     </div>
-                    <div className='mt-2 flex items-end justify-between gap-4'>
-                      <p className='text-[1.35rem] font-medium tracking-[-0.04em] text-primary-token'>
-                        4,218
-                      </p>
-                      <p className='text-[12px] text-tertiary-token'>
-                        owned contacts
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className='rounded-[0.95rem] border border-subtle bg-[rgba(10,11,16,0.82)] px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl'>
-                    <div className='flex items-center gap-2 text-[12px] font-medium text-secondary-token'>
-                      <BarChart3 className='h-3.5 w-3.5 text-primary-token' />
-                      Top source
-                    </div>
-                    <div className='mt-2 flex items-end justify-between gap-4'>
-                      <p className='text-[1.35rem] font-medium tracking-[-0.04em] text-primary-token'>
-                        IG / social
-                      </p>
-                      <p className='text-[12px] text-tertiary-token'>38%</p>
+                    <div className='homepage-surface-card rounded-[0.95rem] px-4 py-3'>
+                      <div className='flex items-center gap-2 text-[12px] font-medium text-secondary-token'>
+                        <BarChart3 className='h-3.5 w-3.5 text-primary-token' />
+                        Top source
+                      </div>
+                      <div className='mt-2 flex items-end justify-between gap-4'>
+                        <p className='text-[1.35rem] font-medium tracking-[-0.04em] text-primary-token'>
+                          IG / social
+                        </p>
+                        <p className='text-[12px] text-tertiary-token'>38%</p>
+                      </div>
                     </div>
                   </div>
                 </div>
