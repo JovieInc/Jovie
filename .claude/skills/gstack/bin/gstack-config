@@ -80,10 +80,7 @@ case "${1:-}" in
     # Auto-relink skills when prefix setting changes (skip during setup to avoid recursive call)
     if [ "$KEY" = "skill_prefix" ] && [ -z "${GSTACK_SETUP_RUNNING:-}" ]; then
       GSTACK_RELINK="$(dirname "$0")/gstack-relink"
-      if [ -x "$GSTACK_RELINK" ] && ! "$GSTACK_RELINK"; then
-        echo "Error: gstack-relink failed; skill_prefix may now be out of sync with installed skill links." >&2
-        exit 1
-      fi
+      [ -x "$GSTACK_RELINK" ] && "$GSTACK_RELINK" || true
     fi
     ;;
   list)

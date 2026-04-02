@@ -1,0 +1,13 @@
+{
+  "name": "@jovie/extension-contracts",
+  "version": "26.4.107",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

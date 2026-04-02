@@ -25,13 +25,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-case "$LIMIT" in
-  ''|*[!0-9]*)
-    echo "gstack-learnings-search: --limit must be a non-negative integer" >&2
-    exit 1
-    ;;
-esac
-
 LEARNINGS_FILE="$GSTACK_HOME/projects/$SLUG/learnings.jsonl"
 
 # Collect all JSONL files to search
@@ -49,95 +42,90 @@ if [ ${#FILES[@]} -eq 0 ]; then
   exit 0
 fi
 
-TYPE_ENV="$TYPE" QUERY_ENV="$QUERY" LIMIT_ENV="$LIMIT" SLUG_ENV="$SLUG" CROSS_PROJECT_ENV="$CROSS_PROJECT" \
-  bun -e "
-    import { basename, dirname } from 'node:path';
+# Process all files through bun for JSON parsing, decay, dedup, filtering
+cat "${FILES[@]}" 2>/dev/null | bun -e "
+const lines = (await Bun.stdin.text()).trim().split('\n').filter(Boolean);
+const now = Date.now();
+const type = '${TYPE}';
+const query = '${QUERY}'.toLowerCase();
+const limit = ${LIMIT};
+const slug = '${SLUG}';
 
-    const now = Date.now();
-    const type = process.env.TYPE_ENV || '';
-    const query = (process.env.QUERY_ENV || '').toLowerCase();
-    const limit = Number.parseInt(process.env.LIMIT_ENV || '10', 10);
-    const slug = process.env.SLUG_ENV || '';
-    const crossProjectEnabled = process.env.CROSS_PROJECT_ENV === 'true';
-    const files = process.argv.slice(1);
+const entries = [];
+for (const line of lines) {
+  try {
+    const e = JSON.parse(line);
+    if (!e.key || !e.type) continue;
 
-    const entries = [];
-    for (const file of files) {
-      let text = '';
-      try {
-        text = await Bun.file(file).text();
-      } catch {
-        continue;
-      }
-      const projectSlug = basename(dirname(file));
-      for (const line of text.split('\n').filter(Boolean)) {
-        try {
-          const e = JSON.parse(line);
-          if (!e.key || !e.type) continue;
-
-          let conf = e.confidence || 5;
-          if (e.source === 'observed' || e.source === 'inferred') {
-            const days = Math.floor((now - new Date(e.ts).getTime()) / 86400000);
-            conf = Math.max(0, conf - Math.floor(days / 30));
-          }
-
-          entries.push({
-            ...e,
-            _effectiveConfidence: conf,
-            _projectSlug: projectSlug,
-            _crossProject: crossProjectEnabled && projectSlug !== slug,
-          });
-        } catch {}
-      }
+    // Apply confidence decay: observed/inferred lose 1pt per 30 days
+    let conf = e.confidence || 5;
+    if (e.source === 'observed' || e.source === 'inferred') {
+      const days = Math.floor((now - new Date(e.ts).getTime()) / 86400000);
+      conf = Math.max(0, conf - Math.floor(days / 30));
     }
+    e._effectiveConfidence = conf;
 
-    const seen = new Map();
-    for (const e of entries) {
-      const dk = e.key + '|' + e.type + '|' + e._projectSlug;
-      const existing = seen.get(dk);
-      if (!existing || new Date(e.ts) > new Date(existing.ts)) {
-        seen.set(dk, e);
-      }
-    }
+    // Determine if this is from the current project or cross-project
+    // Cross-project entries are tagged for display
+    e._crossProject = !line.includes(slug) && '${CROSS_PROJECT}' === 'true';
 
-    let results = Array.from(seen.values());
-    if (type) results = results.filter((e) => e.type === type);
-    if (query) {
-      results = results.filter((e) =>
-        (e.key || '').toLowerCase().includes(query) ||
-        (e.insight || '').toLowerCase().includes(query) ||
-        (e.files || []).some((f) => f.toLowerCase().includes(query)) ||
-        (e._projectSlug || '').toLowerCase().includes(query),
-      );
-    }
+    entries.push(e);
+  } catch {}
+}
 
-    results.sort((a, b) => {
-      if (b._effectiveConfidence !== a._effectiveConfidence) return b._effectiveConfidence - a._effectiveConfidence;
-      return new Date(b.ts).getTime() - new Date(a.ts).getTime();
-    });
-    results = results.slice(0, limit);
+// Dedup: latest winner per key+type
+const seen = new Map();
+for (const e of entries) {
+  const dk = e.key + '|' + e.type;
+  const existing = seen.get(dk);
+  if (!existing || new Date(e.ts) > new Date(existing.ts)) {
+    seen.set(dk, e);
+  }
+}
+let results = Array.from(seen.values());
 
-    if (results.length === 0) process.exit(0);
+// Filter by type
+if (type) results = results.filter(e => e.type === type);
 
-    const byType = {};
-    for (const e of results) {
-      const t = e.type || 'unknown';
-      if (!byType[t]) byType[t] = [];
-      byType[t].push(e);
-    }
+// Filter by query
+if (query) results = results.filter(e =>
+  (e.key || '').toLowerCase().includes(query) ||
+  (e.insight || '').toLowerCase().includes(query) ||
+  (e.files || []).some(f => f.toLowerCase().includes(query))
+);
 
-    const counts = Object.entries(byType).map(([t, arr]) => arr.length + ' ' + t + (arr.length > 1 ? 's' : ''));
-    console.log('LEARNINGS: ' + results.length + ' loaded (' + counts.join(', ') + ')');
-    console.log('');
+// Sort by effective confidence desc, then recency
+results.sort((a, b) => {
+  if (b._effectiveConfidence !== a._effectiveConfidence) return b._effectiveConfidence - a._effectiveConfidence;
+  return new Date(b.ts).getTime() - new Date(a.ts).getTime();
+});
 
-    for (const [t, arr] of Object.entries(byType)) {
-      console.log('## ' + t.charAt(0).toUpperCase() + t.slice(1) + 's');
-      for (const e of arr) {
-        const cross = e._crossProject ? ' [cross-project:' + e._projectSlug + ']' : '';
-        const files = e.files?.length ? ' (files: ' + e.files.join(', ') + ')' : '';
-        console.log('- [' + e.key + '] (confidence: ' + e._effectiveConfidence + '/10, ' + e.source + ', ' + (e.ts || '').split('T')[0] + ')' + cross);
-        console.log('  ' + e.insight + files);
-      }
-      console.log('');
-    }
-  " "${FILES[@]}" 2>/dev/null || exit 0
+// Limit
+results = results.slice(0, limit);
+
+if (results.length === 0) process.exit(0);
+
+// Format output
+const byType = {};
+for (const e of results) {
+  const t = e.type || 'unknown';
+  if (!byType[t]) byType[t] = [];
+  byType[t].push(e);
+}
+
+// Summary line
+const counts = Object.entries(byType).map(([t, arr]) => arr.length + ' ' + t + (arr.length > 1 ? 's' : ''));
+console.log('LEARNINGS: ' + results.length + ' loaded (' + counts.join(', ') + ')');
+console.log('');
+
+for (const [t, arr] of Object.entries(byType)) {
+  console.log('## ' + t.charAt(0).toUpperCase() + t.slice(1) + 's');
+  for (const e of arr) {
+    const cross = e._crossProject ? ' [cross-project]' : '';
+    const files = e.files?.length ? ' (files: ' + e.files.join(', ') + ')' : '';
+    console.log('- [' + e.key + '] (confidence: ' + e._effectiveConfidence + '/10, ' + e.source + ', ' + (e.ts || '').split('T')[0] + ')' + cross);
+    console.log('  ' + e.insight + files);
+  }
+  console.log('');
+}
+" 2>/dev/null || exit 0

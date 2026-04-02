@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "Jovie",
+  "description": "Jovie side panel for music workflow context, insertion, and sync actions.",
+  "version": "0.1.0",
+  "permissions": ["permissions", "sidePanel", "storage", "tabs"],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "https://app.jov.ie/*",
+    "https://jov.ie/*"
+  ],
+  "optional_host_permissions": [
+    "https://mail.google.com/*",
+    "https://genius.com/*",
+    "https://*.genius.com/*",
+    "https://eventbrite.com/*",
+    "https://*.eventbrite.com/*",
+    "https://bandsintown.com/*",
+    "https://*.bandsintown.com/*",
+    "https://open.spotify.com/*",
+    "https://artists.spotify.com/*",
+    "https://instagram.com/*",
+    "https://*.instagram.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://mail.google.com/*",
+        "https://genius.com/*",
+        "https://*.genius.com/*",
+        "https://eventbrite.com/*",
+        "https://*.eventbrite.com/*",
+        "https://bandsintown.com/*",
+        "https://*.bandsintown.com/*",
+        "https://open.spotify.com/*",
+        "https://artists.spotify.com/*",
+        "https://instagram.com/*",
+        "https://*.instagram.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Open Jovie"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  }
+}

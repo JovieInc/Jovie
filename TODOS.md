@@ -1,5 +1,41 @@
 # TODOs
 
+## Extension performance budgets and regression checks
+
+**What:** Add explicit performance budgets and regression checks for the Chrome extension, including shell render stability, preload latency, layout-shift prevention, and common interaction latency thresholds.
+
+**Why:** The extension is used in the middle of active work. If the shell flickers, shifts layout, or takes more than a beat to surface entities and actions, the product will feel broken even when the underlying functionality works. Performance is part of trust for this surface.
+
+**Pros:** Prevents silent performance decay, keeps common flows feeling instant, gives CI a guardrail against regressions, and protects the no-layout-shift bar for the side panel.
+
+**Cons:** Adds benchmark maintenance, fixture upkeep, and some CI/runtime complexity around measurement and thresholds.
+
+**Context:** The engineering review locked in proactive warm caching, static shell rendering, and a strong bias against layout shifts or blank flashes. This TODO should cover extension-specific budgets such as panel open time, candidate list render time, preview readiness time, and layout-shift regressions. It should integrate with the extension test harness and ideally fail loudly when thresholds regress.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** Chrome extension Track 1 foundation (shared capability layer + side panel + summary endpoints) landing first.
+
+---
+
+## Authenticated browser ingestion and execution tier
+
+**What:** Add a post-Track-1 capability tier for authenticated browser-side ingestion and execution against private or semi-private web surfaces that do not expose the needed APIs, such as Spotify for Artists, social networks, submission forms, and long-tail manual ops sites.
+
+**Why:** The long-term strategic value of the extension is not just autofill. It is browser-resident access to cookies, loaded app state, and DOM-native workflows that let Jovie ingest data and perform deterministic actions on sites where traditional APIs are missing or insufficient.
+
+**Pros:** Unlocks two-way sync on high-value surfaces, gives Jovie access to richer DSP/social data, supports manual-op automation that otherwise cannot be productized, and preserves the original strategic reason for building the extension.
+
+**Cons:** Higher trust and compliance complexity, more auth/cookie handling risk, more sensitive platform/TOS considerations, and significantly more adapter and observability work.
+
+**Context:** The Track 1 engineering plan deliberately excludes automated authenticated ingestion from MVP execution and testing, but keeps the architecture ready for it by placing cookies, host permissions, DOM extraction, and execution in the browser layer while keeping workflows, flags, summaries, and logs in the shared capability layer. This TODO should define the next tier clearly so the program does not drift into being “just a smart autofill extension.”
+
+**Effort:** L
+**Priority:** P1
+**Depends on:** Chrome extension Track 1 runtime foundation, remote kill switches, browser contract harness, and policy review for platform/TOS boundaries.
+
+---
+
 ## Project-level /ship override mechanism
 
 **What:** Create a project-level `/ship` override mechanism (e.g., `.claude/skills/overrides/ship.md`) that customizes the generic gstack `/ship` template (CalVer format, `version.json` instead of `VERSION` file) without forking the template — so gstack upgrades don't lose project customizations and new gstack features aren't blocked.

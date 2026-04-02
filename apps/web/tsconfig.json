@@ -32,7 +32,9 @@
       "@/lib/*": ["./lib/*"],
       "@/types/*": ["./types/*"],
       "@jovie/ui": ["../../packages/ui"],
-      "@jovie/ui/*": ["../../packages/ui/*"]
+      "@jovie/ui/*": ["../../packages/ui/*"],
+      "@jovie/extension-contracts": ["../../packages/extension-contracts"],
+      "@jovie/extension-contracts/*": ["../../packages/extension-contracts/*"]
     }
   },
   // Add new source directories here — files outside these paths won't be typechecked.

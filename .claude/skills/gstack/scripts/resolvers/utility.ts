@@ -95,8 +95,8 @@ This is the **primary mode** for developers verifying their work. When the user 
 
 1. **Analyze the branch diff** to understand what changed:
    \`\`\`bash
-   git diff <base>...HEAD --name-only
-   git log <base>..HEAD --oneline
+   git diff main...HEAD --name-only
+   git log main..HEAD --oneline
    \`\`\`
 
 2. **Identify affected pages/routes** from the changed files:
