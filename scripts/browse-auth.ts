@@ -193,8 +193,9 @@ async function runLocalBypassFlow(args: BrowseAuthArgs) {
   });
 
   if (!response.ok) {
+    const errorText = await response.text();
     throw new Error(
-      `Local browse auth failed: ${response.status} ${await response.text()}`
+      `Local browse auth failed: ${response.status} ${errorText}`
     );
   }
 
@@ -221,6 +222,17 @@ async function runLocalBypassFlow(args: BrowseAuthArgs) {
       `/api/dev/test-auth/enter?persona=${payload.persona}&redirect=/app/dashboard/earnings`,
       baseUrl
     ).toString()}`
+  );
+}
+
+function shouldFallbackToClerk(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes('E2E_USE_TEST_AUTH_BYPASS is not enabled') ||
+    error.message.includes('Only available on loopback and private dev hosts')
   );
 }
 
@@ -407,8 +419,18 @@ async function main() {
   console.log(`Persona: ${args.persona}`);
 
   if (isPrivateOrLoopbackHost(baseUrl.hostname)) {
-    await runLocalBypassFlow(args);
-    return;
+    try {
+      await runLocalBypassFlow(args);
+      return;
+    } catch (error) {
+      if (!shouldFallbackToClerk(error)) {
+        throw error;
+      }
+
+      console.log(
+        'Local bypass unavailable, falling back to Clerk testing token auth'
+      );
+    }
   }
 
   console.log('Mode: Clerk fallback');

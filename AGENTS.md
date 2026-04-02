@@ -1165,9 +1165,11 @@ Use Clerk's official Playwright testing helpers whenever an E2E test needs auth.
 - Do **not** use pre-authenticated Clerk tokens to skip sign-up/sign-in flows unless the test scope explicitly starts post-auth.
 - Do **not** mock Clerk auth in Playwright E2E tests.
 
-**Golden path reference:**
+**Golden path references:**
 
-- `apps/web/tests/e2e/golden-path-signup.spec.ts` is the canonical Clerk-authenticated onboarding example.
+- `apps/web/tests/e2e/onboarding.spec.ts` shows the canonical fresh-user Clerk-authenticated onboarding flow using `setupClerkTestingToken({ page })` plus `createOrReuseTestUserSession(page, email)`.
+- `apps/web/tests/e2e/auth.setup.ts` is the canonical shared auth bootstrap that writes `tests/.auth/user.json`.
+- For manual browse auth outside Playwright, use `doppler run --project jovie-web --config dev -- pnpm tsx scripts/browse-auth.ts --base-url http://localhost:3002 --output /tmp/browse-clerk-cookies.json --persona creator` and import the exported cookies into browse.
 
 **Test user cleanup:**
 
