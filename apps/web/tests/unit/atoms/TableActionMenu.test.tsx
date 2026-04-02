@@ -14,6 +14,7 @@ vi.mock('@jovie/ui', async () => {
       items,
       triggerIcon: TriggerIcon,
       trigger,
+      triggerClassName,
       children,
     }: {
       items: Array<{
@@ -24,11 +25,16 @@ vi.mock('@jovie/ui', async () => {
       }>;
       triggerIcon?: React.ComponentType<{ className?: string }>;
       trigger?: React.ReactNode;
+      triggerClassName?: string;
       children?: React.ReactNode;
     }) => (
       <div data-testid='common-dropdown'>
         {TriggerIcon && (
-          <button type='button' aria-label='Open menu'>
+          <button
+            type='button'
+            aria-label='Open menu'
+            className={triggerClassName}
+          >
             <TriggerIcon className='h-4 w-4' />
           </button>
         )}
@@ -71,6 +77,15 @@ describe('TableActionMenu', () => {
     expect(
       screen.getByRole('button', { name: 'Open menu' })
     ).toBeInTheDocument();
+  });
+
+  it('uses a borderless default trigger style', () => {
+    render(<TableActionMenu items={sampleItems} />);
+
+    const trigger = screen.getByRole('button', { name: 'Open menu' });
+    expect(trigger.className).toContain('border-transparent');
+    expect(trigger.className).not.toContain('hover:border-subtle');
+    expect(trigger.className).not.toContain('focus-visible:border-');
   });
 
   it('converts action items to dropdown items', () => {

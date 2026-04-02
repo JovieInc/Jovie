@@ -50,9 +50,10 @@ describe('TrackSidebar', () => {
     );
 
     expect(screen.getAllByText('Midnight Echo').length).toBeGreaterThan(0);
-    expect(
-      screen.getAllByRole('button', { name: /copy isrc/i }).length
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /copy isrc/i })).toHaveLength(
+      1
+    );
+    expect(screen.getByTestId('track-details-panel')).toBeInTheDocument();
 
     await user.click(screen.getByTestId('drawer-tab-platforms'));
 
@@ -88,8 +89,10 @@ describe('TrackSidebar', () => {
     );
 
     expect(screen.getAllByText('Midnight Echo').length).toBeGreaterThan(0);
-    expect(
-      screen.getAllByRole('button', { name: /copy isrc/i }).length
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /copy isrc/i })).toHaveLength(
+      1
+    );
+    expect(screen.getByText('Track link')).toBeInTheDocument();
+    expect(screen.getByText('Actions')).toBeInTheDocument();
   });
 });

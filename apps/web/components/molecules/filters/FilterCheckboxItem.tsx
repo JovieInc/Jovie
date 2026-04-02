@@ -1,7 +1,6 @@
 'use client';
 
 import { MENU_ITEM_BASE } from '@jovie/ui';
-import { Check } from 'lucide-react';
 import { type ReactNode, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -67,22 +66,19 @@ export function FilterCheckboxItem({
       onKeyDown={handleKeyDown}
       className={cn(
         MENU_ITEM_BASE,
-        'w-full rounded-[6px] border border-transparent',
-        checked && 'text-primary-token'
+        'w-full gap-2.5 rounded-[8px] border border-transparent px-2.5 py-2 text-[13px]',
+        checked
+          ? 'bg-surface-1 text-primary-token'
+          : 'text-secondary-token hover:text-primary-token'
       )}
     >
-      <span
-        className={cn(
-          'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
-          checked
-            ? 'border-(--linear-accent) bg-(--linear-accent) text-white'
-            : 'border-subtle bg-surface-1'
-        )}
-      >
-        {checked && <Check className='h-3 w-3' />}
-      </span>
       {icon && (
-        <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token'>
+        <span
+          className={cn(
+            'flex h-4 w-4 shrink-0 items-center justify-center',
+            checked ? 'text-primary-token' : 'text-tertiary-token'
+          )}
+        >
           {icon}
         </span>
       )}

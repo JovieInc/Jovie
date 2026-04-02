@@ -6,21 +6,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Input,
   SimpleTooltip,
 } from '@jovie/ui';
-import { Check, ChevronDown, Info, Loader2 } from 'lucide-react';
-import {
-  startTransition,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
-import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
+import { Check, ChevronDown, Info } from 'lucide-react';
 
 import {
   DrawerButton,
+  DrawerEditableTextField,
   DrawerPropertyRow,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
@@ -67,15 +59,10 @@ const METADATA_BADGE_CLASSNAME =
   'h-5 rounded-full border border-subtle bg-surface-0 px-2 text-[9.5px] font-[510] tracking-[-0.01em] shadow-none';
 const METADATA_ROW_CLASSNAME = 'rounded-none px-0 py-1 first:pt-0 last:pb-0';
 const METADATA_STACK_CLASSNAME = 'space-y-0.5';
-const METADATA_COPY_CELL_CLASSNAME =
-  'h-5.5 rounded-full px-1.5 text-[10.5px] leading-none tracking-[0.02em]';
-const METADATA_COPY_TEXT_CELL_CLASSNAME =
-  'h-5.5 rounded-full px-1.5 text-[10.5px] font-[460] leading-none';
+const METADATA_DISPLAY_VALUE_CLASSNAME =
+  'text-[11.5px] font-[460] leading-[16px] text-primary-token';
 const METADATA_INPUT_CLASSNAME =
-  'h-7 rounded-full border-subtle bg-surface-0 px-2.5 text-[11px] font-[460] text-primary-token shadow-none';
-const AUTO_SAVE_DELAY_MS = 1500;
-
-type SaveStatus = 'idle' | 'saving' | 'saved';
+  'h-7 rounded-[8px] border-subtle bg-surface-0 px-2.5 text-[11px] font-[460] text-primary-token shadow-none';
 
 function PopularityScore({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
@@ -123,16 +110,6 @@ interface ReleaseMetadataProps {
   readonly variant?: 'card' | 'flat';
 }
 
-interface EditableMetadataFieldProps {
-  readonly releaseId: string;
-  readonly label: string;
-  readonly value: string | null | undefined;
-  readonly placeholder: string;
-  readonly monospace?: boolean;
-  readonly normalizeValue: (value: string) => string | null;
-  readonly onSave: (releaseId: string, value: string | null) => Promise<void>;
-}
-
 function formatCopyrightLine(line: string, symbol: '℗' | '©'): string {
   const normalized = line.replace(/^[℗©\s]+/u, '').trim();
   return `${symbol} ${normalized}`;
@@ -164,156 +141,6 @@ function CopyrightLabel({
 
 function MetadataFallbackValue({ children }: { readonly children: string }) {
   return <span className={METADATA_MUTED_TEXT_CLASSNAME}>{children}</span>;
-}
-
-function EditableMetadataField({
-  releaseId,
-  label,
-  value,
-  placeholder,
-  monospace = false,
-  normalizeValue,
-  onSave,
-}: EditableMetadataFieldProps) {
-  const [draft, setDraft] = useState(value ?? '');
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const draftRef = useRef(draft);
-  const valueRef = useRef(value ?? '');
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savedIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
-
-  draftRef.current = draft;
-  valueRef.current = value ?? '';
-
-  useEffect(() => {
-    setDraft(value ?? '');
-    setSaveStatus('idle');
-    setErrorMessage(null);
-  }, [value, releaseId]);
-
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      if (savedIndicatorTimerRef.current) {
-        clearTimeout(savedIndicatorTimerRef.current);
-      }
-    };
-  }, []);
-
-  const performSave = useCallback(async () => {
-    const draftSnapshot = draftRef.current;
-    const nextValue = normalizeValue(draftSnapshot);
-    const currentValue = normalizeValue(valueRef.current);
-
-    if (nextValue === currentValue) {
-      setSaveStatus('idle');
-      setErrorMessage(null);
-      return;
-    }
-
-    setSaveStatus('saving');
-    setErrorMessage(null);
-
-    try {
-      await onSave(releaseId, nextValue);
-
-      if (draftRef.current !== draftSnapshot) {
-        setSaveStatus('idle');
-        return;
-      }
-
-      setSaveStatus('saved');
-      if (savedIndicatorTimerRef.current) {
-        clearTimeout(savedIndicatorTimerRef.current);
-      }
-      savedIndicatorTimerRef.current = setTimeout(
-        () => setSaveStatus('idle'),
-        2000
-      );
-    } catch (error) {
-      setSaveStatus('idle');
-      setErrorMessage(
-        error instanceof Error ? error.message : `Failed to save ${label}`
-      );
-    }
-  }, [label, normalizeValue, onSave, releaseId]);
-
-  useEffect(() => {
-    const nextValue = normalizeValue(draft);
-    const currentValue = normalizeValue(value ?? '');
-    if (nextValue === currentValue) {
-      return;
-    }
-
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-
-    saveTimerRef.current = setTimeout(() => {
-      startTransition(() => {
-        void performSave();
-      });
-    }, AUTO_SAVE_DELAY_MS);
-
-    return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-      }
-    };
-  }, [draft, normalizeValue, performSave, value]);
-
-  const handleBlur = useCallback(() => {
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
-    void performSave();
-  }, [performSave]);
-
-  return (
-    <div className='min-w-0 space-y-1'>
-      <Input
-        value={draft}
-        onChange={event => {
-          setDraft(event.target.value);
-          setErrorMessage(null);
-          if (saveStatus === 'saved') {
-            setSaveStatus('idle');
-          }
-        }}
-        onBlur={handleBlur}
-        placeholder={placeholder}
-        aria-label={label}
-        className={cn(
-          METADATA_INPUT_CLASSNAME,
-          monospace && 'font-mono tracking-[0.02em]',
-          errorMessage && 'border-destructive text-destructive'
-        )}
-      />
-      {(saveStatus !== 'idle' || errorMessage) && (
-        <div className='flex min-h-4 items-center gap-1 text-[10px] leading-none'>
-          {saveStatus === 'saving' && (
-            <>
-              <Loader2 className='h-3 w-3 animate-spin text-tertiary-token' />
-              <span className='text-tertiary-token'>Saving…</span>
-            </>
-          )}
-          {saveStatus === 'saved' && !errorMessage && (
-            <>
-              <Check className='h-3 w-3 text-success' />
-              <span className='text-tertiary-token'>Saved</span>
-            </>
-          )}
-          {errorMessage && (
-            <span className='text-[10px] text-destructive'>{errorMessage}</span>
-          )}
-        </div>
-      )}
-    </div>
-  );
 }
 
 export function ReleaseMetadata({
@@ -365,30 +192,32 @@ export function ReleaseMetadata({
             labelClassName={METADATA_LABEL_CLASSNAME}
             label='ISRC'
             value={
-              canEditPrimaryIsrc && onSavePrimaryIsrc ? (
-                <EditableMetadataField
-                  releaseId={release.id}
-                  label='ISRC'
-                  value={release.primaryIsrc}
-                  placeholder='Add ISRC'
-                  monospace
-                  normalizeValue={value => {
-                    const trimmed = value.trim();
-                    return trimmed
-                      ? trimmed.replaceAll(/[^a-zA-Z0-9]/g, '').toUpperCase()
-                      : null;
-                  }}
-                  onSave={onSavePrimaryIsrc}
-                />
-              ) : (
-                <CopyableMonospaceCell
-                  value={release.primaryIsrc}
-                  label='ISRC'
-                  size='sm'
-                  maxWidth={140}
-                  className={METADATA_COPY_CELL_CLASSNAME}
-                />
-              )
+              <DrawerEditableTextField
+                label='ISRC'
+                value={release.primaryIsrc}
+                editable={canEditPrimaryIsrc}
+                placeholder='Add ISRC'
+                emptyLabel='—'
+                monospace
+                normalizeValue={nextValue => {
+                  const trimmed = nextValue.trim();
+                  return trimmed
+                    ? trimmed.replaceAll(/[^a-zA-Z0-9]/g, '').toUpperCase()
+                    : null;
+                }}
+                onSave={
+                  onSavePrimaryIsrc
+                    ? nextValue => onSavePrimaryIsrc(release.id, nextValue)
+                    : undefined
+                }
+                copyValue={release.primaryIsrc ?? null}
+                displayClassName={METADATA_DISPLAY_VALUE_CLASSNAME}
+                emptyClassName={METADATA_MUTED_TEXT_CLASSNAME}
+                inputClassName={cn(
+                  METADATA_INPUT_CLASSNAME,
+                  'font-mono tracking-[0.02em]'
+                )}
+              />
             }
           />
 
@@ -398,33 +227,34 @@ export function ReleaseMetadata({
             labelClassName={METADATA_LABEL_CLASSNAME}
             label='UPC'
             value={
-              canEditMetadata && onSaveMetadata ? (
-                <EditableMetadataField
-                  releaseId={release.id}
-                  label='UPC'
-                  value={release.upc}
-                  placeholder='Add UPC'
-                  monospace
-                  normalizeValue={value => {
-                    const trimmed = value.trim();
-                    return trimmed ? trimmed : null;
-                  }}
-                  onSave={async (releaseId, upc) =>
-                    onSaveMetadata(releaseId, {
-                      upc,
-                      label: release.label ?? null,
-                    })
-                  }
-                />
-              ) : (
-                <CopyableMonospaceCell
-                  value={release.upc}
-                  label='UPC'
-                  size='sm'
-                  maxWidth={140}
-                  className={METADATA_COPY_CELL_CLASSNAME}
-                />
-              )
+              <DrawerEditableTextField
+                label='UPC'
+                value={release.upc}
+                editable={canEditMetadata}
+                placeholder='Add UPC'
+                emptyLabel='—'
+                monospace
+                normalizeValue={nextValue => {
+                  const trimmed = nextValue.trim();
+                  return trimmed ? trimmed : null;
+                }}
+                onSave={
+                  onSaveMetadata
+                    ? upc =>
+                        onSaveMetadata(release.id, {
+                          upc,
+                          label: release.label ?? null,
+                        })
+                    : undefined
+                }
+                copyValue={release.upc ?? null}
+                displayClassName={METADATA_DISPLAY_VALUE_CLASSNAME}
+                emptyClassName={METADATA_MUTED_TEXT_CLASSNAME}
+                inputClassName={cn(
+                  METADATA_INPUT_CLASSNAME,
+                  'font-mono tracking-[0.02em]'
+                )}
+              />
             }
           />
 
@@ -434,37 +264,30 @@ export function ReleaseMetadata({
             labelClassName={METADATA_LABEL_CLASSNAME}
             label='Label'
             value={
-              canEditMetadata && onSaveMetadata ? (
-                <EditableMetadataField
-                  releaseId={release.id}
-                  label='Label'
-                  value={release.label}
-                  placeholder='Add Label'
-                  normalizeValue={value => {
-                    const trimmed = value.trim();
-                    return trimmed ? trimmed : null;
-                  }}
-                  onSave={async (releaseId, label) =>
-                    onSaveMetadata(releaseId, {
-                      upc: release.upc ?? null,
-                      label,
-                    })
-                  }
-                />
-              ) : release.label ? (
-                <CopyableMonospaceCell
-                  value={release.label}
-                  label='Label'
-                  size='sm'
-                  maxWidth={140}
-                  className={cn(
-                    METADATA_COPY_TEXT_CELL_CLASSNAME,
-                    'font-sans tracking-normal'
-                  )}
-                />
-              ) : (
-                <MetadataFallbackValue>Unknown</MetadataFallbackValue>
-              )
+              <DrawerEditableTextField
+                label='Label'
+                value={release.label}
+                editable={canEditMetadata}
+                placeholder='Add Label'
+                emptyLabel='Unknown'
+                normalizeValue={nextValue => {
+                  const trimmed = nextValue.trim();
+                  return trimmed ? trimmed : null;
+                }}
+                onSave={
+                  onSaveMetadata
+                    ? label =>
+                        onSaveMetadata(release.id, {
+                          upc: release.upc ?? null,
+                          label,
+                        })
+                    : undefined
+                }
+                copyValue={release.label ?? null}
+                displayClassName={METADATA_DISPLAY_VALUE_CLASSNAME}
+                emptyClassName={METADATA_MUTED_TEXT_CLASSNAME}
+                inputClassName={METADATA_INPUT_CLASSNAME}
+              />
             }
           />
           {release.copyrightLine && (

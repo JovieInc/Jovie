@@ -234,7 +234,11 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseTrackList', () => ({
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseMetadata', () => ({
-  ReleaseMetadata: () => <div data-testid='metadata'>Metadata</div>,
+  ReleaseMetadata: ({ variant }: { variant?: 'card' | 'flat' }) => (
+    <div data-testid='metadata' data-variant={variant ?? 'card'}>
+      Metadata
+    </div>
+  ),
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
@@ -242,7 +246,11 @@ vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseLyricsSection', () => ({
-  ReleaseLyricsSection: () => <div data-testid='lyrics'>Lyrics</div>,
+  ReleaseLyricsSection: ({ variant }: { variant?: 'card' | 'flat' }) => (
+    <div data-testid='lyrics' data-variant={variant ?? 'card'}>
+      Lyrics
+    </div>
+  ),
 }));
 
 vi.mock('@/components/organisms/release-sidebar/TrackDetailPanel', () => ({
@@ -351,6 +359,10 @@ describe('ReleaseSidebar Links tab', () => {
 
     // Details tab active by default
     expect(screen.getByTestId('metadata')).toBeInTheDocument();
+    expect(screen.getByTestId('metadata')).toHaveAttribute(
+      'data-variant',
+      'flat'
+    );
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
 
     // Switch to Links tab
@@ -373,6 +385,10 @@ describe('ReleaseSidebar Links tab', () => {
     // Switch to Lyrics tab
     await user.click(screen.getByTestId('drawer-tab-lyrics'));
     expect(screen.getByTestId('lyrics')).toBeInTheDocument();
+    expect(screen.getByTestId('lyrics')).toHaveAttribute(
+      'data-variant',
+      'flat'
+    );
     expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
 
     // Switch to Track list

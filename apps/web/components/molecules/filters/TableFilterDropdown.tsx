@@ -6,6 +6,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   TooltipShortcut,
 } from '@jovie/ui';
@@ -41,8 +44,8 @@ export interface TableFilterDropdownCategory<T extends string = string> {
   readonly searchPlaceholder?: string;
 }
 
-export interface TableFilterDropdownProps {
-  readonly categories: readonly TableFilterDropdownCategory[];
+export interface TableFilterDropdownProps<T extends string = string> {
+  readonly categories: readonly TableFilterDropdownCategory<T>[];
   readonly buttonClassName?: string;
   readonly iconOnly?: boolean;
   readonly emptyMessage?: string;
@@ -56,7 +59,6 @@ function TableFilterSection<T extends string>({
 }>) {
   const [search, setSearch] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
-  const shouldShowSearch = category.options.length > 6;
 
   const filteredOptions = useMemo(() => {
     if (!search.trim()) return category.options;
@@ -66,39 +68,19 @@ function TableFilterSection<T extends string>({
     );
   }, [category.options, search]);
 
-  const handleClear = useCallback(() => {
-    setSearch('');
-    searchRef.current?.focus();
-  }, []);
-
   return (
-    <div className='space-y-1.5'>
-      <div className='flex items-center gap-2 px-1'>
-        <Icon
-          name={category.iconName as 'Filter'}
-          className='h-3.5 w-3.5 text-tertiary-token'
-        />
-        <span className='text-[11px] font-[560] tracking-[0.02em] text-tertiary-token'>
-          {category.label}
-        </span>
-        {category.selectedIds.length > 0 ? (
-          <span className='rounded-full border border-(--linear-app-frame-seam) bg-surface-1 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token'>
-            {category.selectedIds.length}
-          </span>
-        ) : null}
-      </div>
-
-      {shouldShowSearch ? (
+    <div className='flex max-h-[320px] min-h-[220px] min-w-[260px] flex-col overflow-hidden'>
+      <div className='border-b border-(--linear-app-frame-seam) p-2'>
         <FilterSearchInput
           value={search}
           onChange={setSearch}
-          onClear={handleClear}
+          onClear={() => setSearch('')}
           placeholder={category.searchPlaceholder ?? `Search ${category.label}`}
           inputRef={searchRef}
         />
-      ) : null}
+      </div>
 
-      <div className='space-y-1'>
+      <div className='flex-1 overflow-y-auto p-1.5'>
         {filteredOptions.length === 0 ? (
           <DropdownEmptyState message='No options found' />
         ) : (
@@ -109,8 +91,8 @@ function TableFilterSection<T extends string>({
               icon={
                 option.iconName ? (
                   <Icon
-                    name={option.iconName as 'Filter'}
-                    className='h-3.5 w-3.5'
+                    name={option.iconName}
+                    className='h-3.5 w-3.5 text-tertiary-token'
                   />
                 ) : undefined
               }
@@ -126,15 +108,50 @@ function TableFilterSection<T extends string>({
   );
 }
 
-export function TableFilterDropdown({
+function TableFilterSubmenu<T extends string>({
+  category,
+}: Readonly<{
+  category: TableFilterDropdownCategory<T>;
+}>) {
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger
+        inset={false}
+        className='justify-between gap-2 rounded-[8px] px-2.5 py-2 text-[13px] text-secondary-token'
+      >
+        <span className='flex min-w-0 items-center gap-2.5'>
+          <Icon
+            name={category.iconName}
+            className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+          />
+          <span className='flex-1 truncate text-left'>{category.label}</span>
+        </span>
+        <span className='flex items-center gap-2'>
+          {category.selectedIds.length > 0 ? (
+            <span className='shrink-0 text-[11px] tabular-nums text-tertiary-token'>
+              {category.selectedIds.length}
+            </span>
+          ) : null}
+        </span>
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent
+        sideOffset={8}
+        className={cn(LINEAR_SURFACE.popover, 'overflow-hidden p-0')}
+      >
+        <TableFilterSection category={category} />
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+export function TableFilterDropdown<T extends string = string>({
   categories,
   buttonClassName,
-  iconOnly = false,
+  iconOnly = true,
   emptyMessage = 'No filters found',
   onClearAll,
-}: Readonly<TableFilterDropdownProps>) {
+}: Readonly<TableFilterDropdownProps<T>>) {
   const [isOpen, setIsOpen] = useState(false);
-
   const hasAnyFilter = categories.some(category => category.selectedIds.length);
 
   const handleOpenChange = useCallback((open: boolean) => {
@@ -150,7 +167,7 @@ export function TableFilterDropdown({
             size='sm'
             className={cn(
               PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-              iconOnly && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+              PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
               (isOpen || hasAnyFilter) && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
               buttonClassName
             )}
@@ -175,28 +192,23 @@ export function TableFilterDropdown({
         sideOffset={4}
         className={cn(
           LINEAR_SURFACE.popover,
-          'flex min-w-[240px] max-w-[calc(100vw-16px)] flex-col overflow-hidden'
+          'flex min-w-[240px] max-w-[calc(100vw-16px)] flex-col overflow-hidden p-1.5'
         )}
         onCloseAutoFocus={event => event.preventDefault()}
       >
-        <div className='max-h-[340px] space-y-3 overflow-y-auto p-2'>
-          {categories.length === 0 ? (
-            <DropdownEmptyState message={emptyMessage} />
-          ) : (
-            categories.map((category, index) => (
-              <div key={category.id} className='space-y-3'>
-                {index > 0 ? <DropdownMenuSeparator /> : null}
-                <TableFilterSection category={category} />
-              </div>
-            ))
-          )}
-        </div>
+        {categories.length === 0 ? (
+          <DropdownEmptyState message={emptyMessage} />
+        ) : (
+          categories.map(category => (
+            <TableFilterSubmenu key={category.id} category={category} />
+          ))
+        )}
 
         {hasAnyFilter && onClearAll ? (
           <>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className='my-1' />
             <DropdownMenuItem
-              className='text-tertiary-token hover:text-primary-token'
+              className='rounded-[8px] text-tertiary-token hover:text-primary-token'
               onSelect={event => {
                 event.preventDefault();
                 onClearAll();

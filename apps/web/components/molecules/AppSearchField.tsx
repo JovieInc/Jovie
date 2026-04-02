@@ -45,6 +45,7 @@ export function AppSearchField({
         ref={inputRef}
         autoFocus={autoFocus}
         type='search'
+        data-app-search-field='true'
         value={value}
         onChange={event => onChange(event.target.value)}
         onKeyDown={event => {
@@ -61,7 +62,7 @@ export function AppSearchField({
         <AppIconButton
           type='button'
           ariaLabel='Clear search'
-          className='border-transparent bg-transparent text-tertiary-token hover:border-subtle hover:bg-surface-1 hover:text-secondary-token'
+          className='border-transparent bg-transparent text-tertiary-token hover:border-transparent hover:bg-surface-1 hover:text-secondary-token'
           onClick={() => {
             onChange('');
             onClear?.();

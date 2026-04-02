@@ -322,31 +322,11 @@ export function TrackSidebar({
           contentClassName='pt-2'
         >
           {activeTab === 'details' && (
-            <div className='space-y-2'>
-              {track.isrc && (
-                <DrawerActionRow
-                  onClick={handleCopyIsrc}
-                  icon={<Hash className='h-3.5 w-3.5' />}
-                  label='Copy ISRC'
-                  trailing={
-                    <span className='font-mono text-[10px] text-tertiary-token'>
-                      {track.isrc}
-                    </span>
-                  }
-                />
-              )}
-            </div>
-          )}
-          {activeTab === 'details' && (
-            <DrawerSurfaceCard
-              className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden')}
-            >
-              <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+            <div className='space-y-3' data-testid='track-details-panel'>
+              <div className='space-y-2'>
                 <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
                   Track link
                 </p>
-              </div>
-              <div className='space-y-2.5 p-2.5'>
                 <CopyableUrlRow
                   url={smartLinkUrl}
                   size='md'
@@ -362,25 +342,16 @@ export function TrackSidebar({
                   }}
                 />
               </div>
-            </DrawerSurfaceCard>
-          )}
-
-          {activeTab === 'details' && trackHeaderCard ? (
-            <DrawerSurfaceCard
-              className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden')}
-            >
-              <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+              <div className='space-y-2'>
                 <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
                   Actions
                 </p>
-              </div>
-              <DrawerCardActionBar
-                primaryActions={primaryActions}
-                overflowActions={overflowActions}
-                className='border-t-0 px-2.5 py-2'
-              />
-              {track.isrc ? (
-                <div className='border-t border-(--linear-app-frame-seam) p-2.5'>
+                <DrawerCardActionBar
+                  primaryActions={primaryActions}
+                  overflowActions={overflowActions}
+                  className='border-0 bg-transparent px-0 py-0'
+                />
+                {track.isrc ? (
                   <DrawerActionRow
                     onClick={handleCopyIsrc}
                     icon={<Hash className='h-3.5 w-3.5' />}
@@ -391,10 +362,10 @@ export function TrackSidebar({
                       </span>
                     }
                   />
-                </div>
-              ) : null}
-            </DrawerSurfaceCard>
-          ) : null}
+                ) : null}
+              </div>
+            </div>
+          )}
 
           {activeTab === 'platforms' && (
             <TrackPlatformLinksSection providers={streamingProviders} />

@@ -8,6 +8,8 @@ describe('OnboardingExperienceShell', () => {
       <OnboardingExperienceShell
         mode='standalone'
         stableStageHeight='tall'
+        sidebar={<nav>Step Navigation</nav>}
+        sidebarTitle='Jovie Setup'
         topBar={<div>Top Bar</div>}
         sidePanel={<aside>Preview Panel</aside>}
         footer={<div>Footer Dots</div>}
@@ -19,11 +21,24 @@ describe('OnboardingExperienceShell', () => {
 
     expect(screen.getByTestId('onboarding-shell')).toBeInTheDocument();
     expect(screen.getByText('Top Bar')).toBeInTheDocument();
+    expect(screen.getByText('Jovie Setup')).toBeInTheDocument();
+    expect(screen.getByText('Step Navigation')).toBeInTheDocument();
     expect(screen.getByText('Preview Panel')).toBeInTheDocument();
     expect(screen.getByText('Footer Dots')).toBeInTheDocument();
     expect(screen.getByText('Onboarding Stage')).toBeInTheDocument();
     expect(container.innerHTML).toContain('min-h-screen');
     expect(container.innerHTML).toContain('min-h-[560px]');
+  });
+
+  it('supports a flat stage surface', () => {
+    const { container } = render(
+      <OnboardingExperienceShell mode='standalone' stageVariant='flat'>
+        <div>Flat Stage</div>
+      </OnboardingExperienceShell>
+    );
+
+    expect(screen.getByText('Flat Stage')).toBeInTheDocument();
+    expect(container.innerHTML).toContain('px-0 py-2');
   });
 
   it('supports embedded mode without fullscreen classes', () => {

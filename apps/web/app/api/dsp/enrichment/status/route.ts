@@ -89,6 +89,55 @@ function isTerminalJobStatus(status: string | null | undefined): boolean {
   return status === 'succeeded' || status === 'failed';
 }
 
+const ACTIVE_DISCOVERY_JOB_TTL_MS = 10 * 60 * 1000;
+
+function isActiveDiscoveryJob(
+  job:
+    | {
+        status: string;
+        createdAt: Date | null;
+        updatedAt: Date | null;
+      }
+    | undefined,
+  providerStatuses: ProviderEnrichmentStatus[],
+  latestMatchUpdatedAt: Date | null
+): boolean {
+  if (!job) {
+    return false;
+  }
+
+  const isPendingStatus =
+    job.status === 'pending' || job.status === 'processing';
+  if (!isPendingStatus) {
+    return false;
+  }
+
+  const lastHeartbeat = job.updatedAt ?? job.createdAt;
+  if (
+    lastHeartbeat &&
+    Date.now() - lastHeartbeat.getTime() > ACTIVE_DISCOVERY_JOB_TTL_MS
+  ) {
+    return false;
+  }
+
+  const hasOnlyTerminalProviderStates =
+    providerStatuses.length > 0 &&
+    providerStatuses.every(
+      status => status.phase === 'complete' || status.phase === 'failed'
+    );
+
+  if (
+    hasOnlyTerminalProviderStates &&
+    latestMatchUpdatedAt &&
+    lastHeartbeat &&
+    latestMatchUpdatedAt.getTime() >= lastHeartbeat.getTime()
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 // ============================================================================
 // Route Handler
 // ============================================================================
@@ -180,10 +229,6 @@ export async function GET(request: Request) {
       );
     }
 
-    const hasPendingDiscoveryJob =
-      discoveryJob?.status === 'pending' ||
-      discoveryJob?.status === 'processing';
-
     // Fetch all matches for this profile
     const matches = await db
       .select({
@@ -228,6 +273,23 @@ export async function GET(request: Request) {
         lastUpdatedAt: toISOStringOrFallback(match?.updatedAt),
       };
     });
+
+    const latestMatchUpdatedAt =
+      matches.length > 0
+        ? matches.reduce<Date | null>(
+            (latest, match) =>
+              !match.updatedAt || (latest && latest >= match.updatedAt)
+                ? latest
+                : match.updatedAt,
+            null
+          )
+        : null;
+
+    const hasPendingDiscoveryJob = isActiveDiscoveryJob(
+      discoveryJob,
+      providerStatuses,
+      latestMatchUpdatedAt
+    );
 
     // Calculate overall status
     const overallPhase = determineOverallPhase(

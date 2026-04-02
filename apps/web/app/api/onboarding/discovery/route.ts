@@ -16,6 +16,7 @@ import { captureError } from '@/lib/error-tracking';
 import { getHometownFromSettings } from '@/types/db';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const ACTIVE_DISCOVERY_JOB_TTL_MS = 10 * 60 * 1000;
 
 const PROVIDER_LABELS: Record<string, string> = {
   apple_music: 'Apple Music',
@@ -36,6 +37,47 @@ function parseConfidenceScore(
     typeof value === 'number' ? value : Number.parseFloat(String(value ?? '0'));
 
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isActiveDiscoveryJob(
+  job:
+    | {
+        status: string;
+        createdAt: Date | null;
+        updatedAt: Date | null;
+      }
+    | undefined,
+  latestMatchUpdatedAt: Date | null,
+  hasTerminalMatches: boolean
+): boolean {
+  if (!job) {
+    return false;
+  }
+
+  const isPendingStatus =
+    job.status === 'pending' || job.status === 'processing';
+  if (!isPendingStatus) {
+    return false;
+  }
+
+  const lastHeartbeat = job.updatedAt ?? job.createdAt;
+  if (
+    lastHeartbeat &&
+    Date.now() - lastHeartbeat.getTime() > ACTIVE_DISCOVERY_JOB_TTL_MS
+  ) {
+    return false;
+  }
+
+  if (
+    hasTerminalMatches &&
+    latestMatchUpdatedAt &&
+    lastHeartbeat &&
+    latestMatchUpdatedAt.getTime() >= lastHeartbeat.getTime()
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 export async function GET(request: Request) {
@@ -199,6 +241,7 @@ export async function GET(request: Request) {
       db
         .select({
           status: ingestionJobs.status,
+          createdAt: ingestionJobs.createdAt,
           updatedAt: ingestionJobs.updatedAt,
         })
         .from(ingestionJobs)
@@ -244,6 +287,22 @@ export async function GET(request: Request) {
         match =>
           match.status === 'confirmed' || match.status === 'auto_confirmed'
       ).length + (profile.spotifyId ? 1 : 0);
+    const latestMatchUpdatedAt =
+      dspMatches.length > 0
+        ? dspMatches.reduce<Date | null>(
+            (latest, match) =>
+              !match.updatedAt || (latest && latest >= match.updatedAt)
+                ? latest
+                : match.updatedAt,
+            null
+          )
+        : null;
+    const hasTerminalMatches = dspMatches.some(
+      match =>
+        match.status === 'confirmed' ||
+        match.status === 'auto_confirmed' ||
+        match.status === 'rejected'
+    );
 
     return NextResponse.json(
       {
@@ -299,9 +358,11 @@ export async function GET(request: Request) {
             activeSocialCount: activeSocialCountResult[0]?.value ?? 0,
             dspCount: confirmedDspCount,
           },
-          hasPendingDiscoveryJob:
-            latestDiscoveryJob[0]?.status === 'pending' ||
-            latestDiscoveryJob[0]?.status === 'processing',
+          hasPendingDiscoveryJob: isActiveDiscoveryJob(
+            latestDiscoveryJob[0],
+            latestMatchUpdatedAt,
+            hasTerminalMatches
+          ),
         },
       },
       { status: 200, headers: NO_STORE_HEADERS }

@@ -35,6 +35,7 @@ interface ReleaseLyricsSectionProps {
   readonly lyrics?: string;
   readonly isEditable: boolean;
   readonly isSaving?: boolean;
+  readonly variant?: 'card' | 'flat';
   readonly onSaveLyrics?: (releaseId: string, lyrics: string) => Promise<void>;
   readonly onFormatLyrics?: (
     releaseId: string,
@@ -48,6 +49,7 @@ export function ReleaseLyricsSection({
   lyrics,
   isEditable,
   isSaving = false,
+  variant = 'card',
   onSaveLyrics,
   onFormatLyrics,
 }: ReleaseLyricsSectionProps) {
@@ -178,7 +180,11 @@ export function ReleaseLyricsSection({
 
   return (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
+      variant={variant}
+      className={cn(
+        variant === 'card' && LINEAR_SURFACE.drawerCardSm,
+        'overflow-hidden'
+      )}
     >
       <div className='space-y-2.5 p-3'>
         <Textarea

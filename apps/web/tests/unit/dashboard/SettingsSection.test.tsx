@@ -16,6 +16,8 @@ describe('SettingsSection', () => {
 
     const heading = screen.getByRole('heading', { name: 'Artist Profile' });
     expect(heading).toBeInTheDocument();
-    expect(screen.getByText('Photo, display name, and username.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Photo, display name, and username.')
+    ).toBeInTheDocument();
   });
 });

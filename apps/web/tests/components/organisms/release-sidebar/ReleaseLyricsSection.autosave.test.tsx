@@ -24,8 +24,16 @@ vi.mock('@/components/molecules/drawer', () => ({
       {children}
     </section>
   ),
-  DrawerSurfaceCard: ({ children }: { children?: React.ReactNode }) => (
-    <div>{children}</div>
+  DrawerSurfaceCard: ({
+    children,
+    variant,
+  }: {
+    children?: React.ReactNode;
+    variant?: 'card' | 'flat';
+  }) => (
+    <div data-testid='release-lyrics-surface' data-variant={variant ?? 'card'}>
+      {children}
+    </div>
   ),
 }));
 
@@ -197,5 +205,26 @@ describe('ReleaseLyricsSection auto-save', () => {
       expect(onSaveLyrics).toHaveBeenCalledTimes(1);
       expect(onSaveLyrics).toHaveBeenCalledWith('r1', 'abc');
     });
+  });
+
+  it('renders in flat mode without changing autosave affordances', () => {
+    render(
+      <ReleaseLyricsSection
+        releaseId='r1'
+        lyrics='Some lyrics here'
+        isEditable={true}
+        variant='flat'
+      />
+    );
+
+    expect(screen.getByTestId('release-lyrics-surface')).toBeInTheDocument();
+    expect(screen.getByTestId('release-lyrics-surface')).toHaveAttribute(
+      'data-variant',
+      'flat'
+    );
+    expect(screen.getByPlaceholderText('Paste your lyrics here')).toHaveValue(
+      'Some lyrics here'
+    );
+    expect(screen.getByRole('button', { name: /^copy$/i })).toBeInTheDocument();
   });
 });

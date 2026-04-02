@@ -1,24 +1,52 @@
 import { TooltipProvider } from '@jovie/ui';
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockTask = {
   id: 'task-1',
-  profileId: 'profile-1',
   taskNumber: 1,
+  creatorProfileId: 'profile-1',
   title:
     'Upload final master to distributor with long metadata review and delivery notes',
   description: 'Document the release handoff and delivery checklist.',
   status: 'done',
   priority: 'high',
   assigneeKind: 'human',
+  assigneeUserId: null,
+  agentType: null,
+  agentStatus: 'approved',
+  agentInput: null,
+  agentOutput: null,
+  agentError: null,
   dueAt: null,
   releaseId: null,
   releaseTitle: null,
+  parentTaskId: null,
+  category: null,
+  scheduledFor: null,
+  startedAt: null,
+  completedAt: '2026-04-01T00:00:00.000Z',
+  position: 0,
+  sourceTemplateId: null,
+  metadata: null,
   createdAt: '2026-04-01T00:00:00.000Z',
   updatedAt: '2026-04-01T00:00:00.000Z',
 } as const;
+
+const mockTaskTwo = {
+  ...mockTask,
+  id: 'task-2',
+  taskNumber: 2,
+  title: 'Confirm final DSP delivery checklist',
+  description: 'Follow up on delivery status and confirm provider approval.',
+  status: 'in_progress',
+  agentStatus: 'processing',
+  priority: 'medium',
+} as const;
+
+const mockCreateTask = vi.fn();
+const mockUpdateTask = vi.fn();
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({
@@ -49,24 +77,23 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
 
 vi.mock('@/lib/queries/useTasksQuery', () => ({
   useTasksQuery: () => ({
-    data: { tasks: [mockTask] },
+    data: { tasks: [mockTask, mockTaskTwo] },
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
   }),
-  useTaskQuery: () => ({
-    data: mockTask,
+  useTaskQuery: (taskId: string | null) => ({
+    data: taskId === 'task-1' ? mockTask : undefined,
   }),
 }));
 
 vi.mock('@/lib/queries/useTaskMutations', () => ({
   useCreateTaskMutation: () => ({
-    mutateAsync: vi.fn(),
+    mutateAsync: mockCreateTask,
     isPending: false,
   }),
   useUpdateTaskMutation: () => ({
-    mutate: vi.fn(),
-    mutateAsync: vi.fn(),
+    mutate: mockUpdateTask,
     isPending: false,
   }),
 }));
@@ -126,6 +153,17 @@ function renderPage() {
 }
 
 describe('TasksPageClient', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockCreateTask.mockReset();
+    mockUpdateTask.mockReset();
+  });
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+  });
+
   it('renders a single unified filter menu button in the toolbar', () => {
     renderPage();
 
@@ -141,5 +179,64 @@ describe('TasksPageClient', () => {
     const titleEditor = screen.getByLabelText('Task title');
     expect(titleEditor.tagName).toBe('TEXTAREA');
     expect(titleEditor).toHaveValue(mockTask.title);
+  });
+
+  it('shows the compact progress metadata for the selected task', () => {
+    renderPage();
+
+    expect(screen.getByText('Done')).toBeInTheDocument();
+    expect(screen.getByText('High')).toBeInTheDocument();
+    expect(screen.getByText('You')).toBeInTheDocument();
+  });
+
+  it('autosaves document edits and removes the manual save button', () => {
+    renderPage();
+
+    expect(
+      screen.queryByRole('button', { name: /save task/i })
+    ).not.toBeInTheDocument();
+
+    const titleEditor = screen.getByLabelText('Task title');
+    fireEvent.change(titleEditor, {
+      target: { value: 'Updated release handoff title' },
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(mockUpdateTask).toHaveBeenCalledWith(
+      {
+        taskId: 'task-1',
+        data: {
+          title: 'Updated release handoff title',
+          description: mockTask.description,
+        },
+      },
+      expect.objectContaining({
+        onError: expect.any(Function),
+      })
+    );
+  });
+
+  it('renders previous and next task navigation controls', () => {
+    renderPage();
+
+    expect(
+      screen.getByRole('button', { name: 'Previous task' })
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next task' })).toBeEnabled();
+  });
+
+  it('supports j and k keyboard navigation across visible tasks', () => {
+    renderPage();
+
+    expect(screen.getByLabelText('Task title')).toHaveValue(mockTask.title);
+
+    fireEvent.keyDown(window, { key: 'j' });
+    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+
+    fireEvent.keyDown(window, { key: 'k' });
+    expect(screen.getByLabelText('Task title')).toHaveValue(mockTask.title);
   });
 });

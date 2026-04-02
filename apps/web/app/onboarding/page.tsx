@@ -82,12 +82,10 @@ export default async function OnboardingPage({
   // Try to get existing profile data if available (user might be partially onboarded)
   // This is optional - if it fails, we just don't pre-fill
   let existingProfile = null;
-  let existingAvatarQuality = null;
   if (!shouldSkipDashboardPrefetch) {
     try {
       const dashboardData = await getDashboardData();
       existingProfile = dashboardData.selectedProfile;
-      existingAvatarQuality = dashboardData.avatarQuality;
     } catch (error) {
       // Capture database/connection errors to Sentry (but not "no profile" errors)
       const errorMessage = extractErrorMessage(error, 'Unknown error');
@@ -139,7 +137,6 @@ export default async function OnboardingPage({
       initialProfileId={existingProfile?.id ?? authResult.profileId}
       initialResumeStep={resolvedSearchParams?.resume ?? null}
       existingAvatarUrl={existingProfile?.avatarUrl ?? null}
-      existingAvatarQuality={existingAvatarQuality}
       existingBio={existingProfile?.bio ?? null}
       existingGenres={existingProfile?.genres ?? null}
     />

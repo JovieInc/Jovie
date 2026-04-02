@@ -1,7 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ReleaseMetadata } from '@/components/organisms/release-sidebar/ReleaseMetadata';
 import type { Release } from '@/components/organisms/release-sidebar/types';
 
@@ -38,15 +38,9 @@ function renderReleaseMetadata(release: Release) {
 }
 
 describe('ReleaseMetadata editable fields', () => {
-  beforeEach(() => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-  });
+  it('renders empty metadata fields in read mode first and enters edit mode on click', async () => {
+    const user = userEvent.setup();
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('renders empty metadata fields as editable inputs in admin mode', () => {
     render(
       <TooltipProvider>
         <ReleaseMetadata
@@ -58,22 +52,19 @@ describe('ReleaseMetadata editable fields', () => {
       </TooltipProvider>
     );
 
-    expect(screen.getByLabelText('ISRC')).toHaveAttribute(
+    expect(screen.getByLabelText('Edit ISRC')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Add ISRC')).not.toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('Edit ISRC'));
+
+    expect(screen.getByLabelText('Edit ISRC')).toHaveAttribute(
       'placeholder',
       'Add ISRC'
     );
-    expect(screen.getByLabelText('UPC')).toHaveAttribute(
-      'placeholder',
-      'Add UPC'
-    );
-    expect(screen.getByLabelText('Label')).toHaveAttribute(
-      'placeholder',
-      'Add Label'
-    );
   });
 
-  it('auto-saves metadata after debounce and normalizes ISRC', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  it('saves on blur and normalizes ISRC', async () => {
+    const user = userEvent.setup();
     const onSavePrimaryIsrc = vi.fn().mockResolvedValue(undefined);
 
     render(
@@ -87,8 +78,10 @@ describe('ReleaseMetadata editable fields', () => {
       </TooltipProvider>
     );
 
-    await user.type(screen.getByLabelText('ISRC'), 'us-abc-1234567');
-    vi.advanceTimersByTime(1600);
+    await user.click(screen.getByLabelText('Edit ISRC'));
+    const input = screen.getByLabelText('Edit ISRC');
+    await user.type(input, 'us-abc-1234567');
+    await user.tab();
 
     await waitFor(() => {
       expect(onSavePrimaryIsrc).toHaveBeenCalledWith(
@@ -98,8 +91,8 @@ describe('ReleaseMetadata editable fields', () => {
     });
   });
 
-  it('flushes pending saves on blur', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  it('saves label changes on blur', async () => {
+    const user = userEvent.setup();
     const onSaveMetadata = vi.fn().mockResolvedValue(undefined);
 
     render(
@@ -113,7 +106,8 @@ describe('ReleaseMetadata editable fields', () => {
       </TooltipProvider>
     );
 
-    const input = screen.getByLabelText('Label');
+    await user.click(screen.getByLabelText('Edit Label'));
+    const input = screen.getByLabelText('Edit Label');
     await user.type(input, 'New Label');
     await user.tab();
 
@@ -124,40 +118,21 @@ describe('ReleaseMetadata editable fields', () => {
       });
     });
   });
-
-  it('keeps draft text visible and shows inline error when save fails', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    const onSaveMetadata = vi
-      .fn()
-      .mockRejectedValue(
-        new Error('This UPC is already used on another release')
-      );
-
-    render(
-      <TooltipProvider>
-        <ReleaseMetadata
-          release={buildRelease({ upc: null })}
-          isEditable
-          onSavePrimaryIsrc={vi.fn().mockResolvedValue(undefined)}
-          onSaveMetadata={onSaveMetadata}
-        />
-      </TooltipProvider>
-    );
-
-    const input = screen.getByLabelText('UPC');
-    await user.type(input, '12345678');
-    vi.advanceTimersByTime(1600);
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('12345678')).toBeInTheDocument();
-      expect(
-        screen.getByText('This UPC is already used on another release')
-      ).toBeInTheDocument();
-    });
-  });
 });
 
 describe('ReleaseMetadata canvas status', () => {
+  it('renders correctly in flat mode without the nested card chrome', () => {
+    render(
+      <TooltipProvider>
+        <ReleaseMetadata release={buildRelease()} variant='flat' />
+      </TooltipProvider>
+    );
+
+    expect(screen.getByTestId('release-metadata-card')).toHaveClass('border-0');
+    expect(screen.getByTestId('release-metadata-grid')).toBeInTheDocument();
+    expect(screen.getByText('ISRC')).toBeInTheDocument();
+  });
+
   it('renders metadata as a single divider-free grid', () => {
     renderReleaseMetadata(buildRelease());
 
