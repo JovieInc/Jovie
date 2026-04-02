@@ -1,0 +1,7 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": ".cache/tsbuildinfo"
+  },
+  "include": ["index.ts"]
+}

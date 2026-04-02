@@ -64,14 +64,14 @@ while IFS= read -r f; do
     requirements.txt|pyproject.toml|go.mod|Cargo.toml|composer.json) CONFIG=true ;;
 
     # Migrations: database migration files
-    db/migrate/*|*/migrations/*|alembic/*|prisma/migrations/*) MIGRATIONS=true; BACKEND=true ;;
+    db/migrate/*|*/migrations/*|alembic/*|prisma/migrations/*) MIGRATIONS=true ;;
 
     # API: routes, controllers, endpoints, GraphQL/OpenAPI schemas
-    *controller*|*route*|*endpoint*|*/api/*) API=true; BACKEND=true ;;
-    *.graphql|*.gql|openapi.*|swagger.*) API=true; BACKEND=true ;;
+    *controller*|*route*|*endpoint*|*/api/*) API=true ;;
+    *.graphql|*.gql|openapi.*|swagger.*) API=true ;;
 
     # Auth: authentication, authorization, sessions, permissions
-    *auth*|*session*|*jwt*|*oauth*|*permission*|*role*) AUTH=true; BACKEND=true ;;
+    *auth*|*session*|*jwt*|*oauth*|*permission*|*role*) AUTH=true ;;
 
     # Backend: everything else that's code (excluding views/components already matched)
     *.rb|*.py|*.go|*.rs|*.java|*.php|*.ex|*.exs) BACKEND=true ;;

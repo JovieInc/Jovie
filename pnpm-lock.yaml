@@ -118,6 +118,12 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  apps/extension:
+    dependencies:
+      '@jovie/extension-contracts':
+        specifier: workspace:*
+        version: link:../../packages/extension-contracts
+
   apps/should-i-make:
     dependencies:
       '@vercel/analytics':
@@ -536,6 +542,8 @@ importers:
       vitest:
         specifier: ^4.1.2
         version: 4.1.2(@opentelemetry/api@1.9.0)(@types/node@22.19.15)(@vitest/browser-playwright@4.1.2)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.4(@types/node@22.19.15)(typescript@5.9.3))(vite@6.4.1(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+
+  packages/extension-contracts: {}
 
   packages/ui:
     dependencies:

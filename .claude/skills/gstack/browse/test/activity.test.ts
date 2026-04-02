@@ -7,8 +7,8 @@ describe('filterArgs — privacy filtering', () => {
     expect(filterArgs('fill', ['input[type=passwd]', 'abc'])).toEqual(['input[type=passwd]', '[REDACTED]']);
   });
 
-  it('redacts fill values for non-password fields too', () => {
-    expect(filterArgs('fill', ['#email', 'user@test.com'])).toEqual(['#email', '[REDACTED]']);
+  it('preserves fill value for non-password fields', () => {
+    expect(filterArgs('fill', ['#email', 'user@test.com'])).toEqual(['#email', 'user@test.com']);
   });
 
   it('redacts type command args', () => {

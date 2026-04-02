@@ -29,11 +29,7 @@ const processingTabs = new Set<number>();
 function getGitRoot(): string | null {
   try {
     const { execSync } = require('child_process');
-    return execSync('git rev-parse --show-toplevel', {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 5000,
-    }).trim();
+    return execSync('git rev-parse --show-toplevel', { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
   } catch {
     return null;
   }
@@ -271,10 +267,7 @@ async function askClaude(queueEntry: any): Promise<void> {
       stderrBuffer += data.toString();
     });
 
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
     proc.on('close', (code) => {
-      if (timeoutId) clearTimeout(timeoutId);
       if (buffer.trim()) {
         try { handleStreamEvent(JSON.parse(buffer), tid); } catch {}
       }
@@ -289,7 +282,6 @@ async function askClaude(queueEntry: any): Promise<void> {
     });
 
     proc.on('error', (err) => {
-      if (timeoutId) clearTimeout(timeoutId);
       const errorMsg = stderrBuffer.trim()
         ? `${err.message}\nstderr: ${stderrBuffer.trim().slice(-500)}`
         : err.message;
@@ -301,7 +293,7 @@ async function askClaude(queueEntry: any): Promise<void> {
 
     // Timeout (default 300s / 5 min — multi-page tasks need time)
     const timeoutMs = parseInt(process.env.SIDEBAR_AGENT_TIMEOUT || '300000', 10);
-    timeoutId = setTimeout(() => {
+    setTimeout(() => {
       try { proc.kill(); } catch {}
       const timeoutMsg = stderrBuffer.trim()
         ? `Timed out after ${timeoutMs / 1000}s\nstderr: ${stderrBuffer.trim().slice(-500)}`
@@ -316,20 +308,26 @@ async function askClaude(queueEntry: any): Promise<void> {
 
 // ─── Poll loop ───────────────────────────────────────────────────
 
-function readQueueLines(): string[] {
+function countLines(): number {
   try {
-    return fs.readFileSync(QUEUE, 'utf-8').split('\n').filter(Boolean);
-  } catch { return []; }
+    return fs.readFileSync(QUEUE, 'utf-8').split('\n').filter(Boolean).length;
+  } catch { return 0; }
+}
+
+function readLine(n: number): string | null {
+  try {
+    const lines = fs.readFileSync(QUEUE, 'utf-8').split('\n').filter(Boolean);
+    return lines[n - 1] || null;
+  } catch { return null; }
 }
 
 async function poll() {
-  const lines = readQueueLines();
-  const current = lines.length;
+  const current = countLines();
   if (current <= lastLine) return;
 
   while (lastLine < current) {
     lastLine++;
-    const line = lines[lastLine - 1] || null;
+    const line = readLine(lastLine);
     if (!line) continue;
 
     let entry: any;
@@ -358,7 +356,7 @@ async function main() {
   fs.mkdirSync(dir, { recursive: true });
   if (!fs.existsSync(QUEUE)) fs.writeFileSync(QUEUE, '');
 
-  lastLine = readQueueLines().length;
+  lastLine = countLines();
   await refreshToken();
 
   console.log(`[sidebar-agent] Started. Watching ${QUEUE} from line ${lastLine}`);

@@ -8,7 +8,6 @@
 
 PORT="${1:-9222}"
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-CHROME_PROCESS="$CHROME"
 REAL_PROFILE="$HOME/Library/Application Support/Google/Chrome"
 CDP_DATA_DIR="$HOME/.gstack/cdp-profile/chrome"
 
@@ -18,19 +17,19 @@ if ! [ -f "$CHROME" ]; then
 fi
 
 # Check if Chrome is running
-if pgrep -f "$CHROME_PROCESS" >/dev/null 2>&1; then
+if pgrep -f "Google Chrome" >/dev/null 2>&1; then
   echo "Chrome is still running. Quitting..."
   osascript -e 'tell application "Google Chrome" to quit' 2>/dev/null
 
   # Wait for it to fully exit
   for i in $(seq 1 20); do
-    pgrep -f "$CHROME_PROCESS" >/dev/null 2>&1 || break
+    pgrep -f "Google Chrome" >/dev/null 2>&1 || break
     sleep 0.5
   done
 
-  if pgrep -f "$CHROME_PROCESS" >/dev/null 2>&1; then
+  if pgrep -f "Google Chrome" >/dev/null 2>&1; then
     echo "Chrome won't quit. Force-killing..." >&2
-    pkill -f "$CHROME_PROCESS"
+    pkill -f "Google Chrome"
     sleep 1
   fi
 fi
@@ -39,14 +38,12 @@ fi
 # Chrome requires a "non-default" data dir for --remote-debugging-port.
 # We symlink the real Default profile so cookies/extensions carry over.
 mkdir -p "$CDP_DATA_DIR"
-[ -L "$CDP_DATA_DIR/Default" ] && ! [ -e "$CDP_DATA_DIR/Default" ] && rm -f "$CDP_DATA_DIR/Default"
-if [ -d "$REAL_PROFILE/Default" ] && ! [ -e "$CDP_DATA_DIR/Default" ] && ! [ -L "$CDP_DATA_DIR/Default" ]; then
+if [ -d "$REAL_PROFILE/Default" ] && ! [ -e "$CDP_DATA_DIR/Default" ]; then
   ln -s "$REAL_PROFILE/Default" "$CDP_DATA_DIR/Default"
   echo "Linked real Chrome profile into CDP data dir"
 fi
 # Also link Local State (contains crypto keys for cookie decryption, etc.)
-[ -L "$CDP_DATA_DIR/Local State" ] && ! [ -e "$CDP_DATA_DIR/Local State" ] && rm -f "$CDP_DATA_DIR/Local State"
-if [ -f "$REAL_PROFILE/Local State" ] && ! [ -e "$CDP_DATA_DIR/Local State" ] && ! [ -L "$CDP_DATA_DIR/Local State" ]; then
+if [ -f "$REAL_PROFILE/Local State" ] && ! [ -e "$CDP_DATA_DIR/Local State" ]; then
   ln -s "$REAL_PROFILE/Local State" "$CDP_DATA_DIR/Local State"
 fi
 

@@ -131,8 +131,7 @@ if [ "$TIER" = "community" ]; then
       INSTALL_ID="$(cat /proc/sys/kernel/random/uuid)"
     else
       # Fallback: random hex from /dev/urandom
-      _hex="$(od -An -tx1 -N16 /dev/urandom 2>/dev/null | tr -d ' \n')"
-      INSTALL_ID="$(printf '%s' "$_hex" | sed 's/^\(........\)\(....\)\(....\)\(....\)\(............\)$/\1-\2-\3-\4-\5/')"
+      INSTALL_ID="$(od -An -tx1 -N16 /dev/urandom 2>/dev/null | tr -d ' \n')"
     fi
     if [ -n "$INSTALL_ID" ]; then
       mkdir -p "$(dirname "$ID_FILE")" 2>/dev/null
@@ -167,7 +166,7 @@ ERR_FIELD="null"
 [ -n "$ERROR_CLASS" ] && ERR_FIELD="\"$(json_safe "$ERROR_CLASS")\""
 
 ERR_MSG_FIELD="null"
-[ -n "$ERROR_MESSAGE" ] && ERR_MSG_FIELD="\"$(printf '%s' "$ERROR_MESSAGE" | tr -d '\010\014' | head -c 200 | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/	/\\t/g' | tr '\n\r' '  ')\""
+[ -n "$ERROR_MESSAGE" ] && ERR_MSG_FIELD="\"$(printf '%s' "$ERROR_MESSAGE" | head -c 200 | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/	/\\t/g' | tr '\n\r' '  ')\""
 
 STEP_FIELD="null"
 [ -n "$FAILED_STEP" ] && STEP_FIELD="\"$(json_safe "$FAILED_STEP")\""

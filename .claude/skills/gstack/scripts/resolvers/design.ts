@@ -80,7 +80,7 @@ Comprehensive review: 10-15 pages, every interaction flow, exhaustive checklist.
 
 ### Diff-aware (automatic when on a feature branch with no URL)
 When on a feature branch, scope to pages affected by the branch changes:
-1. Analyze the branch diff: \`git diff <base>...HEAD --name-only\`
+1. Analyze the branch diff: \`git diff main...HEAD --name-only\`
 2. Map changed files to affected pages/routes
 3. Detect running app on common local ports (3000, 4000, 8080)
 4. Audit only affected pages, compare design quality before/after
@@ -790,7 +790,7 @@ Generating visual mockups of the proposed design... (say "skip" if you don't nee
 
 \`\`\`bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
- _DESIGN_DIR=~/.gstack/projects/$SLUG/designs/mockup-$(date +%Y%m%d-%H%M%S)
+_DESIGN_DIR=~/.gstack/projects/$SLUG/designs/mockup-$(date +%Y%m%d)
 mkdir -p "$_DESIGN_DIR"
 echo "DESIGN_DIR: $_DESIGN_DIR"
 \`\`\`
@@ -947,3 +947,4 @@ Use AskUserQuestion to verify before proceeding.
 echo '{"approved_variant":"<V>","feedback":"<FB>","date":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","screen":"<SCREEN>","branch":"'$(git branch --show-current 2>/dev/null)'"}' > "$_DESIGN_DIR/approved.json"
 \`\`\``;
 }
+

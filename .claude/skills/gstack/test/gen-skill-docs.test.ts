@@ -7,7 +7,6 @@ import * as os from 'os';
 
 const ROOT = path.resolve(import.meta.dir, '..');
 const MAX_SKILL_DESCRIPTION_LENGTH = 1024;
-const VENDORED_SETUP_CMD = 'cd .claude/skills/gstack && ./setup';
 
 function extractDescription(content: string): string {
   const fmEnd = content.indexOf('\n---', 4);
@@ -69,7 +68,7 @@ describe('gen-skill-docs', () => {
   test('generated SKILL.md contains all commands', () => {
     const content = fs.readFileSync(path.join(ROOT, 'SKILL.md'), 'utf-8');
     for (const [cmd, meta] of Object.entries(COMMAND_DESCRIPTIONS)) {
-      const display = (meta.usage || cmd).replace(/\|/g, '\\|');
+      const display = meta.usage || cmd;
       expect(content).toContain(display);
     }
   });
@@ -214,11 +213,20 @@ describe('gen-skill-docs', () => {
     expect(browseTmpl).toContain('{{PREAMBLE}}');
   });
 
-  test('generated SKILL.md contains contributor mode check', () => {
+  test('generated SKILL.md contains operational self-improvement (replaced contributor mode)', () => {
     const content = fs.readFileSync(path.join(ROOT, 'SKILL.md'), 'utf-8');
-    expect(content).toContain('Contributor Mode');
-    expect(content).toContain('gstack_contributor');
-    expect(content).toContain('contributor-logs');
+    expect(content).not.toContain('Contributor Mode');
+    expect(content).not.toContain('gstack_contributor');
+    expect(content).not.toContain('contributor-logs');
+    expect(content).toContain('Operational Self-Improvement');
+    expect(content).toContain('gstack-learnings-log');
+    expect(content).toContain('gstack-learnings-search --limit 3');
+  });
+
+  test('generated SKILL.md with LEARNINGS_LOG contains operational type', () => {
+    // Check a skill that has LEARNINGS_LOG (e.g., review)
+    const content = fs.readFileSync(path.join(ROOT, 'review', 'SKILL.md'), 'utf-8');
+    expect(content).toContain('operational');
   });
 
   test('generated SKILL.md contains session awareness', () => {
@@ -1289,7 +1297,6 @@ describe('parameterized resolver support', () => {
 
 describe('preamble routing injection', () => {
   const shipContent = fs.readFileSync(path.join(ROOT, 'ship', 'SKILL.md'), 'utf-8');
-  const qaContent = fs.readFileSync(path.join(ROOT, 'qa', 'SKILL.md'), 'utf-8');
 
   test('preamble bash checks for routing section in CLAUDE.md', () => {
     expect(shipContent).toContain('grep -q "## Skill routing" CLAUDE.md');
@@ -1301,14 +1308,14 @@ describe('preamble routing injection', () => {
     expect(shipContent).toContain('ROUTING_DECLINED');
   });
 
-  test('interactive skills include routing injection AskUserQuestion', () => {
-    expect(qaContent).toContain('Add routing rules to CLAUDE.md');
-    expect(qaContent).toContain("I'll invoke skills manually");
+  test('preamble includes routing injection AskUserQuestion', () => {
+    expect(shipContent).toContain('Add routing rules to CLAUDE.md');
+    expect(shipContent).toContain("I'll invoke skills manually");
   });
 
-  test('non-interactive ship defers routing injection', () => {
-    expect(shipContent).toMatch(/ship.*non-interactive/i);
-    expect(shipContent).toMatch(/routing-setup questions/i);
+  test('routing injection respects prior decline', () => {
+    expect(shipContent).toContain('ROUTING_DECLINED');
+    expect(shipContent).toMatch(/routing_declined.*true/);
   });
 
   test('routing injection only fires when all conditions met', () => {
@@ -1319,10 +1326,10 @@ describe('preamble routing injection', () => {
   });
 
   test('routing section content includes key routing rules', () => {
-    expect(qaContent).toContain('invoke $_PFXoffice-hours');
-    expect(qaContent).toContain('invoke $_PFXinvestigate');
-    expect(qaContent).toContain('invoke $_PFXship');
-    expect(qaContent).toContain('invoke $_PFXqa');
+    expect(shipContent).toContain('invoke office-hours');
+    expect(shipContent).toContain('invoke investigate');
+    expect(shipContent).toContain('invoke ship');
+    expect(shipContent).toContain('invoke qa');
   });
 });
 
@@ -1532,7 +1539,7 @@ describe('Codex generation (--host codex)', () => {
   test('no .claude/skills/ in Codex output', () => {
     for (const skill of CODEX_SKILLS) {
       const content = fs.readFileSync(path.join(AGENTS_DIR, skill.codexName, 'SKILL.md'), 'utf-8');
-      expect(content.replaceAll(VENDORED_SETUP_CMD, '')).not.toContain('.claude/skills');
+      expect(content).not.toContain('.claude/skills');
     }
   });
 
@@ -1685,10 +1692,9 @@ describe('Codex generation (--host codex)', () => {
     // Verify across ALL generated skills, not just review
     for (const skill of CODEX_SKILLS) {
       const content = fs.readFileSync(path.join(AGENTS_DIR, skill.codexName, 'SKILL.md'), 'utf-8');
-      const normalized = content.replaceAll(VENDORED_SETUP_CMD, '');
       // No skill should reference Claude paths
       expect(content).not.toContain('~/.claude/skills');
-      expect(normalized).not.toContain('.claude/skills');
+      expect(content).not.toContain('.claude/skills');
       if (content.includes('gstack-config') || content.includes('gstack-update-check') || content.includes('gstack-telemetry-log')) {
         expect(content).toContain('$GSTACK_ROOT');
       }
@@ -1817,7 +1823,7 @@ describe('Factory generation (--host factory)', () => {
   test('no .claude/skills/ in Factory output', () => {
     for (const skill of FACTORY_SKILLS) {
       const content = fs.readFileSync(path.join(FACTORY_DIR, skill.factoryName, 'SKILL.md'), 'utf-8');
-      expect(content.replaceAll(VENDORED_SETUP_CMD, '')).not.toContain('.claude/skills');
+      expect(content).not.toContain('.claude/skills');
     }
   });
 
