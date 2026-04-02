@@ -24,29 +24,25 @@ export default async function AuthLayout({
 
   if (isClerkUnavailable) {
     return (
-      <>
-        <FeatureFlagsProvider>
-          <main id='main-content'>
-            <AuthShellLayout
-              formTitle='Auth unavailable'
-              showFormTitle={false}
-              showFooterPrompt={false}
-            >
-              <AuthUnavailableCard />
-            </AuthShellLayout>
-          </main>
-        </FeatureFlagsProvider>
-      </>
+      <FeatureFlagsProvider>
+        <main id='main-content'>
+          <AuthShellLayout
+            formTitle='Auth unavailable'
+            showFormTitle={false}
+            showFooterPrompt={false}
+          >
+            <AuthUnavailableCard />
+          </AuthShellLayout>
+        </main>
+      </FeatureFlagsProvider>
     );
   }
 
   return (
-    <>
-      <AuthClientProviders publishableKey={publishableKey}>
-        <FeatureFlagsProvider>
-          <main id='main-content'>{children}</main>
-        </FeatureFlagsProvider>
-      </AuthClientProviders>
-    </>
+    <AuthClientProviders publishableKey={publishableKey}>
+      <FeatureFlagsProvider>
+        <main id='main-content'>{children}</main>
+      </FeatureFlagsProvider>
+    </AuthClientProviders>
   );
 }
