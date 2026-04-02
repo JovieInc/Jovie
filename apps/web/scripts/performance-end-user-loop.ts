@@ -380,10 +380,11 @@ export function createEndUserLoopState(options: {
   readonly routes: readonly PerfRouteDefinition[];
   readonly routesDir: string;
 }): EndUserLoopState {
-  const failingRouteIds = buildRouteQueue(options.baselineSummary).map(
-    entry => entry.id
-  );
   const selectedRouteIds = options.routes.map(route => route.id);
+  const selectedRouteIdSet = new Set(selectedRouteIds);
+  const failingRouteIds = buildRouteQueue(options.baselineSummary)
+    .map(entry => entry.id)
+    .filter(routeId => selectedRouteIdSet.has(routeId));
   const passingRouteIds = selectedRouteIds.filter(
     routeId => !failingRouteIds.includes(routeId)
   );

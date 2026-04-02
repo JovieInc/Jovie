@@ -217,6 +217,36 @@ describe('performance end-user loop', () => {
     expect(state.currentRouteId).toBe('home');
   });
 
+  it('filters stale failing route ids that are outside the selected routes', () => {
+    const summary = createSummary();
+    const baselineSummary = {
+      ...summary,
+      pages: [
+        ...summary.pages,
+        {
+          ...summary.pages[2]!,
+          id: 'creator-earnings',
+          configuredPath: '/app/dashboard/earnings',
+          resolvedPath: '/app/dashboard/earnings',
+          url: 'http://127.0.0.1:4100/app/dashboard/earnings',
+        },
+      ],
+    } satisfies GuardSummary;
+    const state = createEndUserLoopState({
+      artifactDir: '/tmp/perf/end-user',
+      authPath: '/tmp/auth.json',
+      baselineSummary,
+      cliOptions: createCliOptions(),
+      promptPath: '/tmp/perf/end-user/optimizer-prompt.txt',
+      routes: [requireRoute('home'), requireRoute('creator-releases')],
+      routesDir: '/tmp/perf/end-user/routes',
+    });
+
+    expect(state.routeOrder).toEqual(['home', 'creator-releases']);
+    expect(state.routeStates['creator-earnings']).toBeUndefined();
+    expect(state.currentRouteId).toBe('home');
+  });
+
   it('keeps passing routes in the queue when optimizePassing is enabled', () => {
     const state = createEndUserLoopState({
       artifactDir: '/tmp/perf/end-user',

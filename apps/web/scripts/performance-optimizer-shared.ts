@@ -69,11 +69,11 @@ function assertSuccess(result: CommandResult, message: string) {
   );
 }
 
-function readJsonFile<T>(filePath: string): T {
+export function readJsonFile<T>(filePath: string): T {
   return JSON.parse(readFileSync(filePath, 'utf8')) as T;
 }
 
-function writeJsonFile(filePath: string, value: unknown) {
+export function writeJsonFile(filePath: string, value: unknown) {
   writeFileSync(filePath, JSON.stringify(value, null, 2) + '\n');
 }
 
