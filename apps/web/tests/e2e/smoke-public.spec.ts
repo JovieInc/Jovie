@@ -60,15 +60,20 @@ test('homepage: hero heading, CTA, final claim CTA', async ({ page }) => {
     .first();
   await expect(cta).toBeVisible({ timeout: 20_000 });
 
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  const finalCtaHeadline = page.getByTestId('final-cta-headline');
+  await page
+    .getByRole('link', { name: 'Start Free' })
+    .last()
+    .scrollIntoViewIfNeeded();
+  const finalCtaHeadline = page.getByRole('heading', {
+    name: 'Own the release stack.',
+  });
   await expect(
     finalCtaHeadline,
     'Homepage did not render the final claim CTA section'
   ).toBeVisible({ timeout: 20_000 });
   await expect(
-    page.getByTestId('final-cta-headline'),
-    'Homepage did not render the final claim handle form'
+    page.getByRole('link', { name: 'Start Free' }).last(),
+    'Homepage did not render the final CTA action'
   ).toBeVisible({ timeout: 20_000 });
 
   const bodyText =
@@ -258,7 +263,10 @@ test.describe('Public Profile - dualipa', () => {
       'Subscribe mode did not render the notification entry action'
     ).toBeVisible({ timeout: 30_000 });
     await expect(
-      page.getByText(/get notified/i),
+      page
+        .locator('[data-slot="drawer-content"], [role="dialog"], main')
+        .getByText(/^get notified$/i)
+        .first(),
       'Subscribe mode did not render the get-notified state'
     ).toBeVisible({ timeout: 30_000 });
   });
