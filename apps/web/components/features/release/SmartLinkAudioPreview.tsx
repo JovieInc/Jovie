@@ -63,13 +63,15 @@ export function SmartLinkAudioPreview({
     duration > 0 ? formatDuration(Math.round(duration) * 1000) : null;
   const fallbackSourceLabel =
     previewVerification === 'fallback'
-      ? ({
-          spotify: 'Spotify preview',
-          apple_music: 'Apple Music preview',
-          deezer: 'Deezer preview',
-          musicfetch: 'MusicFetch preview',
-          audio_url: 'Stored audio',
-        }[previewSource ?? 'audio_url'] ?? 'Fallback preview')
+      ? previewSource
+        ? ({
+            spotify: 'Spotify preview',
+            apple_music: 'Apple Music preview',
+            deezer: 'Deezer preview',
+            musicfetch: 'MusicFetch preview',
+            audio_url: 'Stored audio',
+          }[previewSource] ?? 'Fallback preview')
+        : 'Fallback preview'
       : null;
 
   return (

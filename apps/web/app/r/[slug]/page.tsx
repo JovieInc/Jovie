@@ -257,7 +257,6 @@ export default async function ReleaseSmartLinkPage({
   const previewState = derivePreviewState({
     audioUrl: null,
     previewUrl: null,
-    isrc: links.length > 0 ? 'lookup_attempted' : null,
     metadata: null,
     providerLinks: links,
   });

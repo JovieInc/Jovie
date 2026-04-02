@@ -183,6 +183,41 @@ function buildInlineCredits(
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
+function partitionProviders(providers: Array<Provider & { url: string }>): {
+  canonicalProviders: Array<Provider & { url: string }>;
+  fallbackProviders: Array<Provider & { url: string }>;
+  unverifiedProviders: Array<Provider & { url: string }>;
+} {
+  return providers.reduce(
+    (groups, provider) => {
+      if (provider.confidence === 'search_fallback') {
+        groups.fallbackProviders.push(provider);
+        return groups;
+      }
+
+      if (
+        provider.confidence === 'canonical' ||
+        provider.confidence === 'manual_override'
+      ) {
+        groups.canonicalProviders.push(provider);
+        return groups;
+      }
+
+      groups.unverifiedProviders.push(provider);
+      return groups;
+    },
+    {
+      canonicalProviders: [],
+      fallbackProviders: [],
+      unverifiedProviders: [],
+    } as {
+      canonicalProviders: Array<Provider & { url: string }>;
+      fallbackProviders: Array<Provider & { url: string }>;
+      unverifiedProviders: Array<Provider & { url: string }>;
+    }
+  );
+}
+
 /**
  * Render the artist line with featured artists.
  * "Tim White feat. Erica Gibson" with profile links on each name.
@@ -269,12 +304,8 @@ export function ReleaseLandingPage({
   const clickableProviders = providers.filter(
     (provider): provider is Provider & { url: string } => Boolean(provider.url)
   );
-  const canonicalProviders = clickableProviders.filter(
-    provider => provider.confidence !== 'search_fallback'
-  );
-  const fallbackProviders = clickableProviders.filter(
-    provider => provider.confidence === 'search_fallback'
-  );
+  const { canonicalProviders, fallbackProviders, unverifiedProviders } =
+    partitionProviders(clickableProviders);
   const sizes = buildArtworkSizes(artworkSizes, release.artworkUrl);
   const inlineCredits = buildInlineCredits(credits);
   const hasPreview = Boolean(release.previewUrl);
@@ -414,6 +445,29 @@ export function ReleaseLandingPage({
                 return (
                   <SmartLinkProviderButton
                     key={`fallback-${provider.key}`}
+                    href={appendUTMParamsToUrl(provider.url, utmParams)}
+                    onClick={() => handleProviderClick(provider.key)}
+                    label={logoConfig?.name ?? provider.label}
+                    iconPath={logoConfig?.iconPath}
+                  />
+                );
+              })}
+            </div>
+          </details>
+        ) : null}
+
+        {unverifiedProviders.length > 0 ? (
+          <details className='mt-3 rounded-xl bg-surface-1/35 p-3 ring-1 ring-inset ring-white/[0.08]'>
+            <summary className='cursor-pointer list-none text-left text-xs text-white/70'>
+              Unverified DSPs
+            </summary>
+            <div className='mt-3 space-y-2'>
+              {unverifiedProviders.map(provider => {
+                const logoConfig = DSP_LOGO_CONFIG[provider.key];
+
+                return (
+                  <SmartLinkProviderButton
+                    key={`unverified-${provider.key}`}
                     href={appendUTMParamsToUrl(provider.url, utmParams)}
                     onClick={() => handleProviderClick(provider.key)}
                     label={logoConfig?.name ?? provider.label}

@@ -101,4 +101,39 @@ describe('TrackSidebar', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Preview Unverified/i)).toBeInTheDocument();
   });
+
+  it('treats missing preview verification as not checked and keeps unknown-confidence links out of canonical DSPs', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TrackSidebar
+        track={buildTrack({
+          previewVerification: undefined,
+          providerConfidenceSummary: {
+            canonical: 0,
+            searchFallback: 0,
+            unknown: 1,
+            unresolvedProviders: ['soundcloud'],
+          },
+          providers: [
+            {
+              key: 'soundcloud',
+              label: 'SoundCloud',
+              url: 'https://soundcloud.com/track/123',
+              confidence: undefined,
+            },
+          ],
+        })}
+        isOpen={true}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(/Preview Not Checked/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Verified Preview/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('drawer-tab-platforms'));
+
+    expect(screen.getByText(/Unverified DSPs/i)).toBeInTheDocument();
+  });
 });

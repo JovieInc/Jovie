@@ -79,7 +79,6 @@ function mapLegacyTrackToViewModel(
   const previewState = derivePreviewState({
     audioUrl: track.audioUrl,
     previewUrl: track.previewUrl,
-    isrc: track.isrc,
     metadata: track.metadata,
     providerLinks: track.providerLinks,
   });
@@ -125,7 +124,6 @@ function mapReleaseTrackToViewModel(
   const previewState = derivePreviewState({
     audioUrl: track.audioUrl,
     previewUrl: track.previewUrl,
-    isrc: track.isrc,
     metadata: track.metadata,
     providerLinks: track.providerLinks,
   });

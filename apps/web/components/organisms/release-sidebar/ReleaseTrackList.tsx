@@ -52,24 +52,38 @@ import { useTrackAudioPlayer } from './useTrackAudioPlayer';
 
 interface ReleaseTrackListProps {
   readonly release: Release;
-  readonly onTrackClick?: (track: ReleaseSidebarTrack) => void;
   readonly tracksOverride?: ReleaseSidebarTrack[];
-  readonly showHeading?: boolean;
 }
 
 function getPreviewStatusLabel(
   previewVerification: PreviewVerification | undefined
 ): string {
   switch (previewVerification) {
+    case 'verified':
+      return 'Verified';
     case 'fallback':
       return 'Fallback';
     case 'unknown':
       return 'Unknown';
     case 'missing':
-      return 'Not checked';
-    case 'verified':
     default:
-      return 'Verified';
+      return 'Not checked';
+  }
+}
+
+function getPreviewStatusToneClass(
+  previewVerification: PreviewVerification | undefined
+): string {
+  switch (previewVerification) {
+    case 'fallback':
+      return 'text-secondary-token';
+    case 'unknown':
+      return 'text-amber-300';
+    case 'verified':
+      return 'text-tertiary-token';
+    case 'missing':
+    default:
+      return 'text-quaternary-token';
   }
 }
 
@@ -103,6 +117,43 @@ function getProviderConfidenceLabel(
     default:
       return null;
   }
+}
+
+function partitionProvidersByConfidence(
+  providers: ReleaseSidebarTrack['providers']
+): {
+  canonicalProviders: ReleaseSidebarTrack['providers'];
+  fallbackProviders: ReleaseSidebarTrack['providers'];
+  unverifiedProviders: ReleaseSidebarTrack['providers'];
+} {
+  return providers.reduce(
+    (groups, provider) => {
+      if (provider.confidence === 'search_fallback') {
+        groups.fallbackProviders.push(provider);
+        return groups;
+      }
+
+      if (
+        provider.confidence === 'canonical' ||
+        provider.confidence === 'manual_override'
+      ) {
+        groups.canonicalProviders.push(provider);
+        return groups;
+      }
+
+      groups.unverifiedProviders.push(provider);
+      return groups;
+    },
+    {
+      canonicalProviders: [],
+      fallbackProviders: [],
+      unverifiedProviders: [],
+    } as {
+      canonicalProviders: ReleaseSidebarTrack['providers'];
+      fallbackProviders: ReleaseSidebarTrack['providers'];
+      unverifiedProviders: ReleaseSidebarTrack['providers'];
+    }
+  );
 }
 
 export function ReleaseTrackList({
@@ -154,12 +205,19 @@ export function ReleaseTrackList({
           LINEAR_SURFACE.drawerCardSm,
           'overflow-hidden px-3 py-2.5'
         )}
+        data-testid='release-playback-summary'
       >
-        <p className='text-[11px] text-tertiary-token'>
+        <p
+          className='text-[11px] text-tertiary-token'
+          data-testid='release-preview-summary'
+        >
           Previews: {previewCounts.verified} verified, {previewCounts.fallback}{' '}
           fallback, {previewCounts.unknown} unknown
         </p>
-        <p className='mt-1 text-[11px] text-tertiary-token'>
+        <p
+          className='mt-1 text-[11px] text-tertiary-token'
+          data-testid='release-provider-summary'
+        >
           Providers: {providerCounts.canonical} canonical,{' '}
           {providerCounts.searchFallback} fallback, {providerCounts.unknown}{' '}
           unknown
@@ -261,21 +319,10 @@ function TrackPlaybackRow({
   const progressDuration = isActiveTrack ? playbackState.duration : 0;
   const progressCurrentTime = isActiveTrack ? playbackState.currentTime : 0;
   const statusLabel = getPreviewStatusLabel(track.previewVerification);
-  const statusToneClass =
-    track.previewVerification === 'fallback'
-      ? 'text-secondary-token'
-      : track.previewVerification === 'unknown'
-        ? 'text-amber-300'
-        : track.previewVerification === 'missing'
-          ? 'text-quaternary-token'
-          : 'text-tertiary-token';
+  const statusToneClass = getPreviewStatusToneClass(track.previewVerification);
   const summary = track.providerConfidenceSummary;
-  const canonicalProviders = track.providers.filter(
-    provider => provider.confidence !== 'search_fallback'
-  );
-  const fallbackProviders = track.providers.filter(
-    provider => provider.confidence === 'search_fallback'
-  );
+  const { canonicalProviders, fallbackProviders, unverifiedProviders } =
+    partitionProvidersByConfidence(track.providers);
   const unresolvedProviders = summary?.unresolvedProviders ?? [];
   const panelId = `release-playback-panel-${track.id}`;
 
@@ -339,14 +386,20 @@ function TrackPlaybackRow({
                   </span>
                 ) : null}
               </div>
-              <p className='mt-1 text-[10px] text-tertiary-token'>
+              <p
+                className='mt-1 text-[10px] text-tertiary-token'
+                data-testid={`release-track-provider-summary-${track.id}`}
+              >
                 {summary?.canonical ?? 0} canonical,{' '}
                 {summary?.searchFallback ?? 0} fallback
                 {summary && summary.unknown > 0
                   ? `, ${summary.unknown} unknown`
                   : ''}
               </p>
-              <p className={cn('mt-0.5 text-[10px]', statusToneClass)}>
+              <p
+                className={cn('mt-0.5 text-[10px]', statusToneClass)}
+                data-testid={`release-track-status-${track.id}`}
+              >
                 {statusLabel}
               </p>
             </div>
@@ -432,16 +485,28 @@ function TrackPlaybackRow({
                 <ProviderGroup
                   title='Canonical DSPs'
                   providers={canonicalProviders}
+                  testId={`release-track-canonical-providers-${track.id}`}
                 />
               ) : null}
               {fallbackProviders.length > 0 ? (
                 <ProviderGroup
                   title='Search Fallback'
                   providers={fallbackProviders}
+                  testId={`release-track-fallback-providers-${track.id}`}
+                />
+              ) : null}
+              {unverifiedProviders.length > 0 ? (
+                <ProviderGroup
+                  title='Unverified DSPs'
+                  providers={unverifiedProviders}
+                  testId={`release-track-unverified-providers-${track.id}`}
                 />
               ) : null}
               {unresolvedProviders.length > 0 ? (
-                <p className='text-[10px] text-tertiary-token'>
+                <p
+                  className='text-[10px] text-tertiary-token'
+                  data-testid={`release-track-unresolved-${track.id}`}
+                >
                   Unresolved:{' '}
                   {unresolvedProviders
                     .map(provider => PROVIDER_LABELS[provider])
@@ -476,12 +541,14 @@ function TrackPlaybackRow({
 function ProviderGroup({
   title,
   providers,
+  testId,
 }: {
   readonly title: string;
   readonly providers: ReleaseSidebarTrack['providers'];
+  readonly testId?: string;
 }) {
   return (
-    <div className='space-y-1'>
+    <div className='space-y-1' data-testid={testId}>
       <p className='text-[10px] text-tertiary-token'>{title}</p>
       <div className='space-y-1'>
         {providers.map(provider => {

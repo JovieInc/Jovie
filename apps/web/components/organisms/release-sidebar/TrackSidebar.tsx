@@ -78,15 +78,15 @@ function getPreviewStatusLabel(
   previewVerification: PreviewVerification | undefined
 ): string {
   switch (previewVerification) {
+    case 'verified':
+      return 'Verified Preview';
     case 'fallback':
       return 'Fallback Preview';
     case 'unknown':
       return 'Preview Unverified';
     case 'missing':
-      return 'Preview Not Checked';
-    case 'verified':
     default:
-      return 'Verified Preview';
+      return 'Preview Not Checked';
   }
 }
 
@@ -107,6 +107,68 @@ function getPreviewSourceLabel(
     default:
       return null;
   }
+}
+
+function getPlaybackAnnouncement(params: {
+  title: string | null | undefined;
+  playbackStatus: 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+  isActiveTrack: boolean;
+  isPlaying: boolean;
+}): string {
+  if (params.playbackStatus === 'error') {
+    return 'Preview unavailable.';
+  }
+
+  if (!params.title || !params.isActiveTrack) {
+    return '';
+  }
+
+  if (params.isPlaying) {
+    return `Now playing ${params.title}.`;
+  }
+
+  if (params.playbackStatus === 'paused') {
+    return `Paused ${params.title}.`;
+  }
+
+  return '';
+}
+
+function partitionProvidersByConfidence(
+  providers: TrackSidebarData['providers']
+): {
+  canonicalProviders: TrackSidebarData['providers'];
+  fallbackProviders: TrackSidebarData['providers'];
+  unverifiedProviders: TrackSidebarData['providers'];
+} {
+  return providers.reduce(
+    (groups, provider) => {
+      if (provider.confidence === 'search_fallback') {
+        groups.fallbackProviders.push(provider);
+        return groups;
+      }
+
+      if (
+        provider.confidence === 'canonical' ||
+        provider.confidence === 'manual_override'
+      ) {
+        groups.canonicalProviders.push(provider);
+        return groups;
+      }
+
+      groups.unverifiedProviders.push(provider);
+      return groups;
+    },
+    {
+      canonicalProviders: [],
+      fallbackProviders: [],
+      unverifiedProviders: [],
+    } as {
+      canonicalProviders: TrackSidebarData['providers'];
+      fallbackProviders: TrackSidebarData['providers'];
+      unverifiedProviders: TrackSidebarData['providers'];
+    }
+  );
 }
 
 export function TrackSidebar({
@@ -162,12 +224,8 @@ export function TrackSidebar({
   }, [track, onBackToRelease]);
 
   const streamingProviders = track?.providers.filter(p => p.url) ?? [];
-  const canonicalProviders = streamingProviders.filter(
-    provider => provider.confidence !== 'search_fallback'
-  );
-  const fallbackProviders = streamingProviders.filter(
-    provider => provider.confidence === 'search_fallback'
-  );
+  const { canonicalProviders, fallbackProviders, unverifiedProviders } =
+    partitionProvidersByConfidence(streamingProviders);
   const unresolvedProviders =
     track?.providerConfidenceSummary?.unresolvedProviders ?? [];
 
@@ -224,12 +282,12 @@ export function TrackSidebar({
   const isPlaying = isThisTrack && playbackState.isPlaying;
   const currentTime = isThisTrack ? playbackState.currentTime : 0;
   const duration = isThisTrack ? playbackState.duration : 0;
-  const liveAnnouncement =
-    playbackState.playbackStatus === 'error'
-      ? 'Preview unavailable.'
-      : track?.title && isThisTrack
-        ? `Now playing ${track.title}.`
-        : '';
+  const liveAnnouncement = getPlaybackAnnouncement({
+    title: track?.title,
+    playbackStatus: playbackState.playbackStatus,
+    isActiveTrack: isThisTrack,
+    isPlaying,
+  });
 
   useEffect(() => {
     return onError(reason => {
@@ -467,6 +525,13 @@ export function TrackSidebar({
                   providers={fallbackProviders}
                   title='Search Fallback'
                   emptyMessage='No fallback DSP links available.'
+                />
+              ) : null}
+              {unverifiedProviders.length > 0 ? (
+                <TrackPlatformLinksSection
+                  providers={unverifiedProviders}
+                  title='Unverified DSPs'
+                  emptyMessage='No unverified DSP links available.'
                 />
               ) : null}
             </div>

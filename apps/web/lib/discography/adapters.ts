@@ -79,7 +79,6 @@ export function mapTrackToViewModel(params: {
   const previewState = derivePreviewState({
     audioUrl: track.audioUrl,
     previewUrl: track.previewUrl,
-    isrc: track.isrc,
     metadata: track.metadata,
     providerLinks: track.providerLinks,
   });

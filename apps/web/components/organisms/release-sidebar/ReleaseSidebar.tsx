@@ -661,7 +661,6 @@ export function ReleaseSidebar({
                   <ReleaseTrackList
                     release={release}
                     tracksOverride={tracksOverride}
-                    showHeading={false}
                   />
                 </div>
               )}

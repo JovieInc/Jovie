@@ -156,7 +156,6 @@ export default async function TrackDeepLinkPage({
   const previewState = derivePreviewState({
     audioUrl: null,
     previewUrl: track.previewUrl ?? null,
-    isrc: track.providerLinks.length > 0 ? 'lookup_attempted' : null,
     metadata: track.previewMetadata ?? null,
     providerLinks: track.providerLinks,
   });

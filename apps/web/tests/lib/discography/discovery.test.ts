@@ -283,6 +283,83 @@ describe('discovery', () => {
       expect(result.previewsBackfilled).toBe(1);
     });
 
+    it('does not overwrite preview-resolution metadata when the preview URL was not stored', async () => {
+      mockMusicfetchLookupByIsrc.mockResolvedValue({
+        links: {},
+        raw: {},
+      });
+      mockLookupSpotifyByIsrc.mockResolvedValue({
+        url: 'https://open.spotify.com/track/123',
+        trackId: '123',
+        previewUrl: 'https://p.scdn.co/mp3-preview/123',
+      });
+      mockUpdateRecordingPreviewByIsrc.mockResolvedValueOnce(false);
+
+      const { discoverLinksForRelease } = await import(
+        '@/lib/discography/discovery'
+      );
+
+      const result = await discoverLinksForRelease('release-1', []);
+
+      expect(mockUpdateRecordingPreviewByIsrc).toHaveBeenCalledWith(
+        'profile-1',
+        'USUM72212345',
+        'https://p.scdn.co/mp3-preview/123'
+      );
+      expect(mockSetRecordingPreviewResolutionByIsrc).not.toHaveBeenCalledWith(
+        'profile-1',
+        'USUM72212345',
+        expect.objectContaining({
+          status: 'fallback',
+          source: 'spotify',
+        })
+      );
+      expect(result.previewsBackfilled).toBe(0);
+    });
+
+    it('writes fallback preview metadata once when multiple parallel sources return previews', async () => {
+      mockMusicfetchLookupByIsrc.mockResolvedValue({
+        links: {
+          youtube: 'https://music.youtube.com/watch?v=abc',
+        },
+        raw: {
+          previewUrl: 'https://musicfetch.example.com/preview.m4a',
+        },
+      });
+      mockLookupDeezerByIsrc.mockResolvedValue({
+        url: 'https://www.deezer.com/track/789',
+        trackId: '789',
+        albumUrl: 'https://www.deezer.com/album/100',
+        albumId: '100',
+        previewUrl: 'https://cdns-preview-7.dzcdn.net/stream/c-789.mp3',
+      });
+      mockUpdateRecordingPreviewByIsrc.mockResolvedValueOnce(true);
+
+      const { discoverLinksForRelease } = await import(
+        '@/lib/discography/discovery'
+      );
+
+      const result = await discoverLinksForRelease('release-1', []);
+
+      expect(mockUpdateRecordingPreviewByIsrc).toHaveBeenCalledTimes(1);
+      expect(mockUpdateRecordingPreviewByIsrc).toHaveBeenCalledWith(
+        'profile-1',
+        'USUM72212345',
+        'https://musicfetch.example.com/preview.m4a'
+      );
+      expect(mockSetRecordingPreviewResolutionByIsrc).toHaveBeenCalledTimes(1);
+      expect(mockSetRecordingPreviewResolutionByIsrc).toHaveBeenCalledWith(
+        'profile-1',
+        'USUM72212345',
+        expect.objectContaining({
+          status: 'fallback',
+          source: 'musicfetch',
+        })
+      );
+      expect(result.previewsBackfilled).toBe(1);
+      expect(mockLookupSpotifyByIsrc).not.toHaveBeenCalled();
+    });
+
     it('returns error when no tracks found for release', async () => {
       mockGetTracksForRelease.mockResolvedValue([]);
 

@@ -330,7 +330,6 @@ export default async function ContentSmartLinkPage({
   const previewState = derivePreviewState({
     audioUrl: null,
     previewUrl: content.previewUrl ?? null,
-    isrc: content.providerLinks.length > 0 ? 'lookup_attempted' : null,
     metadata: content.previewMetadata ?? null,
     providerLinks: content.providerLinks,
   });

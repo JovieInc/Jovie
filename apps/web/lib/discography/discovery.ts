@@ -53,6 +53,12 @@ export interface DiscoverLinksOptions {
   storefront?: string;
 }
 
+type FallbackPreviewSource =
+  | 'musicfetch'
+  | 'spotify'
+  | 'apple_music'
+  | 'deezer';
+
 /**
  * All DSPs that should receive search URL fallbacks when canonical links
  * cannot be resolved. Spotify is excluded because it's always set during
@@ -260,7 +266,8 @@ export async function discoverLinksForRelease(
   const isrc = trackWithIsrc.isrc;
   const existingSet = new Set(existingProviders);
   let appleMusicPreviewUrl: string | null = null;
-  let resolvedFallbackPreview = false;
+  let deezerPreviewUrl: string | null = null;
+  let musicfetchPreviewUrl: string | null = null;
   const attemptedPreviewSources: string[] = [];
 
   // Run lookups in parallel
@@ -328,22 +335,7 @@ export async function discoverLinksForRelease(
 
             // Backfill preview URL from Deezer if recording has none
             if (deezerResult.previewUrl && trackWithIsrc.creatorProfileId) {
-              resolvedFallbackPreview = true;
-              const updated = await updateRecordingPreviewByIsrc(
-                trackWithIsrc.creatorProfileId,
-                isrc,
-                deezerResult.previewUrl
-              );
-              await setRecordingPreviewResolutionByIsrc(
-                trackWithIsrc.creatorProfileId,
-                isrc,
-                {
-                  status: 'fallback',
-                  source: 'deezer',
-                  attemptedSources: attemptedPreviewSources,
-                }
-              );
-              if (updated) result.previewsBackfilled++;
+              deezerPreviewUrl = deezerResult.previewUrl;
             }
           }
         })
@@ -395,22 +387,7 @@ export async function discoverLinksForRelease(
             mfPreview.startsWith('https://') &&
             trackWithIsrc.creatorProfileId
           ) {
-            resolvedFallbackPreview = true;
-            const updated = await updateRecordingPreviewByIsrc(
-              trackWithIsrc.creatorProfileId,
-              isrc,
-              mfPreview
-            );
-            await setRecordingPreviewResolutionByIsrc(
-              trackWithIsrc.creatorProfileId,
-              isrc,
-              {
-                status: 'fallback',
-                source: 'musicfetch',
-                attemptedSources: attemptedPreviewSources,
-              }
-            );
-            if (updated) result.previewsBackfilled++;
+            musicfetchPreviewUrl = mfPreview;
           }
         })
         .catch(error => {
@@ -423,57 +400,60 @@ export async function discoverLinksForRelease(
 
   await Promise.all(lookupPromises);
 
-  if (!resolvedFallbackPreview && trackWithIsrc.creatorProfileId) {
-    attemptedPreviewSources.push('spotify');
-    const spotifyResult = await lookupSpotifyByIsrc(isrc, {
-      market: storefront.toUpperCase(),
-    });
+  if (trackWithIsrc.creatorProfileId) {
+    let spotifyPreviewUrl: string | null = null;
+
+    if (!musicfetchPreviewUrl) {
+      attemptedPreviewSources.push('spotify');
+      const spotifyResult = await lookupSpotifyByIsrc(isrc, {
+        market: storefront.toUpperCase(),
+      });
+      spotifyPreviewUrl = spotifyResult?.previewUrl ?? null;
+    }
 
     const previewCandidates: Array<{
       previewUrl: string;
-      source: 'spotify' | 'apple_music';
+      source: FallbackPreviewSource;
     }> = [
-      spotifyResult?.previewUrl
-        ? { previewUrl: spotifyResult.previewUrl, source: 'spotify' }
+      musicfetchPreviewUrl
+        ? { previewUrl: musicfetchPreviewUrl, source: 'musicfetch' }
+        : null,
+      spotifyPreviewUrl
+        ? { previewUrl: spotifyPreviewUrl, source: 'spotify' }
         : null,
       appleMusicPreviewUrl
         ? { previewUrl: appleMusicPreviewUrl, source: 'apple_music' }
         : null,
+      deezerPreviewUrl
+        ? { previewUrl: deezerPreviewUrl, source: 'deezer' }
+        : null,
     ].filter(
-      (
-        value
-      ): value is { previewUrl: string; source: 'spotify' | 'apple_music' } =>
+      (value): value is { previewUrl: string; source: FallbackPreviewSource } =>
         Boolean(value)
     );
 
-    let previewResolved = false;
     for (const candidate of previewCandidates) {
       const updated = await updateRecordingPreviewByIsrc(
         trackWithIsrc.creatorProfileId,
         isrc,
         candidate.previewUrl
       );
-      await setRecordingPreviewResolutionByIsrc(
-        trackWithIsrc.creatorProfileId,
-        isrc,
-        {
-          status: 'fallback',
-          source: candidate.source,
-          attemptedSources: attemptedPreviewSources,
-        }
-      );
       if (updated) {
+        await setRecordingPreviewResolutionByIsrc(
+          trackWithIsrc.creatorProfileId,
+          isrc,
+          {
+            status: 'fallback',
+            source: candidate.source,
+            attemptedSources: attemptedPreviewSources,
+          }
+        );
         result.previewsBackfilled++;
-        previewResolved = true;
         break;
       }
     }
 
-    if (
-      !previewResolved &&
-      !appleMusicPreviewUrl &&
-      !spotifyResult?.previewUrl
-    ) {
+    if (previewCandidates.length === 0) {
       await setRecordingPreviewResolutionByIsrc(
         trackWithIsrc.creatorProfileId,
         isrc,

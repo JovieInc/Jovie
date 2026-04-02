@@ -148,23 +148,4 @@ export interface ReleaseSidebarProps {
   readonly tracksOverride?: ReleaseSidebarTrack[];
   /** Optional static analytics data used instead of the live sidebar API */
   readonly analyticsOverride?: ReleaseSidebarAnalytics | null;
-  readonly onTrackClick?: (track: {
-    id: string;
-    title: string;
-    slug: string;
-    smartLinkPath: string;
-    trackNumber: number;
-    discNumber: number;
-    durationMs: number | null;
-    isrc: string | null;
-    isExplicit: boolean;
-    providers: Array<{ key: ProviderKey; label: string; url: string }>;
-    releaseId: string;
-    previewUrl?: string | null;
-    audioUrl?: string | null;
-    audioFormat?: string | null;
-    previewSource?: import('@/lib/discography/types').PreviewSource;
-    previewVerification?: import('@/lib/discography/types').PreviewVerification;
-    providerConfidenceSummary?: import('@/lib/discography/types').ProviderConfidenceSummary;
-  }) => void;
 }

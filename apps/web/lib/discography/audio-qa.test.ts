@@ -7,7 +7,6 @@ describe('derivePreviewState', () => {
       derivePreviewState({
         audioUrl: null,
         previewUrl: null,
-        isrc: 'USUM72212345',
         metadata: null,
         providerLinks: [
           {
@@ -27,7 +26,6 @@ describe('derivePreviewState', () => {
       derivePreviewState({
         audioUrl: null,
         previewUrl: null,
-        isrc: 'USUM72212345',
         metadata: {
           previewResolution: {
             status: 'unknown',

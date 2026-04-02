@@ -79,9 +79,10 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerSection: ({ children }: { children: React.ReactNode }) => (
     <section>{children}</section>
   ),
-  DrawerSurfaceCard: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
+  DrawerSurfaceCard: ({
+    children,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
 }));
 
 vi.mock('@/lib/queries', () => ({
@@ -115,7 +116,6 @@ describe('ReleaseTrackList', () => {
     render(
       <ReleaseTrackList
         release={release}
-        showHeading={false}
         tracksOverride={[
           {
             id: 'track_1',
@@ -133,7 +133,7 @@ describe('ReleaseTrackList', () => {
             audioUrl: null,
             audioFormat: null,
             previewSource: null,
-            previewVerification: 'unknown',
+            previewVerification: 'missing',
             providerConfidenceSummary: {
               canonical: 1,
               searchFallback: 1,
@@ -159,20 +159,28 @@ describe('ReleaseTrackList', () => {
       />
     );
 
-    expect(screen.getByText(/Previews:/i)).toBeInTheDocument();
-    expect(screen.getByText('Unknown')).toBeInTheDocument();
+    expect(screen.getByTestId('release-preview-summary')).toHaveTextContent(
+      'Previews: 0 verified, 0 fallback, 0 unknown'
+    );
     expect(
-      screen.getAllByText(/1 canonical, 1 fallback, 2 unknown/i).length
-    ).toBeGreaterThan(0);
+      screen.getByTestId('release-track-status-track_1')
+    ).toHaveTextContent('Not checked');
+    expect(
+      screen.getByTestId('release-track-provider-summary-track_1')
+    ).toHaveTextContent('1 canonical, 1 fallback, 2 unknown');
 
     const disclosure = screen.getByRole('button', { expanded: false });
 
     await user.click(disclosure);
 
-    expect(screen.getByText(/Canonical DSPs/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Search Fallback/i).length).toBeGreaterThan(0);
     expect(
-      screen.getByText(/Unresolved: Apple Music, YouTube/i)
+      screen.getByTestId('release-track-canonical-providers-track_1')
     ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('release-track-fallback-providers-track_1')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('release-track-unresolved-track_1')
+    ).toHaveTextContent('Unresolved: Apple Music, YouTube');
   });
 });

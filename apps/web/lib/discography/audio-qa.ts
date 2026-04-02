@@ -18,7 +18,6 @@ interface ProviderLinkInput {
 interface TrackAudioQaInput {
   readonly audioUrl: string | null;
   readonly previewUrl: string | null;
-  readonly isrc: string | null;
   readonly metadata?: Record<string, unknown> | null;
   readonly providerLinks: ProviderLinkInput[];
 }
@@ -108,13 +107,6 @@ export function derivePreviewState(input: TrackAudioQaInput): {
   }
 
   if (previewResolution?.status === 'missing') {
-    return {
-      previewSource: null,
-      previewVerification: 'missing',
-    };
-  }
-
-  if (!input.isrc) {
     return {
       previewSource: null,
       previewVerification: 'missing',
