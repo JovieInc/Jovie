@@ -99,8 +99,7 @@ export function ChatPageClient({
     isFirstSession: dashboardIsFirstSession,
   } = useDashboardData();
   const { setPreviewData } = usePreviewPanelData();
-  const { isOpen: isPreviewPanelOpen, open: openPreviewPanel } =
-    usePreviewPanelState();
+  const { open: openPreviewPanel } = usePreviewPanelState();
   const router = useRouter();
   const searchParams = useSearchParams();
   const notifications = useNotifications();
@@ -134,8 +133,11 @@ export function ChatPageClient({
   const canAutoRetry = isProfileSetupRace && autoRetryCount < 3;
   const enablePreviewPanel = !env.IS_E2E;
   const fromOnboarding = searchParams.get('from') === 'onboarding';
+  const panelParam = searchParams.get('panel');
+  // Only hydrate preview panel when explicitly requested via ?panel=profile
+  // or coming from onboarding. Otherwise, panel stays closed by default.
   const shouldHydratePreviewPanel =
-    enablePreviewPanel && (isPreviewPanelOpen || fromOnboarding);
+    enablePreviewPanel && (panelParam === 'profile' || fromOnboarding);
 
   useEffect(() => {
     return () => {
@@ -296,7 +298,6 @@ export function ChatPageClient({
     };
   }, [headerActions, setHeaderBadge, setHeaderActions]);
 
-  const panelParam = useMemo(() => searchParams.get('panel'), [searchParams]);
   const rawQuery = useMemo(() => searchParams.get('q'), [searchParams]);
 
   // Auto-open the profile drawer when redirected from /dashboard/profile (?panel=profile)

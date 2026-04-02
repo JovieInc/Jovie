@@ -1,6 +1,12 @@
 'use client';
 
-import { Calendar, DollarSign, ShoppingBag } from 'lucide-react';
+import {
+  Calendar,
+  DollarSign,
+  Mail,
+  ShoppingBag,
+  UserRound,
+} from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -11,7 +17,6 @@ import { ProfileNavButton } from '@/components/molecules/ProfileNavButton';
 import { SocialLink as SocialLinkComponent } from '@/components/molecules/SocialLink';
 import { ProfileNotificationsButton } from '@/components/organisms/ProfileNotificationsButton';
 import { Container } from '@/components/site/Container';
-import { ArtistContactsButton } from '@/features/profile/artist-contacts-button';
 import { ProfileFooter } from '@/features/profile/ProfileFooter';
 import { extractVenmoUsername } from '@/features/profile/utils/venmo';
 
@@ -49,6 +54,7 @@ import { useProfileShell } from './useProfileShell';
 export function ProfileShell({
   artist,
   socialLinks,
+  viewerCountryCode,
   contacts = [],
   subtitle,
   children,
@@ -74,11 +80,11 @@ export function ProfileShell({
     notificationsEnabled,
     notificationsController,
     notificationsContextValue,
-    modeLinks,
     socialLinks: prioritizedSocialLinks,
   } = useProfileShell({
     artist,
     socialLinks,
+    viewerCountryCode,
     contacts,
     visitTrackingToken,
   });
@@ -107,6 +113,11 @@ export function ProfileShell({
     [venmoLink]
   );
   const hasTipSupport = showTipButton && Boolean(venmoLink);
+  const headerSocialLinks = useMemo(
+    () => prioritizedSocialLinks.slice(0, 2),
+    [prioritizedSocialLinks]
+  );
+  const hasContacts = contacts.length > 0;
   const availableDspPreferences = useMemo(
     () => toDSPPreferences(getCanonicalProfileDSPs(artist, socialLinks)),
     [artist, socialLinks]
@@ -196,35 +207,21 @@ export function ProfileShell({
           <div className='relative z-10 flex min-h-dvh flex-col pt-14 pb-4 sm:pt-16 sm:pb-6'>
             <div className='flex flex-1 flex-col items-center px-4'>
               <div
-                className={`${maxWidthClass} space-y-4 sm:space-y-5 md:space-y-6`}
+                className={`${maxWidthClass} flex min-h-full flex-1 flex-col`}
               >
-                <ArtistInfo
-                  artist={artist}
-                  subtitle={subtitle}
-                  photoDownloadSizes={photoDownloadSizes}
-                  allowPhotoDownloads={allowPhotoDownloads}
-                />
-                {children}
-                {/* Social bar with contacts and tip buttons inline */}
-                {(showSocialBar ||
-                  showTourButton ||
-                  hasTipSupport ||
-                  hasActiveSubscriptions) && (
-                  <div className='flex justify-center'>
-                    <div
-                      className='flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-1 py-1'
-                      data-testid='social-links'
-                    >
-                      {/* Mail (contacts) — left */}
-                      <ArtistContactsButton
-                        contacts={contacts}
-                        artistHandle={artist.handle}
-                        artistName={artist.name}
-                      />
-                      {/* Social icons — only in profile mode to reduce distractions during conversion flows */}
-                      {(!mode || mode === 'profile') &&
-                        showSocialBar &&
-                        modeLinks.map(link => (
+                <div className='space-y-4 sm:space-y-5 md:space-y-6'>
+                  <div className='md:grid md:grid-cols-[1fr_auto_1fr] md:items-center'>
+                    <div className='hidden md:block' />
+                    <ArtistInfo
+                      artist={artist}
+                      subtitle={subtitle}
+                      photoDownloadSizes={photoDownloadSizes}
+                      allowPhotoDownloads={allowPhotoDownloads}
+                      className='hidden md:flex'
+                    />
+                    {headerSocialLinks.length > 0 ? (
+                      <div className='hidden items-center justify-self-end gap-2 md:flex'>
+                        {headerSocialLinks.map(link => (
                           <SocialLinkComponent
                             key={link.id}
                             link={link}
@@ -232,6 +229,65 @@ export function ProfileShell({
                             artistName={artist.name}
                           />
                         ))}
+                      </div>
+                    ) : (
+                      <div className='hidden md:block' />
+                    )}
+                  </div>
+                  <ArtistInfo
+                    artist={artist}
+                    subtitle={subtitle}
+                    photoDownloadSizes={photoDownloadSizes}
+                    allowPhotoDownloads={allowPhotoDownloads}
+                    className='md:hidden'
+                  />
+                  {children}
+                </div>
+
+                {(showSocialBar ||
+                  showTourButton ||
+                  hasTipSupport ||
+                  hasContacts ||
+                  showShopButton) && (
+                  <div className='mt-auto flex justify-center pt-6 sm:pt-8'>
+                    <div
+                      className='flex min-h-12 flex-wrap items-center justify-center gap-2 rounded-full border border-subtle/50 bg-black/10 px-2 py-2 backdrop-blur-sm sm:gap-3'
+                      data-testid='profile-mode-nav'
+                    >
+                      <CircleIconButton
+                        size='md'
+                        variant='ghost'
+                        ariaLabel='Profile'
+                        data-testid='profile-trigger'
+                        className={`border transition-[background-color,border-color,color] ${
+                          !mode || mode === 'profile'
+                            ? 'border-subtle bg-surface-1 text-primary-token'
+                            : 'border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+                        }`}
+                        onClick={() => {
+                          router.push(`/${artist.handle}`);
+                        }}
+                      >
+                        <UserRound className='h-4 w-4' aria-hidden='true' />
+                      </CircleIconButton>
+                      {hasContacts && (
+                        <CircleIconButton
+                          size='md'
+                          variant='ghost'
+                          ariaLabel='Contact'
+                          data-testid='contact-trigger'
+                          className={`border transition-[background-color,border-color,color] ${
+                            mode === 'contact'
+                              ? 'border-subtle bg-surface-1 text-primary-token'
+                              : 'border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+                          }`}
+                          onClick={() => {
+                            router.push(`/${artist.handle}?mode=contact`);
+                          }}
+                        >
+                          <Mail className='h-4 w-4' aria-hidden='true' />
+                        </CircleIconButton>
+                      )}
                       {/* Tour */}
                       {showTourButton && (
                         <CircleIconButton
@@ -272,73 +328,45 @@ export function ProfileShell({
                         </CircleIconButton>
                       )}
 
-                      {/* Tip — right */}
-                      {hasTipSupport &&
-                        venmoLink &&
-                        (isMobile ? (
-                          <>
-                            <CircleIconButton
-                              size='md'
-                              variant='ghost'
-                              ariaLabel='Tip'
-                              data-testid='tip-trigger'
-                              className={`border transition-[background-color,border-color,color] ${
-                                isTipModeActive
-                                  ? 'border-subtle bg-surface-1 text-primary-token'
-                                  : 'border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
-                              }`}
-                              onClick={() => setTipDrawerOpen(true)}
-                            >
-                              <DollarSign
-                                className='h-4 w-4'
-                                aria-hidden='true'
-                              />
-                            </CircleIconButton>
-                            <TipDrawer
-                              open={tipDrawerOpen}
-                              onOpenChange={setTipDrawerOpen}
-                              artistName={artist.name}
-                              artistHandle={artist.handle}
-                              venmoLink={venmoLink}
-                              venmoUsername={venmoUsername}
-                            />
-                          </>
-                        ) : (
-                          /* Always reserve space for the tip button to prevent layout shift.
-                             When tip mode is active, render invisibly instead of not at all. */
-                          <CircleIconButton
-                            size='md'
-                            variant='ghost'
-                            ariaLabel='Tip'
-                            data-testid='tip-trigger'
-                            className={`border border-subtle/50 bg-transparent text-secondary-token transition-[background-color,border-color,color] hover:border-subtle hover:bg-surface-1 hover:text-primary-token${isTipModeActive ? ' invisible' : ''}`}
-                            aria-hidden={isTipModeActive || undefined}
-                            tabIndex={isTipModeActive ? -1 : undefined}
-                            onClick={() => {
-                              router.push(`/${artist.handle}?mode=tip`);
-                            }}
-                          >
-                            <DollarSign
-                              className='h-4 w-4'
-                              aria-hidden='true'
-                            />
-                          </CircleIconButton>
-                        ))}
-                      {(!mode || mode === 'profile') &&
-                        showSocialBar &&
-                        prioritizedSocialLinks.map(link => (
-                          <SocialLinkComponent
-                            key={link.id}
-                            link={link}
-                            handle={artist.handle}
-                            artistName={artist.name}
-                          />
-                        ))}
+                      {/* Tip */}
+                      {hasTipSupport && venmoLink && (
+                        <CircleIconButton
+                          size='md'
+                          variant='ghost'
+                          ariaLabel='Tip'
+                          data-testid='tip-trigger'
+                          className={`border transition-[background-color,border-color,color] ${
+                            isTipModeActive
+                              ? 'border-subtle bg-surface-1 text-primary-token'
+                              : 'border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+                          }`}
+                          onClick={() => {
+                            if (isMobile) {
+                              setTipDrawerOpen(true);
+                              return;
+                            }
+                            router.push(`/${artist.handle}?mode=tip`);
+                          }}
+                        >
+                          <DollarSign className='h-4 w-4' aria-hidden='true' />
+                        </CircleIconButton>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
             </div>
+
+            {hasTipSupport && venmoLink && isMobile ? (
+              <TipDrawer
+                open={tipDrawerOpen}
+                onOpenChange={setTipDrawerOpen}
+                artistName={artist.name}
+                artistHandle={artist.handle}
+                venmoLink={venmoLink}
+                venmoUsername={venmoUsername}
+              />
+            ) : null}
 
             {showFooter && <ProfileFooter artist={artist} />}
           </div>

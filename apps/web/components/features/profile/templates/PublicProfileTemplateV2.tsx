@@ -21,13 +21,11 @@ import { ProfileViewportShell } from '@/features/profile/ProfileViewportShell';
 import { resolveProfileV2Presentation } from '@/features/profile/profile-v2-presentation';
 import { TipDrawer } from '@/features/profile/TipDrawer';
 import { extractVenmoUsername } from '@/features/profile/utils/venmo';
+import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
-import {
-  detectSourcePlatform,
-  getHeaderSocialLinks,
-} from '@/lib/utils/context-aware-links';
+import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
@@ -52,6 +50,7 @@ interface PublicProfileTemplateV2Props {
   readonly photoDownloadSizes?: AvatarSize[];
   readonly tourDates: TourDateViewModel[];
   readonly visitTrackingToken?: string;
+  readonly viewerCountryCode?: string | null;
 }
 
 function unwrapNextImageUrl(url: string | null | undefined): string | null {
@@ -105,6 +104,7 @@ export function PublicProfileTemplateV2({
   photoDownloadSizes = [],
   tourDates,
   visitTrackingToken,
+  viewerCountryCode,
 }: PublicProfileTemplateV2Props) {
   const [activeOverlay, setActiveOverlay] =
     useState<ProfileV2OverlayMode>(null);
@@ -113,8 +113,12 @@ export function PublicProfileTemplateV2({
   const tourSectionRef = useRef<HTMLElement | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const mergedDSPs = useMemo(
-    () => getCanonicalProfileDSPs(artist, socialLinks),
-    [artist, socialLinks]
+    () =>
+      sortDSPsByGeoPopularity(
+        getCanonicalProfileDSPs(artist, socialLinks),
+        viewerCountryCode
+      ),
+    [artist, socialLinks, viewerCountryCode]
   );
   const {
     available,
@@ -147,6 +151,7 @@ export function PublicProfileTemplateV2({
   const { notificationsContextValue } = useProfileShell({
     artist,
     socialLinks,
+    viewerCountryCode,
     contacts,
     visitTrackingToken,
     modeOverride: historyMode,
@@ -277,17 +282,8 @@ export function PublicProfileTemplateV2({
   }, [historyMode]);
 
   const visibleSocialLinks = useMemo(() => {
-    if (typeof document === 'undefined') {
-      return [];
-    }
-
-    const sourcePlatform = detectSourcePlatform(
-      document.referrer,
-      new URLSearchParams(globalThis.location.search)
-    );
-
-    return getHeaderSocialLinks(socialLinks, sourcePlatform, 4);
-  }, [socialLinks]);
+    return getHeaderSocialLinks(socialLinks, viewerCountryCode, 2);
+  }, [socialLinks, viewerCountryCode]);
 
   const featuredContent = useMemo(
     () => resolveFeaturedContent(tourDates, latestRelease),
@@ -419,6 +415,7 @@ export function PublicProfileTemplateV2({
             primaryActionKind={primaryActionKind}
             spotlightLabel={heroSpotlight.label}
             spotlightValue={heroSpotlight.value}
+            socialLinks={visibleSocialLinks}
             onPlayClick={handlePlayClick}
             onBellClick={handleBellClick}
           />

@@ -1,6 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReleaseMetadata } from '@/components/organisms/release-sidebar/ReleaseMetadata';
 import type { Release } from '@/components/organisms/release-sidebar/types';
 
@@ -35,6 +36,126 @@ function renderReleaseMetadata(release: Release) {
     </TooltipProvider>
   );
 }
+
+describe('ReleaseMetadata editable fields', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('renders empty metadata fields as editable inputs in admin mode', () => {
+    render(
+      <TooltipProvider>
+        <ReleaseMetadata
+          release={buildRelease({ primaryIsrc: null, upc: null, label: null })}
+          isEditable
+          onSavePrimaryIsrc={vi.fn().mockResolvedValue(undefined)}
+          onSaveMetadata={vi.fn().mockResolvedValue(undefined)}
+        />
+      </TooltipProvider>
+    );
+
+    expect(screen.getByLabelText('ISRC')).toHaveAttribute(
+      'placeholder',
+      'Add ISRC'
+    );
+    expect(screen.getByLabelText('UPC')).toHaveAttribute(
+      'placeholder',
+      'Add UPC'
+    );
+    expect(screen.getByLabelText('Label')).toHaveAttribute(
+      'placeholder',
+      'Add Label'
+    );
+  });
+
+  it('auto-saves metadata after debounce and normalizes ISRC', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const onSavePrimaryIsrc = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <TooltipProvider>
+        <ReleaseMetadata
+          release={buildRelease({ primaryIsrc: null })}
+          isEditable
+          onSavePrimaryIsrc={onSavePrimaryIsrc}
+          onSaveMetadata={vi.fn().mockResolvedValue(undefined)}
+        />
+      </TooltipProvider>
+    );
+
+    await user.type(screen.getByLabelText('ISRC'), 'us-abc-1234567');
+    vi.advanceTimersByTime(1600);
+
+    await waitFor(() => {
+      expect(onSavePrimaryIsrc).toHaveBeenCalledWith(
+        'release_1',
+        'USABC1234567'
+      );
+    });
+  });
+
+  it('flushes pending saves on blur', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const onSaveMetadata = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <TooltipProvider>
+        <ReleaseMetadata
+          release={buildRelease({ label: null })}
+          isEditable
+          onSavePrimaryIsrc={vi.fn().mockResolvedValue(undefined)}
+          onSaveMetadata={onSaveMetadata}
+        />
+      </TooltipProvider>
+    );
+
+    const input = screen.getByLabelText('Label');
+    await user.type(input, 'New Label');
+    await user.tab();
+
+    await waitFor(() => {
+      expect(onSaveMetadata).toHaveBeenCalledWith('release_1', {
+        upc: '123456789012',
+        label: 'New Label',
+      });
+    });
+  });
+
+  it('keeps draft text visible and shows inline error when save fails', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const onSaveMetadata = vi
+      .fn()
+      .mockRejectedValue(
+        new Error('This UPC is already used on another release')
+      );
+
+    render(
+      <TooltipProvider>
+        <ReleaseMetadata
+          release={buildRelease({ upc: null })}
+          isEditable
+          onSavePrimaryIsrc={vi.fn().mockResolvedValue(undefined)}
+          onSaveMetadata={onSaveMetadata}
+        />
+      </TooltipProvider>
+    );
+
+    const input = screen.getByLabelText('UPC');
+    await user.type(input, '12345678');
+    vi.advanceTimersByTime(1600);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('12345678')).toBeInTheDocument();
+      expect(
+        screen.getByText('This UPC is already used on another release')
+      ).toBeInTheDocument();
+    });
+  });
+});
 
 describe('ReleaseMetadata canvas status', () => {
   it('renders metadata as a single divider-free grid', () => {

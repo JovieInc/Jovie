@@ -11,8 +11,10 @@ import {
   useRescanIsrcLinksMutation,
   useResetProviderOverrideMutation,
   useSaveCanvasStatusMutation,
+  useSavePrimaryIsrcMutation,
   useSaveProviderOverrideMutation,
   useSaveReleaseLyricsMutation,
+  useSaveReleaseMetadataMutation,
   useSaveReleaseTargetPlaylistsMutation,
   useSyncReleasesFromSpotifyMutation,
 } from '@/lib/queries';
@@ -65,6 +67,8 @@ export function useReleaseProviderMatrix({
   const refreshReleaseMutation = useRefreshReleaseMutation(profileId);
   const rescanIsrcMutation = useRescanIsrcLinksMutation(profileId);
   const saveCanvasStatusMutation = useSaveCanvasStatusMutation(profileId);
+  const savePrimaryIsrcMutation = useSavePrimaryIsrcMutation(profileId);
+  const saveReleaseMetadataMutation = useSaveReleaseMetadataMutation(profileId);
   const saveLyricsMutation = useSaveReleaseLyricsMutation(profileId);
   const saveTargetPlaylistsMutation =
     useSaveReleaseTargetPlaylistsMutation(profileId);
@@ -449,6 +453,39 @@ export function useReleaseProviderMatrix({
     [saveTargetPlaylistsMutation, updateRow]
   );
 
+  const handleSaveMetadata = useCallback(
+    async (
+      releaseId: string,
+      values: { upc: string | null; label: string | null }
+    ) => {
+      const release = rawRowsRef.current.find(r => r.id === releaseId);
+      if (!release) return;
+
+      const updated = await saveReleaseMetadataMutation.mutateAsync({
+        profileId: release.profileId,
+        releaseId,
+        ...values,
+      });
+      updateRow(updated);
+    },
+    [saveReleaseMetadataMutation, updateRow]
+  );
+
+  const handleSavePrimaryIsrc = useCallback(
+    async (releaseId: string, isrc: string | null) => {
+      const release = rawRowsRef.current.find(r => r.id === releaseId);
+      if (!release) return;
+
+      const updated = await savePrimaryIsrcMutation.mutateAsync({
+        profileId: release.profileId,
+        releaseId,
+        isrc,
+      });
+      updateRow(updated);
+    },
+    [savePrimaryIsrcMutation, updateRow]
+  );
+
   const handleFormatLyrics = useCallback(
     async (
       releaseId: string,
@@ -510,6 +547,8 @@ export function useReleaseProviderMatrix({
     isRescanningIsrc,
     handleCanvasStatusUpdate,
     handleAddUrl,
+    handleSaveMetadata,
+    handleSavePrimaryIsrc,
     handleSaveLyrics,
     handleSaveTargetPlaylists,
     handleFormatLyrics,

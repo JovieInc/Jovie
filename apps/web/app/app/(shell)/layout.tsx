@@ -16,7 +16,6 @@ import {
   resolveAppShellRequestPath,
 } from './shell-route-matches';
 
-export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export default async function AppShellLayout({
@@ -25,16 +24,20 @@ export default async function AppShellLayout({
   readonly children: React.ReactNode;
 }) {
   try {
+    const headerStorePromise = headers();
+
     // Auth check is fast — reads JWT from request headers, cached via React cache().
     // Must run before Suspense so unauthenticated users redirect immediately
     // instead of seeing a dashboard skeleton flash.
     const auth = await getCachedAuth();
+    const headerStore = await headerStorePromise;
+    const nextUrlHeader = headerStore.get('next-url');
+    const pathname = resolveAppShellRequestPath(nextUrlHeader);
+
     if (!auth.userId) {
-      const headerStore = await headers();
-      redirect(buildAppShellSignInUrl(headerStore));
+      redirect(buildAppShellSignInUrl(nextUrlHeader));
     }
-    const headerStore = await headers();
-    const pathname = resolveAppShellRequestPath(headerStore.get('next-url'));
+
     let shellFallback: React.ReactNode;
     if (isChatShellRoute(pathname)) {
       shellFallback = (
@@ -61,7 +64,7 @@ export default async function AppShellLayout({
     // DashboardShellContent resolves dashboard data + feature flags.
     return (
       <Suspense fallback={shellFallback}>
-        <DashboardShellContent userId={auth.userId}>
+        <DashboardShellContent userId={auth.userId} pathname={pathname}>
           {children}
         </DashboardShellContent>
       </Suspense>

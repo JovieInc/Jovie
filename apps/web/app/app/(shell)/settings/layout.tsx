@@ -1,4 +1,4 @@
-import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
+import { PageShell } from '@/components/organisms/PageShell';
 
 export default function SettingsLayout({
   children,
@@ -6,15 +6,15 @@ export default function SettingsLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <AppShellContentPanel
+    <PageShell
       maxWidth='form'
       frame='none'
       contentPadding='none'
-      scroll='page'
+      scroll='panel'
       surfaceClassName='pb-10'
       data-testid='settings-shell-content'
     >
       <div className='space-y-6'>{children}</div>
-    </AppShellContentPanel>
+    </PageShell>
   );
 }

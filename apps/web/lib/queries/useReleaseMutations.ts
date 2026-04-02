@@ -8,8 +8,10 @@ import {
   rescanIsrcLinks,
   resetProviderOverride,
   saveCanvasStatus,
+  savePrimaryIsrc,
   saveProviderOverride,
   saveReleaseLyrics,
+  saveReleaseMetadata,
   saveReleaseTargetPlaylists,
   syncFromSpotify,
 } from '@/app/app/(shell)/dashboard/releases/actions';
@@ -328,6 +330,14 @@ export function useSaveReleaseTargetPlaylistsMutation(profileId: string) {
 
 export function useSaveCanvasStatusMutation(profileId: string) {
   return useReleaseMutation(profileId, saveCanvasStatus);
+}
+
+export function useSaveReleaseMetadataMutation(profileId: string) {
+  return useReleaseMutation(profileId, saveReleaseMetadata);
+}
+
+export function useSavePrimaryIsrcMutation(profileId: string) {
+  return useReleaseMutation(profileId, savePrimaryIsrc);
 }
 
 export function useFormatReleaseLyricsMutation(profileId: string) {

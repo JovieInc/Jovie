@@ -7,12 +7,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   Input,
+  UserAvatar,
 } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   Bot,
+  CalendarDays,
   Check,
-  ChevronDown,
+  Disc3,
   FileText,
   Flag,
   MoreVertical,
@@ -28,24 +30,33 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { providerConfig } from '@/app/app/(shell)/dashboard/releases/config';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
-import { DashboardWorkspacePanel } from '@/components/features/dashboard/organisms/DashboardWorkspacePanel';
+import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
 import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
+import {
+  HIDDEN_DIV_STYLES,
+  useTextareaAutosize,
+} from '@/components/jovie/hooks/useTextareaAutosize';
+import { TableFilterDropdown } from '@/components/molecules/filters';
+import {
+  PAGE_SHELL_SURFACE_CLASSNAMES,
+  PageShell,
+} from '@/components/organisms/PageShell';
 import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
-  PAGE_TOOLBAR_MENU_TRIGGER_CLASS,
   PageToolbar,
-  PageToolbarActionButton,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import {
@@ -62,6 +73,7 @@ import type {
 import {
   type AccentPaletteName,
   getAccentCssVars,
+  TASK_PRIORITY_ACCENT,
 } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
 
@@ -107,101 +119,74 @@ const PRIORITY_META: Record<
   urgent: {
     label: 'Urgent',
     symbol: 'Urgent',
-    accent: 'pink',
+    accent: TASK_PRIORITY_ACCENT.urgent,
   },
   high: {
     label: 'High',
     symbol: 'High',
-    accent: 'orange',
+    accent: TASK_PRIORITY_ACCENT.high,
   },
   medium: {
     label: 'Medium',
     symbol: 'Medium',
-    accent: 'purple',
+    accent: TASK_PRIORITY_ACCENT.medium,
   },
-  low: { label: 'Low', symbol: 'Low', accent: 'blue' },
-  none: { label: 'None', symbol: '', accent: 'gray' },
+  low: { label: 'Low', symbol: 'Low', accent: TASK_PRIORITY_ACCENT.low },
+  none: { label: 'None', symbol: '', accent: TASK_PRIORITY_ACCENT.none },
 };
 
-function StatusDotCell({
-  task,
-  onToggle,
-}: Readonly<{
-  task: TaskView;
-  onToggle: (task: TaskView) => void;
-}>) {
-  const meta = STATUS_META[task.status];
-  const accent = getAccentCssVars(meta.accent);
+const TASK_PROGRESS_META: Record<
+  TaskStatus,
+  {
+    readonly percent: 25 | 50 | 75 | 100;
+    readonly accent: AccentPaletteName;
+  }
+> = {
+  backlog: { percent: 25, accent: 'orange' },
+  todo: { percent: 50, accent: 'blue' },
+  in_progress: { percent: 75, accent: 'purple' },
+  done: { percent: 100, accent: 'pink' },
+  cancelled: { percent: 25, accent: 'gray' },
+};
+
+function ProgressRing({ status }: Readonly<{ status: TaskStatus }>) {
+  const { percent, accent } = TASK_PROGRESS_META[status];
+  const accentVars = getAccentCssVars(accent);
+  const radius = 8;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - percent / 100);
 
   return (
-    <button
-      type='button'
-      onClick={event => {
-        event.stopPropagation();
-        onToggle(task);
-      }}
-      className='flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-surface-1'
-      aria-label={`Status: ${meta.label}`}
-      title={meta.label}
+    <div
+      className='flex h-8 w-8 items-center justify-center rounded-full'
+      title={`${STATUS_META[status].label} · ${percent}%`}
     >
-      <span
-        className='h-2 w-2 rounded-full'
-        style={{ backgroundColor: accent.solid }}
-      />
-    </button>
-  );
-}
-
-function ToolbarFilterMenu<TValue extends string>({
-  label,
-  value,
-  options,
-  onChange,
-  ariaLabel,
-}: Readonly<{
-  label: string;
-  value: TValue | 'all';
-  options: readonly { value: TValue | 'all'; label: string }[];
-  onChange: (value: TValue | 'all') => void;
-  ariaLabel: string;
-}>) {
-  const selectedLabel =
-    options.find(option => option.value === value)?.label ?? label;
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type='button'
-          variant='ghost'
-          size='sm'
-          aria-label={ariaLabel}
-          className={cn(
-            PAGE_TOOLBAR_MENU_TRIGGER_CLASS,
-            'h-7 min-w-[132px] rounded-full'
-          )}
-        >
-          <span className='truncate'>{selectedLabel}</span>
-          <ChevronDown className='h-3.5 w-3.5 text-tertiary-token' />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align='start' sideOffset={8}>
-        {options.map(option => {
-          const active = option.value === value;
-          return (
-            <DropdownMenuItem
-              key={option.value}
-              onSelect={() => onChange(option.value)}
-            >
-              <span className='mr-2 inline-flex w-4 items-center justify-center'>
-                {active ? <Check className='h-3.5 w-3.5' /> : null}
-              </span>
-              {option.label}
-            </DropdownMenuItem>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      <svg
+        viewBox='0 0 24 24'
+        className='h-6 w-6 -rotate-90'
+        aria-hidden='true'
+      >
+        <circle
+          cx='12'
+          cy='12'
+          r={radius}
+          fill='none'
+          stroke='color-mix(in oklab, var(--linear-app-frame-seam) 70%, transparent)'
+          strokeWidth='2'
+        />
+        <circle
+          cx='12'
+          cy='12'
+          r={radius}
+          fill='none'
+          stroke={accentVars.solid}
+          strokeLinecap='round'
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          strokeWidth='2'
+        />
+      </svg>
+    </div>
   );
 }
 
@@ -223,7 +208,10 @@ function StatusBadgeCell({ status }: Readonly<{ status: TaskStatus }>) {
   );
 }
 
-function PriorityCell({ priority }: Readonly<{ priority: TaskPriority }>) {
+function PriorityCell({
+  priority,
+  compact = false,
+}: Readonly<{ priority: TaskPriority; compact?: boolean }>) {
   const meta = PRIORITY_META[priority];
   const accent = getAccentCssVars(meta.accent);
 
@@ -233,13 +221,24 @@ function PriorityCell({ priority }: Readonly<{ priority: TaskPriority }>) {
 
   return (
     <span
-      className='inline-flex items-center rounded-full px-2.5 py-1 text-[10.5px] font-[600]'
+      className={cn(
+        'inline-flex items-center rounded-full font-[600]',
+        compact
+          ? 'gap-1.5 px-2 py-0.5 text-[10px]'
+          : 'gap-1.5 px-2.5 py-1 text-[10.5px]'
+      )}
       style={{
-        backgroundColor: `color-mix(in oklab, ${accent.solid} 14%, var(--linear-surface-elevated))`,
+        backgroundColor: `color-mix(in oklab, ${accent.solid} 16%, var(--linear-surface-elevated))`,
+        boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${accent.solid} 24%, transparent)`,
         color: accent.solid,
       }}
       title={`Priority: ${meta.label}`}
     >
+      <span
+        className='h-1.5 w-1.5 rounded-full'
+        style={{ backgroundColor: accent.solid }}
+        aria-hidden='true'
+      />
       {meta.symbol}
     </span>
   );
@@ -247,27 +246,35 @@ function PriorityCell({ priority }: Readonly<{ priority: TaskPriority }>) {
 
 function AssigneeCell({
   assigneeKind,
-}: Readonly<{ assigneeKind: TaskAssigneeKind }>) {
-  const jovieAccent = getAccentCssVars('pink');
+  artistName,
+  compact = false,
+}: Readonly<{
+  assigneeKind: TaskAssigneeKind;
+  artistName?: string | null;
+  compact?: boolean;
+}>) {
+  const isJovie = assigneeKind === 'jovie';
+  const label = isJovie ? 'Jovie' : 'You';
+  const name = isJovie ? 'Jovie' : (artistName ?? 'You');
+  const accent = getAccentCssVars(isJovie ? 'pink' : 'blue');
 
   return (
     <span
-      role='img'
       className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-[560]',
-        assigneeKind === 'jovie' ? '' : 'bg-surface-1 text-secondary-token'
+        'inline-flex items-center text-secondary-token',
+        compact ? 'gap-1.5 text-[10.5px]' : 'gap-2 text-[11px]'
       )}
-      style={
-        assigneeKind === 'jovie'
-          ? {
-              backgroundColor: jovieAccent.subtle,
-              color: jovieAccent.solid,
-            }
-          : undefined
-      }
-      aria-label={`Assignee: ${assigneeKind === 'jovie' ? 'Jovie' : 'You'}`}
+      title={`Assignee: ${label}`}
     >
-      {assigneeKind === 'jovie' ? 'Jovie' : 'You'}
+      <span
+        className='inline-flex rounded-full'
+        style={{
+          boxShadow: `0 0 0 1px color-mix(in oklab, ${accent.solid} 22%, transparent)`,
+        }}
+      >
+        <UserAvatar name={name} size='xs' />
+      </span>
+      <span className='font-[560] text-secondary-token'>{label}</span>
     </span>
   );
 }
@@ -290,50 +297,68 @@ function resolveArtistName(
 function TaskTitleCellContent({
   task,
   onOpenRelease,
+  artistName,
 }: Readonly<{
   task: TaskView;
   onOpenRelease: (task: TaskView) => void;
+  artistName?: string | null;
 }>) {
-  const shouldShowAssignee = task.assigneeKind === 'jovie';
-
   return (
-    <div className='min-w-0 py-2'>
-      <div className='flex min-w-0 items-center gap-2'>
-        <p className='truncate text-[13px] font-[560] leading-[17px] text-primary-token'>
-          {task.title}
-        </p>
+    <div className='min-w-0 py-1'>
+      <div className='flex min-w-0 items-start gap-3'>
+        <div className='shrink-0 pt-0.5'>
+          <ProgressRing status={task.status} />
+        </div>
+        <div className='min-w-0 flex-1'>
+          <p className='truncate text-[12.75px] font-[570] leading-[17px] text-primary-token'>
+            {task.title}
+          </p>
+          <div className='mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] text-secondary-token'>
+            <span className='shrink-0 font-[560] text-tertiary-token'>
+              J-{task.taskNumber}
+            </span>
+            <span className='inline-flex items-center gap-1'>
+              <Flag className='h-3 w-3 text-tertiary-token' />
+              <PriorityCell priority={task.priority} compact />
+            </span>
+            <span className='inline-flex items-center gap-1'>
+              <AssigneeCell
+                assigneeKind={task.assigneeKind}
+                artistName={artistName}
+                compact
+              />
+            </span>
+            {task.dueAt ? (
+              <span className='inline-flex items-center gap-1'>
+                <CalendarDays className='h-3 w-3 text-tertiary-token' />
+                <ReleaseTaskDueBadge
+                  dueDate={task.dueAt}
+                  dueDaysOffset={null}
+                  isCompleted={task.status === 'done'}
+                />
+              </span>
+            ) : null}
+            {task.releaseTitle ? (
+              <button
+                type='button'
+                onClick={event => {
+                  event.stopPropagation();
+                  onOpenRelease(task);
+                }}
+                className='inline-flex min-w-0 items-center gap-1 rounded-full px-1.5 py-0.5 transition-colors hover:bg-surface-1 hover:text-primary-token'
+              >
+                <Disc3 className='h-3 w-3 text-tertiary-token' />
+                <span className='truncate'>{task.releaseTitle}</span>
+              </button>
+            ) : null}
+          </div>
+          {task.description ? (
+            <p className='truncate pt-1 text-[11px] leading-[15px] text-secondary-token'>
+              {task.description}
+            </p>
+          ) : null}
+        </div>
       </div>
-      <div className='flex min-w-0 items-center gap-2 pt-1'>
-        <span className='shrink-0 text-[11px] font-[560] text-tertiary-token'>
-          J-{task.taskNumber}
-        </span>
-        {task.releaseTitle ? (
-          <>
-            <span className='h-1 w-1 shrink-0 rounded-full bg-[color-mix(in_oklab,var(--text-tertiary)_72%,transparent)]' />
-            <button
-              type='button'
-              onClick={event => {
-                event.stopPropagation();
-                onOpenRelease(task);
-              }}
-              className='truncate rounded-full px-2 py-0.5 text-[11px] font-[560] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
-            >
-              {task.releaseTitle}
-            </button>
-          </>
-        ) : null}
-        {shouldShowAssignee ? (
-          <>
-            <span className='h-1 w-1 shrink-0 rounded-full bg-[color-mix(in_oklab,var(--text-tertiary)_72%,transparent)]' />
-            <AssigneeCell assigneeKind={task.assigneeKind} />
-          </>
-        ) : null}
-      </div>
-      {task.description ? (
-        <p className='truncate pt-1 text-[11.5px] leading-[15px] text-secondary-token'>
-          {task.description}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -348,6 +373,7 @@ function TaskDocumentPanel({
   onSave,
   onOpenRelease,
   isSaving,
+  artistName,
 }: Readonly<{
   task: TaskView | null;
   title: string;
@@ -358,18 +384,27 @@ function TaskDocumentPanel({
   onSave: () => void;
   onOpenRelease: (task: TaskView) => void;
   isSaving: boolean;
+  artistName?: string | null;
 }>) {
   if (!task) {
     return (
-      <div className='flex min-h-0 flex-1 items-center justify-center px-8'>
-        <div className='max-w-md text-center'>
-          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-[14px] border border-subtle bg-surface-1 text-secondary-token'>
+      <div className='flex min-h-0 flex-1 items-center justify-center bg-surface-0 px-6 py-6'>
+        <div
+          className={cn(
+            PAGE_SHELL_SURFACE_CLASSNAMES.emptyState,
+            'max-w-xl px-8 py-10 text-center'
+          )}
+        >
+          <div className='mx-auto flex h-11 w-11 items-center justify-center rounded-[14px] border border-subtle bg-surface-1 text-secondary-token'>
             <FileText className='h-5 w-5' />
           </div>
-          <h2 className='mt-4 text-[16px] font-[590] text-primary-token'>
-            Select a Task to Open Its Document
+          <p className='mt-4 text-[10.5px] font-[700] uppercase tracking-[0.16em] text-tertiary-token'>
+            Task Workspace
+          </p>
+          <h2 className='mt-2 text-[21px] font-[590] tracking-[-0.03em] text-primary-token'>
+            Select a task to open its document
           </h2>
-          <p className='mt-1 text-[13px] leading-[19px] text-secondary-token'>
+          <p className='mt-2 text-[13px] leading-[20px] text-secondary-token'>
             Tasks now open into a central writing surface so the brief,
             instructions, and agent context live with the work instead of being
             buried in a table row.
@@ -382,82 +417,201 @@ function TaskDocumentPanel({
   const hasRelease = Boolean(task.releaseId && task.releaseTitle);
 
   return (
-    <div className='flex min-h-0 min-w-0 flex-1 flex-col bg-surface-0'>
-      <div className='flex items-center justify-between border-b border-subtle px-6 py-3'>
-        <div className='flex min-w-0 items-center gap-2'>
-          <span className='rounded-full bg-surface-1 px-2.5 py-1 text-[10.5px] font-[600] text-tertiary-token'>
-            J-{task.taskNumber}
-          </span>
-          <StatusBadgeCell status={task.status} />
-          <PriorityCell priority={task.priority} />
-          <AssigneeCell assigneeKind={task.assigneeKind} />
-          {task.dueAt ? (
-            <ReleaseTaskDueBadge
-              dueDate={task.dueAt}
-              dueDaysOffset={null}
-              isCompleted={task.status === 'done'}
-            />
-          ) : null}
-          {hasRelease ? (
-            <button
-              type='button'
-              onClick={() => onOpenRelease(task)}
-              className='truncate rounded-full bg-surface-1 px-2.5 py-1 text-[10.5px] font-[600] text-secondary-token transition-colors hover:text-primary-token'
-            >
-              {task.releaseTitle}
-            </button>
-          ) : null}
-        </div>
-        <div className='flex items-center gap-2'>
-          <Button type='button' variant='secondary' size='sm' onClick={onClose}>
-            <X className='mr-1 h-3.5 w-3.5' />
-            Close
-          </Button>
-          <Button type='button' size='sm' onClick={onSave} disabled={isSaving}>
-            {isSaving ? 'Saving...' : 'Save Task'}
-          </Button>
-        </div>
-      </div>
-
-      <div className='min-h-0 flex-1 overflow-y-auto'>
-        <div className='mx-auto flex max-w-4xl flex-col px-8 py-8'>
-          <input
-            value={title}
-            onChange={event => onTitleChange(event.target.value)}
-            placeholder='Untitled Task'
-            className='w-full border-0 bg-transparent px-0 text-[30px] font-[620] tracking-[-0.03em] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)]'
-          />
-
-          <div className='mt-6 rounded-[20px] border border-subtle bg-surface-1 p-5'>
-            <div className='flex items-center gap-2 text-[11px] font-[600] uppercase tracking-[0.12em] text-tertiary-token'>
-              <Bot className='h-3.5 w-3.5' />
-              Agent Context
+    <div className='flex min-h-0 min-w-0 flex-1 flex-col bg-surface-0 px-3 py-3'>
+      <div
+        className={cn(
+          PAGE_SHELL_SURFACE_CLASSNAMES.document,
+          'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'
+        )}
+      >
+        <div className='flex flex-col gap-4 border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] px-6 py-4 xl:flex-row xl:items-start xl:justify-between'>
+          <div className='flex min-w-0 flex-1 flex-col gap-3'>
+            <div className='flex min-w-0 flex-wrap items-center gap-2'>
+              <span
+                className={cn(
+                  PAGE_SHELL_SURFACE_CLASSNAMES.metaRow,
+                  'px-2.5 py-1 text-[10px] font-[650] uppercase tracking-[0.1em] text-tertiary-token'
+                )}
+              >
+                Task J-{task.taskNumber}
+              </span>
+              <StatusBadgeCell status={task.status} />
+              <PriorityCell priority={task.priority} />
+              <AssigneeCell
+                assigneeKind={task.assigneeKind}
+                artistName={artistName}
+              />
+              {task.dueAt ? (
+                <ReleaseTaskDueBadge
+                  dueDate={task.dueAt}
+                  dueDaysOffset={null}
+                  isCompleted={task.status === 'done'}
+                />
+              ) : null}
+              {hasRelease ? (
+                <button
+                  type='button'
+                  onClick={() => onOpenRelease(task)}
+                  className={cn(
+                    PAGE_SHELL_SURFACE_CLASSNAMES.metaRow,
+                    'truncate px-2.5 py-1 text-[10.5px] font-[600] text-secondary-token transition-colors hover:text-primary-token'
+                  )}
+                >
+                  {task.releaseTitle}
+                </button>
+              ) : null}
             </div>
-            <p className='mt-2 text-[13px] leading-[20px] text-secondary-token'>
-              Treat this like the working brief for the task. Add decision
-              context, references, rollout notes, edge cases, or exact output
-              requirements so agents have durable context when the task is
-              assigned.
-            </p>
+            <div className='min-w-0'>
+              <p className='text-[10.5px] font-[650] uppercase tracking-[0.14em] text-tertiary-token'>
+                Work Brief
+              </p>
+              <p className='mt-1 max-w-[40rem] text-[12.5px] leading-[18px] text-secondary-token'>
+                Keep the brief, delivery notes, and agent handoff context in one
+                document so the task reads like work, not table metadata.
+              </p>
+            </div>
           </div>
-
-          <div className='mt-6 rounded-[24px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] bg-[color-mix(in_oklab,var(--linear-surface-elevated)_82%,var(--linear-surface))] px-6 py-6'>
-            <label
-              htmlFor='task-context-editor'
-              className='text-[11px] font-[600] uppercase tracking-[0.12em] text-tertiary-token'
+          <div className='flex shrink-0 flex-wrap items-center justify-end gap-2'>
+            <Button
+              type='button'
+              variant='secondary'
+              size='sm'
+              onClick={onClose}
             >
-              Task Context
-            </label>
-            <textarea
-              id='task-context-editor'
-              value={description}
-              onChange={event => onDescriptionChange(event.target.value)}
-              placeholder='Write the brief, constraints, notes, deliverables, and any context an assignee or agent should keep in mind.'
-              className='mt-3 min-h-[460px] w-full resize-none border-0 bg-transparent px-0 text-[15px] leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
-            />
+              <X className='mr-1 h-3.5 w-3.5' />
+              Close
+            </Button>
+            <Button
+              type='button'
+              size='sm'
+              onClick={onSave}
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving...' : 'Save Task'}
+            </Button>
+          </div>
+        </div>
+
+        <div className='min-h-0 flex-1 overflow-y-auto'>
+          <div className='mx-auto flex w-full max-w-[58rem] flex-col gap-6 px-6 py-6 sm:px-8 sm:py-8'>
+            <div className='space-y-3'>
+              <TaskTitleEditor value={title} onChange={onTitleChange} />
+              <p className='max-w-[42rem] text-[14px] leading-[22px] text-secondary-token'>
+                Write the assignment so a teammate or agent can pick it up
+                without needing a second explanation.
+              </p>
+            </div>
+
+            <div className='grid gap-4 xl:grid-cols-[minmax(0,1fr)_17rem]'>
+              <div
+                className={cn(
+                  PAGE_SHELL_SURFACE_CLASSNAMES.workspace,
+                  'px-6 py-5'
+                )}
+              >
+                <label
+                  htmlFor='task-context-editor'
+                  className='text-[10.5px] font-[650] uppercase tracking-[0.14em] text-tertiary-token'
+                >
+                  Task Context
+                </label>
+                <p className='mt-1 text-[12.5px] leading-[18px] text-secondary-token'>
+                  Capture the brief, constraints, rollout notes, links, and
+                  deliverables in a document that can survive handoff.
+                </p>
+                <textarea
+                  id='task-context-editor'
+                  value={description}
+                  onChange={event => onDescriptionChange(event.target.value)}
+                  placeholder='Write the brief, constraints, notes, deliverables, and any context an assignee or agent should keep in mind.'
+                  className='mt-5 min-h-[420px] w-full resize-none border-0 bg-transparent px-0 text-[15px] leading-[1.85] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
+                />
+              </div>
+
+              <aside className='space-y-4'>
+                <div
+                  className={cn(
+                    PAGE_SHELL_SURFACE_CLASSNAMES.inspector,
+                    'px-4 py-4'
+                  )}
+                >
+                  <div className='flex items-center gap-2 text-[10.5px] font-[650] uppercase tracking-[0.14em] text-tertiary-token'>
+                    <Bot className='h-3.5 w-3.5' />
+                    Agent Context
+                  </div>
+                  <p className='mt-2 text-[12.5px] leading-[19px] text-secondary-token'>
+                    Use this task like a durable operating brief: include
+                    references, edge cases, rollout notes, and exact output
+                    requirements.
+                  </p>
+                </div>
+                <div
+                  className={cn(
+                    PAGE_SHELL_SURFACE_CLASSNAMES.inspector,
+                    'px-4 py-4'
+                  )}
+                >
+                  <p className='text-[10.5px] font-[650] uppercase tracking-[0.14em] text-tertiary-token'>
+                    Editing Notes
+                  </p>
+                  <ul className='mt-2 space-y-2 text-[12.5px] leading-[18px] text-secondary-token'>
+                    <li>Lead with the decision that matters most.</li>
+                    <li>Call out dependencies before deliverables.</li>
+                    <li>Make agent expectations explicit.</li>
+                  </ul>
+                </div>
+              </aside>
+            </div>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TaskTitleEditor({
+  value,
+  onChange,
+}: Readonly<{
+  value: string;
+  onChange: (value: string) => void;
+}>) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { measuredHeight, isAtMaxHeight, containerRef, hiddenDivRef } =
+    useTextareaAutosize({
+      value,
+      minHeight: 54,
+      maxHeight: 220,
+      textareaRef,
+    });
+
+  return (
+    <div ref={containerRef} className='relative min-w-0'>
+      <textarea
+        ref={textareaRef}
+        value={value}
+        rows={1}
+        aria-label='Task title'
+        onChange={event => onChange(event.target.value)}
+        placeholder='Untitled Task'
+        className='w-full resize-none border-0 bg-transparent px-0 py-0 text-[clamp(1.85rem,3vw,2.75rem)] font-[620] leading-[1.04] tracking-[-0.045em] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)]'
+        style={{
+          height: measuredHeight,
+          overflowY: isAtMaxHeight ? 'auto' : 'hidden',
+        }}
+      />
+      <div
+        ref={hiddenDivRef}
+        aria-hidden='true'
+        style={{
+          ...HIDDEN_DIV_STYLES,
+          fontSize: 'clamp(1.85rem, 3vw, 2.75rem)',
+          lineHeight: '1.04',
+          fontWeight: 620,
+          letterSpacing: '-0.045em',
+          padding: '0',
+        }}
+      />
     </div>
   );
 }
@@ -472,12 +626,15 @@ function TaskEmptyState({
   onOpenComposer: () => void;
 }>) {
   return (
-    <div className='flex min-h-[320px] flex-col items-center justify-center gap-3 px-6 text-center'>
+    <div className='flex min-h-[360px] flex-col items-center justify-center gap-3 px-6 text-center'>
       <div className='space-y-1'>
-        <h2 className='text-[15px] font-[560] text-primary-token'>
+        <p className='text-[10.5px] font-[700] uppercase tracking-[0.14em] text-tertiary-token'>
+          Task Workspace
+        </p>
+        <h2 className='text-[18px] font-[580] tracking-[-0.025em] text-primary-token'>
           {hasFilters
-            ? 'No Tasks Match Your Filters'
-            : 'Your Task List Is Empty'}
+            ? 'No tasks match your filters'
+            : 'Your task list is empty'}
         </h2>
         <p className='max-w-[520px] text-[13px] text-secondary-token'>
           {hasFilters
@@ -529,6 +686,7 @@ export function TasksPageClient() {
   >('all');
   const [draftTitle, setDraftTitle] = useState('');
   const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [isToolbarMenuOpen, setIsToolbarMenuOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(
     null
@@ -540,6 +698,7 @@ export function TasksPageClient() {
   const createTaskMutation = useCreateTaskMutation();
   const updateTaskMutation = useUpdateTaskMutation();
   const { data: releases = [] } = useReleasesQuery(profileId ?? '');
+  const { setHeaderActions } = useSetHeaderActions();
 
   const filters = useMemo(
     () => ({
@@ -567,6 +726,72 @@ export function TasksPageClient() {
     statusFilter !== 'all' ||
     priorityFilter !== 'all' ||
     assigneeFilter !== 'all';
+  const clearFilters = useCallback(() => {
+    setSearch('');
+    setStatusFilter('all');
+    setPriorityFilter('all');
+    setAssigneeFilter('all');
+  }, []);
+  const showTaskWorkbenchEmptyState = !isLoading && tasks.length === 0;
+
+  const taskFilterCategories = useMemo(
+    () => [
+      {
+        id: 'status',
+        label: 'Status',
+        iconName: 'ListTodo',
+        options: (
+          Object.entries(STATUS_META) as Array<
+            [TaskStatus, (typeof STATUS_META)[TaskStatus]]
+          >
+        ).map(([value, meta]) => ({
+          id: value,
+          label: meta.label,
+        })),
+        selectedIds: statusFilter === 'all' ? [] : [statusFilter],
+        onToggle: (value: string) =>
+          setStatusFilter(current =>
+            current === value ? 'all' : (value as TaskStatus)
+          ),
+        searchPlaceholder: 'Search statuses...',
+      },
+      {
+        id: 'priority',
+        label: 'Priority',
+        iconName: 'Flag',
+        options: (
+          Object.entries(PRIORITY_META) as Array<
+            [TaskPriority, (typeof PRIORITY_META)[TaskPriority]]
+          >
+        ).map(([value, meta]) => ({
+          id: value,
+          label: meta.label,
+        })),
+        selectedIds: priorityFilter === 'all' ? [] : [priorityFilter],
+        onToggle: (value: string) =>
+          setPriorityFilter(current =>
+            current === value ? 'all' : (value as TaskPriority)
+          ),
+        searchPlaceholder: 'Search priorities...',
+      },
+      {
+        id: 'assignee',
+        label: 'Assignee',
+        iconName: 'Users',
+        options: [
+          { id: 'human', label: 'You' },
+          { id: 'jovie', label: 'Jovie' },
+        ],
+        selectedIds: assigneeFilter === 'all' ? [] : [assigneeFilter],
+        onToggle: (value: string) =>
+          setAssigneeFilter(current =>
+            current === value ? 'all' : (value as TaskAssigneeKind)
+          ),
+        searchPlaceholder: 'Search assignees...',
+      },
+    ],
+    [assigneeFilter, priorityFilter, statusFilter]
+  );
 
   useEffect(() => {
     if (!selectedTask) {
@@ -725,67 +950,23 @@ export function TasksPageClient() {
   const columns = useMemo(
     () =>
       [
-        columnHelper.display({
-          id: 'statusDot',
-          header: '',
-          size: 44,
-          enableSorting: false,
-          cell: info => (
-            <StatusDotCell
-              task={info.row.original}
-              onToggle={task => {
-                updateTaskMutation.mutate({
-                  taskId: task.id,
-                  data: { status: task.status === 'done' ? 'todo' : 'done' },
-                });
-              }}
-            />
-          ),
-          meta: { className: 'pl-3 pr-1' },
-        }),
         columnHelper.accessor('taskNumber', {
           id: 'title',
-          header: 'Task',
+          header: 'Tasks',
           size: 9999,
           cell: info => (
             <TaskTitleCellContent
               task={info.row.original}
               onOpenRelease={openReleaseSidebar}
+              artistName={artistName}
             />
           ),
-          meta: { className: 'px-1 pr-3' },
-        }),
-        columnHelper.accessor('status', {
-          id: 'status',
-          header: 'Status',
-          size: 116,
-          cell: info => <StatusBadgeCell status={info.getValue()} />,
-          meta: { className: 'px-1' },
-        }),
-        columnHelper.accessor('priority', {
-          id: 'priority',
-          header: 'Priority',
-          size: 92,
-          cell: info => <PriorityCell priority={info.getValue()} />,
-          meta: { className: 'px-1' },
-        }),
-        columnHelper.accessor('dueAt', {
-          id: 'dueAt',
-          header: 'Due',
-          size: 92,
-          cell: info => (
-            <ReleaseTaskDueBadge
-              dueDate={info.getValue()}
-              dueDaysOffset={null}
-              isCompleted={info.row.original.status === 'done'}
-            />
-          ),
-          meta: { className: 'px-1' },
+          meta: { className: 'pl-2 pr-2' },
         }),
         columnHelper.display({
           id: 'actions',
           header: '',
-          size: 48,
+          size: 40,
           enableSorting: false,
           cell: info => (
             <TableActionMenu
@@ -798,16 +979,16 @@ export function TasksPageClient() {
                 type='button'
                 onClick={event => event.stopPropagation()}
                 aria-label='Open task actions'
-                className='ml-auto inline-flex h-6.5 w-6.5 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1'
+                className='ml-auto inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1'
               >
                 <MoreVertical className='h-3.5 w-3.5' />
               </button>
             </TableActionMenu>
           ),
-          meta: { className: 'px-1 pr-3' },
+          meta: { className: 'pl-0 pr-2' },
         }),
       ] as ColumnDef<TaskView, unknown>[],
-    [getTaskContextMenuItems, openReleaseSidebar, updateTaskMutation]
+    [getTaskContextMenuItems, openReleaseSidebar]
   );
 
   const handleCreateTask = async (event: FormEvent<HTMLFormElement>) => {
@@ -830,19 +1011,71 @@ export function TasksPageClient() {
     }
   };
 
+  const headerActions = useMemo(
+    () => (
+      <DropdownMenu
+        open={isToolbarMenuOpen}
+        onOpenChange={setIsToolbarMenuOpen}
+      >
+        <DropdownMenuTrigger asChild>
+          <div>
+            <DashboardHeaderActionButton
+              ariaLabel='Open task actions'
+              icon={<Plus className='h-3.5 w-3.5' />}
+              iconOnly
+              pressed={isToolbarMenuOpen || isComposerOpen}
+            />
+          </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align='end' sideOffset={8}>
+          <DropdownMenuItem
+            onSelect={() => {
+              setIsComposerOpen(true);
+            }}
+          >
+            <Plus className='mr-2 h-4 w-4' />
+            New Task
+          </DropdownMenuItem>
+          {hasFilters ? (
+            <DropdownMenuItem
+              onSelect={() => {
+                setSearch('');
+                setStatusFilter('all');
+                setPriorityFilter('all');
+                setAssigneeFilter('all');
+              }}
+            >
+              <X className='mr-2 h-4 w-4' />
+              Clear Filters
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ),
+    [hasFilters, isComposerOpen, isToolbarMenuOpen]
+  );
+
+  useEffect(() => {
+    setHeaderActions(headerActions);
+
+    return () => {
+      setHeaderActions(null);
+    };
+  }, [headerActions, setHeaderActions]);
+
   return (
-    <DashboardWorkspacePanel
-      className='overflow-hidden'
-      data-testid='tasks-workspace'
-    >
+    <PageShell className='overflow-hidden' data-testid='tasks-workspace'>
       <section
-        className='flex min-h-0 flex-1 flex-col overflow-hidden'
+        className={cn(
+          PAGE_SHELL_SURFACE_CLASSNAMES.workspace,
+          'flex min-h-0 flex-1 flex-col overflow-hidden'
+        )}
         data-testid='tasks-content-panel'
       >
         {isComposerOpen ? (
           <form
             onSubmit={handleCreateTask}
-            className='flex items-center gap-2 border-b border-subtle px-app-header py-2.5'
+            className='flex items-center gap-2 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-app-header py-3'
           >
             <Input
               value={draftTitle}
@@ -883,63 +1116,11 @@ export function TasksPageClient() {
                   className='h-8 pl-8 text-[12px]'
                 />
               </div>
-              <ToolbarFilterMenu
-                label='Status'
-                value={statusFilter}
-                ariaLabel='Filter by status'
-                onChange={value => setStatusFilter(value as TaskStatus | 'all')}
-                options={[
-                  { value: 'all', label: 'All Statuses' },
-                  { value: 'backlog', label: 'Backlog' },
-                  { value: 'todo', label: 'Todo' },
-                  { value: 'in_progress', label: 'In Progress' },
-                  { value: 'done', label: 'Done' },
-                  { value: 'cancelled', label: 'Cancelled' },
-                ]}
-              />
-              <ToolbarFilterMenu
-                label='Priority'
-                value={priorityFilter}
-                ariaLabel='Filter by priority'
-                onChange={value =>
-                  setPriorityFilter(value as TaskPriority | 'all')
-                }
-                options={[
-                  { value: 'all', label: 'All Priorities' },
-                  { value: 'urgent', label: 'Urgent' },
-                  { value: 'high', label: 'High' },
-                  { value: 'medium', label: 'Medium' },
-                  { value: 'low', label: 'Low' },
-                  { value: 'none', label: 'None' },
-                ]}
-              />
-              <ToolbarFilterMenu
-                label='Assignee'
-                value={assigneeFilter}
-                ariaLabel='Filter by assignee'
-                onChange={value =>
-                  setAssigneeFilter(value as TaskAssigneeKind | 'all')
-                }
-                options={[
-                  { value: 'all', label: 'All Assignees' },
-                  { value: 'human', label: 'You' },
-                  { value: 'jovie', label: 'Jovie' },
-                ]}
+              <TableFilterDropdown
+                categories={taskFilterCategories}
+                onClearAll={clearFilters}
               />
             </div>
-          }
-          end={
-            <PageToolbarActionButton
-              label='New Task'
-              icon={<Plus className='h-3.5 w-3.5' />}
-              iconOnly
-              tooltipLabel={isComposerOpen ? 'Close task composer' : 'New Task'}
-              ariaLabel={
-                isComposerOpen ? 'Close task composer' : 'Create new task'
-              }
-              active={isComposerOpen}
-              onClick={() => setIsComposerOpen(value => !value)}
-            />
           }
         />
 
@@ -963,50 +1144,63 @@ export function TasksPageClient() {
             </Button>
           </div>
         ) : (
-          <div className='flex min-h-0 flex-1'>
+          <div className='flex min-h-0 flex-1 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--linear-app-content-surface)_38%,transparent),transparent_20%)]'>
             <div
               className={cn(
-                'min-h-0 min-w-0',
-                selectedTask
-                  ? 'w-[min(48vw,560px)] border-r border-subtle'
+                'min-h-0 min-w-0 shrink-0 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_54%,transparent)]',
+                selectedTask || showTaskWorkbenchEmptyState
+                  ? 'w-[clamp(20rem,34vw,34rem)] border-r border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
                   : 'flex-1'
               )}
             >
-              <UnifiedTable
-                data={tasks}
-                columns={columns}
-                isLoading={isLoading}
-                getRowId={row => row.id}
-                enableVirtualization={false}
-                rowHeight={60}
-                skeletonRows={8}
-                className='text-[13px]'
-                containerClassName='h-full px-2 pb-2 pt-0.5'
-                onRowClick={row => openTaskDocument(row)}
-                getContextMenuItems={getTaskContextMenuItems}
-                getRowClassName={row =>
-                  cn(
-                    'rounded-none border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] transition-colors',
-                    row.id === selectedTaskId
-                      ? 'bg-[color-mix(in_oklab,var(--linear-row-hover)_92%,transparent)]'
-                      : row.status === 'done'
-                        ? 'opacity-72'
-                        : 'hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_72%,transparent)]'
-                  )
-                }
-                emptyState={
-                  <TaskEmptyState
-                    hasFilters={hasFilters}
-                    onClearFilters={() => {
-                      setSearch('');
-                      setStatusFilter('all');
-                      setPriorityFilter('all');
-                      setAssigneeFilter('all');
-                    }}
-                    onOpenComposer={() => setIsComposerOpen(true)}
-                  />
-                }
-              />
+              {showTaskWorkbenchEmptyState ? (
+                <div className='flex h-full items-center justify-center px-6 py-6'>
+                  <div
+                    className={cn(
+                      PAGE_SHELL_SURFACE_CLASSNAMES.emptyState,
+                      'w-full max-w-[26rem] px-6 py-8'
+                    )}
+                  >
+                    <TaskEmptyState
+                      hasFilters={hasFilters}
+                      onClearFilters={clearFilters}
+                      onOpenComposer={() => setIsComposerOpen(true)}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <UnifiedTable
+                  data={tasks}
+                  columns={columns}
+                  isLoading={isLoading}
+                  getRowId={row => row.id}
+                  hideHeader
+                  enableVirtualization={false}
+                  rowHeight={68}
+                  skeletonRows={8}
+                  className='text-[13px]'
+                  containerClassName='h-full px-2.5 pb-2.5 pt-1.5'
+                  onRowClick={row => openTaskDocument(row)}
+                  getContextMenuItems={getTaskContextMenuItems}
+                  getRowClassName={row =>
+                    cn(
+                      'rounded-[14px] border border-transparent transition-colors',
+                      row.id === selectedTaskId
+                        ? 'border-[color-mix(in_oklab,var(--linear-app-frame-seam)_70%,transparent)] bg-[color-mix(in_oklab,var(--linear-row-hover)_86%,var(--linear-app-content-surface))] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'
+                        : row.status === 'done'
+                          ? 'opacity-72'
+                          : 'hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_72%,transparent)]'
+                    )
+                  }
+                  emptyState={
+                    <TaskEmptyState
+                      hasFilters={hasFilters}
+                      onClearFilters={clearFilters}
+                      onOpenComposer={() => setIsComposerOpen(true)}
+                    />
+                  }
+                />
+              )}
             </div>
             {selectedTask ? (
               <TaskDocumentPanel
@@ -1019,6 +1213,7 @@ export function TasksPageClient() {
                 onSave={() => void handleSaveTaskDocument()}
                 onOpenRelease={openReleaseSidebar}
                 isSaving={updateTaskMutation.isPending}
+                artistName={artistName}
               />
             ) : (
               <TaskDocumentPanel
@@ -1031,11 +1226,12 @@ export function TasksPageClient() {
                 onSave={() => {}}
                 onOpenRelease={() => {}}
                 isSaving={false}
+                artistName={artistName}
               />
             )}
           </div>
         )}
       </section>
-    </DashboardWorkspacePanel>
+    </PageShell>
   );
 }

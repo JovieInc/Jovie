@@ -5,10 +5,7 @@ import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
-import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
-import { usePlanGate } from '@/lib/queries';
 
 import {
   ChatInput,
@@ -16,7 +13,6 @@ import {
   ChatMessageSkeleton,
   ErrorDisplay,
   ScrollToBottom,
-  SuggestedProfilesCarousel,
   SuggestedPrompts,
 } from './components';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
@@ -24,44 +20,12 @@ import {
   useChatImageAttachments,
   useJovieChat,
   useStickToBottom,
-  useSuggestedProfiles,
 } from './hooks';
 import type { JovieChatProps, MessagePart } from './types';
 
 /** Sentinel ID for the synthetic thinking placeholder */
 const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
 const VIRTUALIZATION_THRESHOLD = 12;
-
-function deriveSessionState(
-  suggestedProfiles: ReturnType<typeof useSuggestedProfiles>,
-  isFirstSessionProp: boolean,
-  latestReleaseTitleProp: string | null,
-  profileId: string | undefined
-) {
-  const suggestionsReady = !suggestedProfiles.isLoading;
-  const detectedFirstSession = suggestionsReady
-    ? (suggestedProfiles.starterContext?.conversationCount ?? 0) === 0
-    : null;
-  const isFirstSession =
-    detectedFirstSession === null
-      ? isFirstSessionProp
-      : isFirstSessionProp || detectedFirstSession;
-  const latestReleaseTitle =
-    latestReleaseTitleProp ??
-    suggestedProfiles.starterContext?.latestReleaseTitle ??
-    null;
-  const showSuggestedProfiles = Boolean(profileId) && !isFirstSession;
-  const hasCarouselItems =
-    showSuggestedProfiles &&
-    !suggestedProfiles.isLoading &&
-    suggestedProfiles.total > 0;
-  return {
-    isFirstSession,
-    latestReleaseTitle,
-    showSuggestedProfiles,
-    hasCarouselItems,
-  };
-}
 
 export function JovieChat({
   profileId,
@@ -70,33 +34,14 @@ export function JovieChat({
   onConversationCreate,
   initialQuery,
   onTitleChange,
-  displayName,
   avatarUrl,
   username,
-  isFirstSession: isFirstSessionProp = false,
-  latestReleaseTitle: latestReleaseTitleProp = null,
+  displayName,
+  isFirstSession = false,
+  latestReleaseTitle,
 }: JovieChatProps) {
-  const { profileCompletion } = useDashboardData();
-  const { aiCanUseTools } = usePlanGate();
   const initialQuerySubmitted = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
-
-  // Suggested profiles carousel data
-  const shouldLoadSuggestedProfiles = Boolean(profileId) && !isFirstSessionProp;
-  const suggestedProfiles = useSuggestedProfiles(profileId, {
-    enabled: shouldLoadSuggestedProfiles,
-  });
-  const {
-    isFirstSession,
-    latestReleaseTitle,
-    showSuggestedProfiles,
-    hasCarouselItems,
-  } = deriveSessionState(
-    suggestedProfiles,
-    isFirstSessionProp,
-    latestReleaseTitleProp,
-    profileId
-  );
   const {
     input,
     setInput,
@@ -321,10 +266,17 @@ export function JovieChat({
     onPaste: handlePaste,
   } as const;
 
+  const greetingName = displayName?.trim() || username?.trim() || null;
+  const emptyStateHeading = isFirstSession
+    ? 'Welcome to Jovie'
+    : greetingName
+      ? `Welcome Back ${greetingName}`
+      : 'Welcome Back';
+
   return (
     <div
       ref={dropZoneRef}
-      className='relative flex h-full flex-col bg-[linear-gradient(180deg,color-mix(in_oklab,var(--linear-app-content-surface)_14%,transparent),transparent_18%)]'
+      className='relative flex h-full flex-col bg-(--linear-app-content-surface)'
       data-testid='chat-content'
     >
       {/* Hidden file input for image attachments */}
@@ -368,16 +320,19 @@ export function JovieChat({
             {/* Messages area */}
             <div
               ref={scrollContainerRef}
-              className='relative flex-1 overflow-y-auto px-4 py-6 sm:px-5'
+              className='relative flex flex-1 flex-col overflow-y-auto px-4 py-5 sm:px-5'
               onScroll={onScroll}
             >
               {shouldVirtualizeMessages ? (
                 <div
                   ref={totalSizeRef}
-                  className='mx-auto max-w-[44rem]'
+                  className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
                   style={{
                     position: 'relative',
-                    height: virtualizer.getTotalSize(),
+                    height: Math.max(
+                      virtualizer.getTotalSize(),
+                      scrollContainerRef.current?.clientHeight ?? 0
+                    ),
                   }}
                 >
                   {virtualizer.getVirtualItems().map(virtualItem => {
@@ -397,7 +352,7 @@ export function JovieChat({
                           transform: `translateY(${virtualItem.start}px)`,
                         }}
                       >
-                        <div className='pb-7'>
+                        <div className='pb-4'>
                           <ChatMessage
                             id={message.id}
                             role={message.role}
@@ -417,11 +372,14 @@ export function JovieChat({
                   })}
                 </div>
               ) : (
-                <div ref={totalSizeRef} className='mx-auto max-w-[44rem]'>
+                <div
+                  ref={totalSizeRef}
+                  className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col justify-center'
+                >
                   {displayMessages.map((message, index) => {
                     const isThinking = message.id === THINKING_PLACEHOLDER_ID;
                     return (
-                      <div key={message.id} className='pb-7'>
+                      <div key={message.id} className='pb-4'>
                         <ChatMessage
                           id={message.id}
                           role={message.role}
@@ -469,7 +427,7 @@ export function JovieChat({
             )}
 
             {/* Input at bottom */}
-            <div className='border-t border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-4 sm:px-5'>
+            <div className='bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
               <div className='mx-auto max-w-2xl space-y-2'>
                 {isRateLimited && (
                   <p className='text-xs text-tertiary-token' aria-live='polite'>
@@ -497,21 +455,14 @@ export function JovieChat({
             transition={{ duration: 0.15 }}
           >
             <div className='flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-6 sm:py-8'>
-              <div className='mx-auto flex w-full max-w-[50rem] flex-col items-center gap-8'>
-                <div className='relative flex w-full max-w-[36rem] flex-col items-center gap-1.5 text-center'>
-                  <div
-                    aria-hidden='true'
-                    className='pointer-events-none absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,color-mix(in_oklab,var(--linear-accent)_10%,transparent)_0%,transparent_74%)] blur-3xl'
-                  />
-                  <h1 className='text-balance text-[1.375rem] font-[560] tracking-[-0.03em] text-primary-token sm:text-[1.625rem]'>
-                    Welcome to Jovie
+              <div className='mx-auto flex w-full max-w-[34rem] flex-1 flex-col items-center justify-center gap-5'>
+                <div className='flex flex-col items-center gap-1 text-center'>
+                  <h1 className='text-[1.2rem] font-[560] tracking-[-0.03em] text-primary-token sm:text-[1.35rem]'>
+                    {emptyStateHeading}
                   </h1>
-                  <p className='max-w-[28rem] text-balance text-[13px] leading-5 text-secondary-token'>
-                    Ask anything or tell Jovie what you need
-                  </p>
                 </div>
 
-                <div className='relative w-full max-w-[35rem] space-y-3'>
+                <div className='flex w-full flex-col items-center space-y-2.5'>
                   {isRateLimited && (
                     <p
                       className='text-center text-xs text-tertiary-token'
@@ -522,7 +473,15 @@ export function JovieChat({
                     </p>
                   )}
                   <ChatUsageAlert />
-                  <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
+                  <div className='w-full max-w-[35rem] space-y-2'>
+                    <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
+                    <SuggestedPrompts
+                      onSelect={handleSuggestedPrompt}
+                      isFirstSession={isFirstSession}
+                      latestReleaseTitle={latestReleaseTitle}
+                      layout='flat'
+                    />
+                  </div>
 
                   {chatError && (
                     <ErrorDisplay
@@ -532,40 +491,6 @@ export function JovieChat({
                       isSubmitting={isSubmitting}
                     />
                   )}
-                </div>
-
-                <div className='flex w-full max-w-[39rem] flex-col items-center gap-2'>
-                  <SuggestedPrompts
-                    onSelect={handleSuggestedPrompt}
-                    isFirstSession={isFirstSession}
-                    latestReleaseTitle={latestReleaseTitle}
-                    canUseAdvancedTools={aiCanUseTools}
-                    layout='rail'
-                  />
-                </div>
-
-                <div className='chat-stagger w-full max-w-[42rem] space-y-4 sm:space-y-5'>
-                  {showSuggestedProfiles && (
-                    <SuggestedProfilesCarousel
-                      suggestions={suggestedProfiles.suggestions}
-                      isLoading={suggestedProfiles.isLoading}
-                      currentIndex={suggestedProfiles.currentIndex}
-                      total={suggestedProfiles.total}
-                      next={suggestedProfiles.next}
-                      prev={suggestedProfiles.prev}
-                      confirm={suggestedProfiles.confirm}
-                      reject={suggestedProfiles.reject}
-                      isActioning={suggestedProfiles.isActioning}
-                      username={username}
-                      displayName={displayName}
-                      avatarUrl={avatarUrl}
-                    />
-                  )}
-
-                  {!hasCarouselItems &&
-                    (profileCompletion?.percentage ?? 0) < 100 && (
-                      <ProfileCompletionCard />
-                    )}
                 </div>
               </div>
             </div>

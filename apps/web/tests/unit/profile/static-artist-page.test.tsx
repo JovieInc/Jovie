@@ -72,6 +72,7 @@ vi.mock('@/lib/dsp', () => ({
     },
   },
   getAvailableDSPs: vi.fn(() => []),
+  sortDSPsByGeoPopularity: vi.fn((dsps) => dsps),
 }));
 
 // Mock useUserLocation so the geolocation API is never invoked in jsdom.

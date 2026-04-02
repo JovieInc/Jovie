@@ -24,10 +24,10 @@ import {
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
+import { PageShell } from '@/components/organisms/PageShell';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
-import { DashboardWorkspacePanel } from '@/features/dashboard/organisms/DashboardWorkspacePanel';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
@@ -126,6 +126,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     isRescanningIsrc,
     handleCanvasStatusUpdate,
     handleAddUrl,
+    handleSaveMetadata,
+    handleSavePrimaryIsrc,
     handleSaveLyrics,
     handleSaveTargetPlaylists,
     handleFormatLyrics,
@@ -669,6 +671,12 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           }
           onArtworkRevert={releaseSidebarHandlers.artworkRevert}
           onReleaseChange={handleReleaseChange}
+          onSaveMetadata={
+            experienceAdapter?.onSaveMetadata ?? handleSaveMetadata
+          }
+          onSavePrimaryIsrc={
+            experienceAdapter?.onSavePrimaryIsrc ?? handleSavePrimaryIsrc
+          }
           onSaveLyrics={experienceAdapter?.onSaveLyrics ?? handleSaveLyrics}
           onSaveTargetPlaylists={
             experienceAdapter?.onSaveTargetPlaylists ??
@@ -756,14 +764,14 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             />
           )}
         {showEmptyState && (
-          <DashboardWorkspacePanel
-            className='mx-3 lg:mx-4'
+          <PageShell
+            className='mx-3 mt-2.5 lg:mx-4'
             data-testid='release-table-shell'
           >
             <ReleasesEmptyState
               onConnectSpotify={() => setSpotifySearchOpen(true)}
             />
-          </DashboardWorkspacePanel>
+          </PageShell>
         )}
 
         {/* Soft-cap banner: request higher limit when over 100 smart links */}
@@ -791,7 +799,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         {/* Table — fills edge-to-edge within the app shell */}
         {showReleasesTable && (
           <QueryErrorBoundary>
-            <DashboardWorkspacePanel
+            <PageShell
+              className='mt-2.5'
               data-testid='release-table-shell'
               toolbar={
                 <ReleaseTableSubheader
@@ -827,13 +836,13 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 getSmartLinkLockReason={getSmartLinkLockReason}
                 onTrackClick={openTrackDrawer}
               />
-            </DashboardWorkspacePanel>
+            </PageShell>
           </QueryErrorBoundary>
         )}
 
         {/* Show "No releases" state when connected but no releases and not importing */}
         {isConnected && rows.length === 0 && !isImporting && (
-          <DashboardWorkspacePanel
+          <PageShell
             className='mx-3 lg:mx-4 mt-2.5'
             data-testid='release-table-shell'
           >
@@ -883,7 +892,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 )}
               </div>
             </div>
-          </DashboardWorkspacePanel>
+          </PageShell>
         )}
       </div>
 

@@ -15,9 +15,9 @@ import {
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: { absolute: `${APP_NAME} — Your music. One link.` },
+  title: { absolute: `${APP_NAME} | Drop More Music. Crush Every Release.` },
   description:
-    'Set up once and every new release gets imported, linked, and sent to fans automatically.',
+    'Drop more music. Crush every release. Jovie gives independent artists smart links, release automation, artist profiles, and audience proof in one clean system.',
   metadataBase: new URL(BASE_URL),
   alternates: {
     canonical: APP_ROUTES.LANDING_NEW,
@@ -25,9 +25,9 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     url: `${BASE_URL}${APP_ROUTES.LANDING_NEW}`,
-    title: `${APP_NAME} — Your music. One link.`,
+    title: `${APP_NAME} | Drop More Music. Crush Every Release.`,
     description:
-      'Set up once and every new release gets imported, linked, and sent to fans automatically.',
+      'Drop more music. Crush every release. Jovie gives independent artists smart links, release automation, artist profiles, and audience proof in one clean system.',
     siteName: APP_NAME,
     images: [
       {
@@ -40,9 +40,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${APP_NAME} — Your music. One link.`,
+    title: `${APP_NAME} | Drop More Music. Crush Every Release.`,
     description:
-      'Set up once and every new release gets imported, linked, and sent to fans automatically.',
+      'Drop more music. Crush every release. Jovie gives independent artists smart links, release automation, artist profiles, and audience proof in one clean system.',
     images: [`${BASE_URL}/og/default.png`],
   },
   robots: {
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
 const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: ['Jovie', 'jov.ie', 'Jovie release platform'],
   description:
-    'Set up once and every new release gets imported, linked, and sent to fans automatically.',
+    'Drop more music. Crush every release. Jovie gives independent artists smart links, release automation, artist profiles, and audience proof in one clean system.',
 });
 
 const SOFTWARE_SCHEMA = buildSoftwareSchema(
@@ -92,8 +92,6 @@ export default function NewLandingPage() {
       <LandingReleaseSection />
 
       <LandingProfileSection />
-
-      <div aria-hidden='true' className='section-gradient-divider' />
 
       <LandingFinalCTA />
     </div>

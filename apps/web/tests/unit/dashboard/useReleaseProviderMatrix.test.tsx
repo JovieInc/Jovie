@@ -44,6 +44,8 @@ vi.mock('@/lib/queries', () => ({
     ...makeMockMutation(vi.fn()),
     mutateAsync: stableFormatLyricsAsync,
   }),
+  useSavePrimaryIsrcMutation: () => makeMockMutation(vi.fn()),
+  useSaveReleaseMetadataMutation: () => makeMockMutation(vi.fn()),
 }));
 
 vi.mock('sonner', () => ({
