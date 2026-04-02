@@ -40,12 +40,10 @@ export async function GET(request: NextRequest) {
   }
 
   const actor = await ensureDevTestAuthActor(persona);
-  const response = NextResponse.redirect(
-    new URL(redirectPath, request.nextUrl.origin),
-    { status: 303 }
-  );
+  const response = new NextResponse(null, { status: 303 });
 
   response.headers.set('Cache-Control', NO_STORE_HEADERS['Cache-Control']);
+  response.headers.set('Location', redirectPath);
 
   for (const cookie of buildDevTestAuthCookieDescriptors(
     actor,

@@ -24,6 +24,7 @@ describe('performance optimizer lib', () => {
     ]);
 
     expect(parsed.mode).toBe('dashboard');
+    expect(parsed.scope).toBe('route');
     expect(parsed.threshold).toBe(100);
   });
 
@@ -36,7 +37,27 @@ describe('performance optimizer lib', () => {
     ]);
 
     expect(parsed.mode).toBe('dashboard');
+    expect(parsed.scope).toBe('route');
     expect(parsed.threshold).toBe(90);
+  });
+
+  it('parses end-user scope, route ids, and group filters', () => {
+    const parsed = parsePerfLoopArgs([
+      '--scope',
+      'end-user',
+      '--group',
+      'creator-shell',
+      '--route-id',
+      'creator-earnings',
+      '--resume',
+      '--optimize-passing',
+    ]);
+
+    expect(parsed.scope).toBe('end-user');
+    expect(parsed.groupIds).toEqual(['creator-shell']);
+    expect(parsed.routeId).toBe('creator-earnings');
+    expect(parsed.resume).toBe(true);
+    expect(parsed.optimizePassing).toBe(true);
   });
 
   it('rejects even runs-per-sample values so median selection stays unbiased', () => {
@@ -52,6 +73,12 @@ describe('performance optimizer lib', () => {
     ).toThrow('Expected a positive odd integer for --runs-per-sample');
   });
 
+  it('accepts --runs as an alias for --runs-per-sample', () => {
+    const parsed = parsePerfLoopArgs(['--scope', 'end-user', '--runs', '1']);
+
+    expect(parsed.runsPerSample).toBe(1);
+  });
+
   it('uses the package-relative budget guard script path', () => {
     const args = buildDashboardBudgetGuardArgs();
 
@@ -65,6 +92,19 @@ describe('performance optimizer lib', () => {
     expect(args).toEqual(
       expect.arrayContaining(['--auth-path', '/tmp/session.json'])
     );
+  });
+
+  it('prefers route ids over paths when building budget guard args', () => {
+    const args = buildDashboardBudgetGuardArgs(
+      '/tmp/session.json',
+      '/app/dashboard/releases',
+      'creator-releases'
+    );
+
+    expect(args).toEqual(
+      expect.arrayContaining(['--route-id', 'creator-releases'])
+    );
+    expect(args).not.toEqual(expect.arrayContaining(['--path']));
   });
 
   it('aggregates homepage lighthouse samples around the median score', () => {
@@ -265,6 +305,7 @@ describe('performance optimizer lib', () => {
     const state = createEmptyRunState(
       {
         mode: 'dashboard',
+        scope: 'route',
         threshold: 100,
         baseUrl: 'http://localhost:3000',
         authPath: 'apps/web/.auth/session.json',
@@ -300,9 +341,7 @@ describe('performance optimizer lib', () => {
 
     expect(prompt).toContain('Mode: dashboard');
     expect(prompt).toContain('DashboardNav.tsx');
-    expect(prompt).toContain(
-      'Warm authenticated navigation-to-visible-shell time'
-    );
+    expect(prompt).toContain('Route performance for /app/dashboard/releases');
     expect(prompt).toContain(APP_ROUTES.DASHBOARD_RELEASES);
     expect(prompt).toContain('Measure a 5-run baseline and use the median.');
     expect(prompt).toContain('Rebuild and remeasure 5 times.');

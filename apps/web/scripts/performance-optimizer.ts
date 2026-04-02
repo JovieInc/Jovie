@@ -53,17 +53,25 @@ export function printHelp() {
   console.log(
     [
       'Usage: pnpm --filter web perf:loop --mode homepage --threshold 95',
-      '       pnpm --filter web perf:loop --mode dashboard --threshold 100 --auth-path apps/web/.auth/session.json',
+      '       pnpm --filter web perf:loop --mode route --route-id creator-releases --auth-path apps/web/.auth/session.json',
+      '       pnpm --filter web perf:loop --scope end-user',
       '',
       'Options:',
-      '  --mode homepage|dashboard',
+      '  --mode homepage|dashboard|route',
+      '  --scope homepage|route|end-user',
       '  --threshold <number>',
       '  --base-url <url>',
       '  --auth-path <path>',
       '  --artifacts-dir <path>',
+      '  --group <manifest-group>',
+      '  --route-id <manifest-route-id>',
+      '  --route <path>',
+      '  --runs <number>',
       '  --runs-per-sample <number>',
       '  --max-no-progress <number>',
       '  --hypothesis <label>',
+      '  --resume',
+      '  --optimize-passing',
       '  --fresh',
       '  --skip-build',
     ].join('\n')
@@ -146,7 +154,7 @@ function persistCurrentPointer(mode: PerfMode, artifactDir: string) {
   writeJsonFile(currentPointerPath(mode), { artifactDir });
 }
 
-function resolveStatePaths(artifactDir: string) {
+export function resolveStatePaths(artifactDir: string) {
   return {
     measurementsDir: resolve(artifactDir, 'measurements'),
     promptPath: resolve(artifactDir, 'optimizer-prompt.txt'),
@@ -154,7 +162,7 @@ function resolveStatePaths(artifactDir: string) {
   };
 }
 
-function resolveAuthPath(authPath?: string) {
+export function resolveAuthPath(authPath?: string) {
   if (authPath) {
     return resolve(repoRoot, authPath);
   }
@@ -177,7 +185,7 @@ export function filterChangedFiles(files: readonly string[]) {
   ];
 }
 
-function collectChangedFiles() {
+export function collectChangedFiles() {
   const tracked = runCommand(
     'git',
     ['diff', '--name-only', '--relative', 'HEAD'],
@@ -419,7 +427,8 @@ function parseJsonOutput(output: string, message: string) {
 function measureDashboardSample(
   baseUrl: string,
   authPath?: string,
-  route?: string
+  route?: string,
+  routeId?: string
 ) {
   const env: NodeJS.ProcessEnv = { ...process.env, BASE_URL: baseUrl };
   const resolvedAuthPath = resolveAuthPath(authPath);
@@ -432,7 +441,7 @@ function measureDashboardSample(
     env.PERF_BUDGET_AUTH_PATH = resolvedAuthPath;
   }
 
-  const args = buildDashboardBudgetGuardArgs(resolvedAuthPath, route);
+  const args = buildDashboardBudgetGuardArgs(resolvedAuthPath, route, routeId);
   const result = runCommand('doppler', args, { cwd: repoRoot, env });
   const rawSummary = parseJsonOutput(
     result.stdout,
@@ -445,7 +454,7 @@ function measureDashboardSample(
   };
 }
 
-async function measureCurrentState(
+export async function measureCurrentState(
   config: PerfRunConfig,
   measurementsDir: string,
   skipBuild: boolean
@@ -485,7 +494,8 @@ async function measureCurrentState(
       const result = measureDashboardSample(
         config.baseUrl,
         config.authPath,
-        config.route
+        config.route,
+        config.routeId
       );
       samples.push(result.sample);
       rawSamples.push(result.raw);
@@ -715,6 +725,11 @@ async function main() {
   }
 
   const cliOptions = parsePerfLoopArgs(rawArgs);
+  if (cliOptions.scope === 'end-user') {
+    const { runEndUserPerfLoop } = await import('./performance-end-user-loop');
+    await runEndUserPerfLoop(cliOptions);
+    return;
+  }
   const artifactDir = resolveArtifactDir(cliOptions);
   const { measurementsDir, promptPath } = resolveStatePaths(artifactDir);
   ensureDir(artifactDir);
@@ -723,6 +738,7 @@ async function main() {
 
   const config: PerfRunConfig = {
     mode: cliOptions.mode,
+    scope: cliOptions.scope,
     threshold: cliOptions.threshold,
     baseUrl: cliOptions.baseUrl,
     authPath: resolveAuthPath(cliOptions.authPath),
@@ -730,6 +746,7 @@ async function main() {
     runsPerSample: cliOptions.runsPerSample,
     artifactsDir: artifactDir,
     route: cliOptions.route,
+    routeId: cliOptions.routeId,
   };
 
   const changedFiles = collectChangedFiles();

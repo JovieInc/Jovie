@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.110] - 2026-04-02
+
+> Added a resumable end-user performance loop for core routes, tightened homepage perf handling during the redesign window, and fixed the local auth bypass so authenticated perf and E2E bootstraps work reliably on loopback hosts.
+
+### Added
+
+- `/perf-loop all core pages` support via the new end-user performance orchestrator and command docs
+
+### Changed
+
+- Performance loop CLI now supports end-user scope, manifest route IDs, group filters, resume state, and a dedicated `perf:loop:end-user` entrypoint
+- Homepage perf work now lazy-loads the phone showcase path and reduces below-the-fold rendering cost while preserving the existing route UI
+
+### Fixed
+
+- Local dev test-auth bootstrap now keeps redirects host-stable so bypass cookies survive on `localhost` and `127.0.0.1`
+- Performance route selection and tests now cover manifest-ID driven route resolution and resumable end-user state flow
+
 ## [26.4.109] - 2026-04-01
 
 > Polished the Jovie chat interface and dashboard shell visual design: flattened the right drawer to match Linear's app-shell elevation, elevated entity cards so they read clearly on the flat surface, cleaned up bevel shadows from the chat input and suggestion pills, and vertically centered the chat welcome state.

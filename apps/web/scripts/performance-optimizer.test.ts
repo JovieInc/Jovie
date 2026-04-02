@@ -28,6 +28,7 @@ describe('performance optimizer helpers', () => {
     const state = createEmptyRunState(
       {
         mode: 'dashboard',
+        scope: 'route',
         threshold: 100,
         baseUrl: 'http://localhost:3000',
         authPath: 'apps/web/.auth/session.json',
