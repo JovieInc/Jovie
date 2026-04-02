@@ -181,6 +181,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       previewUrl?: string | null;
       audioUrl?: string | null;
       audioFormat?: string | null;
+      previewSource?: import('@/lib/discography/types').PreviewSource;
+      previewVerification?: import('@/lib/discography/types').PreviewVerification;
+      providerConfidenceSummary?: import('@/lib/discography/types').ProviderConfidenceSummary;
     }) => {
       const parentRelease = rows.find(r => r.id === track.releaseId);
       openTrackDrawer({
@@ -196,6 +199,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         previewUrl: track.previewUrl ?? null,
         audioUrl: track.audioUrl ?? null,
         audioFormat: track.audioFormat ?? null,
+        previewSource: track.previewSource,
+        previewVerification: track.previewVerification,
+        providerConfidenceSummary: track.providerConfidenceSummary,
         providers: track.providers,
         releaseTitle: parentRelease?.title ?? '',
         releaseArtworkUrl: parentRelease?.artworkUrl,
@@ -720,6 +726,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     isRescanningIsrc,
     handleArtworkUpload,
     handleReleaseChange,
+    handleSaveMetadata,
+    handleSavePrimaryIsrc,
     handleSaveLyrics,
     handleSaveTargetPlaylists,
     isLyricsSaving,

@@ -20,6 +20,10 @@ import {
   UnreleasedReleaseHero,
 } from '@/features/release';
 import {
+  derivePreviewState,
+  getProviderConfidence,
+} from '@/lib/discography/audio-qa';
+import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
@@ -304,6 +308,7 @@ export default async function ContentSmartLinkPage({
       label: PROVIDER_CONFIG[key].label,
       accent: PROVIDER_CONFIG[key].accent,
       url: link?.url ?? null,
+      confidence: link ? getProviderConfidence(link) : 'unknown',
     };
   }).filter(p => p.url);
 
@@ -316,11 +321,19 @@ export default async function ContentSmartLinkPage({
         label: PROVIDER_CONFIG[key].label,
         accent: PROVIDER_CONFIG[key].accent,
         url: link?.url ?? null,
+        confidence: link ? getProviderConfidence(link) : 'unknown',
       };
     })
     .filter(p => p.url);
 
   const allProviders = [...providers, ...secondaryProviders];
+  const previewState = derivePreviewState({
+    audioUrl: null,
+    previewUrl: content.previewUrl ?? null,
+    isrc: content.providerLinks.length > 0 ? 'lookup_attempted' : null,
+    metadata: content.previewMetadata ?? null,
+    providerLinks: content.providerLinks,
+  });
 
   // Check if any video provider links exist for "Use this sound"
   const hasVideoLinks = content.providerLinks.some(
@@ -387,6 +400,7 @@ export default async function ContentSmartLinkPage({
         content={content}
         creator={creator}
         allProviders={allProviders}
+        previewState={previewState}
         utmParams={utmParams}
         soundsUrl={soundsUrl}
       />
@@ -400,6 +414,7 @@ function ContentPageBody({
   content,
   creator,
   allProviders,
+  previewState,
   utmParams,
   soundsUrl,
 }: Readonly<{
@@ -412,7 +427,9 @@ function ContentPageBody({
     label: string;
     accent: string;
     url: string | null;
+    confidence?: import('@/lib/discography/types').ProviderConfidence;
   }>;
+  previewState: ReturnType<typeof derivePreviewState>;
   utmParams: ReturnType<typeof extractUTMParams>;
   soundsUrl: string | null;
 }>) {
@@ -476,6 +493,8 @@ function ContentPageBody({
         artworkUrl: content.artworkUrl,
         releaseDate: toISOStringOrNull(content.releaseDate),
         previewUrl: content.previewUrl ?? null,
+        previewVerification: previewState.previewVerification,
+        previewSource: previewState.previewSource,
       }}
       artist={{
         name: artistName,

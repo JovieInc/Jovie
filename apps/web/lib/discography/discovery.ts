@@ -23,10 +23,12 @@ import {
   buildSearchUrl,
   lookupAppleMusicByIsrc,
   lookupDeezerByIsrc,
+  lookupSpotifyByIsrc,
 } from './provider-links';
 import {
   getReleaseById,
   getTracksForRelease,
+  setRecordingPreviewResolutionByIsrc,
   updateRecordingPreviewByIsrc,
   updateTrackLyrics,
   upsertProviderLink,
@@ -128,7 +130,12 @@ async function resolveAlbumFromRelationship(
 async function lookupAppleMusic(
   isrc: string,
   storefront: string
-): Promise<{ url: string; externalId: string | null; source: string } | null> {
+): Promise<{
+  url: string;
+  externalId: string | null;
+  source: string;
+  previewUrl: string | null;
+} | null> {
   // Try MusicKit API first (officially supports ISRC filtering)
   if (isAppleMusicAvailable()) {
     try {
@@ -142,6 +149,10 @@ async function lookupAppleMusic(
           url: albumUrl ?? songUrl,
           externalId: track.id,
           source: 'musickit_isrc',
+          previewUrl:
+            track.attributes.previews?.find(preview =>
+              preview.url?.startsWith('https://')
+            )?.url ?? null,
         };
       }
     } catch {
@@ -157,6 +168,7 @@ async function lookupAppleMusic(
         url: itunesResult.url,
         externalId: itunesResult.trackId,
         source: 'itunes_isrc',
+        previewUrl: itunesResult.previewUrl,
       };
     }
   } catch {
@@ -247,16 +259,21 @@ export async function discoverLinksForRelease(
 
   const isrc = trackWithIsrc.isrc;
   const existingSet = new Set(existingProviders);
+  let appleMusicPreviewUrl: string | null = null;
+  let resolvedFallbackPreview = false;
+  const attemptedPreviewSources: string[] = [];
 
   // Run lookups in parallel
   const lookupPromises: Promise<void>[] = [];
 
   // Apple Music lookup — prefer MusicKit API (reliable), fall back to iTunes
   if (!skipExisting || !existingSet.has('apple_music')) {
+    attemptedPreviewSources.push('apple_music');
     lookupPromises.push(
       lookupAppleMusic(isrc, storefront)
         .then(async match => {
           if (match) {
+            appleMusicPreviewUrl = match.previewUrl;
             await saveDiscoveredLink({
               releaseId,
               providerId: 'apple_music',
@@ -283,6 +300,7 @@ export async function discoverLinksForRelease(
     !existingSet.has('deezer') ||
     trackWithIsrc.creatorProfileId;
   if (needsDeezerLookup) {
+    attemptedPreviewSources.push('deezer');
     lookupPromises.push(
       lookupDeezerByIsrc(isrc)
         .then(async deezerResult => {
@@ -310,10 +328,20 @@ export async function discoverLinksForRelease(
 
             // Backfill preview URL from Deezer if recording has none
             if (deezerResult.previewUrl && trackWithIsrc.creatorProfileId) {
+              resolvedFallbackPreview = true;
               const updated = await updateRecordingPreviewByIsrc(
                 trackWithIsrc.creatorProfileId,
                 isrc,
                 deezerResult.previewUrl
+              );
+              await setRecordingPreviewResolutionByIsrc(
+                trackWithIsrc.creatorProfileId,
+                isrc,
+                {
+                  status: 'fallback',
+                  source: 'deezer',
+                  attemptedSources: attemptedPreviewSources,
+                }
               );
               if (updated) result.previewsBackfilled++;
             }
@@ -329,6 +357,7 @@ export async function discoverLinksForRelease(
 
   // Musicfetch lookup (supplementary — resolves all other DSPs in one call)
   if (isMusicfetchAvailable()) {
+    attemptedPreviewSources.push('musicfetch');
     lookupPromises.push(
       musicfetchLookupByIsrc(isrc, { withLyrics: true })
         .then(async musicfetchResult => {
@@ -366,11 +395,22 @@ export async function discoverLinksForRelease(
             mfPreview.startsWith('https://') &&
             trackWithIsrc.creatorProfileId
           ) {
-            await updateRecordingPreviewByIsrc(
+            resolvedFallbackPreview = true;
+            const updated = await updateRecordingPreviewByIsrc(
               trackWithIsrc.creatorProfileId,
               isrc,
               mfPreview
             );
+            await setRecordingPreviewResolutionByIsrc(
+              trackWithIsrc.creatorProfileId,
+              isrc,
+              {
+                status: 'fallback',
+                source: 'musicfetch',
+                attemptedSources: attemptedPreviewSources,
+              }
+            );
+            if (updated) result.previewsBackfilled++;
           }
         })
         .catch(error => {
@@ -382,6 +422,69 @@ export async function discoverLinksForRelease(
   }
 
   await Promise.all(lookupPromises);
+
+  if (!resolvedFallbackPreview && trackWithIsrc.creatorProfileId) {
+    attemptedPreviewSources.push('spotify');
+    const spotifyResult = await lookupSpotifyByIsrc(isrc, {
+      market: storefront.toUpperCase(),
+    });
+
+    const previewCandidates: Array<{
+      previewUrl: string;
+      source: 'spotify' | 'apple_music';
+    }> = [
+      spotifyResult?.previewUrl
+        ? { previewUrl: spotifyResult.previewUrl, source: 'spotify' }
+        : null,
+      appleMusicPreviewUrl
+        ? { previewUrl: appleMusicPreviewUrl, source: 'apple_music' }
+        : null,
+    ].filter(
+      (
+        value
+      ): value is { previewUrl: string; source: 'spotify' | 'apple_music' } =>
+        Boolean(value)
+    );
+
+    let previewResolved = false;
+    for (const candidate of previewCandidates) {
+      const updated = await updateRecordingPreviewByIsrc(
+        trackWithIsrc.creatorProfileId,
+        isrc,
+        candidate.previewUrl
+      );
+      await setRecordingPreviewResolutionByIsrc(
+        trackWithIsrc.creatorProfileId,
+        isrc,
+        {
+          status: 'fallback',
+          source: candidate.source,
+          attemptedSources: attemptedPreviewSources,
+        }
+      );
+      if (updated) {
+        result.previewsBackfilled++;
+        previewResolved = true;
+        break;
+      }
+    }
+
+    if (
+      !previewResolved &&
+      !appleMusicPreviewUrl &&
+      !spotifyResult?.previewUrl
+    ) {
+      await setRecordingPreviewResolutionByIsrc(
+        trackWithIsrc.creatorProfileId,
+        isrc,
+        {
+          status: 'unknown',
+          source: null,
+          attemptedSources: attemptedPreviewSources,
+        }
+      );
+    }
+  }
 
   // Generate search URL fallbacks for any DSPs not resolved above.
   // This ensures every release gets at least a search link for all supported

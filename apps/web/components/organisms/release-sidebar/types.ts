@@ -29,6 +29,9 @@ export type ReleaseSidebarTrack = Pick<
   | 'previewUrl'
   | 'audioUrl'
   | 'audioFormat'
+  | 'previewSource'
+  | 'previewVerification'
+  | 'providerConfidenceSummary'
   | 'providers'
 >;
 
@@ -160,5 +163,8 @@ export interface ReleaseSidebarProps {
     previewUrl?: string | null;
     audioUrl?: string | null;
     audioFormat?: string | null;
+    previewSource?: import('@/lib/discography/types').PreviewSource;
+    previewVerification?: import('@/lib/discography/types').PreviewVerification;
+    providerConfidenceSummary?: import('@/lib/discography/types').ProviderConfidenceSummary;
   }) => void;
 }

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ReleaseTrackList } from '@/components/organisms/release-sidebar/ReleaseTrackList';
@@ -107,7 +108,8 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 }));
 
 describe('ReleaseTrackList', () => {
-  it('shows provider icons in the track platform submenu', () => {
+  it('renders playback summary and expanded provider grouping', async () => {
+    const user = userEvent.setup();
     const release = createMockRelease();
 
     render(
@@ -130,11 +132,26 @@ describe('ReleaseTrackList', () => {
             previewUrl: null,
             audioUrl: null,
             audioFormat: null,
+            previewSource: null,
+            previewVerification: 'unknown',
+            providerConfidenceSummary: {
+              canonical: 1,
+              searchFallback: 1,
+              unknown: 2,
+              unresolvedProviders: ['apple_music', 'youtube'],
+            },
             providers: [
               {
                 key: 'spotify',
                 label: 'Spotify',
                 url: 'https://open.spotify.com/track/123',
+                confidence: 'canonical',
+              },
+              {
+                key: 'soundcloud',
+                label: 'SoundCloud',
+                url: 'https://soundcloud.com/track/123',
+                confidence: 'search_fallback',
               },
             ],
           },
@@ -142,12 +159,20 @@ describe('ReleaseTrackList', () => {
       />
     );
 
+    expect(screen.getByText(/Previews:/i)).toBeInTheDocument();
+    expect(screen.getByText('Unknown')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /open on platform/i })
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('provider-icon-spotify')).toBeInTheDocument();
+      screen.getAllByText(/1 canonical, 1 fallback, 2 unknown/i).length
+    ).toBeGreaterThan(0);
+
+    const disclosure = screen.getByRole('button', { expanded: false });
+
+    await user.click(disclosure);
+
+    expect(screen.getByText(/Canonical DSPs/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Search Fallback/i).length).toBeGreaterThan(0);
     expect(
-      screen.getByRole('button', { name: /spotify/i })
+      screen.getByText(/Unresolved: Apple Music, YouTube/i)
     ).toBeInTheDocument();
   });
 });

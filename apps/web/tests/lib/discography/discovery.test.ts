@@ -41,6 +41,7 @@ vi.mock('@/lib/discography/musicfetch', () => ({
 // Provider links (iTunes fallback, Deezer, buildSearchUrl)
 const mockLookupAppleMusicByIsrc = vi.fn();
 const mockLookupDeezerByIsrc = vi.fn();
+const mockLookupSpotifyByIsrc = vi.fn();
 const mockBuildSearchUrl = vi.fn(
   (provider: string, _track: unknown, _opts?: unknown) =>
     `https://search.example.com/${provider}`
@@ -50,6 +51,7 @@ vi.mock('@/lib/discography/provider-links', () => ({
   lookupAppleMusicByIsrc: (...args: unknown[]) =>
     mockLookupAppleMusicByIsrc(...args),
   lookupDeezerByIsrc: (...args: unknown[]) => mockLookupDeezerByIsrc(...args),
+  lookupSpotifyByIsrc: (...args: unknown[]) => mockLookupSpotifyByIsrc(...args),
   buildSearchUrl: (provider: string, track: unknown, opts?: unknown) =>
     mockBuildSearchUrl(provider, track, opts),
 }));
@@ -58,11 +60,20 @@ vi.mock('@/lib/discography/provider-links', () => ({
 const mockGetTracksForRelease = vi.fn();
 const mockUpsertProviderLink = vi.fn().mockResolvedValue({ id: 'link-1' });
 const mockGetReleaseById = vi.fn();
+const mockUpdateRecordingPreviewByIsrc = vi.fn().mockResolvedValue(false);
+const mockSetRecordingPreviewResolutionByIsrc = vi
+  .fn()
+  .mockResolvedValue(false);
 
 vi.mock('@/lib/discography/queries', () => ({
   getTracksForRelease: (...args: unknown[]) => mockGetTracksForRelease(...args),
   upsertProviderLink: (...args: unknown[]) => mockUpsertProviderLink(...args),
   getReleaseById: (...args: unknown[]) => mockGetReleaseById(...args),
+  updateRecordingPreviewByIsrc: (...args: unknown[]) =>
+    mockUpdateRecordingPreviewByIsrc(...args),
+  setRecordingPreviewResolutionByIsrc: (...args: unknown[]) =>
+    mockSetRecordingPreviewResolutionByIsrc(...args),
+  updateTrackLyrics: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ---------------------------------------------------------------------------
@@ -132,9 +143,12 @@ describe('discovery', () => {
     mockMusicfetchLookupByIsrc.mockResolvedValue(null);
     mockLookupAppleMusicByIsrc.mockResolvedValue(null);
     mockLookupDeezerByIsrc.mockResolvedValue(null);
+    mockLookupSpotifyByIsrc.mockResolvedValue(null);
     mockGetTracksForRelease.mockResolvedValue([makeTrack()]);
     mockUpsertProviderLink.mockResolvedValue({ id: 'link-1' });
     mockGetReleaseById.mockResolvedValue(makeRelease());
+    mockUpdateRecordingPreviewByIsrc.mockResolvedValue(false);
+    mockSetRecordingPreviewResolutionByIsrc.mockResolvedValue(false);
     mockBuildSearchUrl.mockImplementation(
       (provider: string) => `https://search.example.com/${provider}`
     );
@@ -205,6 +219,68 @@ describe('discovery', () => {
           quality: 'canonical',
         })
       );
+    });
+
+    it('backfills the preview from Spotify when MusicFetch has no usable preview', async () => {
+      mockMusicfetchLookupByIsrc.mockResolvedValue({
+        links: {},
+        raw: {},
+      });
+      mockLookupSpotifyByIsrc.mockResolvedValue({
+        url: 'https://open.spotify.com/track/123',
+        trackId: '123',
+        previewUrl: 'https://p.scdn.co/mp3-preview/123',
+      });
+      mockUpdateRecordingPreviewByIsrc.mockResolvedValueOnce(true);
+
+      const { discoverLinksForRelease } = await import(
+        '@/lib/discography/discovery'
+      );
+
+      const result = await discoverLinksForRelease('release-1', []);
+
+      expect(mockLookupSpotifyByIsrc).toHaveBeenCalledWith('USUM72212345', {
+        market: 'US',
+      });
+      expect(mockUpdateRecordingPreviewByIsrc).toHaveBeenCalledWith(
+        'profile-1',
+        'USUM72212345',
+        'https://p.scdn.co/mp3-preview/123'
+      );
+      expect(result.previewsBackfilled).toBe(1);
+    });
+
+    it('falls back to Apple preview when Spotify has no preview and MusicFetch is empty', async () => {
+      mockMusicKitLookupByIsrc.mockResolvedValue({
+        id: 'am-123',
+        attributes: {
+          url: 'https://music.apple.com/us/album/midnights/123?i=456',
+          previews: [{ url: 'https://audio-ssl.itunes.apple.com/preview.m4a' }],
+        },
+      });
+      mockMusicfetchLookupByIsrc.mockResolvedValue({
+        links: {},
+        raw: {},
+      });
+      mockLookupSpotifyByIsrc.mockResolvedValue({
+        url: 'https://open.spotify.com/track/123',
+        trackId: '123',
+        previewUrl: null,
+      });
+      mockUpdateRecordingPreviewByIsrc.mockResolvedValueOnce(true);
+
+      const { discoverLinksForRelease } = await import(
+        '@/lib/discography/discovery'
+      );
+
+      const result = await discoverLinksForRelease('release-1', []);
+
+      expect(mockUpdateRecordingPreviewByIsrc).toHaveBeenCalledWith(
+        'profile-1',
+        'USUM72212345',
+        'https://audio-ssl.itunes.apple.com/preview.m4a'
+      );
+      expect(result.previewsBackfilled).toBe(1);
     });
 
     it('returns error when no tracks found for release', async () => {

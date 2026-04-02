@@ -1,4 +1,9 @@
 import { toISOStringOrFallback } from '@/lib/utils/date';
+import {
+  derivePreviewState,
+  getProviderConfidence,
+  summarizeProviderConfidence,
+} from './audio-qa';
 import type { ProviderKey, TrackViewModel } from './types';
 import { buildTrackDeepLinkPath } from './utils';
 
@@ -7,6 +12,7 @@ export interface ProviderLinkInput {
   sourceType?: string | null;
   updatedAt?: Date | string | null;
   url: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 function mapProviderLinksToViewModel(
@@ -31,6 +37,7 @@ function mapProviderLinksToViewModel(
         url,
         source,
         updatedAt: toISOStringOrFallback(match?.updatedAt),
+        confidence: getProviderConfidence(match),
         path: url
           ? buildTrackDeepLinkPath(
               profileHandle,
@@ -61,6 +68,7 @@ export function mapTrackToViewModel(params: {
     previewUrl: string | null;
     audioUrl: string | null;
     audioFormat: string | null;
+    metadata?: Record<string, unknown> | null;
     providerLinks: ProviderLinkInput[];
   };
   providerLabels: Record<ProviderKey, string>;
@@ -68,6 +76,13 @@ export function mapTrackToViewModel(params: {
   releaseSlug: string;
 }): TrackViewModel {
   const { track, providerLabels, profileHandle, releaseSlug } = params;
+  const previewState = derivePreviewState({
+    audioUrl: track.audioUrl,
+    previewUrl: track.previewUrl,
+    isrc: track.isrc,
+    metadata: track.metadata,
+    providerLinks: track.providerLinks,
+  });
 
   return {
     id: track.id,
@@ -90,6 +105,9 @@ export function mapTrackToViewModel(params: {
     previewUrl: track.previewUrl,
     audioUrl: track.audioUrl,
     audioFormat: track.audioFormat,
+    previewSource: previewState.previewSource,
+    previewVerification: previewState.previewVerification,
+    providerConfidenceSummary: summarizeProviderConfidence(track.providerLinks),
     providers: mapProviderLinksToViewModel(
       track.providerLinks,
       providerLabels,
