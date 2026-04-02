@@ -16,6 +16,74 @@ interface ProductScreenshotFrameProps {
   readonly width: number;
 }
 
+function renderScreenshotContent({
+  alt,
+  aspectRatio,
+  height,
+  isAvailable,
+  priority,
+  quality,
+  sizes,
+  src,
+  title,
+  width,
+}: Pick<
+  ProductScreenshotFrameProps,
+  | 'alt'
+  | 'aspectRatio'
+  | 'height'
+  | 'isAvailable'
+  | 'priority'
+  | 'quality'
+  | 'sizes'
+  | 'src'
+  | 'title'
+  | 'width'
+>) {
+  if (isAvailable === false) {
+    return (
+      <div
+        className='grid w-full place-items-center bg-[radial-gradient(circle_at_top,rgba(113,112,255,0.12),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))] px-6 py-10 text-center'
+        style={{ aspectRatio }}
+      >
+        <div className='max-w-[22rem]'>
+          <div className='mb-4 inline-flex rounded-full border border-subtle bg-surface-1 px-3 py-1 text-xs text-tertiary-token'>
+            {title}
+          </div>
+          <p className='text-lg font-medium tracking-tight text-primary-token'>
+            Preview coming soon
+          </p>
+          <p className='mt-2 text-sm leading-6 text-secondary-token'>
+            See it live when you sign up.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAvailable === true) {
+    return (
+      <Image
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        priority={priority}
+        quality={quality}
+        sizes={sizes}
+        className='w-full'
+      />
+    );
+  }
+
+  return (
+    <div
+      className='w-full animate-pulse bg-surface-1'
+      style={{ aspectRatio }}
+    />
+  );
+}
+
 export function ProductScreenshotFrame({
   alt,
   aspectRatio,
@@ -69,50 +137,18 @@ export function ProductScreenshotFrame({
         </div>
       ) : null}
 
-      {(() => {
-        if (isAvailable === false) {
-          return (
-            <div
-              className='grid w-full place-items-center bg-[radial-gradient(circle_at_top,rgba(113,112,255,0.12),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))] px-6 py-10 text-center'
-              style={{ aspectRatio }}
-            >
-              <div className='max-w-[22rem]'>
-                <div className='mb-4 inline-flex rounded-full border border-subtle bg-surface-1 px-3 py-1 text-xs text-tertiary-token'>
-                  {title}
-                </div>
-                <p className='text-lg font-medium tracking-tight text-primary-token'>
-                  Preview coming soon
-                </p>
-                <p className='mt-2 text-sm leading-6 text-secondary-token'>
-                  See it live when you sign up.
-                </p>
-              </div>
-            </div>
-          );
-        }
-
-        if (isAvailable === true) {
-          return (
-            <Image
-              src={src}
-              alt={alt}
-              width={width}
-              height={height}
-              priority={priority}
-              quality={quality}
-              sizes={sizes}
-              className='w-full'
-            />
-          );
-        }
-
-        return (
-          <div
-            className='w-full animate-pulse bg-surface-1'
-            style={{ aspectRatio }}
-          />
-        );
-      })()}
+      {renderScreenshotContent({
+        alt,
+        aspectRatio,
+        height,
+        isAvailable,
+        priority,
+        quality,
+        sizes,
+        src,
+        title,
+        width,
+      })}
     </figure>
   );
 }
