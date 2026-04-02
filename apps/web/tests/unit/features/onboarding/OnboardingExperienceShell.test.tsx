@@ -9,6 +9,8 @@ describe('OnboardingExperienceShell', () => {
         mode='standalone'
         stableStageHeight='tall'
         topBar={<div>Top Bar</div>}
+        rail={<nav>Desktop Rail</nav>}
+        mobileRail={<div>Mobile Rail</div>}
         sidePanel={<aside>Preview Panel</aside>}
         footer={<div>Footer Dots</div>}
         data-testid='onboarding-shell'
@@ -19,11 +21,14 @@ describe('OnboardingExperienceShell', () => {
 
     expect(screen.getByTestId('onboarding-shell')).toBeInTheDocument();
     expect(screen.getByText('Top Bar')).toBeInTheDocument();
+    expect(screen.getByText('Desktop Rail')).toBeInTheDocument();
+    expect(screen.getByText('Mobile Rail')).toBeInTheDocument();
     expect(screen.getByText('Preview Panel')).toBeInTheDocument();
     expect(screen.getByText('Footer Dots')).toBeInTheDocument();
     expect(screen.getByText('Onboarding Stage')).toBeInTheDocument();
     expect(container.innerHTML).toContain('min-h-screen');
     expect(container.innerHTML).toContain('min-h-[560px]');
+    expect(container.innerHTML).not.toContain('rounded-[22px]');
   });
 
   it('supports embedded mode without fullscreen classes', () => {

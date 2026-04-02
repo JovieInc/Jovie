@@ -20,10 +20,11 @@ export function MarketingHeader({
 
   return (
     <header
-      className='fixed left-0 right-0 top-0 z-100 w-full border-b'
+      className='fixed left-0 right-0 top-0 z-100 w-full border-b backdrop-blur-xl'
       style={{
-        backgroundColor: 'var(--linear-bg-header)',
-        borderBottomColor: 'var(--linear-border-default)',
+        background:
+          'color-mix(in oklab, var(--linear-bg-header) 78%, transparent)',
+        borderBottomColor: 'var(--linear-border-subtle)',
         color: 'var(--linear-text-primary)',
       }}
     >

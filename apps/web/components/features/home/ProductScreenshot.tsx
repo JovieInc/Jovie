@@ -18,6 +18,8 @@ interface ProductScreenshotProps {
   readonly priority?: boolean;
   /** Additional className for the outer wrapper */
   readonly className?: string;
+  /** Additional className for the image itself */
+  readonly imageClassName?: string;
   /** Skip the HEAD availability check — render the image immediately.
    *  Use for committed screenshots where the file is guaranteed to exist.
    *  This preserves the next/image priority preload for above-fold images. */
@@ -40,6 +42,7 @@ export function ProductScreenshot({
   title = 'Jovie',
   priority = false,
   className,
+  imageClassName,
   skipCheck = false,
   testId,
   chrome = 'window',
@@ -83,7 +86,7 @@ export function ProductScreenshot({
         .join(' ')}
       style={{
         boxShadow:
-          '0 0 0 1px var(--linear-app-shell-border), 0 28px 70px rgba(0,0,0,0.28), 0 10px 22px rgba(0,0,0,0.18)',
+          '0 0 0 1px var(--linear-app-shell-border), var(--linear-shadow-card-elevated)',
       }}
     >
       <div
@@ -139,7 +142,7 @@ export function ProductScreenshot({
               width={width}
               height={height}
               priority={priority}
-              className='w-full'
+              className={['w-full', imageClassName].filter(Boolean).join(' ')}
             />
           );
         }

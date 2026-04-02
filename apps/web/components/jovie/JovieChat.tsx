@@ -455,14 +455,14 @@ export function JovieChat({
             transition={{ duration: 0.15 }}
           >
             <div className='flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-6 sm:py-8'>
-              <div className='mx-auto flex w-full max-w-[34rem] flex-1 flex-col items-center justify-center gap-5'>
+              <div className='mx-auto flex w-full max-w-[38rem] flex-1 flex-col items-center justify-center gap-4'>
                 <div className='flex flex-col items-center gap-1 text-center'>
                   <h1 className='text-[1.2rem] font-[560] tracking-[-0.03em] text-primary-token sm:text-[1.35rem]'>
                     {emptyStateHeading}
                   </h1>
                 </div>
 
-                <div className='flex w-full flex-col items-center space-y-2.5'>
+                <div className='flex w-full flex-col items-center space-y-3'>
                   {isRateLimited && (
                     <p
                       className='text-center text-xs text-tertiary-token'
@@ -473,7 +473,7 @@ export function JovieChat({
                     </p>
                   )}
                   <ChatUsageAlert />
-                  <div className='w-full max-w-[35rem] space-y-2'>
+                  <div className='w-full max-w-[38rem] space-y-2.5'>
                     <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
                     <SuggestedPrompts
                       onSelect={handleSuggestedPrompt}

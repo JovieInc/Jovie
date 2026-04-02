@@ -57,7 +57,9 @@ test.describe('Product Screenshots – Public Profile', () => {
       .waitFor({ state: 'visible', timeout: TIMEOUTS.CONTENT_VISIBLE });
 
     // Wait for subscribe section to settle if present
-    const subscribeSection = page.locator('section[aria-labelledby="profile-subscribe-heading"]').first();
+    const subscribeSection = page
+      .locator('section[aria-labelledby="profile-subscribe-heading"]')
+      .first();
     if (await subscribeSection.isVisible().catch(() => false)) {
       await subscribeSection.waitFor({ state: 'visible' });
       // Small delay for form to fully hydrate
@@ -97,7 +99,9 @@ test.describe('Product Screenshots – Public Profile', () => {
       .waitFor({ state: 'visible', timeout: TIMEOUTS.CONTENT_VISIBLE });
 
     // Wait for subscribe section to settle if present
-    const subscribeSection = page.locator('section[aria-labelledby="profile-subscribe-heading"]').first();
+    const subscribeSection = page
+      .locator('section[aria-labelledby="profile-subscribe-heading"]')
+      .first();
     if (await subscribeSection.isVisible().catch(() => false)) {
       await subscribeSection.waitFor({ state: 'visible' });
       await page.waitForTimeout(300);

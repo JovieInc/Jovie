@@ -544,7 +544,12 @@ export function ProfileContactSidebar() {
             <div className='h-7 w-12 rounded-full skeleton' />
             <div className='h-7 w-14 rounded-full skeleton' />
           </div>
-          <div className={cn(LINEAR_SURFACE.drawerCardSm, 'space-y-2 border-0 p-2')}>
+          <div
+            className={cn(
+              LINEAR_SURFACE.drawerCardSm,
+              'space-y-2 border-0 p-2'
+            )}
+          >
             {[1, 2, 3, 4, 5].map(i => (
               <div
                 key={i}

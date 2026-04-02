@@ -100,7 +100,6 @@ const DIALOG_LOG_PATH = config.dialogLog;
 interface ChatEntry {
   id: number;
   ts: string;
-  tabId?: number;
   role: 'user' | 'assistant' | 'agent';
   message?: string;
   type?: string;
@@ -132,6 +131,12 @@ interface TabAgentState {
   queue: Array<{message: string, ts: string, extensionUrl?: string | null}>;
 }
 const tabAgents = new Map<number, TabAgentState>();
+// Legacy globals kept for backward compat with health check and kill
+let agentProcess: ChildProcess | null = null;
+let agentStatus: 'idle' | 'processing' | 'hung' = 'idle';
+let agentStartTime: number | null = null;
+let messageQueue: Array<{message: string, ts: string, extensionUrl?: string | null}> = [];
+let currentMessage: string | null = null;
 // Per-tab chat buffers — each browser tab gets its own conversation
 const chatBuffers = new Map<number, ChatEntry[]>(); // tabId -> entries
 let chatNextId = 0;
@@ -146,53 +151,6 @@ function getTabAgent(tabId: number): TabAgentState {
 
 function getTabAgentStatus(tabId: number): 'idle' | 'processing' | 'hung' {
   return tabAgents.has(tabId) ? tabAgents.get(tabId)!.status : 'idle';
-}
-
-function resetTabAgent(tabId: number): void {
-  const tabState = getTabAgent(tabId);
-  tabState.status = 'idle';
-  tabState.startTime = null;
-  tabState.currentMessage = null;
-  if (agentTabId === tabId) {
-    agentTabId = null;
-  }
-}
-
-function resetAllTabAgents(): void {
-  for (const tabId of tabAgents.keys()) {
-    resetTabAgent(tabId);
-  }
-  agentTabId = null;
-}
-
-function getSidebarTabId(reqTabId?: number | null): number {
-  if (typeof reqTabId === 'number' && !Number.isNaN(reqTabId)) return reqTabId;
-  return browserManager?.getActiveTabId?.() ?? 0;
-}
-
-function getAgentSummary(tabId?: number | null) {
-  if (typeof tabId === 'number' && !Number.isNaN(tabId)) {
-    const tabState = getTabAgent(tabId);
-    return {
-      tabId,
-      status: tabState.status,
-      runningFor: tabState.startTime ? Date.now() - tabState.startTime : null,
-      currentMessage: tabState.currentMessage,
-      queueLength: tabState.queue.length,
-      queue: tabState.queue,
-    };
-  }
-
-  const active = [...tabAgents.entries()].find(([, state]) => state.status === 'processing' || state.status === 'hung');
-  const totalQueued = [...tabAgents.values()].reduce((sum, state) => sum + state.queue.length, 0);
-  return {
-    tabId: active?.[0] ?? null,
-    status: active?.[1].status ?? 'idle',
-    runningFor: active?.[1].startTime ? Date.now() - active[1].startTime : null,
-    currentMessage: active?.[1].currentMessage ?? null,
-    queueLength: totalQueued,
-    queue: active?.[1].queue ?? [],
-  };
 }
 
 function getChatBuffer(tabId?: number): ChatEntry[] {
@@ -431,7 +389,7 @@ function listSessions(): Array<SidebarSession & { chatLines: number }> {
   } catch { return []; }
 }
 
-function processAgentEvent(event: any, tabId: number): void {
+function processAgentEvent(event: any): void {
   if (event.type === 'system') {
     if (event.claudeSessionId && sidebarSession && !sidebarSession.claudeSessionId) {
       sidebarSession.claudeSessionId = event.claudeSessionId;
@@ -446,27 +404,27 @@ function processAgentEvent(event: any, tabId: number): void {
   const ts = new Date().toISOString();
 
   if (event.type === 'tool_use') {
-    addChatEntry({ ts, role: 'agent', type: 'tool_use', tool: event.tool, input: event.input || '' }, tabId);
+    addChatEntry({ ts, role: 'agent', type: 'tool_use', tool: event.tool, input: event.input || '' });
     return;
   }
 
   if (event.type === 'text') {
-    addChatEntry({ ts, role: 'agent', type: 'text', text: event.text || '' }, tabId);
+    addChatEntry({ ts, role: 'agent', type: 'text', text: event.text || '' });
     return;
   }
 
   if (event.type === 'text_delta') {
-    addChatEntry({ ts, role: 'agent', type: 'text_delta', text: event.text || '' }, tabId);
+    addChatEntry({ ts, role: 'agent', type: 'text_delta', text: event.text || '' });
     return;
   }
 
   if (event.type === 'result') {
-    addChatEntry({ ts, role: 'agent', type: 'result', text: event.text || event.result || '' }, tabId);
+    addChatEntry({ ts, role: 'agent', type: 'result', text: event.text || event.result || '' });
     return;
   }
 
   if (event.type === 'agent_error') {
-    addChatEntry({ ts, role: 'agent', type: 'agent_error', error: event.error || 'Unknown error' }, tabId);
+    addChatEntry({ ts, role: 'agent', type: 'agent_error', error: event.error || 'Unknown error' });
     return;
   }
 
@@ -480,6 +438,10 @@ function spawnClaude(userMessage: string, extensionUrl?: string | null, forTabId
   tabState.status = 'processing';
   tabState.startTime = Date.now();
   tabState.currentMessage = userMessage;
+  // Keep legacy globals in sync for health check / kill
+  agentStatus = 'processing';
+  agentStartTime = Date.now();
+  currentMessage = userMessage;
 
   // Prefer the URL from the Chrome extension (what the user actually sees)
   // over Playwright's page.url() which can be stale in headed mode.
@@ -547,7 +509,9 @@ function spawnClaude(userMessage: string, extensionUrl?: string | null, forTabId
     fs.appendFileSync(agentQueue, entry + '\n');
   } catch (err: any) {
     addChatEntry({ ts: new Date().toISOString(), role: 'agent', type: 'agent_error', error: `Failed to queue: ${err.message}` });
-    resetTabAgent(agentTabId ?? 0);
+    agentStatus = 'idle';
+    agentStartTime = null;
+    currentMessage = null;
     return;
   }
   // The sidebar-agent.ts process polls this file and spawns claude.
@@ -555,12 +519,15 @@ function spawnClaude(userMessage: string, extensionUrl?: string | null, forTabId
   // Agent status transitions happen when we receive agent_done/agent_error events.
 }
 
-function killAgent(tabId?: number | null): void {
-  if (typeof tabId === 'number' && !Number.isNaN(tabId)) {
-    resetTabAgent(tabId);
-    return;
+function killAgent(): void {
+  if (agentProcess) {
+    try { agentProcess.kill('SIGTERM'); } catch {}
+    setTimeout(() => { try { agentProcess?.kill('SIGKILL'); } catch {} }, 3000);
   }
-  resetAllTabAgents();
+  agentProcess = null;
+  agentStartTime = null;
+  currentMessage = null;
+  agentStatus = 'idle';
 }
 
 // Agent health check — detect hung processes
@@ -573,6 +540,10 @@ function startAgentHealthCheck(): void {
         state.status = 'hung';
         console.log(`[browse] Sidebar agent for tab ${tid} hung (>${AGENT_TIMEOUT_MS / 1000}s)`);
       }
+    }
+    // Legacy global check
+    if (agentStatus === 'processing' && agentStartTime && Date.now() - agentStartTime > AGENT_TIMEOUT_MS) {
+      agentStatus = 'hung';
     }
   }, 10000);
 }
@@ -885,6 +856,7 @@ async function shutdown() {
   // Stop watch mode if active
   if (browserManager.isWatching()) browserManager.stopWatch();
   killAgent();
+  messageQueue = [];
   saveSession(); // Persist chat history before exit
   if (sidebarSession?.worktreePath) removeWorktree(sidebarSession.worktreePath);
   if (agentHealthInterval) clearInterval(agentHealthInterval);
@@ -921,6 +893,7 @@ if (process.platform === 'win32') {
 function emergencyCleanup() {
   if (isShuttingDown) return;
   isShuttingDown = true;
+  // Kill agent subprocess if running
   try { killAgent(); } catch {}
   // Save session state so chat history persists across crashes
   try { saveSession(); } catch {}
@@ -957,7 +930,7 @@ async function start() {
   if (!skipBrowser) {
     const headed = process.env.BROWSE_HEADED === '1';
     if (headed) {
-      await browserManager.launchHeaded();
+      await browserManager.launchHeaded(AUTH_TOKEN);
       console.log(`[browse] Launched headed Chromium with extension`);
     } else {
       await browserManager.launch();
@@ -985,24 +958,18 @@ async function start() {
           uptime: Math.floor((Date.now() - startTime) / 1000),
           tabs: browserManager.getTabCount(),
           currentUrl: browserManager.getCurrentUrl(),
-          // token removed — extension bootstraps via localhost /extension/auth
+          // token removed — see .auth.json for extension bootstrap
           chatEnabled: true,
-          agent: getAgentSummary(),
+          agent: {
+            status: agentStatus,
+            runningFor: agentStartTime ? Date.now() - agentStartTime : null,
+            currentMessage,
+            queueLength: messageQueue.length,
+          },
           session: sidebarSession ? { id: sidebarSession.id, name: sidebarSession.name } : null,
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Extension auth bootstrap — localhost only, no bearer token required
-      if (url.pathname === '/extension/auth') {
-        return new Response(JSON.stringify({ token: AUTH_TOKEN }), {
-          status: 200,
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-store',
-          },
         });
       }
 
@@ -1163,7 +1130,7 @@ async function start() {
         const entries = buf.filter(e => e.id >= afterId);
         const activeTab = browserManager?.getActiveTabId?.() ?? 0;
         // Return per-tab agent status so the sidebar shows the right state per tab
-        const tabAgentStatus = tabId !== null ? getTabAgentStatus(tabId) : getAgentSummary().status;
+        const tabAgentStatus = tabId !== null ? getTabAgentStatus(tabId) : agentStatus;
         return new Response(JSON.stringify({ entries, total: chatNextId, agentStatus: tabAgentStatus, activeTabId: activeTab }), {
           status: 200,
           headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
@@ -1231,20 +1198,14 @@ async function start() {
         if (!validateAuth(req)) {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
         }
-        const body = await req.json().catch(() => ({}));
-        const targetTabId = getSidebarTabId(typeof body.tabId === 'number' ? body.tabId : null);
-        const tabState = getTabAgent(targetTabId);
-        killAgent(targetTabId);
-        addChatEntry({ ts: new Date().toISOString(), role: 'agent', type: 'agent_error', error: 'Killed by user' }, targetTabId);
+        killAgent();
+        addChatEntry({ ts: new Date().toISOString(), role: 'agent', type: 'agent_error', error: 'Killed by user' });
         // Process next in queue
-        if (tabState.queue.length > 0) {
-          const next = tabState.queue.shift()!;
-          spawnClaude(next.message, next.extensionUrl, targetTabId);
+        if (messageQueue.length > 0) {
+          const next = messageQueue.shift()!;
+          spawnClaude(next.message, next.extensionUrl);
         }
-        return new Response(JSON.stringify({ ok: true, queueLength: tabState.queue.length }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
 
       // Stop agent (user-initiated) — queued messages remain for dismissal
@@ -1252,12 +1213,9 @@ async function start() {
         if (!validateAuth(req)) {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
         }
-        const body = await req.json().catch(() => ({}));
-        const targetTabId = getSidebarTabId(typeof body.tabId === 'number' ? body.tabId : null);
-        const tabState = getTabAgent(targetTabId);
-        killAgent(targetTabId);
-        addChatEntry({ ts: new Date().toISOString(), role: 'agent', type: 'agent_error', error: 'Stopped by user' }, targetTabId);
-        return new Response(JSON.stringify({ ok: true, queuedMessages: tabState.queue.length }), {
+        killAgent();
+        addChatEntry({ ts: new Date().toISOString(), role: 'agent', type: 'agent_error', error: 'Stopped by user' });
+        return new Response(JSON.stringify({ ok: true, queuedMessages: messageQueue.length }), {
           status: 200, headers: { 'Content-Type': 'application/json' },
         });
       }
@@ -1269,12 +1227,10 @@ async function start() {
         }
         const body = await req.json();
         const idx = body.index;
-        const targetTabId = getSidebarTabId(typeof body.tabId === 'number' ? body.tabId : null);
-        const tabState = getTabAgent(targetTabId);
-        if (typeof idx === 'number' && idx >= 0 && idx < tabState.queue.length) {
-          tabState.queue.splice(idx, 1);
+        if (typeof idx === 'number' && idx >= 0 && idx < messageQueue.length) {
+          messageQueue.splice(idx, 1);
         }
-        return new Response(JSON.stringify({ ok: true, queueLength: tabState.queue.length }), {
+        return new Response(JSON.stringify({ ok: true, queueLength: messageQueue.length }), {
           status: 200, headers: { 'Content-Type': 'application/json' },
         });
       }
@@ -1284,11 +1240,9 @@ async function start() {
         if (!validateAuth(req)) {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
         }
-        const requestedTabId = url.searchParams.get('tabId');
-        const targetTabId = getSidebarTabId(requestedTabId ? parseInt(requestedTabId, 10) : null);
         return new Response(JSON.stringify({
           session: sidebarSession,
-          agent: getAgentSummary(targetTabId),
+          agent: { status: agentStatus, runningFor: agentStartTime ? Date.now() - agentStartTime : null, currentMessage, queueLength: messageQueue.length, queue: messageQueue },
         }), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
 
@@ -1298,7 +1252,7 @@ async function start() {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
         }
         killAgent();
-        tabAgents.clear();
+        messageQueue = [];
         // Clean up old session's worktree before creating new one
         if (sidebarSession?.worktreePath) removeWorktree(sidebarSession.worktreePath);
         sidebarSession = createSession();
@@ -1325,18 +1279,30 @@ async function start() {
         const body = await req.json();
         // Events from sidebar-agent include tabId so we route to the right tab
         const eventTabId = body.tabId ?? agentTabId ?? 0;
-        processAgentEvent(body, eventTabId);
+        processAgentEvent(body);
         // Handle agent lifecycle events
         if (body.type === 'agent_done' || body.type === 'agent_error') {
+          agentProcess = null;
+          agentStartTime = null;
+          currentMessage = null;
           if (body.type === 'agent_done') {
-            addChatEntry({ ts: new Date().toISOString(), role: 'agent', type: 'agent_done' }, eventTabId);
+            addChatEntry({ ts: new Date().toISOString(), role: 'agent', type: 'agent_done' });
           }
+          // Reset per-tab agent state
           const tabState = getTabAgent(eventTabId);
-          resetTabAgent(eventTabId);
+          tabState.status = 'idle';
+          tabState.startTime = null;
+          tabState.currentMessage = null;
           // Process next queued message for THIS tab
           if (tabState.queue.length > 0) {
             const next = tabState.queue.shift()!;
             spawnClaude(next.message, next.extensionUrl, eventTabId);
+          }
+          agentTabId = null; // Release tab lock
+          // Legacy: update global status (idle if no tab has an active agent)
+          const anyActive = [...tabAgents.values()].some(t => t.status === 'processing');
+          if (!anyActive) {
+            agentStatus = 'idle';
           }
         }
         // Capture claude session ID for --resume
@@ -1373,7 +1339,8 @@ async function start() {
           inspectorData = result;
           inspectorTimestamp = Date.now();
           // Also store on browserManager for CLI access
-          browserManager.setInspectorState(result, inspectorTimestamp);
+          (browserManager as any)._inspectorData = result;
+          (browserManager as any)._inspectorTimestamp = inspectorTimestamp;
           emitInspectorEvent({ type: 'pick', selector, timestamp: inspectorTimestamp });
           return new Response(JSON.stringify(result), {
             status: 200, headers: { 'Content-Type': 'application/json' },

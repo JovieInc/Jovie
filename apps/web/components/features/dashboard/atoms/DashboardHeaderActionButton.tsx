@@ -17,7 +17,7 @@ export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_ACTIVE_CLASS =
   'border-transparent bg-surface-0 text-primary-token shadow-none';
 
 export const DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS =
-  'rounded-full border-transparent bg-transparent text-tertiary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0';
+  'h-9 w-9 rounded-full border-transparent bg-transparent text-tertiary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0';
 
 export const DASHBOARD_HEADER_ACTION_ICON_BUTTON_ACTIVE_CLASS =
   'border-transparent bg-surface-0 text-primary-token shadow-none';

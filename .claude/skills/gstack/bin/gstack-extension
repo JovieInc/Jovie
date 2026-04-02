@@ -1,26 +1,25 @@
 #!/bin/bash
 # gstack-extension — helper to install the Chrome extension
 #
-# macOS-only helper: uses pbcopy, osascript, and the macOS Chrome app path.
 # When using $B connect, the extension auto-loads. This script is for
 # installing it in your regular Chrome (not the Playwright-controlled one).
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-GSTACK_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Find the extension directory
 EXT_DIR=""
-if [ -f "$GSTACK_DIR/extension/manifest.json" ]; then
-  EXT_DIR="$GSTACK_DIR/extension"
+if [ -f "$REPO_ROOT/extension/manifest.json" ]; then
+  EXT_DIR="$REPO_ROOT/extension"
 elif [ -f "$HOME/.claude/skills/gstack/extension/manifest.json" ]; then
   EXT_DIR="$HOME/.claude/skills/gstack/extension"
 fi
 
 if [ -z "$EXT_DIR" ]; then
   echo "Error: extension/ directory not found."
-  echo "Expected at: $GSTACK_DIR/extension/ or ~/.claude/skills/gstack/extension/"
+  echo "Expected at: $REPO_ROOT/extension/ or ~/.claude/skills/gstack/extension/"
   exit 1
 fi
 
@@ -29,7 +28,7 @@ echo -n "$EXT_DIR" | pbcopy 2>/dev/null
 
 # Get browse server port
 PORT=""
-STATE_FILE="$GSTACK_DIR/.gstack/browse.json"
+STATE_FILE="$REPO_ROOT/.gstack/browse.json"
 if [ -f "$STATE_FILE" ]; then
   PORT=$(grep -o '"port":[0-9]*' "$STATE_FILE" | grep -o '[0-9]*')
 fi

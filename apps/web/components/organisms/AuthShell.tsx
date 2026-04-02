@@ -20,6 +20,7 @@ export interface AuthShellProps {
   readonly section: 'admin' | 'dashboard' | 'settings';
   readonly breadcrumbs: DashboardBreadcrumbItem[];
   readonly headerBadge?: ReactNode;
+  readonly headerStatus?: ReactNode;
   readonly headerAction?: ReactNode;
   readonly showMobileTabs?: boolean;
   readonly isTableRoute?: boolean;
@@ -37,6 +38,7 @@ function AuthShellInner({
   section,
   breadcrumbs,
   headerBadge,
+  headerStatus,
   headerAction,
   showMobileTabs = false,
   isTableRoute = false,
@@ -47,8 +49,6 @@ function AuthShellInner({
   const previewPanelState = usePreviewPanelState();
 
   const sidebarTrigger = isMobile ? null : <SidebarTrigger />;
-
-  const isInSettings = section === 'settings';
 
   // Memoize the sidebar so it doesn't re-render on breadcrumb/header changes.
   // The sidebar only depends on `section` — it shouldn't remount when
@@ -68,18 +68,17 @@ function AuthShellInner({
     <AppShellFrame
       sidebar={sidebar}
       header={
-        isInSettings ? null : (
-          <DashboardHeader
-            breadcrumbs={breadcrumbs}
-            sidebarTrigger={sidebarTrigger}
-            breadcrumbSuffix={headerBadge}
-            action={headerAction}
-            mobileProfileSlot={
-              <MobileProfileDrawer onOpen={previewPanelState.toggle} />
-            }
-            showDivider={isTableRoute}
-          />
-        )
+        <DashboardHeader
+          breadcrumbs={breadcrumbs}
+          sidebarTrigger={sidebarTrigger}
+          breadcrumbSuffix={headerBadge}
+          status={headerStatus}
+          action={headerAction}
+          mobileProfileSlot={
+            <MobileProfileDrawer onOpen={previewPanelState.toggle} />
+          }
+          showDivider={isTableRoute}
+        />
       }
       main={children}
       rightPanel={rightPanel}

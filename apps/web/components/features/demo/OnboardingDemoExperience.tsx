@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DemoAuthShell } from './DemoAuthShell';
+import { DemoOnboardingShell } from './DemoOnboardingShell';
 import { OnboardingDemoContent } from './OnboardingDemoContent';
 import type { StepId } from './OnboardingDemoSteps';
 
@@ -30,12 +31,17 @@ export function OnboardingDemoExperience() {
   return (
     <DemoAuthShell>
       {!isComplete && (
-        <OnboardingDemoContent
-          currentStep={currentStep}
-          onStepChange={setCurrentStep}
-          isRevealing={isRevealing}
-          onFinish={handleFinish}
-        />
+        <DemoOnboardingShell currentStep={currentStep}>
+          <OnboardingDemoContent
+            currentStep={currentStep}
+            onStepChange={setCurrentStep}
+            isRevealing={isRevealing}
+            onFinish={handleFinish}
+            rail={null}
+            topBar={null}
+            footer={null}
+          />
+        </DemoOnboardingShell>
       )}
     </DemoAuthShell>
   );

@@ -297,7 +297,9 @@ function PressPhotosSection({
   const remainingSlots = MAX_PRESS_PHOTOS - pressPhotos.length;
 
   return (
-    <DrawerSection className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 border-0 p-3')}>
+    <DrawerSection
+      className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 border-0 p-3')}
+    >
       <div className='flex items-center justify-between gap-3'>
         <DrawerSectionHeading>Press Photos</DrawerSectionHeading>
         <div className='flex items-center gap-1.5'>

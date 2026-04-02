@@ -12,9 +12,7 @@ import {
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   Bot,
-  CalendarDays,
   Check,
-  Disc3,
   FileText,
   Flag,
   MoreVertical,
@@ -305,65 +303,68 @@ function TaskTitleCellContent({
 }>) {
   const hasDueDate = Boolean(task.dueAt);
   const hasRelease = Boolean(task.releaseTitle);
-  
+
   return (
-    <div className='flex min-w-0 items-start gap-3 py-1.5'>
-      <div className='flex h-[18px] w-8 shrink-0 items-center justify-center'>
-        <ProgressRing status={task.status} />
-      </div>
-      <div className='min-w-0 flex-1'>
-        <p className='truncate text-[12.75px] font-[570] leading-[18px] text-primary-token'>
-          {task.title}
-        </p>
-        <div className='mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1'>
-          {/* Fixed metadata section - always present */}
-          <div className='flex items-center gap-2 text-[10.5px]'>
-            <span className='font-[560] text-tertiary-token'>
-              J-{task.taskNumber}
-            </span>
-            <span className='text-tertiary-token/40'>·</span>
-            <PriorityCell priority={task.priority} compact />
-            <span className='text-tertiary-token/40'>·</span>
-            <AssigneeCell
-              assigneeKind={task.assigneeKind}
-              artistName={artistName}
-              compact
-            />
-          </div>
-          
-          {/* Optional metadata - only show when present */}
-          {hasDueDate && (
+    <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_9.5rem] items-start gap-3 py-1.5'>
+      <div className='flex min-w-0 items-start gap-3'>
+        <div className='flex h-[18px] w-8 shrink-0 items-center justify-center'>
+          <ProgressRing status={task.status} />
+        </div>
+        <div className='min-w-0 flex-1'>
+          <p className='truncate text-[12.75px] font-[570] leading-[18px] text-primary-token'>
+            {task.title}
+          </p>
+          <div className='mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1'>
             <div className='flex items-center gap-2 text-[10.5px]'>
+              <span className='font-[560] text-tertiary-token'>
+                J-{task.taskNumber}
+              </span>
               <span className='text-tertiary-token/40'>·</span>
-              <ReleaseTaskDueBadge
-                dueDate={task.dueAt!}
-                dueDaysOffset={null}
-                isCompleted={task.status === 'done'}
-              />
+              <PriorityCell priority={task.priority} compact />
+              {hasRelease ? (
+                <>
+                  <span className='text-tertiary-token/40'>·</span>
+                  <button
+                    type='button'
+                    onClick={event => {
+                      event.stopPropagation();
+                      onOpenRelease(task);
+                    }}
+                    className='truncate text-secondary-token transition-colors hover:text-primary-token'
+                  >
+                    {task.releaseTitle}
+                  </button>
+                </>
+              ) : null}
             </div>
-          )}
-          
-          {hasRelease && (
-            <div className='flex min-w-0 items-center gap-2 text-[10.5px] text-secondary-token'>
-              <span className='text-tertiary-token/40'>·</span>
-              <button
-                type='button'
-                onClick={event => {
-                  event.stopPropagation();
-                  onOpenRelease(task);
-                }}
-                className='truncate transition-colors hover:text-primary-token'
-              >
-                {task.releaseTitle}
-              </button>
-            </div>
+          </div>
+          {task.description ? (
+            <p className='mt-1 truncate text-[11px] leading-[15px] text-secondary-token/70'>
+              {task.description}
+            </p>
+          ) : null}
+        </div>
+      </div>
+      <div className='flex w-[9.5rem] flex-col items-end gap-1.5 pt-0.5 text-right'>
+        <StatusBadgeCell status={task.status} />
+        <div className='min-h-[18px] text-[10.5px]'>
+          {hasDueDate ? (
+            <ReleaseTaskDueBadge
+              dueDate={task.dueAt!}
+              dueDaysOffset={null}
+              isCompleted={task.status === 'done'}
+            />
+          ) : (
+            <span className='text-tertiary-token'>No due date</span>
           )}
         </div>
-        {task.description ? (
-          <p className='mt-1 truncate text-[11px] leading-[15px] text-secondary-token/70'>
-            {task.description}
-          </p>
-        ) : null}
+        <div className='flex min-h-[18px] items-center'>
+          <AssigneeCell
+            assigneeKind={task.assigneeKind}
+            artistName={artistName}
+            compact
+          />
+        </div>
       </div>
     </div>
   );
@@ -408,12 +409,11 @@ function TaskDocumentPanel({
             Task Workspace
           </p>
           <h2 className='mt-2 text-[21px] font-[590] tracking-[-0.03em] text-primary-token'>
-            Select a task to open its document
+            Select a task to open it
           </h2>
           <p className='mt-2 text-[13px] leading-[20px] text-secondary-token'>
-            Tasks now open into a central writing surface so the brief,
-            instructions, and agent context live with the work instead of being
-            buried in a table row.
+            The brief, deliverables, and agent context stay in one working
+            document instead of getting buried in a table row.
           </p>
         </div>
       </div>
@@ -423,13 +423,8 @@ function TaskDocumentPanel({
   const hasRelease = Boolean(task.releaseId && task.releaseTitle);
 
   return (
-    <div className='flex min-h-0 min-w-0 flex-1 flex-col bg-surface-0 px-3 py-3'>
-      <div
-        className={cn(
-          PAGE_SHELL_SURFACE_CLASSNAMES.document,
-          'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'
-        )}
-      >
+    <div className='flex min-h-0 min-w-0 flex-1 flex-col bg-surface-0'>
+      <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
         <div className='flex flex-col gap-4 border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] px-6 py-4 xl:flex-row xl:items-start xl:justify-between'>
           <div className='flex min-w-0 flex-1 flex-col gap-3'>
             <div className='flex min-w-0 flex-wrap items-center gap-2'>
@@ -467,15 +462,6 @@ function TaskDocumentPanel({
                 </button>
               ) : null}
             </div>
-            <div className='min-w-0'>
-              <p className='text-[10.5px] font-[650] uppercase tracking-[0.14em] text-tertiary-token'>
-                Work Brief
-              </p>
-              <p className='mt-1 max-w-[40rem] text-[12.5px] leading-[18px] text-secondary-token'>
-                Keep the brief, delivery notes, and agent handoff context in one
-                document so the task reads like work, not table metadata.
-              </p>
-            </div>
           </div>
           <div className='flex shrink-0 flex-wrap items-center justify-end gap-2'>
             <Button
@@ -487,14 +473,6 @@ function TaskDocumentPanel({
               <X className='mr-1 h-3.5 w-3.5' />
               Close
             </Button>
-            <Button
-              type='button'
-              size='sm'
-              onClick={onSave}
-              disabled={isSaving}
-            >
-              {isSaving ? 'Saving...' : 'Save Task'}
-            </Button>
           </div>
         </div>
 
@@ -504,7 +482,7 @@ function TaskDocumentPanel({
               <TaskTitleEditor value={title} onChange={onTitleChange} />
               <p className='max-w-[42rem] text-[14px] leading-[22px] text-secondary-token'>
                 Write the assignment so a teammate or agent can pick it up
-                without needing a second explanation.
+                cleanly, without a second explanation.
               </p>
             </div>
 
@@ -1002,7 +980,7 @@ export function TasksPageClient() {
           meta: { className: 'pl-0 pr-2' },
         }),
       ] as ColumnDef<TaskView, unknown>[],
-    [getTaskContextMenuItems, openReleaseSidebar]
+    [artistName, getTaskContextMenuItems, openReleaseSidebar]
   );
 
   const handleCreateTask = async (event: FormEvent<HTMLFormElement>) => {
@@ -1082,7 +1060,7 @@ export function TasksPageClient() {
       <section
         className={cn(
           PAGE_SHELL_SURFACE_CLASSNAMES.workspace,
-          'flex min-h-0 flex-1 flex-col overflow-hidden'
+          'flex min-h-0 flex-1 flex-col overflow-hidden p-2'
         )}
         data-testid='tasks-content-panel'
       >

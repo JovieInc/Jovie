@@ -135,6 +135,22 @@ The example above says one thing three times. Jovie should say it once.
 - If a section still reads clearly after removing its border or eyebrow label, that simpler version is usually the right one
 - Before shipping a UI, run this check: does it look like a generic AI-generated SaaS mockup? If yes, remove chrome until it feels native to Jovie
 
+### Canonical App Shell
+
+- The app shell is the primary product system. Dashboard, settings, and admin should share one header anatomy, one spacing rhythm, and one surface model.
+- Header anatomy is fixed:
+  - breadcrumb/title on the left
+  - app activity rail on the right
+  - primary page actions after the activity rail
+- Activity rail is reserved for app-wide background work like discovery, ingest, import, or agent execution. Do not scatter those states through page bodies unless the page is showing unique local detail.
+- Product surfaces should collapse to three tiers:
+  - canvas
+  - primary content container
+  - floating surface
+- Default product controls are true circles or true pills. No rounded-square drift in header actions or compact controls.
+- Row layouts should use fixed right rails for status, due dates, and utility metadata so long lists align like a real tool, not a pile of cards.
+- Default gutters should feel tight and operational. If extra padding does not add clarity, remove it.
+
 ---
 
 ## Subtraction Principle

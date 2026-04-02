@@ -339,7 +339,10 @@ export function TrackSidebar({
           )}
           {activeTab === 'details' && (
             <DrawerSurfaceCard
-              className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden border-0')}
+              className={cn(
+                LINEAR_SURFACE.drawerCard,
+                'overflow-hidden border-0'
+              )}
             >
               <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
                 <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
@@ -367,7 +370,10 @@ export function TrackSidebar({
 
           {activeTab === 'details' && trackHeaderCard ? (
             <DrawerSurfaceCard
-              className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden border-0')}
+              className={cn(
+                LINEAR_SURFACE.drawerCard,
+                'overflow-hidden border-0'
+              )}
             >
               <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
                 <p className='text-[11px] font-[510] leading-none text-tertiary-token'>

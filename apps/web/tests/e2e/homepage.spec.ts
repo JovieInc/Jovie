@@ -31,16 +31,16 @@ test.describe('Homepage', () => {
   test('hero renders with current headline, lead, and CTA button', async ({
     page,
   }) => {
-    await expect(page.locator('h1')).toContainText('Drop More Music.');
-    await expect(page.locator('h1')).toContainText('Crush Every Release.');
+    await expect(page.locator('h1')).toContainText('Drop more music.');
+    await expect(page.locator('h1')).toContainText('Crush every release.');
     await expect(
       page.getByText(
-        'Smart links, release automation, and fan insight that keep every launch moving.'
+        'Release pages, routing, fan capture, and follow-up in one system.'
       )
     ).toBeVisible();
 
     await expect(
-      page.getByRole('link', { name: /get started free/i })
+      page.getByRole('link', { name: /start free/i }).first()
     ).toBeVisible();
   });
 
@@ -59,29 +59,35 @@ test.describe('Homepage', () => {
 
   test('core homepage sections render in order', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: 'The right action for every fan.' })
+      page.getByRole('heading', {
+        name: 'One release. Twenty-seven destinations.',
+      })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Claim your handle.' })
+      page.getByRole('heading', {
+        name: 'Everything after the drop stays connected.',
+      })
     ).toBeVisible();
   });
 
-  test('final CTA renders with preserved ids and claim form', async ({
-    page,
-  }) => {
-    const finalHeadline = page.getByTestId('final-cta-headline');
-    await expect(finalHeadline).toHaveText('Claim your handle.');
-
-    await expect(finalHeadline).toBeVisible();
+  test('final CTA renders with release-oriented actions', async ({ page }) => {
     await expect(
-      page.getByTestId('final-cta-form').locator('input').first()
+      page.getByRole('heading', {
+        name: 'Start the next release before this one cools off.',
+      })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'See Profiles' })
     ).toBeVisible();
   });
 
   test('is responsive on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
 
-    await expect(page.locator('h1')).toContainText('Drop More Music.', {
+    await expect(page.locator('h1')).toContainText('Drop more music.', {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+    await expect(page.locator('h1')).toContainText('Crush every release.', {
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
 
@@ -93,7 +99,7 @@ test.describe('Homepage', () => {
     });
 
     await expect(
-      page.getByRole('link', { name: /get started free/i })
+      page.getByRole('link', { name: /start free/i }).first()
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });

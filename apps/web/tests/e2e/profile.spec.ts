@@ -162,15 +162,19 @@ describeProfile('Profile - Core Rendering', () => {
 
     // Get bounding boxes for key elements
     const hero = page.locator('section').first();
-    const subscribeSection = page.locator('section[aria-labelledby="profile-subscribe-heading"]').first();
-    const mainContent = page.locator('main').first();
+    const subscribeSection = page
+      .locator('section[aria-labelledby="profile-subscribe-heading"]')
+      .first();
+    const _mainContent = page.locator('main').first();
 
     const heroBox = await hero.boundingBox();
     const subscribeBox = await subscribeSection.boundingBox();
 
     if (heroBox && subscribeBox) {
       // Ensure subscribe section doesn't overlap hero
-      expect(subscribeBox.y).toBeGreaterThanOrEqual(heroBox.y + heroBox.height - 2); // 2px tolerance
+      expect(subscribeBox.y).toBeGreaterThanOrEqual(
+        heroBox.y + heroBox.height - 2
+      ); // 2px tolerance
     }
 
     // Ensure no horizontal overflow
@@ -179,10 +183,14 @@ describeProfile('Profile - Core Rendering', () => {
     expect(bodyWidth).toBeLessThanOrEqual(viewportWidth + 1); // 1px tolerance
   });
 
-  test('subscribe CTA is fully visible and readable at mobile', async ({ page }) => {
+  test('subscribe CTA is fully visible and readable at mobile', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 390, height: 844 });
 
-    const subscribeSection = page.locator('section[aria-labelledby="profile-subscribe-heading"]').first();
+    const subscribeSection = page
+      .locator('section[aria-labelledby="profile-subscribe-heading"]')
+      .first();
     await expect(subscribeSection).toBeVisible();
 
     // Check that subscribe section is within viewport bounds

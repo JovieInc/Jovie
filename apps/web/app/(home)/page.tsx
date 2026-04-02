@@ -13,10 +13,10 @@ export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = {
-    absolute: `${APP_NAME} | Drop More Music. Run Every Release.`,
+    absolute: `${APP_NAME} | Drop more music. Crush every release.`,
   };
   const description =
-    'Profiles, smart links, release AI, catalog monitoring, and task planning for independent artists, all in one system.';
+    'Run every release with profiles, smart links, fan capture, and release execution in one system for independent artists.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -82,7 +82,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${BASE_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - Drop More Music. Run Every Release.`,
+          alt: `${APP_NAME} - Drop more music. Crush every release.`,
           type: 'image/png',
         },
       ],
@@ -94,7 +94,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${BASE_URL}/og/default.png`,
-          alt: `${APP_NAME} - Drop More Music. Run Every Release.`,
+          alt: `${APP_NAME} - Drop more music. Crush every release.`,
           width: 1200,
           height: 630,
         },
@@ -130,11 +130,11 @@ export async function generateMetadata(): Promise<Metadata> {
 const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'Profiles, smart links, release AI, catalog monitoring, and task planning for independent artists, all in one system.',
+    'Run every release with profiles, smart links, fan capture, and release execution in one system for independent artists.',
 });
 
 const SOFTWARE_SCHEMA = buildSoftwareSchema(
-  'Run every release with artist profiles, smart links, release AI, catalog monitoring, and task planning built for independent musicians.'
+  'Run every release with artist profiles, smart links, fan capture, and release execution built for independent musicians.'
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({

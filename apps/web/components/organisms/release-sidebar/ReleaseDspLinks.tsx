@@ -116,7 +116,10 @@ export function ReleaseDspLinks({
       {/* Add link form */}
       {isEditable && isAddingLink && (
         <DrawerSurfaceCard
-          className={cn(LINEAR_SURFACE.drawerCardSm, 'mt-1.5 space-y-2.5 border-0 p-3')}
+          className={cn(
+            LINEAR_SURFACE.drawerCardSm,
+            'mt-1.5 space-y-2.5 border-0 p-3'
+          )}
           testId='release-target-playlists-card'
         >
           <DrawerFormGridRow label='Provider'>

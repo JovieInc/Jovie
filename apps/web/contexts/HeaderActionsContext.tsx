@@ -15,11 +15,13 @@ import {
 interface HeaderActionsState {
   headerActions: ReactNode;
   headerBadge: ReactNode;
+  headerStatus: ReactNode;
 }
 
 interface HeaderActionsDispatch {
   setHeaderActions: (actions: ReactNode) => void;
   setHeaderBadge: (badge: ReactNode) => void;
+  setHeaderStatus: (status: ReactNode) => void;
 }
 
 /** Full context value – kept for backward-compat of `useHeaderActions()`. */
@@ -77,16 +79,17 @@ export function HeaderActionsProvider({
 }: HeaderActionsProviderProps) {
   const [headerActions, setHeaderActions] = useState<ReactNode>(null);
   const [headerBadge, setHeaderBadge] = useState<ReactNode>(null);
+  const [headerStatus, setHeaderStatus] = useState<ReactNode>(null);
 
   const state = useMemo(
-    () => ({ headerActions, headerBadge }),
-    [headerActions, headerBadge]
+    () => ({ headerActions, headerBadge, headerStatus }),
+    [headerActions, headerBadge, headerStatus]
   );
 
   // useState setters are referentially stable, so this memo never recomputes.
   const dispatch = useMemo(
-    () => ({ setHeaderActions, setHeaderBadge }),
-    [setHeaderActions, setHeaderBadge]
+    () => ({ setHeaderActions, setHeaderBadge, setHeaderStatus }),
+    [setHeaderActions, setHeaderBadge, setHeaderStatus]
   );
 
   return (

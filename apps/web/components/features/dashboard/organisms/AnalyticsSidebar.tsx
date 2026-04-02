@@ -133,7 +133,10 @@ function FunnelCard({
   const maxValue = stages[0]?.value ?? 0;
 
   return (
-    <DrawerSurfaceCard className='divide-y divide-subtle overflow-hidden py-1'>
+    <DrawerSurfaceCard
+      variant='card'
+      className='divide-y divide-subtle overflow-hidden py-1'
+    >
       {stages.map((stage, index) => {
         const barPercent = maxValue > 0 ? (stage.value / maxValue) * 100 : 0;
         const rate =
@@ -202,7 +205,7 @@ function RankedList({
   }
 
   return (
-    <ul className='min-h-[196px] space-y-0.5'>
+    <ul className='min-h-[196px] space-y-0.5 pb-2'>
       {items.map((item, index) => (
         <li
           key={item.key}

@@ -1,8 +1,12 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { OnboardingExperienceShell } from '@/components/features/onboarding/OnboardingExperienceShell';
+import {
+  OnboardingStepProgressHeader,
+  OnboardingStepRail,
+} from '@/features/dashboard/organisms/onboarding-v2/OnboardingStepRail';
 import { cn } from '@/lib/utils';
-import { OnboardingDemoProfilePanel } from './OnboardingDemoProfilePanel';
 import {
   ALL_STEPS,
   OnboardingDemoStep,
@@ -32,6 +36,10 @@ interface OnboardingDemoContentProps {
   readonly onStepChange: (step: StepId) => void;
   readonly isRevealing: boolean;
   readonly onFinish: () => void;
+  readonly rail?: ReactNode | null;
+  readonly mobileRail?: ReactNode | null;
+  readonly topBar?: ReactNode | null;
+  readonly footer?: ReactNode | null;
 }
 
 export function OnboardingDemoContent({
@@ -39,10 +47,14 @@ export function OnboardingDemoContent({
   onStepChange,
   isRevealing,
   onFinish,
+  rail,
+  mobileRail,
+  topBar,
+  footer,
 }: OnboardingDemoContentProps) {
   const currentIndex = ALL_STEPS.indexOf(currentStep);
 
-  const topBar = (
+  const defaultTopBar = (
     <div className='rounded-2xl border border-subtle bg-surface-0/80 backdrop-blur-sm'>
       <div className='flex items-center gap-1 overflow-x-auto px-4 py-2 sm:px-6'>
         <span className='mr-2 shrink-0 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400'>
@@ -70,7 +82,7 @@ export function OnboardingDemoContent({
     </div>
   );
 
-  const footer = (
+  const defaultFooter = (
     <div className='flex items-center justify-center gap-2 pt-1'>
       {ALL_STEPS.map((step, index) => (
         <button
@@ -91,9 +103,22 @@ export function OnboardingDemoContent({
     <OnboardingExperienceShell
       mode='embedded'
       stableStageHeight={currentStep === 'handle' ? 'tall' : 'default'}
-      topBar={topBar}
-      footer={footer}
-      sidePanel={<OnboardingDemoProfilePanel currentStep={currentStep} />}
+      rail={
+        rail === undefined ? (
+          <OnboardingStepRail currentStep={currentStep} />
+        ) : (
+          rail
+        )
+      }
+      mobileRail={
+        mobileRail === undefined ? (
+          <OnboardingStepProgressHeader currentStep={currentStep} />
+        ) : (
+          mobileRail
+        )
+      }
+      topBar={topBar === undefined ? defaultTopBar : topBar}
+      footer={footer === undefined ? defaultFooter : footer}
       stageClassName='overflow-hidden'
       data-testid='demo-onboarding-experience-shell'
       className={cn(

@@ -19,7 +19,7 @@ export function MarketingFooter() {
           className='inline-flex items-center gap-2 rounded-md p-1 -m-1 focus-ring-themed'
           aria-label='Jovie home'
         >
-          <BrandLogo size={20} tone='white' />
+          <BrandLogo size={20} tone='auto' />
           <span
             className='text-[12px] font-medium tracking-[-0.01em]'
             style={{ color: 'var(--linear-text-tertiary)' }}

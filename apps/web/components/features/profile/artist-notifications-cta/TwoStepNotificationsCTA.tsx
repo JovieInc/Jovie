@@ -245,7 +245,7 @@ function ChannelInputRow({
           type='button'
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className='mr-2 inline-flex h-11 shrink-0 items-center justify-center rounded-[1rem] bg-btn-primary px-5 text-[15px] font-semibold text-btn-primary-foreground transition-opacity duration-150 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed'
+          className='mr-2 inline-flex h-11 shrink-0 items-center justify-center rounded-[1.25rem] bg-btn-primary px-5 text-[15px] font-semibold text-btn-primary-foreground transition-opacity duration-150 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed'
           style={noFontSynthesisStyle}
         >
           {getSubmitLabel(isSubmitting, otpStep)}

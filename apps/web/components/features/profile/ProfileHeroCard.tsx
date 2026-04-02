@@ -67,7 +67,7 @@ export function ArtistHero({
     'inline-flex min-h-12 items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-[590] text-black shadow-[0_18px_45px_rgba(0,0,0,0.34)] transition-[transform,opacity] duration-200 hover:opacity-92 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
 
   return (
-    <section className='relative h-[44dvh] min-h-[360px] max-h-[560px] w-full overflow-hidden md:h-[52dvh] md:min-h-[480px] md:rounded-t-[30px]'>
+    <section className='relative h-[48dvh] min-h-[420px] max-h-[620px] w-full overflow-hidden md:h-[52dvh] md:min-h-[480px] md:rounded-t-[30px]'>
       <div className='absolute inset-0'>
         <ImageWithFallback
           src={heroImageUrl ?? artist.image_url}

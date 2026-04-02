@@ -338,17 +338,17 @@ export async function handleMetaCommand(
         return 'focus requires headed mode. Run `$B connect` first.';
       }
       try {
+        const { execSync } = await import('child_process');
         // Try common Chromium-based browser app names to bring to foreground
         const appNames = ['Comet', 'Google Chrome', 'Arc', 'Brave Browser', 'Microsoft Edge'];
         let activated = false;
         for (const appName of appNames) {
-          const result = Bun.spawnSync(
-            ['osascript', '-e', `tell application "${appName}" to activate`],
-            { stdout: 'pipe', stderr: 'pipe', timeout: 3000 }
-          );
-          if (result.exitCode === 0) {
+          try {
+            execSync(`osascript -e 'tell application "${appName}" to activate'`, { stdio: 'pipe', timeout: 3000 });
             activated = true;
             break;
+          } catch {
+            // Try next browser
           }
         }
 
@@ -403,15 +403,13 @@ export async function handleMetaCommand(
 
     // ─── Inbox ──────────────────────────────────────────
     case 'inbox': {
+      const { execSync } = await import('child_process');
       let gitRoot: string;
-      const result = Bun.spawnSync(
-        ['git', 'rev-parse', '--show-toplevel'],
-        { stdout: 'pipe', stderr: 'pipe', timeout: 5000 }
-      );
-      if (result.exitCode !== 0) {
+      try {
+        gitRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+      } catch {
         return 'Not in a git repository — cannot locate inbox.';
       }
-      gitRoot = result.stdout.toString().trim();
 
       const inboxDir = path.join(gitRoot, '.context', 'sidebar-inbox');
       if (!fs.existsSync(inboxDir)) return 'Inbox empty.';

@@ -89,13 +89,35 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
 
     await sidebar.getByTestId('drawer-tab-links').click();
     await waitForSettle(page);
+
+    await hideTransientUI(page);
+    await assertNoDevOverlays(page);
+    await page.screenshot({
+      path: `${OUTPUT_DIR}/releases-dashboard-platforms-open.png`,
+      fullPage: false,
+    });
+    console.log('📸 Saved: releases-dashboard-platforms-open.png');
+
     await sidebar.screenshot({
       path: `${OUTPUT_DIR}/release-sidebar-platforms.png`,
     });
     console.log('📸 Saved: release-sidebar-platforms.png');
 
+    // Switch to a release with a real campaign playbook before capturing tasks.
+    await page.getByText('Solar Flare').first().click();
+    await expect(sidebar).toBeVisible({ timeout: TIMEOUTS.SIDEBAR_VISIBLE });
+    await waitForSettle(page);
     await sidebar.getByTestId('drawer-tab-tasks').click();
     await waitForSettle(page);
+
+    await hideTransientUI(page);
+    await assertNoDevOverlays(page);
+    await page.screenshot({
+      path: `${OUTPUT_DIR}/releases-dashboard-tasks-open.png`,
+      fullPage: false,
+    });
+    console.log('📸 Saved: releases-dashboard-tasks-open.png');
+
     await sidebar.screenshot({
       path: `${OUTPUT_DIR}/release-sidebar-tasks.png`,
     });

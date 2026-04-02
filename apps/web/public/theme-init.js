@@ -2,28 +2,27 @@
   try {
     var root = document.documentElement;
     var pathname = globalThis.location?.pathname ?? '/';
+    var storageValue =
+      typeof localStorage !== 'undefined'
+        ? localStorage.getItem('jovie-theme')
+        : null;
     var isThemeEnabledRoute =
       pathname.startsWith('/app') ||
       pathname.startsWith('/onboarding') ||
       pathname.startsWith('/signin') ||
       pathname.startsWith('/signup') ||
       pathname.startsWith('/waitlist');
+    var systemPrefersDark =
+      typeof globalThis.matchMedia === 'function' &&
+      globalThis.matchMedia('(prefers-color-scheme: dark)').matches;
 
     if (isThemeEnabledRoute) {
-      var storageValue =
-        typeof localStorage !== 'undefined'
-          ? localStorage.getItem('jovie-theme')
-          : null;
       var theme =
         storageValue === 'light' ||
         storageValue === 'dark' ||
         storageValue === 'system'
           ? storageValue
           : 'system';
-
-      var systemPrefersDark =
-        typeof globalThis.matchMedia === 'function' &&
-        globalThis.matchMedia('(prefers-color-scheme: dark)').matches;
       var resolvedDark =
         theme === 'dark' || (theme === 'system' && systemPrefersDark);
 
@@ -38,15 +37,25 @@
         );
       }
     } else {
-      // Public/marketing routes: always dark — the design system assumes dark mode.
-      // Ignoring stored preference prevents hybrid light/dark rendering since the
-      // marketing layout hardcodes a .dark ancestor class.
-      root.classList.add('dark');
-      root.style.colorScheme = 'dark';
+      var marketingTheme =
+        storageValue === 'light' ||
+        storageValue === 'dark' ||
+        storageValue === 'system'
+          ? storageValue
+          : 'dark';
+      var resolvedMarketingDark =
+        marketingTheme === 'dark' ||
+        (marketingTheme === 'system' && systemPrefersDark);
+
+      root.classList.toggle('dark', resolvedMarketingDark);
+      root.style.colorScheme = resolvedMarketingDark ? 'dark' : 'light';
 
       var metaThemeDark = document.querySelector('meta[name="theme-color"]');
       if (metaThemeDark) {
-        metaThemeDark.setAttribute('content', '#0a0a0a');
+        metaThemeDark.setAttribute(
+          'content',
+          resolvedMarketingDark ? '#0a0a0a' : '#ffffff'
+        );
       }
     }
 

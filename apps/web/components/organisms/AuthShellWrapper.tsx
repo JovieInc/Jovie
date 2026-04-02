@@ -23,6 +23,7 @@ import {
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import { HeaderActivityIndicator } from '@/features/dashboard/atoms/HeaderActivityIndicator';
 import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
 import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileProgress';
 import { ReleaseTablePendingShell } from '@/features/dashboard/organisms/ReleaseTablePendingShell';
@@ -176,6 +177,13 @@ function AuthShellWrapperInner({
     <ErrorBoundary fallback={null}>{rawHeaderBadge}</ErrorBoundary>
   ) : null;
 
+  const rawHeaderStatus = headerActionsContext?.headerStatus ?? (
+    <HeaderActivityIndicator />
+  );
+  const headerStatus = rawHeaderStatus ? (
+    <ErrorBoundary fallback={null}>{rawHeaderStatus}</ErrorBoundary>
+  ) : null;
+
   // Memoize the sidebar open change handler to prevent context value changes
   // that would cause infinite re-render loops in sidebar consumers.
   // Only create a callback when persistSidebarCollapsed is defined, otherwise
@@ -268,6 +276,7 @@ function AuthShellWrapperInner({
               section={config.section}
               breadcrumbs={config.breadcrumbs}
               headerBadge={headerBadge}
+              headerStatus={headerStatus}
               headerAction={headerAction}
               showMobileTabs={config.showMobileTabs}
               isTableRoute={config.isTableRoute}

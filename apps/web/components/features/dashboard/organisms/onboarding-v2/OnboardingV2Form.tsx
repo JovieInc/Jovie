@@ -2,16 +2,13 @@
 
 import { Button } from '@jovie/ui';
 import {
-  AlertCircle,
   ArrowRight,
   Check,
   Disc3,
   ExternalLink,
-  Link2,
   Loader2,
   Music2,
   RefreshCw,
-  Sparkles,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -31,7 +28,6 @@ import { OnboardingExperienceShell } from '@/components/features/onboarding/Onbo
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthBackButton } from '@/features/auth';
-import { PREVIEW_PANEL_WIDTH } from '@/features/dashboard/layout/PreviewPanel';
 import { useHandleValidation } from '@/features/dashboard/organisms/apple-style-onboarding/useHandleValidation';
 import {
   type AutoConnectedArtistSelection,
@@ -51,21 +47,15 @@ import {
 } from '@/lib/onboarding/session-keys';
 import type { AvatarQuality } from '@/lib/profile/avatar-quality';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
+import {
+  type OnboardingFlowStepId,
+  OnboardingStepProgressHeader,
+  OnboardingStepRail,
+} from './OnboardingStepRail';
 
 const DISCOVERY_POLL_INTERVAL_MS = 1200;
 const DISCOVERY_STAGE_TIMEOUT_MS = 10000;
 const DISCOVERY_AUTO_ADVANCE_MS = 800;
-
-type StepId =
-  | 'handle'
-  | 'spotify'
-  | 'artist-confirm'
-  | 'upgrade'
-  | 'dsp'
-  | 'social'
-  | 'releases'
-  | 'late-arrivals'
-  | 'profile-ready';
 
 interface SelectedArtist {
   id: string;
@@ -179,7 +169,9 @@ function normalizeSelectedArtist(
   };
 }
 
-function normalizeResumeStep(step: string | null | undefined): StepId | null {
+function normalizeResumeStep(
+  step: string | null | undefined
+): OnboardingFlowStepId | null {
   switch (step) {
     case 'handle':
       return 'handle';
@@ -204,7 +196,7 @@ function normalizeResumeStep(step: string | null | undefined): StepId | null {
   }
 }
 
-function getResumeQueryValue(step: StepId): string | null {
+function getResumeQueryValue(step: OnboardingFlowStepId): string | null {
   switch (step) {
     case 'spotify':
     case 'artist-confirm':
@@ -245,10 +237,10 @@ function extractSpotifyArtistId(input: string): string | null {
 }
 
 function addLateArrivalSuffix(
-  currentStep: StepId,
+  currentStep: OnboardingFlowStepId,
   stage: 'dsp' | 'social' | 'releases'
 ): boolean {
-  const order: StepId[] = [
+  const order: OnboardingFlowStepId[] = [
     'handle',
     'spotify',
     'artist-confirm',
@@ -295,7 +287,7 @@ function appendLateArrivals<T>({
   stage,
 }: {
   buildItem: (item: T, id: string) => LateArrival;
-  currentStep: StepId;
+  currentStep: OnboardingFlowStepId;
   getId: (item: T) => string;
   late: LateArrival[];
   nextItems: T[];
@@ -320,7 +312,7 @@ function appendLateArrivals<T>({
 function collectLateArrivals(
   previousSnapshot: DiscoverySnapshot,
   nextSnapshot: DiscoverySnapshot,
-  currentStep: StepId
+  currentStep: OnboardingFlowStepId
 ): LateArrival[] {
   const late: LateArrival[] = [];
 
@@ -437,9 +429,6 @@ function StepFrame({ actions, children, prompt, title }: StepFrameProps) {
   return (
     <div className='mx-auto flex w-full max-w-2xl flex-col gap-6'>
       <div className='space-y-2'>
-        <p className='text-[11px] font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
-          Onboarding
-        </p>
         <h1 className='text-3xl font-[620] tracking-[-0.04em] text-primary-token sm:text-[2.7rem]'>
           {title}
         </h1>
@@ -530,206 +519,6 @@ function SelectedArtistCard({
   );
 }
 
-function PreviewPanel({
-  avatarQuality,
-  discoverySnapshot,
-  existingAvatarUrl,
-  existingBio,
-  existingGenres,
-  selectedArtist,
-}: Readonly<{
-  avatarQuality: AvatarQuality | null;
-  discoverySnapshot: DiscoverySnapshot | null;
-  existingAvatarUrl: string | null;
-  existingBio: string | null;
-  existingGenres: string[] | null;
-  selectedArtist: SelectedArtist | null;
-}>) {
-  const profile = discoverySnapshot?.profile;
-  const previewAvatarUrl = profile?.avatarUrl ?? existingAvatarUrl;
-  const isUsingExistingAvatar =
-    !profile?.avatarUrl && Boolean(existingAvatarUrl);
-  const activeLinks = (discoverySnapshot?.socialItems ?? []).filter(
-    item => item.kind === 'link' && item.state === 'active'
-  );
-
-  return (
-    <aside
-      className='max-xl:hidden'
-      style={{ width: `${PREVIEW_PANEL_WIDTH}px` }}
-    >
-      <div className='sticky top-8 space-y-4'>
-        <ContentSurfaceCard className='overflow-hidden p-5'>
-          <div className='flex items-center gap-3'>
-            {previewAvatarUrl ? (
-              <Image
-                src={previewAvatarUrl}
-                alt=''
-                width={56}
-                height={56}
-                className='h-14 w-14 rounded-full object-cover'
-                unoptimized
-              />
-            ) : (
-              <div className='flex h-14 w-14 items-center justify-center rounded-full bg-surface-0 text-tertiary-token'>
-                <Sparkles className='h-5 w-5' />
-              </div>
-            )}
-            <div className='min-w-0'>
-              <p className='truncate text-base font-[590] text-primary-token'>
-                {profile?.displayName || selectedArtist?.name || 'Your profile'}
-              </p>
-              <p className='truncate text-sm text-secondary-token'>
-                @{profile?.username ?? 'pending'}
-              </p>
-            </div>
-          </div>
-
-          {isUsingExistingAvatar && avatarQuality?.status === 'low' ? (
-            <div className='mt-3 flex items-start gap-2 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-left text-[12px] text-secondary-token'>
-              <AlertCircle
-                className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'
-                aria-hidden='true'
-              />
-              <p>
-                This photo is only {avatarQuality.width}x{avatarQuality.height}.
-                Jovie profiles look best at 512x512 or higher, so swap in a
-                sharper image if you have one.
-              </p>
-            </div>
-          ) : null}
-
-          <div className='mt-4 grid grid-cols-3 gap-2 text-center'>
-            <div className='rounded-2xl bg-surface-0 px-3 py-2'>
-              <p className='text-lg font-[590] text-primary-token'>
-                {discoverySnapshot?.counts.releaseCount ?? 0}
-              </p>
-              <p className='text-[11px] uppercase tracking-[0.12em] text-tertiary-token'>
-                Releases
-              </p>
-            </div>
-            <div className='rounded-2xl bg-surface-0 px-3 py-2'>
-              <p className='text-lg font-[590] text-primary-token'>
-                {discoverySnapshot?.counts.dspCount ?? (selectedArtist ? 1 : 0)}
-              </p>
-              <p className='text-[11px] uppercase tracking-[0.12em] text-tertiary-token'>
-                DSPs
-              </p>
-            </div>
-            <div className='rounded-2xl bg-surface-0 px-3 py-2'>
-              <p className='text-lg font-[590] text-primary-token'>
-                {discoverySnapshot?.counts.activeSocialCount ?? 0}
-              </p>
-              <p className='text-[11px] uppercase tracking-[0.12em] text-tertiary-token'>
-                Social
-              </p>
-            </div>
-          </div>
-        </ContentSurfaceCard>
-
-        <ContentSurfaceCard className='p-5'>
-          <p className='text-[11px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
-            Profile preview
-          </p>
-          <div className='mt-3 space-y-3'>
-            {profile?.bio || existingBio ? (
-              <p className='text-sm leading-6 text-secondary-token'>
-                {profile?.bio ?? existingBio}
-              </p>
-            ) : (
-              <p className='text-sm leading-6 text-secondary-token'>
-                Your profile summary will keep getting better as discovery
-                finishes.
-              </p>
-            )}
-
-            {(profile?.genres ?? existingGenres)?.length ? (
-              <div className='flex flex-wrap gap-2'>
-                {(profile?.genres ?? existingGenres ?? [])
-                  .slice(0, 4)
-                  .map(genre => (
-                    <span
-                      key={genre}
-                      className='rounded-full bg-surface-0 px-2.5 py-1 text-[11px] text-secondary-token'
-                    >
-                      {genre}
-                    </span>
-                  ))}
-              </div>
-            ) : null}
-
-            {activeLinks.length > 0 ? (
-              <div className='space-y-2'>
-                {activeLinks.slice(0, 4).map(link => (
-                  <div
-                    key={`${link.kind}:${link.id}`}
-                    className='flex items-center justify-between rounded-2xl bg-surface-0 px-3 py-2'
-                  >
-                    <div className='min-w-0'>
-                      <p className='truncate text-sm font-[560] text-primary-token'>
-                        {link.platformLabel}
-                      </p>
-                      <p className='truncate text-xs text-secondary-token'>
-                        {link.username || link.url}
-                      </p>
-                    </div>
-                    <Link2 className='h-4 w-4 shrink-0 text-tertiary-token' />
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </ContentSurfaceCard>
-
-        <ContentSurfaceCard className='p-5'>
-          <p className='text-[11px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
-            Recent releases
-          </p>
-          <div className='mt-3 space-y-2'>
-            {(discoverySnapshot?.releases ?? []).length === 0 ? (
-              <p className='text-sm text-secondary-token'>
-                Releases will appear here as soon as discovery finishes.
-              </p>
-            ) : (
-              discoverySnapshot?.releases.map(release => (
-                <div
-                  key={release.id}
-                  className='flex items-center gap-3 rounded-2xl bg-surface-0 px-3 py-2'
-                >
-                  {release.artworkUrl ? (
-                    <Image
-                      src={release.artworkUrl}
-                      alt=''
-                      width={40}
-                      height={40}
-                      className='h-10 w-10 rounded-xl object-cover'
-                      unoptimized
-                    />
-                  ) : (
-                    <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-surface-1 text-tertiary-token'>
-                      <Disc3 className='h-4 w-4' />
-                    </div>
-                  )}
-                  <div className='min-w-0'>
-                    <p className='truncate text-sm font-[560] text-primary-token'>
-                      {release.title}
-                    </p>
-                    <p className='text-xs text-secondary-token'>
-                      {release.releaseDate
-                        ? new Date(release.releaseDate).getFullYear()
-                        : 'New release'}
-                    </p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </ContentSurfaceCard>
-      </div>
-    </aside>
-  );
-}
-
 export function OnboardingV2Form({
   existingAvatarUrl = null,
   existingAvatarQuality = null,
@@ -756,7 +545,7 @@ export function OnboardingV2Form({
 
   const [profileHandle, setProfileHandle] = useState(normalizedInitialHandle);
   const [profileId, setProfileId] = useState<string | null>(initialProfileId);
-  const [currentStep, setCurrentStep] = useState<StepId>(
+  const [currentStep, setCurrentStep] = useState<OnboardingFlowStepId>(
     initialStep ?? (initialProfileId ? 'spotify' : 'handle')
   );
   const [selectedArtist, setSelectedArtist] = useState<SelectedArtist | null>(
@@ -773,7 +562,7 @@ export function OnboardingV2Form({
   const handleInputRef = useRef<HTMLInputElement | null>(null);
   const stageStartedAtRef = useRef<number>(Date.now());
   const selectedArtistRef = useRef<SelectedArtist | null>(selectedArtist);
-  const currentStepRef = useRef<StepId>(currentStep);
+  const currentStepRef = useRef<OnboardingFlowStepId>(currentStep);
   const discoverySnapshotRef = useRef<DiscoverySnapshot | null>(null);
   const discoveryRequestSeqRef = useRef(0);
   const lateArrivalIdsRef = useRef<Set<string>>(new Set());
@@ -1969,6 +1758,8 @@ export function OnboardingV2Form({
     <OnboardingExperienceShell
       mode='standalone'
       stableStageHeight={currentStep === 'handle' ? 'tall' : 'default'}
+      rail={<OnboardingStepRail currentStep={currentStep} />}
+      mobileRail={<OnboardingStepProgressHeader currentStep={currentStep} />}
       topBar={
         currentStep === 'spotify' ||
         currentStep === 'artist-confirm' ||
@@ -1977,16 +1768,6 @@ export function OnboardingV2Form({
             <AuthBackButton onClick={handleGoBack} ariaLabel='Go back' />
           </div>
         ) : null
-      }
-      sidePanel={
-        <PreviewPanel
-          avatarQuality={existingAvatarQuality}
-          discoverySnapshot={discoverySnapshot}
-          existingAvatarUrl={existingAvatarUrl}
-          existingBio={existingBio}
-          existingGenres={existingGenres}
-          selectedArtist={selectedArtist}
-        />
       }
       data-testid='onboarding-experience-shell'
     >

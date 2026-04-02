@@ -1410,8 +1410,14 @@ body {
       transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
       border-color 200ms ease-out,
       background-color 200ms ease-out;
+    border-radius: 9999px;
   }
   .chat-pill:hover {
+    background: color-mix(
+      in oklab,
+      var(--linear-row-hover) 82%,
+      var(--linear-app-content-surface)
+    );
     box-shadow:
       0 4px 12px rgba(0, 0, 0, 0.25),
       inset 0 1px 0 rgba(255, 255, 255, 0.05);

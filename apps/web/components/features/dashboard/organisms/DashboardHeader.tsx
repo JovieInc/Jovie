@@ -10,6 +10,8 @@ export interface DashboardHeaderProps {
   readonly sidebarTrigger?: ReactNode;
   /** Content shown after breadcrumb (left side) */
   readonly breadcrumbSuffix?: ReactNode;
+  /** Shared app activity shown left of the action button */
+  readonly status?: ReactNode;
   /** Content shown on right side */
   readonly action?: ReactNode;
   /** Profile button slot shown on the far right of the mobile header */
@@ -23,6 +25,7 @@ export function DashboardHeader({
   leading,
   sidebarTrigger,
   breadcrumbSuffix,
+  status,
   action,
   mobileProfileSlot,
   showDivider = false,
@@ -47,6 +50,7 @@ export function DashboardHeader({
           {currentLabel}
         </h1>
         <div className='flex items-center gap-2'>
+          {status ? <div className='flex items-center'>{status}</div> : null}
           {action ? (
             <div className='flex items-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1 [&_button]:h-8 [&_button]:rounded-full [&_button]:shadow-none [&_button>svg]:h-4 [&_button>svg]:w-4'>
               {action}
@@ -95,9 +99,12 @@ export function DashboardHeader({
             </>
           )}
         </div>
-        {action ? (
-          <div className='ml-auto flex items-center gap-1'>{action}</div>
-        ) : null}
+        <div className='ml-auto flex items-center gap-2'>
+          {status ? <div className='flex items-center'>{status}</div> : null}
+          {action ? (
+            <div className='flex items-center gap-1'>{action}</div>
+          ) : null}
+        </div>
       </div>
     </header>
   );

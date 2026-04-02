@@ -17,7 +17,7 @@ import Image from 'next/image';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
+import { DrawerButton } from '@/components/molecules/drawer';
 import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
 import { BASE_URL } from '@/constants/domains';
 import { useClipboard } from '@/hooks/useClipboard';
@@ -285,16 +285,11 @@ export function EarningsTab() {
   const tippers = earnings?.tippers ?? [];
 
   return (
-    <div className='flex flex-col gap-4'>
-      {/* ── Earnings Stats ─────────────────────────── */}
-      <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
-        Revenue
-      </p>
-
+    <div className='flex flex-col gap-3'>
       {isEarningsLoading ? (
-        <div className='grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2'>
+        <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
           {[1, 2, 3].map(i => (
-            <ContentSurfaceCard key={i} className='space-y-2 p-2.5'>
+            <ContentSurfaceCard key={i} className='space-y-2 p-3'>
               <div className='flex items-center gap-2'>
                 <div className='h-7 w-7 rounded-md skeleton' />
                 <div className='h-3 w-16 rounded-sm skeleton' />
@@ -304,7 +299,7 @@ export function EarningsTab() {
           ))}
         </div>
       ) : (
-        <dl className='grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2'>
+        <dl className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
           <StatCard
             label='Total revenue'
             value={formatCents(stats?.totalRevenueCents ?? 0)}
@@ -329,113 +324,108 @@ export function EarningsTab() {
         </dl>
       )}
 
-      {/* ── Tippers Table ──────────────────────────── */}
-      <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
-        Recent tippers
-      </p>
-
-      <ContentSurfaceCard className='overflow-hidden'>
-        <UnifiedTable
-          data={tippers}
-          columns={tipperColumns as ColumnDef<TipperRow, unknown>[]}
-          isLoading={isEarningsLoading}
-          getRowId={row => row.id}
-          enableVirtualization={false}
-          emptyState={
-            <TableEmptyState
-              icon={<Users className='h-5 w-5' />}
-              title='No tips yet'
-              description='Share your tip link to get started.'
-            />
-          }
-        />
-      </ContentSurfaceCard>
-
-      {/* ── QR Code Card ───────────────────────────── */}
-      <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
-        QR Code
-      </p>
-
-      <ContentSurfaceCard className='p-3 sm:p-4'>
-        <div className='flex items-center gap-2 mb-4'>
-          <div
-            className='flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-1'
-            aria-hidden='true'
-          >
-            <QrCode className='h-3.5 w-3.5 text-accent' />
-          </div>
-          <h2 className='text-[13px] font-[510] text-primary-token'>
-            Tip QR Code
-          </h2>
-        </div>
-
-        <div className='flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:gap-6'>
-          {/* Preview */}
-          <div className='shrink-0 rounded-lg bg-white p-2'>
-            <QrPreview dataUrl={displayDataUrl} isLoading={isGenerating} />
-          </div>
-
-          {/* Actions */}
-          <div className='flex flex-1 flex-col gap-4'>
+      <div className='grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.9fr)]'>
+        <ContentSurfaceCard className='overflow-hidden'>
+          <div className='flex items-center justify-between border-b border-subtle px-4 py-3'>
             <div>
-              <p className='text-[13px] font-[510] text-primary-token'>
-                Share your tip page
-              </p>
-              <p className='mt-1 text-[13px] leading-5 text-secondary-token'>
-                Download this QR code to print on merch, flyers, or display at
-                shows. The high-res version is 1024px for crisp output.
+              <h2 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
+                Recent Tippers
+              </h2>
+              <p className='text-[12px] text-secondary-token'>
+                Every tip that came through your share link.
               </p>
             </div>
+          </div>
+          <UnifiedTable
+            data={tippers}
+            columns={tipperColumns as ColumnDef<TipperRow, unknown>[]}
+            isLoading={isEarningsLoading}
+            getRowId={row => row.id}
+            enableVirtualization={false}
+            emptyState={
+              <TableEmptyState
+                icon={<Users className='h-5 w-5' />}
+                title='No tips yet'
+                description='Share your tip link to get started.'
+              />
+            }
+          />
+        </ContentSurfaceCard>
 
-            {/* Tip URL display */}
-            <DrawerSurfaceCard className='flex items-center gap-2 rounded-md bg-surface-0 px-2.5 py-2'>
+        <ContentSurfaceCard className='flex flex-col gap-4 p-4 sm:p-5'>
+          <div className='space-y-1'>
+            <div className='flex items-center gap-2'>
+              <div
+                className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0'
+                aria-hidden='true'
+              >
+                <QrCode className='h-4 w-4 text-accent' />
+              </div>
+              <div>
+                <h2 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
+                  Share Kit
+                </h2>
+                <p className='text-[12px] text-secondary-token'>
+                  One link, one QR code, ready for merch and flyers.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className='rounded-[20px] border border-subtle bg-surface-0 p-3'>
+            <div className='flex items-center gap-2'>
               <Link2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-              <span className='min-w-0 flex-1 truncate text-[13px] text-secondary-token'>
+              <span className='min-w-0 flex-1 truncate text-[12.5px] text-secondary-token'>
                 {tipUrl}
               </span>
-            </DrawerSurfaceCard>
-
-            {/* Action buttons */}
-            <div className='flex flex-wrap gap-2'>
-              <DrawerButton
-                tone='secondary'
-                size='sm'
-                className='gap-2'
-                onClick={handleDownloadPng}
-                disabled={isDownloadingPng}
-              >
-                <FileImage className='h-3.5 w-3.5' />
-                {isDownloadingPng ? 'Generating...' : 'Download PNG'}
-              </DrawerButton>
-
-              <DrawerButton
-                tone='secondary'
-                size='sm'
-                className='gap-2'
-                onClick={handleDownloadSvg}
-                disabled={isDownloadingSvg}
-              >
-                <FileCode2 className='h-3.5 w-3.5' />
-                {isDownloadingSvg ? 'Generating...' : 'Download SVG'}
-              </DrawerButton>
-
-              <DrawerButton
-                tone='ghost'
-                size='sm'
-                className='gap-2'
-                onClick={handleCopyLink}
-              >
-                {isCopySuccess ? (
-                  <Check className='h-3.5 w-3.5 text-success' />
-                ) : (
-                  <Copy className='h-3.5 w-3.5' />
-                )}
-                {isCopySuccess ? 'Copied' : 'Copy tip link'}
-              </DrawerButton>
             </div>
           </div>
-        </div>
-      </ContentSurfaceCard>
+
+          <div className='flex justify-center rounded-[24px] border border-subtle bg-[color-mix(in_oklab,var(--linear-app-content-surface)_84%,var(--linear-surface-elevated))] p-4'>
+            <div className='rounded-[20px] bg-white p-3 shadow-[0_1px_0_rgba(0,0,0,0.03)]'>
+              <QrPreview dataUrl={displayDataUrl} isLoading={isGenerating} />
+            </div>
+          </div>
+
+          <div className='grid gap-2 sm:grid-cols-2'>
+            <DrawerButton
+              tone='secondary'
+              size='sm'
+              className='gap-2 justify-center'
+              onClick={handleDownloadPng}
+              disabled={isDownloadingPng}
+            >
+              <FileImage className='h-3.5 w-3.5' />
+              {isDownloadingPng ? 'Generating...' : 'Download PNG'}
+            </DrawerButton>
+
+            <DrawerButton
+              tone='secondary'
+              size='sm'
+              className='gap-2 justify-center'
+              onClick={handleDownloadSvg}
+              disabled={isDownloadingSvg}
+            >
+              <FileCode2 className='h-3.5 w-3.5' />
+              {isDownloadingSvg ? 'Generating...' : 'Download SVG'}
+            </DrawerButton>
+          </div>
+
+          <DrawerButton
+            tone='ghost'
+            size='sm'
+            className='gap-2 justify-center'
+            onClick={handleCopyLink}
+          >
+            {isCopySuccess ? (
+              <Check className='h-3.5 w-3.5 text-success' />
+            ) : (
+              <Copy className='h-3.5 w-3.5' />
+            )}
+            {isCopySuccess ? 'Copied' : 'Copy Tip Link'}
+          </DrawerButton>
+        </ContentSurfaceCard>
+      </div>
     </div>
   );
 }

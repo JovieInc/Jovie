@@ -127,7 +127,7 @@ function SendStopButton({
           showStop || canSend
             ? 'border-(--linear-btn-primary-border) bg-(--linear-btn-primary-bg) text-(--linear-btn-primary-fg) shadow-[0_1px_1px_rgba(0,0,0,0.06),0_6px_16px_-10px_rgba(0,0,0,0.24)] hover:bg-(--linear-btn-primary-hover)'
             : 'cursor-not-allowed border-(--linear-app-frame-seam) bg-surface-0 text-tertiary-token',
-          isCompact ? 'h-8 w-8' : 'h-9 w-9'
+          'h-9 w-9'
         )}
         aria-label={showStop ? 'Stop generating' : 'Send message'}
       >
@@ -181,7 +181,7 @@ function AttachDropdown({
             'border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token transition-[background-color,border-color,color,box-shadow]',
             'hover:border-default hover:bg-surface-1 hover:text-primary-token hover:shadow-[var(--linear-app-card-shadow)]',
             'disabled:opacity-50 disabled:cursor-not-allowed',
-            isCompact ? 'h-8 w-8' : 'h-9 w-9'
+            'h-9 w-9'
           )}
           aria-label='Attachment options'
         >
@@ -351,8 +351,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const hasQuickActions =
       Boolean(onQuickActionSelect) && (quickActions?.length ?? 0) > 0;
 
-    // Both collapsed and expanded resolve to 32px radius for a pill shape.
-    const borderRadius = isCompact ? 26 : 30;
+    // Keep the input shell clearly pill-shaped in both compact and full modes.
+    const borderRadius = isCompact ? 28 : 32;
 
     // Shadow states
     let boxShadow = isDark
@@ -386,9 +386,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           }
           className={cn(
             'overflow-hidden border transition-[border-color,background-color,box-shadow] duration-normal',
-            // Light mode: bright shell inset, dark mode: content surface
-            'bg-[color-mix(in_oklab,white_94%,var(--linear-app-content-surface))] dark:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
-            'shadow-[0_6px_18px_-16px_rgba(15,23,42,0.38),0_1px_0_rgba(255,255,255,0.4)_inset] dark:shadow-[0_8px_18px_-14px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.05)]',
+            'bg-[color-mix(in_oklab,white_96%,var(--linear-app-content-surface))] dark:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
+            'shadow-[0_10px_28px_-24px_rgba(15,23,42,0.42),0_1px_0_rgba(255,255,255,0.42)_inset] dark:shadow-[0_12px_28px_-22px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.05)]',
             borderClass
           )}
           style={reducedMotion ? { borderRadius, boxShadow } : { borderRadius }}
@@ -477,7 +476,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       ? 'border-error/20 bg-error/10 text-error'
                       : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token hover:shadow-[var(--linear-app-card-shadow)]',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
-                    isCompact ? 'h-8 w-8' : 'h-9 w-9'
+                    'h-9 w-9'
                   )}
                   aria-label={
                     isListening ? 'Stop dictation' : 'Dictate message'
@@ -557,7 +556,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
                   <div className='flex items-center justify-end'>
                     <span className='text-[11px] text-tertiary-token'>
-                      ⏎ to send · Shift+Enter for newline
+                      Return to send · Shift+Return for newline
                     </span>
                   </div>
                 </div>

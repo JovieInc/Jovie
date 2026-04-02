@@ -182,7 +182,7 @@ export function SuggestedPrompts({
               key={suggestion.label}
               type='button'
               onClick={() => onSelect(suggestion.prompt)}
-              className='group flex w-full items-center gap-2 rounded-full bg-transparent px-3 py-2 text-left text-[12.5px] text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/12'
+              className='group flex w-full items-center gap-2 rounded-full border border-transparent bg-transparent px-3 py-2 text-left text-[12.5px] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_82%,var(--linear-app-content-surface))] hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/12'
               aria-label={suggestion.label}
             >
               <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-150 group-hover:text-primary-token'>

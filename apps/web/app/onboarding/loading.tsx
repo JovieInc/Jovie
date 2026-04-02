@@ -4,11 +4,15 @@
 import { OnboardingExperienceShell } from '@/components/features/onboarding/OnboardingExperienceShell';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
-const ONBOARDING_PREVIEW_WIDTH_PX = 360;
-const ONBOARDING_LOADING_METRIC_KEYS = [
-  'releases',
-  'platforms',
-  'social',
+const ONBOARDING_LOADING_RAIL_ITEMS = [
+  'Claim Handle',
+  'Find Your Spotify',
+  'Confirm Artist',
+  'Upgrade',
+  'Review DSPs',
+  'Review Socials',
+  'Review Releases',
+  'Finish Profile',
 ] as const;
 
 export default function OnboardingLoading() {
@@ -16,50 +20,35 @@ export default function OnboardingLoading() {
     <OnboardingExperienceShell
       mode='standalone'
       stableStageHeight='tall'
-      sidePanel={
-        <aside
-          className='hidden xl:block'
-          style={{ width: `${ONBOARDING_PREVIEW_WIDTH_PX}px` }}
-        >
-          <div className='sticky top-8 space-y-4'>
-            <ContentSurfaceCard className='space-y-4 p-5'>
-              <div className='flex items-center gap-3'>
-                <div className='h-14 w-14 rounded-full skeleton' />
-                <div className='min-w-0 flex-1 space-y-2'>
-                  <div className='h-4 w-28 skeleton rounded-md' />
-                  <div className='h-3 w-20 skeleton rounded-md' />
-                </div>
+      rail={
+        <div className='space-y-5 pt-1'>
+          <div className='h-4 w-24 skeleton rounded-md' />
+          <div className='space-y-2'>
+            {ONBOARDING_LOADING_RAIL_ITEMS.map(item => (
+              <div key={item} className='flex items-center gap-3 py-1'>
+                <div className='h-2.5 w-2.5 shrink-0 skeleton rounded-full' />
+                <div className='h-3 w-32 skeleton rounded-md' />
               </div>
-              <div className='grid grid-cols-3 gap-2'>
-                {ONBOARDING_LOADING_METRIC_KEYS.map(metricKey => (
-                  <div
-                    key={metricKey}
-                    className='space-y-2 rounded-2xl bg-surface-0 px-3 py-2'
-                  >
-                    <div className='mx-auto h-4 w-8 skeleton rounded-md' />
-                    <div className='mx-auto h-2.5 w-10 skeleton rounded-md' />
-                  </div>
-                ))}
-              </div>
-            </ContentSurfaceCard>
-
-            <ContentSurfaceCard className='space-y-3 p-5'>
-              <div className='h-3 w-24 skeleton rounded-md' />
-              <div className='h-16 w-full skeleton rounded-xl' />
-              <div className='h-10 w-full skeleton rounded-xl' />
-              <div className='h-10 w-full skeleton rounded-xl' />
-            </ContentSurfaceCard>
+            ))}
           </div>
-        </aside>
+        </div>
+      }
+      mobileRail={
+        <div className='space-y-4'>
+          <div className='h-4 w-24 skeleton rounded-md' />
+          <div className='grid grid-cols-4 gap-2 sm:grid-cols-8'>
+            {ONBOARDING_LOADING_RAIL_ITEMS.map(item => (
+              <div key={item} className='h-2 skeleton rounded-full' />
+            ))}
+          </div>
+        </div>
       }
       data-testid='onboarding-loading-shell'
     >
-      <div className='mx-auto w-full max-w-xl space-y-8'>
-        <div className='h-2 w-full skeleton rounded-full' />
-
-        <div className='space-y-3 text-center'>
-          <div className='mx-auto h-10 w-64 skeleton rounded-md' />
-          <div className='mx-auto h-5 w-80 skeleton rounded-md' />
+      <div className='mx-auto w-full max-w-2xl space-y-8'>
+        <div className='space-y-3'>
+          <div className='h-10 w-64 skeleton rounded-md' />
+          <div className='h-5 w-80 max-w-full skeleton rounded-md' />
         </div>
 
         <ContentSurfaceCard className='space-y-6 p-8'>
