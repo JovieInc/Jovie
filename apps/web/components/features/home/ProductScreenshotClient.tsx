@@ -35,23 +35,21 @@ export function ProductScreenshotClient({
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
-    let isActive = true;
+    const controller = new AbortController();
 
-    fetch(src, { method: 'HEAD' })
+    fetch(src, { method: 'HEAD', signal: controller.signal })
       .then(response => {
-        if (isActive) {
-          const contentType = response.headers.get('content-type') ?? '';
-          setIsAvailable(response.ok && contentType.startsWith('image/'));
-        }
+        const contentType = response.headers.get('content-type') ?? '';
+        setIsAvailable(response.ok && contentType.startsWith('image/'));
       })
       .catch(() => {
-        if (isActive) {
+        if (!controller.signal.aborted) {
           setIsAvailable(false);
         }
       });
 
     return () => {
-      isActive = false;
+      controller.abort();
     };
   }, [src]);
 

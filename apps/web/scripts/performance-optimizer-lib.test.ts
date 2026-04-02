@@ -341,7 +341,9 @@ describe('performance optimizer lib', () => {
 
     expect(prompt).toContain('Mode: dashboard');
     expect(prompt).toContain('DashboardNav.tsx');
-    expect(prompt).toContain('Route performance for /app/dashboard/releases');
+    expect(prompt).toContain(
+      `Route performance for ${APP_ROUTES.DASHBOARD_RELEASES}`
+    );
     expect(prompt).toContain(APP_ROUTES.DASHBOARD_RELEASES);
     expect(prompt).toContain('Measure a 5-run baseline and use the median.');
     expect(prompt).toContain('Rebuild and remeasure 5 times.');

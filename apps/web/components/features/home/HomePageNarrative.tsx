@@ -84,7 +84,7 @@ const PROFILE_MODES: readonly ProfileMode[] = [
 
 const DEFERRED_SECTION_STYLE = {
   contentVisibility: 'auto',
-  containIntrinsicSize: '1200px',
+  containIntrinsicSize: 'auto 1200px',
 } as const;
 
 interface SectionHeaderProps {

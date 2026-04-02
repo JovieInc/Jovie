@@ -33,7 +33,7 @@ export function ProductScreenshotFrame({
 }: ProductScreenshotFrameProps) {
   return (
     <figure
-      aria-label={alt}
+      aria-label={isAvailable === true ? undefined : alt}
       data-testid={testId}
       className={[
         'relative overflow-hidden rounded-[0.95rem] border border-subtle bg-surface-0 shadow-card-elevated md:rounded-[1rem]',
