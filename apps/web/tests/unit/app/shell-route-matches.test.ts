@@ -20,6 +20,12 @@ describe('resolveAppShellRequestPath', () => {
     );
   });
 
+  it('strips route groups from x-matched-path when they are present', () => {
+    expect(
+      resolveAppShellRequestPath(null, '/app/(shell)/dashboard/releases')
+    ).toBe('/app/dashboard/releases');
+  });
+
   it('accepts absolute header values', () => {
     expect(
       resolveAppShellRequestPath(

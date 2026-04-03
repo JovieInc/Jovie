@@ -1,12 +1,26 @@
 import { APP_ROUTES } from '@/constants/routes';
 
+function normalizeAppShellPath(pathname: string): string {
+  const normalizedSegments = pathname
+    .split('/')
+    .filter(segment => segment.length > 0 && !/^\([^/]+\)$/.test(segment));
+
+  if (normalizedSegments.length === 0) {
+    return '/';
+  }
+
+  return `/${normalizedSegments.join('/')}`;
+}
+
 function parseAppShellPath(headerValue: string | null): string | null {
   if (!headerValue) {
     return null;
   }
 
   try {
-    return new URL(headerValue, 'https://jovie.local').pathname;
+    return normalizeAppShellPath(
+      new URL(headerValue, 'https://jovie.local').pathname
+    );
   } catch {
     return null;
   }

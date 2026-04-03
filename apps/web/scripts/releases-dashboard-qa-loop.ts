@@ -264,6 +264,30 @@ function spawnWithCapture(
   env: NodeJS.ProcessEnv,
   prefix: string
 ) {
+  const createPrefixedWriter = (write: (text: string) => void) => {
+    let pendingLine = '';
+
+    return {
+      push(text: string) {
+        pendingLine += text;
+        const lines = pendingLine.split('\n');
+        pendingLine = lines.pop() ?? '';
+
+        for (const line of lines) {
+          write(`[${prefix}] ${line}\n`);
+        }
+      },
+      flush() {
+        if (pendingLine.length === 0) {
+          return;
+        }
+
+        write(`[${prefix}] ${pendingLine}`);
+        pendingLine = '';
+      },
+    };
+  };
+
   return new Promise<{ code: number | null; stdout: string; stderr: string }>(
     resolvePromise => {
       const [bin, ...args] = command;
@@ -275,18 +299,28 @@ function spawnWithCapture(
 
       let stdout = '';
       let stderr = '';
+      const stdoutWriter = createPrefixedWriter(text =>
+        process.stdout.write(text)
+      );
+      const stderrWriter = createPrefixedWriter(text =>
+        process.stderr.write(text)
+      );
 
       child.stdout.on('data', chunk => {
         const text = chunk.toString();
         stdout += text;
-        process.stdout.write(`[${prefix}] ${text}`);
+        stdoutWriter.push(text);
       });
       child.stderr.on('data', chunk => {
         const text = chunk.toString();
         stderr += text;
-        process.stderr.write(`[${prefix}] ${text}`);
+        stderrWriter.push(text);
       });
-      child.on('close', code => resolvePromise({ code, stdout, stderr }));
+      child.on('close', code => {
+        stdoutWriter.flush();
+        stderrWriter.flush();
+        resolvePromise({ code, stdout, stderr });
+      });
     }
   );
 }
