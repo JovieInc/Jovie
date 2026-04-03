@@ -5,6 +5,7 @@
  * Import these directly for the most common rate limiting scenarios.
  */
 
+import { env } from '@/lib/env-server';
 import { RATE_LIMITERS } from './config';
 import { createPlanAwareRateLimiter } from './plan-aware-limiter';
 import { createRateLimiter, RateLimiter } from './rate-limiter';
@@ -557,7 +558,9 @@ export const appleMusicSearchLimiter = createRateLimiter(
 export const musicBrainzLookupLimiter = createRateLimiter(
   RATE_LIMITERS.musicBrainzLookup,
   {
-    requireRedis: process.env.NODE_ENV === 'production',
+    // Intentionally fail closed in production so a Redis outage doesn't
+    // degrade into unsynchronized per-instance bursting against MusicBrainz.
+    requireRedis: env.NODE_ENV === 'production',
   }
 );
 

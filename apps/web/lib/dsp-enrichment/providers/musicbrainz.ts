@@ -29,7 +29,11 @@ const DEFAULT_BASE_DELAY_MS = 1500;
 
 function isNonRetryableError(error: unknown): boolean {
   if (error instanceof MusicBrainzError) {
-    return error.statusCode === 404 || error.statusCode === 400;
+    return (
+      error.statusCode === 404 ||
+      error.statusCode === 400 ||
+      error.statusCode === 429
+    );
   }
   return false;
 }
