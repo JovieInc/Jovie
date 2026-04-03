@@ -165,6 +165,7 @@ export function getTaskAssigneeVisual(
   };
 }
 
+// DEPRECATION: use getTaskStageVisual instead.
 export const getTaskVisualStage = getTaskStageVisual;
 
 export function getTaskPriorityMeta(
@@ -179,4 +180,5 @@ export function getTaskPriorityMeta(
       };
 }
 
+// DEPRECATION: use getTaskAssigneeVisual instead.
 export const getTaskAssigneeMeta = getTaskAssigneeVisual;

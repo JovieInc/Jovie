@@ -70,9 +70,8 @@ function SearchKeyboardShortcut() {
 
       const searchField = getVisibleSearchField();
 
-      event.preventDefault();
-
       if (searchField) {
+        event.preventDefault();
         searchField.focus();
         searchField.select();
         return;
@@ -86,6 +85,7 @@ function SearchKeyboardShortcut() {
 
       if (!searchTrigger) return;
 
+      event.preventDefault();
       searchTrigger.click();
 
       globalThis.requestAnimationFrame(() => {

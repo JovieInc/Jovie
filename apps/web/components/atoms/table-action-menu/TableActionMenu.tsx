@@ -101,7 +101,7 @@ export function TableActionMenu({
       align={align}
       open={open}
       onOpenChange={onOpenChange}
-      triggerClassName='ml-auto inline-flex h-6.5 w-6.5 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-[background-color,color,box-shadow] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+      triggerClassName='ml-auto inline-flex h-6.5 w-6.5 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-[background-color,color,box-shadow] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-focus'
     />
   );
 }

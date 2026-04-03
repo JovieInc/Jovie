@@ -58,6 +58,17 @@ export function FilterCheckboxItem({
     },
     [onCheckedChange, searchInputRef]
   );
+  const trailingVisual =
+    count !== undefined || checked ? (
+      <span className='flex items-center gap-1'>
+        {count !== undefined ? (
+          <span className='text-[10px] tabular-nums text-tertiary-token'>
+            {count}
+          </span>
+        ) : null}
+        {checked ? <Check className='h-4 w-4 text-primary-token' /> : null}
+      </span>
+    ) : null;
 
   return (
     <button
@@ -91,15 +102,7 @@ export function FilterCheckboxItem({
           ) : null
         }
         label={label}
-        trailingVisual={
-          count !== undefined ? (
-            <span className='text-[10px] tabular-nums text-tertiary-token'>
-              {count}
-            </span>
-          ) : checked ? (
-            <Check className='h-4 w-4 text-primary-token' />
-          ) : null
-        }
+        trailingVisual={trailingVisual}
       />
     </button>
   );

@@ -19,6 +19,7 @@ import { users } from '@/lib/db/schema/auth';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { isActiveDiscoveryJob } from '@/lib/discovery/is-active-discovery-job';
 import { captureError } from '@/lib/error-tracking';
 import type { EnrichmentPhase, ProviderEnrichmentStatus } from '@/lib/queries';
 import { toISOStringOrFallback, toISOStringOrNull } from '@/lib/utils/date';
@@ -87,55 +88,6 @@ function calculateOverallProgress(
 
 function isTerminalJobStatus(status: string | null | undefined): boolean {
   return status === 'succeeded' || status === 'failed';
-}
-
-const ACTIVE_DISCOVERY_JOB_TTL_MS = 10 * 60 * 1000;
-
-function isActiveDiscoveryJob(
-  job:
-    | {
-        status: string;
-        createdAt: Date | null;
-        updatedAt: Date | null;
-      }
-    | undefined,
-  providerStatuses: ProviderEnrichmentStatus[],
-  latestMatchUpdatedAt: Date | null
-): boolean {
-  if (!job) {
-    return false;
-  }
-
-  const isPendingStatus =
-    job.status === 'pending' || job.status === 'processing';
-  if (!isPendingStatus) {
-    return false;
-  }
-
-  const lastHeartbeat = job.updatedAt ?? job.createdAt;
-  if (
-    lastHeartbeat &&
-    Date.now() - lastHeartbeat.getTime() > ACTIVE_DISCOVERY_JOB_TTL_MS
-  ) {
-    return false;
-  }
-
-  const hasOnlyTerminalProviderStates =
-    providerStatuses.length > 0 &&
-    providerStatuses.every(
-      status => status.phase === 'complete' || status.phase === 'failed'
-    );
-
-  if (
-    hasOnlyTerminalProviderStates &&
-    latestMatchUpdatedAt &&
-    lastHeartbeat &&
-    latestMatchUpdatedAt.getTime() >= lastHeartbeat.getTime()
-  ) {
-    return false;
-  }
-
-  return true;
 }
 
 // ============================================================================
@@ -284,11 +236,16 @@ export async function GET(request: Request) {
             null
           )
         : null;
+    const hasOnlyTerminalProviderStates =
+      providerStatuses.length > 0 &&
+      providerStatuses.every(
+        status => status.phase === 'complete' || status.phase === 'failed'
+      );
 
     const hasPendingDiscoveryJob = isActiveDiscoveryJob(
       discoveryJob,
-      providerStatuses,
-      latestMatchUpdatedAt
+      latestMatchUpdatedAt,
+      hasOnlyTerminalProviderStates
     );
 
     // Calculate overall status

@@ -88,6 +88,8 @@ export function OnboardingExperienceShell({
               STAGE_VARIANT_CLASSNAME[stageVariant],
               stageClassName
             )}
+            data-testid={`onboarding-stage-${stageVariant}`}
+            data-stage-variant={stageVariant}
           >
             {children}
           </div>

@@ -12,11 +12,11 @@ import {
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { isActiveDiscoveryJob } from '@/lib/discovery/is-active-discovery-job';
 import { captureError } from '@/lib/error-tracking';
 import { getHometownFromSettings } from '@/types/db';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-const ACTIVE_DISCOVERY_JOB_TTL_MS = 10 * 60 * 1000;
 
 const PROVIDER_LABELS: Record<string, string> = {
   apple_music: 'Apple Music',
@@ -37,47 +37,6 @@ function parseConfidenceScore(
     typeof value === 'number' ? value : Number.parseFloat(String(value ?? '0'));
 
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function isActiveDiscoveryJob(
-  job:
-    | {
-        status: string;
-        createdAt: Date | null;
-        updatedAt: Date | null;
-      }
-    | undefined,
-  latestMatchUpdatedAt: Date | null,
-  hasTerminalMatches: boolean
-): boolean {
-  if (!job) {
-    return false;
-  }
-
-  const isPendingStatus =
-    job.status === 'pending' || job.status === 'processing';
-  if (!isPendingStatus) {
-    return false;
-  }
-
-  const lastHeartbeat = job.updatedAt ?? job.createdAt;
-  if (
-    lastHeartbeat &&
-    Date.now() - lastHeartbeat.getTime() > ACTIVE_DISCOVERY_JOB_TTL_MS
-  ) {
-    return false;
-  }
-
-  if (
-    hasTerminalMatches &&
-    latestMatchUpdatedAt &&
-    lastHeartbeat &&
-    latestMatchUpdatedAt.getTime() >= lastHeartbeat.getTime()
-  ) {
-    return false;
-  }
-
-  return true;
 }
 
 export async function GET(request: Request) {
@@ -297,12 +256,14 @@ export async function GET(request: Request) {
             null
           )
         : null;
-    const hasTerminalMatches = dspMatches.some(
-      match =>
-        match.status === 'confirmed' ||
-        match.status === 'auto_confirmed' ||
-        match.status === 'rejected'
-    );
+    const hasOnlyTerminalMatches =
+      dspMatches.length > 0 &&
+      dspMatches.every(
+        match =>
+          match.status === 'confirmed' ||
+          match.status === 'auto_confirmed' ||
+          match.status === 'rejected'
+      );
 
     return NextResponse.json(
       {
@@ -361,7 +322,7 @@ export async function GET(request: Request) {
           hasPendingDiscoveryJob: isActiveDiscoveryJob(
             latestDiscoveryJob[0],
             latestMatchUpdatedAt,
-            hasTerminalMatches
+            hasOnlyTerminalMatches
           ),
         },
       },

@@ -1,5 +1,5 @@
 import type { ElementType, ReactNode } from 'react';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
+import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import { cn } from '@/lib/utils';
 
 export const DRAWER_SURFACE_CARD_CLASSNAME = LINEAR_SURFACE.drawerCard;
@@ -31,6 +31,7 @@ export function DrawerSurfaceCard({
       hidden={hidden}
       aria-busy={ariaBusy}
       data-testid={testId}
+      data-variant={variant}
       className={cn(
         variant === 'card'
           ? DRAWER_SURFACE_CARD_CLASSNAME

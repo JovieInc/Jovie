@@ -65,16 +65,15 @@ export function DrawerEditableTextField({
       normalizeValue ??
       ((nextValue: string) => {
         const trimmed = nextValue.trim();
-        return trimmed ? trimmed : null;
+        return trimmed || null;
       }),
     [normalizeValue]
   );
 
   useEffect(() => {
-    if (!isEditing) {
-      setDraft(value ?? '');
-    }
-  }, [isEditing, value]);
+    setIsEditing(false);
+    setDraft(value ?? '');
+  }, [value]);
 
   useEffect(() => {
     if (!isEditing || !inputRef.current) {
@@ -121,6 +120,18 @@ export function DrawerEditableTextField({
     await copy(nextValue);
   }, [copy, copyValue, value]);
 
+  const handleCommit = useCallback(() => {
+    commit().catch(() => {
+      // commit() already reports save failures through toast.
+    });
+  }, [commit]);
+
+  const handleCopyClick = useCallback(() => {
+    handleCopy().catch(() => {
+      // Copy failures are non-critical and already surfaced by useClipboard.
+    });
+  }, [handleCopy]);
+
   const hasValue = Boolean(value);
   const visibleActions = actions.filter(
     action => hasValue || action.showWhenEmpty === true
@@ -133,13 +144,11 @@ export function DrawerEditableTextField({
         type={inputType}
         value={draft}
         onChange={event => setDraft(event.target.value)}
-        onBlur={() => {
-          void commit();
-        }}
+        onBlur={handleCommit}
         onKeyDown={event => {
           if (event.key === 'Enter') {
             event.preventDefault();
-            void commit();
+            handleCommit();
           } else if (event.key === 'Escape') {
             event.preventDefault();
             cancel();
@@ -204,7 +213,7 @@ export function DrawerEditableTextField({
           <DrawerInlineIconButton
             onClick={event => {
               event.stopPropagation();
-              void handleCopy();
+              handleCopyClick();
             }}
             aria-label={copyLabel ?? `Copy ${label}`}
             className='text-tertiary-token'

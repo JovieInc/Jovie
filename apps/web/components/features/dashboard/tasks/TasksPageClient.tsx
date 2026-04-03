@@ -103,6 +103,18 @@ const TASK_ASSIGNEE_OPTIONS = [
   ['jovie', 'Jovie'],
 ] as const satisfies ReadonlyArray<readonly [TaskAssigneeKind, string]>;
 
+const NOOP = () => {};
+const NOOP_TASK_OPEN = (_task: TaskView) => {};
+const NOOP_TASK_STATUS_UPDATE = (_taskId: string, _status: TaskStatus) => {};
+const NOOP_TASK_PRIORITY_UPDATE = (
+  _taskId: string,
+  _priority: TaskPriority
+) => {};
+const NOOP_TASK_ASSIGNEE_UPDATE = (
+  _taskId: string,
+  _assigneeKind: TaskAssigneeKind
+) => {};
+
 function resolveArtistName(
   profile: Readonly<{
     display_name?: string | null;
@@ -689,10 +701,12 @@ export function TasksPageClient() {
   );
   const [editorTitle, setEditorTitle] = useState('');
   const [editorDescription, setEditorDescription] = useState('');
+  const latestSelectedTaskIdRef = useRef<string | null>(null);
   const deferredSearch = useDeferredValue(search);
   const profileId = selectedProfile?.id;
   const createTaskMutation = useCreateTaskMutation();
   const updateTaskMutation = useUpdateTaskMutation();
+  const { mutate: updateTask, isPending: isUpdatingTask } = updateTaskMutation;
   const { data: releases = [] } = useReleasesQuery(profileId ?? '');
 
   const filters = useMemo(
@@ -893,7 +907,11 @@ export function TasksPageClient() {
   }, [canSelectNext, selectTaskByIndex, selectedTaskIndex]);
 
   useEffect(() => {
-    if (!selectedTask || updateTaskMutation.isPending) {
+    latestSelectedTaskIdRef.current = selectedTask?.id ?? null;
+  }, [selectedTask]);
+
+  useEffect(() => {
+    if (!selectedTask || isUpdatingTask) {
       return;
     }
 
@@ -908,10 +926,16 @@ export function TasksPageClient() {
       return;
     }
 
+    const selectedTaskIdAtSchedule = selectedTask.id;
+
     const timeoutId = globalThis.setTimeout(() => {
-      updateTaskMutation.mutate(
+      if (selectedTaskIdAtSchedule !== latestSelectedTaskIdRef.current) {
+        return;
+      }
+
+      updateTask(
         {
-          taskId: selectedTask.id,
+          taskId: selectedTaskIdAtSchedule,
           data: {
             title: nextTitle,
             description: nextDescription || null,
@@ -931,9 +955,9 @@ export function TasksPageClient() {
   }, [
     editorDescription,
     editorTitle,
+    isUpdatingTask,
     selectedTask,
-    updateTaskMutation,
-    updateTaskMutation.isPending,
+    updateTask,
   ]);
 
   useEffect(() => {
@@ -964,12 +988,19 @@ export function TasksPageClient() {
       taskId: string,
       data: Partial<Pick<TaskView, 'status' | 'priority' | 'assigneeKind'>>
     ) => {
-      updateTaskMutation.mutate({
-        taskId,
-        data,
-      });
+      updateTask(
+        {
+          taskId,
+          data,
+        },
+        {
+          onError: () => {
+            toast.error("Couldn't update task");
+          },
+        }
+      );
     },
-    [updateTaskMutation]
+    [updateTask]
   );
 
   const getTaskContextMenuItems = useCallback(
@@ -1309,13 +1340,13 @@ export function TasksPageClient() {
                   task={null}
                   title=''
                   description=''
-                  onTitleChange={() => {}}
-                  onDescriptionChange={() => {}}
-                  onClose={() => {}}
-                  onOpenRelease={() => {}}
-                  onUpdateStatus={() => {}}
-                  onUpdatePriority={() => {}}
-                  onUpdateAssignee={() => {}}
+                  onTitleChange={NOOP}
+                  onDescriptionChange={NOOP}
+                  onClose={NOOP}
+                  onOpenRelease={NOOP_TASK_OPEN}
+                  onUpdateStatus={NOOP_TASK_STATUS_UPDATE}
+                  onUpdatePriority={NOOP_TASK_PRIORITY_UPDATE}
+                  onUpdateAssignee={NOOP_TASK_ASSIGNEE_UPDATE}
                   artistName={artistName}
                   isDesktopLayout={isXlUp}
                 />

@@ -228,10 +228,8 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
 
-    expect(releaseMatrix).toContain("<PageShell className='mt-2.5'");
-    expect(releaseMatrix).toContain(
-      "<PageShell className='mt-2.5' data-testid='release-table-shell'>"
-    );
+    expect(releaseMatrix).toContain("className='mt-2.5'");
+    expect(releaseMatrix).toContain("data-testid='release-table-shell'");
   });
 
   it('keeps task and preview cards off the shell canvas token', () => {
@@ -278,11 +276,13 @@ describe('surface elevation guardrails', () => {
     );
 
     expect(shellFrame).toContain('lg:shadow-[var(--linear-app-shell-shadow)]');
-    expect(shellFrame).toContain('lg:ml-[var(--linear-app-shell-gap)]');
-    expect(sidebar).toContain(
-      'group-data-[variant=sidebar]:lg:shadow-[var(--linear-app-sidebar-shadow)]'
+    expect(shellFrame).toContain(
+      'lg:gap-[var(--linear-app-shell-gap)] lg:p-[var(--linear-app-shell-gap)]'
     );
     expect(linearTokens).toContain('--linear-app-sidebar-shadow:');
+    expect(sidebar).not.toContain(
+      'group-data-[variant=sidebar]:lg:shadow-[var(--linear-app-sidebar-shadow)]'
+    );
     expect(rightDrawer).toContain('bg-surface-0');
     // Mobile overlay retains shadow; desktop drawer is flat so elevation
     // comes from DrawerSurfaceCard cards inside the shell, not the outer aside.

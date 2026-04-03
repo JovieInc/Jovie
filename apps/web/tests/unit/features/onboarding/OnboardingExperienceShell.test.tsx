@@ -31,14 +31,17 @@ describe('OnboardingExperienceShell', () => {
   });
 
   it('supports a flat stage surface', () => {
-    const { container } = render(
+    render(
       <OnboardingExperienceShell mode='standalone' stageVariant='flat'>
         <div>Flat Stage</div>
       </OnboardingExperienceShell>
     );
 
     expect(screen.getByText('Flat Stage')).toBeInTheDocument();
-    expect(container.innerHTML).toContain('px-0 py-2');
+    expect(screen.getByTestId('onboarding-stage-flat')).toHaveAttribute(
+      'data-stage-variant',
+      'flat'
+    );
   });
 
   it('supports embedded mode without fullscreen classes', () => {

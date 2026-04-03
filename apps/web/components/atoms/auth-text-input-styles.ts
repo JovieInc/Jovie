@@ -4,9 +4,9 @@ export const AUTH_TEXT_INPUT_BASE_CLASS = cn(
   'border border-subtle bg-surface-0 text-primary-token',
   'placeholder:text-tertiary-token',
   'rounded-full',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40 focus-visible:ring-offset-2',
-  'h-(--linear-button-height-md) sm:h-(--linear-button-height-md) min-h-[40px] px-3',
-  'text-(--linear-caption-size) font-(--linear-caption-weight)',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/40 focus-visible:ring-offset-2',
+  'h-10 min-h-10 px-3',
+  'text-sm font-medium',
   'touch-manipulation',
   '[-webkit-tap-highlight-color:transparent]',
   'transition-colors duration-150'

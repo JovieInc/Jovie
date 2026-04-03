@@ -48,6 +48,7 @@ const mockTaskTwo = {
 const mockCreateTask = vi.fn();
 const mockUpdateTask = vi.fn();
 const mockSetHeaderActions = vi.fn();
+let setHeaderActionsHost: ((actions: React.ReactNode) => void) | null = null;
 let mockIsXlUp = true;
 let mockIs2xlUp = true;
 
@@ -64,7 +65,10 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
 
 vi.mock('@/contexts/HeaderActionsContext', () => ({
   useSetHeaderActions: () => ({
-    setHeaderActions: mockSetHeaderActions,
+    setHeaderActions: (actions: React.ReactNode) => {
+      mockSetHeaderActions(actions);
+      setHeaderActionsHost?.(actions);
+    },
   }),
 }));
 
@@ -200,9 +204,23 @@ const { TasksPageClient } = await import(
   '@/components/features/dashboard/tasks/TasksPageClient'
 );
 
+function HeaderActionsHost() {
+  const [actions, setActions] = React.useState<React.ReactNode>(null);
+
+  React.useEffect(() => {
+    setHeaderActionsHost = setActions;
+    return () => {
+      setHeaderActionsHost = null;
+    };
+  }, []);
+
+  return <div data-testid='header-actions-host'>{actions}</div>;
+}
+
 function renderPage() {
   return render(
     <TooltipProvider>
+      <HeaderActionsHost />
       <TasksPageClient />
     </TooltipProvider>
   );
@@ -314,10 +332,6 @@ describe('TasksPageClient', () => {
   it('promotes the header into create mode when new task is triggered', () => {
     renderPage();
 
-    const headerActions = mockSetHeaderActions.mock.calls.at(-1)?.[0];
-    expect(headerActions).toBeTruthy();
-
-    render(headerActions);
     fireEvent.click(screen.getByRole('button', { name: 'Create task' }));
 
     expect(screen.getByLabelText('New task name')).toBeInTheDocument();

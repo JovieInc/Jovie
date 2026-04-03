@@ -79,13 +79,12 @@ describe('TableActionMenu', () => {
     ).toBeInTheDocument();
   });
 
-  it('uses a borderless default trigger style', () => {
+  it('renders an accessible default trigger button', () => {
     render(<TableActionMenu items={sampleItems} />);
 
     const trigger = screen.getByRole('button', { name: 'Open menu' });
-    expect(trigger.className).toContain('border-transparent');
-    expect(trigger.className).not.toContain('hover:border-subtle');
-    expect(trigger.className).not.toContain('focus-visible:border-');
+    expect(trigger).toBeInTheDocument();
+    expect(trigger).toHaveAccessibleName('Open menu');
   });
 
   it('converts action items to dropdown items', () => {

@@ -184,7 +184,7 @@ export function TableFilterDropdown<T extends string = string>({
             size='sm'
             className={cn(
               PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-              PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+              iconOnly && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
               (isOpen || hasAnyFilter) && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
               buttonClassName
             )}

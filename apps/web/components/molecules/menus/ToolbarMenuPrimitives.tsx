@@ -1,7 +1,7 @@
 import { DropdownMenuItem } from '@jovie/ui';
 import { Check } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
+import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import { cn } from '@/lib/utils';
 
 export const TOOLBAR_MENU_CONTENT_CLASS = cn(
@@ -22,7 +22,7 @@ export const TOOLBAR_MENU_LEADING_VISUAL_CLASS =
   'flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token';
 
 export const TOOLBAR_MENU_TRAILING_VISUAL_CLASS =
-  'flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token';
+  'inline-flex min-w-4 shrink-0 items-center justify-end text-tertiary-token';
 
 export function ToolbarMenuRow({
   leadingVisual,

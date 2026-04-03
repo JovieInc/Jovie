@@ -63,11 +63,11 @@ export function ProfileContactHeader({
         <DrawerEditableTextField
           label='Display name'
           value={displayName}
-          editable={editable}
+          editable={editable && Boolean(onDisplayNameChange)}
           emptyLabel='Add display name'
           onSave={async nextValue => {
-            if (nextValue) {
-              onDisplayNameChange?.(nextValue);
+            if (onDisplayNameChange) {
+              await onDisplayNameChange(nextValue ?? '');
             }
           }}
           displayClassName='text-[13px] font-[590] leading-[15px] tracking-[-0.01em] text-primary-token'

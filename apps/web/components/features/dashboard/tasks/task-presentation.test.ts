@@ -4,7 +4,7 @@ import {
   getTaskPriorityVisual,
   getTaskStageVisual,
   getTaskStatusVisual,
-} from '@/components/features/dashboard/tasks/task-presentation';
+} from './task-presentation';
 
 describe('task-presentation', () => {
   it('maps in-progress review states to the 75 percent stage', () => {

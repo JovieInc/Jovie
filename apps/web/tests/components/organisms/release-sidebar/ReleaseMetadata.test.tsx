@@ -128,7 +128,10 @@ describe('ReleaseMetadata canvas status', () => {
       </TooltipProvider>
     );
 
-    expect(screen.getByTestId('release-metadata-card')).toHaveClass('border-0');
+    expect(screen.getByTestId('release-metadata-card')).toHaveAttribute(
+      'data-variant',
+      'flat'
+    );
     expect(screen.getByTestId('release-metadata-grid')).toBeInTheDocument();
     expect(screen.getByText('ISRC')).toBeInTheDocument();
   });

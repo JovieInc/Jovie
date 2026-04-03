@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DrawerEditableTextField } from '@/components/molecules/drawer/DrawerEditableTextField';
+import { DrawerEditableTextField } from './DrawerEditableTextField';
 
 const writeText = vi.fn().mockResolvedValue(undefined);
 
@@ -54,5 +54,25 @@ describe('DrawerEditableTextField', () => {
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith('5054227019579');
     });
+  });
+
+  it('resets the draft when the backing value changes mid-edit', () => {
+    const { rerender } = render(
+      <DrawerEditableTextField label='Label' value='Original' editable />
+    );
+
+    fireEvent.click(screen.getByLabelText('Edit Label'));
+    fireEvent.change(screen.getByLabelText('Edit Label'), {
+      target: { value: 'Unsaved draft' },
+    });
+
+    rerender(
+      <DrawerEditableTextField label='Label' value='Replacement' editable />
+    );
+
+    expect(
+      screen.queryByRole('textbox', { name: 'Edit Label' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Replacement')).toBeInTheDocument();
   });
 });

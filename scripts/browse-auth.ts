@@ -194,9 +194,7 @@ async function runLocalBypassFlow(args: BrowseAuthArgs) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `Local browse auth failed: ${response.status} ${errorText}`
-    );
+    throw new LocalBypassError(response.status, errorText);
   }
 
   const payload = (await response.json()) as {
@@ -225,7 +223,21 @@ async function runLocalBypassFlow(args: BrowseAuthArgs) {
   );
 }
 
+class LocalBypassError extends Error {
+  constructor(
+    readonly status: number,
+    readonly body: string
+  ) {
+    super(`Local browse auth failed: ${status} ${body}`);
+    this.name = 'LocalBypassError';
+  }
+}
+
 function shouldFallbackToClerk(error: unknown): boolean {
+  if (error instanceof LocalBypassError) {
+    return error.status === 403 || error.status === 404;
+  }
+
   if (!(error instanceof Error)) {
     return false;
   }

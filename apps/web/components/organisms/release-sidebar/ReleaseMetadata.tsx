@@ -9,14 +9,14 @@ import {
   SimpleTooltip,
 } from '@jovie/ui';
 import { Check, ChevronDown, Info } from 'lucide-react';
-
+import { useEffect, useRef } from 'react';
 import {
   DrawerButton,
   DrawerEditableTextField,
   DrawerPropertyRow,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
+import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
@@ -160,6 +160,17 @@ export function ReleaseMetadata({
     canvasStatusConfig.displayLabel ?? canvasStatusConfig.label;
   const canEditMetadata = isEditable && Boolean(onSaveMetadata);
   const canEditPrimaryIsrc = isEditable && Boolean(onSavePrimaryIsrc);
+  const metadataDraftRef = useRef({
+    upc: release.upc ?? null,
+    label: release.label ?? null,
+  });
+
+  useEffect(() => {
+    metadataDraftRef.current = {
+      upc: release.upc ?? null,
+      label: release.label ?? null,
+    };
+  }, [release.label, release.upc]);
 
   return (
     <DrawerSurfaceCard
@@ -240,11 +251,16 @@ export function ReleaseMetadata({
                 }}
                 onSave={
                   onSaveMetadata
-                    ? upc =>
-                        onSaveMetadata(release.id, {
+                    ? async upc => {
+                        metadataDraftRef.current = {
+                          ...metadataDraftRef.current,
                           upc,
-                          label: release.label ?? null,
-                        })
+                        };
+                        await onSaveMetadata(
+                          release.id,
+                          metadataDraftRef.current
+                        );
+                      }
                     : undefined
                 }
                 copyValue={release.upc ?? null}
@@ -276,11 +292,16 @@ export function ReleaseMetadata({
                 }}
                 onSave={
                   onSaveMetadata
-                    ? label =>
-                        onSaveMetadata(release.id, {
-                          upc: release.upc ?? null,
+                    ? async label => {
+                        metadataDraftRef.current = {
+                          ...metadataDraftRef.current,
                           label,
-                        })
+                        };
+                        await onSaveMetadata(
+                          release.id,
+                          metadataDraftRef.current
+                        );
+                      }
                     : undefined
                 }
                 copyValue={release.label ?? null}

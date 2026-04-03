@@ -605,7 +605,7 @@ function OnboardingSidebar({
           const isCurrent = step.id === displayStep;
 
           return (
-            <li key={step.id}>
+            <li key={step.id} aria-current={isCurrent ? 'step' : undefined}>
               <div
                 className={cn(
                   'flex items-center gap-3 rounded-xl px-2 py-2 text-[13px] transition-colors',

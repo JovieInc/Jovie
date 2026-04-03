@@ -3,7 +3,7 @@
 import { UserAvatar } from '@jovie/ui';
 import { Disc3 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
+import { ReleaseDueBadge } from '@/components/molecules/ReleaseDueBadge';
 import type { TaskView } from '@/lib/tasks/types';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
@@ -160,7 +160,7 @@ export function TaskListRow({
       <div className='flex w-full min-w-[4.75rem] shrink-0 items-center justify-end gap-1'>
         <div className='min-w-0 flex-1 truncate text-right'>
           {task.dueAt ? (
-            <ReleaseTaskDueBadge
+            <ReleaseDueBadge
               dueDate={task.dueAt}
               dueDaysOffset={null}
               isCompleted={isDone}
