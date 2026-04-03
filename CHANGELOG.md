@@ -85,11 +85,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.111] - 2026-04-02
 
-> Moved tips into Artist Profile so payout setup, tip links, and QR sharing live next to the public profile editor, while legacy earnings routes now land on the new surface and tip traffic stays aligned with analytics.
+> Moved tips into Artist Profile so payout setup, tip links, and QR sharing live next to the public profile editor, while legacy earnings routes now land on the new surface and tip traffic stays aligned with analytics. Added AI album art generation for release workflows, including locked remix-family designs, reusable artist brand kits, deterministic text rendering, and direct apply from chat.
 
 ### Added
 
 - Added a shared monetization summary model and API that powers the new tips card in Artist Profile and the preview drawer Earn tab
+- AI album art generation services for text-free background creation, deterministic typography rendering, durable session storage, and reusable template metadata
+- Artist profile brand kit management with deterministic logo placement plus a dedicated logo upload route
+- Empty-state album art generation flows in the release drawer and add-release drawer, with matching-design and series-template entry points
+- Interactive chat album art cards with direct apply actions, session-aware state handling, and coverage for chat-side album art behavior
 
 ### Changed
 
@@ -97,12 +101,17 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Legacy earnings and tipping routes now redirect to `Settings > Artist Profile ?tab=earn#tips`
 - Smart setup prompts now use generic tips and payments copy instead of Venmo-specific language
 - Analytics now shows a single `Tip Link Visits` metric when tip traffic exists
+- Release, chat, and entitlements contracts now expose album art template metadata and the per-release album art run limit
+- Release-side series generation can now choose among multiple saved brand kits instead of forcing the default template
+- Daily maintenance now includes expired album art session cleanup and blob cleanup retries
 
 ### Fixed
 
 - Tip visit totals now count all tracked tip-link visits so the new tips surfaces match analytics
 - Preserved existing getting-started checklist completion for the renamed tips task
 - [internal] Updated route-matrix and performance-manifest expectations to the new redirects and current settings section selectors
+- Album art cleanup now expires stale generation sessions and removes orphaned preview assets during daily maintenance
+- Chat album art apply state resets correctly when a new generation session replaces the previous result
 
 ## [26.4.110] - 2026-04-02
 
