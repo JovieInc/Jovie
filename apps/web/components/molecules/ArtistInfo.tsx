@@ -80,16 +80,19 @@ export function ArtistInfo({
     </div>
   );
 
+  let alignmentClass: string;
+  if (bodyLayout === 'split') {
+    alignmentClass = 'items-center';
+  } else if (align === 'start') {
+    alignmentClass = 'items-start text-left';
+  } else {
+    alignmentClass = 'items-center text-center';
+  }
+
   return (
     <div
       data-testid='profile-header'
-      className={`flex flex-col space-y-2.5 sm:space-y-3 ${
-        bodyLayout === 'split'
-          ? 'items-center'
-          : align === 'start'
-            ? 'items-start text-left'
-            : 'items-center text-center'
-      } ${className}`}
+      className={`flex flex-col space-y-2.5 sm:space-y-3 ${alignmentClass} ${className}`}
     >
       <ProfilePhotoContextMenu
         name={artist.name}

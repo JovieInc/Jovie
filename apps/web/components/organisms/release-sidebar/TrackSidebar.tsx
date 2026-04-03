@@ -312,11 +312,14 @@ export function TrackSidebar({
     }).catch(() => {});
   }, [playableUrl, toggleTrack, track]);
 
-  const trackLabel = track
-    ? track.discNumber > 1
-      ? `${track.discNumber}-${track.trackNumber}`
-      : String(track.trackNumber)
-    : '';
+  let trackLabel: string;
+  if (!track) {
+    trackLabel = '';
+  } else if (track.discNumber > 1) {
+    trackLabel = `${track.discNumber}-${track.trackNumber}`;
+  } else {
+    trackLabel = String(track.trackNumber);
+  }
 
   return (
     <EntitySidebarShell
