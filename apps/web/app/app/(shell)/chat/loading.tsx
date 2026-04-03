@@ -36,7 +36,7 @@ export default function ChatLoading() {
                     disabled
                     rows={1}
                     aria-label='Chat message input'
-                    placeholder='Ask Jovie anything'
+                    placeholder='Ask Jovie...'
                     className='min-w-0 flex-1 resize-none bg-transparent py-1.5 text-[14px] leading-6 text-primary-token placeholder:text-tertiary-token focus:outline-none'
                   />
                   <button
@@ -52,9 +52,9 @@ export default function ChatLoading() {
 
               {/* Suggested prompts skeleton */}
               <div className='flex flex-wrap justify-center gap-2 pt-1'>
-                <Skeleton className='h-8 w-28 rounded-full' rounded='full' />
-                <Skeleton className='h-8 w-24 rounded-full' rounded='full' />
-                <Skeleton className='h-8 w-32 rounded-full' rounded='full' />
+                <Skeleton className='h-8 w-28' rounded='full' />
+                <Skeleton className='h-8 w-24' rounded='full' />
+                <Skeleton className='h-8 w-32' rounded='full' />
               </div>
             </div>
           </div>

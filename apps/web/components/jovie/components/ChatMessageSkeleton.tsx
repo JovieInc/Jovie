@@ -10,9 +10,13 @@ export function ChatMessageSkeleton() {
     <div
       className='mx-auto max-w-[44rem] space-y-6 px-4 py-6'
       aria-hidden='true'
+      data-testid='chat-message-skeleton'
     >
       {/* Assistant message skeleton */}
-      <div className='flex justify-start gap-3'>
+      <div
+        className='flex justify-start gap-3'
+        data-testid='assistant-skeleton'
+      >
         <Skeleton className='h-8 w-8 shrink-0 rounded-xl' rounded='lg' />
         <div className='max-w-[60%] space-y-2 rounded-[16px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-3.5'>
           <Skeleton className='h-4 w-[85%]' rounded='lg' />
@@ -22,7 +26,7 @@ export function ChatMessageSkeleton() {
       </div>
 
       {/* User message skeleton */}
-      <div className='flex justify-end gap-3'>
+      <div className='flex justify-end gap-3' data-testid='user-skeleton'>
         <div className='max-w-[52%] space-y-2 rounded-[14px] bg-accent/90 px-4 py-3'>
           <Skeleton className='h-4 w-[75%] bg-white/25' rounded='lg' />
         </div>
