@@ -48,6 +48,7 @@ describe('DEFAULT_RELEASE_TASK_TEMPLATE', () => {
       'DSP Pitching',
       'DSP Profile',
       'Lyrics',
+      'Press',
       'Platform',
       'Fan Engagement',
       'Post-Release',
@@ -91,5 +92,16 @@ describe('DEFAULT_RELEASE_TASK_TEMPLATE', () => {
       // Explainer should be at least a sentence
       expect(item.explainerText!.length).toBeGreaterThan(20);
     }
+  });
+
+  it('ships editor helpers for the press release and distributor form tasks', () => {
+    const helperTitles = DEFAULT_RELEASE_TASK_TEMPLATE.filter(
+      item => item.descriptionHelper
+    ).map(item => item.title);
+
+    expect(helperTitles).toEqual([
+      'Complete distributor marketing/pitching form',
+      'Draft press release',
+    ]);
   });
 });

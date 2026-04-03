@@ -75,4 +75,34 @@ describe('DrawerEditableTextField', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText('Replacement')).toBeInTheDocument();
   });
+
+  it('preserves the trailing action slot while editing', () => {
+    render(
+      <DrawerEditableTextField
+        label='Spotify URL'
+        value='https://open.spotify.com/artist/4u'
+        editable
+        copyValue='https://open.spotify.com/artist/4u'
+        actions={[
+          {
+            id: 'open-link',
+            ariaLabel: 'Open Spotify URL',
+            href: 'https://open.spotify.com/artist/4u',
+          },
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByLabelText('Edit Spotify URL'));
+
+    screen.getByRole('textbox', { name: 'Edit Spotify URL' });
+    const actionSlot = document.querySelector(
+      '[data-slot="drawer-editable-text-field-actions"][aria-hidden="true"]'
+    );
+
+    expect(actionSlot).not.toBeNull();
+    expect(actionSlot?.children).toHaveLength(2);
+    expect(screen.queryByLabelText('Copy Spotify URL')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Open Spotify URL')).not.toBeInTheDocument();
+  });
 });

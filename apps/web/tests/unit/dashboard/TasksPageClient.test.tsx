@@ -120,13 +120,50 @@ const mockTaskTwo = {
   priority: 'medium',
 } as const;
 
+const mockTaskDescriptionHelper = {
+  title: 'Press Release',
+  intro: [
+    'Start drafting your press release here, or tag @Jovie and ask her to draft a first pass for you.',
+  ],
+  bullets: [
+    'What is being announced',
+    'Why this release matters now',
+    'Release date and key context',
+  ],
+  links: [
+    {
+      label: 'UnitedMasters Promote Tab',
+      href: 'https://support.unitedmasters.com/hc/en-us/articles/4407142673299-How-do-I-promote-my-music-using-UnitedMasters',
+    },
+  ],
+  footer: 'Keep it tight. One page is enough.',
+} as const;
+
+const mockHelperTask = {
+  ...mockTask,
+  id: 'task-helper',
+  taskNumber: 3,
+  title: 'Draft press release',
+  description: null,
+  status: 'todo',
+  priority: 'medium',
+  category: 'Press',
+  sourceTemplateId: 'template-press-release',
+  metadata: {
+    descriptionHelper: mockTaskDescriptionHelper,
+  },
+} as const;
+
 const mockCreateTask = vi.fn();
+const mockDeleteTask = vi.fn();
 const mockUpdateTask = vi.fn();
 const mockSetHeaderActions = vi.fn();
 let setHeaderActionsHost: ((actions: React.ReactNode) => void) | null = null;
 let mockIsXlUp = true;
 let mockIs2xlUp = true;
+let mockTasksData = [mockTask, mockTaskTwo];
 let mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
+const mockUnifiedTable = vi.fn();
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({
@@ -178,24 +215,23 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
 
 vi.mock('@/lib/queries/useTasksQuery', () => ({
   useTasksQuery: () => ({
-    data: { tasks: [mockTask, mockTaskTwo] },
+    data: { tasks: mockTasksData },
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
   }),
   useTaskQuery: (taskId: string | null) => ({
-    data:
-      taskId === 'task-1'
-        ? mockTask
-        : taskId === 'task-2'
-          ? mockTaskTwo
-          : undefined,
+    data: mockTasksData.find(task => task.id === taskId),
   }),
 }));
 
 vi.mock('@/lib/queries/useTaskMutations', () => ({
   useCreateTaskMutation: () => ({
     mutateAsync: mockCreateTask,
+    isPending: false,
+  }),
+  useDeleteTaskMutation: () => ({
+    mutate: mockDeleteTask,
     isPending: false,
   }),
   useUpdateTaskMutation: () => ({
@@ -229,7 +265,10 @@ vi.mock('@/components/organisms/PageShell', async importOriginal => {
   return {
     ...actual,
     PageShell: ({ children }: { children: React.ReactNode }) => (
-      <div data-testid='page-shell'>{children}</div>
+      <div data-testid='page-shell'>
+        <div data-testid='dashboard-header' />
+        {children}
+      </div>
     ),
   };
 });
@@ -276,7 +315,16 @@ vi.mock('@/components/organisms/table', () => ({
       {end}
     </div>
   ),
-  UnifiedTable: () => <div data-testid='tasks-table' />,
+  UnifiedTable: (props: { minWidth?: string; containerClassName?: string }) => {
+    mockUnifiedTable(props);
+    return (
+      <div
+        data-testid='tasks-table'
+        data-min-width={props.minWidth ?? ''}
+        data-container-class-name={props.containerClassName ?? ''}
+      />
+    );
+  },
   convertContextMenuItems: vi.fn(() => []),
 }));
 
@@ -320,10 +368,13 @@ describe('TasksPageClient', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mockCreateTask.mockReset();
+    mockDeleteTask.mockReset();
     mockUpdateTask.mockReset();
     mockSetHeaderActions.mockReset();
+    mockUnifiedTable.mockReset();
     mockIsXlUp = true;
     mockIs2xlUp = true;
+    mockTasksData = [mockTask, mockTaskTwo];
     mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
   });
 
@@ -349,6 +400,17 @@ describe('TasksPageClient', () => {
     expect(titleEditor).toHaveValue(mockTaskTwo.title);
   });
 
+  it('keeps the tasks subheader at the same compact header height as the page header', () => {
+    renderPage();
+
+    const pageHeader = screen.getByTestId('dashboard-header');
+    const subheader = screen.getByTestId('tasks-workspace-subheader');
+
+    expect(subheader.getBoundingClientRect().height).toBe(
+      pageHeader.getBoundingClientRect().height
+    );
+  });
+
   it('shows the compact progress metadata for the selected task', () => {
     renderPage();
 
@@ -364,6 +426,19 @@ describe('TasksPageClient', () => {
     expect(
       screen.getByTestId('task-document-scroll-region')
     ).toBeInTheDocument();
+  });
+
+  it('pins the tasks table to the pane width instead of inheriting a wider table minimum', () => {
+    renderPage();
+
+    expect(screen.getByTestId('tasks-table')).toHaveAttribute(
+      'data-min-width',
+      '100%'
+    );
+    expect(screen.getByTestId('tasks-table')).toHaveAttribute(
+      'data-container-class-name',
+      'h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5'
+    );
   });
 
   it('hides the task document when the right panel opens on constrained desktop widths', () => {
@@ -404,6 +479,150 @@ describe('TasksPageClient', () => {
         onError: expect.any(Function),
       })
     );
+  });
+
+  it('shows the empty-description helper for supported release tasks', () => {
+    mockTasksData = [mockHelperTask, mockTask];
+
+    renderPage();
+
+    expect(screen.getByTestId('task-description-helper')).toBeInTheDocument();
+    expect(screen.getByText('Press Release')).toBeInTheDocument();
+    expect(
+      screen.getByText(/tag @Jovie and ask her to draft a first pass/i)
+    ).toBeInTheDocument();
+  });
+
+  it('does not show the helper when the selected task already has a description', () => {
+    renderPage();
+
+    expect(
+      screen.queryByTestId('task-description-helper')
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Task description')).toHaveValue(
+      mockTaskTwo.description
+    );
+  });
+
+  it('does not show the helper for manual empty-description tasks', () => {
+    mockTasksData = [
+      {
+        ...mockTask,
+        id: 'manual-task',
+        description: null,
+        releaseId: null,
+        releaseTitle: null,
+        metadata: null,
+      },
+      mockTask,
+    ];
+
+    renderPage();
+
+    expect(
+      screen.queryByTestId('task-description-helper')
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Task description')).toBeInTheDocument();
+  });
+
+  it('hides the helper when the user clicks into the helper body', () => {
+    mockTasksData = [mockHelperTask, mockTask];
+
+    renderPage();
+
+    fireEvent.click(screen.getByTestId('task-description-helper'));
+
+    expect(
+      screen.queryByTestId('task-description-helper')
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Task description')).toBeInTheDocument();
+  });
+
+  it('shows the helper for existing release tasks without helper metadata', () => {
+    mockTasksData = [
+      {
+        ...mockHelperTask,
+        metadata: {
+          dueDaysOffset: -21,
+        },
+      },
+      mockTask,
+    ];
+
+    renderPage();
+
+    expect(screen.getByTestId('task-description-helper')).toBeInTheDocument();
+    expect(screen.getByText('Press Release')).toBeInTheDocument();
+  });
+
+  it('hides the helper when the description editor receives focus', () => {
+    mockTasksData = [mockHelperTask, mockTask];
+
+    renderPage();
+
+    fireEvent.focus(screen.getByLabelText('Task description'));
+
+    expect(
+      screen.queryByTestId('task-description-helper')
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides the helper and keeps typed text in the editor', () => {
+    mockTasksData = [mockHelperTask, mockTask];
+
+    renderPage();
+
+    const editor = screen.getByLabelText('Task description');
+
+    fireEvent.focus(editor);
+    fireEvent.change(editor, {
+      target: {
+        value: 'H',
+      },
+    });
+
+    expect(
+      screen.queryByTestId('task-description-helper')
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Task description')).toHaveValue('H');
+  });
+
+  it('hides the helper before pasted text is written into the editor', () => {
+    mockTasksData = [mockHelperTask, mockTask];
+
+    renderPage();
+
+    const editor = screen.getByLabelText('Task description');
+
+    fireEvent.focus(editor);
+    fireEvent.paste(editor, {
+      clipboardData: {
+        getData: (type: string) => (type === 'text' ? 'Press copy' : ''),
+      },
+    });
+    fireEvent.change(editor, {
+      target: {
+        value: 'Press copy',
+      },
+    });
+
+    expect(
+      screen.queryByTestId('task-description-helper')
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Task description')).toHaveValue('Press copy');
+  });
+
+  it('does not dirty the editor when a helper link is clicked', () => {
+    mockTasksData = [mockHelperTask, mockTask];
+
+    renderPage();
+
+    fireEvent.click(
+      screen.getByRole('link', { name: 'UnitedMasters Promote Tab' })
+    );
+
+    expect(screen.getByTestId('task-description-helper')).toBeInTheDocument();
+    expect(screen.getByLabelText('Task description')).toHaveValue('');
   });
 
   it('renders previous and next task navigation controls', () => {
@@ -453,6 +672,86 @@ describe('TasksPageClient', () => {
     expect(menuRows.some(row => row.textContent?.includes('In Progress'))).toBe(
       true
     );
+  });
+
+  it('adds a destructive delete action to the task context menu', () => {
+    renderPage();
+
+    const tableProps = mockUnifiedTable.mock.calls.at(-1)?.[0] as
+      | {
+          getContextMenuItems?: (task: typeof mockTaskTwo) => ReadonlyArray<{
+            readonly id: string;
+            readonly label?: string;
+            readonly destructive?: boolean;
+          }>;
+        }
+      | undefined;
+
+    const deleteItem = tableProps
+      ?.getContextMenuItems?.(mockTaskTwo)
+      ?.find(item => item.id === 'delete-task');
+
+    expect(deleteItem).toMatchObject({
+      id: 'delete-task',
+      label: 'Delete Task',
+      destructive: true,
+    });
+  });
+
+  it('confirms before deleting a task from the context menu', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderPage();
+
+    const tableProps = mockUnifiedTable.mock.calls.at(-1)?.[0] as
+      | {
+          getContextMenuItems?: (task: typeof mockTaskTwo) => ReadonlyArray<{
+            readonly id: string;
+            readonly onClick?: () => void;
+          }>;
+        }
+      | undefined;
+
+    const deleteItem = tableProps
+      ?.getContextMenuItems?.(mockTaskTwo)
+      ?.find(item => item.id === 'delete-task');
+
+    deleteItem?.onClick?.();
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      `Delete "${mockTaskTwo.title}"? This can't be undone.`
+    );
+    expect(mockDeleteTask).toHaveBeenCalledWith(
+      mockTaskTwo.id,
+      expect.objectContaining({
+        onError: expect.any(Function),
+      })
+    );
+
+    confirmSpy.mockRestore();
+  });
+
+  it('does not delete a task when the context menu confirmation is cancelled', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderPage();
+
+    const tableProps = mockUnifiedTable.mock.calls.at(-1)?.[0] as
+      | {
+          getContextMenuItems?: (task: typeof mockTaskTwo) => ReadonlyArray<{
+            readonly id: string;
+            readonly onClick?: () => void;
+          }>;
+        }
+      | undefined;
+
+    const deleteItem = tableProps
+      ?.getContextMenuItems?.(mockTaskTwo)
+      ?.find(item => item.id === 'delete-task');
+
+    deleteItem?.onClick?.();
+
+    expect(mockDeleteTask).not.toHaveBeenCalled();
+
+    confirmSpy.mockRestore();
   });
 
   it('supports j and k keyboard navigation across visible tasks', () => {
