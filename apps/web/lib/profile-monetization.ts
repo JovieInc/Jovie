@@ -153,10 +153,12 @@ export function resolveProfileMonetizationSummary(
   let paymentState: ProfilePaymentState;
   if (!hasProfileUrl) {
     paymentState = 'needs_profile_url';
-  } else if (stripeReady || hasVenmoSetup) {
+  } else if (stripeReady) {
     paymentState = resolveReadyState(input.tipVisits, input.tipsReceived);
   } else if (stripeIncomplete) {
     paymentState = 'setup_incomplete';
+  } else if (hasVenmoSetup) {
+    paymentState = resolveReadyState(input.tipVisits, input.tipsReceived);
   } else {
     paymentState = 'not_setup';
   }

@@ -422,7 +422,7 @@ export async function updateTask(
   let completedAt: Date | null | undefined;
   if (data.completedAt !== undefined) {
     completedAt = data.completedAt;
-  } else if (!data.status) {
+  } else if (data.status === undefined) {
     completedAt = existingTask.completedAt;
   } else {
     completedAt =

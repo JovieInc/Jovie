@@ -154,7 +154,7 @@ function updateTaskStatsForStatusChange(
   const resolveCount = (key: keyof TaskStats): number => {
     if (previousStatusKey === key) return previousStatusCount;
     if (nextStatusKey === key) return nextStatusCount;
-    return stats[key] as number;
+    return stats[key];
   };
 
   return {
