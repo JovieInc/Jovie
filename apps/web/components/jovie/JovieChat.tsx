@@ -267,11 +267,14 @@ export function JovieChat({
   } as const;
 
   const greetingName = displayName?.trim() || username?.trim() || null;
-  const emptyStateHeading = isFirstSession
-    ? 'Welcome to Jovie'
-    : greetingName
-      ? `Welcome Back ${greetingName}`
-      : 'Welcome Back';
+  let emptyStateHeading: string;
+  if (isFirstSession) {
+    emptyStateHeading = 'Welcome to Jovie';
+  } else if (greetingName) {
+    emptyStateHeading = `Welcome Back ${greetingName}`;
+  } else {
+    emptyStateHeading = 'Welcome Back';
+  }
 
   return (
     <div
