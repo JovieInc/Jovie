@@ -75,6 +75,8 @@ export function ProfileShell({
   allowPhotoDownloads = false,
   visitTrackingToken,
 }: ProfileShellProps) {
+  const isProfileRoot = !mode || mode === 'profile';
+  const isCompactMobileHeader = !isProfileRoot || showBackButton;
   const {
     handleNotificationsTrigger,
     notificationsEnabled,
@@ -177,22 +179,27 @@ export function ProfileShell({
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
         id='main-content'
-        className='relative w-full min-h-dvh bg-base text-primary-token font-medium tracking-tight'
+        className='relative min-h-dvh w-full overflow-hidden bg-[color:var(--profile-stage-bg)] text-primary-token font-medium tracking-tight'
         data-test='public-profile-root'
       >
+        <div
+          className='pointer-events-none absolute inset-0 bg-[var(--profile-stage-overlay)]'
+          aria-hidden='true'
+        />
+
         {backgroundPattern !== 'none' && (
           <BackgroundPattern variant={backgroundPattern} />
         )}
 
         {showGradientBlurs && (
           <>
-            <div className='absolute left-1/4 top-1/4 h-48 w-48 sm:h-72 sm:w-72 md:h-96 md:w-96 rounded-full bg-surface-2 blur-3xl opacity-20' />
-            <div className='absolute bottom-1/4 right-1/4 h-48 w-48 sm:h-72 sm:w-72 md:h-96 md:w-96 rounded-full bg-surface-3 blur-3xl opacity-15' />
+            <div className='pointer-events-none absolute left-[12%] top-[14%] h-56 w-56 rounded-full bg-[color:var(--profile-stage-glow-a)] blur-3xl sm:h-72 sm:w-72 md:h-[26rem] md:w-[26rem]' />
+            <div className='pointer-events-none absolute bottom-[10%] right-[10%] h-56 w-56 rounded-full bg-[color:var(--profile-stage-glow-b)] blur-3xl sm:h-72 sm:w-72 md:h-[24rem] md:w-[24rem]' />
           </>
         )}
 
         <Container>
-          <div className='absolute left-4 top-4 z-20'>
+          <div className='absolute left-4 top-3.5 z-20 md:top-4'>
             <ProfileNavButton
               showBackButton={showBackButton}
               artistHandle={artist.handle}
@@ -200,48 +207,61 @@ export function ProfileShell({
             />
           </div>
 
-          <div className='absolute right-4 top-4 z-20 flex items-center gap-2'>
+          <div className='absolute right-4 top-3.5 z-20 flex items-center gap-2 md:top-4'>
             {renderNotificationControls()}
           </div>
 
-          <div className='relative z-10 flex min-h-dvh flex-col pt-14 pb-4 sm:pt-16 sm:pb-6'>
+          <div className='relative z-10 flex min-h-dvh flex-col pb-4 pt-12 sm:pb-6 sm:pt-14'>
             <div className='flex flex-1 flex-col items-center px-4'>
               <div
                 className={`${maxWidthClass} flex min-h-full flex-1 flex-col`}
               >
-                <div className='space-y-4 sm:space-y-5 md:space-y-6'>
-                  <div className='md:grid md:grid-cols-[1fr_auto_1fr] md:items-center'>
-                    <div className='hidden md:block' />
+                <div
+                  className={`${
+                    isCompactMobileHeader
+                      ? 'space-y-3 sm:space-y-4 md:space-y-6'
+                      : 'space-y-4 sm:space-y-5 md:space-y-6'
+                  }`}
+                >
+                  <div className='hidden md:flex md:justify-center'>
                     <ArtistInfo
                       artist={artist}
                       subtitle={subtitle}
                       photoDownloadSizes={photoDownloadSizes}
                       allowPhotoDownloads={allowPhotoDownloads}
-                      className='hidden md:flex'
+                      nameSize='xl'
+                      bodyLayout='split'
+                      trailingContent={headerSocialLinks.map(link => (
+                        <SocialLinkComponent
+                          key={link.id}
+                          link={link}
+                          handle={artist.handle}
+                          artistName={artist.name}
+                        />
+                      ))}
+                      className='w-full max-w-[38rem]'
                     />
-                    {headerSocialLinks.length > 0 ? (
-                      <div className='hidden items-center justify-self-end gap-2 md:flex'>
-                        {headerSocialLinks.map(link => (
-                          <SocialLinkComponent
-                            key={link.id}
-                            link={link}
-                            handle={artist.handle}
-                            artistName={artist.name}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className='hidden md:block' />
-                    )}
                   </div>
                   <ArtistInfo
                     artist={artist}
                     subtitle={subtitle}
                     photoDownloadSizes={photoDownloadSizes}
                     allowPhotoDownloads={allowPhotoDownloads}
-                    className='md:hidden'
+                    avatarSize={isCompactMobileHeader ? 'md' : 'lg'}
+                    nameSize={isCompactMobileHeader ? 'sm' : 'lg'}
+                    viewport='mobile'
+                    className={`md:hidden ${
+                      isCompactMobileHeader
+                        ? '!space-y-2 sm:!space-y-2.5'
+                        : '!space-y-2.5 sm:!space-y-3'
+                    }`}
                   />
-                  {children}
+                  <div
+                    data-testid='profile-content-stack'
+                    className={isCompactMobileHeader ? 'pt-1' : ''}
+                  >
+                    {children}
+                  </div>
                 </div>
 
                 {(showSocialBar ||
@@ -249,20 +269,21 @@ export function ProfileShell({
                   hasTipSupport ||
                   hasContacts ||
                   showShopButton) && (
-                  <div className='mt-auto flex justify-center pt-6 sm:pt-8'>
-                    <div
-                      className='flex min-h-12 flex-wrap items-center justify-center gap-2 rounded-full border border-subtle/50 bg-black/10 px-2 py-2 backdrop-blur-sm sm:gap-3'
+                  <div className='mt-auto pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-6 sm:pt-8'>
+                    <nav
+                      className='mx-auto flex w-full max-w-sm items-center justify-center gap-2 rounded-full border border-[color:var(--profile-dock-border)] bg-[var(--profile-dock-bg)] px-2 py-2 shadow-[var(--profile-dock-shadow)] backdrop-blur-2xl sm:gap-3'
+                      aria-label='Profile modes'
                       data-testid='profile-mode-nav'
                     >
                       <CircleIconButton
                         size='md'
-                        variant='ghost'
+                        variant='pearl'
                         ariaLabel='Profile'
                         data-testid='profile-trigger'
-                        className={`border transition-[background-color,border-color,color] ${
+                        className={`transition-[background-color,color,box-shadow] ${
                           !mode || mode === 'profile'
-                            ? 'border-subtle bg-surface-1 text-primary-token'
-                            : 'border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+                            ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
+                            : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
                         }`}
                         onClick={() => {
                           router.push(`/${artist.handle}`);
@@ -273,13 +294,13 @@ export function ProfileShell({
                       {hasContacts && (
                         <CircleIconButton
                           size='md'
-                          variant='ghost'
+                          variant='pearl'
                           ariaLabel='Contact'
                           data-testid='contact-trigger'
-                          className={`border transition-[background-color,border-color,color] ${
+                          className={`transition-[background-color,color,box-shadow] ${
                             mode === 'contact'
-                              ? 'border-subtle bg-surface-1 text-primary-token'
-                              : 'border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+                              ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
+                              : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
                           }`}
                           onClick={() => {
                             router.push(`/${artist.handle}?mode=contact`);
@@ -292,13 +313,13 @@ export function ProfileShell({
                       {showTourButton && (
                         <CircleIconButton
                           size='md'
-                          variant='ghost'
+                          variant='pearl'
                           ariaLabel='Tour dates'
                           data-testid='tour-trigger'
-                          className={`border transition-[background-color,border-color,color] ${
+                          className={`transition-[background-color,color,box-shadow] ${
                             isTourModeActive
-                              ? 'border-subtle bg-surface-1 text-primary-token'
-                              : 'border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+                              ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
+                              : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
                           }`}
                           onClick={() => {
                             router.push(`/${artist.handle}?mode=tour`);
@@ -312,10 +333,10 @@ export function ProfileShell({
                       {showShopButton && (
                         <CircleIconButton
                           size='md'
-                          variant='ghost'
+                          variant='pearl'
                           ariaLabel='Shop'
                           data-testid='shop-trigger'
-                          className='border border-subtle/50 bg-transparent text-secondary-token transition-[background-color,border-color,color] hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+                          className='border-transparent bg-transparent text-tertiary-token shadow-none transition-[background-color,color,box-shadow] hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
                           onClick={() => {
                             window.open(
                               `/${artist.handle}/shop`,
@@ -332,13 +353,13 @@ export function ProfileShell({
                       {hasTipSupport && venmoLink && (
                         <CircleIconButton
                           size='md'
-                          variant='ghost'
+                          variant='pearl'
                           ariaLabel='Tip'
                           data-testid='tip-trigger'
-                          className={`border transition-[background-color,border-color,color] ${
+                          className={`transition-[background-color,color,box-shadow] ${
                             isTipModeActive
-                              ? 'border-subtle bg-surface-1 text-primary-token'
-                              : 'border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+                              ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
+                              : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
                           }`}
                           onClick={() => {
                             if (isMobile) {
@@ -351,7 +372,7 @@ export function ProfileShell({
                           <DollarSign className='h-4 w-4' aria-hidden='true' />
                         </CircleIconButton>
                       )}
-                    </div>
+                    </nav>
                   </div>
                 )}
               </div>

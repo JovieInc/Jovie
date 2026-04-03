@@ -1,0 +1,375 @@
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { test } from './setup';
+import { waitForHydration } from './utils/smoke-test-utils';
+
+type ShellVariant = 'legacy' | 'v2';
+type ThemeVariant = 'dark' | 'light';
+type BreakpointVariant = 'mobile' | 'tablet' | 'desktop';
+
+interface BreakpointConfig {
+  readonly name: BreakpointVariant;
+  readonly width: number;
+  readonly height: number;
+}
+
+interface ProfileAuditCase {
+  readonly id: string;
+  readonly path: string;
+  readonly readySelector: string;
+  readonly shells: readonly ShellVariant[];
+  readonly composerVisible?: boolean;
+  readonly focusComposerInput?: boolean;
+}
+
+const TEST_PROFILE = 'dualipa';
+const TIP_PROFILE = 'testartist';
+const NOTIFICATIONS_PROFILE = 'testartist';
+const BREAKPOINTS: readonly BreakpointConfig[] = [
+  { name: 'mobile', width: 390, height: 844 },
+  { name: 'tablet', width: 768, height: 1024 },
+  { name: 'desktop', width: 1280, height: 900 },
+];
+const THEMES: readonly ThemeVariant[] = ['dark', 'light'];
+const PROFILE_CASES: readonly ProfileAuditCase[] = [
+  {
+    id: 'profile',
+    path: `/${TEST_PROFILE}`,
+    readySelector: '[data-testid="profile-header"]',
+    shells: ['legacy', 'v2'],
+  },
+  {
+    id: 'listen',
+    path: `/${TEST_PROFILE}?mode=listen`,
+    readySelector: '[data-testid="profile-header"]',
+    shells: ['legacy', 'v2'],
+  },
+  {
+    id: 'subscribe',
+    path: `/${TEST_PROFILE}?mode=subscribe`,
+    readySelector: '[data-testid="subscribe-cta-container"]',
+    shells: ['legacy', 'v2'],
+    composerVisible: true,
+  },
+  {
+    id: 'subscribe-focus',
+    path: `/${TEST_PROFILE}?mode=subscribe`,
+    readySelector: '[data-testid="subscribe-cta-container"]',
+    shells: ['legacy', 'v2'],
+    composerVisible: true,
+    focusComposerInput: true,
+  },
+  {
+    id: 'about',
+    path: `/${TEST_PROFILE}?mode=about`,
+    readySelector: '[data-testid="profile-header"]',
+    shells: ['legacy', 'v2'],
+  },
+  {
+    id: 'tour',
+    path: `/${TEST_PROFILE}?mode=tour`,
+    readySelector: '#profile-tour-heading, [data-testid="profile-header"]',
+    shells: ['legacy', 'v2'],
+  },
+  {
+    id: 'contact',
+    path: `/${TEST_PROFILE}?mode=contact`,
+    readySelector:
+      '[data-testid="profile-header"], [data-testid="contact-drawer"]',
+    shells: ['legacy', 'v2'],
+  },
+  {
+    id: 'tip',
+    path: `/${TIP_PROFILE}?mode=tip`,
+    readySelector: '[data-testid="profile-header"], [data-testid="tip-drawer"]',
+    shells: ['legacy', 'v2'],
+  },
+  {
+    id: 'notifications',
+    path: `/${NOTIFICATIONS_PROFILE}/notifications`,
+    readySelector: '[data-testid="notifications-page"]',
+    shells: ['legacy'],
+    composerVisible: true,
+  },
+  {
+    id: 'notifications-focus',
+    path: `/${NOTIFICATIONS_PROFILE}/notifications`,
+    readySelector: '[data-testid="notifications-page"]',
+    shells: ['legacy'],
+    composerVisible: true,
+    focusComposerInput: true,
+  },
+];
+
+const DEV_OVERLAY_SELECTORS = [
+  '[data-sonner-toaster]',
+  '[data-testid="cookie-banner"], [data-cookie-banner]',
+  '[role="tooltip"]',
+  '#intercom-container, .intercom-lightweight-app',
+  '[data-testid="dev-toolbar"]',
+  '.tsqd-parent-container',
+  'button[aria-label*="query devtools" i]',
+  '#vercel-toolbar',
+  '[data-nextjs-dialog-overlay]',
+  '[data-nextjs-toast]',
+  'nextjs-portal',
+  '[data-nextjs-build-indicator]',
+] as const;
+
+const WEB_ROOT = process.cwd().endsWith('/apps/web')
+  ? process.cwd()
+  : path.resolve(process.cwd(), 'apps/web');
+const REPO_ROOT = path.resolve(WEB_ROOT, '..', '..');
+const cycleName = process.env.PROFILE_AUDIT_CYCLE ?? 'cycle-01';
+const cycleDir = path.join(REPO_ROOT, '.context/profile-audit', cycleName);
+
+function withShellVariant(routePath: string, shell: ShellVariant): string {
+  if (shell === 'legacy') {
+    return routePath;
+  }
+
+  const separator = routePath.includes('?') ? '&' : '?';
+  return `${routePath}${separator}ff_profile_v2=1`;
+}
+
+function screenshotName(
+  shell: ShellVariant,
+  theme: ThemeVariant,
+  breakpoint: BreakpointVariant,
+  routeId: string
+): string {
+  return `${shell}-${theme}-${breakpoint}-${routeId}.png`;
+}
+
+async function blockAnalytics(page: import('@playwright/test').Page) {
+  await page.route('**/api/profile/view', route =>
+    route.fulfill({ status: 200, body: '{}' })
+  );
+  await page.route('**/api/audience/visit', route =>
+    route.fulfill({ status: 200, body: '{}' })
+  );
+  await page.route('**/api/track', route =>
+    route.fulfill({ status: 200, body: '{}' })
+  );
+}
+
+async function waitForSettle(page: import('@playwright/test').Page) {
+  await page.waitForLoadState('domcontentloaded').catch(() => undefined);
+  await page.waitForTimeout(1500);
+}
+
+async function waitForImages(page: import('@playwright/test').Page) {
+  await page
+    .waitForFunction(() => {
+      const images = Array.from(document.querySelectorAll('img'));
+      return images.every(
+        img =>
+          (img as HTMLImageElement).complete &&
+          (img as HTMLImageElement).naturalWidth > 0
+      );
+    })
+    .catch(() => undefined);
+}
+
+async function hideTransientUi(page: import('@playwright/test').Page) {
+  await page.evaluate((selectors: readonly string[]) => {
+    const hide = (selector: string) => {
+      document.querySelectorAll(selector).forEach(element => {
+        (element as HTMLElement).style.display = 'none';
+      });
+    };
+
+    selectors.forEach(hide);
+  }, DEV_OVERLAY_SELECTORS);
+}
+
+async function assertNoDevOverlays(page: import('@playwright/test').Page) {
+  const visibleSelectors = await page.evaluate(
+    (selectors: readonly string[]) => {
+      const visible: string[] = [];
+
+      for (const selector of selectors) {
+        const elements = document.querySelectorAll(selector);
+        for (const element of elements) {
+          const style = window.getComputedStyle(element as HTMLElement);
+          if (style.display !== 'none' && style.visibility !== 'hidden') {
+            visible.push(selector);
+            break;
+          }
+        }
+      }
+
+      return visible;
+    },
+    DEV_OVERLAY_SELECTORS
+  );
+
+  if (visibleSelectors.length > 0) {
+    throw new Error(
+      `Dev overlay(s) still visible before screenshot: ${visibleSelectors.join(', ')}`
+    );
+  }
+}
+
+async function waitForVisibleSelector(
+  page: import('@playwright/test').Page,
+  selector: string
+) {
+  await page.waitForFunction(
+    targetSelector => {
+      return Array.from(document.querySelectorAll(targetSelector)).some(
+        element => {
+          const style = window.getComputedStyle(element as HTMLElement);
+          return style.display !== 'none' && style.visibility !== 'hidden';
+        }
+      );
+    },
+    selector,
+    { timeout: 30_000 }
+  );
+}
+
+async function ensureComposerVisible(page: import('@playwright/test').Page) {
+  const composer = page.locator('[data-testid="subscription-pearl-composer"]');
+
+  if ((await composer.count()) > 0) {
+    const visible = await composer
+      .first()
+      .isVisible()
+      .catch(() => false);
+    if (visible) {
+      return;
+    }
+  }
+
+  const revealButton = page
+    .getByRole('button', {
+      name: /turn on notifications|get notified/i,
+    })
+    .first();
+
+  if (await revealButton.isVisible().catch(() => false)) {
+    await revealButton.click();
+  }
+
+  await composer.first().waitFor({ state: 'visible', timeout: 15_000 });
+}
+
+async function focusComposerInput(page: import('@playwright/test').Page) {
+  const input = page.locator('[data-testid="subscription-input"]').first();
+  await input.waitFor({ state: 'visible', timeout: 15_000 });
+  await input.focus();
+}
+
+test.describe('Public profile visual audit @smoke', () => {
+  test.describe.configure({ mode: 'serial' });
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test.beforeAll(() => {
+    mkdirSync(cycleDir, { recursive: true });
+    writeFileSync(
+      path.join(cycleDir, 'manifest.json'),
+      JSON.stringify(
+        {
+          cycle: cycleName,
+          generatedAt: new Date().toISOString(),
+          cases: PROFILE_CASES.flatMap(routeCase =>
+            routeCase.shells.flatMap(shell =>
+              THEMES.flatMap(theme =>
+                BREAKPOINTS.map(breakpoint => ({
+                  routeId: routeCase.id,
+                  shell,
+                  theme,
+                  breakpoint: breakpoint.name,
+                  captureState: routeCase.focusComposerInput
+                    ? 'composer-focus'
+                    : routeCase.composerVisible
+                      ? 'composer'
+                      : 'rest',
+                  path: withShellVariant(routeCase.path, shell),
+                }))
+              )
+            )
+          ),
+        },
+        null,
+        2
+      )
+    );
+  });
+
+  for (const routeCase of PROFILE_CASES) {
+    for (const shell of routeCase.shells) {
+      for (const theme of THEMES) {
+        for (const breakpoint of BREAKPOINTS) {
+          const filename = screenshotName(
+            shell,
+            theme,
+            breakpoint.name,
+            routeCase.id
+          );
+
+          test(`${routeCase.id} · ${shell} · ${theme} · ${breakpoint.name}`, async ({
+            page,
+          }, testInfo) => {
+            await blockAnalytics(page);
+            await page.emulateMedia({ colorScheme: theme });
+            await page.setViewportSize({
+              width: breakpoint.width,
+              height: breakpoint.height,
+            });
+
+            const targetPath = withShellVariant(routeCase.path, shell);
+            await page.goto(targetPath, {
+              waitUntil: 'domcontentloaded',
+              timeout: 120_000,
+            });
+
+            await waitForHydration(page);
+            await waitForVisibleSelector(page, routeCase.readySelector);
+            if (routeCase.composerVisible) {
+              await ensureComposerVisible(page);
+            }
+            if (routeCase.focusComposerInput) {
+              await focusComposerInput(page);
+            }
+
+            await waitForImages(page);
+            await waitForSettle(page);
+            await hideTransientUi(page);
+            await assertNoDevOverlays(page);
+
+            const outputPath = testInfo.outputPath(filename);
+            await page.screenshot({
+              path: outputPath,
+              fullPage: false,
+            });
+
+            copyFileSync(outputPath, path.join(cycleDir, filename));
+            await testInfo.attach('profile-visual-case', {
+              body: JSON.stringify(
+                {
+                  cycle: cycleName,
+                  routeId: routeCase.id,
+                  shell,
+                  theme,
+                  breakpoint: breakpoint.name,
+                  captureState: routeCase.focusComposerInput
+                    ? 'composer-focus'
+                    : routeCase.composerVisible
+                      ? 'composer'
+                      : 'rest',
+                  path: targetPath,
+                  screenshot: filename,
+                },
+                null,
+                2
+              ),
+              contentType: 'application/json',
+            });
+          });
+        }
+      }
+    }
+  }
+});

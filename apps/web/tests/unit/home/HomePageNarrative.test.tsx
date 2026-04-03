@@ -2,67 +2,53 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomePageNarrative } from '@/features/home/HomePageNarrative';
 
-vi.mock('@/components/atoms/DspLogo', () => ({
-  DspLogo: ({ provider }: { provider: string }) => (
-    <div data-testid={`dsp-logo-${provider}`}>{provider}</div>
+vi.mock('@/features/home/ArtistProfileModesShowcase', () => ({
+  ArtistProfileModesShowcase: () => (
+    <div data-testid='artist-profile-modes-showcase'>modes showcase</div>
   ),
 }));
 
-vi.mock('@/features/home/ProductScreenshot', () => ({
-  ProductScreenshot: ({
-    testId,
-    title,
-  }: {
-    testId?: string;
-    title?: string;
-  }) => <div data-testid={testId ?? 'product-screenshot'}>{title}</div>,
+vi.mock('@/features/home/HomeHeroSurfaceCluster', () => ({
+  HomeHeroSurfaceCluster: () => (
+    <div>
+      <div data-testid='homepage-hero-profile-card'>profile</div>
+      <div data-testid='homepage-hero-release-card'>release</div>
+      <div data-testid='homepage-hero-task-card-1'>task-1</div>
+      <div data-testid='homepage-hero-task-card-2'>task-2</div>
+      <div data-testid='homepage-hero-task-card-3'>task-3</div>
+    </div>
+  ),
 }));
 
-vi.mock('@/features/home/phone-showcase-primitives', () => ({
-  MODES: [
-    {
-      id: 'profile',
-      headline: 'Profile',
-      description: 'Profile mode',
-      outcome: 'Grow',
-    },
-    {
-      id: 'tour',
-      headline: 'Tour',
-      description: 'Tour mode',
-      outcome: 'Sell tickets',
-    },
-    {
-      id: 'tip',
-      headline: 'Tip',
-      description: 'Tip mode',
-      outcome: 'Earn tips',
-    },
-    {
-      id: 'listen',
-      headline: 'Listen',
-      description: 'Listen mode',
-      outcome: 'Boost streams',
-    },
-  ],
-  PhoneShowcase: () => <div data-testid='phone-showcase'>phone showcase</div>,
+vi.mock('@/features/home/ReleaseModeMockCard', () => ({
+  ReleaseModeMockCard: ({ testId }: { testId?: string }) => (
+    <div data-testid={testId ?? 'release-mode-card'}>release card</div>
+  ),
+}));
+
+vi.mock('@/features/home/ReleaseOperatingSystemShowcase', () => ({
+  ReleaseOperatingSystemShowcase: () => (
+    <div data-testid='homepage-release-operating-system-surface'>
+      operating system
+    </div>
+  ),
 }));
 
 describe('HomePageNarrative', () => {
-  it('renders the redesigned homepage narrative in order', () => {
+  it('renders the shorter homepage narrative in order', () => {
     render(<HomePageNarrative />);
 
     expect(
       screen.getByRole('heading', {
-        name: 'Drop More Music. Run Every Release.',
+        name: 'Drop more music. Crush every release.',
       })
     ).toBeInTheDocument();
     expect(
-      screen.getByText('One system across the release stack')
+      screen.getByText('Connected with leading label partners')
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', {
-        name: 'One profile. All the fan modes.',
+        name: 'Profiles that convert.',
       })
     ).toBeInTheDocument();
     expect(
@@ -71,19 +57,56 @@ describe('HomePageNarrative', () => {
       })
     ).toBeInTheDocument();
     expect(
+      screen.getAllByText('Notify every fan. Every time. Automatically.').length
+    ).toBeGreaterThan(0);
+    expect(
       screen.getByRole('heading', {
+        name: 'Context, monitoring, and tasks in one system.',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', {
         name: 'AI that knows the context.',
       })
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('heading', {
+      screen.queryByRole('heading', {
         name: 'Your catalog and profile presence, in one view.',
       })
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('heading', {
+      screen.queryByRole('heading', {
         name: 'A promotion plan, generated for every release.',
       })
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the hero cluster, release pair, and merged operating-system surface', () => {
+    render(<HomePageNarrative />);
+
+    expect(
+      screen.getByTestId('homepage-hero-profile-card')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('homepage-hero-release-card')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-hero-task-card-1')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-hero-task-card-2')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-hero-task-card-3')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('artist-profile-modes-showcase')
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByTestId('homepage-release-destination-presave').length
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByTestId('homepage-release-destination-live').length
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByTestId('homepage-release-destination-notification').length
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByTestId('homepage-release-operating-system-surface')
     ).toBeInTheDocument();
   });
 });

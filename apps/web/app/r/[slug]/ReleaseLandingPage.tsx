@@ -344,17 +344,25 @@ export function ReleaseLandingPage({
       {/* Artwork + Info — pinned at top, never scrolls */}
       <div className='shrink-0'>
         {/* Release Artwork */}
-        <AlbumArtworkContextMenu
-          title={release.title}
-          sizes={sizes}
-          allowDownloads={allowDownloads}
-        >
+        {allowDownloads ? (
+          <AlbumArtworkContextMenu
+            title={release.title}
+            sizes={sizes}
+            allowDownloads={allowDownloads}
+          >
+            <SmartLinkArtworkCard
+              title={release.title}
+              artworkUrl={release.artworkUrl}
+              className='shadow-black/40'
+            />
+          </AlbumArtworkContextMenu>
+        ) : (
           <SmartLinkArtworkCard
             title={release.title}
             artworkUrl={release.artworkUrl}
             className='shadow-black/40'
           />
-        </AlbumArtworkContextMenu>
+        )}
 
         {/* Release Info */}
         <div className='mt-4 text-center'>

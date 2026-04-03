@@ -30,12 +30,12 @@ export function ProfileDrawerShell({
       <Drawer.Portal>
         <Drawer.Overlay className={DRAWER_OVERLAY_CLASS} />
         <Drawer.Content
-          className={`fixed inset-x-0 bottom-0 z-50 flex max-h-[88vh] w-full max-w-full flex-col overflow-x-hidden rounded-t-[30px] border-t border-white/10 bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[var(--profile-drawer-shadow)] backdrop-blur-2xl ${contentClassName ?? ''}`}
+          className={`fixed inset-x-0 bottom-0 z-50 flex max-h-[88vh] w-full max-w-full flex-col overflow-hidden rounded-t-[32px] border-t border-[color:var(--profile-panel-border)] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[var(--profile-drawer-shadow)] backdrop-blur-2xl ${contentClassName ?? ''}`}
           data-testid={dataTestId}
           aria-describedby={undefined}
         >
-          <div className='pointer-events-none absolute inset-0 rounded-t-[30px] bg-[var(--profile-drawer-highlight)]' />
-          <div className='pointer-events-none absolute inset-x-0 top-0 h-px bg-white/25' />
+          <div className='pointer-events-none absolute inset-0 rounded-t-[32px] bg-[var(--profile-drawer-highlight)]' />
+          <div className='pointer-events-none absolute inset-x-0 top-0 h-px bg-white/16' />
 
           <div className='relative z-10 flex items-start justify-between gap-4 px-5 pb-3 pt-3 md:px-6'>
             <div className='flex-1'>
@@ -55,7 +55,7 @@ export function ProfileDrawerShell({
             <button
               type='button'
               onClick={() => onOpenChange(false)}
-              className='mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/6 text-secondary-token transition-[background-color,border-color,color] hover:border-white/20 hover:bg-white/10 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+              className='mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] text-secondary-token shadow-[var(--profile-pearl-shadow)] transition-[background-color,border-color,color] hover:bg-[var(--profile-pearl-bg-hover)] hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
               aria-label='Close'
             >
               <X className='h-4 w-4' />
@@ -63,7 +63,7 @@ export function ProfileDrawerShell({
           </div>
 
           <div
-            className={`relative z-10 overflow-y-auto overscroll-contain px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] md:px-6 ${bodyClassName ?? ''}`}
+            className={`relative z-10 overflow-y-auto overscroll-contain rounded-t-[28px] bg-[color:var(--profile-drawer-bg)] px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] md:px-6 ${bodyClassName ?? ''}`}
           >
             {children}
           </div>

@@ -40,9 +40,13 @@ export function ProfileNotificationsButton({
   const button = (
     <CircleIconButton
       ref={buttonRef}
-      size='xs'
-      variant='frosted'
-      className='relative'
+      size='md'
+      variant='pearl'
+      className={
+        isActive
+          ? 'relative bg-[var(--profile-pearl-bg-active)] text-primary-token'
+          : 'relative text-primary-token/76'
+      }
       aria-expanded={ariaExpanded}
       ariaLabel={
         hasActiveSubscriptions
@@ -55,8 +59,8 @@ export function ProfileNotificationsButton({
       <Bell
         className={
           isActive
-            ? 'h-4 w-4 fill-current text-accent'
-            : 'h-4 w-4 text-primary-token'
+            ? 'h-[17px] w-[17px] fill-current text-primary-token'
+            : 'h-[17px] w-[17px] text-primary-token/84'
         }
         aria-hidden='true'
       />

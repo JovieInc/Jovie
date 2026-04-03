@@ -109,6 +109,7 @@ export function PublicProfileTemplateV2({
   const [activeOverlay, setActiveOverlay] =
     useState<ProfileV2OverlayMode>(null);
   const [historyMode, setHistoryMode] = useState<ProfileMode>(mode);
+  const aboutSectionRef = useRef<HTMLElement | null>(null);
   const subscribeSectionRef = useRef<HTMLElement | null>(null);
   const tourSectionRef = useRef<HTMLElement | null>(null);
   const prefersReducedMotion = useReducedMotion();
@@ -209,6 +210,22 @@ export function PublicProfileTemplateV2({
     });
   }, [prefersReducedMotion]);
 
+  const scrollToAboutSection = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const aboutSection = aboutSectionRef.current;
+    if (!aboutSection) {
+      return;
+    }
+
+    aboutSection.scrollIntoView({
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  }, [prefersReducedMotion]);
+
   const applyRequestedMode = useCallback(
     (nextMode: ProfileMode) => {
       setHistoryMode(nextMode);
@@ -236,6 +253,11 @@ export function PublicProfileTemplateV2({
         return undefined;
       }
 
+      if (presentation.scrollTarget === 'about') {
+        scrollToAboutSection();
+        return undefined;
+      }
+
       if (presentation.scrollTarget === 'tour' && tourDates.length > 0) {
         return scrollToTourSection();
       }
@@ -245,6 +267,7 @@ export function PublicProfileTemplateV2({
     [
       hasContacts,
       mergedDSPs.length,
+      scrollToAboutSection,
       scrollToSubscribeSection,
       scrollToTourSection,
       tourDates.length,
@@ -418,6 +441,7 @@ export function PublicProfileTemplateV2({
             socialLinks={visibleSocialLinks}
             onPlayClick={handlePlayClick}
             onBellClick={handleBellClick}
+            compact={historyMode === 'subscribe'}
           />
         }
       >
@@ -437,6 +461,7 @@ export function PublicProfileTemplateV2({
             hasTip={Boolean(venmoLink)}
             primaryActionKind={primaryActionKind}
             subscribeTwoStep={subscribeTwoStep}
+            aboutSectionRef={aboutSectionRef}
             subscribeSectionRef={subscribeSectionRef}
             subscribeModeActive={historyMode === 'subscribe'}
             onTipClick={handleTipClick}

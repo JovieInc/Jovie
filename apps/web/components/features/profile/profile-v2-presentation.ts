@@ -5,7 +5,7 @@ import type {
 
 export interface ProfileV2Presentation {
   readonly initialOverlay: ProfileV2OverlayMode;
-  readonly scrollTarget: 'tour' | null;
+  readonly scrollTarget: 'about' | 'tour' | null;
 }
 
 export function resolveProfileV2Presentation(
@@ -17,7 +17,7 @@ export function resolveProfileV2Presentation(
     case 'tip':
       return { initialOverlay: 'tip', scrollTarget: null };
     case 'about':
-      return { initialOverlay: null, scrollTarget: null };
+      return { initialOverlay: null, scrollTarget: 'about' };
     case 'listen':
       return { initialOverlay: 'listen', scrollTarget: null };
     case 'subscribe':

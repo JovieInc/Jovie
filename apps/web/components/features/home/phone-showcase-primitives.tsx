@@ -21,51 +21,20 @@ import { PhoneFrame } from './PhoneFrame';
 import {
   MOCK_ARTIST,
   MODE_CONTENT,
-  type MODE_IDS,
   PHONE_CONTENT_HEIGHT,
 } from './phone-mode-content';
+import {
+  PHONE_SHOWCASE_MODES,
+  type PhoneShowcaseModeData,
+} from './phone-showcase-modes';
 
 /* ------------------------------------------------------------------ */
 /*  Mode data                                                          */
 /* ------------------------------------------------------------------ */
 
-export interface ModeData {
-  id: (typeof MODE_IDS)[number];
-  headline: string;
-  description: string;
-  outcome: string;
-}
+export type ModeData = PhoneShowcaseModeData;
 
-export const MODES: ModeData[] = [
-  {
-    id: 'profile',
-    headline: 'Keep the fan before they disappear.',
-    description:
-      'First-time visitors can subscribe fast. Returning fans see the next best action instead of a generic stack of links.',
-    outcome: 'Grow',
-  },
-  {
-    id: 'tour',
-    headline: 'Show the closest show first.',
-    description:
-      'A fan in Los Angeles should not scroll through 30 cities. Jovie surfaces the nearest date and ticket button first.',
-    outcome: 'Sell tickets',
-  },
-  {
-    id: 'tip',
-    headline: 'Turn in-person moments into revenue.',
-    description:
-      'When someone scans your QR code after a set, Jovie opens the fastest tip flow instead of another menu of links.',
-    outcome: 'Earn tips',
-  },
-  {
-    id: 'listen',
-    headline: 'Open the right streaming app instantly.',
-    description:
-      'A new listener taps once. Jovie routes them to Spotify, Apple Music, or YouTube Music without the usual friction.',
-    outcome: 'Boost streams',
-  },
-] as const;
+export const MODES: readonly ModeData[] = PHONE_SHOWCASE_MODES;
 
 export const PHONE_TOUR_CONTAINER_CLASS =
   'mx-auto w-full max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0';
