@@ -183,4 +183,80 @@ describe('ReleaseTrackList', () => {
       screen.getByTestId('release-track-unresolved-track_1')
     ).toHaveTextContent('Unresolved: Apple Music, YouTube');
   });
+
+  it('renders correct status labels for verified, fallback, and unknown preview states', () => {
+    const release = createMockRelease();
+
+    const baseTrack = {
+      releaseId: release.id,
+      releaseSlug: release.slug,
+      trackNumber: 1,
+      discNumber: 1,
+      durationMs: 185000,
+      isrc: 'USRC17607839',
+      isExplicit: false,
+      previewUrl: null,
+      audioUrl: null,
+      audioFormat: null,
+      previewSource: null,
+      providerConfidenceSummary: {
+        canonical: 0,
+        searchFallback: 0,
+        unknown: 0,
+        unresolvedProviders: [],
+      },
+      providers: [],
+    };
+
+    render(
+      <ReleaseTrackList
+        release={release}
+        tracksOverride={[
+          {
+            ...baseTrack,
+            id: 'track_verified',
+            title: 'Verified Track',
+            slug: 'verified-track',
+            smartLinkPath: `${release.smartLinkPath}/verified-track`,
+            previewVerification: 'verified',
+            previewUrl: 'https://example.com/preview.mp3',
+            previewSource: 'spotify',
+          },
+          {
+            ...baseTrack,
+            id: 'track_fallback',
+            title: 'Fallback Track',
+            slug: 'fallback-track',
+            smartLinkPath: `${release.smartLinkPath}/fallback-track`,
+            trackNumber: 2,
+            previewVerification: 'fallback',
+            previewUrl: 'https://example.com/preview2.mp3',
+            previewSource: 'musicfetch',
+          },
+          {
+            ...baseTrack,
+            id: 'track_unknown',
+            title: 'Unknown Track',
+            slug: 'unknown-track',
+            smartLinkPath: `${release.smartLinkPath}/unknown-track`,
+            trackNumber: 3,
+            previewVerification: 'unknown',
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByTestId('release-preview-summary')).toHaveTextContent(
+      'Audio Previews: 1 ready, 1 unconfirmed, 1 pending'
+    );
+    expect(
+      screen.getByTestId('release-track-status-track_verified')
+    ).toHaveTextContent('Ready');
+    expect(
+      screen.getByTestId('release-track-status-track_fallback')
+    ).toHaveTextContent('Unconfirmed');
+    expect(
+      screen.getByTestId('release-track-status-track_unknown')
+    ).toHaveTextContent('Pending');
+  });
 });

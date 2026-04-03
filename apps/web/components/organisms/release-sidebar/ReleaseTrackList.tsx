@@ -60,11 +60,11 @@ function getPreviewStatusLabel(
 ): string {
   switch (previewVerification) {
     case 'verified':
-      return 'Verified';
+      return 'Ready';
     case 'fallback':
-      return 'Fallback';
+      return 'Unconfirmed';
     case 'unknown':
-      return 'Unknown';
+      return 'Pending';
     case 'missing':
     default:
       return 'Not checked';

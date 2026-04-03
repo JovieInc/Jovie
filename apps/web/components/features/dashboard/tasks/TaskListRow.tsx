@@ -51,9 +51,8 @@ export function PriorityBars({
           className='w-[3px] rounded-[1px]'
           style={{
             height: `${6 + i * 2}px`,
-            backgroundColor: i <= bars ? accentColor : undefined,
+            backgroundColor: accentColor,
             opacity: i <= bars ? 1 : 0.15,
-            ...(i > bars ? { backgroundColor: accentColor } : {}),
           }}
         />
       ))}
