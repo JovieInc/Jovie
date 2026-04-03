@@ -1380,7 +1380,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ['1/4', '2/4', '3/4', '4/4']
+        shard: ['1/8', '2/8', '3/8', '4/8', '5/8', '6/8', '7/8', '8/8']
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -1440,7 +1440,7 @@ jobs:
           VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
           # Mitigate low-frequency flakes by retrying failed tests once in CI
           RETRY_FLAG="--retry=1"
-          # Use shard-specific output file so Codecov Test Analytics receives all 4 shards
+          # Use shard-specific output file so Codecov Test Analytics receives all shards
           # (a shared filename causes only the last upload to be recorded)
           # Note: vitest runs from apps/web/, so path is relative to that directory
           SHARD_SLUG="${{ matrix.shard }}"
