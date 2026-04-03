@@ -71,6 +71,8 @@ export function AudienceFilterDropdown({
       buttonClassName={buttonClassName}
       iconOnly={iconOnly}
       onClearAll={() => onFiltersChange({ ...filters, segments: [] })}
+      headerLabel='Filter Audience'
+      shortcutHint='S'
     />
   );
 }

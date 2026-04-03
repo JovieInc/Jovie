@@ -1,42 +1,38 @@
 'use client';
 
 import { Loader2, Plus, RefreshCw } from 'lucide-react';
-import { useState } from 'react';
 import { toast } from 'sonner';
 import {
   PageToolbar,
   PageToolbarActionButton,
 } from '@/components/organisms/table';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
-import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import { useTriggerDiscoveryMutation } from '@/lib/queries/useDspEnrichmentMutations';
 import type { EnrichmentStatus } from '@/lib/queries/useDspEnrichmentStatusQuery';
 import {
   getPhaseLabel,
   isEnrichmentInProgress,
 } from '@/lib/queries/useDspEnrichmentStatusQuery';
-import { AddPlatformDialog } from './AddPlatformDialog';
 
 interface DspPresenceSummaryProps {
   readonly confirmedCount: number;
   readonly suggestedCount: number;
-  readonly existingProviderIds: DspProviderId[];
   readonly profileId: string;
   readonly isAdmin?: boolean;
   readonly spotifyId?: string | null;
   readonly enrichmentStatus?: EnrichmentStatus;
+  readonly onAddPlatform: () => void;
 }
 
 export function DspPresenceSummary({
   confirmedCount,
   suggestedCount,
-  existingProviderIds,
   profileId,
   isAdmin = false,
   spotifyId,
   enrichmentStatus,
+  onAddPlatform,
 }: DspPresenceSummaryProps) {
-  const [dialogOpen, setDialogOpen] = useState(false);
   const { mutate: triggerDiscovery, isPending: isRefreshing } =
     useTriggerDiscoveryMutation();
   const isDiscovering = isEnrichmentInProgress(enrichmentStatus);
@@ -118,17 +114,12 @@ export function DspPresenceSummary({
             <PageToolbarActionButton
               label='Add Platform'
               icon={<Plus className='h-3.5 w-3.5' />}
-              onClick={() => setDialogOpen(true)}
+              onClick={onAddPlatform}
               iconOnly
               tooltipLabel='Add platform'
             />
           </div>
         }
-      />
-      <AddPlatformDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        existingProviderIds={existingProviderIds}
       />
     </>
   );

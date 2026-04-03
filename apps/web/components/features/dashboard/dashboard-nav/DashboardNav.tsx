@@ -266,17 +266,18 @@ export function DashboardNav(_: DashboardNavProps) {
       {isAdmin && !isInSettings && (
         <div data-testid='admin-nav-section' className='mt-3'>
           <SidebarCollapsibleGroup label='Admin' defaultOpen>
-            <div className='space-y-2'>
-              {adminNavigationSections.map((section, index) => (
-                <div key={section.label} data-admin-section={section.label}>
-                  {index > 0 ? <div className='my-1.5' /> : null}
-                  <p className='px-2.5 pb-0.5 text-[11px] font-[560] tracking-[-0.01em] text-sidebar-muted/80 group-data-[collapsible=icon]:hidden'>
-                    {section.label}
-                  </p>
-                  {renderSection(section.items)}
-                </div>
-              ))}
-            </div>
+            {adminNavigationSections.map(section => (
+              <div
+                key={section.label}
+                className='space-y-2'
+                data-admin-section={section.label}
+              >
+                <p className='px-2.5 pb-0.5 text-[11px] font-[560] tracking-[-0.01em] text-sidebar-muted/80 group-data-[collapsible=icon]:hidden'>
+                  {section.label}
+                </p>
+                {renderSection(section.items)}
+              </div>
+            ))}
           </SidebarCollapsibleGroup>
         </div>
       )}

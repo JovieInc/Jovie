@@ -2,6 +2,10 @@ import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { ensureSignedInUser } from '../helpers/clerk-auth';
 import {
+  ADMIN_PRIMARY_NAV_SURFACES,
+  getAdminSurfaceById,
+} from './utils/admin-surface-manifest';
+import {
   checkForClientError,
   getAdminCredentials,
   hasAdminCredentials,
@@ -33,17 +37,8 @@ import {
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
 const ADMIN_PAGES = FAST_ITERATION
-  ? [{ path: APP_ROUTES.ADMIN, name: 'Admin Dashboard' }]
-  : [
-      { path: APP_ROUTES.ADMIN, name: 'Admin Dashboard' },
-      { path: APP_ROUTES.ADMIN_LEADS, name: 'Admin Leads' },
-      { path: APP_ROUTES.ADMIN_OUTREACH, name: 'Admin Outreach' },
-      { path: APP_ROUTES.ADMIN_CAMPAIGNS, name: 'Admin Campaigns' },
-      { path: APP_ROUTES.ADMIN_CREATORS, name: 'Admin Creators' },
-      { path: APP_ROUTES.ADMIN_USERS, name: 'Admin Users' },
-      { path: APP_ROUTES.ADMIN_FEEDBACK, name: 'Admin Feedback' },
-      { path: APP_ROUTES.ADMIN_ACTIVITY, name: 'Admin Activity' },
-    ];
+  ? [getAdminSurfaceById('overview')]
+  : ADMIN_PRIMARY_NAV_SURFACES;
 
 /**
  * Dashboard pages to test navigation from
@@ -72,20 +67,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
   test.setTimeout(300_000);
 
   test.beforeEach(async ({ page }) => {
-    // Skip if Clerk testing not set up
-    test.skip(
-      process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true',
-      'Auth setup not available'
-    );
-    // Skip if no admin credentials configured
-    if (!hasAdminCredentials()) {
-      console.log('⚠ Skipping admin navigation tests - no credentials');
-      console.log(
-        '  Set E2E_CLERK_ADMIN_USERNAME/PASSWORD or E2E_CLERK_USER_USERNAME/PASSWORD'
-      );
-      test.skip();
-      return;
-    }
+    test.skip(!hasAdminCredentials(), 'Admin auth not available');
 
     // Capture console errors for debugging
     page.on('console', msg => {
@@ -277,6 +259,47 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     });
   });
 
+  test('admin nav shows only primary workspaces and settings keeps tool links', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+
+    await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN, {
+      timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
+      retries: FAST_ITERATION ? 3 : 2,
+    });
+    await settleAdminNavigation(page);
+
+    const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
+    await expect(adminNavSection).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+
+    for (const label of ['Overview', 'People', 'Growth', 'Activity']) {
+      await expect(
+        adminNavSection.getByText(label, { exact: true })
+      ).toBeVisible();
+    }
+
+    for (const label of ['Investors', 'Screenshots', 'Algorithm Health']) {
+      await expect(
+        adminNavSection.getByText(label, { exact: true })
+      ).toHaveCount(0);
+    }
+
+    await smokeNavigateWithRetry(page, APP_ROUTES.SETTINGS_ADMIN, {
+      timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
+      retries: FAST_ITERATION ? 3 : 2,
+    });
+    await settleAdminNavigation(page);
+
+    for (const label of ['Investors', 'Screenshots', 'Algorithm Health']) {
+      await expect(page.getByText(label, { exact: true })).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
+    }
+  });
+
   /**
    * Test rapid navigation between pages
    *
@@ -290,7 +313,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
       FAST_ITERATION,
       'Rapid navigation stress test is excluded from the fast smoke gate'
     );
-    test.setTimeout(120_000); // 2 minutes
+    test.setTimeout(240_000); // Cold local bypass runs still compile several heavy routes
 
     const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
 

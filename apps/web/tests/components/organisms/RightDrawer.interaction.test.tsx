@@ -52,7 +52,7 @@ describe('RightDrawer', () => {
     expect(aside).not.toHaveClass('shadow-[var(--linear-app-drawer-shadow)]');
   });
 
-  it('calls keyboard handler only when focus is inside the drawer', () => {
+  it('handles Escape while open even when focus remains outside the drawer', () => {
     const onKeyDown = vi.fn();
 
     render(
@@ -70,14 +70,20 @@ describe('RightDrawer', () => {
     );
 
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(onKeyDown).not.toHaveBeenCalled();
-
-    screen.getByRole('button', { name: 'Inside' }).focus();
-    fireEvent.keyDown(document, { key: 'Escape' });
-
     expect(onKeyDown).toHaveBeenCalledTimes(1);
     expect(onKeyDown).toHaveBeenCalledWith(
       expect.objectContaining({ key: 'Escape' })
+    );
+
+    fireEvent.keyDown(document, { key: 'Enter' });
+    expect(onKeyDown).toHaveBeenCalledTimes(1);
+
+    screen.getByRole('button', { name: 'Inside' }).focus();
+    fireEvent.keyDown(document, { key: 'Enter' });
+
+    expect(onKeyDown).toHaveBeenCalledTimes(2);
+    expect(onKeyDown).toHaveBeenCalledWith(
+      expect.objectContaining({ key: 'Enter' })
     );
   });
 

@@ -7,6 +7,9 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 const { version: APP_VERSION } = require('../../version.json');
 
 const nextConfig = {
+  // Local authenticated E2E uses 127.0.0.1 so host-only bypass cookies match.
+  // Next dev defaults to localhost, which otherwise blocks loopback dev assets/HMR.
+  allowedDevOrigins: ['127.0.0.1', '::1', '[::1]'],
   // Move dev indicator to top-right so it doesn't overlap the DevToolbar
   devIndicators: {
     position: 'top-right',

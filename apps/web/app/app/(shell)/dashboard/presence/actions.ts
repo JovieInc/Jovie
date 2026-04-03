@@ -37,24 +37,68 @@ export interface DspPresenceData {
   readonly suggestedCount: number;
 }
 
+interface DspPresenceMatchRow {
+  readonly matchId: string;
+  readonly providerId: string;
+  readonly externalArtistName: string | null;
+  readonly externalArtistUrl: string | null;
+  readonly externalArtistImageUrl: string | null;
+  readonly confidenceScore: string | null;
+  readonly confidenceBreakdown: DspMatchConfidenceBreakdown | null;
+  readonly matchingIsrcCount: number;
+  readonly status: string;
+  readonly matchSource: string | null;
+  readonly confirmedAt: Date | null;
+}
+
+const DSP_PRESENCE_STATUS_ORDER: Record<string, number> = {
+  suggested: 0,
+  auto_confirmed: 1,
+  confirmed: 2,
+};
+
+function buildDspPresenceData(
+  matches: readonly DspPresenceMatchRow[]
+): DspPresenceData {
+  const items: DspPresenceItem[] = matches
+    .filter(match => match.status !== 'rejected')
+    .map(match => ({
+      matchId: match.matchId,
+      providerId: match.providerId as DspProviderId,
+      externalArtistName: match.externalArtistName,
+      externalArtistUrl: match.externalArtistUrl,
+      externalArtistImageUrl: match.externalArtistImageUrl,
+      confidenceScore:
+        match.confidenceScore == null ? null : Number(match.confidenceScore),
+      confidenceBreakdown: match.confidenceBreakdown,
+      matchingIsrcCount: match.matchingIsrcCount,
+      status: match.status as DspMatchStatus,
+      matchSource: match.matchSource,
+      confirmedAt: match.confirmedAt?.toISOString() ?? null,
+    }))
+    .sort(
+      (a, b) =>
+        (DSP_PRESENCE_STATUS_ORDER[a.status] ?? 3) -
+        (DSP_PRESENCE_STATUS_ORDER[b.status] ?? 3)
+    );
+
+  return {
+    items,
+    confirmedCount: items.filter(
+      item => item.status === 'confirmed' || item.status === 'auto_confirmed'
+    ).length,
+    suggestedCount: items.filter(item => item.status === 'suggested').length,
+  };
+}
+
 // ============================================================================
 // Data Loading
 // ============================================================================
 
-export async function loadDspPresence(): Promise<DspPresenceData> {
-  const data = await getDashboardData();
-
-  if (data.needsOnboarding && !data.dashboardLoadError) {
-    redirect(APP_ROUTES.ONBOARDING);
-  }
-
-  const profile = data.selectedProfile;
-  if (!profile) {
-    redirect(APP_ROUTES.ONBOARDING);
-  }
-
+export async function loadDspPresenceForProfile(
+  profileId: string
+): Promise<DspPresenceData> {
   try {
-    // Fetch all matches (confirmed, auto_confirmed, suggested)
     const matches = await dashboardQuery(
       () =>
         db
@@ -72,51 +116,33 @@ export async function loadDspPresence(): Promise<DspPresenceData> {
             confirmedAt: dspArtistMatches.confirmedAt,
           })
           .from(dspArtistMatches)
-          .where(eq(dspArtistMatches.creatorProfileId, profile.id)),
+          .where(eq(dspArtistMatches.creatorProfileId, profileId)),
       'loadDspPresence:matches'
     );
 
-    // Filter out rejected matches
-    const activeMatches = matches.filter(m => m.status !== 'rejected');
-
-    const items: DspPresenceItem[] = activeMatches.map(match => ({
-      matchId: match.matchId,
-      providerId: match.providerId as DspProviderId,
-      externalArtistName: match.externalArtistName,
-      externalArtistUrl: match.externalArtistUrl,
-      externalArtistImageUrl: match.externalArtistImageUrl,
-      confidenceScore:
-        match.confidenceScore == null ? null : Number(match.confidenceScore),
-      confidenceBreakdown: match.confidenceBreakdown,
-      matchingIsrcCount: match.matchingIsrcCount,
-      status: match.status as DspMatchStatus,
-      matchSource: match.matchSource,
-      confirmedAt: match.confirmedAt?.toISOString() ?? null,
-    }));
-
-    // Sort: suggested first (actionable), then auto_confirmed, then confirmed
-    const statusOrder: Record<string, number> = {
-      suggested: 0,
-      auto_confirmed: 1,
-      confirmed: 2,
-    };
-    items.sort(
-      (a, b) => (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3)
-    );
-
-    return {
-      items,
-      confirmedCount: items.filter(
-        i => i.status === 'confirmed' || i.status === 'auto_confirmed'
-      ).length,
-      suggestedCount: items.filter(i => i.status === 'suggested').length,
-    };
+    return buildDspPresenceData(matches);
   } catch (error) {
     captureError('loadDspPresence failed', error, {
-      route: '/app/presence',
+      route: APP_ROUTES.PRESENCE,
+      profileId,
     });
-    return { items: [], confirmedCount: 0, suggestedCount: 0 };
+    throw error;
   }
+}
+
+export async function loadDspPresence(): Promise<DspPresenceData> {
+  const data = await getDashboardData();
+
+  if (data.needsOnboarding && !data.dashboardLoadError) {
+    redirect(APP_ROUTES.ONBOARDING);
+  }
+
+  const profile = data.selectedProfile;
+  if (!profile) {
+    redirect(APP_ROUTES.ONBOARDING);
+  }
+
+  return loadDspPresenceForProfile(profile.id);
 }
 
 // ============================================================================
