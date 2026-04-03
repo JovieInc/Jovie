@@ -9,6 +9,10 @@ const stableLocalServerCommand =
 const webServerCommand = process.env.DATABASE_URL
   ? stableLocalServerCommand
   : `doppler run -- ${stableLocalServerCommand}`;
+const baseURL = process.env.BASE_URL || 'http://localhost:3100';
+const managedBaseUrl = new URL(baseURL);
+const managedWebServerPort =
+  managedBaseUrl.port || (managedBaseUrl.protocol === 'https:' ? '443' : '80');
 
 process.env.PUBLIC_NOAUTH_SMOKE = '1';
 const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
@@ -21,7 +25,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:3100',
+    baseURL,
     trace: 'on-first-retry',
     video: 'retain-on-failure',
     // Add custom headers to bypass Clerk in test mode
@@ -49,7 +53,7 @@ export default defineConfig({
     : {
         webServer: {
           command: webServerCommand,
-          url: 'http://localhost:3100',
+          url: managedBaseUrl.origin,
           reuseExistingServer: !process.env.CI,
           timeout: 300000,
           stdout: 'pipe',
@@ -57,7 +61,7 @@ export default defineConfig({
           env: {
             ...process.env,
             NODE_ENV: 'test',
-            PORT: '3100',
+            PORT: managedWebServerPort,
             NEXT_PUBLIC_E2E_MODE: '1',
             PUBLIC_NOAUTH_SMOKE: '1',
             NEXT_PUBLIC_CLERK_MOCK: '1',
