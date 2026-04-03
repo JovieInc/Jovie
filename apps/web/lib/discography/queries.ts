@@ -918,6 +918,60 @@ export async function updateRecordingPreviewByIsrc(
   return (result.rowCount ?? 0) > 0;
 }
 
+export async function setRecordingPreviewResolutionByIsrc(
+  creatorProfileId: string,
+  isrc: string,
+  resolution: {
+    status: 'verified' | 'fallback' | 'unknown' | 'missing';
+    source:
+      | 'audio_url'
+      | 'spotify'
+      | 'apple_music'
+      | 'deezer'
+      | 'musicfetch'
+      | null;
+    attemptedSources?: string[];
+  }
+): Promise<boolean> {
+  const [recording] = await db
+    .select({
+      id: discogRecordings.id,
+      metadata: discogRecordings.metadata,
+    })
+    .from(discogRecordings)
+    .where(
+      and(
+        eq(discogRecordings.creatorProfileId, creatorProfileId),
+        eq(discogRecordings.isrc, isrc)
+      )
+    )
+    .limit(1);
+
+  if (!recording) {
+    return false;
+  }
+
+  const nextMetadata = {
+    ...(recording.metadata ?? {}),
+    previewResolution: {
+      status: resolution.status,
+      source: resolution.source,
+      checkedAt: new Date().toISOString(),
+      attemptedSources: resolution.attemptedSources ?? [],
+    },
+  };
+
+  const result = await db
+    .update(discogRecordings)
+    .set({
+      metadata: nextMetadata,
+      updatedAt: new Date(),
+    })
+    .where(eq(discogRecordings.id, recording.id));
+
+  return (result.rowCount ?? 0) > 0;
+}
+
 /**
  * Get tracks for a release
  */
@@ -950,6 +1004,7 @@ export interface TrackWithProviders {
   previewUrl: string | null;
   audioUrl: string | null;
   audioFormat: string | null;
+  metadata: Record<string, unknown> | null;
   providerLinks: ProviderLink[];
 }
 
@@ -1055,6 +1110,7 @@ export async function getTracksForReleaseWithProviders(
     previewUrl: track.previewUrl,
     audioUrl: track.audioUrl,
     audioFormat: track.audioFormat,
+    metadata: track.metadata ?? null,
     providerLinks: resolveTrackProviderLinks(
       linksByTrack.get(track.id) ?? [],
       releaseProviderLinks
@@ -1304,6 +1360,7 @@ export interface ReleaseTrackWithProviders {
   previewUrl: string | null;
   audioUrl: string | null;
   audioFormat: string | null;
+  metadata: Record<string, unknown> | null;
   providerLinks: ProviderLink[];
 }
 
@@ -1406,6 +1463,7 @@ export async function getReleaseTracksForReleaseWithProviders(
     previewUrl: rec.previewUrl,
     audioUrl: rec.audioUrl,
     audioFormat: rec.audioFormat,
+    metadata: rec.metadata ?? null,
     providerLinks: resolveTrackProviderLinks(
       linksByReleaseTrack.get(rt.id) ?? [],
       releaseProviderLinks

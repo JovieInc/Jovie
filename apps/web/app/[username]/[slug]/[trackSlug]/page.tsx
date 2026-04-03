@@ -11,6 +11,10 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { BASE_URL } from '@/constants/app';
+import {
+  derivePreviewState,
+  getProviderConfidence,
+} from '@/lib/discography/audio-qa';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
 import { generateArtworkImageObject } from '@/lib/images/seo';
@@ -145,9 +149,16 @@ export default async function TrackDeepLinkPage({
         label: PROVIDER_CONFIG[key].label,
         accent: PROVIDER_CONFIG[key].accent,
         url: link?.url ?? null,
+        confidence: link ? getProviderConfidence(link) : 'unknown',
       };
     })
     .filter(p => p.url);
+  const previewState = derivePreviewState({
+    audioUrl: null,
+    previewUrl: track.previewUrl ?? null,
+    metadata: track.previewMetadata ?? null,
+    providerLinks: track.providerLinks,
+  });
 
   const artistName = creator.displayName ?? creator.username;
   const trackUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}/${trackSlug}`;
@@ -233,6 +244,8 @@ export default async function TrackDeepLinkPage({
           artworkUrl: track.artworkUrl,
           releaseDate: toISOStringOrNull(track.releaseDate),
           previewUrl: track.previewUrl ?? null,
+          previewVerification: previewState.previewVerification,
+          previewSource: previewState.previewSource,
         }}
         artist={{
           name: artistName,

@@ -547,6 +547,7 @@ export function normalizeRawPageResults(
 async function measureGuardSummaryForRoute(options: {
   readonly artifactDir: string;
   readonly authPath?: string;
+  readonly baseUrl: string;
   readonly routeId: string;
   readonly runs: number;
   readonly skipBuild: boolean;
@@ -556,7 +557,7 @@ async function measureGuardSummaryForRoute(options: {
   }
 
   const port = await findFreePort();
-  const server = await startServer(options.artifactDir, port);
+  const server = await startServer(options.artifactDir, options.baseUrl, port);
   try {
     return await runPerformanceBudgetsGuard({
       authPath: options.authPath,
@@ -892,6 +893,7 @@ export async function runEndUserPerfLoop(cliOptions: PerfLoopCliOptions) {
             await measureGuardSummaryForRoute({
               artifactDir,
               authPath: state.authPath,
+              baseUrl: cliOptions.baseUrl,
               routeId: routeState.routeId,
               runs: cliOptions.runsPerSample,
               skipBuild: cliOptions.skipBuild,
@@ -973,6 +975,7 @@ export async function runEndUserPerfLoop(cliOptions: PerfLoopCliOptions) {
           await measureGuardSummaryForRoute({
             artifactDir,
             authPath: state.authPath,
+            baseUrl: cliOptions.baseUrl,
             routeId: routeState.routeId,
             runs: cliOptions.runsPerSample,
             skipBuild: cliOptions.skipBuild,
