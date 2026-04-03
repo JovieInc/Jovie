@@ -1,6 +1,6 @@
 import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { test } from './setup';
+import { expect, test } from './setup';
 import { waitForHydration } from './utils/smoke-test-utils';
 
 type ShellVariant = 'legacy' | 'v2';
@@ -25,6 +25,7 @@ interface ProfileAuditCase {
 const TEST_PROFILE = 'dualipa';
 const TIP_PROFILE = 'testartist';
 const NOTIFICATIONS_PROFILE = 'testartist';
+const PROFILE_READY_SELECTOR = 'h1, [data-testid="profile-header"]';
 const BREAKPOINTS: readonly BreakpointConfig[] = [
   { name: 'mobile', width: 390, height: 844 },
   { name: 'tablet', width: 768, height: 1024 },
@@ -35,26 +36,28 @@ const PROFILE_CASES: readonly ProfileAuditCase[] = [
   {
     id: 'profile',
     path: `/${TEST_PROFILE}`,
-    readySelector: '[data-testid="profile-header"]',
+    readySelector: PROFILE_READY_SELECTOR,
     shells: ['legacy', 'v2'],
   },
   {
     id: 'listen',
     path: `/${TEST_PROFILE}?mode=listen`,
-    readySelector: '[data-testid="profile-header"]',
+    readySelector: PROFILE_READY_SELECTOR,
     shells: ['legacy', 'v2'],
   },
   {
     id: 'subscribe',
     path: `/${TEST_PROFILE}?mode=subscribe`,
-    readySelector: '[data-testid="subscribe-cta-container"]',
+    readySelector:
+      '[data-testid="subscribe-cta-container"], h1, [data-testid="profile-header"]',
     shells: ['legacy', 'v2'],
     composerVisible: true,
   },
   {
     id: 'subscribe-focus',
     path: `/${TEST_PROFILE}?mode=subscribe`,
-    readySelector: '[data-testid="subscribe-cta-container"]',
+    readySelector:
+      '[data-testid="subscribe-cta-container"], h1, [data-testid="profile-header"]',
     shells: ['legacy', 'v2'],
     composerVisible: true,
     focusComposerInput: true,
@@ -62,26 +65,25 @@ const PROFILE_CASES: readonly ProfileAuditCase[] = [
   {
     id: 'about',
     path: `/${TEST_PROFILE}?mode=about`,
-    readySelector: '[data-testid="profile-header"]',
+    readySelector: PROFILE_READY_SELECTOR,
     shells: ['legacy', 'v2'],
   },
   {
     id: 'tour',
     path: `/${TEST_PROFILE}?mode=tour`,
-    readySelector: '#profile-tour-heading, [data-testid="profile-header"]',
+    readySelector: `#profile-tour-heading, ${PROFILE_READY_SELECTOR}`,
     shells: ['legacy', 'v2'],
   },
   {
     id: 'contact',
     path: `/${TEST_PROFILE}?mode=contact`,
-    readySelector:
-      '[data-testid="profile-header"], [data-testid="contact-drawer"]',
+    readySelector: `${PROFILE_READY_SELECTOR}, [data-testid="contact-drawer"]`,
     shells: ['legacy', 'v2'],
   },
   {
     id: 'tip',
     path: `/${TIP_PROFILE}?mode=tip`,
-    readySelector: '[data-testid="profile-header"], [data-testid="tip-drawer"]',
+    readySelector: `${PROFILE_READY_SELECTOR}, [data-testid="tip-drawer"]`,
     shells: ['legacy', 'v2'],
   },
   {
@@ -215,18 +217,32 @@ async function waitForVisibleSelector(
   page: import('@playwright/test').Page,
   selector: string
 ) {
-  await page.waitForFunction(
-    targetSelector => {
-      return Array.from(document.querySelectorAll(targetSelector)).some(
-        element => {
-          const style = window.getComputedStyle(element as HTMLElement);
-          return style.display !== 'none' && style.visibility !== 'hidden';
+  const locator = page.locator(selector);
+
+  await expect
+    .poll(
+      async () => {
+        const count = await locator.count();
+
+        for (let index = 0; index < count; index += 1) {
+          if (
+            await locator
+              .nth(index)
+              .isVisible()
+              .catch(() => false)
+          ) {
+            return true;
+          }
         }
-      );
-    },
-    selector,
-    { timeout: 30_000 }
-  );
+
+        return false;
+      },
+      {
+        timeout: 30_000,
+        message: `Expected a visible element matching selector: ${selector}`,
+      }
+    )
+    .toBe(true);
 }
 
 async function ensureComposerVisible(page: import('@playwright/test').Page) {

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DspPresenceSidebar } from '@/features/dashboard/organisms/dsp-presence/DspPresenceSidebar';
@@ -109,12 +110,17 @@ describe('DspPresenceSidebar', () => {
     mockUseDashboardData.mockReturnValue({
       selectedProfile: { id: 'profile-123' },
     });
-    mockUseDspMatchActions.mockReturnValue({
-      confirmMatch: vi.fn(),
-      rejectMatch: vi.fn(),
-      isConfirming: false,
-      isRejecting: false,
-    });
+    mockUseDspMatchActions.mockImplementation(
+      (options?: {
+        onConfirmSuccess?: () => void;
+        onRejectSuccess?: () => void;
+      }) => ({
+        confirmMatch: vi.fn(() => options?.onConfirmSuccess?.()),
+        rejectMatch: vi.fn(() => options?.onRejectSuccess?.()),
+        isConfirming: false,
+        isRejecting: false,
+      })
+    );
   });
 
   it('shows suggested-match actions when the item is actionable', () => {
@@ -175,7 +181,9 @@ describe('DspPresenceSidebar', () => {
     expect(screen.getByText('View on Apple Music')).toBeInTheDocument();
   });
 
-  it('wires route refresh callbacks into match actions', () => {
+  it('refreshes the route after confirm and reject actions', async () => {
+    const user = userEvent.setup();
+
     render(
       <DspPresenceSidebar
         item={{
@@ -195,15 +203,8 @@ describe('DspPresenceSidebar', () => {
       />
     );
 
-    const options = mockUseDspMatchActions.mock.calls[0]?.[0] as
-      | {
-          onConfirmSuccess?: () => void;
-          onRejectSuccess?: () => void;
-        }
-      | undefined;
-
-    options?.onConfirmSuccess?.();
-    options?.onRejectSuccess?.();
+    await user.click(screen.getByRole('button', { name: 'Confirm Match' }));
+    await user.click(screen.getByRole('button', { name: 'Reject' }));
 
     expect(mockRefresh).toHaveBeenCalledTimes(2);
   });

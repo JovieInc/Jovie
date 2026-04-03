@@ -98,36 +98,28 @@ function buildDspPresenceData(
 export async function loadDspPresenceForProfile(
   profileId: string
 ): Promise<DspPresenceData> {
-  try {
-    const matches = await dashboardQuery(
-      () =>
-        db
-          .select({
-            matchId: dspArtistMatches.id,
-            providerId: dspArtistMatches.providerId,
-            externalArtistName: dspArtistMatches.externalArtistName,
-            externalArtistUrl: dspArtistMatches.externalArtistUrl,
-            externalArtistImageUrl: dspArtistMatches.externalArtistImageUrl,
-            confidenceScore: dspArtistMatches.confidenceScore,
-            confidenceBreakdown: dspArtistMatches.confidenceBreakdown,
-            matchingIsrcCount: dspArtistMatches.matchingIsrcCount,
-            status: dspArtistMatches.status,
-            matchSource: dspArtistMatches.matchSource,
-            confirmedAt: dspArtistMatches.confirmedAt,
-          })
-          .from(dspArtistMatches)
-          .where(eq(dspArtistMatches.creatorProfileId, profileId)),
-      'loadDspPresence:matches'
-    );
+  const matches = await dashboardQuery(
+    () =>
+      db
+        .select({
+          matchId: dspArtistMatches.id,
+          providerId: dspArtistMatches.providerId,
+          externalArtistName: dspArtistMatches.externalArtistName,
+          externalArtistUrl: dspArtistMatches.externalArtistUrl,
+          externalArtistImageUrl: dspArtistMatches.externalArtistImageUrl,
+          confidenceScore: dspArtistMatches.confidenceScore,
+          confidenceBreakdown: dspArtistMatches.confidenceBreakdown,
+          matchingIsrcCount: dspArtistMatches.matchingIsrcCount,
+          status: dspArtistMatches.status,
+          matchSource: dspArtistMatches.matchSource,
+          confirmedAt: dspArtistMatches.confirmedAt,
+        })
+        .from(dspArtistMatches)
+        .where(eq(dspArtistMatches.creatorProfileId, profileId)),
+    'loadDspPresence:matches'
+  );
 
-    return buildDspPresenceData(matches);
-  } catch (error) {
-    captureError('loadDspPresence failed', error, {
-      route: APP_ROUTES.PRESENCE,
-      profileId,
-    });
-    throw error;
-  }
+  return buildDspPresenceData(matches);
 }
 
 export async function loadDspPresence(): Promise<DspPresenceData> {
