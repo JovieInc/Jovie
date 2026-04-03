@@ -90,6 +90,7 @@ interface ServerState {
   startedAt: string;
   serverPath: string;
   binaryVersion?: string;
+  mode?: 'launched' | 'headed';
 }
 
 // ─── State File ────────────────────────────────────────────────
@@ -217,7 +218,7 @@ function cleanupLegacyState(): void {
 }
 
 // ─── Server Lifecycle ──────────────────────────────────────────
-async function startServer(): Promise<ServerState> {
+async function startServer(extraEnv?: Record<string, string>): Promise<ServerState> {
   ensureStateDir(config);
 
   // Clean up stale state file and error log
@@ -234,14 +235,14 @@ async function startServer(): Promise<ServerState> {
     const launcherCode =
       `const{spawn}=require('child_process');` +
       `spawn(process.execPath,[${JSON.stringify(NODE_SERVER_SCRIPT)}],` +
-      `{detached:true,stdio:'ignore',env:Object.assign({},process.env,` +
+      `{detached:true,stdio:['ignore','ignore','ignore'],env:Object.assign({},process.env,` +
       `{BROWSE_STATE_FILE:${JSON.stringify(config.stateFile)}})}).unref()`;
-    Bun.spawnSync(['node', '-e', launcherCode], { stdio: 'ignore' });
+    Bun.spawnSync(['node', '-e', launcherCode], { stdio: ['ignore', 'ignore', 'ignore'] });
   } else {
     // macOS/Linux: Bun.spawn + unref works correctly
     proc = Bun.spawn(['bun', 'run', SERVER_SCRIPT], {
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, BROWSE_STATE_FILE: config.stateFile },
+      env: { ...process.env, BROWSE_STATE_FILE: config.stateFile, ...extraEnv },
     });
     proc.unref();
   }
@@ -290,8 +291,9 @@ async function startServer(): Promise<ServerState> {
 function acquireServerLock(): (() => void) | null {
   const lockPath = `${config.stateFile}.lock`;
   try {
-    // O_CREAT | O_EXCL — fails if file already exists (atomic check-and-create)
-    const fd = fs.openSync(lockPath, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY);
+    // 'wx' — create exclusively, fails if file already exists (atomic check-and-create)
+    // Using string flag instead of numeric constants for Bun Windows compatibility
+    const fd = fs.openSync(lockPath, 'wx');
     fs.writeSync(fd, `${process.pid}\n`);
     fs.closeSync(fd);
     return () => { try { fs.unlinkSync(lockPath); } catch {} };
@@ -326,6 +328,15 @@ async function ensureServer(): Promise<ServerState> {
       return startServer();
     }
     return state;
+  }
+
+  // Guard: never silently replace a headed server with a headless one.
+  // Headed mode means a user-visible Chrome window is (or was) controlled.
+  // Silently replacing it would be confusing — tell the user to reconnect.
+  if (state && state.mode === 'headed' && isProcessAlive(state.pid)) {
+    console.error(`[browse] Headed server running (PID ${state.pid}) but not responding.`);
+    console.error(`[browse] Run '$B connect' to restart.`);
+    process.exit(1);
   }
 
   // Ensure state directory exists before lock acquisition (lock file lives there)
@@ -470,6 +481,184 @@ Refs:           After 'snapshot', use @e1, @e2... as selectors:
 
   const command = args[0];
   const commandArgs = args.slice(1);
+
+  // ─── Headed Connect (pre-server command) ────────────────────
+  // connect must be handled BEFORE ensureServer() because it needs
+  // to restart the server in headed mode with the Chrome extension.
+  if (command === 'connect') {
+    // Check if already in headed mode and healthy
+    const existingState = readState();
+    if (existingState && existingState.mode === 'headed' && isProcessAlive(existingState.pid)) {
+      try {
+        const resp = await fetch(`http://127.0.0.1:${existingState.port}/health`, {
+          signal: AbortSignal.timeout(2000),
+        });
+        if (resp.ok) {
+          console.log('Already connected in headed mode.');
+          process.exit(0);
+        }
+      } catch {
+        // Headed server alive but not responding — kill and restart
+      }
+    }
+
+    // Kill ANY existing server (SIGTERM → wait 2s → SIGKILL)
+    if (existingState && isProcessAlive(existingState.pid)) {
+      try { process.kill(existingState.pid, 'SIGTERM'); } catch {}
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (isProcessAlive(existingState.pid)) {
+        try { process.kill(existingState.pid, 'SIGKILL'); } catch {}
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    // Kill orphaned Chromium processes that may still hold the profile lock.
+    // The server PID is the Bun process; Chromium is a child that can outlive it
+    // if the server is killed abruptly (SIGKILL, crash, manual rm of state file).
+    const profileDir = path.join(process.env.HOME || '/tmp', '.gstack', 'chromium-profile');
+    try {
+      const singletonLock = path.join(profileDir, 'SingletonLock');
+      const lockTarget = fs.readlinkSync(singletonLock); // e.g. "hostname-12345"
+      const orphanPid = parseInt(lockTarget.split('-').pop() || '', 10);
+      if (orphanPid && isProcessAlive(orphanPid)) {
+        try { process.kill(orphanPid, 'SIGTERM'); } catch {}
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (isProcessAlive(orphanPid)) {
+          try { process.kill(orphanPid, 'SIGKILL'); } catch {}
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+    } catch {
+      // No lock symlink or not readable — nothing to kill
+    }
+
+    // Clean up Chromium profile locks (can persist after crashes)
+    for (const lockFile of ['SingletonLock', 'SingletonSocket', 'SingletonCookie']) {
+      try { fs.unlinkSync(path.join(profileDir, lockFile)); } catch {}
+    }
+
+    // Delete stale state file
+    try { fs.unlinkSync(config.stateFile); } catch {}
+
+    console.log('Launching headed Chromium with extension + sidebar agent...');
+    try {
+      // Start server in headed mode with extension auto-loaded
+      // Use a well-known port so the Chrome extension auto-connects
+      const serverEnv: Record<string, string> = {
+        BROWSE_HEADED: '1',
+        BROWSE_PORT: '34567',
+        BROWSE_SIDEBAR_CHAT: '1',
+      };
+      const newState = await startServer(serverEnv);
+
+      // Print connected status
+      const resp = await fetch(`http://127.0.0.1:${newState.port}/command`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${newState.token}`,
+        },
+        body: JSON.stringify({ command: 'status', args: [] }),
+        signal: AbortSignal.timeout(5000),
+      });
+      const status = await resp.text();
+      console.log(`Connected to real Chrome\n${status}`);
+
+      // Auto-start sidebar agent
+      // __dirname is inside $bunfs in compiled binaries — resolve from execPath instead
+      let agentScript = path.resolve(__dirname, 'sidebar-agent.ts');
+      if (!fs.existsSync(agentScript)) {
+        agentScript = path.resolve(path.dirname(process.execPath), '..', 'src', 'sidebar-agent.ts');
+      }
+      try {
+        if (!fs.existsSync(agentScript)) {
+          throw new Error(`sidebar-agent.ts not found at ${agentScript}`);
+        }
+        // Clear old agent queue
+        const agentQueue = path.join(process.env.HOME || '/tmp', '.gstack', 'sidebar-agent-queue.jsonl');
+        try { fs.writeFileSync(agentQueue, ''); } catch {}
+
+        // Resolve browse binary path the same way — execPath-relative
+        let browseBin = path.resolve(__dirname, '..', 'dist', 'browse');
+        if (!fs.existsSync(browseBin)) {
+          browseBin = process.execPath; // the compiled binary itself
+        }
+
+        // Kill any existing sidebar-agent processes before starting a new one.
+        // Old agents have stale auth tokens and will silently fail to relay events,
+        // causing the server to mark the agent as "hung".
+        try {
+          const { spawnSync } = require('child_process');
+          spawnSync('pkill', ['-f', 'sidebar-agent\\.ts'], { stdio: 'ignore', timeout: 3000 });
+        } catch {}
+
+        const agentProc = Bun.spawn(['bun', 'run', agentScript], {
+          cwd: config.projectDir,
+          env: {
+            ...process.env,
+            BROWSE_BIN: browseBin,
+            BROWSE_STATE_FILE: config.stateFile,
+            BROWSE_SERVER_PORT: String(newState.port),
+          },
+          stdio: ['ignore', 'ignore', 'ignore'],
+        });
+        agentProc.unref();
+        console.log(`[browse] Sidebar agent started (PID: ${agentProc.pid})`);
+      } catch (err: any) {
+        console.error(`[browse] Sidebar agent failed to start: ${err.message}`);
+        console.error(`[browse] Run manually: bun run ${agentScript}`);
+      }
+    } catch (err: any) {
+      console.error(`[browse] Connect failed: ${err.message}`);
+      process.exit(1);
+    }
+    process.exit(0);
+  }
+
+  // ─── Headed Disconnect (pre-server command) ─────────────────
+  // disconnect must be handled BEFORE ensureServer() because the headed
+  // guard blocks all commands when the server is unresponsive.
+  if (command === 'disconnect') {
+    const existingState = readState();
+    if (!existingState || existingState.mode !== 'headed') {
+      console.log('Not in headed mode — nothing to disconnect.');
+      process.exit(0);
+    }
+    // Try graceful shutdown via server
+    try {
+      const resp = await fetch(`http://127.0.0.1:${existingState.port}/command`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${existingState.token}`,
+        },
+        body: JSON.stringify({ command: 'disconnect', args: [] }),
+        signal: AbortSignal.timeout(3000),
+      });
+      if (resp.ok) {
+        console.log('Disconnected from real browser.');
+        process.exit(0);
+      }
+    } catch {
+      // Server not responding — force cleanup
+    }
+    // Force kill + cleanup
+    if (isProcessAlive(existingState.pid)) {
+      try { process.kill(existingState.pid, 'SIGTERM'); } catch {}
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (isProcessAlive(existingState.pid)) {
+        try { process.kill(existingState.pid, 'SIGKILL'); } catch {}
+      }
+    }
+    // Clean profile locks and state file
+    const profileDir = path.join(process.env.HOME || '/tmp', '.gstack', 'chromium-profile');
+    for (const lockFile of ['SingletonLock', 'SingletonSocket', 'SingletonCookie']) {
+      try { fs.unlinkSync(path.join(profileDir, lockFile)); } catch {}
+    }
+    try { fs.unlinkSync(config.stateFile); } catch {}
+    console.log('Disconnected (server was unresponsive — force cleaned).');
+    process.exit(0);
+  }
 
   // Special case: chain reads from stdin
   if (command === 'chain' && commandArgs.length === 0) {

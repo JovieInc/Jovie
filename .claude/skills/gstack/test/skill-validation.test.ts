@@ -1325,7 +1325,7 @@ describe('Codex skill', () => {
     expect(content).toContain('fall back to the Claude adversarial subagent');
     // Review log uses new skill name
     expect(content).toContain('adversarial-review');
-    expect(content).toContain('xhigh');
+    expect(content).toContain('reasoning_effort="high"');
     expect(content).toContain('ADVERSARIAL REVIEW SYNTHESIS');
   });
 
@@ -1335,7 +1335,7 @@ describe('Codex skill', () => {
     expect(content).toContain('< 50');
     expect(content).toContain('200+');
     expect(content).toContain('adversarial-review');
-    expect(content).toContain('xhigh');
+    expect(content).toContain('reasoning_effort="high"');
     expect(content).toContain('Investigate and fix');
   });
 
@@ -1367,11 +1367,6 @@ describe('Codex skill', () => {
     expect(content).toContain('"skill":"review"');
     expect(content).toContain('"issues_found":N');
     expect(content).toContain('Persist Eng Review result');
-  });
-
-  test('/ship gate suggests /review or /plan-eng-review when Eng Review is missing', () => {
-    const content = fs.readFileSync(path.join(ROOT, 'ship', 'SKILL.md'), 'utf-8');
-    expect(content).toContain('Abort — run /review or /plan-eng-review first');
   });
 
   test('Review Readiness Dashboard includes Adversarial Review row', () => {

@@ -1,7 +1,6 @@
 ---
 name: gstack-upgrade
 description: |
-  MANUAL TRIGGER ONLY: invoke only when user types /gstack-upgrade.
   Upgrade gstack to the latest version. Detects global vs vendored install,
   runs the upgrade, and shows what's new. Use when asked to "upgrade gstack",
   "update gstack", or "get latest version".
