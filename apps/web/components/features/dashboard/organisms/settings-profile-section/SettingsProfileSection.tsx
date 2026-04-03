@@ -16,6 +16,9 @@ import { useSettingsProfile } from './useSettingsProfile';
 
 const PROFILE_INPUT_CLASS =
   'block w-full rounded-[10px] border border-subtle bg-surface-0 px-3 py-2 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-focus focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/20';
+const PROFILE_ROW_CLASS =
+  'grid gap-2 py-3 sm:grid-cols-[168px_minmax(0,1fr)] sm:items-start sm:gap-x-5';
+const PROFILE_FIELD_COLUMN_CLASS = 'w-full sm:max-w-[420px]';
 
 export function SettingsProfileSection({
   artist,
@@ -72,43 +75,47 @@ export function SettingsProfileSection({
       description='Display name, username, image, and place details fans see.'
       actions={<SettingsStatusPill status={profileSaveStatus} />}
     >
-      <div className='space-y-1 px-4 py-4 sm:px-5'>
-        <div className='flex items-center justify-between gap-4 py-2'>
-          <span className='text-[13px] text-primary-token'>
+      <div className='space-y-0 px-4 py-4 sm:px-5'>
+        <div className={PROFILE_ROW_CLASS}>
+          <span className='pt-1 text-[13px] text-primary-token'>
             Profile picture
           </span>
-          <AvatarUploadable
-            src={artist.image_url}
-            alt={artist.name || 'Profile photo'}
-            name={artist.name || artist.handle}
-            size='sm'
-            uploadable
-            showHoverOverlay
-            onUpload={handleAvatarUpload}
-            onSuccess={handleAvatarUpdate}
-            onError={message => toast.error(message)}
-            maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
-            acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
-          />
+          <div className='flex justify-start sm:pt-0.5'>
+            <AvatarUploadable
+              src={artist.image_url}
+              alt={artist.name || 'Profile photo'}
+              name={artist.name || artist.handle}
+              size='sm'
+              uploadable
+              showHoverOverlay
+              onUpload={handleAvatarUpload}
+              onSuccess={handleAvatarUpdate}
+              onError={message => toast.error(message)}
+              maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
+              acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
+            />
+          </div>
         </div>
         {avatarQuality.status === 'low' ? (
-          <div className='flex items-start gap-3 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[12px] text-secondary-token'>
-            <AlertCircle
-              className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'
-              aria-hidden='true'
-            />
-            <p>
-              This photo is only {avatarQuality.width}x{avatarQuality.height}.
-              Jovie profiles look best at 512x512 or higher, so upload a sharper
-              image before this goes live at full size.
-            </p>
+          <div className='pb-2 sm:pl-[calc(168px+1.25rem)]'>
+            <div className='flex items-start gap-3 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[12px] text-secondary-token'>
+              <AlertCircle
+                className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'
+                aria-hidden='true'
+              />
+              <p>
+                This photo is only {avatarQuality.width}x{avatarQuality.height}.
+                Jovie profiles look best at 512x512 or higher, so upload a
+                sharper image before this goes live at full size.
+              </p>
+            </div>
           </div>
         ) : null}
 
-        <div className='flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between'>
+        <div className={PROFILE_ROW_CLASS}>
           <label
             htmlFor='displayName'
-            className='shrink-0 text-[13px] text-primary-token'
+            className='pt-2 text-[13px] text-primary-token'
           >
             Display name
           </label>
@@ -120,12 +127,12 @@ export function SettingsProfileSection({
             onChange={e => handleFieldChange('displayName', e.target.value)}
             onBlur={() => flushSave()}
             placeholder='The name your fans will see'
-            className={`w-full sm:max-w-[280px] ${PROFILE_INPUT_CLASS}`}
+            className={`${PROFILE_FIELD_COLUMN_CLASS} ${PROFILE_INPUT_CLASS}`}
           />
         </div>
 
-        <div className='flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between'>
-          <div className='shrink-0'>
+        <div className={PROFILE_ROW_CLASS}>
+          <div>
             <label
               htmlFor='username'
               className='text-[13px] text-primary-token'
@@ -136,7 +143,7 @@ export function SettingsProfileSection({
               Used in your profile URL
             </p>
           </div>
-          <div className='flex w-full rounded-md sm:max-w-[280px]'>
+          <div className={`flex rounded-md ${PROFILE_FIELD_COLUMN_CLASS}`}>
             <span className='inline-flex select-none items-center rounded-l-[10px] border border-r-0 border-subtle bg-surface-0 px-3 text-[13px] text-secondary-token'>
               {profileDomain}/
             </span>
@@ -155,8 +162,8 @@ export function SettingsProfileSection({
           </div>
         </div>
 
-        <div className='flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between'>
-          <div className='shrink-0'>
+        <div className={PROFILE_ROW_CLASS}>
+          <div>
             <label
               htmlFor='location'
               className='text-[13px] text-primary-token'
@@ -175,12 +182,12 @@ export function SettingsProfileSection({
             onChange={e => handleFieldChange('location', e.target.value)}
             onBlur={() => flushSave()}
             placeholder='Los Angeles, CA'
-            className={`w-full sm:max-w-[280px] ${PROFILE_INPUT_CLASS}`}
+            className={`${PROFILE_FIELD_COLUMN_CLASS} ${PROFILE_INPUT_CLASS}`}
           />
         </div>
 
-        <div className='flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between'>
-          <div className='shrink-0'>
+        <div className={PROFILE_ROW_CLASS}>
+          <div>
             <label
               htmlFor='hometown'
               className='text-[13px] text-primary-token'
@@ -199,12 +206,12 @@ export function SettingsProfileSection({
             onChange={e => handleFieldChange('hometown', e.target.value)}
             onBlur={() => flushSave()}
             placeholder='Nashville, TN'
-            className={`w-full sm:max-w-[280px] ${PROFILE_INPUT_CLASS}`}
+            className={`${PROFILE_FIELD_COLUMN_CLASS} ${PROFILE_INPUT_CLASS}`}
           />
         </div>
 
-        <div className='flex flex-col gap-2 py-2'>
-          <div className='shrink-0'>
+        <div className={PROFILE_ROW_CLASS}>
+          <div>
             <label
               htmlFor='careerHighlights'
               className='text-[13px] text-primary-token'
@@ -217,7 +224,7 @@ export function SettingsProfileSection({
               helps Jovie write better pitches and recommendations.
             </p>
           </div>
-          <div className='relative'>
+          <div className={`relative ${PROFILE_FIELD_COLUMN_CLASS}`}>
             <textarea
               name='careerHighlights'
               id='careerHighlights'
@@ -237,8 +244,8 @@ export function SettingsProfileSection({
           </div>
         </div>
 
-        <div className='flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between'>
-          <div className='shrink-0'>
+        <div className={PROFILE_ROW_CLASS}>
+          <div>
             <label
               htmlFor='targetPlaylists'
               className='text-[13px] text-primary-token'
@@ -259,7 +266,7 @@ export function SettingsProfileSection({
             onBlur={() => flushSave()}
             placeholder='e.g. Pollen, Butter, Lorem'
             maxLength={310}
-            className={`w-full sm:max-w-[280px] ${PROFILE_INPUT_CLASS}`}
+            className={`${PROFILE_FIELD_COLUMN_CLASS} ${PROFILE_INPUT_CLASS}`}
           />
         </div>
       </div>

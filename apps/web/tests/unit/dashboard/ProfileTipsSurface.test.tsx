@@ -220,7 +220,7 @@ describe('ProfileTipsSurface', () => {
     );
 
     expect(
-      getByRole('button', { name: 'View Tip Traffic In Analytics' })
+      getByRole('button', { name: 'View tip traffic in Analytics' })
     ).toBeDefined();
   });
 
@@ -244,7 +244,7 @@ describe('ProfileTipsSurface', () => {
     );
 
     expect(
-      queryByRole('button', { name: 'View Tip Traffic In Analytics' })
+      queryByRole('button', { name: 'View tip traffic in Analytics' })
     ).toBeNull();
   });
 });
