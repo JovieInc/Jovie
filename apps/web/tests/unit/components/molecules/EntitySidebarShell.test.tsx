@@ -8,12 +8,18 @@ vi.mock('@/components/organisms/RightDrawer', () => ({
     children,
     ariaLabel,
     'data-testid': testId,
+    'data-surface-tone': surfaceTone,
   }: {
     readonly children: ReactNode;
     readonly ariaLabel?: string;
     readonly 'data-testid'?: string;
+    readonly 'data-surface-tone'?: string;
   }) => (
-    <aside data-testid={testId ?? 'right-drawer'} aria-label={ariaLabel}>
+    <aside
+      data-testid={testId ?? 'right-drawer'}
+      data-surface-tone={surfaceTone}
+      aria-label={ariaLabel}
+    >
       {children}
     </aside>
   ),
@@ -87,5 +93,23 @@ describe('EntitySidebarShell', () => {
 
     expect(screen.getByText('Drawer tabs')).toBeInTheDocument();
     expect(screen.getByText('Body content')).toBeInTheDocument();
+  });
+
+  it('gives quiet sidebars a distinct rail treatment in light mode', () => {
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Release details'
+        title='Release title'
+        surfaceTone='quiet'
+      >
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    expect(screen.getByTestId('right-drawer')).toHaveAttribute(
+      'data-surface-tone',
+      'quiet'
+    );
   });
 });

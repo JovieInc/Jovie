@@ -55,7 +55,10 @@ export function TaskWorkspaceHeaderBar({
   const createFormId = 'task-workspace-create-form';
 
   return (
-    <div className='flex min-h-[48px] items-center justify-between gap-3 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-1 py-1.5'>
+    <div
+      data-testid='tasks-workspace-subheader'
+      className='flex h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)] items-center justify-between gap-3 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-app-header'
+    >
       <div className='min-w-0 flex-1'>
         {mode === 'search' ? (
           <AppSearchField
@@ -84,8 +87,8 @@ export function TaskWorkspaceHeaderBar({
             />
           </form>
         ) : (
-          <div className='flex min-h-8 items-center pl-2.5'>
-            <span className='text-[11px] font-[560] text-tertiary-token'>
+          <div className='flex h-full items-center pl-1.5'>
+            <span className='text-[10.5px] font-[560] text-tertiary-token'>
               {taskCount === 1 ? '1 Task' : `${taskCount} Tasks`}
             </span>
           </div>

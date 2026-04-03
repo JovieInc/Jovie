@@ -220,7 +220,7 @@ describe('ProfileTipsSurface', () => {
     );
 
     expect(
-      getByRole('button', { name: 'View Tip Traffic In Analytics' })
+      getByRole('button', { name: 'View tip traffic in Analytics' })
     ).toBeDefined();
   });
 
@@ -244,7 +244,33 @@ describe('ProfileTipsSurface', () => {
     );
 
     expect(
-      queryByRole('button', { name: 'View Tip Traffic In Analytics' })
+      queryByRole('button', { name: 'View tip traffic in Analytics' })
     ).toBeNull();
+  });
+
+  it('keeps the polite status live region mounted even before a message is shown', () => {
+    const summary = resolveProfileMonetizationSummary({
+      username: 'artist',
+      stripeConnectEnabled: false,
+      stripeAccountId: null,
+      stripeOnboardingComplete: false,
+      stripePayoutsEnabled: false,
+      hasVenmoHandle: true,
+      hasVenmoLink: false,
+      tipVisits: 0,
+      tipsReceived: 0,
+      totalReceivedCents: 0,
+      monthReceivedCents: 0,
+    });
+
+    const { container } = fastRender(
+      <ProfileTipsSurface summary={summary} {...baseCallbacks} />
+    );
+
+    const liveRegion = container.querySelector('[aria-live="polite"]');
+
+    expect(liveRegion).not.toBeNull();
+    expect(liveRegion).toHaveClass('sr-only');
+    expect(liveRegion).toHaveTextContent('');
   });
 });

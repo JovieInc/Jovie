@@ -79,6 +79,7 @@ export function ProfileTipsSurface({
   className,
 }: Readonly<ProfileTipsSurfaceProps>) {
   const isStripeConnectEnabled = useCodeFlag('STRIPE_CONNECT_ENABLED');
+  const isDrawer = variant === 'drawer';
   const isShareable =
     summary.tipUrl !== null &&
     isProfileMonetizationShareable(summary.paymentState);
@@ -190,13 +191,15 @@ export function ProfileTipsSurface({
   return (
     <div
       className={cn(
-        'grid gap-4 lg:grid-cols-[minmax(0,1fr)_132px] lg:items-start',
-        variant === 'drawer' ? 'px-3 pb-1 pt-1' : 'px-4 py-4 sm:px-5',
+        'grid gap-4',
+        isDrawer
+          ? 'grid-cols-[minmax(0,1fr)_156px] items-start px-3 pb-1 pt-1'
+          : 'px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_148px] lg:items-start',
         className
       )}
       data-testid={`profile-tips-surface-${variant}`}
     >
-      <div className='min-w-0 space-y-3'>
+      <div className={cn('min-w-0', isDrawer ? 'space-y-4' : 'space-y-3')}>
         <div className='flex flex-wrap items-center gap-2'>
           <span className='inline-flex items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-[11px] font-[510] text-secondary-token'>
             <StatusIcon paymentState={summary.paymentState} />
@@ -205,87 +208,117 @@ export function ProfileTipsSurface({
           <ProviderPill provider={summary.provider} />
         </div>
 
-        <p className='max-w-[48ch] text-[13px] leading-[19px] text-secondary-token'>
+        <p
+          className={cn(
+            'text-[13px] leading-[19px] text-secondary-token',
+            isDrawer ? 'max-w-[30ch]' : 'max-w-[48ch]'
+          )}
+        >
           {summary.narrative}
         </p>
 
-        <div className='flex flex-wrap items-center gap-2'>
-          <Button
-            type='button'
-            size='sm'
-            variant='primary'
-            onClick={() => {
-              void handlePrimaryAction();
-            }}
-          >
-            {getProfileMonetizationPrimaryActionLabel(
-              summary.paymentState,
-              isStripeConnectEnabled
+        <div className={cn('space-y-2.5', isDrawer ? 'max-w-[13rem]' : null)}>
+          <div
+            className={cn(
+              'flex gap-2',
+              isDrawer ? 'flex-col items-start' : 'flex-wrap items-center'
             )}
-          </Button>
-
-          {isShareable ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type='button'
-                  size='sm'
-                  variant='secondary'
-                  disabled={isDownloadingPng || isDownloadingSvg}
-                >
-                  <QrCode className='mr-1.5 h-3.5 w-3.5' aria-hidden='true' />
-                  Download QR
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align='start' sideOffset={6}>
-                <DropdownMenuItem
-                  onClick={() => {
-                    void handleDownloadPng();
-                  }}
-                  disabled={isDownloadingPng}
-                >
-                  Download PNG
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    void handleDownloadSvg();
-                  }}
-                  disabled={isDownloadingSvg}
-                >
-                  Download SVG
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
-        </div>
-
-        {summary.tipVisits > 0 && onViewAnalytics ? (
-          <button
-            type='button'
-            onClick={onViewAnalytics}
-            className='inline-flex items-center gap-1 text-[12px] font-[510] text-secondary-token transition-colors hover:text-primary-token'
           >
-            View Tip Traffic In Analytics
-            <ArrowUpRight className='h-3.5 w-3.5' aria-hidden='true' />
-          </button>
-        ) : null}
+            <Button
+              type='button'
+              size='sm'
+              variant='primary'
+              onClick={() => {
+                void handlePrimaryAction();
+              }}
+            >
+              {getProfileMonetizationPrimaryActionLabel(
+                summary.paymentState,
+                isStripeConnectEnabled
+              )}
+            </Button>
 
-        <p
-          className='min-h-[16px] text-[12px] text-tertiary-token'
-          aria-live='polite'
-        >
-          {statusMessage}
-        </p>
+            {isShareable ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type='button'
+                    size='sm'
+                    variant='secondary'
+                    disabled={isDownloadingPng || isDownloadingSvg}
+                  >
+                    <QrCode className='mr-1.5 h-3.5 w-3.5' aria-hidden='true' />
+                    Download QR
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align='start' sideOffset={6}>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      void handleDownloadPng();
+                    }}
+                    disabled={isDownloadingPng}
+                  >
+                    Download PNG
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      void handleDownloadSvg();
+                    }}
+                    disabled={isDownloadingSvg}
+                  >
+                    Download SVG
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </div>
+
+          {summary.tipVisits > 0 && onViewAnalytics ? (
+            <button
+              type='button'
+              onClick={onViewAnalytics}
+              className='inline-flex w-fit items-start gap-1.5 text-left text-[12px] font-[510] text-secondary-token transition-colors hover:text-primary-token'
+            >
+              <span>View tip traffic in Analytics</span>
+              <ArrowUpRight
+                className='mt-0.5 h-3.5 w-3.5 shrink-0'
+                aria-hidden='true'
+              />
+            </button>
+          ) : null}
+
+          <p
+            className={cn(
+              'text-[12px] text-tertiary-token',
+              !statusMessage && 'sr-only'
+            )}
+            aria-live='polite'
+          >
+            {statusMessage}
+          </p>
+        </div>
       </div>
 
-      <div className='flex lg:justify-end'>
-        <div className='flex h-[132px] w-[132px] shrink-0 items-center justify-center rounded-[16px] border border-(--linear-app-frame-seam) bg-surface-0 p-3'>
+      <div
+        className={cn(
+          'flex',
+          isDrawer ? 'justify-end pt-0.5' : 'lg:justify-end'
+        )}
+      >
+        <div
+          className={cn(
+            'shrink-0 rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-0',
+            isDrawer
+              ? 'flex h-[156px] w-[156px] items-center justify-center p-3'
+              : 'flex h-[148px] w-[148px] items-center justify-center p-3'
+          )}
+        >
           {qrPreviewUrl ? (
             <Image
               src={qrPreviewUrl}
               alt='Tip QR code'
-              width={132}
-              height={132}
+              width={isDrawer ? 132 : 124}
+              height={isDrawer ? 132 : 124}
               unoptimized
               className='h-full w-full rounded-[10px] bg-white object-contain'
             />

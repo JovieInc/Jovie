@@ -162,6 +162,9 @@ export async function instantiateReleaseTasks(releaseId: string) {
         explainerText: item.explainerText ?? null,
         learnMoreUrl: item.learnMoreUrl ?? null,
         videoUrl: null,
+        ...(item.descriptionHelper
+          ? { descriptionHelper: item.descriptionHelper }
+          : {}),
       },
     })
   );
