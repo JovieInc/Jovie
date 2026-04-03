@@ -787,14 +787,12 @@ function MobileTaskSection({
   selectedTaskId,
   artistName,
   onOpenTask,
-  onOpenRelease,
 }: Readonly<{
   title: string;
   tasks: ReadonlyArray<TaskView>;
   selectedTaskId: string | null;
   artistName?: string | null;
   onOpenTask: (task: TaskView) => void;
-  onOpenRelease: (task: TaskView) => void;
 }>) {
   if (tasks.length === 0) {
     return null;
@@ -813,7 +811,6 @@ function MobileTaskSection({
             task={task}
             artistName={artistName}
             onOpenTask={onOpenTask}
-            onOpenRelease={onOpenRelease}
             isSelected={task.id === selectedTaskId}
           />
         ))}
@@ -826,13 +823,11 @@ function MobileTaskListItem({
   task,
   artistName,
   onOpenTask,
-  onOpenRelease,
   isSelected,
 }: Readonly<{
   task: TaskView;
   artistName?: string | null;
   onOpenTask: (task: TaskView) => void;
-  onOpenRelease: (task: TaskView) => void;
   isSelected: boolean;
 }>) {
   const stage = getTaskStageVisual(task.status, task.agentStatus);
@@ -1614,7 +1609,6 @@ export function TasksPageClient() {
                           selectedTaskId={selectedTaskId}
                           artistName={artistName}
                           onOpenTask={openTaskDocument}
-                          onOpenRelease={openReleaseSidebar}
                         />
                         <MobileTaskSection
                           title='Closed'
@@ -1622,7 +1616,6 @@ export function TasksPageClient() {
                           selectedTaskId={selectedTaskId}
                           artistName={artistName}
                           onOpenTask={openTaskDocument}
-                          onOpenRelease={openReleaseSidebar}
                         />
                       </>
                     ) : (
@@ -1632,7 +1625,6 @@ export function TasksPageClient() {
                         selectedTaskId={selectedTaskId}
                         artistName={artistName}
                         onOpenTask={openTaskDocument}
-                        onOpenRelease={openReleaseSidebar}
                       />
                     )}
                   </div>

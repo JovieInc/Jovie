@@ -65,11 +65,13 @@ async function resolveBypassUserId(
       const payload = (await response.json()) as { userId?: string | null };
       return payload.userId?.trim() || fallbackUserId;
     } catch (error) {
-      if (error instanceof ClerkTestError || attempt === 3) {
+      if (error instanceof ClerkTestError) {
         throw error;
       }
 
-      await sleep(500 * attempt);
+      if (attempt < 3) {
+        await sleep(500 * attempt);
+      }
     }
   }
 

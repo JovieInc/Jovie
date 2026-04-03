@@ -145,7 +145,7 @@ export function EntitySidebarShell({
           variant='card'
           className={cn(
             'overflow-hidden lg:mx-0 lg:mt-0',
-            'border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,transparent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+            'border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-surface-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
           )}
         >
           {entityHeader}
@@ -174,7 +174,7 @@ export function EntitySidebarShell({
             className={cn(
               'overflow-hidden lg:rounded-[18px]',
               !isQuietTone &&
-                'border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,transparent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] lg:border'
+                'border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-surface-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] lg:border'
             )}
           >
             <div

@@ -19,7 +19,7 @@ interface AlgorithmHealthWorkspaceProps {
 
 export function AlgorithmHealthWorkspace({
   fixtureReport = null,
-}: Readonly<AlgorithmHealthWorkspaceProps>) {
+}: AlgorithmHealthWorkspaceProps) {
   const [artistId, setArtistId] = useState<string>(
     TIM_WHITE_PROFILE.spotifyArtistId
   );
@@ -249,20 +249,22 @@ function NeighbourRow({ neighbour }: Readonly<{ neighbour: ScoredNeighbour }>) {
 }
 
 function SizeBadge({ size }: Readonly<{ size: NeighbourSize }>) {
-  const variant =
-    size === 'BIGGER'
-      ? 'success'
-      : size === 'SIMILAR'
-        ? 'warning'
-        : 'destructive';
+  const sizeConfig = {
+    BIGGER: { label: 'Bigger', variant: 'success' },
+    SIMILAR: { label: 'Similar', variant: 'warning' },
+    SMALLER: { label: 'Smaller', variant: 'destructive' },
+  } as const satisfies Record<
+    NeighbourSize,
+    {
+      readonly label: string;
+      readonly variant: 'success' | 'warning' | 'destructive';
+    }
+  >;
+  const { label, variant } = sizeConfig[size];
 
   return (
     <Badge variant={variant} size='sm'>
-      {size === 'BIGGER'
-        ? 'Bigger'
-        : size === 'SIMILAR'
-          ? 'Similar'
-          : 'Smaller'}
+      {label}
     </Badge>
   );
 }

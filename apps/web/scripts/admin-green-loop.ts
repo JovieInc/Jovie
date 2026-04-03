@@ -559,7 +559,6 @@ async function main() {
   const mode = parseMode(process.argv[2]);
   const runtime = createRuntime(await resolveServerPort());
   const managedServer = createManagedServer(runtime);
-  let exitCode = 1;
 
   const cleanup = async () => {
     await managedServer.dispose();
@@ -582,7 +581,7 @@ async function main() {
     }
 
     const results = await runPass(mode, runtime);
-    exitCode = results.every(result => result.status === 'green') ? 0 : 1;
+    const exitCode = results.every(result => result.status === 'green') ? 0 : 1;
     process.exitCode = exitCode;
   } finally {
     await cleanup();

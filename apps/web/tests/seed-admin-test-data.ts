@@ -460,10 +460,25 @@ async function ensureCampaignSettings() {
     .from(campaignSettings)
     .limit(1);
 
-  if (!existingSettings) {
-    await db.insert(campaignSettings).values({
-      id: 1,
-    });
+  const campaignSettingsValues = {
+    id: 1,
+    campaignsEnabled: true,
+    fitScoreThreshold: '50',
+    batchLimit: 20,
+    throttlingConfig: {
+      minDelayMs: 30000,
+      maxDelayMs: 120000,
+      maxPerHour: 30,
+    },
+  };
+
+  if (existingSettings) {
+    await db
+      .update(campaignSettings)
+      .set(campaignSettingsValues)
+      .where(eq(campaignSettings.id, existingSettings.id));
+  } else {
+    await db.insert(campaignSettings).values(campaignSettingsValues);
   }
 }
 
