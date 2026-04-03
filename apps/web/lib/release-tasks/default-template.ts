@@ -156,6 +156,18 @@ export const DEFAULT_RELEASE_TASK_TEMPLATE: DefaultTemplateItem[] = [
     priority: 'medium',
     dueDaysOffset: -14,
   },
+  {
+    title: 'Run Metadata Agent',
+    description:
+      'Generate the Xperi/AllMusic submission package for this release and review it before sending.',
+    explainerText:
+      'The Metadata Agent packages your release sheet, artwork, press photos, and artist bio into the format required by manual metadata destinations like Xperi/AllMusic. Review the package, approve the send, then let Jovie track when the updates go live.',
+    category: 'DSP Profile',
+    assigneeType: 'ai_workflow',
+    aiWorkflowId: 'metadata-agent-run',
+    priority: 'high',
+    dueDaysOffset: -14,
+  },
 
   // ─── Lyrics ────────────────────────────────────────────────────
   {
