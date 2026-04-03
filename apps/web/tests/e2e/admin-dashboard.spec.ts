@@ -1,6 +1,15 @@
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { ensureSignedInUser } from '../helpers/clerk-auth';
+import {
+  ensureSignedInUser,
+  getAdminCredentials,
+  hasAdminCredentials,
+} from '../helpers/clerk-auth';
+import {
+  ADMIN_FAST_HEALTH_SURFACES,
+  ADMIN_RENDER_SURFACES,
+  getAdminSurfaceById,
+} from './utils/admin-surface-manifest';
 import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 
 /**
@@ -19,35 +28,6 @@ import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
  *
  * @smoke @admin @critical
  */
-
-function hasAdminCredentials(): boolean {
-  const adminUsername =
-    process.env.E2E_CLERK_ADMIN_USERNAME ??
-    process.env.E2E_CLERK_USER_USERNAME ??
-    '';
-  const adminPassword =
-    process.env.E2E_CLERK_ADMIN_PASSWORD ??
-    process.env.E2E_CLERK_USER_PASSWORD ??
-    '';
-  return (
-    adminUsername.length > 0 &&
-    (adminPassword.length > 0 || adminUsername.includes('+clerk_test')) &&
-    process.env.CLERK_TESTING_SETUP_SUCCESS === 'true'
-  );
-}
-
-function getAdminCredentials(): { username: string; password: string } {
-  return {
-    username:
-      process.env.E2E_CLERK_ADMIN_USERNAME ??
-      process.env.E2E_CLERK_USER_USERNAME ??
-      '',
-    password:
-      process.env.E2E_CLERK_ADMIN_PASSWORD ??
-      process.env.E2E_CLERK_USER_PASSWORD ??
-      '',
-  };
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ADMIN DASHBOARD SUITE
@@ -120,7 +100,7 @@ test.describe('Admin Dashboard', () => {
 
     const response = await smokeNavigateWithRetry(
       page,
-      APP_ROUTES.ADMIN_CREATORS,
+      getAdminSurfaceById('people-creators').path,
       {
         timeout: 90_000,
         retries: fastIteration ? 3 : 2,
@@ -160,7 +140,7 @@ test.describe('Admin Dashboard', () => {
 
     const response = await smokeNavigateWithRetry(
       page,
-      APP_ROUTES.ADMIN_USERS,
+      getAdminSurfaceById('people-users').path,
       {
         timeout: 90_000,
         retries: fastIteration ? 3 : 2,
@@ -199,21 +179,9 @@ test.describe('Admin Dashboard', () => {
     );
     test.setTimeout(360_000); // 6 min for 8 pages
 
-    const adminPages = fastIteration
-      ? [
-          APP_ROUTES.ADMIN,
-          APP_ROUTES.ADMIN_CREATORS,
-          APP_ROUTES.ADMIN_USERS,
-          APP_ROUTES.ADMIN_CAMPAIGNS,
-        ]
-      : [
-          APP_ROUTES.ADMIN,
-          APP_ROUTES.ADMIN_CREATORS,
-          APP_ROUTES.ADMIN_USERS,
-          APP_ROUTES.ADMIN_ACTIVITY,
-          APP_ROUTES.ADMIN_CAMPAIGNS,
-          APP_ROUTES.ADMIN_LEADS,
-        ];
+    const adminPages = (
+      fastIteration ? ADMIN_FAST_HEALTH_SURFACES : ADMIN_RENDER_SURFACES
+    ).map(surface => surface.path);
 
     // Check first page for admin access
     const firstResponse = await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN, {

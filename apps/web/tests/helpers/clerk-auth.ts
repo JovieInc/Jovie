@@ -29,6 +29,12 @@ function getRequestedBypassPersona(): 'creator' | 'admin' | null {
   return null;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolveSleep => {
+    setTimeout(resolveSleep, ms);
+  });
+}
+
 async function resolveBypassUserId(
   baseUrl: string,
   fallbackUserId: string,
@@ -38,21 +44,36 @@ async function resolveBypassUserId(
     return fallbackUserId;
   }
 
-  const response = await fetch(new URL('/api/dev/test-auth/session', baseUrl), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ persona }),
-  });
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(
+        new URL('/api/dev/test-auth/session', baseUrl),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persona }),
+        }
+      );
 
-  if (!response.ok) {
-    throw new ClerkTestError(
-      `Failed to resolve ${persona} test auth persona.`,
-      'CLERK_SETUP_FAILED'
-    );
+      if (!response.ok) {
+        throw new ClerkTestError(
+          `Failed to resolve ${persona} test auth persona.`,
+          'CLERK_SETUP_FAILED'
+        );
+      }
+
+      const payload = (await response.json()) as { userId?: string | null };
+      return payload.userId?.trim() || fallbackUserId;
+    } catch (error) {
+      if (error instanceof ClerkTestError || attempt === 3) {
+        throw error;
+      }
+
+      await sleep(500 * attempt);
+    }
   }
 
-  const payload = (await response.json()) as { userId?: string | null };
-  return payload.userId?.trim() || fallbackUserId;
+  return fallbackUserId;
 }
 
 async function enableTestAuthBypass(page: Page): Promise<void> {

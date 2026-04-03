@@ -23,7 +23,12 @@ import {
   Users,
 } from 'lucide-react';
 
-import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
+import {
+  ADMIN_NAV_REGISTRY,
+  ADMIN_PRIMARY_WORKSPACE_IDS,
+  ADMIN_SETTINGS_TOOL_IDS,
+  type AdminWorkspaceId,
+} from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 
 import type { NavItem } from './types';
@@ -175,13 +180,33 @@ const adminIconById = {
   'algorithm-health': AudioWaveform,
 } as const;
 
-export const adminNavigation: NavItem[] = ADMIN_NAV_REGISTRY.map(item => ({
-  name: item.label,
-  href: item.href,
-  id: `admin_${item.id}`,
-  icon: adminIconById[item.id],
-  description: item.description,
-}));
+function buildAdminNavigationItems(
+  ids: readonly AdminWorkspaceId[]
+): NavItem[] {
+  return ids.map(id => {
+    const item = ADMIN_NAV_REGISTRY.find(entry => entry.id === id);
+
+    if (!item) {
+      throw new Error(`Missing admin navigation registry item for "${id}"`);
+    }
+
+    return {
+      name: item.label,
+      href: item.href,
+      id: `admin_${item.id}`,
+      icon: adminIconById[item.id],
+      description: item.description,
+    };
+  });
+}
+
+export const adminNavigation: NavItem[] = buildAdminNavigationItems(
+  ADMIN_PRIMARY_WORKSPACE_IDS
+);
+
+export const adminSettingsNavigation: NavItem[] = buildAdminNavigationItems(
+  ADMIN_SETTINGS_TOOL_IDS
+);
 
 export interface AdminNavSection {
   label: string;
@@ -191,19 +216,19 @@ export interface AdminNavSection {
 export const adminNavigationSections: AdminNavSection[] = [
   {
     label: 'Workspaces',
-    items: [
-      adminNavigation.find(item => item.id === 'admin_overview')!,
-      adminNavigation.find(item => item.id === 'admin_people')!,
-      adminNavigation.find(item => item.id === 'admin_growth')!,
-      adminNavigation.find(item => item.id === 'admin_activity')!,
-    ],
+    items: adminNavigation,
+  },
+];
+
+export const adminSettingsNavigationSections: AdminNavSection[] = [
+  {
+    // Settings keeps quick links to the primary workspaces alongside utilities.
+    label: 'Workspaces',
+    items: adminNavigation,
   },
   {
     label: 'Utilities',
-    items: [
-      adminNavigation.find(item => item.id === 'admin_investors')!,
-      adminNavigation.find(item => item.id === 'admin_screenshots')!,
-    ],
+    items: adminSettingsNavigation,
   },
 ];
 

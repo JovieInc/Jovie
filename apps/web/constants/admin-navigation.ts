@@ -47,6 +47,19 @@ export interface AdminNavRegistryItem {
   readonly section: AdminNavigationSection;
 }
 
+export const ADMIN_PRIMARY_WORKSPACE_IDS = [
+  'overview',
+  'people',
+  'growth',
+  'activity',
+] as const satisfies readonly AdminWorkspaceId[];
+
+export const ADMIN_SETTINGS_TOOL_IDS = [
+  'investors',
+  'screenshots',
+  'algorithm-health',
+] as const satisfies readonly AdminWorkspaceId[];
+
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
   {
     id: 'overview',
@@ -121,45 +134,6 @@ export const ADMIN_OUTREACH_QUEUE_LABELS: Record<AdminOutreachQueue, string> = {
   review: 'Manual review',
 };
 
-export const ADMIN_LEGACY_ROUTE_MAP = {
-  [APP_ROUTES.ADMIN_WAITLIST]: {
-    workspace: 'people',
-    view: 'waitlist',
-  },
-  [APP_ROUTES.ADMIN_CREATORS]: {
-    workspace: 'people',
-    view: 'creators',
-  },
-  [APP_ROUTES.ADMIN_USERS]: {
-    workspace: 'people',
-    view: 'users',
-  },
-  [APP_ROUTES.ADMIN_RELEASES]: {
-    workspace: 'people',
-    view: 'releases',
-  },
-  [APP_ROUTES.ADMIN_FEEDBACK]: {
-    workspace: 'people',
-    view: 'feedback',
-  },
-  [APP_ROUTES.ADMIN_LEADS]: {
-    workspace: 'growth',
-    view: 'leads',
-  },
-  [APP_ROUTES.ADMIN_OUTREACH]: {
-    workspace: 'growth',
-    view: 'outreach',
-  },
-  [APP_ROUTES.ADMIN_CAMPAIGNS]: {
-    workspace: 'growth',
-    view: 'campaigns',
-  },
-  [APP_ROUTES.ADMIN_INGEST]: {
-    workspace: 'growth',
-    view: 'ingest',
-  },
-} as const;
-
 export function isAdminPeopleView(
   value: string | null | undefined
 ): value is AdminPeopleView {
@@ -218,6 +192,85 @@ export function buildAdminGrowthHref(
     ? `${APP_ROUTES.ADMIN_GROWTH}?${query}`
     : APP_ROUTES.ADMIN_GROWTH;
 }
+
+export const ADMIN_LEGACY_REDIRECT_MAP = {
+  [APP_ROUTES.ADMIN_WAITLIST]: {
+    workspace: 'people',
+    view: 'waitlist',
+    href: buildAdminPeopleHref('waitlist'),
+  },
+  [APP_ROUTES.ADMIN_CREATORS]: {
+    workspace: 'people',
+    view: 'creators',
+    href: buildAdminPeopleHref('creators'),
+  },
+  [APP_ROUTES.ADMIN_USERS]: {
+    workspace: 'people',
+    view: 'users',
+    href: buildAdminPeopleHref('users'),
+  },
+  [APP_ROUTES.ADMIN_RELEASES]: {
+    workspace: 'people',
+    view: 'releases',
+    href: buildAdminPeopleHref('releases'),
+  },
+  [APP_ROUTES.ADMIN_FEEDBACK]: {
+    workspace: 'people',
+    view: 'feedback',
+    href: buildAdminPeopleHref('feedback'),
+  },
+  [APP_ROUTES.ADMIN_LEADS]: {
+    workspace: 'growth',
+    view: 'leads',
+    href: buildAdminGrowthHref('leads'),
+  },
+  [APP_ROUTES.ADMIN_OUTREACH]: {
+    workspace: 'growth',
+    view: 'outreach',
+    href: buildAdminGrowthHref('outreach'),
+  },
+  [APP_ROUTES.ADMIN_OUTREACH_EMAIL]: {
+    workspace: 'growth',
+    view: 'outreach',
+    queue: 'email',
+    href: buildAdminGrowthHref(
+      'outreach',
+      new URLSearchParams({ queue: 'email' })
+    ),
+  },
+  [APP_ROUTES.ADMIN_OUTREACH_DM]: {
+    workspace: 'growth',
+    view: 'outreach',
+    queue: 'dm',
+    href: buildAdminGrowthHref(
+      'outreach',
+      new URLSearchParams({ queue: 'dm' })
+    ),
+  },
+  [APP_ROUTES.ADMIN_OUTREACH_REVIEW]: {
+    workspace: 'growth',
+    view: 'outreach',
+    queue: 'review',
+    href: buildAdminGrowthHref(
+      'outreach',
+      new URLSearchParams({ queue: 'review' })
+    ),
+  },
+  [APP_ROUTES.ADMIN_CAMPAIGNS]: {
+    workspace: 'growth',
+    view: 'campaigns',
+    href: buildAdminGrowthHref('campaigns'),
+  },
+  [APP_ROUTES.ADMIN_INGEST]: {
+    workspace: 'growth',
+    view: 'ingest',
+    href: buildAdminGrowthHref('ingest'),
+  },
+  [APP_ROUTES.ADMIN_GROWTH_YC_METRICS]: {
+    workspace: 'overview',
+    href: APP_ROUTES.ADMIN,
+  },
+} as const;
 
 export function searchParamsFromRecord(
   record: SearchParamRecord | undefined

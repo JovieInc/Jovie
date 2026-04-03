@@ -3,6 +3,81 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
+
+  return {
+    ...actual,
+    DropdownMenu: ({ children }: { children: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    DropdownMenuContent: ({
+      children,
+      className,
+      onCloseAutoFocus: _onCloseAutoFocus,
+      sideOffset: _sideOffset,
+      ...props
+    }: React.HTMLAttributes<HTMLDivElement> & {
+      className?: string;
+      onCloseAutoFocus?: unknown;
+      sideOffset?: unknown;
+    }) => (
+      <div role='menu' className={className} {...props}>
+        {children}
+      </div>
+    ),
+    DropdownMenuSub: ({ children }: { children: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    DropdownMenuSubTrigger: ({
+      children,
+      className,
+      inset: _inset,
+      ...props
+    }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+      className?: string;
+      inset?: unknown;
+    }) => (
+      <button type='button' className={className} {...props}>
+        {children}
+      </button>
+    ),
+    DropdownMenuSubContent: ({
+      children,
+      className,
+      sideOffset: _sideOffset,
+      ...props
+    }: React.HTMLAttributes<HTMLDivElement> & {
+      className?: string;
+      sideOffset?: unknown;
+    }) => (
+      <div role='menu' className={className} {...props}>
+        {children}
+      </div>
+    ),
+    DropdownMenuSeparator: (props: React.HTMLAttributes<HTMLHRElement>) => (
+      <hr {...props} />
+    ),
+    DropdownMenuItem: ({
+      children,
+      className,
+      onSelect,
+      ...props
+    }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+      className?: string;
+      onSelect?: () => void;
+    }) => (
+      <button type='button' className={className} onClick={onSelect} {...props}>
+        {children}
+      </button>
+    ),
+    TooltipShortcut: ({ children }: { children: React.ReactNode }) => children,
+  };
+});
+
 const mockTask = {
   id: 'task-1',
   taskNumber: 1,
@@ -51,6 +126,7 @@ const mockSetHeaderActions = vi.fn();
 let setHeaderActionsHost: ((actions: React.ReactNode) => void) | null = null;
 let mockIsXlUp = true;
 let mockIs2xlUp = true;
+let mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({
@@ -88,6 +164,10 @@ vi.mock('@/hooks/useBreakpoint', () => ({
 
     return false;
   },
+}));
+
+vi.mock('@/hooks/useMediaQuery', () => ({
+  useMediaQuery: () => mockCanShowTaskDocumentAlongsideReleaseSidebar,
 }));
 
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
@@ -165,12 +245,22 @@ vi.mock('@/components/organisms/table', () => ({
     label,
     onClick,
     ariaLabel,
+    disabled,
+    icon,
   }: {
     label: React.ReactNode;
     onClick?: () => void;
     ariaLabel?: string;
+    disabled?: boolean;
+    icon?: React.ReactNode;
   }) => (
-    <button type='button' onClick={onClick} aria-label={ariaLabel}>
+    <button
+      type='button'
+      onClick={onClick}
+      aria-label={ariaLabel}
+      disabled={disabled}
+    >
+      {icon}
       {label}
     </button>
   ),
@@ -234,6 +324,7 @@ describe('TasksPageClient', () => {
     mockSetHeaderActions.mockReset();
     mockIsXlUp = true;
     mockIs2xlUp = true;
+    mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
   });
 
   afterEach(() => {
@@ -255,19 +346,28 @@ describe('TasksPageClient', () => {
 
     const titleEditor = screen.getByLabelText('Task title');
     expect(titleEditor.tagName).toBe('TEXTAREA');
-    expect(titleEditor).toHaveValue(mockTask.title);
+    expect(titleEditor).toHaveValue(mockTaskTwo.title);
   });
 
   it('shows the compact progress metadata for the selected task', () => {
     renderPage();
 
-    expect(screen.getByText('Done')).toBeInTheDocument();
-    expect(screen.getByText('High')).toBeInTheDocument();
-    expect(screen.getByText('You')).toBeInTheDocument();
+    expect(screen.getAllByText('In Progress').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Medium').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('You').length).toBeGreaterThan(0);
+  });
+
+  it('renders separate list and document scroll regions on desktop', () => {
+    renderPage();
+
+    expect(screen.getByTestId('task-list-pane')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('task-document-scroll-region')
+    ).toBeInTheDocument();
   });
 
   it('hides the task document when the right panel opens on constrained desktop widths', () => {
-    mockIs2xlUp = false;
+    mockCanShowTaskDocumentAlongsideReleaseSidebar = false;
     renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: 'QA Release' }));
@@ -294,10 +394,10 @@ describe('TasksPageClient', () => {
 
     expect(mockUpdateTask).toHaveBeenCalledWith(
       {
-        taskId: 'task-1',
+        taskId: 'task-2',
         data: {
           title: 'Updated release handoff title',
-          description: mockTask.description,
+          description: mockTaskTwo.description,
         },
       },
       expect.objectContaining({
@@ -339,16 +439,32 @@ describe('TasksPageClient', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
+  it('renders task property menus with shared menu contracts and selected rows', () => {
+    renderPage();
+
+    const surface = document.querySelector('[data-menu-surface="toolbar"]');
+    expect(surface).toBeTruthy();
+
+    const menuRows = Array.from(
+      (surface as HTMLElement).querySelectorAll('[data-menu-row]')
+    );
+
+    expect(menuRows.length).toBeGreaterThan(0);
+    expect(menuRows.some(row => row.textContent?.includes('In Progress'))).toBe(
+      true
+    );
+  });
+
   it('supports j and k keyboard navigation across visible tasks', () => {
     renderPage();
 
-    expect(screen.getByLabelText('Task title')).toHaveValue(mockTask.title);
-
-    fireEvent.keyDown(window, { key: 'j' });
     expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
 
-    fireEvent.keyDown(window, { key: 'k' });
+    fireEvent.keyDown(window, { key: 'j' });
     expect(screen.getByLabelText('Task title')).toHaveValue(mockTask.title);
+
+    fireEvent.keyDown(window, { key: 'k' });
+    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
   });
 
   it('does not auto-select a task on narrower layouts', () => {
@@ -357,6 +473,21 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
-    expect(screen.getByTestId('tasks-table')).toBeInTheDocument();
+    expect(screen.getByTestId('mobile-task-list')).toBeInTheDocument();
+  });
+
+  it('renders the mobile list shell and opens task detail on tap', () => {
+    mockIsXlUp = false;
+
+    renderPage();
+
+    expect(screen.getByText('2 total tasks')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Search tasks' })
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByTestId('mobile-task-row')[0]!);
+
+    expect(screen.getByLabelText('Task title')).toBeInTheDocument();
   });
 });

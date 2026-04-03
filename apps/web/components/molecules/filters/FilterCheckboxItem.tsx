@@ -6,6 +6,7 @@ import { type ReactNode, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import {
   TOOLBAR_MENU_ITEM_CLASS,
+  TOOLBAR_MENU_ROW_SELECTED_CLASS,
   ToolbarMenuRow,
 } from '../menus/ToolbarMenuPrimitives';
 
@@ -74,6 +75,8 @@ export function FilterCheckboxItem({
     <button
       type='button'
       data-filter-item
+      data-menu-row
+      data-selected={checked ? 'true' : undefined}
       onClick={e => {
         e.preventDefault();
         e.stopPropagation();
@@ -85,7 +88,7 @@ export function FilterCheckboxItem({
         TOOLBAR_MENU_ITEM_CLASS,
         'w-full',
         checked
-          ? 'bg-surface-1 text-primary-token'
+          ? TOOLBAR_MENU_ROW_SELECTED_CLASS
           : 'text-secondary-token hover:text-primary-token'
       )}
     >
