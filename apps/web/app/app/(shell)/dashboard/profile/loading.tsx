@@ -1,17 +1,43 @@
+import { Skeleton } from '@jovie/ui';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
-import { ChatMessageSkeleton } from '@/components/jovie/components/ChatMessageSkeleton';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
+/**
+ * Profile page loading skeleton.
+ * Matches the JovieChat empty state layout since ProfilePageChat renders JovieChat.
+ */
 export default function ProfileLoading() {
   return (
     <ChatWorkspaceSurface>
       <div className='flex h-full min-h-0 flex-col' aria-busy='true'>
-        <div className='flex-1'>
-          <ChatMessageSkeleton />
-        </div>
-        <div className='border-t border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 pb-4 pt-4 sm:px-5 sm:pb-6'>
-          <div className='mx-auto w-full max-w-2xl space-y-2'>
-            <LoadingSkeleton height='h-10' width='w-full' rounded='lg' />
+        <div className='flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-6 sm:py-8'>
+          <div className='mx-auto flex w-full max-w-[34rem] flex-1 flex-col items-center justify-center gap-5'>
+            {/* Heading skeleton */}
+            <Skeleton className='h-6 w-48' rounded='lg' />
+
+            {/* Input area skeleton */}
+            <div className='w-full max-w-[35rem] space-y-2'>
+              <div className='overflow-hidden rounded-[24px] border border-black/6 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] shadow-[0_1px_0_rgba(255,255,255,0.72),0_10px_22px_-20px_rgba(15,23,42,0.42)] dark:border-white/8'>
+                <div className='relative flex items-end gap-2 px-3 py-2.5'>
+                  <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 opacity-80'>
+                    <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
+                  </div>
+                  <div className='min-w-0 flex-1 py-1.5'>
+                    <LoadingSkeleton height='h-5' width='w-full' rounded='md' />
+                  </div>
+                  <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0'>
+                    <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
+                  </div>
+                </div>
+              </div>
+
+              {/* Suggested prompts skeleton */}
+              <div className='flex flex-wrap justify-center gap-2 pt-1'>
+                <Skeleton className='h-8 w-28 rounded-full' rounded='full' />
+                <Skeleton className='h-8 w-24 rounded-full' rounded='full' />
+                <Skeleton className='h-8 w-32 rounded-full' rounded='full' />
+              </div>
+            </div>
           </div>
         </div>
       </div>
