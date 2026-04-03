@@ -88,4 +88,27 @@ describe('EntitySidebarShell', () => {
     expect(screen.getByText('Drawer tabs')).toBeInTheDocument();
     expect(screen.getByText('Body content')).toBeInTheDocument();
   });
+
+  it('gives quiet sidebars a distinct rail treatment in light mode', () => {
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Release details'
+        title='Release title'
+        surfaceTone='quiet'
+      >
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    const rail = screen.getByTestId('right-drawer').firstElementChild;
+    const className = rail?.getAttribute('class') ?? '';
+
+    expect(className).toContain(
+      'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_93%,var(--linear-app-shell-border)_7%)]'
+    );
+    expect(className).toContain(
+      'shadow-[-1px_0_0_0_color-mix(in_oklab,var(--linear-app-shell-border)_56%,transparent)]'
+    );
+  });
 });

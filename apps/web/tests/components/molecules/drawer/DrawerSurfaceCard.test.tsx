@@ -40,6 +40,26 @@ describe('DrawerSurfaceCard', () => {
     expect(className).toContain('shadow-[');
   });
 
+  it('uses the quieter drawer treatment without adding floating shadows', () => {
+    render(
+      <DrawerSurfaceCard testId='surface-card' variant='quiet'>
+        Quiet
+      </DrawerSurfaceCard>
+    );
+
+    const className =
+      screen.getByTestId('surface-card').getAttribute('class') ?? '';
+
+    expect(className).toContain('rounded-xl');
+    expect(className).toContain(
+      'border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)]'
+    );
+    expect(className).toContain(
+      'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-app-shell-border)_2%)]'
+    );
+    expect(className).toContain('shadow-none');
+  });
+
   it('keeps elevated shadows scoped to floating sidebar and drawer surfaces', () => {
     expect(LINEAR_SURFACE.drawerCard).toContain('shadow-[');
     expect(LINEAR_SURFACE.drawerCardSm).toContain('shadow-[');
