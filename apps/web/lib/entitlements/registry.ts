@@ -26,6 +26,7 @@ export type BooleanEntitlement =
   | 'canBeVerified'
   | 'aiCanUseTools'
   | 'canCreateManualReleases'
+  | 'canAccessMetadataSubmissionAgent'
   | 'canAccessFutureReleases'
   | 'canSendNotifications'
   | 'canEditSmartLinks'
@@ -83,6 +84,7 @@ const PRO_BOOLEANS: Record<BooleanEntitlement, boolean> = {
   canBeVerified: true,
   aiCanUseTools: true,
   canCreateManualReleases: true,
+  canAccessMetadataSubmissionAgent: true,
   canAccessFutureReleases: true,
   canSendNotifications: true,
   canEditSmartLinks: true,
@@ -146,6 +148,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canBeVerified: false,
       aiCanUseTools: true,
       canCreateManualReleases: true,
+      canAccessMetadataSubmissionAgent: false,
       canAccessFutureReleases: false,
       canSendNotifications: false,
       canEditSmartLinks: true,
@@ -218,6 +221,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canBeVerified: true,
       aiCanUseTools: true,
       canCreateManualReleases: true,
+      canAccessMetadataSubmissionAgent: true,
       canAccessFutureReleases: true,
       canSendNotifications: true,
       canEditSmartLinks: true,

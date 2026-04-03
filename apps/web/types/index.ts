@@ -305,6 +305,7 @@ export interface UserEntitlements {
   canBeVerified: boolean;
   aiCanUseTools: boolean;
   canCreateManualReleases: boolean;
+  canAccessMetadataSubmissionAgent: boolean;
   canAccessFutureReleases: boolean;
   canSendNotifications: boolean;
   canEditSmartLinks: boolean;

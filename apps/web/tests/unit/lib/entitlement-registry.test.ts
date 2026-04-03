@@ -29,6 +29,7 @@ describe('Entitlement Registry Consistency', () => {
       'canBeVerified',
       'aiCanUseTools',
       'canCreateManualReleases',
+      'canAccessMetadataSubmissionAgent',
       'canAccessFutureReleases',
       'canSendNotifications',
       'canEditSmartLinks',
