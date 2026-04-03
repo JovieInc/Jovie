@@ -17,6 +17,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         smartLinksLimit: null,
         aiDailyMessageLimit: 10,
         aiPitchGenPerRelease: 1,
+        aiAlbumArtRunsPerRelease: 1,
       });
       expect(free.booleans).toEqual({
         canExportContacts: false,
@@ -56,6 +57,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         smartLinksLimit: null,
         aiDailyMessageLimit: 100,
         aiPitchGenPerRelease: null,
+        aiAlbumArtRunsPerRelease: null,
       });
       expect(pro.booleans).toEqual({
         canExportContacts: true,
@@ -95,6 +97,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         smartLinksLimit: null,
         aiDailyMessageLimit: 500,
         aiPitchGenPerRelease: null,
+        aiAlbumArtRunsPerRelease: null,
       });
       expect(max.booleans).toEqual({
         canExportContacts: true,
