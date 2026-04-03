@@ -481,7 +481,7 @@ describe('TasksPageClient', () => {
 
     renderPage();
 
-    expect(screen.getByText('My Tasks')).toBeInTheDocument();
+    expect(screen.getByText('2 total tasks')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Search tasks' })
     ).toBeInTheDocument();

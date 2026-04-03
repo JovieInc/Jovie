@@ -130,6 +130,28 @@ export function EntitySidebarShell({
   const titleBarActions = actionsInEntityHeader
     ? closeAction
     : (headerActions ?? closeAction);
+  const minimalEntityHeaderContent =
+    isMinimalHeader && !isEmpty && entityHeader ? (
+      isQuietTone ? (
+        <div
+          data-testid='entity-sidebar-entity-header'
+          className='lg:mx-0 lg:mt-0'
+        >
+          {entityHeader}
+        </div>
+      ) : (
+        <DrawerSurfaceCard
+          testId='entity-sidebar-entity-header'
+          variant='card'
+          className={cn(
+            'overflow-hidden lg:mx-0 lg:mt-0',
+            'border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,transparent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+          )}
+        >
+          {entityHeader}
+        </DrawerSurfaceCard>
+      )
+    ) : null;
   return (
     <RightDrawer
       isOpen={isOpen}
@@ -208,27 +230,7 @@ export function EntitySidebarShell({
             </div>
           </DrawerSurfaceCard>
 
-          {isMinimalHeader && !isEmpty && entityHeader ? (
-            isQuietTone ? (
-              <div
-                data-testid='entity-sidebar-entity-header'
-                className='lg:mx-0 lg:mt-0'
-              >
-                {entityHeader}
-              </div>
-            ) : (
-              <DrawerSurfaceCard
-                testId='entity-sidebar-entity-header'
-                variant='card'
-                className={cn(
-                  'overflow-hidden lg:mx-0 lg:mt-0',
-                  'border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,transparent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
-                )}
-              >
-                {entityHeader}
-              </DrawerSurfaceCard>
-            )
-          ) : null}
+          {minimalEntityHeaderContent}
         </div>
 
         {isEmpty ? (

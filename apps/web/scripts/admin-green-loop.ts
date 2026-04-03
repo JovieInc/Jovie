@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { type FSWatcher, watch } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -26,41 +27,27 @@ interface GoalResult {
   readonly durationMs: number;
 }
 
+interface AdminGreenRuntime {
+  readonly serverPort: string;
+  readonly serverBaseUrl: string;
+  readonly sharedEnv: NodeJS.ProcessEnv;
+  readonly serverEnv: NodeJS.ProcessEnv;
+}
+
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, '..', '..', '..');
 const WEB_ROOT = resolve(REPO_ROOT, 'apps/web');
 const REPORT_PATH = resolve(REPO_ROOT, '.context/admin-green/latest.json');
-const SERVER_PORT = process.env.ADMIN_GREEN_PORT ?? '3100';
-const SERVER_BASE_URL =
-  process.env.BASE_URL ?? `http://localhost:${SERVER_PORT}`;
+const DEFAULT_SERVER_PORT = Number.parseInt(
+  process.env.ADMIN_GREEN_PORT ?? '3110',
+  10
+);
 const SERVER_READY_TIMEOUT_MS = Number(
   process.env.ADMIN_GREEN_SERVER_TIMEOUT_MS ?? 300_000
 );
 const SERVER_HEALTHCHECK_TIMEOUT_MS = 5_000;
 const SERVER_SHUTDOWN_TIMEOUT_MS = 15_000;
 const SERVER_LOG_LIMIT = 200;
-
-const SHARED_ENV = {
-  ...process.env,
-  BASE_URL: SERVER_BASE_URL,
-  E2E_SKIP_WEB_SERVER: '1',
-  E2E_USE_TEST_AUTH_BYPASS: '1',
-  E2E_TEST_AUTH_PERSONA: 'admin',
-  NEXT_PUBLIC_CLERK_MOCK: '1',
-  NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
-} satisfies NodeJS.ProcessEnv;
-
-const SERVER_ENV = {
-  ...SHARED_ENV,
-  NODE_ENV: 'test',
-  PORT: SERVER_PORT,
-  NEXT_PUBLIC_E2E_MODE: '1',
-  NEXT_DISABLE_TOOLBAR: '1',
-  E2E_FAST_ONBOARDING: '1',
-  E2E_ALLOW_DEV_CSP: '1',
-  NODE_OPTIONS:
-    `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=8192`.trim(),
-} satisfies NodeJS.ProcessEnv;
 
 const VERIFY_GOALS: readonly GoalDefinition[] = [
   {
@@ -146,6 +133,68 @@ function getGoals(mode: AdminGreenMode): readonly GoalDefinition[] {
   return mode === 'record' ? RECORD_GOALS : VERIFY_GOALS;
 }
 
+function isPortAvailable(port: number): Promise<boolean> {
+  return new Promise(resolvePort => {
+    const probe = createServer();
+
+    probe.once('error', () => {
+      resolvePort(false);
+    });
+
+    probe.once('listening', () => {
+      probe.close(() => resolvePort(true));
+    });
+
+    probe.listen(port);
+  });
+}
+
+async function resolveServerPort(): Promise<string> {
+  for (
+    let candidate = DEFAULT_SERVER_PORT;
+    candidate < DEFAULT_SERVER_PORT + 50;
+    candidate += 1
+  ) {
+    if (await isPortAvailable(candidate)) {
+      return String(candidate);
+    }
+  }
+
+  throw new Error(
+    `Unable to find an open port for admin green loop starting at ${DEFAULT_SERVER_PORT}.`
+  );
+}
+
+function createRuntime(serverPort: string): AdminGreenRuntime {
+  const serverBaseUrl = `http://localhost:${serverPort}`;
+  const sharedEnv = {
+    ...process.env,
+    BASE_URL: serverBaseUrl,
+    E2E_SKIP_WEB_SERVER: '1',
+    E2E_USE_TEST_AUTH_BYPASS: '1',
+    E2E_TEST_AUTH_PERSONA: 'admin',
+    NEXT_PUBLIC_CLERK_MOCK: '1',
+    NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
+  } satisfies NodeJS.ProcessEnv;
+
+  return {
+    serverPort,
+    serverBaseUrl,
+    sharedEnv,
+    serverEnv: {
+      ...sharedEnv,
+      NODE_ENV: 'test',
+      PORT: serverPort,
+      NEXT_PUBLIC_E2E_MODE: '1',
+      NEXT_DISABLE_TOOLBAR: '1',
+      E2E_FAST_ONBOARDING: '1',
+      E2E_ALLOW_DEV_CSP: '1',
+      NODE_OPTIONS:
+        `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=8192`.trim(),
+    } satisfies NodeJS.ProcessEnv,
+  };
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise(resolveSleep => {
     setTimeout(resolveSleep, ms);
@@ -184,7 +233,8 @@ function getServerLogSnippet(buffer: readonly string[]): string {
 
 async function waitForServerReady(
   server: ChildProcess,
-  recentLogs: readonly string[]
+  recentLogs: readonly string[],
+  runtime: AdminGreenRuntime
 ): Promise<void> {
   const startedAt = Date.now();
 
@@ -201,7 +251,7 @@ async function waitForServerReady(
     }
 
     try {
-      const response = await fetch(SERVER_BASE_URL, {
+      const response = await fetch(runtime.serverBaseUrl, {
         signal: AbortSignal.timeout(SERVER_HEALTHCHECK_TIMEOUT_MS),
       });
 
@@ -217,7 +267,7 @@ async function waitForServerReady(
 
   throw new Error(
     [
-      `Timed out waiting for admin green loop server at ${SERVER_BASE_URL}.`,
+      `Timed out waiting for admin green loop server at ${runtime.serverBaseUrl}.`,
       getServerLogSnippet(recentLogs),
     ].join('\n')
   );
@@ -228,21 +278,24 @@ async function stopServer(server: ChildProcess | null): Promise<void> {
     return;
   }
 
+  const exited = new Promise<void>(resolveExit => {
+    server.once('exit', () => resolveExit());
+  });
+
   server.kill('SIGTERM');
 
   await Promise.race([
-    new Promise<void>(resolveExit => {
-      server.once('exit', () => resolveExit());
-    }),
-    sleep(SERVER_SHUTDOWN_TIMEOUT_MS).then(() => {
+    exited,
+    sleep(SERVER_SHUTDOWN_TIMEOUT_MS).then(async () => {
       if (server.exitCode === null && server.signalCode === null) {
         server.kill('SIGKILL');
+        await exited;
       }
     }),
   ]);
 }
 
-function createManagedServer() {
+function createManagedServer(runtime: AdminGreenRuntime) {
   let server: ChildProcess | null = null;
   let startPromise: Promise<void> | null = null;
   const recentLogs: string[] = [];
@@ -255,7 +308,7 @@ function createManagedServer() {
     recentLogs.length = 0;
     server = spawn('pnpm', ['run', 'dev:local:playwright'], {
       cwd: WEB_ROOT,
-      env: SERVER_ENV,
+      env: runtime.serverEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
@@ -266,7 +319,7 @@ function createManagedServer() {
       pushServerLog(recentLogs, chunk, 'stderr');
     });
 
-    await waitForServerReady(server, recentLogs);
+    await waitForServerReady(server, recentLogs, runtime);
   };
 
   const ensure = async () => {
@@ -277,7 +330,7 @@ function createManagedServer() {
 
     if (server && server.exitCode === null && server.signalCode === null) {
       try {
-        const response = await fetch(SERVER_BASE_URL, {
+        const response = await fetch(runtime.serverBaseUrl, {
           signal: AbortSignal.timeout(SERVER_HEALTHCHECK_TIMEOUT_MS),
         });
 
@@ -309,13 +362,16 @@ function createManagedServer() {
   };
 }
 
-async function runGoal(goal: GoalDefinition): Promise<GoalResult> {
+async function runGoal(
+  goal: GoalDefinition,
+  runtime: AdminGreenRuntime
+): Promise<GoalResult> {
   const startedAt = Date.now();
 
   const exitCode = await new Promise<number>(resolveExit => {
     const child = spawn(goal.command[0], [...goal.command.slice(1)], {
       cwd: WEB_ROOT,
-      env: SHARED_ENV,
+      env: runtime.sharedEnv,
       stdio: 'inherit',
     });
 
@@ -335,7 +391,8 @@ async function runGoal(goal: GoalDefinition): Promise<GoalResult> {
 
 async function writeReport(
   mode: AdminGreenMode,
-  results: readonly GoalResult[]
+  results: readonly GoalResult[],
+  runtime: AdminGreenRuntime
 ): Promise<void> {
   const green = results.every(result => result.status === 'green');
   const payload = {
@@ -343,11 +400,12 @@ async function writeReport(
     green,
     generatedAt: new Date().toISOString(),
     auth: {
-      E2E_USE_TEST_AUTH_BYPASS: SHARED_ENV.E2E_USE_TEST_AUTH_BYPASS,
-      E2E_TEST_AUTH_PERSONA: SHARED_ENV.E2E_TEST_AUTH_PERSONA,
-      NEXT_PUBLIC_CLERK_MOCK: SHARED_ENV.NEXT_PUBLIC_CLERK_MOCK,
+      baseUrl: runtime.serverBaseUrl,
+      E2E_USE_TEST_AUTH_BYPASS: runtime.sharedEnv.E2E_USE_TEST_AUTH_BYPASS,
+      E2E_TEST_AUTH_PERSONA: runtime.sharedEnv.E2E_TEST_AUTH_PERSONA,
+      NEXT_PUBLIC_CLERK_MOCK: runtime.sharedEnv.NEXT_PUBLIC_CLERK_MOCK,
       NEXT_PUBLIC_CLERK_PROXY_DISABLED:
-        SHARED_ENV.NEXT_PUBLIC_CLERK_PROXY_DISABLED,
+        runtime.sharedEnv.NEXT_PUBLIC_CLERK_PROXY_DISABLED,
     },
     manifest: {
       renderCount: ADMIN_RENDER_SURFACES.length,
@@ -372,10 +430,11 @@ async function writeReport(
 
 function printGoalMatrix(
   mode: AdminGreenMode,
-  goals: readonly GoalDefinition[]
+  goals: readonly GoalDefinition[],
+  runtime: AdminGreenRuntime
 ) {
   console.log(`Admin green loop mode: ${mode}`);
-  console.log(`Managed server: ${SERVER_BASE_URL}`);
+  console.log(`Managed server: ${runtime.serverBaseUrl}`);
   console.log('Render surfaces:');
   for (const surface of ADMIN_RENDER_SURFACES) {
     console.log(`  - ${surface.id}: ${surface.path} -> ${surface.rootTestId}`);
@@ -390,42 +449,72 @@ function printGoalMatrix(
   }
 }
 
-async function runPass(mode: AdminGreenMode): Promise<readonly GoalResult[]> {
+async function runPass(
+  mode: AdminGreenMode,
+  runtime: AdminGreenRuntime
+): Promise<readonly GoalResult[]> {
   const goals = getGoals(mode);
-  printGoalMatrix(mode, goals);
+  printGoalMatrix(mode, goals, runtime);
 
   const results: GoalResult[] = [];
 
   for (const goal of goals) {
-    results.push(await runGoal(goal));
+    results.push(await runGoal(goal, runtime));
   }
 
-  await writeReport(mode, results);
+  await writeReport(mode, results, runtime);
   return results;
 }
 
 async function watchUntilGreen(
-  managedServer: ReturnType<typeof createManagedServer>
+  managedServer: ReturnType<typeof createManagedServer>,
+  runtime: AdminGreenRuntime
 ) {
   let running = false;
   let queued = false;
   let watcher: FSWatcher | null = null;
+  let resolveWatch: (() => void) | null = null;
+  let rejectWatch: ((error: unknown) => void) | null = null;
+  let completed = false;
+
+  const finish = () => {
+    if (completed) {
+      return;
+    }
+
+    completed = true;
+    watcher?.close();
+    watcher = null;
+    resolveWatch?.();
+  };
 
   const runVerifyPass = async () => {
+    if (completed) {
+      return;
+    }
+
     if (running) {
       queued = true;
       return;
     }
 
     running = true;
-    await managedServer.ensure();
-    const results = await runPass('verify');
-    const allGreen = results.every(result => result.status === 'green');
-    running = false;
 
-    if (allGreen) {
+    try {
+      await managedServer.ensure();
+      const results = await runPass('verify', runtime);
+      if (results.every(result => result.status === 'green')) {
+        finish();
+        return;
+      }
+    } catch (error) {
+      completed = true;
       watcher?.close();
+      watcher = null;
+      rejectWatch?.(error);
       return;
+    } finally {
+      running = false;
     }
 
     if (queued) {
@@ -434,20 +523,17 @@ async function watchUntilGreen(
     }
   };
 
-  await runVerifyPass();
-  const initialResults = await runPass('verify');
-  if (initialResults.every(result => result.status === 'green')) {
-    return;
-  }
+  await new Promise<void>((resolvePromise, rejectPromise) => {
+    resolveWatch = resolvePromise;
+    rejectWatch = rejectPromise;
 
-  await new Promise<void>(resolveWatch => {
     watcher = watch(
       REPO_ROOT,
       {
         recursive: true,
       },
       (_eventType, filename) => {
-        if (!filename) {
+        if (!filename || completed) {
           return;
         }
 
@@ -461,32 +547,19 @@ async function watchUntilGreen(
           return;
         }
 
-        void runVerifyPass().then(() => {
-          void writeReport('verify', []);
-        });
+        void runVerifyPass();
       }
     );
 
-    const pollForCompletion = async () => {
-      while (watcher) {
-        await sleep(500);
-        const report = await runPass('verify');
-        if (report.every(result => result.status === 'green')) {
-          watcher.close();
-          watcher = null;
-          resolveWatch();
-          return;
-        }
-      }
-    };
-
-    void pollForCompletion();
+    void runVerifyPass();
   });
 }
 
 async function main() {
   const mode = parseMode(process.argv[2]);
-  const managedServer = createManagedServer();
+  const runtime = createRuntime(await resolveServerPort());
+  const managedServer = createManagedServer(runtime);
+  let exitCode = 1;
 
   const cleanup = async () => {
     await managedServer.dispose();
@@ -503,14 +576,14 @@ async function main() {
     await managedServer.ensure();
 
     if (mode === 'watch') {
-      await watchUntilGreen(managedServer);
-      process.exit(0);
+      await watchUntilGreen(managedServer, runtime);
+      process.exitCode = 0;
       return;
     }
 
-    const results = await runPass(mode);
-    const allGreen = results.every(result => result.status === 'green');
-    process.exit(allGreen ? 0 : 1);
+    const results = await runPass(mode, runtime);
+    exitCode = results.every(result => result.status === 'green') ? 0 : 1;
+    process.exitCode = exitCode;
   } finally {
     await cleanup();
   }
@@ -533,5 +606,5 @@ main().catch(async error => {
     )}\n`,
     'utf8'
   );
-  process.exit(1);
+  process.exitCode = 1;
 });

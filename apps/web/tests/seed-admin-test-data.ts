@@ -210,11 +210,18 @@ async function seedWaitlist() {
     .from(waitlistSettings)
     .limit(1);
 
-  if (!existingSettings) {
-    await db.insert(waitlistSettings).values({
-      id: 1,
-      autoAcceptResetsAt: new Date('2099-01-02T00:00:00.000Z'),
-    });
+  const waitlistSettingsValues = {
+    id: 1,
+    autoAcceptResetsAt: new Date('2099-01-02T00:00:00.000Z'),
+  };
+
+  if (existingSettings) {
+    await db
+      .update(waitlistSettings)
+      .set(waitlistSettingsValues)
+      .where(eq(waitlistSettings.id, existingSettings.id));
+  } else {
+    await db.insert(waitlistSettings).values(waitlistSettingsValues);
   }
 }
 
@@ -325,7 +332,9 @@ async function seedLeads() {
       outreachRoute: fixture.outreachRoute,
       outreachStatus: fixture.outreachStatus,
       claimToken: fixture.claimToken,
-      claimTokenHash: await hashClaimToken(fixture.claimToken),
+      claimTokenHash: fixture.claimToken
+        ? await hashClaimToken(fixture.claimToken)
+        : null,
       outreachQueuedAt: null,
       priorityScore: fixture.priorityScore,
       emailInvalid: false,
@@ -350,13 +359,20 @@ async function seedLeads() {
     .from(leadPipelineSettings)
     .limit(1);
 
-  if (!existingSettings) {
-    await db.insert(leadPipelineSettings).values({
-      id: 1,
-      enabled: true,
-      queryBudgetResetsAt: new Date('2099-01-02T00:00:00.000Z'),
-      autoIngestResetsAt: new Date('2099-01-02T00:00:00.000Z'),
-    });
+  const leadPipelineSettingsValues = {
+    id: 1,
+    enabled: true,
+    queryBudgetResetsAt: new Date('2099-01-02T00:00:00.000Z'),
+    autoIngestResetsAt: new Date('2099-01-02T00:00:00.000Z'),
+  };
+
+  if (existingSettings) {
+    await db
+      .update(leadPipelineSettings)
+      .set(leadPipelineSettingsValues)
+      .where(eq(leadPipelineSettings.id, existingSettings.id));
+  } else {
+    await db.insert(leadPipelineSettings).values(leadPipelineSettingsValues);
   }
 }
 
@@ -416,18 +432,25 @@ async function seedInvestors() {
     .from(investorSettings)
     .limit(1);
 
-  if (!existingSettings) {
-    await db.insert(investorSettings).values({
-      showProgressBar: true,
-      raiseTarget: 500000,
-      committedAmount: 175000,
-      investorCount: 12,
-      bookCallUrl: 'https://cal.com/e2e-admin/fundraise',
-      investUrl: 'https://jov.ie/invest/e2e-admin',
-      followupEnabled: true,
-      followupDelayHours: 48,
-      engagedThreshold: 50,
-    });
+  const investorSettingsValues = {
+    showProgressBar: true,
+    raiseTarget: 500000,
+    committedAmount: 175000,
+    investorCount: 12,
+    bookCallUrl: 'https://cal.com/e2e-admin/fundraise',
+    investUrl: 'https://jov.ie/invest/e2e-admin',
+    followupEnabled: true,
+    followupDelayHours: 48,
+    engagedThreshold: 50,
+  };
+
+  if (existingSettings) {
+    await db
+      .update(investorSettings)
+      .set(investorSettingsValues)
+      .where(eq(investorSettings.id, existingSettings.id));
+  } else {
+    await db.insert(investorSettings).values(investorSettingsValues);
   }
 }
 

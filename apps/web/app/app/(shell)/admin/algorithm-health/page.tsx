@@ -30,6 +30,7 @@ export default async function AlgorithmHealthPage({
       testId='admin-algorithm-health-page'
     >
       <AlgorithmHealthWorkspace
+        key={fixtureParam === 'e2e' ? 'fixture-e2e' : 'fixture-live'}
         fixtureReport={
           fixtureParam === 'e2e' ? ALGORITHM_HEALTH_E2E_REPORT : null
         }

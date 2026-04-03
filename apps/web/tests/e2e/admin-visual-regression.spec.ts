@@ -3,6 +3,7 @@ import {
   ensureSignedInUser,
   getAdminCredentials,
   hasAdminCredentials,
+  setTestAuthBypassSession,
 } from '../helpers/clerk-auth';
 import {
   ADMIN_MOBILE_SNAPSHOT_SURFACES,
@@ -13,6 +14,7 @@ import {
 
 const DESKTOP_VIEWPORT = { width: 1440, height: 1100 } as const;
 const MOBILE_VIEWPORT = { width: 390, height: 844 } as const;
+const USE_TEST_AUTH_BYPASS = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 
 function jsonResponse(body: unknown) {
   return {
@@ -133,7 +135,7 @@ async function registerAdminVisualStubs(page: import('@playwright/test').Page) {
       );
     }
 
-    if (queue === 'manual_review') {
+    if (queue === 'review' || queue === 'manual_review') {
       return route.fulfill(
         jsonResponse({
           items: [
@@ -354,7 +356,10 @@ async function openSurface(
   viewport: { width: number; height: number }
 ) {
   await page.setViewportSize(viewport);
-  await page.goto(surface.path, { timeout: 90_000 });
+  await page.goto(surface.path, {
+    waitUntil: 'domcontentloaded',
+    timeout: 90_000,
+  });
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(2000);
 
@@ -368,6 +373,12 @@ test.describe('admin visual regression', () => {
     test.skip(!hasAdminCredentials(), 'Admin auth not available');
 
     await registerAdminVisualStubs(page);
+
+    if (USE_TEST_AUTH_BYPASS) {
+      await setTestAuthBypassSession(page, 'admin');
+      return;
+    }
+
     await ensureSignedInUser(page, getAdminCredentials());
   });
 

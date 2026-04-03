@@ -2,6 +2,7 @@
 
 import { Badge, Button, Input } from '@jovie/ui';
 import Image from 'next/image';
+import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type {
@@ -75,7 +76,13 @@ export function AlgorithmHealthWorkspace({
             graph.
           </p>
         </div>
-        <div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
+        <form
+          className='flex flex-col gap-2 sm:flex-row sm:items-center'
+          onSubmit={(event: FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
+            void analyse();
+          }}
+        >
           <Input
             value={artistId}
             onChange={event => setArtistId(event.target.value)}
@@ -84,15 +91,13 @@ export function AlgorithmHealthWorkspace({
             aria-label='Spotify artist ID'
           />
           <Button
+            type='submit'
             size='sm'
-            onClick={() => {
-              void analyse();
-            }}
             disabled={loading || artistId.trim().length === 0}
           >
             {loading ? 'Analysing...' : 'Analyse'}
           </Button>
-        </div>
+        </form>
       </ContentSurfaceCard>
 
       {error ? (

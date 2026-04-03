@@ -125,8 +125,12 @@ type MobileTaskScope = 'all' | 'open' | 'done';
 const MOBILE_TASK_SCOPE_OPTIONS = [
   ['all', 'All'],
   ['open', 'Open'],
-  ['done', 'Done'],
+  ['done', 'Closed'],
 ] as const satisfies ReadonlyArray<readonly [MobileTaskScope, string]>;
+
+function isTaskClosed(task: Readonly<TaskView>): boolean {
+  return task.status === 'done' || task.status === 'cancelled';
+}
 
 function compareTaskCompletionOrder(
   left: Readonly<TaskView>,
@@ -147,11 +151,11 @@ function getMobileScopedTasks(
   scope: MobileTaskScope
 ): TaskView[] {
   if (scope === 'open') {
-    return tasks.filter(task => task.status !== 'done');
+    return tasks.filter(task => !isTaskClosed(task));
   }
 
   if (scope === 'done') {
-    return tasks.filter(task => task.status === 'done');
+    return tasks.filter(isTaskClosed);
   }
 
   return [...tasks];
@@ -162,8 +166,8 @@ function partitionTasksForMobile(tasks: ReadonlyArray<TaskView>): {
   readonly completedTasks: TaskView[];
 } {
   return {
-    activeTasks: tasks.filter(task => task.status !== 'done'),
-    completedTasks: tasks.filter(task => task.status === 'done'),
+    activeTasks: tasks.filter(task => !isTaskClosed(task)),
+    completedTasks: tasks.filter(isTaskClosed),
   };
 }
 
@@ -1004,8 +1008,8 @@ export function TasksPageClient() {
   const mobileScopeCounts = useMemo(
     () => ({
       all: tasks.length,
-      open: tasks.filter(task => task.status !== 'done').length,
-      done: tasks.filter(task => task.status === 'done').length,
+      open: tasks.filter(task => !isTaskClosed(task)).length,
+      done: tasks.filter(isTaskClosed).length,
     }),
     [tasks]
   );
@@ -1571,10 +1575,7 @@ export function TasksPageClient() {
                 >
                   <div className='flex items-center justify-between px-4 pb-1 pt-3'>
                     <div>
-                      <h1 className='text-[1.9rem] font-[620] tracking-[-0.05em] text-primary-token'>
-                        My Tasks
-                      </h1>
-                      <p className='mt-1 text-[12px] text-secondary-token'>
+                      <p className='text-[12px] text-secondary-token'>
                         {mobileScopeCounts.all} total tasks
                       </p>
                     </div>
@@ -1616,7 +1617,7 @@ export function TasksPageClient() {
                           onOpenRelease={openReleaseSidebar}
                         />
                         <MobileTaskSection
-                          title='Done'
+                          title='Closed'
                           tasks={mobileTaskSections.completedTasks}
                           selectedTaskId={selectedTaskId}
                           artistName={artistName}
@@ -1626,7 +1627,7 @@ export function TasksPageClient() {
                       </>
                     ) : (
                       <MobileTaskSection
-                        title={mobileScope === 'open' ? 'Open' : 'Done'}
+                        title={mobileScope === 'open' ? 'Open' : 'Closed'}
                         tasks={mobileScopedTasks}
                         selectedTaskId={selectedTaskId}
                         artistName={artistName}

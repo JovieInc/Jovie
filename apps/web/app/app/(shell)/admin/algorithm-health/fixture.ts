@@ -76,7 +76,7 @@ export const ALGORITHM_HEALTH_E2E_REPORT: AlgorithmHealthReport = {
       genreOverlap: 1,
       authenticity: {
         level: 'CAUTION',
-        reasons: ['No genres despite significant followers'],
+        reasons: ['Limited genre diversity despite significant followers'],
       },
     },
     {
