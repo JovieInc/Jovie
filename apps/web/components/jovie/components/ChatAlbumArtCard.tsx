@@ -2,7 +2,7 @@
 
 import { Check, Loader2 } from 'lucide-react';
 import Image from 'next/image';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { applyGeneratedReleaseAlbumArt } from '@/app/app/(shell)/dashboard/releases/actions';
 import { cn } from '@/lib/utils';
@@ -38,6 +38,11 @@ export function ChatAlbumArtCard({
   );
   const [isApplying, setIsApplying] = useState(false);
   const [isApplied, setIsApplied] = useState(false);
+
+  useEffect(() => {
+    setSelectedOptionId(options?.[0]?.id ?? null);
+    setIsApplied(false);
+  }, [options, sessionId]);
 
   const handleApply = useCallback(async () => {
     if (!releaseId || !sessionId || !selectedOptionId) {
@@ -110,11 +115,12 @@ export function ChatAlbumArtCard({
                 key={option.id}
                 type='button'
                 onClick={() => setSelectedOptionId(option.id)}
+                aria-pressed={selectedOptionId === option.id}
                 className={cn(
                   'relative aspect-square overflow-hidden rounded-[12px] border transition-colors',
                   selectedOptionId === option.id
                     ? 'border-primary-token'
-                    : 'border-subtle'
+                    : 'border-subtle hover:border-default'
                 )}
               >
                 <Image
