@@ -80,6 +80,7 @@ export {
   handleCheckLimiter,
   healthLimiter,
   isrcRescanLimiter,
+  musicBrainzLookupLimiter,
   onboardingLimiter,
   paymentIntentLimiter,
   publicClickLimiter,

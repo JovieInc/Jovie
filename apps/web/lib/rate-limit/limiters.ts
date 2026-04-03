@@ -5,6 +5,7 @@
  * Import these directly for the most common rate limiting scenarios.
  */
 
+import { env } from '@/lib/env-server';
 import { RATE_LIMITERS } from './config';
 import { createPlanAwareRateLimiter } from './plan-aware-limiter';
 import { createRateLimiter, RateLimiter } from './rate-limiter';
@@ -551,6 +552,19 @@ export const appleMusicSearchLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for MusicBrainz lookups.
+ * Limit: 1 request per second across the configured backend.
+ */
+export const musicBrainzLookupLimiter = createRateLimiter(
+  RATE_LIMITERS.musicBrainzLookup,
+  {
+    // Intentionally fail closed in production so a Redis outage doesn't
+    // degrade into unsynchronized per-instance bursting against MusicBrainz.
+    requireRedis: env.NODE_ENV === 'production',
+  }
+);
+
+/**
  * Rate limiter for DSP artist discovery
  * Limit: 10 discoveries per minute per user
  * Protects 3rd-party platform APIs (Apple Music, Deezer, MusicBrainz)
@@ -880,6 +894,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     aiChat: aiChatLimiter,
     bandsintownSync: bandsintownSyncLimiter,
     appleMusicSearch: appleMusicSearchLimiter,
+    musicBrainzLookup: musicBrainzLookupLimiter,
     appleMusicRescanFree: _appleMusicRescanFreeLimiter,
     appleMusicRescanPaid: _appleMusicRescanPaidLimiter,
     releaseRefreshFree: _releaseRefreshFreeLimiter,

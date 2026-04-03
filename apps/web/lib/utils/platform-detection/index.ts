@@ -6,7 +6,11 @@
  */
 
 // Detector - Platform detection and identity
-export { canonicalIdentity, detectPlatform } from './detector';
+export {
+  canonicalIdentity,
+  detectPlatform,
+  detectPlatformByHost,
+} from './detector';
 // Environment - Environment detection helpers
 export {
   getBaseUrl,
