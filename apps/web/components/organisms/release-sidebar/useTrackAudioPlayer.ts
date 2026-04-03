@@ -15,6 +15,12 @@ interface AudioTrackSource {
 interface PlaybackState {
   readonly activeTrackId: string | null;
   readonly isPlaying: boolean;
+  readonly playbackStatus: 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+  readonly lastErrorReason:
+    | 'play_rejected'
+    | 'media_error'
+    | 'missing_source'
+    | null;
   readonly currentTime: number;
   readonly duration: number;
   readonly trackTitle: string | null;
@@ -41,6 +47,8 @@ function getAudio(): HTMLAudioElement | null {
 let state: PlaybackState = {
   activeTrackId: null,
   isPlaying: false,
+  playbackStatus: 'idle',
+  lastErrorReason: null,
   currentTime: 0,
   duration: 0,
   trackTitle: null,
@@ -50,7 +58,9 @@ let state: PlaybackState = {
 };
 
 const listeners = new Set<() => void>();
-const errorListeners = new Set<() => void>();
+const errorListeners = new Set<
+  (reason: PlaybackState['lastErrorReason']) => void
+>();
 
 function notify(): void {
   for (const listener of listeners) {
@@ -61,6 +71,35 @@ function notify(): void {
 function setState(partial: Partial<PlaybackState>): void {
   state = { ...state, ...partial };
   notify();
+}
+
+function notifyPlaybackError(reason: PlaybackState['lastErrorReason']): void {
+  for (const cb of errorListeners) {
+    cb(reason);
+  }
+}
+
+function handlePlaybackFailure(
+  audio: HTMLAudioElement | null,
+  reason: PlaybackState['lastErrorReason']
+): void {
+  if (audio) {
+    audio.pause();
+    audio.src = '';
+  }
+  setState({
+    activeTrackId: null,
+    isPlaying: false,
+    playbackStatus: 'error',
+    lastErrorReason: reason,
+    currentTime: 0,
+    duration: 0,
+    trackTitle: null,
+    releaseTitle: null,
+    artistName: null,
+    artworkUrl: null,
+  });
+  notifyPlaybackError(reason);
 }
 
 function bindAudioEvents(el: HTMLAudioElement): void {
@@ -76,10 +115,21 @@ function bindAudioEvents(el: HTMLAudioElement): void {
     });
   });
 
-  el.addEventListener('play', () => setState({ isPlaying: true }));
-  el.addEventListener('pause', () => setState({ isPlaying: false }));
+  el.addEventListener('play', () =>
+    setState({
+      isPlaying: true,
+      playbackStatus: 'playing',
+      lastErrorReason: null,
+    })
+  );
+  el.addEventListener('pause', () =>
+    setState({
+      isPlaying: false,
+      playbackStatus: state.activeTrackId ? 'paused' : 'idle',
+    })
+  );
   el.addEventListener('ended', () =>
-    setState({ isPlaying: false, currentTime: 0 })
+    setState({ isPlaying: false, playbackStatus: 'paused', currentTime: 0 })
   );
   el.addEventListener('loadedmetadata', () => {
     setState({
@@ -94,19 +144,7 @@ function bindAudioEvents(el: HTMLAudioElement): void {
     });
   });
   el.addEventListener('error', () => {
-    setState({
-      activeTrackId: null,
-      isPlaying: false,
-      currentTime: 0,
-      duration: 0,
-      trackTitle: null,
-      releaseTitle: null,
-      artistName: null,
-      artworkUrl: null,
-    });
-    for (const cb of errorListeners) {
-      cb();
-    }
+    handlePlaybackFailure(el, 'media_error');
   });
 }
 
@@ -128,7 +166,12 @@ export function useTrackAudioPlayer() {
     // Same track — toggle pause/resume
     if (state.activeTrackId === track.id) {
       if (audio.paused) {
-        await audio.play();
+        try {
+          await audio.play();
+        } catch (error) {
+          handlePlaybackFailure(audio, 'play_rejected');
+          throw error;
+        }
       } else {
         audio.pause();
       }
@@ -136,12 +179,18 @@ export function useTrackAudioPlayer() {
     }
 
     // New track — cancel any in-flight play() from a prior switch
-    if (!track.audioUrl) return;
+    if (!track.audioUrl) {
+      handlePlaybackFailure(audio, 'missing_source');
+      return;
+    }
     const token = ++_playToken;
     audio.pause();
     audio.src = track.audioUrl;
     setState({
       activeTrackId: track.id,
+      isPlaying: false,
+      playbackStatus: 'loading',
+      lastErrorReason: null,
       currentTime: 0,
       duration: 0,
       trackTitle: track.title,
@@ -149,10 +198,18 @@ export function useTrackAudioPlayer() {
       artistName: track.artistName ?? null,
       artworkUrl: track.artworkUrl ?? null,
     });
-    await audio.play();
-    // If another toggleTrack fired while play() was in-flight, pause this stale track
+    try {
+      await audio.play();
+    } catch (error) {
+      if (_playToken === token) {
+        handlePlaybackFailure(audio, 'play_rejected');
+      }
+      throw error;
+    }
+    // Another toggle fired while this play() was in-flight. The newer call owns
+    // the shared audio element now, so avoid pausing here.
     if (_playToken !== token) {
-      audio.pause();
+      return;
     }
   }, []);
 
@@ -163,12 +220,15 @@ export function useTrackAudioPlayer() {
     audio.currentTime = Math.max(0, Math.min(time, audio.duration));
   }, []);
 
-  const onError = useCallback((cb: () => void) => {
-    errorListeners.add(cb);
-    return () => {
-      errorListeners.delete(cb);
-    };
-  }, []);
+  const onError = useCallback(
+    (cb: (reason: PlaybackState['lastErrorReason']) => void) => {
+      errorListeners.add(cb);
+      return () => {
+        errorListeners.delete(cb);
+      };
+    },
+    []
+  );
 
   return {
     playbackState,
