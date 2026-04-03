@@ -42,13 +42,13 @@ function extractJsonLdValue(html: string, key: string): string | null {
   }
 
   for (const script of scripts) {
-    const contentMatch = script.match(/>([\s\S]*?)<\/script>/i);
-    if (!contentMatch?.[1]) {
+    const content = extractScriptContent(script);
+    if (!content) {
       continue;
     }
 
     try {
-      const parsed = JSON.parse(contentMatch[1]) as Record<string, unknown>;
+      const parsed = JSON.parse(content) as Record<string, unknown>;
       const value = parsed[key];
       if (typeof value === 'string') {
         return value.trim();
@@ -99,13 +99,13 @@ function extractJsonLdArtistName(html: string): string | null {
   }
 
   for (const script of scripts) {
-    const contentMatch = script.match(/>([\s\S]*?)<\/script>/i);
-    if (!contentMatch?.[1]) {
+    const content = extractScriptContent(script);
+    if (!content) {
       continue;
     }
 
     try {
-      const parsed = JSON.parse(contentMatch[1]) as Record<string, unknown>;
+      const parsed = JSON.parse(content) as Record<string, unknown>;
       const artistName =
         extractJsonLdEntityName(parsed.byArtist) ??
         extractJsonLdEntityName(parsed.artist) ??
@@ -122,15 +122,74 @@ function extractJsonLdArtistName(html: string): string | null {
   return null;
 }
 
+function extractScriptContent(script: string): string | null {
+  const openTagEnd = script.indexOf('>');
+  if (openTagEnd === -1) {
+    return null;
+  }
+
+  const closeTagStart = script.toLowerCase().lastIndexOf('</script>');
+  if (closeTagStart === -1 || closeTagStart <= openTagEnd) {
+    return null;
+  }
+
+  const content = script.slice(openTagEnd + 1, closeTagStart).trim();
+  return content.length > 0 ? content : null;
+}
+
 function extractTrackCount(html: string): number | null {
-  const trackCountMatch =
-    html.match(/(\d+)\s+tracks?/i) ??
-    html.match(/"numTracks"\s*:\s*"?(?<count>\d+)"?/i);
+  const fromJsonLd = extractNumericValueAfterToken(html, '"numTracks"');
+  if (fromJsonLd !== null) {
+    return fromJsonLd;
+  }
 
-  const rawValue =
-    trackCountMatch?.groups?.count ?? trackCountMatch?.[1] ?? null;
+  return extractNumericValueBeforeTrackLabel(html);
+}
 
-  return rawValue ? Number.parseInt(rawValue, 10) : null;
+function extractNumericValueAfterToken(
+  html: string,
+  token: string
+): number | null {
+  const tokenIndex = html.indexOf(token);
+  if (tokenIndex === -1) {
+    return null;
+  }
+
+  for (let index = tokenIndex + token.length; index < html.length; index += 1) {
+    const char = html[index];
+    if (char >= '0' && char <= '9') {
+      let end = index + 1;
+
+      while (end < html.length && html[end] >= '0' && html[end] <= '9') {
+        end += 1;
+      }
+
+      return Number.parseInt(html.slice(index, end), 10);
+    }
+  }
+
+  return null;
+}
+
+function extractNumericValueBeforeTrackLabel(html: string): number | null {
+  const lowerHtml = html.toLowerCase();
+  const trackLabelIndex = lowerHtml.indexOf('track');
+  if (trackLabelIndex === -1) {
+    return null;
+  }
+
+  let index = trackLabelIndex - 1;
+  while (index >= 0 && /\s/.test(html[index] ?? '')) {
+    index -= 1;
+  }
+
+  let start = index;
+  while (start >= 0 && html[start] >= '0' && html[start] <= '9') {
+    start -= 1;
+  }
+
+  const digits = html.slice(start + 1, index + 1);
+  return digits.length > 0 ? Number.parseInt(digits, 10) : null;
 }
 
 function extractUpc(html: string): string | null {
