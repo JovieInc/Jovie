@@ -4,14 +4,7 @@ import dynamic from 'next/dynamic';
 import React from 'react';
 import { env } from '@/lib/env-client';
 import { ClerkAnalytics } from './ClerkAnalytics';
-
-const ToastProvider = dynamic(
-  () => import('./ToastProvider').then(mod => ({ default: mod.ToastProvider })),
-  {
-    ssr: true,
-    loading: () => null,
-  }
-);
+import { ToastProvider } from './ToastProvider';
 
 const Analytics = dynamic(
   () => import('./Analytics').then(mod => ({ default: mod.Analytics })),
