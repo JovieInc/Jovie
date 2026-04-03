@@ -2442,6 +2442,21 @@ export async function generateMatchingReleaseAlbumArtVariant(params: {
   });
 }
 
+function resolveDraftAlbumArtMode(params: {
+  sourceReleaseId?: string | null;
+  brandKitId?: string | null;
+}): 'matching_variant' | 'series_background_refresh' | 'base' {
+  if (params.sourceReleaseId) {
+    return 'matching_variant';
+  }
+
+  if (params.brandKitId) {
+    return 'series_background_refresh';
+  }
+
+  return 'base';
+}
+
 export async function generateDraftAlbumArtOptions(params: {
   draftKey: string;
   title: string;
@@ -2464,11 +2479,10 @@ export async function generateDraftAlbumArtOptions(params: {
     artistName: profile.handle || 'Unknown Artist',
     releaseType: params.releaseType,
     genres: params.genres ?? [],
-    mode: params.sourceReleaseId
-      ? 'matching_variant'
-      : params.brandKitId
-        ? 'series_background_refresh'
-        : 'base',
+    mode: resolveDraftAlbumArtMode({
+      sourceReleaseId: params.sourceReleaseId,
+      brandKitId: params.brandKitId,
+    }),
     brandKitId: params.brandKitId ?? null,
     sourceTemplateReleaseId: params.sourceReleaseId ?? null,
     runLimit: entitlements.aiAlbumArtRunsPerRelease,

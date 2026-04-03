@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { gateway } from '@ai-sdk/gateway';
 import { del } from '@vercel/blob';
 import { generateImage } from 'ai';
-import { and, desc, eq, or } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { processArtworkToSizes } from '@/app/api/images/artwork/upload/process';
 import {
   getVercelBlobUploader,
@@ -12,6 +12,7 @@ import {
 } from '@/app/api/images/upload/lib';
 import { ALBUM_ART_IMAGE_MODEL } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import {
   albumArtGenerationSessions,
   artistBrandKits,
@@ -48,6 +49,21 @@ async function deleteBlobUrlIfConfigured(url: string | null | undefined) {
   }
 
   await del(url, { token });
+}
+
+function resolveTemplateSourceType(params: {
+  readonly brandKitId?: string | null;
+  readonly sourceTemplateReleaseId?: string | null;
+}) {
+  if (params.brandKitId) {
+    return 'artist_brand_kit' as const;
+  }
+
+  if (params.sourceTemplateReleaseId) {
+    return 'release_family' as const;
+  }
+
+  return 'none' as const;
 }
 
 async function uploadAlbumArtBuffer(params: {
@@ -109,7 +125,10 @@ async function createGenerationContext(
   const brandKit = input.brandKitId
     ? mapBrandKitRecord(
         (await db.query.artistBrandKits.findFirst({
-          where: eq(artistBrandKits.id, input.brandKitId),
+          where: and(
+            eq(artistBrandKits.id, input.brandKitId),
+            eq(artistBrandKits.profileId, input.profileId)
+          ),
         })) ?? null
       )
     : null;
@@ -117,12 +136,23 @@ async function createGenerationContext(
     ? (readReleaseAlbumArtMetadata(
         (
           await db.query.discogReleases.findFirst({
-            where: eq(discogReleases.id, input.sourceTemplateReleaseId),
+            where: and(
+              eq(discogReleases.id, input.sourceTemplateReleaseId),
+              eq(discogReleases.creatorProfileId, input.profileId)
+            ),
             columns: { metadata: true },
           })
         )?.metadata as Record<string, unknown> | null
       ).albumArtTemplate ?? null)
     : null;
+
+  if (input.brandKitId && !brandKit) {
+    throw new Error('Brand kit not found');
+  }
+
+  if (input.mode === 'matching_variant' && !sourceTemplate) {
+    throw new Error('Matching album art source template not found');
+  }
 
   return {
     releaseId: input.releaseId,
@@ -295,11 +325,10 @@ export async function generateAlbumArt(
     releaseId: input.releaseId ?? null,
     draftKey: input.draftKey ?? null,
     mode: input.mode,
-    templateSourceType: input.brandKitId
-      ? 'artist_brand_kit'
-      : input.sourceTemplateReleaseId
-        ? 'release_family'
-        : 'none',
+    templateSourceType: resolveTemplateSourceType({
+      brandKitId: input.brandKitId,
+      sourceTemplateReleaseId: input.sourceTemplateReleaseId,
+    }),
     templateSourceId: input.brandKitId ?? input.sourceTemplateReleaseId ?? null,
     status: 'ready',
     consumedRuns: 1,
@@ -334,7 +363,8 @@ export async function getLatestReadySession(params: {
   const session = await db.query.albumArtGenerationSessions.findFirst({
     where: and(
       eq(albumArtGenerationSessions.profileId, params.profileId),
-      eq(albumArtGenerationSessions.id, params.sessionId)
+      eq(albumArtGenerationSessions.id, params.sessionId),
+      eq(albumArtGenerationSessions.status, 'ready')
     ),
     orderBy: [desc(albumArtGenerationSessions.createdAt)],
   });
@@ -378,24 +408,40 @@ export async function createArtistBrandKit(params: {
   readonly logoOpacity?: number;
   readonly isDefault?: boolean;
 }) {
-  if (params.isDefault) {
-    await db
-      .update(artistBrandKits)
-      .set({ isDefault: false, updatedAt: new Date() })
-      .where(eq(artistBrandKits.profileId, params.profileId));
-  }
+  const created = params.isDefault
+    ? await runLegacyDbTransaction(async tx => {
+        await tx
+          .update(artistBrandKits)
+          .set({ isDefault: false, updatedAt: new Date() })
+          .where(eq(artistBrandKits.profileId, params.profileId));
 
-  const [created] = await db
-    .insert(artistBrandKits)
-    .values({
-      profileId: params.profileId,
-      name: params.name.trim(),
-      logoAssetUrl: params.logoAssetUrl ?? null,
-      logoPosition: params.logoPosition ?? 'top-left',
-      logoOpacity: String(params.logoOpacity ?? 1),
-      isDefault: params.isDefault ?? false,
-    })
-    .returning();
+        const [nextCreated] = await tx
+          .insert(artistBrandKits)
+          .values({
+            profileId: params.profileId,
+            name: params.name.trim(),
+            logoAssetUrl: params.logoAssetUrl ?? null,
+            logoPosition: params.logoPosition ?? 'top-left',
+            logoOpacity: String(params.logoOpacity ?? 1),
+            isDefault: true,
+          })
+          .returning();
+
+        return nextCreated;
+      })
+    : (
+        await db
+          .insert(artistBrandKits)
+          .values({
+            profileId: params.profileId,
+            name: params.name.trim(),
+            logoAssetUrl: params.logoAssetUrl ?? null,
+            logoPosition: params.logoPosition ?? 'top-left',
+            logoOpacity: String(params.logoOpacity ?? 1),
+            isDefault: false,
+          })
+          .returning()
+      )[0];
 
   return mapBrandKitRecord(created);
 }
@@ -424,35 +470,57 @@ export async function updateArtistBrandKit(params: {
     return null;
   }
 
-  if (params.isDefault) {
-    await db
-      .update(artistBrandKits)
-      .set({ isDefault: false, updatedAt: new Date() })
-      .where(
-        and(
-          eq(artistBrandKits.profileId, params.profileId),
-          or(eq(artistBrandKits.isDefault, true))
-        )
-      );
-  }
+  const updated = params.isDefault
+    ? await runLegacyDbTransaction(async tx => {
+        await tx
+          .update(artistBrandKits)
+          .set({ isDefault: false, updatedAt: new Date() })
+          .where(
+            and(
+              eq(artistBrandKits.profileId, params.profileId),
+              eq(artistBrandKits.isDefault, true)
+            )
+          );
 
-  const [updated] = await db
-    .update(artistBrandKits)
-    .set({
-      name: params.name.trim(),
-      logoAssetUrl: params.logoAssetUrl ?? null,
-      logoPosition: params.logoPosition ?? 'top-left',
-      logoOpacity: String(params.logoOpacity ?? 1),
-      isDefault: params.isDefault ?? false,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(artistBrandKits.id, params.brandKitId),
-        eq(artistBrandKits.profileId, params.profileId)
-      )
-    )
-    .returning();
+        const [nextUpdated] = await tx
+          .update(artistBrandKits)
+          .set({
+            name: params.name.trim(),
+            logoAssetUrl: params.logoAssetUrl ?? null,
+            logoPosition: params.logoPosition ?? 'top-left',
+            logoOpacity: String(params.logoOpacity ?? 1),
+            isDefault: true,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(artistBrandKits.id, params.brandKitId),
+              eq(artistBrandKits.profileId, params.profileId)
+            )
+          )
+          .returning();
+
+        return nextUpdated;
+      })
+    : (
+        await db
+          .update(artistBrandKits)
+          .set({
+            name: params.name.trim(),
+            logoAssetUrl: params.logoAssetUrl ?? null,
+            logoPosition: params.logoPosition ?? 'top-left',
+            logoOpacity: String(params.logoOpacity ?? 1),
+            isDefault: false,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(artistBrandKits.id, params.brandKitId),
+              eq(artistBrandKits.profileId, params.profileId)
+            )
+          )
+          .returning()
+      )[0];
 
   if (
     existing.logoAssetUrl &&

@@ -95,5 +95,6 @@ describe('GET /api/cron/daily-maintenance', () => {
     expect(data.results.cleanupKeys.success).toBe(true);
     expect(data.results.billingReconciliation.success).toBe(true);
     expect(data.results.dataRetention.success).toBe(true);
+    expect(mockCleanupExpiredAlbumArtSessions).toHaveBeenCalledTimes(1);
   });
 });

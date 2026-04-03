@@ -14,15 +14,38 @@ import type {
 
 const CANVAS_SIZE = 3000;
 const SAFE_MARGIN = 180;
+const FONT_FILE_PATHS = [
+  path.join(process.cwd(), 'public/fonts/Inter-Variable.woff2'),
+  path.join(process.cwd(), 'apps/web/public/fonts/Inter-Variable.woff2'),
+] as const;
 
 let fontCssPromise: Promise<string> | null = null;
 
+async function loadFontCss(): Promise<string> {
+  let lastError: Error | null = null;
+
+  for (const fontPath of FONT_FILE_PATHS) {
+    try {
+      const buffer = await readFile(fontPath);
+      return `@font-face{font-family:'AlbumArtInter';src:url(data:font/woff2;base64,${buffer.toString('base64')}) format('woff2');font-display:block;}svg{font-family:'AlbumArtInter',sans-serif;}`;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  throw new Error(
+    `Failed to load album art font from ${FONT_FILE_PATHS.join(', ')}`,
+    {
+      cause: lastError,
+    }
+  );
+}
+
 async function getFontCss(): Promise<string> {
   if (!fontCssPromise) {
-    fontCssPromise = readFile(
-      path.join(process.cwd(), 'apps/web/public/fonts/Inter-Variable.woff2')
-    ).then(buffer => {
-      return `@font-face{font-family:'AlbumArtInter';src:url(data:font/woff2;base64,${buffer.toString('base64')}) format('woff2');font-display:block;}svg{font-family:'AlbumArtInter',sans-serif;}`;
+    fontCssPromise = loadFontCss().catch(error => {
+      fontCssPromise = null;
+      throw error;
     });
   }
 
@@ -36,6 +59,11 @@ async function fetchAssetBuffer(url: string): Promise<Buffer> {
   while (attempt < 2) {
     try {
       const response = await fetchWithTimeoutResponse(url, { timeout: 10000 });
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch asset buffer (${response.status} ${response.statusText})`
+        );
+      }
       const arrayBuffer = await response.arrayBuffer();
       return Buffer.from(arrayBuffer);
     } catch (error) {
@@ -113,6 +141,13 @@ function escapeXml(value: string): string {
     .replaceAll("'", '&apos;');
 }
 
+function detectLogoMimeSubtype(logoBuffer: Buffer): 'png' | 'svg+xml' {
+  const isPng =
+    logoBuffer[0] === 0x89 && logoBuffer.subarray(1, 4).toString() === 'PNG';
+
+  return isPng ? 'png' : 'svg+xml';
+}
+
 export async function renderAlbumArt(
   input: AlbumArtRenderInput
 ): Promise<AlbumArtRenderResult> {
@@ -122,7 +157,7 @@ export async function renderAlbumArt(
   const logoBuffer =
     input.logoBuffer && input.logoBuffer.length > 0 ? input.logoBuffer : null;
   const logoDataUri = logoBuffer
-    ? `data:image/${logoBuffer.subarray(1, 4).toString() === 'PNG' ? 'png' : 'svg+xml'};base64,${logoBuffer.toString('base64')}`
+    ? `data:image/${detectLogoMimeSubtype(logoBuffer)};base64,${logoBuffer.toString('base64')}`
     : undefined;
 
   const background = sharp(input.backgroundBuffer, { failOnError: false })

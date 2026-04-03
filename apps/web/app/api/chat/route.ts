@@ -1257,11 +1257,11 @@ function createGenerateAlbumArtTool(
         const requestedMode = mode ?? 'base';
         const defaultBrandKit = findDefaultArtistBrandKit(brandKits);
         const selectedBrandKit =
-          requestedMode === 'series_background_refresh'
-            ? brandKitName
+          requestedMode !== 'series_background_refresh'
+            ? null
+            : brandKitName
               ? findBrandKitByName(brandKits, brandKitName)
-              : defaultBrandKit
-            : null;
+              : defaultBrandKit;
 
         if (
           requestedMode === 'series_background_refresh' &&

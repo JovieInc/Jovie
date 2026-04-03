@@ -146,7 +146,21 @@ function renderToolCard(
     }
 
     if (toolInvocation.state === 'result') {
-      const result = toolInvocation.result as {
+      const rawResult = toolInvocation.result;
+      if (
+        typeof rawResult !== 'object' ||
+        rawResult === null ||
+        !('success' in rawResult)
+      ) {
+        return (
+          <ChatAlbumArtCard
+            state='error'
+            error='Unable to render album art result.'
+          />
+        );
+      }
+
+      const result = rawResult as {
         success: boolean;
         releaseId?: string;
         sessionId?: string;

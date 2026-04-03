@@ -1,3 +1,6 @@
+import type { AlbumArtTemplateLock } from '@/lib/services/album-art/types';
+import type { CanvasStatus } from '@/lib/services/canvas/types';
+
 export type ProviderKey =
   | 'spotify'
   | 'apple_music'
@@ -109,9 +112,6 @@ export type ReleaseType =
   | 'live'
   | 'mixtape'
   | 'other';
-
-import type { AlbumArtTemplateLock } from '@/lib/services/album-art/types';
-import type { CanvasStatus } from '@/lib/services/canvas/types';
 
 export type { CanvasStatus } from '@/lib/services/canvas/types';
 

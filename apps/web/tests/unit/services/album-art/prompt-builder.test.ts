@@ -18,4 +18,19 @@ describe('buildAlbumArtPrompt', () => {
     expect(prompt).toContain('Do not include letters');
     expect(prompt).toContain('Genres: house, melodic techno.');
   });
+
+  it('uses only the first two genres when more are provided', () => {
+    const prompt = buildAlbumArtPrompt({
+      profileId: 'profile-1',
+      title: 'Tokyo Drift',
+      artistName: 'Neon Valley',
+      releaseType: 'single',
+      genres: ['house', 'melodic techno', 'progressive house'],
+      mode: 'base',
+      runLimit: 1,
+    });
+
+    expect(prompt).toContain('Genres: house, melodic techno.');
+    expect(prompt).not.toContain('progressive house');
+  });
 });
