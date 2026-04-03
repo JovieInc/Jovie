@@ -12,12 +12,99 @@ import {
 } from 'react';
 import { track } from '@/lib/analytics';
 import { useUpdateSubscriberNameMutation } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 import type { NotificationSubscriptionState } from '@/types/notifications';
 
 /** Prevents synthetic font weight rendering for better typography */
 export const noFontSynthesisStyle: CSSProperties = {
   fontSynthesisWeight: 'none',
 };
+
+export const subscriptionHeadingClassName =
+  'text-balance text-center text-[1.55rem] font-[640] tracking-[-0.045em] text-primary-token sm:text-[1.8rem]';
+
+export const subscriptionDisclaimerClassName =
+  'text-center text-[12px] leading-5 font-normal tracking-[-0.01em] text-muted-foreground/80';
+
+export const subscriptionComposerSurfaceClassName =
+  'rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] shadow-[0_8px_20px_rgba(15,17,24,0.06)] backdrop-blur-2xl transition-[background-color,border-color,box-shadow] duration-200 ease-out dark:shadow-[0_10px_24px_rgba(0,0,0,0.18)]';
+
+export const subscriptionComposerFocusClassName =
+  'border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-hover)] shadow-[0_10px_24px_rgba(15,17,24,0.08)] dark:bg-[var(--profile-pearl-bg-hover)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.22)]';
+
+export const subscriptionInputClassName =
+  'h-12 w-full bg-transparent px-2 text-[17px] font-[560] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 transition-[color,opacity] duration-200 focus-visible:outline-none focus-visible:ring-0';
+
+export const subscriptionPrimaryActionClassName =
+  'inline-flex h-12 shrink-0 items-center justify-center rounded-full border border-transparent bg-[var(--profile-pearl-primary-bg)] px-5 text-[15px] font-semibold tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-none transition-[background-color,color,opacity] duration-200 ease-out hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
+
+export const subscriptionMutedActionClassName =
+  'inline-flex h-10 shrink-0 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] px-4 text-[15px] font-[560] tracking-[-0.015em] text-primary-token shadow-[var(--profile-pearl-shadow)] transition-[background-color,opacity,transform] duration-150 hover:bg-[var(--profile-pearl-bg-hover)] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
+
+export const subscriptionPrimaryLinkClassName = cn(
+  subscriptionPrimaryActionClassName,
+  'h-12 w-full justify-center px-6'
+);
+
+interface SubscriptionPearlComposerProps {
+  readonly leftSlot?: React.ReactNode;
+  readonly children: React.ReactNode;
+  readonly action?: React.ReactNode;
+  readonly layout?: 'inline' | 'stacked';
+  readonly className?: string;
+  readonly dataTestId?: string;
+}
+
+export function SubscriptionPearlComposer({
+  leftSlot,
+  children,
+  action,
+  layout = 'inline',
+  className,
+  dataTestId,
+}: SubscriptionPearlComposerProps) {
+  const stacked = layout === 'stacked';
+
+  return (
+    <div
+      className={cn(
+        subscriptionComposerSurfaceClassName,
+        stacked ? 'rounded-[2rem] p-3' : 'px-1.5 py-1.5',
+        className
+      )}
+      data-testid={dataTestId}
+    >
+      <div
+        className={cn(
+          'min-w-0',
+          stacked ? 'space-y-3' : 'flex items-center gap-2'
+        )}
+      >
+        {leftSlot ? (
+          <div
+            className={cn(
+              'shrink-0',
+              stacked ? 'flex items-center' : 'flex items-center self-stretch'
+            )}
+          >
+            {leftSlot}
+          </div>
+        ) : null}
+        <div className={cn('min-w-0', stacked ? '' : 'flex-1')}>{children}</div>
+        {action ? (
+          <div
+            className={cn(
+              'shrink-0',
+              stacked ? 'flex justify-end' : 'flex items-center'
+            )}
+          >
+            {action}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Loading skeleton - shown during hydration while checking subscription status
@@ -26,10 +113,7 @@ export function SubscriptionFormSkeleton() {
   return (
     <output className='block space-y-3' aria-busy='true'>
       <span className='sr-only'>Loading subscription form</span>
-      {/* Input area skeleton */}
-      <Skeleton className='h-12 w-full rounded-2xl' />
-      {/* Button skeleton */}
-      <Skeleton className='h-11 w-full rounded-md' />
+      <Skeleton className='h-14 w-full rounded-[2rem]' />
       {/* Disclaimer area skeleton - fixed height to prevent layout shift */}
       <div className='h-4' />
     </output>
@@ -149,17 +233,31 @@ export function SubscriptionSuccess({
         </p>
 
         <p
-          className='text-center text-[13px] font-[550] tracking-[0.01em] text-primary-token/88'
+          className='text-center text-[13px] font-[560] tracking-[-0.015em] text-primary-token/88'
           style={noFontSynthesisStyle}
         >
           What should we call you?
         </p>
 
-        <div className='overflow-hidden rounded-xl bg-transparent ring-1 ring-(--color-border-subtle) transition-[ring,background-color] focus-within:bg-surface-1/30 focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))]'>
+        <SubscriptionPearlComposer
+          action={
+            <button
+              type='button'
+              onClick={() => {
+                handleSaveName();
+              }}
+              disabled={phase === 'saving' || !nameInput.trim()}
+              className={subscriptionPrimaryActionClassName}
+              style={noFontSynthesisStyle}
+            >
+              {phase === 'saving' ? 'Saving…' : 'Save'}
+            </button>
+          }
+        >
           <input
             ref={inputRef}
             type='text'
-            className='h-12 w-full border-none bg-transparent px-4 text-[15px] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 focus-visible:outline-none focus-visible:ring-0'
+            className={subscriptionInputClassName}
             placeholder='First name'
             value={nameInput}
             onChange={event => setNameInput(event.target.value)}
@@ -169,19 +267,7 @@ export function SubscriptionSuccess({
             autoComplete='given-name'
             style={noFontSynthesisStyle}
           />
-        </div>
-
-        <button
-          type='button'
-          onClick={() => {
-            handleSaveName();
-          }}
-          disabled={phase === 'saving' || !nameInput.trim()}
-          className='inline-flex h-12 w-full items-center justify-center rounded-xl border border-white/10 bg-white text-base font-semibold text-black transition-[opacity,background-color,border-color] duration-150 hover:border-white/20 hover:bg-white/96 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
-          style={noFontSynthesisStyle}
-        >
-          {phase === 'saving' ? 'Saving...' : 'Save & Listen Now'}
-        </button>
+        </SubscriptionPearlComposer>
 
         <button
           type='button'
@@ -211,7 +297,7 @@ export function SubscriptionSuccess({
           <Link
             href={`/${handle}?mode=listen`}
             prefetch
-            className='inline-flex items-center justify-center w-full px-8 py-4 text-lg font-semibold rounded-xl bg-btn-primary text-btn-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:opacity-95 focus-ring-transparent-offset'
+            className={subscriptionPrimaryLinkClassName}
           >
             Listen Now
           </Link>
@@ -236,7 +322,7 @@ export function SubscriptionSuccess({
         <Link
           href={`/${handle}?mode=listen`}
           prefetch
-          className='inline-flex items-center justify-center w-full px-8 py-4 text-lg font-semibold rounded-xl bg-btn-primary text-btn-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:opacity-95 focus-ring-transparent-offset'
+          className={subscriptionPrimaryLinkClassName}
         >
           Listen Now
         </Link>
@@ -250,12 +336,19 @@ export function SubscriptionSuccess({
  */
 export function SubscriptionPendingConfirmation() {
   return (
-    <div className='space-y-1'>
-      <div className='inline-flex items-center justify-center w-full px-8 py-4 rounded-xl bg-surface-2 text-primary-token shadow-sm transition-colors duration-200'>
-        <Mail className='w-5 h-5 mr-2 text-accent-bright' aria-hidden='true' />
-        <span className='font-semibold'>Check your email</span>
+    <div className='space-y-2'>
+      <div
+        className={cn(
+          subscriptionComposerSurfaceClassName,
+          'inline-flex w-full items-center justify-center gap-2 px-5 py-4 text-primary-token'
+        )}
+      >
+        <Mail className='h-5 w-5 text-primary-token/72' aria-hidden='true' />
+        <span className='text-[15px] font-semibold tracking-[-0.015em]'>
+          Check your email
+        </span>
       </div>
-      <p className='text-xs text-center text-secondary-token'>
+      <p className={subscriptionDisclaimerClassName}>
         We sent a confirmation link to your email. Click it to turn on
         notifications from this artist.
       </p>
