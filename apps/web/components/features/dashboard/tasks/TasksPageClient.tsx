@@ -70,7 +70,10 @@ import {
 } from '@/lib/queries/useTaskMutations';
 import { useTaskQuery, useTasksQuery } from '@/lib/queries/useTasksQuery';
 import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
-import { readTaskDescriptionHelper } from '@/lib/tasks/task-description-helper';
+import {
+  readTaskDescriptionHelper,
+  type TaskDescriptionHelperPayload,
+} from '@/lib/tasks/task-description-helper';
 import type {
   TaskAssigneeKind,
   TaskPriority,
@@ -440,6 +443,20 @@ function TaskMetaMenuNumber({
   );
 }
 
+function findTemplateDescriptionHelper(
+  title: string,
+  category: string | null
+): TaskDescriptionHelperPayload | null {
+  return (
+    DEFAULT_RELEASE_TASK_TEMPLATE.find(
+      item =>
+        item.descriptionHelper &&
+        item.title === title &&
+        item.category === category
+    )?.descriptionHelper ?? null
+  );
+}
+
 function TaskDocumentPanel({
   task,
   title,
@@ -474,12 +491,7 @@ function TaskDocumentPanel({
   const descriptionHelper =
     metadataDescriptionHelper ??
     (task?.releaseId
-      ? (DEFAULT_RELEASE_TASK_TEMPLATE.find(
-          item =>
-            item.descriptionHelper &&
-            item.title === task.title &&
-            item.category === task.category
-        )?.descriptionHelper ?? null)
+      ? findTemplateDescriptionHelper(task.title, task.category)
       : null);
   const showDescriptionHelper = Boolean(
     task &&

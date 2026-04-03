@@ -1,6 +1,10 @@
 import { neon } from '@neondatabase/serverless';
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
+import { and, desc, eq, isNull } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/neon-http';
 import { APP_ROUTES } from '@/constants/routes';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { tasks } from '@/lib/db/schema/tasks';
 import { ensureSignedInUser, hasClerkCredentials } from '../helpers/clerk-auth';
 
 const LAYOUT_TASK_TITLE = 'Layout QA task fixture';
@@ -29,62 +33,59 @@ async function ensureTaskExists(): Promise<string> {
     throw new Error('DATABASE_URL is required for tasks layout seeding.');
   }
 
-  const sql = neon(databaseUrl);
-  await sql`
-    with profile as (
-      select id
-      from creator_profiles
-      where username = 'e2e-test-user'
-      limit 1
-    ),
-    existing_task as (
-      select id
-      from tasks
-      where creator_profile_id = (select id from profile)
-        and title = ${LAYOUT_TASK_TITLE}
-        and deleted_at is null
-      limit 1
+  const db = drizzle(neon(databaseUrl), {
+    schema: { creatorProfiles, tasks },
+  });
+  const [profile] = await db
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.username, 'e2e-test-user'))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error('Could not find the e2e-test-user creator profile.');
+  }
+
+  const [existingTask] = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.creatorProfileId, profile.id),
+        eq(tasks.title, LAYOUT_TASK_TITLE),
+        isNull(tasks.deletedAt)
+      )
     )
-    insert into tasks (
-      creator_profile_id,
-      task_number,
-      title,
-      description,
-      status,
-      priority,
-      assignee_kind,
-      agent_status,
-      position,
-      metadata
-    )
-    select
-      profile.id,
-      coalesce(
-        (
-          select max(task_number) + 1
-          from tasks
-          where creator_profile_id = profile.id
-        ),
-        1
-      ),
-      ${LAYOUT_TASK_TITLE},
-      'Used by the Playwright tasks layout spec.',
-      'in_progress',
-      'high',
-      'human',
-      'approved',
-      coalesce(
-        (
-          select max(position) + 1
-          from tasks
-          where creator_profile_id = profile.id
-        ),
-        0
-      ),
-      '{}'::jsonb
-    from profile
-    where not exists (select 1 from existing_task)
-  `;
+    .limit(1);
+
+  if (!existingTask) {
+    const [lastTaskNumber] = await db
+      .select({ taskNumber: tasks.taskNumber })
+      .from(tasks)
+      .where(eq(tasks.creatorProfileId, profile.id))
+      .orderBy(desc(tasks.taskNumber))
+      .limit(1);
+
+    const [lastPosition] = await db
+      .select({ position: tasks.position })
+      .from(tasks)
+      .where(eq(tasks.creatorProfileId, profile.id))
+      .orderBy(desc(tasks.position))
+      .limit(1);
+
+    await db.insert(tasks).values({
+      creatorProfileId: profile.id,
+      taskNumber: (lastTaskNumber?.taskNumber ?? 0) + 1,
+      title: LAYOUT_TASK_TITLE,
+      description: 'Used by the Playwright tasks layout spec.',
+      status: 'in_progress',
+      priority: 'high',
+      assigneeKind: 'human',
+      agentStatus: 'approved',
+      position: (lastPosition?.position ?? -1) + 1,
+      metadata: {},
+    });
+  }
 
   return LAYOUT_TASK_TITLE;
 }
@@ -141,7 +142,7 @@ async function assertTasksLayout(
   await expect(selectedRow).toBeVisible();
   await expect(page.getByLabel('Task title')).toBeVisible();
 
-  const [headerBox, subheaderBox, paneBox, rowBox, hasOverflow] =
+  const [headerBox, subheaderBox, paneBox, rowBox, fitsWithoutScroll] =
     await Promise.all([
       dashboardHeader.boundingBox(),
       subheader.boundingBox(),
@@ -154,7 +155,7 @@ async function assertTasksLayout(
   expect(subheaderBox).not.toBeNull();
   expect(paneBox).not.toBeNull();
   expect(rowBox).not.toBeNull();
-  expect(hasOverflow).toBe(true);
+  expect(fitsWithoutScroll).toBe(true);
 
   expect(
     Math.abs((headerBox?.height ?? 0) - (subheaderBox?.height ?? 0))

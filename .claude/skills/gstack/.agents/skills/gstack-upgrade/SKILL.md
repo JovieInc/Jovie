@@ -174,6 +174,13 @@ and new version. Migrations handle state fixes that `./setup` alone can't cover
 ```bash
 MIGRATIONS_DIR="$INSTALL_DIR/gstack-upgrade/migrations"
 NEW_VERSION=$(cat "$INSTALL_DIR/VERSION" 2>/dev/null || echo "unknown")
+if [[ "$INSTALL_TYPE" = global-* ]] || [ "$INSTALL_TYPE" = "vendored-global" ]; then
+  export GSTACK_HOST_CONTEXT="claude"
+  export GSTACK_SKILLS_DIR="$(dirname "$INSTALL_DIR")"
+else
+  export GSTACK_HOST_CONTEXT="none"
+  export GSTACK_SKILLS_DIR=""
+fi
 if [ -d "$MIGRATIONS_DIR" ]; then
   find "$MIGRATIONS_DIR" -maxdepth 1 -name 'v*.sh' -type f 2>/dev/null | sort -V | while IFS= read -r migration; do
     # Extract version from filename: v0.15.2.0.sh → 0.15.2.0
@@ -184,7 +191,7 @@ if [ -d "$MIGRATIONS_DIR" ]; then
        && [ "$OLD_VERSION" != "$m_ver" ] \
        && [ "$(printf '%s\n%s' "$m_ver" "$NEW_VERSION" | sort -V | tail -1)" = "$NEW_VERSION" ]; then
       echo "Running migration $m_ver..."
-      bash "$migration" || echo "  Warning: migration $m_ver had errors (non-fatal)"
+      GSTACK_INSTALL_DIR="$INSTALL_DIR" bash "$migration" || echo "  Warning: migration $m_ver had errors (non-fatal)"
     fi
   done
 fi

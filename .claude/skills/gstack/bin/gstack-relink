@@ -106,6 +106,10 @@ for skill_dir in "$INSTALL_DIR"/*/; do
     esac
   fi
   target="$SKILLS_DIR/$link_name"
+  if [ -d "$target" ] && [ -f "$target/SKILL.md" ] && [ ! -L "$target/SKILL.md" ] && ! _skill_entry_points_into_install "$target"; then
+    echo "Skipping external skill directory at $target" >&2
+    continue
+  fi
   # Upgrade old directory symlinks to real directories
   if [ -L "$target" ]; then
     if _skill_entry_points_into_install "$target"; then

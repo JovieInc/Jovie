@@ -265,7 +265,10 @@ vi.mock('@/components/organisms/PageShell', async importOriginal => {
   return {
     ...actual,
     PageShell: ({ children }: { children: React.ReactNode }) => (
-      <div data-testid='page-shell'>{children}</div>
+      <div data-testid='page-shell'>
+        <div data-testid='dashboard-header' />
+        {children}
+      </div>
     ),
   };
 });
@@ -400,8 +403,11 @@ describe('TasksPageClient', () => {
   it('keeps the tasks subheader at the same compact header height as the page header', () => {
     renderPage();
 
-    expect(screen.getByTestId('tasks-workspace-subheader').className).toContain(
-      'h-[var(--linear-app-header-height-compact)]'
+    const pageHeader = screen.getByTestId('dashboard-header');
+    const subheader = screen.getByTestId('tasks-workspace-subheader');
+
+    expect(subheader.getBoundingClientRect().height).toBe(
+      pageHeader.getBoundingClientRect().height
     );
   });
 

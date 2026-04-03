@@ -2606,6 +2606,17 @@ describe('voice-triggers processing', () => {
     expect(result).toContain('Voice triggers (speech-to-text aliases): "see-so", "security review".');
   });
 
+  test('processVoiceTriggers preserves non-default description indentation', () => {
+    const content = `---\nname: cso\ndescription: |\n    Security audit.\n    With extra indentation.\nvoice-triggers:\n  - "see-so"\n---\nBody`;
+    const result = processVoiceTriggers(content);
+
+    expect(result).toContain('  Security audit.');
+    expect(result).toContain('  With extra indentation.');
+    expect(result).toContain(
+      '  Voice triggers (speech-to-text aliases): "see-so".'
+    );
+  });
+
   test('processVoiceTriggers strips voice-triggers field from output', () => {
     const content = `---\nname: cso\ndescription: |\n  Security audit. (gstack)\nvoice-triggers:\n  - "see-so"\n---\nBody`;
     const result = processVoiceTriggers(content);

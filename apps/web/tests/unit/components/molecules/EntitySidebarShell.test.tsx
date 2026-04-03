@@ -8,12 +8,18 @@ vi.mock('@/components/organisms/RightDrawer', () => ({
     children,
     ariaLabel,
     'data-testid': testId,
+    'data-surface-tone': surfaceTone,
   }: {
     readonly children: ReactNode;
     readonly ariaLabel?: string;
     readonly 'data-testid'?: string;
+    readonly 'data-surface-tone'?: string;
   }) => (
-    <aside data-testid={testId ?? 'right-drawer'} aria-label={ariaLabel}>
+    <aside
+      data-testid={testId ?? 'right-drawer'}
+      data-surface-tone={surfaceTone}
+      aria-label={ariaLabel}
+    >
       {children}
     </aside>
   ),
@@ -101,14 +107,9 @@ describe('EntitySidebarShell', () => {
       </EntitySidebarShell>
     );
 
-    const rail = screen.getByTestId('right-drawer').firstElementChild;
-    const className = rail?.getAttribute('class') ?? '';
-
-    expect(className).toContain(
-      'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_93%,var(--linear-app-shell-border)_7%)]'
-    );
-    expect(className).toContain(
-      'shadow-[-1px_0_0_0_color-mix(in_oklab,var(--linear-app-shell-border)_56%,transparent)]'
+    expect(screen.getByTestId('right-drawer')).toHaveAttribute(
+      'data-surface-tone',
+      'quiet'
     );
   });
 });

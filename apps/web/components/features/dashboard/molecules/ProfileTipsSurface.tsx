@@ -287,11 +287,15 @@ export function ProfileTipsSurface({
             </button>
           ) : null}
 
-          {statusMessage ? (
-            <p className='text-[12px] text-tertiary-token' aria-live='polite'>
-              {statusMessage}
-            </p>
-          ) : null}
+          <p
+            className={cn(
+              'text-[12px] text-tertiary-token',
+              !statusMessage && 'sr-only'
+            )}
+            aria-live='polite'
+          >
+            {statusMessage}
+          </p>
         </div>
       </div>
 

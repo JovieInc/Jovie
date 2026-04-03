@@ -32,6 +32,7 @@ function readDescriptionField(frontmatter: string): DescriptionField | null {
   const lines = frontmatter.split('\n');
   let inDescription = false;
   let startIndex = -1;
+  let indent = '';
   const valueLines: string[] = [];
 
   for (const [index, line] of lines.entries()) {
@@ -55,7 +56,12 @@ function readDescriptionField(frontmatter: string): DescriptionField | null {
     }
 
     if (line === '' || /^\s/.test(line)) {
-      valueLines.push(line.replace(/^  /, ''));
+      if (!indent) {
+        const indentMatch = line.match(/^(\s+)/);
+        indent = indentMatch?.[1] ?? '';
+      }
+
+      valueLines.push(indent ? line.replace(new RegExp(`^${indent}`), '') : line);
       continue;
     }
 
