@@ -181,7 +181,6 @@ export {
   type NewDspBioSyncRequest,
   selectDspBioSyncRequestSchema,
 } from './dsp-bio-sync';
-
 // DSP Enrichment (Cross-platform matches, enrichment data)
 export {
   type DspArtistMatch,
@@ -204,7 +203,6 @@ export {
   selectSocialLinkSuggestionSchema,
   socialLinkSuggestions,
 } from './dsp-enrichment';
-
 // Email Engagement (Opens, Clicks, Drip Campaigns)
 export {
   type CampaignEnrollment,
@@ -267,6 +265,8 @@ export {
   leadSourcePlatformEnum,
   leadStatusEnum,
   linkTypeEnum,
+  metadataSubmissionIssueStatusEnum,
+  metadataSubmissionStatusEnum,
   notificationChannelEnum,
   outreachChannelEnum,
   outreachStatusEnum,
@@ -335,7 +335,6 @@ export {
   selectInboundEmailSchema,
   selectOutboundReplySchema,
 } from './inbox';
-
 // Ingestion
 export {
   type IngestionJob,
@@ -433,6 +432,34 @@ export {
   type WrappedLink,
   wrappedLinks,
 } from './links';
+export {
+  insertMetadataSubmissionArtifactSchema,
+  insertMetadataSubmissionIssueSchema,
+  insertMetadataSubmissionRequestSchema,
+  insertMetadataSubmissionSnapshotSchema,
+  insertMetadataSubmissionTargetSchema,
+  type MetadataSubmissionArtifact,
+  type MetadataSubmissionIssue,
+  type MetadataSubmissionRequest,
+  type MetadataSubmissionSnapshot,
+  type MetadataSubmissionSnapshotData,
+  type MetadataSubmissionTarget,
+  metadataSubmissionArtifacts,
+  metadataSubmissionIssues,
+  metadataSubmissionRequests,
+  metadataSubmissionSnapshots,
+  metadataSubmissionTargets,
+  type NewMetadataSubmissionArtifact,
+  type NewMetadataSubmissionIssue,
+  type NewMetadataSubmissionRequest,
+  type NewMetadataSubmissionSnapshot,
+  type NewMetadataSubmissionTarget,
+  selectMetadataSubmissionArtifactSchema,
+  selectMetadataSubmissionIssueSchema,
+  selectMetadataSubmissionRequestSchema,
+  selectMetadataSubmissionSnapshotSchema,
+  selectMetadataSubmissionTargetSchema,
+} from './metadata-submissions';
 // Pixel Tracking (Events, Creator Configs)
 export {
   type CreatorPixel,
