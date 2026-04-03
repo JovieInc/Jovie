@@ -2,12 +2,55 @@
   try {
     var root = document.documentElement;
     var pathname = globalThis.location?.pathname ?? '/';
+    var segments = pathname.split('/').filter(Boolean);
+    var firstSegment = segments[0] ?? '';
+    var publicRouteThemeExclusions = {
+      '.well-known': true,
+      about: true,
+      account: true,
+      actions: true,
+      ai: true,
+      alternatives: true,
+      api: true,
+      app: true,
+      'artist-profiles': true,
+      'artist-selection': true,
+      artists: true,
+      billing: true,
+      blog: true,
+      changelog: true,
+      claim: true,
+      compare: true,
+      demo: true,
+      'engagement-engine': true,
+      error: true,
+      go: true,
+      hud: true,
+      'investor-portal': true,
+      investors: true,
+      launch: true,
+      legal: true,
+      'llms-full.txt': true,
+      'llms.txt': true,
+      new: true,
+      onboarding: true,
+      pricing: true,
+      signin: true,
+      signup: true,
+      support: true,
+      tips: true,
+      ui: true,
+      waitlist: true,
+    };
+    var isPublicProfileRoute =
+      !!firstSegment && !publicRouteThemeExclusions[firstSegment];
     var isThemeEnabledRoute =
       pathname.startsWith('/app') ||
       pathname.startsWith('/onboarding') ||
       pathname.startsWith('/signin') ||
       pathname.startsWith('/signup') ||
-      pathname.startsWith('/waitlist');
+      pathname.startsWith('/waitlist') ||
+      isPublicProfileRoute;
 
     if (isThemeEnabledRoute) {
       var storageValue =
@@ -19,7 +62,9 @@
         storageValue === 'dark' ||
         storageValue === 'system'
           ? storageValue
-          : 'system';
+          : isPublicProfileRoute
+            ? 'system'
+            : 'system';
 
       var systemPrefersDark =
         typeof globalThis.matchMedia === 'function' &&

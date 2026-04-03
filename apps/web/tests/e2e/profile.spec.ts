@@ -35,6 +35,8 @@ const hasDatabase = !!(
 const runProfileTests = process.env.E2E_ARTIST_PROFILE === '1' || hasDatabase;
 const describeProfile = runProfileTests ? test.describe : test.describe.skip;
 
+test.describe.configure({ mode: 'serial' });
+
 async function interceptAnalytics(page: Page) {
   await page.route('**/api/profile/view', (r: Route) =>
     r.fulfill({ status: 200, body: '{}' })
@@ -85,7 +87,10 @@ describeProfile('Profile - Core Rendering', () => {
 
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
-    await page.goto('/dualipa', { timeout: 120_000 });
+    await page.goto('/dualipa', {
+      timeout: 120_000,
+      waitUntil: 'domcontentloaded',
+    });
 
     const h1Visible = await page
       .locator('h1')
@@ -175,7 +180,10 @@ describeProfile('Profile - 404 Page', () => {
   test('shows 404 with navigation for non-existent profile', async ({
     page,
   }) => {
-    await page.goto('/nonexistent-artist', { timeout: 120_000 });
+    await page.goto('/nonexistent-artist', {
+      timeout: 120_000,
+      waitUntil: 'domcontentloaded',
+    });
 
     const h1 = page.locator('h1');
     const isH1Visible = await h1
@@ -197,7 +205,10 @@ describeProfile('Profile - 404 Page', () => {
   });
 
   test('404 page has noindex meta tag', async ({ page }) => {
-    await page.goto('/nonexistent-artist', { timeout: 120_000 });
+    await page.goto('/nonexistent-artist', {
+      timeout: 120_000,
+      waitUntil: 'domcontentloaded',
+    });
 
     const h1 = page.locator('h1');
     const isH1Visible = await h1
@@ -459,6 +470,7 @@ test.describe('Profile Modes @smoke @critical', () => {
 
     await page.waitForURL(new RegExp(`/${handle}(?:$|\\?)`), {
       timeout: SMOKE_TIMEOUTS.URL_STABLE,
+      waitUntil: 'domcontentloaded',
     });
     await waitForHydration(page);
     const bodyText = await assertProfilePageHealthy(page);

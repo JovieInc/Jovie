@@ -67,8 +67,8 @@ export function OtpInput({
             className={cn(
               'h-1 w-1 rounded-full transition-all duration-200',
               i < currentValue.length
-                ? 'bg-primary-token scale-125'
-                : 'bg-subtle'
+                ? 'scale-125 bg-[var(--profile-pearl-primary-bg)]'
+                : 'bg-[color:var(--profile-pearl-border)]'
             )}
           />
         ))}
@@ -120,15 +120,14 @@ export function OtpInput({
             <div
               key={key}
               className={cn(
-                'relative flex items-center justify-center rounded-(--linear-radius-sm) border text-xl sm:text-2xl font-(--linear-caption-weight) transition-all duration-150',
-                'h-(--linear-button-height-md) w-11 sm:h-(--linear-button-height-md) sm:w-10 min-h-[40px]',
-                'bg-surface-0 text-primary-token',
+                'relative flex min-h-[48px] w-11 items-center justify-center rounded-[18px] border text-[1.3rem] font-[620] tracking-[-0.035em] transition-[transform,border-color,background-color,box-shadow] duration-150 sm:h-[52px] sm:w-12 sm:text-[1.45rem]',
+                'border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] text-primary-token shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl',
                 isFocused
-                  ? 'border-(--linear-border-focus) ring-2 ring-(--linear-border-focus)/30 scale-[1.02]'
-                  : 'border-subtle',
-                error && 'border-(--linear-error)',
+                  ? 'scale-[1.01] border-[color:var(--profile-pearl-bg-active)] bg-[var(--profile-pearl-bg-active)] ring-2 ring-[rgb(var(--focus-ring))]/20'
+                  : 'hover:bg-[var(--profile-pearl-bg-hover)]',
+                error && 'border-red-500/55 ring-2 ring-red-500/12',
                 disabled && 'opacity-50 cursor-not-allowed',
-                'active:scale-95 active:bg-surface-1'
+                'active:scale-[0.985]'
               )}
             >
               <input
@@ -148,7 +147,7 @@ export function OtpInput({
                 disabled={disabled}
                 autoComplete={isFirstInput ? 'one-time-code' : 'off'}
                 className={cn(
-                  'absolute inset-0 w-full h-full bg-transparent text-center text-xl sm:text-2xl font-sans',
+                  'absolute inset-0 h-full w-full bg-transparent text-center text-[1.3rem] font-sans sm:text-[1.45rem]',
                   'outline-none border-none',
                   'touch-manipulation [-webkit-tap-highlight-color:transparent]',
                   disabled && 'cursor-not-allowed'
@@ -160,7 +159,7 @@ export function OtpInput({
               {/* Cursor indicator */}
               {isCursor && (
                 <span
-                  className='animate-pulse motion-reduce:animate-none text-secondary-token pointer-events-none'
+                  className='pointer-events-none animate-pulse text-secondary-token motion-reduce:animate-none'
                   aria-hidden='true'
                 >
                   |

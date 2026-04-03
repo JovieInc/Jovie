@@ -13,6 +13,34 @@
     "imagePath": "marketing-home-desktop.png"
   },
   {
+    "id": "release-landing-desktop",
+    "title": "Release Landing Page",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/demo/showcase/release-landing",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "investor-ready"],
+    "capturedAt": "2026-04-02T20:59:13.169Z",
+    "gitSha": null,
+    "imagePath": "release-landing-desktop.png",
+    "publicExportPath": "release-landing-desktop.png"
+  },
+  {
+    "id": "release-tasks-desktop",
+    "title": "Release Tasks",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/demo/showcase/release-tasks",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "investor-ready"],
+    "capturedAt": "2026-04-02T20:59:36.767Z",
+    "gitSha": null,
+    "imagePath": "release-tasks-desktop.png",
+    "publicExportPath": "release-tasks-active.png"
+  },
+  {
     "id": "dashboard-releases-desktop",
     "title": "Releases Dashboard",
     "group": "dashboard",

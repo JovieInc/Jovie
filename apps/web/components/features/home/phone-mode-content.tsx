@@ -5,9 +5,8 @@
  * DeeplinksGrid (scroll-driven phone) to avoid code duplication.
  */
 
-import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
-import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
+import { HomepageLabelLogoMark } from './HomepageLabelLogoMark';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -116,20 +115,26 @@ export const MOCK_TOUR_DATES = [
 ] as const;
 
 function ListenContent() {
-  const dsps = [
-    { key: 'spotify', label: 'Spotify' },
-    { key: 'apple_music', label: 'Apple Music' },
-    { key: 'youtube', label: 'YouTube' },
+  const labels = [
+    { partner: 'orchard', caption: 'Launch partner' },
+    { partner: 'awal', caption: 'Catalog sync' },
+    { partner: 'armada', caption: 'Audience push' },
   ] as const;
   return (
-    <div className='flex h-full flex-col justify-center gap-2'>
-      {dsps.map(dsp => (
-        <SmartLinkProviderButton
-          key={dsp.key}
-          label={dsp.label}
-          iconPath={DSP_LOGO_CONFIG[dsp.key]?.iconPath}
-          className='px-2.5 py-2 text-[13px] bg-surface-2 ring-0 backdrop-blur-none hover:bg-hover'
-        />
+    <div className='flex h-full flex-col justify-center gap-3'>
+      {labels.map(label => (
+        <div
+          key={label.partner}
+          className='flex items-center justify-between rounded-xl bg-surface-1 px-3 py-2.5'
+        >
+          <HomepageLabelLogoMark
+            partner={label.partner}
+            className='text-primary-token'
+          />
+          <span className='text-[10px] text-tertiary-token'>
+            {label.caption}
+          </span>
+        </div>
       ))}
     </div>
   );

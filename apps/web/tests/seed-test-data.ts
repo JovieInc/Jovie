@@ -26,7 +26,13 @@ import {
 import { normalizeEmail } from '@/lib/utils/email';
 
 // Use the same HTTP driver as the app for consistency
-const { discogReleases, discogTracks, providerLinks, tourDates } = schema;
+const {
+  creatorContacts,
+  discogReleases,
+  discogTracks,
+  providerLinks,
+  tourDates,
+} = schema;
 
 interface TestProfile {
   username: string;
@@ -538,6 +544,31 @@ async function seedTourDatesForProfile(
   console.log(`    ✓ Ensured ${TEST_TOUR_DATES.length} tour dates`);
 }
 
+async function seedPublicContactsForProfile(
+  db: ReturnType<typeof drizzle>,
+  profileId: string
+) {
+  await db
+    .delete(creatorContacts)
+    .where(eq(creatorContacts.creatorProfileId, profileId));
+
+  await db.insert(creatorContacts).values([
+    {
+      creatorProfileId: profileId,
+      role: 'bookings',
+      personName: 'Maya Reed',
+      companyName: 'North Star Touring',
+      territories: ['North America'],
+      email: 'booking@dualipa.example.com',
+      preferredChannel: 'email',
+      isActive: true,
+      sortOrder: 0,
+    },
+  ]);
+
+  console.log('    ✓ Ensured public contact coverage');
+}
+
 // Sample release data for E2E tests — covers various edge cases
 const TEST_RELEASES: TestRelease[] = [
   // Single (1 track)
@@ -1043,6 +1074,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
       // Add tour dates for dualipa to test public touring display
       if (profile.username === 'dualipa') {
         await seedTourDatesForProfile(db, createdProfileId);
+        await seedPublicContactsForProfile(db, createdProfileId);
       }
 
       // Add Venmo payment link for tipping tests

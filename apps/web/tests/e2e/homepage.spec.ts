@@ -28,20 +28,22 @@ test.describe('Homepage', () => {
     await waitForHydration(page);
   });
 
-  test('hero renders with current headline, lead, and CTA button', async ({
+  test('hero renders with current headline, lead, CTA, and premium cards', async ({
     page,
   }) => {
-    await expect(page.locator('h1')).toContainText('Drop More Music.');
-    await expect(page.locator('h1')).toContainText('Crush Every Release.');
+    await expect(page.locator('h1')).toContainText(
+      'Drop more music. Crush every release.'
+    );
     await expect(
-      page.getByText(
-        'Smart links, release automation, and fan insight that keep every launch moving.'
-      )
+      page.getByText('One system to make every release count, every time.')
     ).toBeVisible();
+    await expect(page.getByRole('link', { name: /start free/i })).toBeVisible();
 
-    await expect(
-      page.getByRole('link', { name: /get started free/i })
-    ).toBeVisible();
+    await expect(page.getByTestId('homepage-hero-profile-card')).toBeVisible();
+    await expect(page.getByTestId('homepage-hero-release-card')).toBeVisible();
+    await expect(page.getByTestId('homepage-hero-task-card-1')).toBeVisible();
+    await expect(page.getByTestId('homepage-hero-task-card-2')).toBeVisible();
+    await expect(page.getByTestId('homepage-hero-task-card-3')).toBeVisible();
   });
 
   test('header shows auth actions without marketing nav links', async ({
@@ -57,44 +59,60 @@ test.describe('Homepage', () => {
     await expect(page.locator('a[href="/pricing"]')).toHaveCount(0);
   });
 
-  test('core homepage sections render in order', async ({ page }) => {
+  test('core homepage sections render in order with updated surfaces', async ({
+    page,
+  }) => {
     await expect(
-      page.getByRole('heading', { name: 'The right action for every fan.' })
+      page.getByRole('heading', { name: 'Profiles that convert.' })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Claim your handle.' })
+      page.getByRole('heading', {
+        name: 'Every release gets a clean destination.',
+      })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'AI that knows the context.' })
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('heading', {
+        name: 'Context, monitoring, and tasks in one system.',
+      })
+    ).toBeVisible();
+
+    await expect(
+      page.getByTestId('homepage-release-destination-presave').first()
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('homepage-release-destination-live').first()
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('homepage-release-operating-system-surface')
     ).toBeVisible();
   });
 
-  test('final CTA renders with preserved ids and claim form', async ({
-    page,
-  }) => {
-    const finalHeadline = page.getByTestId('final-cta-headline');
-    await expect(finalHeadline).toHaveText('Claim your handle.');
-
-    await expect(finalHeadline).toBeVisible();
+  test('final CTA renders with current actions', async ({ page }) => {
     await expect(
-      page.getByTestId('final-cta-form').locator('input').first()
+      page.getByRole('heading', { name: 'Release day starts here.' })
     ).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Start Free' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Log In' })).toBeVisible();
   });
 
   test('is responsive on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
 
-    await expect(page.locator('h1')).toContainText('Drop More Music.', {
+    await expect(page.locator('h1')).toContainText('Drop more music.', {
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
 
-    await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible({
+    await expect(page.getByTestId('homepage-hero-release-card')).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-    await expect(page.getByRole('link', { name: 'Sign up' })).toBeVisible({
+    await expect(page.getByTestId('homepage-hero-profile-card')).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
 
-    await expect(
-      page.getByRole('link', { name: /get started free/i })
-    ).toBeVisible({
+    await expect(page.getByRole('link', { name: /start free/i })).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   });

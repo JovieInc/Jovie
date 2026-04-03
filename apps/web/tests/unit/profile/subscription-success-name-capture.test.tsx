@@ -72,9 +72,7 @@ describe('SubscriptionSuccess — name capture', () => {
     await vi.advanceTimersByTimeAsync(150);
 
     expect(screen.getByPlaceholderText('First name')).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Save & Listen Now' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
     expect(screen.getByText('What should we call you?')).toBeInTheDocument();
   });
 
@@ -98,9 +96,7 @@ describe('SubscriptionSuccess — name capture', () => {
     render(<SubscriptionSuccess {...nameCaptureProps} />);
     await vi.advanceTimersByTimeAsync(150);
 
-    const saveButton = screen.getByRole('button', {
-      name: 'Save & Listen Now',
-    });
+    const saveButton = screen.getByRole('button', { name: 'Save' });
     expect(saveButton).toBeDisabled();
   });
 
@@ -115,12 +111,10 @@ describe('SubscriptionSuccess — name capture', () => {
     const input = screen.getByPlaceholderText('First name');
     await user.type(input, 'Alice');
 
-    const saveButton = screen.getByRole('button', {
-      name: 'Save & Listen Now',
-    });
+    const saveButton = screen.getByRole('button', { name: 'Save' });
     await user.click(saveButton);
 
-    expect(screen.getByText('Saving...')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Saving…' })).toBeInTheDocument();
   });
 
   it('shows "Thanks, {name}!" after successful save', async () => {
@@ -133,9 +127,7 @@ describe('SubscriptionSuccess — name capture', () => {
     const input = screen.getByPlaceholderText('First name');
     await user.type(input, 'Alice');
 
-    const saveButton = screen.getByRole('button', {
-      name: 'Save & Listen Now',
-    });
+    const saveButton = screen.getByRole('button', { name: 'Save' });
     await user.click(saveButton);
 
     await waitFor(() => {
@@ -166,9 +158,7 @@ describe('SubscriptionSuccess — name capture', () => {
     const input = screen.getByPlaceholderText('First name');
     await user.type(input, 'Bob');
 
-    const saveButton = screen.getByRole('button', {
-      name: 'Save & Listen Now',
-    });
+    const saveButton = screen.getByRole('button', { name: 'Save' });
     await user.click(saveButton);
 
     await waitFor(() => {

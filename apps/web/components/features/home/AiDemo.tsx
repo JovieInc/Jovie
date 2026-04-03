@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { cn } from '@/lib/utils';
 
 interface Segment {
   text: string;
@@ -72,7 +73,7 @@ const DEMOS: Demo[] = [
       { text: ' collectively, steady organic growth.' },
     ],
   },
-];
+] as const;
 
 const SEGMENT_DELAY_MIN = 80;
 const SEGMENT_DELAY_MAX = 140;
@@ -86,7 +87,17 @@ function randomDelay() {
   );
 }
 
-export function AiDemo() {
+interface AiDemoProps {
+  readonly className?: string;
+  readonly variant?: 'default' | 'premium';
+  readonly contextChips?: readonly string[];
+}
+
+export function AiDemo({
+  className,
+  variant = 'default',
+  contextChips = [],
+}: Readonly<AiDemoProps>) {
   const [demoIndex, setDemoIndex] = useState(0);
   const [visibleCount, setVisibleCount] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
@@ -97,8 +108,8 @@ export function AiDemo() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   const currentDemo = DEMOS[demoIndex];
+  const isPremium = variant === 'premium';
 
-  // Check reduced motion preference
   useEffect(() => {
     const mq = globalThis.matchMedia('(prefers-reduced-motion: reduce)');
     setPrefersReducedMotion(mq.matches);
@@ -113,7 +124,6 @@ export function AiDemo() {
     setIsTyping(true);
   }, []);
 
-  // IntersectionObserver to trigger first animation on scroll-in
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -123,7 +133,6 @@ export function AiDemo() {
         if (entry?.isIntersecting && !hasStarted) {
           setHasStarted(true);
           if (prefersReducedMotion) {
-            // Show all segments instantly
             if (currentDemo) setVisibleCount(currentDemo.segments.length);
           } else {
             startTyping();
@@ -135,16 +144,14 @@ export function AiDemo() {
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasStarted, startTyping, prefersReducedMotion, currentDemo]);
+  }, [currentDemo, hasStarted, prefersReducedMotion, startTyping]);
 
-  // Typing animation: reveal segments one at a time
   useEffect(() => {
     if (!isTyping || isPaused || prefersReducedMotion) return;
     if (!currentDemo) return;
 
     if (visibleCount >= currentDemo.segments.length) {
       setIsTyping(false);
-      // Pause then advance to next demo
       timeoutRef.current = setTimeout(() => {
         const nextIndex = (demoIndex + 1) % DEMOS.length;
         setDemoIndex(nextIndex);
@@ -162,15 +169,14 @@ export function AiDemo() {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [
-    isTyping,
-    visibleCount,
     currentDemo,
-    isPaused,
-    prefersReducedMotion,
     demoIndex,
+    isPaused,
+    isTyping,
+    prefersReducedMotion,
+    visibleCount,
   ]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -180,15 +186,13 @@ export function AiDemo() {
   const togglePause = useCallback(() => {
     setIsPaused(prev => !prev);
     if (isPaused && timeoutRef.current) {
-      // Resuming — restart typing if it was in progress
       clearTimeout(timeoutRef.current);
       if (isTyping) {
-        setVisibleCount(prev => prev); // trigger re-render
+        setVisibleCount(prev => prev);
       }
     }
   }, [isPaused, isTyping]);
 
-  // For reduced motion: cycle through demos without animation
   const showNextDemo = useCallback(() => {
     const nextIndex = (demoIndex + 1) % DEMOS.length;
     setDemoIndex(nextIndex);
@@ -204,7 +208,13 @@ export function AiDemo() {
     <figure
       ref={containerRef}
       aria-label='AI writing demo'
-      className='rounded-t-xl rounded-b-none overflow-hidden bg-surface-0 shadow-panel-ring font-sans'
+      className={cn(
+        'overflow-hidden font-sans',
+        isPremium
+          ? 'rounded-[1.35rem] border border-white/10 bg-[linear-gradient(180deg,rgba(16,18,26,0.95),rgba(10,12,18,0.98))] shadow-[0_30px_80px_rgba(0,0,0,0.34),0_10px_24px_rgba(0,0,0,0.24)]'
+          : 'rounded-t-xl rounded-b-none bg-surface-0 shadow-panel-ring',
+        className
+      )}
     >
       <style>{`
         @keyframes segmentIn {
@@ -227,28 +237,47 @@ export function AiDemo() {
         }
       `}</style>
 
-      {/* Browser chrome */}
-      <div className='flex items-center gap-2 px-3.5 py-2.5 border-b border-subtle'>
+      <div
+        className={cn(
+          'flex items-center gap-2 border-b px-3.5 py-2.5',
+          isPremium ? 'border-white/10 bg-white/[0.03]' : 'border-subtle'
+        )}
+      >
         <div className='flex gap-[5px]'>
-          <span className='w-2 h-2 rounded-full bg-[#2a2a2a]' />
-          <span className='w-2 h-2 rounded-full bg-[#2a2a2a]' />
-          <span className='w-2 h-2 rounded-full bg-[#2a2a2a]' />
+          {[1, 2, 3].map(dot => (
+            <span
+              key={dot}
+              className={cn(
+                'h-2 w-2 rounded-full',
+                isPremium ? 'bg-white/20' : 'bg-[#2a2a2a]'
+              )}
+            />
+          ))}
         </div>
-        <div className='flex-1 text-center text-xs text-tertiary-token'>
+        <div
+          className={cn(
+            'flex-1 text-center text-xs',
+            isPremium ? 'text-white/58' : 'text-tertiary-token'
+          )}
+        >
           Jovie AI
         </div>
-        {/* Pause/Play toggle */}
         <button
           type='button'
           onClick={prefersReducedMotion ? showNextDemo : togglePause}
           aria-label={toggleLabel}
-          className='focus-ring w-6 h-6 flex items-center justify-center rounded text-tertiary-token hover:text-secondary-token transition-colors'
+          className={cn(
+            'focus-ring flex h-6 w-6 items-center justify-center rounded transition-colors',
+            isPremium
+              ? 'text-white/42 hover:text-white/74'
+              : 'text-tertiary-token hover:text-secondary-token'
+          )}
         >
           {prefersReducedMotion || isPaused ? (
             <svg
               viewBox='0 0 16 16'
               fill='currentColor'
-              className='w-3 h-3'
+              className='h-3 w-3'
               aria-hidden='true'
             >
               <path d='M4 2l10 6-10 6V2z' />
@@ -257,7 +286,7 @@ export function AiDemo() {
             <svg
               viewBox='0 0 16 16'
               fill='currentColor'
-              className='w-3 h-3'
+              className='h-3 w-3'
               aria-hidden='true'
             >
               <rect x='2' y='2' width='4' height='12' />
@@ -267,22 +296,51 @@ export function AiDemo() {
         </button>
       </div>
 
-      {/* Demo content */}
-      <div className='px-6 pt-6 pb-8'>
-        {/* Prompt */}
-        {currentDemo && (
-          <div className='font-mono text-sm text-tertiary-token mb-4'>
-            {currentDemo.prompt}
-          </div>
-        )}
+      {isPremium && contextChips.length > 0 ? (
+        <div className='flex flex-wrap gap-2 border-b border-white/8 px-4 py-3'>
+          {contextChips.map(chip => (
+            <span
+              key={chip}
+              className='rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[10px] tracking-[0.02em] text-white/62'
+            >
+              {chip}
+            </span>
+          ))}
+        </div>
+      ) : null}
 
-        {/* Response */}
+      <div
+        className={cn(
+          'border-b px-4 py-3',
+          isPremium ? 'border-white/8' : 'border-subtle'
+        )}
+      >
+        <p
+          className={cn(
+            'font-mono text-[12px]',
+            isPremium ? 'text-white/58' : 'text-tertiary-token'
+          )}
+        >
+          {currentDemo.prompt}
+        </p>
+      </div>
+
+      <div
+        className={cn(
+          'min-h-[160px] px-4 py-4',
+          isPremium &&
+            'bg-[radial-gradient(circle_at_top,rgba(129,140,248,0.08),transparent_44%)]'
+        )}
+      >
         <output
           aria-live='polite'
-          className='block text-sm leading-[1.7] text-secondary-token min-h-[120px]'
+          className={cn(
+            'block text-[13px] leading-[1.75]',
+            isPremium ? 'text-white/90' : 'text-secondary-token'
+          )}
         >
-          {currentDemo?.segments.map((segment, i) => {
-            if (i >= visibleCount) return null;
+          {currentDemo.segments.map((segment, index) => {
+            if (index >= visibleCount) return null;
             return (
               <span
                 key={`${demoIndex}-${segment.text.slice(0, 20)}`}
@@ -292,7 +350,12 @@ export function AiDemo() {
                     ? 'none'
                     : 'segmentIn 0.3s ease forwards',
                   ...(segment.highlight
-                    ? { color: 'rgb(52 211 153)', fontWeight: 500 }
+                    ? {
+                        color: isPremium
+                          ? 'rgb(196 181 253)'
+                          : 'var(--linear-accent)',
+                        fontWeight: 500,
+                      }
                     : {}),
                 }}
               >
@@ -301,16 +364,18 @@ export function AiDemo() {
             );
           })}
 
-          {/* Blinking cursor */}
-          {hasStarted && !prefersReducedMotion && (
+          {hasStarted && !prefersReducedMotion ? (
             <span
-              className='ai-demo-cursor inline-block w-[7px] h-[15px] bg-primary-token ml-0.5 align-text-bottom'
+              className='ai-demo-cursor ml-0.5 inline-block h-[15px] w-[7px] align-text-bottom'
               style={{
+                backgroundColor: isPremium
+                  ? 'rgb(196 181 253)'
+                  : 'var(--linear-accent)',
                 animation: 'cursorBlink 1s step-end infinite',
               }}
               aria-hidden='true'
             />
-          )}
+          ) : null}
         </output>
       </div>
     </figure>
