@@ -5,12 +5,10 @@ import {
 } from '@/app/app/(shell)/dashboard/presence/actions';
 import type { DspMatchConfidenceBreakdown } from '@/lib/db/schema/dsp-enrichment';
 
-const { captureErrorMock, dashboardQueryMock, getDashboardDataMock } =
-  vi.hoisted(() => ({
-    captureErrorMock: vi.fn(),
-    dashboardQueryMock: vi.fn(),
-    getDashboardDataMock: vi.fn(),
-  }));
+const { dashboardQueryMock, getDashboardDataMock } = vi.hoisted(() => ({
+  dashboardQueryMock: vi.fn(),
+  getDashboardDataMock: vi.fn(),
+}));
 
 vi.mock('@/lib/db', () => ({
   db: {},
@@ -18,10 +16,6 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/db/query-timeout', () => ({
   dashboardQuery: dashboardQueryMock,
-}));
-
-vi.mock('@/lib/error-tracking', () => ({
-  captureError: captureErrorMock,
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
@@ -117,21 +111,12 @@ describe('presence actions', () => {
     expect(result.suggestedCount).toBe(1);
   });
 
-  it('rethrows query failures after capturing them', async () => {
+  it('rethrows query failures so the page can render a truthful error state', async () => {
     const error = new Error('presence query failed');
     dashboardQueryMock.mockRejectedValueOnce(error);
 
     await expect(loadDspPresenceForProfile('profile-456')).rejects.toThrow(
       'presence query failed'
-    );
-
-    expect(captureErrorMock).toHaveBeenCalledWith(
-      'loadDspPresence failed',
-      error,
-      expect.objectContaining({
-        profileId: 'profile-456',
-        route: '/app/presence',
-      })
     );
   });
 

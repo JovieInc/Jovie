@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { act } from 'react';
@@ -280,6 +280,8 @@ describe('DspPresenceView', () => {
       screen.getByRole('button', { name: 'Empty State Add Platform' })
     );
 
-    expect(screen.getByText('Dialog Open')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Dialog Open')).toBeInTheDocument();
+    });
   });
 });

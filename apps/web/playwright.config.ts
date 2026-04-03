@@ -23,9 +23,11 @@ const includeMobileMatrix =
 const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
 const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 const baseURL = process.env.BASE_URL || 'http://localhost:3100';
-const managedBaseUrl = new URL(baseURL);
-const managedWebServerPort =
-  managedBaseUrl.port || (managedBaseUrl.protocol === 'https:' ? '443' : '80');
+const managedWebServerUrl = new URL(baseURL);
+if (!managedWebServerUrl.port) {
+  managedWebServerUrl.port = '3100';
+}
+const managedWebServerPort = managedWebServerUrl.port;
 const sentryE2eEnabled =
   process.env.SENTRY_E2E_REPORTING === '1' && Boolean(process.env.SENTRY_DSN);
 const shouldSerializeLocalBypassRuns = !isCI && useTestAuthBypass;
@@ -184,7 +186,7 @@ export default defineConfig({
             NODE_OPTIONS:
               `${process.env.NODE_OPTIONS || ''} --max-old-space-size=8192`.trim(),
           },
-          url: managedBaseUrl.origin,
+          url: managedWebServerUrl.origin,
           reuseExistingServer: !isCI,
           timeout: 300000, // Increased to 300s (5min) for Turbopack cold start
           stdout: 'pipe',

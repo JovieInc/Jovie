@@ -19,9 +19,11 @@ if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
 }
 
 const baseURL = process.env.BASE_URL || 'http://localhost:3100';
-const managedBaseUrl = new URL(baseURL);
-const managedWebServerPort =
-  managedBaseUrl.port || (managedBaseUrl.protocol === 'https:' ? '443' : '80');
+const managedWebServerUrl = new URL(baseURL);
+if (!managedWebServerUrl.port) {
+  managedWebServerUrl.port = '3100';
+}
+const managedWebServerPort = managedWebServerUrl.port;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -84,7 +86,7 @@ export default defineConfig({
             PORT: managedWebServerPort,
             NEXT_DISABLE_TOOLBAR: '1',
           },
-          url: managedBaseUrl.origin,
+          url: managedWebServerUrl.origin,
           reuseExistingServer: true,
           timeout: 300000,
           stdout: 'pipe',

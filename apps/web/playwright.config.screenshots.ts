@@ -22,9 +22,11 @@ const webServerCommand = process.env.DATABASE_URL
   ? 'pnpm run dev:local'
   : 'doppler run -- pnpm run dev:local';
 const baseURL = process.env.BASE_URL || 'http://localhost:3100';
-const managedBaseUrl = new URL(baseURL);
-const managedWebServerPort =
-  managedBaseUrl.port || (managedBaseUrl.protocol === 'https:' ? '443' : '80');
+const managedWebServerUrl = new URL(baseURL);
+if (!managedWebServerUrl.port) {
+  managedWebServerUrl.port = '3100';
+}
+const managedWebServerPort = managedWebServerUrl.port;
 
 export default defineConfig({
   testDir: './tests/product-screenshots',
@@ -78,7 +80,7 @@ export default defineConfig({
             // CDN instead of proxying through localhost (which requires HTTPS).
             NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
           },
-          url: managedBaseUrl.origin,
+          url: managedWebServerUrl.origin,
           // Default to fresh server so NEXT_PUBLIC_CLERK_PROXY_DISABLED is always
           // applied. A pre-running server won't have this flag, causing silent
           // Clerk JS loading failures. Opt in with REUSE_EXISTING_SERVER=1.

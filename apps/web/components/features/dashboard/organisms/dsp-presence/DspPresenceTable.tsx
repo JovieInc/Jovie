@@ -123,6 +123,10 @@ export function DspPresenceTable({
   onRowSelect,
 }: DspPresenceTableProps) {
   const getRowId = useCallback((row: DspPresenceItem) => row.matchId, []);
+  const getRowTestId = useCallback(
+    (row: DspPresenceItem) => `presence-match-row-${row.providerId}`,
+    []
+  );
 
   const getRowClassName = useCallback(
     (row: DspPresenceItem) => {
@@ -154,6 +158,7 @@ export function DspPresenceTable({
       columns={columns as ColumnDef<DspPresenceItem, unknown>[]}
       onRowClick={onRowSelect}
       getRowId={getRowId}
+      getRowTestId={getRowTestId}
       getRowClassName={getRowClassName}
       hideHeader
       enableVirtualization={false}
