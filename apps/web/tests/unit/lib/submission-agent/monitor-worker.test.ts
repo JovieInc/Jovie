@@ -33,9 +33,15 @@ function createSelectOrderByChain(result: unknown[]) {
 }
 
 function createSelectWhereChain(result: unknown[]) {
+  const whereResult = {
+    orderBy: vi.fn().mockResolvedValue(result),
+    then: (onFulfilled: (value: unknown[]) => unknown) =>
+      Promise.resolve(result).then(onFulfilled),
+  };
+
   return {
     from: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(result),
+      where: vi.fn().mockReturnValue(whereResult),
     }),
   };
 }
