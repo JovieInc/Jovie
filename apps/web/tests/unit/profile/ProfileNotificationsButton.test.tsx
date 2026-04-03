@@ -21,7 +21,7 @@ describe('ProfileNotificationsButton', () => {
 
     const bellIcon = container.querySelector('svg.lucide-bell');
     expect(bellIcon).toHaveClass('fill-current');
-    expect(bellIcon).toHaveClass('text-accent');
+    expect(bellIcon).toHaveClass('text-primary-token');
 
     expect(container.querySelector('svg.lucide-check')).toBeNull();
   });
@@ -37,6 +37,6 @@ describe('ProfileNotificationsButton', () => {
 
     const bellIcon = container.querySelector('svg.lucide-bell');
     expect(bellIcon).not.toHaveClass('fill-current');
-    expect(bellIcon).toHaveClass('text-primary-token');
+    expect(bellIcon).toHaveClass('text-primary-token/84');
   });
 });

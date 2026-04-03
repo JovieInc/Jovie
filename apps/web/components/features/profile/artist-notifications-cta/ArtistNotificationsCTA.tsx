@@ -10,7 +10,6 @@ import { AlertCircle, Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
-import { CTAButton } from '@/components/molecules/CTAButton';
 import { OtpInput } from '@/features/auth/atoms/otp-input';
 import { CountrySelector } from '@/features/profile/notifications';
 import { track } from '@/lib/analytics';
@@ -18,8 +17,15 @@ import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   noFontSynthesisStyle,
   SubscriptionFormSkeleton,
+  SubscriptionPearlComposer,
   SubscriptionPendingConfirmation,
   SubscriptionSuccess,
+  subscriptionComposerFocusClassName,
+  subscriptionDisclaimerClassName,
+  subscriptionHeadingClassName,
+  subscriptionInputClassName,
+  subscriptionPrimaryActionClassName,
+  subscriptionPrimaryLinkClassName,
 } from './shared';
 import type { ArtistNotificationsCTAProps } from './types';
 import { useSubscriptionForm } from './useSubscriptionForm';
@@ -39,14 +45,13 @@ function ListenNowCTA({
 
   if (variant === 'button') {
     return (
-      <CTAButton
+      <Link
         href={listenHref}
-        variant='primary'
-        size='lg'
-        className='w-full'
+        prefetch
+        className={subscriptionPrimaryLinkClassName}
       >
         Listen Now
-      </CTAButton>
+      </Link>
     );
   }
 
@@ -54,7 +59,7 @@ function ListenNowCTA({
     <Link
       href={listenHref}
       prefetch
-      className='inline-flex items-center justify-center w-full px-8 py-4 text-lg font-semibold rounded-xl bg-btn-primary text-btn-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:opacity-95 focus-ring-transparent-offset'
+      className={subscriptionPrimaryLinkClassName}
     >
       Listen Now
     </Link>
@@ -78,7 +83,7 @@ function ChannelToggle({
   return (
     <button
       type='button'
-      className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
+      className='flex h-12 items-center justify-center rounded-full px-3 text-primary-token/68 transition-colors hover:text-primary-token focus-visible:outline-none'
       aria-label={
         channel === 'sms' ? 'Switch to email updates' : 'Switch to text updates'
       }
@@ -254,12 +259,12 @@ function FormFooter({
 }>) {
   const showDisclaimer = isInputFocused && !error;
   return (
-    <div className='flex items-center justify-center gap-2'>
+    <div className='relative min-h-5'>
       <p
         id={disclaimerId}
-        className={`text-center text-[11px] leading-4 font-normal tracking-wide text-muted-foreground/80 transition-opacity duration-200 ${
+        className={`${subscriptionDisclaimerClassName} text-[11px] leading-4 tracking-wide transition-opacity duration-200 ${
           showDisclaimer ? 'opacity-100' : 'opacity-0'
-        }`}
+        } text-center`}
         style={noFontSynthesisStyle}
         aria-hidden={!showDisclaimer}
       >
@@ -269,9 +274,9 @@ function FormFooter({
       {error && (
         <TooltipProvider delayDuration={0}>
           <Tooltip defaultOpen>
-            <TooltipTrigger>
+            <TooltipTrigger asChild>
               <span
-                className='inline-flex items-center gap-1.5 text-sm text-red-500 dark:text-red-400'
+                className='absolute right-0 top-1/2 inline-flex -translate-y-1/2 items-center gap-1.5 text-sm text-red-500 dark:text-red-400'
                 role='alert'
                 aria-live='assertive'
               >
@@ -455,16 +460,15 @@ export function ArtistNotificationsCTA({
 
   return (
     <div className='space-y-3'>
-      <p
-        className='text-center text-[13px] font-[550] tracking-[0.01em] text-primary-token/88'
-        style={noFontSynthesisStyle}
-      >
+      <p className={subscriptionHeadingClassName} style={noFontSynthesisStyle}>
         {getFormHeading(otpStep)}
       </p>
 
-      <div className='overflow-hidden rounded-xl bg-transparent ring-1 ring-(--color-border-subtle) transition-[ring,background-color] focus-within:bg-surface-1/30 focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))]'>
-        <div className='flex items-center'>
-          {shouldShowCountrySelector ? (
+      <SubscriptionPearlComposer
+        dataTestId='subscription-pearl-composer'
+        layout={otpStep === 'verify' ? 'stacked' : 'inline'}
+        leftSlot={
+          otpStep === 'verify' ? undefined : shouldShowCountrySelector ? (
             <CountrySelector
               country={country}
               isOpen={isCountryOpen}
@@ -477,63 +481,74 @@ export function ArtistNotificationsCTA({
               isSubmitting={isSubmitting}
               onChannelChange={handleChannelChange}
             />
-          )}
-
-          <div className='flex-1 min-w-0'>
-            {otpStep === 'verify' ? (
-              <div className='px-3 py-2'>
-                <OtpInput
-                  value={otpCode}
-                  onChange={handleOtpChange}
-                  onComplete={() => {
-                    handleVerifyOtp();
-                  }}
-                  autoFocus
-                  aria-label='Enter 6-digit verification code'
-                  disabled={isSubmitting}
-                  error={Boolean(error)}
-                />
-              </div>
-            ) : (
-              <>
-                <label htmlFor={inputId} className='sr-only'>
-                  {inputConfig.label}
-                </label>
-                <input
-                  ref={inputRef}
-                  id={inputId}
-                  aria-describedby={disclaimerId}
-                  type={inputConfig.type}
-                  inputMode={inputConfig.inputMode}
-                  className='h-12 w-full border-none bg-transparent px-4 text-[15px] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 focus-visible:outline-none focus-visible:ring-0'
-                  placeholder={inputConfig.placeholder}
-                  value={inputValue}
-                  onChange={event => handleInputChange(event.target.value)}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={handleInputBlur}
-                  onKeyDown={handleKeyDown}
-                  disabled={isSubmitting}
-                  autoComplete={inputConfig.autoComplete}
-                  maxLength={inputConfig.maxLength}
-                  style={noFontSynthesisStyle}
-                />
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <button
-        type='button'
-        onClick={() => {
-          handleFormSubmit();
-        }}
-        disabled={isSubmitting}
-        className='inline-flex h-12 w-full items-center justify-center rounded-xl border border-white/10 bg-white text-base font-semibold text-black transition-[opacity,background-color,border-color] duration-150 hover:border-white/20 hover:bg-white/96 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
-        style={noFontSynthesisStyle}
+          )
+        }
+        action={
+          <button
+            type='button'
+            onClick={() => {
+              handleFormSubmit();
+            }}
+            disabled={isSubmitting}
+            className={
+              otpStep === 'verify'
+                ? `${subscriptionPrimaryActionClassName} min-w-[7rem]`
+                : subscriptionPrimaryActionClassName
+            }
+            style={noFontSynthesisStyle}
+          >
+            {getSubmitButtonLabel(isSubmitting, otpStep)}
+          </button>
+        }
+        className={
+          otpStep === 'verify'
+            ? 'px-3 py-3'
+            : isInputFocused
+              ? subscriptionComposerFocusClassName
+              : undefined
+        }
       >
-        {getSubmitButtonLabel(isSubmitting, otpStep)}
-      </button>
+        {otpStep === 'verify' ? (
+          <div className='px-2 py-2'>
+            <OtpInput
+              value={otpCode}
+              onChange={handleOtpChange}
+              onComplete={() => {
+                handleVerifyOtp();
+              }}
+              autoFocus
+              aria-label='Enter 6-digit verification code'
+              disabled={isSubmitting}
+              error={Boolean(error)}
+            />
+          </div>
+        ) : (
+          <>
+            <label htmlFor={inputId} className='sr-only'>
+              {inputConfig.label}
+            </label>
+            <input
+              ref={inputRef}
+              id={inputId}
+              data-testid='subscription-input'
+              aria-describedby={disclaimerId}
+              type={inputConfig.type}
+              inputMode={inputConfig.inputMode}
+              className={subscriptionInputClassName}
+              placeholder={inputConfig.placeholder}
+              value={inputValue}
+              onChange={event => handleInputChange(event.target.value)}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={handleInputBlur}
+              onKeyDown={handleKeyDown}
+              disabled={isSubmitting}
+              autoComplete={inputConfig.autoComplete}
+              maxLength={inputConfig.maxLength}
+              style={noFontSynthesisStyle}
+            />
+          </>
+        )}
+      </SubscriptionPearlComposer>
 
       <FormFooter
         disclaimerId={disclaimerId}

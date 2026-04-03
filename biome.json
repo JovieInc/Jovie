@@ -12,6 +12,9 @@
     "includes": [
       "**/*",
       "!!.claude",
+      "!.context/**",
+      "!.agents/skills/gstack/**",
+      "!.claude/skills/gstack/**",
       "!!storybook-static",
       "!**/*.html",
       "!**/.next"

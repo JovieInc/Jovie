@@ -4,6 +4,8 @@ export const DEMO_SHOWCASE_SURFACE_IDS = [
   'links',
   'settings',
   'public-profile',
+  'release-landing',
+  'release-tasks',
   'onboarding-handle',
   'onboarding-dsp',
   'onboarding-profile-review',
