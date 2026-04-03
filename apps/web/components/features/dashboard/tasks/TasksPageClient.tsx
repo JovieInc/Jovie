@@ -1562,37 +1562,42 @@ export function TasksPageClient() {
   };
 
   return (
-    <PageShell className='overflow-hidden' data-testid='tasks-workspace'>
-      {isXlUp || headerMode !== 'default' ? (
-        <TaskWorkspaceHeaderBar
-          mode={headerMode}
-          search={search}
-          draftTitle={draftTitle}
-          taskCount={visibleTasks.length}
-          onSearchChange={value => {
-            setSearch(value);
-            if (headerMode === 'default') {
-              setHeaderMode('search');
-            }
-          }}
-          onDraftTitleChange={setDraftTitle}
-          onEnterSearch={() => setHeaderMode('search')}
-          onExitSearch={() => setHeaderMode('default')}
-          onCancelCreate={() => {
-            setDraftTitle('');
-            setHeaderMode('default');
-          }}
-          onSubmitCreate={handleCreateTask}
-          createPending={createTaskMutation.isPending}
-          filterCategories={taskFilterCategories}
-          onClearFilters={clearFilters}
-          showTaskNavigation={isXlUp && Boolean(selectedTask)}
-          canSelectPrevious={canSelectPrevious}
-          canSelectNext={canSelectNext}
-          onSelectPrevious={selectPreviousTask}
-          onSelectNext={selectNextTask}
-        />
-      ) : null}
+    <PageShell
+      className='overflow-hidden'
+      data-testid='tasks-workspace'
+      toolbar={
+        isXlUp || headerMode !== 'default' ? (
+          <TaskWorkspaceHeaderBar
+            mode={headerMode}
+            search={search}
+            draftTitle={draftTitle}
+            taskCount={visibleTasks.length}
+            onSearchChange={value => {
+              setSearch(value);
+              if (headerMode === 'default') {
+                setHeaderMode('search');
+              }
+            }}
+            onDraftTitleChange={setDraftTitle}
+            onEnterSearch={() => setHeaderMode('search')}
+            onExitSearch={() => setHeaderMode('default')}
+            onCancelCreate={() => {
+              setDraftTitle('');
+              setHeaderMode('default');
+            }}
+            onSubmitCreate={handleCreateTask}
+            createPending={createTaskMutation.isPending}
+            filterCategories={taskFilterCategories}
+            onClearFilters={clearFilters}
+            showTaskNavigation={isXlUp && Boolean(selectedTask)}
+            canSelectPrevious={canSelectPrevious}
+            canSelectNext={canSelectNext}
+            onSelectPrevious={selectPreviousTask}
+            onSelectNext={selectNextTask}
+          />
+        ) : undefined
+      }
+    >
       <section
         className={cn(
           'flex min-h-0 flex-1 flex-col gap-2 overflow-hidden pb-2'

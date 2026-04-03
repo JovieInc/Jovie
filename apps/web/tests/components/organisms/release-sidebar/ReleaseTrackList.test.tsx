@@ -129,11 +129,11 @@ describe('ReleaseTrackList', () => {
             durationMs: 185000,
             isrc: 'USRC17607839',
             isExplicit: false,
-            previewUrl: null,
+            previewUrl: 'https://example.com/preview.mp3',
             audioUrl: null,
             audioFormat: null,
-            previewSource: null,
-            previewVerification: 'missing',
+            previewSource: 'spotify',
+            previewVerification: 'verified',
             providerConfidenceSummary: {
               canonical: 1,
               searchFallback: 1,
@@ -160,11 +160,11 @@ describe('ReleaseTrackList', () => {
     );
 
     expect(screen.getByTestId('release-preview-summary')).toHaveTextContent(
-      'Audio Previews: none'
+      'Audio Previews: 1 ready'
     );
     expect(
       screen.getByTestId('release-track-status-track_1')
-    ).toHaveTextContent('Not checked');
+    ).toHaveTextContent('Ready');
     expect(
       screen.getByTestId('release-track-provider-summary-track_1')
     ).toHaveTextContent('1 linked, 1 unconfirmed, 2 pending');

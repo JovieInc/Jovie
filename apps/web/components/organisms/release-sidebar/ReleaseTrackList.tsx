@@ -406,11 +406,15 @@ function TrackPlaybackRow({
                 className='mt-1 text-[10px] text-tertiary-token'
                 data-testid={`release-track-provider-summary-${track.id}`}
               >
-                {summary?.canonical ?? 0} linked, {summary?.searchFallback ?? 0}{' '}
-                unconfirmed
-                {summary && summary.unknown > 0
-                  ? `, ${summary.unknown} pending`
-                  : ''}
+                {[
+                  (summary?.canonical ?? 0) > 0 &&
+                    `${summary?.canonical} linked`,
+                  (summary?.searchFallback ?? 0) > 0 &&
+                    `${summary?.searchFallback} unconfirmed`,
+                  (summary?.unknown ?? 0) > 0 && `${summary?.unknown} pending`,
+                ]
+                  .filter(Boolean)
+                  .join(', ') || 'none'}
               </p>
               <p
                 className={cn('mt-0.5 text-[10px]', statusToneClass)}
@@ -513,7 +517,7 @@ function TrackPlaybackRow({
               ) : null}
               {unverifiedProviders.length > 0 ? (
                 <ProviderGroup
-                  title='Unverified DSPs'
+                  title='Pending DSPs'
                   providers={unverifiedProviders}
                   testId={`release-track-unverified-providers-${track.id}`}
                 />
