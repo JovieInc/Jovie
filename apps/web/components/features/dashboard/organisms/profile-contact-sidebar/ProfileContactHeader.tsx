@@ -65,9 +65,9 @@ export function ProfileContactHeader({
           value={displayName}
           editable={editable && Boolean(onDisplayNameChange)}
           emptyLabel='Add display name'
-          onSave={async nextValue => {
+          onSave={nextValue => {
             if (onDisplayNameChange) {
-              await onDisplayNameChange(nextValue ?? '');
+              onDisplayNameChange(nextValue ?? '');
             }
           }}
           displayClassName='text-[13px] font-[590] leading-[15px] tracking-[-0.01em] text-primary-token'

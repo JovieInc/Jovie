@@ -1619,7 +1619,7 @@ export function TasksPageClient() {
               type='button'
               variant='secondary'
               size='sm'
-              onClick={() => void refetch()}
+              onClick={() => refetch()}
             >
               Retry
             </Button>
