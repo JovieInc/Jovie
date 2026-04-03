@@ -13,10 +13,8 @@ export default async function OnboardingLayout({
   await resolveUserState();
 
   return (
-    <>
-      <ResolvedClientProviders>
-        <FeatureFlagsProvider>{children}</FeatureFlagsProvider>
-      </ResolvedClientProviders>
-    </>
+    <ResolvedClientProviders>
+      <FeatureFlagsProvider>{children}</FeatureFlagsProvider>
+    </ResolvedClientProviders>
   );
 }

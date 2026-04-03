@@ -4,10 +4,12 @@ import { useMemo } from 'react';
 import { useTaskToggleMutation } from '@/lib/queries/useReleaseTaskMutations';
 import { useReleaseTasksQuery } from '@/lib/queries/useReleaseTasksQuery';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
+import { MetadataAgentPanel } from './MetadataAgentPanel';
 import { ReleaseTaskChecklist } from './ReleaseTaskChecklist';
 import { ReleaseTaskRow } from './ReleaseTaskRow';
 
 interface ReleaseTaskPageProps {
+  readonly profileId: string;
   readonly releaseId: string;
   readonly releaseTitle: string;
   readonly releaseDate?: Date | string | null;
@@ -34,6 +36,7 @@ function getUpNextTasks(tasks: ReleaseTaskView[]): ReleaseTaskView[] {
 }
 
 export function ReleaseTaskPage({
+  profileId,
   releaseId,
   releaseTitle,
   releaseDate,
@@ -70,6 +73,12 @@ export function ReleaseTaskPage({
         <span className='mx-1.5'>/</span>
         <span className='text-primary-token'>Tasks</span>
       </nav>
+
+      <MetadataAgentPanel
+        profileId={profileId}
+        releaseId={releaseId}
+        releaseTitle={releaseTitle}
+      />
 
       {/* Up Next section (only when tasks exist and not all done) */}
       {upNextTasks.length > 0 && !allDone && (
