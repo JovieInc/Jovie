@@ -6,6 +6,7 @@
 import 'server-only';
 
 import { musicBrainzLookupLimiter } from '@/lib/rate-limit';
+import { logger } from '@/lib/utils/logger';
 import { musicBrainzCircuitBreaker } from '../circuit-breakers';
 import type { MusicBrainzArtist, MusicBrainzRecording } from '../types';
 
@@ -142,9 +143,16 @@ export async function bulkLookupMusicBrainzByIsrc(
 ): Promise<Map<string, MusicBrainzRecording>> {
   const results = new Map<string, MusicBrainzRecording>();
   for (const isrc of isrcs) {
-    const recordings = await lookupMusicBrainzByIsrc(isrc);
-    if (recordings.length > 0) {
-      results.set(isrc.toUpperCase(), recordings[0]);
+    try {
+      const recordings = await lookupMusicBrainzByIsrc(isrc);
+      if (recordings.length > 0) {
+        results.set(isrc.toUpperCase(), recordings[0]);
+      }
+    } catch (error) {
+      logger.warn('MusicBrainz ISRC lookup failed during bulk lookup', {
+        isrc,
+        error,
+      });
     }
   }
   return results;
