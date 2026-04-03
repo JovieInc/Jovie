@@ -1,5 +1,5 @@
+import { AdminWorkspacePage } from '@/components/features/admin/layout/AdminWorkspacePage';
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
 
 const ADMIN_ACTIVITY_ROW_KEYS = Array.from(
   { length: 8 },
@@ -62,11 +62,19 @@ export function AdminActivitySkeleton() {
 }
 
 export default function AdminActivityLoading() {
+  const activityTabs = [{ value: 'activity', label: 'Activity' }] as const;
+
   return (
-    <PageShell>
-      <PageContent noPadding>
-        <AdminActivitySkeleton />
-      </PageContent>
-    </PageShell>
+    <AdminWorkspacePage
+      title='Activity'
+      description='Recent admin interventions, creator events, and system outcomes.'
+      primaryParam='view'
+      primaryValue='activity'
+      primaryOptions={activityTabs}
+      testId='admin-activity-page'
+      viewTestId='admin-activity-view'
+    >
+      <AdminActivitySkeleton />
+    </AdminWorkspacePage>
   );
 }

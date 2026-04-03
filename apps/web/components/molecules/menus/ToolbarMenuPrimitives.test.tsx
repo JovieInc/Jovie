@@ -32,16 +32,17 @@ describe('ToolbarMenuPrimitives', () => {
           <ToolbarMenuChoiceItem
             active
             label='Done'
-            leadingVisual={<Circle aria-hidden='true' className='h-3 w-3' />}
+            trailingVisual={<span>3</span>}
             onSelect={vi.fn()}
           />
         </DropdownMenuContent>
       </DropdownMenu>
     );
 
-    expect(screen.getByText('Done').closest('[data-menu-row]')).toHaveAttribute(
-      'data-selected',
-      'true'
-    );
+    const row = screen.getByText('Done').closest('[data-menu-row]');
+
+    expect(row).toHaveAttribute('data-selected', 'true');
+    expect(row?.querySelector('[data-menu-trailing]')).toHaveTextContent('3');
+    expect(row?.querySelector('[data-menu-trailing] svg')).toBeTruthy();
   });
 });

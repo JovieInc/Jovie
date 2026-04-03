@@ -118,6 +118,8 @@ const NOOP_TASK_ASSIGNEE_UPDATE = (
   _assigneeKind: TaskAssigneeKind
 ) => {};
 
+const TASK_WORKSPACE_PANE_CLASSNAME = 'min-h-0 overflow-hidden';
+
 type MobileTaskScope = 'all' | 'open' | 'done';
 
 const MOBILE_TASK_SCOPE_OPTIONS = [
@@ -1416,7 +1418,7 @@ export function TasksPageClient() {
                     type='button'
                     onClick={event => event.stopPropagation()}
                     aria-label='Open task actions'
-                    className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-tertiary-token transition-[background-color,color,box-shadow] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'
+                    className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-tertiary-token transition-[background-color,color] duration-150 hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_56%,transparent)] hover:text-primary-token focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-row-hover)_60%,transparent)] focus-visible:text-primary-token'
                   >
                     <MoreVertical className='h-3.5 w-3.5' />
                   </button>
@@ -1424,7 +1426,7 @@ export function TasksPageClient() {
               }
             />
           ),
-          meta: { className: 'pl-2 pr-2.5' },
+          meta: { className: 'px-0' },
         }),
       ] as ColumnDef<TaskView, unknown>[],
     [
@@ -1458,7 +1460,7 @@ export function TasksPageClient() {
     <PageShell className='overflow-hidden' data-testid='tasks-workspace'>
       <section
         className={cn(
-          'flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)]'
+          'flex min-h-0 flex-1 flex-col gap-2 overflow-hidden rounded-[22px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)] px-6 pb-6 pt-3'
         )}
         data-testid='tasks-content-panel'
       >
@@ -1513,12 +1515,13 @@ export function TasksPageClient() {
             </Button>
           </div>
         ) : (
-          <div className='flex min-h-0 flex-1 overflow-hidden p-3'>
+          <div className='flex min-h-0 flex-1 overflow-hidden'>
             <div
               data-testid='task-list-pane'
               className={cn(
                 'min-h-0 min-w-0 shrink-0 overflow-hidden',
-                'xl:w-[31rem] 2xl:w-[33rem] min-[1800px]:w-[35rem] xl:border-r xl:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]',
+                TASK_WORKSPACE_PANE_CLASSNAME,
+                'xl:w-[29rem] 2xl:w-[31rem] min-[1800px]:w-[33rem]',
                 showTaskListPane ? 'block' : 'hidden',
                 (!selectedTask || !showTaskDocumentPane) && 'flex-1'
               )}
@@ -1544,7 +1547,7 @@ export function TasksPageClient() {
                   rowHeight={64}
                   skeletonRows={8}
                   className='text-[13px]'
-                  containerClassName='h-full overflow-y-auto overflow-x-hidden pl-1.5 pr-3 pb-2 pt-0.5'
+                  containerClassName='h-full overflow-y-auto overflow-x-hidden px-0 pb-3 pt-2'
                   onRowClick={row => openTaskDocument(row)}
                   getContextMenuItems={getTaskContextMenuItems}
                   getRowClassName={_row =>
@@ -1637,6 +1640,7 @@ export function TasksPageClient() {
             <div
               className={cn(
                 'min-h-0 min-w-0 flex-1 overflow-hidden',
+                TASK_WORKSPACE_PANE_CLASSNAME,
                 showTaskDocumentPane ? 'flex' : 'hidden'
               )}
               data-testid='task-document-pane'

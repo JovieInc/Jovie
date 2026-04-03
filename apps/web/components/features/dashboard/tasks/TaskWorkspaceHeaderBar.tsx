@@ -3,13 +3,12 @@
 import { Button, Input } from '@jovie/ui';
 import { ArrowDown, ArrowUp, Search, X } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
-import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
 import {
   TableFilterDropdown,
   type TableFilterDropdownCategory,
 } from '@/components/molecules/filters';
+import { PageToolbarActionButton } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 
 export interface TaskWorkspaceHeaderBarProps {
@@ -56,7 +55,7 @@ export function TaskWorkspaceHeaderBar({
   const createFormId = 'task-workspace-create-form';
 
   return (
-    <div className='flex min-h-[48px] items-center justify-between gap-3 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-app-header py-2'>
+    <div className='flex min-h-[48px] items-center justify-between gap-3 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-1 py-1.5'>
       <div className='min-w-0 flex-1'>
         {mode === 'search' ? (
           <AppSearchField
@@ -85,8 +84,8 @@ export function TaskWorkspaceHeaderBar({
             />
           </form>
         ) : (
-          <div className='flex min-h-7 items-center pl-1.5'>
-            <span className='text-[10.5px] font-[560] text-tertiary-token'>
+          <div className='flex min-h-8 items-center pl-2.5'>
+            <span className='text-[11px] font-[560] text-tertiary-token'>
               {taskCount === 1 ? '1 Task' : `${taskCount} Tasks`}
             </span>
           </div>
@@ -118,24 +117,25 @@ export function TaskWorkspaceHeaderBar({
         ) : (
           <>
             {mode === 'search' ? (
-              <DashboardHeaderActionButton
+              <PageToolbarActionButton
                 ariaLabel='Close search'
-                icon={<X className='h-3.5 w-3.5' />}
+                label='Close search'
                 onClick={onExitSearch}
+                icon={<X className='h-3.5 w-3.5' />}
                 iconOnly
                 tooltipLabel='Close search'
               />
             ) : (
-              <AppIconButton
+              <PageToolbarActionButton
                 ariaLabel='Search tasks'
+                label='Search tasks'
                 onClick={onEnterSearch}
                 tooltipLabel='Search'
                 tooltipShortcut='/'
+                iconOnly
                 data-app-search-trigger='true'
-                className='rounded-full border-transparent bg-transparent text-tertiary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0'
-              >
-                <Search className='h-3.5 w-3.5' />
-              </AppIconButton>
+                icon={<Search className='h-3.5 w-3.5' />}
+              />
             )}
             <div className={cn(mode === 'search' && 'opacity-100')}>
               <TableFilterDropdown
@@ -143,30 +143,29 @@ export function TaskWorkspaceHeaderBar({
                 onClearAll={onClearFilters}
                 iconOnly
                 align='end'
-                headerLabel='Filter Tasks'
                 shortcutHint='S'
               />
             </div>
             {showTaskNavigation ? (
               <div className='flex items-center gap-0.5'>
-                <AppIconButton
+                <PageToolbarActionButton
                   ariaLabel='Previous task'
+                  label='Previous task'
                   onClick={onSelectPrevious}
                   tooltipLabel='Previous task'
                   disabled={!canSelectPrevious}
-                  className='rounded-full border-transparent bg-transparent text-tertiary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0 disabled:opacity-35'
-                >
-                  <ArrowUp className='h-3.5 w-3.5' />
-                </AppIconButton>
-                <AppIconButton
+                  iconOnly
+                  icon={<ArrowUp className='h-3.5 w-3.5' />}
+                />
+                <PageToolbarActionButton
                   ariaLabel='Next task'
+                  label='Next task'
                   onClick={onSelectNext}
                   tooltipLabel='Next task'
                   disabled={!canSelectNext}
-                  className='rounded-full border-transparent bg-transparent text-tertiary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0 disabled:opacity-35'
-                >
-                  <ArrowDown className='h-3.5 w-3.5' />
-                </AppIconButton>
+                  iconOnly
+                  icon={<ArrowDown className='h-3.5 w-3.5' />}
+                />
               </div>
             ) : null}
           </>

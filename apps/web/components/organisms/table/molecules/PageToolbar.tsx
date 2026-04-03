@@ -31,15 +31,15 @@ export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
 
 export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
-  'h-7.5 rounded-full border-transparent bg-transparent px-2.5 text-[11.5px] font-[540] text-tertiary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token hover:shadow-none focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0 active:shadow-none [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-7 rounded-full border-0 bg-transparent px-2 text-[11.5px] font-[540] text-tertiary-token shadow-none hover:border-0 hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_56%,transparent)] hover:text-primary-token hover:shadow-none focus-visible:border-0 focus-visible:bg-[color-mix(in_oklab,var(--linear-row-hover)_62%,transparent)] focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-0 active:border-0 active:bg-[color-mix(in_oklab,var(--linear-row-hover)_68%,transparent)] active:text-primary-token active:shadow-none disabled:pointer-events-none disabled:opacity-35 disabled:bg-transparent [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS =
-  'w-7.5 justify-center px-0 text-tertiary-token';
+  'w-7 justify-center px-0 text-tertiary-token';
 
 export const PAGE_TOOLBAR_MENU_TRIGGER_CLASS = cn(
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-  'min-w-[112px] justify-between gap-1.5 rounded-full px-3 text-secondary-token'
+  'min-w-[112px] justify-between gap-1.5 rounded-full px-2.5 text-secondary-token'
 );
 
 export const PAGE_TOOLBAR_ACTION_ACTIVE_CLASS =

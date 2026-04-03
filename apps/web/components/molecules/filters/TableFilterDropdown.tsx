@@ -87,9 +87,12 @@ function TableFilterSection<T extends string>({
 
   return (
     <div className='flex max-h-[320px] min-h-[220px] min-w-[260px] flex-col overflow-hidden'>
-      <div data-menu-header>
-        <div className={TOOLBAR_MENU_HEADER_CLASS}>
-          <span className='truncate text-[11px] font-[600] text-tertiary-token'>
+      <div
+        data-menu-header
+        className='border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)]'
+      >
+        <div className={cn(TOOLBAR_MENU_HEADER_CLASS, 'border-b-0 pb-1.25')}>
+          <span className='truncate text-[11px] font-[600] text-secondary-token'>
             {headerLabel ?? category.label}
           </span>
           {shortcutHint ? (
@@ -98,7 +101,7 @@ function TableFilterSection<T extends string>({
             </span>
           ) : null}
         </div>
-        <div className='px-2.5 pb-2 pt-1.5'>
+        <div className='px-2.5 pb-2 pt-0.5'>
           <FilterSearchInput
             value={search}
             onChange={setSearch}
@@ -169,7 +172,7 @@ function TableFilterSubmenu<T extends string>({
           label={category.label}
           trailingVisual={
             category.selectedIds.length > 0 ? (
-              <span className='inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-surface-1 px-1.5 text-[11px] tabular-nums text-secondary-token'>
+              <span className='inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[6px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_30%,transparent)] px-[5px] text-[10.5px] tabular-nums text-tertiary-token'>
                 {category.selectedIds.length}
               </span>
             ) : null
@@ -177,7 +180,7 @@ function TableFilterSubmenu<T extends string>({
         />
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent
-        sideOffset={8}
+        sideOffset={4}
         data-menu-surface='toolbar'
         className={cn(TOOLBAR_MENU_CONTENT_CLASS, 'p-0')}
       >

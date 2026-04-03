@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { CampaignSettingsPanel } from '@/components/features/admin/campaigns/CampaignSettingsPanel';
 import { WaitlistSettingsPanel } from '@/components/features/admin/WaitlistSettingsPanel';
-import { adminNavigationSections } from '@/components/features/dashboard/dashboard-nav/config';
+import { adminSettingsNavigationSections } from '@/components/features/dashboard/dashboard-nav/config';
 import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
@@ -58,9 +58,7 @@ function AdminLink({ href, icon: Icon, title, description }: AdminLinkProps) {
   );
 }
 
-const quickLinkSections = adminNavigationSections.filter(section =>
-  ['Workspaces', 'Utilities'].includes(section.label)
-);
+const quickLinkSections = adminSettingsNavigationSections;
 
 /**
  * Admin settings section - only visible to admin users.

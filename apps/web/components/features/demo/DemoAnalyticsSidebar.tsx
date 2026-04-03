@@ -247,6 +247,7 @@ export function DemoAnalyticsSidebar({
       title='Analytics'
       onClose={onClose}
       headerMode='minimal'
+      surfaceTone='quiet'
       headerActions={
         <DrawerHeaderActions
           primaryActions={[]}
@@ -255,7 +256,7 @@ export function DemoAnalyticsSidebar({
         />
       }
       entityHeader={
-        <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+        <DrawerSurfaceCard variant='quiet' className='overflow-hidden'>
           <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
             <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
               Analytics
@@ -302,6 +303,7 @@ export function DemoAnalyticsSidebar({
         {/* Ranked lists */}
         <DrawerTabbedCard
           testId='demo-analytics-tabbed-card'
+          surfaceVariant='quiet'
           tabs={
             <DrawerTabs
               value={activeTab}

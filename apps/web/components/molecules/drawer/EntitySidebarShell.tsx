@@ -60,6 +60,8 @@ export interface EntitySidebarShellProps {
   readonly isEmpty?: boolean;
   /** Message shown in empty state */
   readonly emptyMessage?: string;
+  /** Opt-in quieter surface treatment for dashboard/demo right rails. */
+  readonly surfaceTone?: 'default' | 'quiet';
 }
 
 /**
@@ -107,9 +109,11 @@ export function EntitySidebarShell({
   footer,
   isEmpty = false,
   emptyMessage = 'Select an item to view details.',
+  surfaceTone = 'default',
 }: EntitySidebarShellProps) {
   const isMinimalHeader = headerMode === 'minimal';
-  const drawerSectionGapClassName = 'space-y-2.5';
+  const isQuietTone = surfaceTone === 'quiet';
+  const drawerSectionGapClassName = isQuietTone ? 'space-y-2' : 'space-y-2.5';
   const showMinimalHeaderBar = !(isMinimalHeader && hideMinimalHeaderBar);
   const renderMinimalTabsInHeader =
     isMinimalHeader && minimalTabsPlacement === 'header';
@@ -134,16 +138,26 @@ export function EntitySidebarShell({
       onKeyDown={onKeyDown}
       contextMenuItems={contextMenuItems}
       data-testid={testId}
+      data-surface-tone={surfaceTone}
     >
-      <div className='flex h-full min-h-0 flex-col gap-2 px-1.5 py-1.5 lg:px-0 lg:py-0'>
+      <div
+        className={cn(
+          'flex h-full min-h-0 flex-col gap-1.5 px-1.5 py-1.5 lg:px-0 lg:py-0',
+          isQuietTone && 'gap-1'
+        )}
+      >
         <div className={cn('shrink-0', drawerSectionGapClassName)}>
           <DrawerSurfaceCard
-            variant='card'
-            className='overflow-hidden lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none'
+            variant={isQuietTone ? 'quiet' : 'card'}
+            className={cn(
+              'overflow-hidden lg:rounded-[18px]',
+              !isQuietTone &&
+                'border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,transparent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] lg:border'
+            )}
           >
             <div
               className={cn(
-                'border-b border-transparent bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,transparent)] backdrop-blur-[12px]'
+                'border-b border-transparent bg-transparent backdrop-blur-[12px]'
               )}
             >
               {showMinimalHeaderBar ? (
@@ -197,8 +211,12 @@ export function EntitySidebarShell({
           {isMinimalHeader && !isEmpty && entityHeader ? (
             <DrawerSurfaceCard
               testId='entity-sidebar-entity-header'
-              variant='card'
-              className='overflow-hidden lg:mx-1.5 lg:mt-1.5'
+              variant={isQuietTone ? 'quiet' : 'card'}
+              className={cn(
+                'overflow-hidden lg:mx-0 lg:mt-0',
+                !isQuietTone &&
+                  'border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,transparent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+              )}
             >
               {entityHeader}
             </DrawerSurfaceCard>
@@ -206,21 +224,24 @@ export function EntitySidebarShell({
         </div>
 
         {isEmpty ? (
-          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5 lg:pt-1.5'>
-            <DrawerSurfaceCard variant='card' className='p-4'>
+          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-0 lg:pt-0'>
+            <DrawerSurfaceCard
+              variant={isQuietTone ? 'quiet' : 'card'}
+              className='p-4'
+            >
               <DrawerEmptyState message={emptyMessage} />
             </DrawerSurfaceCard>
           </div>
         ) : (
           <>
-            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5 lg:pt-1.5'>
+            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-0 lg:pt-0'>
               <div className={drawerSectionGapClassName}>{children}</div>
             </div>
 
             {footer ? (
               <DrawerSurfaceCard
-                variant='card'
-                className='shrink-0 px-3 py-2.5 lg:mx-1.5'
+                variant={isQuietTone ? 'quiet' : 'card'}
+                className='shrink-0 px-3 py-2.5 lg:mx-0'
               >
                 {footer}
               </DrawerSurfaceCard>

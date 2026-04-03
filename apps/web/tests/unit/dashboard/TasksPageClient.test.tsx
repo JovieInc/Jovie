@@ -245,12 +245,22 @@ vi.mock('@/components/organisms/table', () => ({
     label,
     onClick,
     ariaLabel,
+    disabled,
+    icon,
   }: {
     label: React.ReactNode;
     onClick?: () => void;
     ariaLabel?: string;
+    disabled?: boolean;
+    icon?: React.ReactNode;
   }) => (
-    <button type='button' onClick={onClick} aria-label={ariaLabel}>
+    <button
+      type='button'
+      onClick={onClick}
+      aria-label={ariaLabel}
+      disabled={disabled}
+    >
+      {icon}
       {label}
     </button>
   ),

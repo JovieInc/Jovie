@@ -51,7 +51,7 @@ export function FilterSearchInput({
   );
 
   return (
-    <div className='sticky top-0 z-10 bg-(--linear-app-content-surface)'>
+    <div className='relative'>
       <div className='relative'>
         <Icon
           name='Search'
@@ -65,10 +65,10 @@ export function FilterSearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           className={cn(
-            'w-full rounded-[8px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_52%,transparent)] py-1.5 pl-8 pr-6 text-[12px]',
+            'w-full rounded-[8px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_48%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_34%,transparent)] py-1.5 pl-8 pr-6 text-[12px]',
             'text-primary-token placeholder:text-tertiary-token',
             'transition-[background-color,border-color,box-shadow] duration-150',
-            'focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/18'
+            'focus-visible:border-(--linear-border-focus) focus-visible:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_44%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/14'
           )}
           aria-label={placeholder}
         />

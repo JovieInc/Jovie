@@ -1,6 +1,6 @@
-import { APP_ROUTES } from '@/constants/routes';
 import { ClerkTestError, signInUser } from '../helpers/clerk-auth';
 import { expect, test } from './setup';
+import { getAdminSurfaceById } from './utils/admin-surface-manifest';
 import {
   assertNoCriticalErrors,
   SMOKE_TIMEOUTS,
@@ -46,9 +46,12 @@ async function expectAdminPage(
   expect(response?.status()).toBe(200);
   await waitForHydration(page);
   await page.waitForLoadState('domcontentloaded');
-  await expect(page).toHaveURL(url => url.pathname === path, {
-    timeout: SMOKE_TIMEOUTS.NAVIGATION,
-  });
+  await expect(page).toHaveURL(
+    url => `${url.pathname}${url.search}` === path || url.pathname === path,
+    {
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    }
+  );
 }
 
 test.describe('Admin GTM Health @smoke', () => {
@@ -58,7 +61,7 @@ test.describe('Admin GTM Health @smoke', () => {
     const { getContext, cleanup } = setupPageMonitoring(page);
 
     try {
-      await expectAdminPage(page, APP_ROUTES.ADMIN_LEADS);
+      await expectAdminPage(page, getAdminSurfaceById('growth-leads').path);
       await expect(page.getByText('GTM insights')).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
@@ -82,7 +85,10 @@ test.describe('Admin GTM Health @smoke', () => {
     const { getContext, cleanup } = setupPageMonitoring(page);
 
     try {
-      await expectAdminPage(page, APP_ROUTES.ADMIN_OUTREACH_EMAIL);
+      await expectAdminPage(
+        page,
+        getAdminSurfaceById('growth-outreach-email').path
+      );
       await expect(page.getByText('Campaign emails')).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
