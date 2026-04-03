@@ -43,7 +43,7 @@ import {
 } from '@/features/release/AlbumArtworkContextMenu';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { formatReleaseArtistLine } from '@/lib/discography/formatting';
-import type { ProviderKey, ReleaseSidebarTrack } from '@/lib/discography/types';
+import type { ProviderKey } from '@/lib/discography/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -57,14 +57,13 @@ import { useReleaseHeaderParts } from './ReleaseSidebarHeader';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
 import { ReleaseTargetPlaylistsSection } from './ReleaseTargetPlaylistsSection';
 import { ReleaseTrackList } from './ReleaseTrackList';
-import { TrackDetailPanel, type TrackForDetail } from './TrackDetailPanel';
 import type { Release, ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
 import { useTrackAudioPlayer } from './useTrackAudioPlayer';
 
 /** Tab for organizing sidebar content into focused views */
 type SidebarTab =
-  | 'tracklist'
+  | 'playback'
   | 'links'
   | 'details'
   | 'lyrics'
@@ -73,7 +72,7 @@ type SidebarTab =
 
 /** Options for sidebar tab segment control */
 const SIDEBAR_TAB_OPTIONS = [
-  { value: 'tracklist' as const, label: 'Tracks' },
+  { value: 'playback' as const, label: 'Playback' },
   { value: 'links' as const, label: 'DSPs' },
   { value: 'details' as const, label: 'Details' },
   { value: 'lyrics' as const, label: 'Lyrics' },
@@ -322,7 +321,6 @@ export function ReleaseSidebar({
   tracksOverride,
   analyticsOverride,
   onCanvasStatusUpdate,
-  onTrackClick: externalTrackClick,
 }: ReleaseSidebarProps) {
   const {
     isAddingLink,
@@ -360,23 +358,13 @@ export function ReleaseSidebar({
   const canRevertArtwork = readOnly ? false : _canRevertArtwork;
 
   // Sidebar tab state
-  const [activeTab, setActiveTab] = useState<SidebarTab>('details');
+  const [activeTab, setActiveTab] = useState<SidebarTab>('playback');
   const [platformRescanCooldownEnd, setPlatformRescanCooldownEnd] = useState(0);
   const [platformRescanRemainingMs, setPlatformRescanRemainingMs] = useState(0);
   const platformRescanTimerRef = useRef<ReturnType<typeof setInterval> | null>(
     null
   );
   const wasRescanningPlatformsRef = useRef(false);
-
-  // Track detail panel state — track shape comes from the sidebar route handler
-  const [selectedTrack, setSelectedTrack] = useState<TrackForDetail | null>(
-    null
-  );
-
-  // Reset selected track when release changes (preserve active tab for workflow continuity)
-  useEffect(() => {
-    setSelectedTrack(null);
-  }, [release?.id]);
 
   useEffect(() => {
     setPlatformRescanCooldownEnd(0);
@@ -426,21 +414,6 @@ export function ReleaseSidebar({
       }
     };
   }, [platformRescanCooldownEnd]);
-
-  const handleTrackClick = useCallback(
-    (track: ReleaseSidebarTrack) => {
-      if (externalTrackClick) {
-        externalTrackClick(track);
-        return;
-      }
-      setSelectedTrack(track);
-    },
-    [externalTrackClick]
-  );
-
-  const handleBackToRelease = useCallback(() => {
-    setSelectedTrack(null);
-  }, []);
 
   const handleCanvasStatusChange = useCallback(
     (status: CanvasStatus) => {
@@ -492,7 +465,6 @@ export function ReleaseSidebar({
       buildReleaseActions({
         release,
         onEdit: () => {
-          setSelectedTrack(null);
           setActiveTab('links');
         },
         onCopy: (path, label) => handleCopyReleasePath(path, label),
@@ -630,7 +602,7 @@ export function ReleaseSidebar({
       headerMode='minimal'
       hideMinimalHeaderBar
       entityHeader={
-        !(selectedTrack && release) && release ? (
+        release ? (
           <ReleaseEntityHeader
             headerLabel={headerLabel}
             release={release}
@@ -666,14 +638,7 @@ export function ReleaseSidebar({
       isEmpty={!release}
       emptyMessage='Select a release in the table to view its details.'
     >
-      {selectedTrack && release && (
-        <TrackDetailPanel
-          track={selectedTrack}
-          releaseTitle={release.title}
-          onBack={handleBackToRelease}
-        />
-      )}
-      {!(selectedTrack && release) && release && (
+      {release && (
         <div className='flex min-h-full flex-col'>
           <div className='min-h-0 flex-1'>
             <DrawerTabbedCard
@@ -691,13 +656,11 @@ export function ReleaseSidebar({
               }
               contentClassName={cn(activeTab === 'tasks' && 'pt-2')}
             >
-              {activeTab === 'tracklist' && (
+              {activeTab === 'playback' && (
                 <div data-testid='release-tracks-card'>
                   <ReleaseTrackList
                     release={release}
-                    onTrackClick={handleTrackClick}
                     tracksOverride={tracksOverride}
-                    showHeading={false}
                   />
                 </div>
               )}

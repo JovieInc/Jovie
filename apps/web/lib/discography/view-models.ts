@@ -1,4 +1,5 @@
 import { toISOStringOrFallback } from '@/lib/utils/date';
+import { getProviderConfidence } from './audio-qa';
 import { PRIMARY_PROVIDER_KEYS, PROVIDER_CONFIG } from './config';
 import type { ProviderKey, ProviderSource } from './types';
 import { buildSmartLinkPath } from './utils';
@@ -8,6 +9,7 @@ interface ProviderLinkRecord {
   url: string | null;
   sourceType?: string | null;
   updatedAt?: Date | string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 interface ProviderViewModelOptions {
@@ -49,6 +51,7 @@ export function mapProviderLinksToViewModel({
         url,
         source: mapProviderSource(match?.sourceType),
         updatedAt: toISOStringOrFallback(match?.updatedAt),
+        confidence: getProviderConfidence(match),
         path: url ? buildSmartLinkPath(profileHandle, slug, providerKey) : '',
         isPrimary: PRIMARY_PROVIDER_KEYS.includes(providerKey),
       };

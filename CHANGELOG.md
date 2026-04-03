@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.110] - 2026-04-02
+
+> Reworked release and track sidebars around playback-first QA, hardened shared preview playback failure handling, and made public smart-link preview confidence explicit with Spotify and Apple fallback support.
+
+### Added
+
+- Added dedicated playback cards for release and track sidebars with explicit preview/provider QA states
+- Added shared preview QA derivation and persistence metadata for preview verification and provider confidence
+
+### Changed
+
+- Replaced the release sidebar track list flow with a playback tab using inline disclosure rows
+- Moved track sidebars to playback-first and platforms-only tabs
+- Public smart-link pages now separate canonical provider links from search fallback links and surface fallback preview sources
+
+### Fixed
+
+- Shared audio playback now fails closed on missing media, rejected `play()` calls, and media errors
+- Preview fallback enrichment now tries Spotify and Apple preview sources when MusicFetch does not provide a usable preview
+- Tracks without preview-resolution metadata stay in `missing` instead of being mislabeled as `unknown`
+
 ## [26.4.109] - 2026-04-01
 
 > Polished the Jovie chat interface and dashboard shell visual design: flattened the right drawer to match Linear's app-shell elevation, elevated entity cards so they read clearly on the flat surface, cleaned up bevel shadows from the chat input and suggestion pills, and vertically centered the chat welcome state.

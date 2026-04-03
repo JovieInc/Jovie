@@ -1,4 +1,9 @@
 import {
+  derivePreviewState,
+  getProviderConfidence,
+  summarizeProviderConfidence,
+} from '@/lib/discography/audio-qa';
+import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
@@ -29,6 +34,7 @@ function mapProviders(
     sourceType?: string | null;
     updatedAt?: Date | string | null;
     url: string | null;
+    metadata?: Record<string, unknown> | null;
   }>,
   providerLabels: Record<ProviderKey, string>,
   profileHandle: string,
@@ -49,6 +55,7 @@ function mapProviders(
         url,
         source,
         updatedAt: toISOStringOrFallback(match?.updatedAt),
+        confidence: getProviderConfidence(match),
         path: url
           ? buildTrackDeepLinkPath(
               profileHandle,
@@ -69,6 +76,13 @@ function mapLegacyTrackToViewModel(
   profileHandle: string,
   releaseSlug: string
 ): TrackViewModel {
+  const previewState = derivePreviewState({
+    audioUrl: track.audioUrl,
+    previewUrl: track.previewUrl,
+    metadata: track.metadata,
+    providerLinks: track.providerLinks,
+  });
+
   return {
     id: track.id,
     releaseId: track.releaseId,
@@ -88,6 +102,9 @@ function mapLegacyTrackToViewModel(
     previewUrl: track.previewUrl,
     audioUrl: track.audioUrl,
     audioFormat: track.audioFormat,
+    previewSource: previewState.previewSource,
+    previewVerification: previewState.previewVerification,
+    providerConfidenceSummary: summarizeProviderConfidence(track.providerLinks),
     providers: mapProviders(
       track.providerLinks,
       providerLabels,
@@ -104,6 +121,13 @@ function mapReleaseTrackToViewModel(
   profileHandle: string,
   releaseSlug: string
 ): TrackViewModel {
+  const previewState = derivePreviewState({
+    audioUrl: track.audioUrl,
+    previewUrl: track.previewUrl,
+    metadata: track.metadata,
+    providerLinks: track.providerLinks,
+  });
+
   return {
     id: track.recordingId,
     releaseTrackId: track.id,
@@ -125,6 +149,9 @@ function mapReleaseTrackToViewModel(
     previewUrl: track.previewUrl,
     audioUrl: track.audioUrl,
     audioFormat: track.audioFormat,
+    previewSource: previewState.previewSource,
+    previewVerification: previewState.previewVerification,
+    providerConfidenceSummary: summarizeProviderConfidence(track.providerLinks),
     providers: mapProviders(
       track.providerLinks,
       providerLabels,

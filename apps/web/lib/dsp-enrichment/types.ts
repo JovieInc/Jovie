@@ -145,6 +145,9 @@ export interface AppleMusicTrack {
     isrc?: string;
     durationInMillis?: number;
     url: string;
+    previews?: Array<{
+      url: string;
+    }>;
     artwork?: {
       url: string;
       width: number;

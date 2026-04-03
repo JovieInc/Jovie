@@ -182,11 +182,17 @@ export interface ContentData {
   slug: string;
   artworkUrl: string | null;
   releaseDate: Date | null;
-  providerLinks: Array<{ providerId: string; url: string }>;
+  providerLinks: Array<{
+    providerId: string;
+    url: string;
+    sourceType?: string | null;
+    metadata?: Record<string, unknown> | null;
+  }>;
   artworkSizes?: Record<string, string> | null;
   releaseType?: string | null;
   totalTracks?: number | null;
   previewUrl?: string | null;
+  previewMetadata?: Record<string, unknown> | null;
   releaseId?: string | null;
   /** Parent release slug — present for tracks, used for nested deep link URLs */
   releaseSlug?: string | null;
@@ -213,11 +219,17 @@ export interface CachedContentData {
   slug: string;
   artworkUrl: string | null;
   releaseDate: string | null;
-  providerLinks: Array<{ providerId: string; url: string }>;
+  providerLinks: Array<{
+    providerId: string;
+    url: string;
+    sourceType?: string | null;
+    metadata?: Record<string, unknown> | null;
+  }>;
   artworkSizes?: Record<string, string> | null;
   releaseType?: string | null;
   totalTracks?: number | null;
   previewUrl?: string | null;
+  previewMetadata?: Record<string, unknown> | null;
   releaseId?: string | null;
   releaseSlug?: string | null;
   releaseTitle?: string | null;
@@ -308,6 +320,8 @@ const fetchContentBySlug = async (
         .select({
           providerId: providerLinks.providerId,
           url: providerLinks.url,
+          sourceType: providerLinks.sourceType,
+          metadata: providerLinks.metadata,
         })
         .from(providerLinks)
         .where(
@@ -318,7 +332,10 @@ const fetchContentBySlug = async (
         ),
       fetchReleaseCredits(release.id),
       db
-        .select({ previewUrl: discogRecordings.previewUrl })
+        .select({
+          previewUrl: discogRecordings.previewUrl,
+          previewMetadata: discogRecordings.metadata,
+        })
         .from(discogRecordings)
         .innerJoin(
           discogReleaseTracks,
@@ -355,6 +372,7 @@ const fetchContentBySlug = async (
       totalTracks: release.totalTracks,
       releaseId: release.id,
       previewUrl: previewRow?.previewUrl ?? null,
+      previewMetadata: previewRow?.previewMetadata ?? null,
       credits,
     };
   }
@@ -366,6 +384,7 @@ const fetchContentBySlug = async (
       title: discogRecordings.title,
       slug: discogRecordings.slug,
       previewUrl: discogRecordings.previewUrl,
+      previewMetadata: discogRecordings.metadata,
     })
     .from(discogRecordings)
     .where(
@@ -415,6 +434,8 @@ const fetchContentBySlug = async (
             .select({
               providerId: providerLinks.providerId,
               url: providerLinks.url,
+              sourceType: providerLinks.sourceType,
+              metadata: providerLinks.metadata,
             })
             .from(providerLinks)
             .where(
@@ -436,6 +457,7 @@ const fetchContentBySlug = async (
       releaseDate: toISOStringOrNull(releaseData?.releaseDate),
       providerLinks: links,
       previewUrl: recording.previewUrl,
+      previewMetadata: recording.previewMetadata ?? null,
       releaseId: releaseId ?? null,
       releaseSlug: releaseData?.slug ?? null,
       releaseTitle: releaseData?.title ?? null,
@@ -478,6 +500,8 @@ const fetchContentBySlug = async (
         .select({
           providerId: providerLinks.providerId,
           url: providerLinks.url,
+          sourceType: providerLinks.sourceType,
+          metadata: providerLinks.metadata,
         })
         .from(providerLinks)
         .where(
@@ -497,6 +521,7 @@ const fetchContentBySlug = async (
       releaseDate: toISOStringOrNull(releaseData?.releaseDate),
       providerLinks: links,
       previewUrl: track.previewUrl,
+      previewMetadata: null,
       releaseId: track.releaseId,
       releaseSlug: releaseData?.slug ?? null,
       releaseTitle: releaseData?.title ?? null,
@@ -585,6 +610,7 @@ export const getTrackBySlugInRelease = cache(
           .select({
             title: discogRecordings.title,
             previewUrl: discogRecordings.previewUrl,
+            previewMetadata: discogRecordings.metadata,
           })
           .from(discogRecordings)
           .where(eq(discogRecordings.id, releaseTrack.recordingId))
@@ -603,6 +629,8 @@ export const getTrackBySlugInRelease = cache(
           .select({
             providerId: providerLinks.providerId,
             url: providerLinks.url,
+            sourceType: providerLinks.sourceType,
+            metadata: providerLinks.metadata,
           })
           .from(providerLinks)
           .where(
@@ -622,6 +650,7 @@ export const getTrackBySlugInRelease = cache(
         releaseDate: releaseData?.releaseDate ?? null,
         providerLinks: links,
         previewUrl: recording?.previewUrl ?? null,
+        previewMetadata: recording?.previewMetadata ?? null,
         releaseId,
         releaseSlug: releaseData?.slug ?? null,
         releaseTitle: releaseData?.title ?? null,
@@ -661,6 +690,8 @@ export const getTrackBySlugInRelease = cache(
           .select({
             providerId: providerLinks.providerId,
             url: providerLinks.url,
+            sourceType: providerLinks.sourceType,
+            metadata: providerLinks.metadata,
           })
           .from(providerLinks)
           .where(
@@ -680,6 +711,7 @@ export const getTrackBySlugInRelease = cache(
         releaseDate: releaseData?.releaseDate ?? null,
         providerLinks: links,
         previewUrl: legacyTrack.previewUrl,
+        previewMetadata: null,
         releaseId,
         releaseSlug: releaseData?.slug ?? null,
         releaseTitle: releaseData?.title ?? null,
