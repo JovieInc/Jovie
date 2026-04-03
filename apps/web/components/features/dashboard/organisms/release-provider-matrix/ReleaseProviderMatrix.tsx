@@ -319,7 +319,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   }, []);
 
   const { importedCount, totalCount } = useImportPolling({
-    enabled: isImporting,
+    enabled: isImporting && experienceMode !== 'demo',
     initialTotalCount,
     onReleasesUpdate: handleReleasesFromPolling,
     onImportComplete: handleImportComplete,

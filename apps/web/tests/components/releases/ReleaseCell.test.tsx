@@ -130,6 +130,25 @@ describe('ReleaseCell', () => {
     });
   });
 
+  it('opens the release drawer when a primary select handler is provided', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+
+    render(
+      <ReleaseCell
+        release={baseRelease}
+        artistName='Jovie Artist'
+        onSelect={onSelect}
+      />
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Open Skyline Dreams' })
+    );
+
+    expect(onSelect).toHaveBeenCalledWith(baseRelease);
+  });
+
   it('keeps the active preview control visible while playing', () => {
     playbackState = { activeTrackId: 'release-1', isPlaying: true };
 

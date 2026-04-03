@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.4.111",
+  "version": "26.4.112",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -121,7 +121,8 @@
     "qa:routes": "tsx scripts/route-qa.ts",
     "perf:loop": "tsx scripts/performance-optimizer.ts",
     "perf:loop:end-user": "tsx scripts/performance-optimizer.ts --scope end-user",
-    "perf:overnight": "tsx scripts/performance-overnight.ts"
+    "perf:overnight": "tsx scripts/performance-overnight.ts",
+    "qa:releases:loop": "tsx scripts/releases-dashboard-qa-loop.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^3.0.79",

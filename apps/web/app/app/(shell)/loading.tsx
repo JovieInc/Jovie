@@ -8,6 +8,11 @@ import {
   resolveAppShellRequestPath,
 } from './shell-route-matches';
 
+const LOADING_COPY_FONT_STYLE = {
+  fontFamily:
+    'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+} as const;
+
 /**
  * Shell-level loading state shown during cross-section navigation
  * (e.g., dashboard -> settings, chat -> admin).
@@ -18,7 +23,11 @@ import {
  */
 export default async function ShellLoading() {
   const headerStore = await headers();
-  const pathname = resolveAppShellRequestPath(headerStore.get('next-url'));
+  const pathname = resolveAppShellRequestPath(
+    headerStore.get('next-url'),
+    headerStore.get('x-matched-path'),
+    headerStore.get('x-invoke-path')
+  );
 
   if (isChatShellRoute(pathname)) {
     return <ChatLoading />;
@@ -35,9 +44,28 @@ export default async function ShellLoading() {
       aria-live='polite'
     >
       <div className='flex items-center justify-between gap-3'>
-        <LoadingSkeleton height='h-6' width='w-44' rounded='md' />
+        <div>
+          <p
+            className='text-[12px] font-medium text-secondary-token'
+            style={LOADING_COPY_FONT_STYLE}
+          >
+            Workspace
+          </p>
+          <h2
+            className='mt-1 text-[24px] font-[590] leading-[1.05] tracking-[-0.03em] text-primary-token'
+            style={LOADING_COPY_FONT_STYLE}
+          >
+            Loading your workspace
+          </h2>
+        </div>
         <LoadingSkeleton height='h-8' width='w-24' rounded='md' />
       </div>
+      <p
+        className='max-w-[34rem] text-[13px] leading-[20px] text-secondary-token'
+        style={LOADING_COPY_FONT_STYLE}
+      >
+        Preparing your dashboard, smart links, messages, and latest activity.
+      </p>
 
       <div className='space-y-3 rounded-xl border border-subtle/70 bg-surface-0 p-3'>
         <div className='grid grid-cols-[minmax(0,1.5fr)_120px_72px] gap-3 border-b border-subtle/60 pb-2'>

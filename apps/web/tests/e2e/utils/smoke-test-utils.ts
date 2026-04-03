@@ -109,6 +109,9 @@ export const EXPECTED_ERROR_PATTERNS = [
   // React dev warning for script tags rendered inside components.
   // This is framework noise in local E2E and not a dashboard route regression.
   'encountered a script tag while rendering react component',
+
+  // Next.js dev + CSP on bypass-auth local runs can emit this React dev-only eval warning.
+  'eval() is not supported in this environment',
 ] as const;
 
 const EXPECTED_WARNING_PATTERNS = [

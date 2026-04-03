@@ -15,12 +15,14 @@ interface ReleaseCellProps {
   readonly release: ReleaseViewModel;
   readonly artistName?: string | null;
   readonly showType?: boolean;
+  readonly onSelect?: (release: ReleaseViewModel) => void;
 }
 
 export const ReleaseCell = memo(function ReleaseCell({
   release,
   artistName,
   showType = true,
+  onSelect,
 }: ReleaseCellProps) {
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
   const isActiveTrack = playbackState.activeTrackId === release.id;
@@ -60,6 +62,14 @@ export const ReleaseCell = memo(function ReleaseCell({
   const artistLine = formatCompactReleaseArtistLine(
     release.artistNames,
     artistName
+  );
+
+  const handleSelect = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      onSelect?.(release);
+    },
+    [onSelect, release]
   );
 
   return (
@@ -102,36 +112,75 @@ export const ReleaseCell = memo(function ReleaseCell({
       </div>
 
       {/* Title + artist */}
-      <div className='min-w-0 flex-1'>
-        <div className='flex min-w-0 items-center gap-1.5 leading-none'>
-          <TruncatedText
-            lines={1}
-            className='min-w-0 flex-1 text-[13px] font-[510] leading-[1.15] tracking-[-0.012em] text-primary-token'
-            tooltipSide='top'
-            tooltipAlign='start'
-          >
-            {release.title}
-          </TruncatedText>
-          {showType && typeStyle && hasPreview && (
-            <span
-              className={cn(
-                'shrink-0 text-[10px] font-[510] leading-none tracking-normal',
-                typeStyle.text
-              )}
+      {onSelect ? (
+        <button
+          type='button'
+          onClick={handleSelect}
+          className='min-w-0 flex-1 text-left focus-visible:outline-none'
+          aria-label={`Open ${release.title}`}
+          data-testid={`release-open-${release.id}`}
+        >
+          <div className='flex min-w-0 items-center gap-1.5 leading-none'>
+            <TruncatedText
+              lines={1}
+              className='min-w-0 flex-1 text-[13px] font-[510] leading-[1.15] tracking-[-0.012em] text-primary-token'
+              tooltipSide='top'
+              tooltipAlign='start'
             >
-              {typeStyle.label}
-            </span>
-          )}
+              {release.title}
+            </TruncatedText>
+            {showType && typeStyle && hasPreview && (
+              <span
+                className={cn(
+                  'shrink-0 text-[10px] font-[510] leading-none tracking-normal',
+                  typeStyle.text
+                )}
+              >
+                {typeStyle.label}
+              </span>
+            )}
+          </div>
+          {artistLine ? (
+            <TruncatedText
+              lines={1}
+              className='mt-px text-[11px] font-[400] leading-[1.2] tracking-[-0.005em] text-secondary-token'
+            >
+              {artistLine}
+            </TruncatedText>
+          ) : null}
+        </button>
+      ) : (
+        <div className='min-w-0 flex-1'>
+          <div className='flex min-w-0 items-center gap-1.5 leading-none'>
+            <TruncatedText
+              lines={1}
+              className='min-w-0 flex-1 text-[13px] font-[510] leading-[1.15] tracking-[-0.012em] text-primary-token'
+              tooltipSide='top'
+              tooltipAlign='start'
+            >
+              {release.title}
+            </TruncatedText>
+            {showType && typeStyle && hasPreview && (
+              <span
+                className={cn(
+                  'shrink-0 text-[10px] font-[510] leading-none tracking-normal',
+                  typeStyle.text
+                )}
+              >
+                {typeStyle.label}
+              </span>
+            )}
+          </div>
+          {artistLine ? (
+            <TruncatedText
+              lines={1}
+              className='mt-px text-[11px] font-[400] leading-[1.2] tracking-[-0.005em] text-secondary-token'
+            >
+              {artistLine}
+            </TruncatedText>
+          ) : null}
         </div>
-        {artistLine ? (
-          <TruncatedText
-            lines={1}
-            className='mt-px text-[11px] font-[400] leading-[1.2] tracking-[-0.005em] text-secondary-token'
-          >
-            {artistLine}
-          </TruncatedText>
-        ) : null}
-      </div>
+      )}
     </div>
   );
 });
