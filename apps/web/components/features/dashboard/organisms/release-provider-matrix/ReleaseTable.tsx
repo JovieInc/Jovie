@@ -204,9 +204,10 @@ export function ReleaseTable({
             artistName,
             isExpanded,
             isLoadingTracks,
-            toggleExpansion
+            toggleExpansion,
+            onEdit
           )
-        : createReleaseCellRenderer(artistName),
+        : createReleaseCellRenderer(artistName, onEdit),
       minSize: 200,
       size: 9999, // Large value to make it flex and fill available space
       enableSorting: false,
@@ -229,6 +230,7 @@ export function ReleaseTable({
     return [releaseColumn, rightMetaColumn];
   }, [
     artistName,
+    onEdit,
     showTracks,
     isExpanded,
     isLoadingTracks,

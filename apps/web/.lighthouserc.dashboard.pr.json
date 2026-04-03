@@ -1,8 +1,11 @@
 {
   "ci": {
     "collect": {
-      "numberOfRuns": 1,
-      "puppeteerScript": "scripts/lighthouse-dashboard-auth.cjs"
+      "numberOfRuns": 3,
+      "puppeteerScript": "scripts/lighthouse-dashboard-auth.cjs",
+      "settings": {
+        "disableStorageReset": true
+      }
     },
     "assert": {
       "assertMatrix": [

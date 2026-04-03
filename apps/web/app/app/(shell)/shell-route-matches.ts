@@ -1,17 +1,28 @@
 import { APP_ROUTES } from '@/constants/routes';
 
-export function resolveAppShellRequestPath(
-  nextUrlHeader: string | null
-): string | null {
-  if (!nextUrlHeader) {
+function parseAppShellPath(headerValue: string | null): string | null {
+  if (!headerValue) {
     return null;
   }
 
   try {
-    return new URL(nextUrlHeader, 'https://jovie.local').pathname;
+    return new URL(headerValue, 'https://jovie.local').pathname;
   } catch {
     return null;
   }
+}
+
+export function resolveAppShellRequestPath(
+  ...headerValues: readonly (string | null)[]
+): string | null {
+  for (const headerValue of headerValues) {
+    const pathname = parseAppShellPath(headerValue);
+    if (pathname) {
+      return pathname;
+    }
+  }
+
+  return null;
 }
 
 export function isChatShellRoute(pathname: string | null): boolean {

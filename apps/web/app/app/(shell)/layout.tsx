@@ -32,7 +32,11 @@ export default async function AppShellLayout({
     const auth = await getCachedAuth();
     const headerStore = await headerStorePromise;
     const nextUrlHeader = headerStore.get('next-url');
-    const pathname = resolveAppShellRequestPath(nextUrlHeader);
+    const pathname = resolveAppShellRequestPath(
+      nextUrlHeader,
+      headerStore.get('x-matched-path'),
+      headerStore.get('x-invoke-path')
+    );
 
     if (!auth.userId) {
       redirect(buildAppShellSignInUrl(nextUrlHeader));

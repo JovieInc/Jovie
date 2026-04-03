@@ -14,6 +14,8 @@ vi.mock('@/hooks/useSwipeToReveal', () => ({
   useSwipeToReveal: () => ({
     isOpen: false,
     close: vi.fn(),
+    isDragging: false,
+    offsetX: 0,
     handlers: {},
     style: {},
   }),
@@ -79,6 +81,7 @@ describe('SwipeToReveal', () => {
     );
     const actionsContainer = screen.getByText('Remove').parentElement;
     expect(actionsContainer).toHaveAttribute('aria-hidden', 'true');
+    expect(actionsContainer?.className).toContain('invisible');
   });
 });
 
