@@ -108,7 +108,7 @@ export function SettingsTipsSection() {
           isError ? (
             <ErrorState
               onRetry={() => {
-                void refetch();
+                refetch();
               }}
             />
           ) : (

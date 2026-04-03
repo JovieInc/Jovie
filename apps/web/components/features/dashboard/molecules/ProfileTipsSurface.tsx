@@ -229,7 +229,7 @@ export function ProfileTipsSurface({
               size='sm'
               variant='primary'
               onClick={() => {
-                void handlePrimaryAction();
+                handlePrimaryAction();
               }}
             >
               {getProfileMonetizationPrimaryActionLabel(
@@ -254,7 +254,7 @@ export function ProfileTipsSurface({
                 <DropdownMenuContent align='start' sideOffset={6}>
                   <DropdownMenuItem
                     onClick={() => {
-                      void handleDownloadPng();
+                      handleDownloadPng();
                     }}
                     disabled={isDownloadingPng}
                   >
@@ -262,7 +262,7 @@ export function ProfileTipsSurface({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => {
-                      void handleDownloadSvg();
+                      handleDownloadSvg();
                     }}
                     disabled={isDownloadingSvg}
                   >
