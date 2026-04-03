@@ -1,12 +1,8 @@
 import { Skeleton } from '@jovie/ui';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
+import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import {
-  PageContent,
-  PageHeader,
-  PageShell,
-} from '@/components/organisms/PageShell';
 import { getScreenshots } from '@/lib/admin/screenshots';
 
 const SKELETON_KEYS = Array.from({ length: 8 }, (_, i) => `ss-skel-${i}`);
@@ -44,14 +40,12 @@ export default async function AdminScreenshotsPage() {
   const screenshots = await getScreenshots();
 
   return (
-    <PageShell>
-      <PageHeader
-        title='Screenshots'
-        description={`${screenshots.length} canonical product surfaces from the latest screenshot catalog`}
-      />
-      <PageContent>
-        <ScreenshotGallery screenshots={screenshots} />
-      </PageContent>
-    </PageShell>
+    <AdminToolPage
+      title='Screenshots'
+      description={`${screenshots.length} canonical product surfaces from the latest screenshot catalog.`}
+      testId='admin-screenshots-page'
+    >
+      <ScreenshotGallery screenshots={screenshots} />
+    </AdminToolPage>
   );
 }

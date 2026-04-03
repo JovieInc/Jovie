@@ -29,6 +29,7 @@ interface ArtistHeroProps {
   readonly spotlightValue?: string | null;
   readonly primaryActionKind?: 'tickets' | 'listen' | 'subscribe';
   readonly socialLinks?: LegacySocialLink[];
+  readonly compact?: boolean;
 }
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -61,13 +62,23 @@ export function ArtistHero({
   spotlightValue,
   primaryActionKind = 'listen',
   socialLinks = [],
+  compact = false,
 }: ArtistHeroProps) {
   const eyebrow = getReleaseEyebrow(latestRelease);
+  const heroPearlClassName =
+    'border border-white/12 bg-white/8 shadow-[0_12px_30px_rgba(0,0,0,0.18)] backdrop-blur-2xl';
   const primaryActionClassName =
-    'inline-flex min-h-12 items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-[590] text-black shadow-[0_18px_45px_rgba(0,0,0,0.34)] transition-[transform,opacity] duration-200 hover:opacity-92 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+    'inline-flex min-h-12 items-center justify-center rounded-full bg-[var(--profile-pearl-primary-bg)] px-5 py-3 text-[15px] font-[590] tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-[0_18px_40px_rgba(0,0,0,0.3)] transition-[transform,opacity] duration-200 hover:opacity-94 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
 
   return (
-    <section className='relative h-[48dvh] min-h-[420px] max-h-[620px] w-full overflow-hidden md:h-[56dvh] md:min-h-[520px] md:rounded-t-[30px]'>
+    <section
+      className={`relative w-full overflow-hidden md:h-[56dvh] md:min-h-[520px] md:rounded-t-[30px] ${
+        compact
+          ? 'h-[40dvh] min-h-[320px] max-h-[460px]'
+          : 'h-[48dvh] min-h-[420px] max-h-[620px]'
+      }`}
+      data-testid='profile-header'
+    >
       <div className='absolute inset-0'>
         <ImageWithFallback
           src={heroImageUrl ?? artist.image_url}
@@ -81,18 +92,18 @@ export function ArtistHero({
         />
       </div>
 
-      <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.22),transparent_30%),linear-gradient(180deg,rgba(4,6,10,0.06)_0%,rgba(5,7,12,0.18)_30%,rgba(7,8,10,0.82)_76%,rgba(7,8,10,0.98)_100%)]' />
-      <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,transparent_48%,rgba(6,7,10,0.6)_68%,rgba(5,6,8,0.96)_100%)]' />
+      <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_16%,rgba(255,255,255,0.18),transparent_28%),linear-gradient(180deg,rgba(4,6,10,0.02)_0%,rgba(6,8,12,0.14)_28%,rgba(7,8,10,0.76)_74%,rgba(7,8,10,0.96)_100%)]' />
+      <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,transparent_46%,rgba(6,7,10,0.5)_70%,rgba(5,6,8,0.9)_100%)]' />
 
       <div className='relative flex h-full flex-col justify-between px-5 pb-6 pt-[max(env(safe-area-inset-top),1rem)] md:px-7 md:pb-8 md:pt-6'>
         <div className='flex justify-between gap-3'>
           <div className='flex items-start gap-2'>
             {spotlightLabel && spotlightValue ? (
-              <div className='rounded-full border border-white/12 bg-black/20 px-3 py-1.5 backdrop-blur-md'>
-                <p className='text-[0.65rem] font-[590] uppercase tracking-[0.18em] text-white/52'>
+              <div className={`${heroPearlClassName} rounded-full px-3.5 py-2`}>
+                <p className='text-[0.72rem] font-[560] tracking-[0.01em] text-white/52'>
                   {spotlightLabel}
                 </p>
-                <p className='mt-0.5 text-xs font-[590] text-white/90 md:text-sm'>
+                <p className='mt-0.5 text-[13px] font-[590] tracking-[-0.015em] text-white/90 md:text-sm'>
                   {spotlightValue}
                 </p>
               </div>
@@ -111,39 +122,48 @@ export function ArtistHero({
             <button
               type='button'
               onClick={onBellClick}
-              className='inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-white/12 bg-black/20 px-4 text-sm font-[590] text-white/88 backdrop-blur-md transition-[background-color,border-color,color] hover:border-white/20 hover:bg-black/28 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+              className={`${heroPearlClassName} inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-4 text-[15px] font-[590] tracking-[-0.015em] text-white/88 transition-[background-color,border-color,color,opacity] hover:bg-white/12 hover:text-white hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]`}
               aria-label={`Get notified about ${artist.name}`}
             >
-              <Bell className='h-4 w-4' aria-hidden='true' />
+              <Bell className='h-[17px] w-[17px]' aria-hidden='true' />
               <span className='sr-only md:not-sr-only md:inline'>Notify</span>
             </button>
           </div>
         </div>
 
         <div className='mt-auto max-w-[32rem] space-y-4 md:space-y-5'>
-          <div className='space-y-2'>
-            {eyebrow ? (
-              <p className='text-[0.72rem] font-[590] uppercase tracking-[0.18em] text-white/58'>
-                {eyebrow}
-              </p>
-            ) : null}
+          <div className='flex items-start justify-between gap-4'>
+            <div className='min-w-0 space-y-2 text-left'>
+              {eyebrow ? (
+                <p className='text-[12px] font-[560] tracking-[0.01em] text-white/58'>
+                  {eyebrow}
+                </p>
+              ) : null}
 
-            <h1 className='line-clamp-3 max-w-[20rem] text-[2.4rem] font-[680] tracking-[-0.05em] text-white md:max-w-[30rem] md:text-[3.8rem] md:leading-[0.94]'>
-              {artist.name}
-            </h1>
-          </div>
+              <h1
+                className={`line-clamp-3 max-w-[21rem] font-[640] tracking-[-0.065em] text-white md:max-w-[30rem] md:text-[3.5rem] md:leading-[0.94] ${
+                  compact ? 'text-[2.25rem]' : 'text-[2.65rem]'
+                }`}
+              >
+                {artist.name}
+              </h1>
+            </div>
 
-          <div className='flex flex-wrap items-center gap-3'>
             <button
               type='button'
               onClick={onPlayClick}
-              className='inline-flex min-h-12 items-center justify-center rounded-full border border-white/12 bg-white/8 px-5 py-3 text-sm font-[590] text-white/90 backdrop-blur-md transition-[background-color,border-color,color] hover:border-white/20 hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+              className={`${heroPearlClassName} inline-flex min-h-11 shrink-0 items-center justify-center rounded-full px-4 py-2.5 text-[15px] font-[590] tracking-[-0.015em] text-white/92 transition-[background-color,border-color,color,opacity] hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]`}
               aria-label={`Listen to ${artist.name}`}
             >
-              <Play className='mr-2 h-4 w-4 fill-current' aria-hidden='true' />
+              <Play
+                className='mr-2 h-[17px] w-[17px] fill-current'
+                aria-hidden='true'
+              />
               Play
             </button>
+          </div>
 
+          <div className='flex flex-wrap items-center gap-3'>
             {primaryAction ? (
               primaryAction.href ? (
                 <a
@@ -159,7 +179,10 @@ export function ArtistHero({
                   className={primaryActionClassName}
                 >
                   {primaryActionKind === 'tickets' ? (
-                    <Ticket className='mr-2 h-4 w-4' aria-hidden='true' />
+                    <Ticket
+                      className='mr-2 h-[17px] w-[17px]'
+                      aria-hidden='true'
+                    />
                   ) : null}
                   {primaryAction.label}
                 </a>
@@ -171,7 +194,10 @@ export function ArtistHero({
                   className={primaryActionClassName}
                 >
                   {primaryActionKind === 'tickets' ? (
-                    <Ticket className='mr-2 h-4 w-4' aria-hidden='true' />
+                    <Ticket
+                      className='mr-2 h-[17px] w-[17px]'
+                      aria-hidden='true'
+                    />
                   ) : null}
                   {primaryAction.label}
                 </button>

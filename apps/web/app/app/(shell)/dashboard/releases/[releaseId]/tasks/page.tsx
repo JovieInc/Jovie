@@ -49,6 +49,7 @@ async function TasksContent({ releaseId }: Readonly<{ releaseId: string }>) {
 
   return (
     <ReleaseTaskPage
+      profileId={profileId}
       releaseId={releaseId}
       releaseTitle={release.title ?? 'Release'}
       releaseDate={release.releaseDate}

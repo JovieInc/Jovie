@@ -36,7 +36,6 @@ import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
@@ -80,10 +79,7 @@ const SIDEBAR_TAB_OPTIONS = [
   { value: 'settings' as const, label: 'Settings' },
 ];
 
-const RELEASE_SIDEBAR_CARD_CLASSNAME = cn(
-  LINEAR_SURFACE.sidebarCard,
-  'overflow-hidden'
-);
+const RELEASE_SIDEBAR_CARD_CLASSNAME = 'overflow-hidden';
 const PLATFORM_RESCAN_COOLDOWN_MS = 5 * 60 * 1000;
 
 function formatCooldown(remainingMs: number): string {
@@ -154,6 +150,7 @@ function ReleaseEntityHeader({
 
   return (
     <DrawerSurfaceCard
+      variant='quiet'
       className={RELEASE_SIDEBAR_CARD_CLASSNAME}
       testId='release-header-card'
     >
@@ -266,7 +263,8 @@ function ReleaseSettingsCard({
 }) {
   return (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
+      variant='quiet'
+      className='overflow-hidden'
       testId='release-settings-card'
     >
       <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
@@ -594,13 +592,14 @@ export function ReleaseSidebar({
   return (
     <EntitySidebarShell
       isOpen={isOpen}
-      width={width}
+      width={width ?? 344}
       ariaLabel='Release details'
       onKeyDown={handleKeyDown}
       contextMenuItems={contextMenuItems}
       data-testid='release-sidebar'
       headerMode='minimal'
       hideMinimalHeaderBar
+      surfaceTone='quiet'
       entityHeader={
         release ? (
           <ReleaseEntityHeader
@@ -643,6 +642,7 @@ export function ReleaseSidebar({
           <div className='min-h-0 flex-1'>
             <DrawerTabbedCard
               testId='release-tabbed-card'
+              surfaceVariant='quiet'
               tabs={
                 <DrawerTabs
                   value={activeTab}

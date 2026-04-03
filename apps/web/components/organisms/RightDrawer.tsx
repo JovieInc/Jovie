@@ -64,6 +64,11 @@ export function RightDrawer({
     if (!isOpen || !onKeyDown) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onKeyDown(event);
+        return;
+      }
+
       // Only handle events when the drawer or its children have focus
       if (
         asideRef.current &&

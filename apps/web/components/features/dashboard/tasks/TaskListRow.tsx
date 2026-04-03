@@ -103,18 +103,18 @@ export function TaskListRow({
   return (
     <div
       className={cn(
-        'grid h-full min-w-0 grid-cols-[0.875rem_minmax(0,1fr)_4.75rem] items-center gap-2.5 rounded-[12px] border border-transparent px-2.5 py-2 transition-[background-color,border-color,box-shadow,opacity]',
-        'group-hover/task-row:bg-[color-mix(in_oklab,var(--linear-row-hover)_72%,transparent)]',
-        'group-focus-visible/task-row:border-[color-mix(in_oklab,var(--linear-border-focus)_58%,transparent)] group-focus-visible/task-row:bg-[color-mix(in_oklab,var(--linear-row-hover)_66%,var(--linear-app-content-surface))] group-focus-visible/task-row:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
+        'flex h-full min-w-0 items-center gap-3 px-0 py-2.5 transition-[background-color,opacity]',
+        'group-hover/task-row:bg-[color-mix(in_oklab,var(--linear-row-hover)_52%,transparent)]',
+        'group-focus-visible/task-row:bg-[color-mix(in_oklab,var(--linear-row-hover)_62%,transparent)]',
         isSelected &&
-          'border-[color-mix(in_oklab,var(--linear-app-frame-seam)_82%,transparent)] bg-[color-mix(in_oklab,var(--linear-row-hover)_66%,var(--linear-app-content-surface))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--color-accent-blue)_12%,transparent),inset_0_1px_0_rgba(255,255,255,0.03)]',
-        isDone && !isSelected && 'opacity-75',
+          'bg-[color-mix(in_oklab,var(--linear-row-hover)_68%,transparent)]',
+        isDone && !isSelected && 'opacity-80',
         isCancelled && !isSelected && 'opacity-60'
       )}
     >
       <TaskStageGlyph task={task} />
 
-      <div className='min-w-0'>
+      <div className='min-w-0 flex-1'>
         <p
           className={cn(
             'truncate text-[12.75px] font-[590] leading-[17px] text-primary-token',
@@ -125,8 +125,8 @@ export function TaskListRow({
           {task.title}
         </p>
 
-        <div className='mt-1 grid min-w-0 grid-cols-[3.75rem_1.85rem_3.2rem_3.25rem_minmax(0,1fr)] items-center gap-1.25 overflow-hidden whitespace-nowrap text-[10.5px] leading-none text-secondary-token'>
-          <span className='truncate text-tertiary-token'>{stage.label}</span>
+        <div className='mt-1.25 grid min-w-0 grid-cols-[4.15rem_2.1rem_3.45rem_3.4rem_minmax(0,1fr)] items-center gap-1.25 overflow-hidden whitespace-nowrap text-[10.5px] leading-none text-secondary-token'>
+          <span className='truncate text-secondary-token'>{stage.label}</span>
           <span className='truncate font-[560] text-tertiary-token'>
             J-{task.taskNumber}
           </span>
@@ -143,7 +143,7 @@ export function TaskListRow({
                 event.stopPropagation();
                 onOpenRelease(task);
               }}
-              className='inline-flex min-w-0 items-center gap-1 text-secondary-token transition-colors hover:text-primary-token'
+              className='inline-flex min-w-0 items-center gap-1 text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:text-primary-token'
               title={task.releaseTitle}
             >
               <Disc3 className='h-3 w-3 shrink-0 text-tertiary-token' />
@@ -157,8 +157,8 @@ export function TaskListRow({
         </div>
       </div>
 
-      <div className='flex w-full min-w-[4.75rem] shrink-0 items-center justify-end gap-1'>
-        <div className='min-w-0 flex-1 truncate text-right'>
+      <div className='ml-3 flex shrink-0 items-center justify-end gap-1.5'>
+        <div className='min-w-0 truncate text-right'>
           {task.dueAt ? (
             <ReleaseDueBadge
               dueDate={task.dueAt}

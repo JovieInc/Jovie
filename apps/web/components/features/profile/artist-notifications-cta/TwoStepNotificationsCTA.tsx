@@ -22,8 +22,14 @@ import type { Artist } from '@/types/db';
 import {
   noFontSynthesisStyle,
   SubscriptionFormSkeleton,
+  SubscriptionPearlComposer,
   SubscriptionPendingConfirmation,
   SubscriptionSuccess,
+  subscriptionComposerFocusClassName,
+  subscriptionDisclaimerClassName,
+  subscriptionHeadingClassName,
+  subscriptionInputClassName,
+  subscriptionPrimaryActionClassName,
 } from './shared';
 import { useSubscriptionForm } from './useSubscriptionForm';
 import { formatPhoneDigitsForDisplay, getMaxNationalDigits } from './utils';
@@ -36,8 +42,8 @@ function getExitVariant(instant: boolean) {
   if (instant) return { opacity: 0 };
   return {
     opacity: 0,
-    y: -8,
-    transition: { duration: 0.2, ease: EASE_FADE },
+    y: -4,
+    transition: { duration: 0.16, ease: EASE_FADE },
   };
 }
 
@@ -50,13 +56,8 @@ function getEnterVariant(instant: boolean) {
           opacity: 1,
           y: 0,
           transition: {
-            opacity: { duration: 0.25, ease: EASE_FADE, delay: 0.05 },
-            y: {
-              type: 'spring' as const,
-              stiffness: 500,
-              damping: 30,
-              delay: 0.05,
-            },
+            opacity: { duration: 0.18, ease: EASE_FADE, delay: 0.03 },
+            y: { duration: 0.18, ease: EASE_FADE, delay: 0.03 },
           },
         },
   };
@@ -64,6 +65,7 @@ function getEnterVariant(instant: boolean) {
 
 interface TwoStepNotificationsCTAProps {
   readonly artist: Artist;
+  readonly startExpanded?: boolean;
 }
 
 function useImpressionTracking(handle: string) {
@@ -142,6 +144,7 @@ interface ChannelInputRowProps {
   readonly inputValue: string;
   readonly handlePhoneChange: (v: string) => void;
   readonly handleEmailChange: (v: string) => void;
+  readonly isInputFocused: boolean;
   readonly setIsInputFocused: (f: boolean) => void;
   readonly handleFieldBlur: () => void;
   readonly handleKeyDown: React.KeyboardEventHandler<HTMLInputElement>;
@@ -166,6 +169,7 @@ function ChannelInputRow({
   inputValue,
   handlePhoneChange,
   handleEmailChange,
+  isInputFocused,
   setIsInputFocused,
   handleFieldBlur,
   handleKeyDown,
@@ -187,9 +191,10 @@ function ChannelInputRow({
   };
 
   return (
-    <div className='overflow-hidden rounded-[2rem] bg-surface-0/95 shadow-sm ring-1 ring-(--color-border-subtle) backdrop-blur-md transition-[box-shadow,ring] focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))]'>
-      <div className='flex items-center'>
-        {shouldShowCountrySelector ? (
+    <SubscriptionPearlComposer
+      dataTestId='subscription-pearl-composer'
+      leftSlot={
+        shouldShowCountrySelector ? (
           <CountrySelector
             country={country}
             isOpen={isCountryOpen}
@@ -199,7 +204,7 @@ function ChannelInputRow({
         ) : (
           <button
             type='button'
-            className='flex h-14 items-center bg-transparent pl-5 pr-3.5 text-tertiary-token transition-colors hover:bg-surface-2 focus-visible:outline-none'
+            className='flex h-12 items-center justify-center rounded-full px-3 text-primary-token/68 transition-colors hover:text-primary-token focus-visible:outline-none'
             aria-label={getChannelToggleLabel(channel)}
             onClick={() =>
               handleChannelChange(channel === 'sms' ? 'email' : 'sms')
@@ -212,46 +217,49 @@ function ChannelInputRow({
               <Mail className='w-4 h-4' aria-hidden='true' />
             )}
           </button>
-        )}
-
-        <div className='flex-1 min-w-0'>
-          <label htmlFor={inputId} className='sr-only'>
-            {channel === 'sms' ? 'Phone number' : 'Email address'}
-          </label>
-          <input
-            ref={inputRef}
-            id={inputId}
-            aria-describedby={disclaimerId}
-            type={inputConfig.type}
-            inputMode={inputConfig.inputMode}
-            className='h-14 w-full bg-transparent px-4 text-[17px] font-medium text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 focus-visible:outline-none focus-visible:ring-0'
-            placeholder={inputConfig.placeholder}
-            value={inputValue}
-            onChange={handleInputChange}
-            onFocus={() => setIsInputFocused(true)}
-            onBlur={() => {
-              setIsInputFocused(false);
-              handleFieldBlur();
-            }}
-            onKeyDown={handleKeyDown}
-            disabled={isSubmitting}
-            autoComplete={inputConfig.autoComplete}
-            maxLength={inputConfig.maxLength}
-            style={noFontSynthesisStyle}
-          />
-        </div>
-
+        )
+      }
+      action={
         <button
           type='button'
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className='mr-2 inline-flex h-11 shrink-0 items-center justify-center rounded-[1rem] bg-btn-primary px-5 text-[15px] font-semibold text-btn-primary-foreground transition-opacity duration-150 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed'
+          className={subscriptionPrimaryActionClassName}
           style={noFontSynthesisStyle}
         >
           {getSubmitLabel(isSubmitting, otpStep)}
         </button>
+      }
+      className={isInputFocused ? subscriptionComposerFocusClassName : ''}
+    >
+      <div className='min-w-0'>
+        <label htmlFor={inputId} className='sr-only'>
+          {channel === 'sms' ? 'Phone number' : 'Email address'}
+        </label>
+        <input
+          ref={inputRef}
+          id={inputId}
+          data-testid='subscription-input'
+          aria-describedby={disclaimerId}
+          type={inputConfig.type}
+          inputMode={inputConfig.inputMode}
+          className={subscriptionInputClassName}
+          placeholder={inputConfig.placeholder}
+          value={inputValue}
+          onChange={handleInputChange}
+          onFocus={() => setIsInputFocused(true)}
+          onBlur={() => {
+            setIsInputFocused(false);
+            handleFieldBlur();
+          }}
+          onKeyDown={handleKeyDown}
+          disabled={isSubmitting}
+          autoComplete={inputConfig.autoComplete}
+          maxLength={inputConfig.maxLength}
+          style={noFontSynthesisStyle}
+        />
       </div>
-    </div>
+    </SubscriptionPearlComposer>
   );
 }
 
@@ -259,9 +267,9 @@ function ErrorTooltip({ error }: { readonly error: string }) {
   return (
     <TooltipProvider delayDuration={0}>
       <Tooltip defaultOpen>
-        <TooltipTrigger>
+        <TooltipTrigger asChild>
           <span
-            className='inline-flex items-center gap-1.5 text-sm text-red-500 dark:text-red-400'
+            className='absolute right-0 top-1/2 inline-flex -translate-y-1/2 items-center gap-1.5 text-sm text-red-500 dark:text-red-400'
             role='alert'
             aria-live='assertive'
           >
@@ -282,6 +290,7 @@ function ErrorTooltip({ error }: { readonly error: string }) {
 
 export function TwoStepNotificationsCTA({
   artist,
+  startExpanded = false,
 }: TwoStepNotificationsCTAProps) {
   const {
     country,
@@ -308,7 +317,7 @@ export function TwoStepNotificationsCTA({
     hydrationStatus,
   } = useSubscriptionForm({ artist });
 
-  const [step, setStep] = useState<Step>('button');
+  const [step, setStep] = useState<Step>(startExpanded ? 'input' : 'button');
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
   const disclaimerId = useId();
@@ -326,6 +335,13 @@ export function TwoStepNotificationsCTA({
       source: 'profile_inline',
     });
   }, [artist.handle, openSubscription]);
+
+  useEffect(() => {
+    if (startExpanded) {
+      openSubscription();
+      setStep('input');
+    }
+  }, [openSubscription, startExpanded]);
 
   useEffect(() => {
     if (notificationsState === 'editing') {
@@ -420,11 +436,11 @@ export function TwoStepNotificationsCTA({
       : emailInput;
 
   return (
-    <div className='space-y-5 sm:space-y-6'>
-      <p
-        className='text-center text-[1.75rem] font-[640] tracking-[-0.04em] text-primary-token sm:text-[2rem]'
-        style={noFontSynthesisStyle}
-      >
+    <div
+      className='space-y-4 sm:space-y-5'
+      data-testid='subscribe-cta-container'
+    >
+      <p className={subscriptionHeadingClassName} style={noFontSynthesisStyle}>
         Never miss a release.
       </p>
 
@@ -434,7 +450,7 @@ export function TwoStepNotificationsCTA({
             <button
               type='button'
               onClick={handleReveal}
-              className='w-full inline-flex items-center justify-center rounded-xl bg-btn-primary px-8 py-4 text-base font-semibold text-btn-primary-foreground shadow-sm transition-[transform,opacity] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
+              className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center px-6`}
               style={noFontSynthesisStyle}
             >
               Turn on notifications
@@ -463,6 +479,7 @@ export function TwoStepNotificationsCTA({
                 inputValue={inputValue}
                 handlePhoneChange={handlePhoneChange}
                 handleEmailChange={handleEmailChange}
+                isInputFocused={isInputFocused}
                 setIsInputFocused={setIsInputFocused}
                 handleFieldBlur={handleFieldBlur}
                 handleKeyDown={handleKeyDown}
@@ -471,12 +488,12 @@ export function TwoStepNotificationsCTA({
                 handleSubscribe={handleSubscribe}
               />
 
-              <div className='flex min-h-5 items-center justify-center gap-2'>
+              <div className='relative min-h-5'>
                 <p
                   id={disclaimerId}
-                  className={`text-center text-[12px] leading-5 font-normal tracking-[-0.01em] text-muted-foreground/80 transition-opacity duration-200 ${
+                  className={`${subscriptionDisclaimerClassName} transition-opacity duration-200 ${
                     isInputFocused && !error ? 'opacity-100' : 'opacity-0'
-                  }`}
+                  } text-center`}
                   style={noFontSynthesisStyle}
                   aria-hidden={!isInputFocused || Boolean(error)}
                 >

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { SearchParams } from 'nuqs/server';
 import { InviteCampaignManager } from '@/components/features/admin/campaigns/InviteCampaignManager';
+import { AdminWorkspacePage } from '@/components/features/admin/layout/AdminWorkspacePage';
 import { LeadPipelineKpis } from '@/components/features/admin/leads/LeadPipelineKpis';
 import { LeadPipelineWorkspace } from '@/components/features/admin/leads/LeadPipelineWorkspace';
 import { DmQueuePanel } from '@/components/features/admin/outreach/DmQueuePanel';
@@ -9,8 +10,6 @@ import { OutreachOverviewPanel } from '@/components/features/admin/outreach/Outr
 import { ReviewQueuePanel } from '@/components/features/admin/outreach/ReviewQueuePanel';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
-import { WorkspaceTabsSurface } from '@/components/organisms/WorkspaceTabsSurface';
 import {
   type AdminGrowthView,
   type AdminOutreachQueue,
@@ -109,28 +108,26 @@ export default async function AdminGrowthPage({
   const view = resolveGrowthView(params.view);
   const queue = resolveOutreachQueue(params.queue);
   const content = await renderGrowthView(view, queue, params);
+  const viewTestId =
+    view === 'outreach'
+      ? `admin-growth-view-outreach-${queue}`
+      : `admin-growth-view-${view}`;
 
   return (
-    <PageShell>
-      <PageContent noPadding>
-        <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
-          <WorkspaceTabsSurface
-            title='Growth operations'
-            description='Lead discovery, outreach, campaigns, and ingest.'
-            primaryParam='view'
-            primaryValue={view}
-            primaryOptions={growthTabs}
-            secondaryParam={view === 'outreach' ? 'queue' : undefined}
-            secondaryValue={view === 'outreach' ? queue : undefined}
-            secondaryOptions={
-              view === 'outreach' ? outreachQueueTabs : undefined
-            }
-            clearOnPrimaryChange={['queue']}
-          >
-            {content}
-          </WorkspaceTabsSurface>
-        </div>
-      </PageContent>
-    </PageShell>
+    <AdminWorkspacePage
+      title='Growth'
+      description='Lead discovery, outreach, campaigns, and ingest.'
+      primaryParam='view'
+      primaryValue={view}
+      primaryOptions={growthTabs}
+      secondaryParam={view === 'outreach' ? 'queue' : undefined}
+      secondaryValue={view === 'outreach' ? queue : undefined}
+      secondaryOptions={view === 'outreach' ? outreachQueueTabs : undefined}
+      clearOnPrimaryChange={['queue']}
+      testId='admin-growth-page'
+      viewTestId={viewTestId}
+    >
+      {content}
+    </AdminWorkspacePage>
   );
 }

@@ -19,7 +19,9 @@ import { DashboardEarningsDemo } from '@/features/home/demo/DashboardEarningsDem
 import { DashboardLinksDemo } from '@/features/home/demo/DashboardLinksDemo';
 import { DemoAuthShell } from './DemoAuthShell';
 import { DemoClientProviders } from './DemoClientProviders';
+import { DemoReleaseLandingSurface } from './DemoReleaseLandingSurface';
 import { DemoReleasesExperience } from './DemoReleasesExperience';
+import { DemoReleaseTasksSurface } from './DemoReleaseTasksSurface';
 import { DemoSettingsPanel } from './DemoSettingsPanel';
 import {
   DEMO_RELEASE_SIDEBAR_FIXTURES,
@@ -223,6 +225,10 @@ export function DemoShowcaseSurface({
           <DemoSettingsPanel />
         </DemoShowcasePanel>
       );
+    case 'release-landing':
+      return <DemoReleaseLandingSurface />;
+    case 'release-tasks':
+      return <DemoReleaseTasksSurface />;
     case 'onboarding-handle':
       return (
         <DemoOnboardingShowcase

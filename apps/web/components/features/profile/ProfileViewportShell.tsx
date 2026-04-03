@@ -18,14 +18,14 @@ export function ProfileViewportShell({
   return (
     <div className='relative min-h-[100dvh] overflow-hidden bg-[color:var(--profile-stage-bg)] text-primary-token'>
       <div className='absolute inset-0' aria-hidden='true'>
-        <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.09),transparent_28%),radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.08),transparent_32%),linear-gradient(180deg,rgba(6,8,13,0.42)_0%,rgba(7,8,10,0.86)_42%,rgba(8,9,10,0.98)_100%)]' />
+        <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_26%),radial-gradient(circle_at_20%_16%,rgba(255,255,255,0.05),transparent_28%),linear-gradient(180deg,rgba(6,8,13,0.34)_0%,rgba(7,8,10,0.82)_42%,rgba(8,9,10,0.98)_100%)]' />
         <div className='absolute inset-[-10%]'>
           <ImageWithFallback
             src={ambientImageUrl}
             alt={`${artistName} background`}
             fill
             sizes='100vw'
-            className='scale-[1.06] object-cover opacity-30 blur-[72px] saturate-[0.9]'
+            className='scale-[1.05] object-cover opacity-28 blur-[84px] saturate-[0.88]'
             fallbackVariant='avatar'
             fallbackClassName='bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_48%)]'
           />

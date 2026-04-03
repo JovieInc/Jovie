@@ -22,6 +22,10 @@ const includeMobileMatrix =
   process.env.E2E_MOBILE_MATRIX === '1' || isFullMatrix;
 const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
 const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+const baseURL = process.env.BASE_URL || 'http://localhost:3100';
+const managedBaseUrl = new URL(baseURL);
+const managedWebServerPort =
+  managedBaseUrl.port || (managedBaseUrl.protocol === 'https:' ? '443' : '80');
 const sentryE2eEnabled =
   process.env.SENTRY_E2E_REPORTING === '1' && Boolean(process.env.SENTRY_DSN);
 const shouldSerializeLocalBypassRuns = !isCI && useTestAuthBypass;
@@ -102,7 +106,7 @@ export default defineConfig({
   snapshotPathTemplate: '{snapshotDir}/{testFilePath}/{arg}{ext}',
 
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:3100',
+    baseURL,
     trace: 'on-first-retry',
     video: videoMode,
     // Turbopack compilation needs longer timeouts even for smoke tests
@@ -165,7 +169,7 @@ export default defineConfig({
           env: {
             ...process.env,
             NODE_ENV: 'test',
-            PORT: '3100',
+            PORT: managedWebServerPort,
             NEXT_PUBLIC_E2E_MODE: '1',
             E2E_USE_TEST_AUTH_BYPASS: useTestAuthBypass ? '1' : '0',
             NEXT_DISABLE_TOOLBAR: '1',
@@ -180,7 +184,7 @@ export default defineConfig({
             NODE_OPTIONS:
               `${process.env.NODE_OPTIONS || ''} --max-old-space-size=8192`.trim(),
           },
-          url: 'http://localhost:3100',
+          url: managedBaseUrl.origin,
           reuseExistingServer: !isCI,
           timeout: 300000, // Increased to 300s (5min) for Turbopack cold start
           stdout: 'pipe',

@@ -17,7 +17,6 @@ import {
 import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import type {
   PreviewSource,
@@ -26,7 +25,6 @@ import type {
   ProviderConfidenceSummary,
   ProviderKey,
 } from '@/lib/discography/types';
-import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { TrackPlatformLinksSection } from './TrackPlatformLinksSection';
@@ -329,6 +327,7 @@ export function TrackSidebar({
       title={track?.title ?? 'No track selected'}
       onClose={onClose}
       headerMode='minimal'
+      surfaceTone='quiet'
       headerActions={
         <DrawerHeaderActions
           primaryActions={[]}
@@ -374,6 +373,7 @@ export function TrackSidebar({
       {track ? (
         <DrawerTabbedCard
           testId='track-tabbed-card'
+          surfaceVariant='quiet'
           tabs={
             <DrawerTabs
               value={activeTab}
@@ -387,9 +387,7 @@ export function TrackSidebar({
           contentClassName='pt-2'
         >
           {activeTab === 'playback' ? (
-            <DrawerSurfaceCard
-              className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden')}
-            >
+            <DrawerSurfaceCard variant='quiet' className='overflow-hidden'>
               <div className='space-y-3 p-2.5'>
                 <div className='flex items-start gap-2.5'>
                   <DrawerMediaThumb

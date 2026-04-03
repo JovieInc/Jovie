@@ -62,6 +62,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     entityHeader,
     tabs,
     footer,
+    surfaceTone,
   }: {
     children?: React.ReactNode;
     isEmpty?: boolean;
@@ -69,12 +70,13 @@ vi.mock('@/components/molecules/drawer', () => ({
     entityHeader?: React.ReactNode;
     tabs?: React.ReactNode;
     footer?: React.ReactNode;
+    surfaceTone?: 'default' | 'quiet';
     [key: string]: unknown;
   }) =>
     isEmpty ? (
       <p data-testid='empty-state'>{emptyMessage}</p>
     ) : (
-      <div data-testid='right-drawer'>
+      <div data-testid='right-drawer' data-surface-tone={surfaceTone}>
         {entityHeader}
         {tabs}
         {children}
@@ -103,12 +105,18 @@ vi.mock('@/components/molecules/drawer', () => ({
     children,
     className,
     testId,
+    variant,
   }: {
     children?: React.ReactNode;
     className?: string;
     testId?: string;
+    variant?: 'card' | 'flat' | 'quiet';
   }) => (
-    <div className={className} data-testid={testId}>
+    <div
+      className={className}
+      data-testid={testId}
+      data-surface-variant={variant}
+    >
       {children}
     </div>
   ),
@@ -185,12 +193,14 @@ vi.mock('@/components/molecules/drawer', () => ({
     children,
     tabs,
     testId,
+    surfaceVariant,
   }: {
     children?: React.ReactNode;
     tabs?: React.ReactNode;
     testId?: string;
+    surfaceVariant?: 'card' | 'quiet';
   }) => (
-    <div data-testid={testId}>
+    <div data-testid={testId} data-surface-variant={surfaceVariant}>
       {tabs}
       {children}
     </div>
@@ -402,6 +412,23 @@ describe('ReleaseSidebar Links tab', () => {
 
     expect(screen.queryByText(/^Releases$/)).not.toBeInTheDocument();
     expect(screen.getByTestId('release-header-card')).toBeInTheDocument();
+  });
+
+  it('opts into the quiet right-rail surface contract', () => {
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    expect(screen.getByTestId('right-drawer')).toHaveAttribute(
+      'data-surface-tone',
+      'quiet'
+    );
+    expect(screen.getByTestId('release-header-card')).toHaveAttribute(
+      'data-surface-variant',
+      'quiet'
+    );
+    expect(screen.getByTestId('release-tabbed-card')).toHaveAttribute(
+      'data-surface-variant',
+      'quiet'
+    );
   });
 
   it('preserves active tab when release changes', async () => {

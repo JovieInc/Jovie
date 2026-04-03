@@ -46,6 +46,12 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:synthetic": "playwright test --config=playwright.synthetic.config.ts",
     "test:e2e:golden-path": "playwright test tests/e2e/golden-path.spec.ts",
+    "admin:seed": "NODE_OPTIONS=--conditions=react-server tsx tests/seed-admin-test-data.ts",
+    "admin:visual": "playwright test tests/e2e/admin-visual-regression.spec.ts",
+    "admin:visual:update": "playwright test tests/e2e/admin-visual-regression.spec.ts --update-snapshots",
+    "admin:green": "tsx scripts/admin-green-loop.ts verify",
+    "admin:green:record": "tsx scripts/admin-green-loop.ts record",
+    "admin:green:watch": "tsx scripts/admin-green-loop.ts watch",
     "demo:record": "bash scripts/record-yc-demo.sh",
     "test:e2e:sentry:red": "node scripts/run-sentry-red-lane.mjs",
     "e2e:smoke": "SMOKE_ONLY=1 E2E_FAST_ITERATION=1 playwright test -g @smoke",
@@ -112,6 +118,7 @@
     "test:a11y": "vitest run --config=vitest.config.storybook.mts",
     "test:visual-a11y": "pnpm run e2e:visual && pnpm run test:a11y",
     "perf:auth": "tsx scripts/performance-auth.ts",
+    "qa:routes": "tsx scripts/route-qa.ts",
     "perf:loop": "tsx scripts/performance-optimizer.ts",
     "perf:loop:end-user": "tsx scripts/performance-optimizer.ts --scope end-user",
     "perf:overnight": "tsx scripts/performance-overnight.ts",
@@ -193,6 +200,7 @@
     "vaul": "^1.1.2",
     "web-vitals": "^5.1.0",
     "ws": "^8.20.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {

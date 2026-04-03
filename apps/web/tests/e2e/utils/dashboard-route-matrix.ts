@@ -1,9 +1,11 @@
 import type { Page } from '@playwright/test';
-import {
-  buildAdminGrowthHref,
-  buildAdminPeopleHref,
-} from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  ADMIN_FAST_HEALTH_SURFACES,
+  ADMIN_REDIRECT_SURFACES,
+  ADMIN_RENDER_SURFACES,
+  getAdminSurfaceSelector,
+} from './admin-surface-manifest';
 import {
   resolveChatConversationPath,
   resolveReleaseTasksPathFromPage,
@@ -327,171 +329,39 @@ const aliasRoutes = [
 ] as const satisfies readonly DashboardRouteDescriptor[];
 
 const adminRoutes = [
-  {
-    path: APP_ROUTES.ADMIN,
-    name: 'Admin Overview',
-    kind: 'render',
-    surface: 'admin',
-    authRole: 'admin',
-    contentSelector: '[data-testid="admin-dashboard-content"]',
+  ...ADMIN_RENDER_SURFACES.map(surface => ({
+    path: surface.path,
+    name: surface.name,
+    kind: 'render' as const,
+    surface: 'admin' as const,
+    authRole: 'admin' as const,
+    contentSelector: getAdminSurfaceSelector(surface),
     acceptedDestinations: [APP_ROUTES.DASHBOARD],
     performanceBudgetMs: ADMIN_DEFAULT_BUDGET_MS,
-  },
-  {
-    path: APP_ROUTES.ADMIN_ACTIVITY,
-    name: 'Admin Activity',
-    kind: 'render',
-    surface: 'admin',
-    authRole: 'admin',
-    contentSelector: '[data-testid="admin-activity-content"]',
-    acceptedDestinations: [APP_ROUTES.DASHBOARD],
-    performanceBudgetMs: ADMIN_DEFAULT_BUDGET_MS,
-  },
-  {
-    path: APP_ROUTES.ADMIN_GROWTH,
-    name: 'Admin Growth',
-    kind: 'render',
-    surface: 'admin',
-    authRole: 'admin',
-    contentSelector: ':text("Growth operations")',
-    acceptedDestinations: [APP_ROUTES.DASHBOARD],
-    performanceBudgetMs: ADMIN_DEFAULT_BUDGET_MS,
-  },
-  {
-    path: APP_ROUTES.ADMIN_PEOPLE,
-    name: 'Admin People',
-    kind: 'render',
-    surface: 'admin',
-    authRole: 'admin',
-    contentSelector: ':text("People operations")',
-    acceptedDestinations: [APP_ROUTES.DASHBOARD],
-    performanceBudgetMs: ADMIN_DEFAULT_BUDGET_MS,
-  },
-  {
-    path: APP_ROUTES.ADMIN_INVESTORS,
-    name: 'Admin Investors',
-    kind: 'render',
-    surface: 'admin',
-    authRole: 'admin',
-    contentSelector: ':text("Investor pipeline")',
-    acceptedDestinations: [APP_ROUTES.DASHBOARD],
-    performanceBudgetMs: ADMIN_DEFAULT_BUDGET_MS,
-  },
-  {
-    path: APP_ROUTES.ADMIN_RELEASES,
-    name: 'Admin Releases',
-    kind: 'render',
-    surface: 'admin',
-    authRole: 'admin',
-    contentSelector:
-      ':text-matches("releases|release", "i"), table, [role="table"]',
-    acceptedDestinations: [APP_ROUTES.DASHBOARD],
-    performanceBudgetMs: ADMIN_DEFAULT_BUDGET_MS,
-  },
-  {
-    path: APP_ROUTES.ADMIN_SCREENSHOTS,
-    name: 'Admin Screenshots',
-    kind: 'render',
-    surface: 'admin',
-    authRole: 'admin',
-    contentSelector: '[data-testid="admin-screenshots-content"]',
-    acceptedDestinations: [APP_ROUTES.DASHBOARD],
-    performanceBudgetMs: ADMIN_DEFAULT_BUDGET_MS,
-  },
-  {
-    path: APP_ROUTES.ADMIN_CAMPAIGNS,
-    name: 'Admin Campaigns Redirect',
-    kind: 'redirect',
-    surface: 'admin',
-    authRole: 'admin',
-    acceptedDestinations: [
-      buildAdminGrowthHref('campaigns'),
-      APP_ROUTES.DASHBOARD,
-    ],
-  },
-  {
-    path: APP_ROUTES.ADMIN_CREATORS,
-    name: 'Admin Creators Redirect',
-    kind: 'redirect',
-    surface: 'admin',
-    authRole: 'admin',
-    acceptedDestinations: [
-      buildAdminPeopleHref('creators'),
-      APP_ROUTES.DASHBOARD,
-    ],
-  },
-  {
-    path: APP_ROUTES.ADMIN_FEEDBACK,
-    name: 'Admin Feedback Redirect',
-    kind: 'redirect',
-    surface: 'admin',
-    authRole: 'admin',
-    acceptedDestinations: [
-      buildAdminPeopleHref('feedback'),
-      APP_ROUTES.DASHBOARD,
-    ],
-  },
-  {
-    path: APP_ROUTES.ADMIN_INGEST,
-    name: 'Admin Ingest Redirect',
-    kind: 'redirect',
-    surface: 'admin',
-    authRole: 'admin',
-    acceptedDestinations: [
-      buildAdminGrowthHref('ingest'),
-      APP_ROUTES.DASHBOARD,
-    ],
-  },
-  {
-    path: APP_ROUTES.ADMIN_LEADS,
-    name: 'Admin Leads Redirect',
-    kind: 'redirect',
-    surface: 'admin',
-    authRole: 'admin',
-    acceptedDestinations: [buildAdminGrowthHref('leads'), APP_ROUTES.DASHBOARD],
-  },
-  {
-    path: APP_ROUTES.ADMIN_OUTREACH,
-    name: 'Admin Outreach Redirect',
-    kind: 'redirect',
-    surface: 'admin',
-    authRole: 'admin',
-    acceptedDestinations: [
-      buildAdminGrowthHref('outreach'),
-      APP_ROUTES.DASHBOARD,
-    ],
-  },
-  {
-    path: APP_ROUTES.ADMIN_USERS,
-    name: 'Admin Users Redirect',
-    kind: 'redirect',
-    surface: 'admin',
-    authRole: 'admin',
-    acceptedDestinations: [buildAdminPeopleHref('users'), APP_ROUTES.DASHBOARD],
-  },
-  {
-    path: APP_ROUTES.ADMIN_WAITLIST,
-    name: 'Admin Waitlist Redirect',
-    kind: 'redirect',
-    surface: 'admin',
-    authRole: 'admin',
-    acceptedDestinations: [
-      buildAdminPeopleHref('waitlist'),
-      APP_ROUTES.DASHBOARD,
-    ],
-  },
+  })),
+  ...ADMIN_REDIRECT_SURFACES.map(redirect => ({
+    path: redirect.path,
+    name: redirect.name,
+    kind: 'redirect' as const,
+    surface: 'admin' as const,
+    authRole: 'admin' as const,
+    acceptedDestinations: [redirect.destination, APP_ROUTES.DASHBOARD],
+  })),
 ] as const satisfies readonly DashboardRouteDescriptor[];
 
 const fastHealthPaths = new Set([
   APP_ROUTES.DASHBOARD,
   APP_ROUTES.CHAT,
   APP_ROUTES.DASHBOARD_AUDIENCE,
+  APP_ROUTES.PRESENCE,
   APP_ROUTES.DASHBOARD_RELEASES,
   APP_ROUTES.SETTINGS_ACCOUNT,
   APP_ROUTES.DASHBOARD_OVERVIEW,
 ]);
 
-const fastAdminPaths = new Set([APP_ROUTES.ADMIN, APP_ROUTES.ADMIN_GROWTH]);
+const fastAdminPaths = new Set(
+  ADMIN_FAST_HEALTH_SURFACES.map(surface => surface.path)
+);
 
 function selectFastRoutes(
   routes: readonly DashboardRouteDescriptor[],

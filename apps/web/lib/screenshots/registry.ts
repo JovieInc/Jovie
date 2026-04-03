@@ -80,6 +80,24 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       route: '/',
       waitFor: 'main',
     },
+    {
+      id: 'release-landing-desktop',
+      title: 'Release Landing Page',
+      route: '/demo/showcase/release-landing',
+      waitFor: '[data-testid="demo-showcase-release-landing"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="demo-showcase-release-landing"]',
+      publicExportPath: 'release-landing-desktop.png',
+    },
+    {
+      id: 'release-tasks-desktop',
+      title: 'Release Tasks',
+      route: '/demo/showcase/release-tasks',
+      waitFor: '[data-testid="demo-showcase-release-tasks"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="demo-showcase-release-tasks"]',
+      publicExportPath: 'release-tasks-active.png',
+    },
   ]),
   ...defineScenarios('dashboard', ADMIN_MARKETING_AND_INVESTOR, [
     {

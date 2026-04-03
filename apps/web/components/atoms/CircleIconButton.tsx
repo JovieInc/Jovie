@@ -36,7 +36,8 @@ export type CircleIconButtonVariant =
   | 'frosted'
   | 'ghost'
   | 'secondary'
-  | 'outline';
+  | 'outline'
+  | 'pearl';
 
 export interface CircleIconButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -97,6 +98,13 @@ const variantStyles: Record<CircleIconButtonVariant, string> = {
     'border border-subtle bg-transparent text-tertiary-token',
     'hover:bg-surface-1 hover:text-primary-token'
   ),
+  // Pearl - public profile chrome
+  pearl: cn(
+    'border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] text-primary-token backdrop-blur-xl',
+    'shadow-[var(--profile-pearl-shadow)]',
+    'hover:bg-[var(--profile-pearl-bg-hover)] hover:text-primary-token',
+    'active:bg-[var(--profile-pearl-bg-active)]'
+  ),
 };
 
 const baseStyles = cn(
@@ -109,6 +117,8 @@ const baseStyles = cn(
   // Focus ring using design system utility
   'focus-ring-themed',
   'focus-visible:ring-offset-[var(--color-bg-base)]',
+  // Required for soft material treatments on profile chrome
+  'relative isolate overflow-hidden',
   // Touch optimizations
   'touch-manipulation select-none',
   '[-webkit-tap-highlight-color:transparent]',

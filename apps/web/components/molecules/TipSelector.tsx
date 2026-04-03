@@ -57,8 +57,8 @@ export function TipSelector({
       {/* Visually hidden live region for screen readers */}
       <div className='sr-only' aria-live='polite' ref={statusRef}></div>
 
-      <p className='text-xs font-medium uppercase tracking-[0.15em] text-tertiary-token'>
-        Choose amount
+      <p className='text-[13px] font-[560] tracking-[-0.015em] text-secondary-token'>
+        Choose Amount
       </p>
 
       <fieldset
@@ -78,7 +78,7 @@ export function TipSelector({
 
       <Button
         onClick={handleContinue}
-        className='mt-4 w-full flex items-center justify-center gap-2.5 text-btn-primary-foreground'
+        className='mt-4 flex w-full items-center justify-center gap-2.5 rounded-full border border-white/8 text-[15px] font-semibold tracking-[-0.015em] text-btn-primary-foreground shadow-none transition-[opacity,border-color] duration-200 hover:border-white/14'
         size='lg'
         disabled={isLoading}
         variant='primary'

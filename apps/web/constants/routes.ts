@@ -72,6 +72,7 @@ export const APP_ROUTES = {
   ADMIN_USERS: '/app/admin/users',
   ADMIN_ACTIVITY: '/app/admin/activity',
   ADMIN_CAMPAIGNS: '/app/admin/campaigns',
+  ADMIN_GROWTH_YC_METRICS: '/app/admin/growth/yc-metrics',
   ADMIN_INVESTORS: '/app/admin/investors',
   ADMIN_INVESTORS_LINKS: '/app/admin/investors/links',
   ADMIN_INVESTORS_SETTINGS: '/app/admin/investors/settings',

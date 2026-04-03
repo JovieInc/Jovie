@@ -10,9 +10,9 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import { investorLinks } from '@/lib/db/schema/investors';
@@ -32,51 +32,47 @@ export const dynamic = 'force-dynamic';
  */
 export default function InvestorPipelinePage() {
   return (
-    <PageShell>
-      <PageContent>
-        <div className='space-y-4'>
-          <h1 className='sr-only'>Investor pipeline</h1>
-          <ContentSurfaceCard className='overflow-hidden p-0'>
-            <ContentSectionHeader
-              title='Investor pipeline'
-              subtitle='Track investor links, interest signals, and active fundraising conversations without leaving the admin shell.'
-              actions={
-                <div className='flex items-center gap-2'>
-                  <Button variant='secondary' size='sm' asChild>
-                    <Link href={APP_ROUTES.ADMIN_INVESTORS_SETTINGS}>
-                      <Settings2 className='mr-1.5 h-3.5 w-3.5' />
-                      Settings
-                    </Link>
-                  </Button>
-                  <CreateLinkButton />
-                </div>
-              }
-            />
-            <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-3'>
-              <SummaryCard
-                label='Pipeline view'
-                value='Investor links'
-                description='Every link is a lightweight deal room with stage tracking.'
-              />
-              <SummaryCard
-                label='Signal capture'
-                value='View + stage history'
-                description='Keep engagement, recency, and status visible in one list.'
-              />
-              <SummaryCard
-                label='Next action'
-                value='Create or follow up'
-                description='Use links, notes, and stage changes to keep momentum moving.'
-              />
-            </div>
-          </ContentSurfaceCard>
-
-          <Suspense fallback={<TableSkeleton />}>
-            <InvestorTable />
-          </Suspense>
+    <AdminToolPage
+      title='Investors'
+      description='Track investor links, view signals, and active fundraising conversations.'
+      testId='admin-investors-page'
+      actions={
+        <div className='flex items-center gap-2'>
+          <Button variant='secondary' size='sm' asChild>
+            <Link href={APP_ROUTES.ADMIN_INVESTORS_SETTINGS}>
+              <Settings2 className='mr-1.5 h-3.5 w-3.5' />
+              Settings
+            </Link>
+          </Button>
+          <CreateLinkButton />
         </div>
-      </PageContent>
-    </PageShell>
+      }
+    >
+      <div
+        className='grid gap-3 sm:grid-cols-3'
+        data-testid='admin-investors-summary'
+      >
+        <SummaryCard
+          label='Pipeline View'
+          value='Investor links'
+          description='Every link is a lightweight deal room with stage tracking.'
+        />
+        <SummaryCard
+          label='Signal Capture'
+          value='View + stage history'
+          description='Keep engagement, recency, and status visible in one list.'
+        />
+        <SummaryCard
+          label='Next Action'
+          value='Create or follow up'
+          description='Use links, notes, and stage changes to keep momentum moving.'
+        />
+      </div>
+
+      <Suspense fallback={<TableSkeleton />}>
+        <InvestorTable />
+      </Suspense>
+    </AdminToolPage>
   );
 }
 
@@ -129,7 +125,10 @@ async function InvestorTable() {
   }
 
   return (
-    <ContentSurfaceCard className='overflow-hidden p-0'>
+    <ContentSurfaceCard
+      className='overflow-hidden p-0'
+      data-testid='admin-investors-table'
+    >
       <ContentSectionHeader
         title='Active investor links'
         subtitle={`${links.length} tracked link${links.length === 1 ? '' : 's'} across your pipeline.`}
@@ -276,9 +275,7 @@ function SummaryCard({
 }>) {
   return (
     <ContentSurfaceCard surface='nested' className='p-3.5'>
-      <p className='text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
-        {label}
-      </p>
+      <p className='text-[11px] text-tertiary-token'>{label}</p>
       <p className='mt-1 text-[14px] font-[560] tracking-[-0.016em] text-primary-token'>
         {value}
       </p>

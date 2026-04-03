@@ -18,11 +18,12 @@ vi.mock('@/lib/utils/date', () => ({
   ),
 }));
 
-// Mock TwoStepNotificationsCTA to avoid its heavy dependency tree
+// Mock the client boundary so this server-page unit stays isolated from
+// profile shell hooks and next/navigation client dependencies.
 vi.mock(
-  '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA',
+  '../../../../app/[username]/notifications/NotificationsPageClient',
   () => ({
-    TwoStepNotificationsCTA: ({
+    NotificationsPageClient: ({
       artist,
     }: {
       artist: { handle: string; name: string };

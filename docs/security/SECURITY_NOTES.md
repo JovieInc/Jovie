@@ -1,6 +1,6 @@
 # Security Posture Notes
 
-_Last reviewed: 2025-11-29_
+_Last reviewed: 2026-04-01_
 
 ## 1. Environment & secrets
 

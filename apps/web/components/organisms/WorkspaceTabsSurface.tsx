@@ -95,6 +95,9 @@ export function WorkspaceTabsSurface<
     navigateWithParam,
   ]);
 
+  const shouldShowPrimaryControl = primaryOptions.length > 1;
+  const shouldShowTabControls = shouldShowPrimaryControl || secondaryControl;
+
   return (
     <div className='space-y-4'>
       <ContentSurfaceCard className='overflow-hidden'>
@@ -105,23 +108,27 @@ export function WorkspaceTabsSurface<
           className='min-h-0 px-(--linear-app-header-padding-x) py-3'
           actionsClassName='shrink-0'
         />
-        <div className='border-t border-subtle px-(--linear-app-content-padding-x) py-3'>
-          <div className='flex flex-col gap-3'>
-            <AppSegmentControl
-              value={primaryValue}
-              onValueChange={value =>
-                navigateWithParam(primaryParam, value, [
-                  ...PRIMARY_TAB_RESET_KEYS,
-                  ...clearOnPrimaryChange,
-                ])
-              }
-              options={primaryOptions}
-              size='sm'
-              aria-label={`${title} primary views`}
-            />
-            {secondaryControl}
+        {shouldShowTabControls ? (
+          <div className='border-t border-subtle px-(--linear-app-content-padding-x) py-3'>
+            <div className='flex flex-col gap-3'>
+              {shouldShowPrimaryControl ? (
+                <AppSegmentControl
+                  value={primaryValue}
+                  onValueChange={value =>
+                    navigateWithParam(primaryParam, value, [
+                      ...PRIMARY_TAB_RESET_KEYS,
+                      ...clearOnPrimaryChange,
+                    ])
+                  }
+                  options={primaryOptions}
+                  size='sm'
+                  aria-label={`${title} primary views`}
+                />
+              ) : null}
+              {secondaryControl}
+            </div>
           </div>
-        </div>
+        ) : null}
       </ContentSurfaceCard>
       {children}
     </div>

@@ -133,7 +133,7 @@ function renderContent({ viewModel, mergedDSPs }: RenderContentOptions) {
       return (
         <div className='space-y-3 py-2 sm:py-3'>
           {viewModel.subscribeTwoStep ? (
-            <TwoStepNotificationsCTA artist={viewModel.artist} />
+            <TwoStepNotificationsCTA artist={viewModel.artist} startExpanded />
           ) : (
             <ArtistNotificationsCTA
               artist={viewModel.artist}
