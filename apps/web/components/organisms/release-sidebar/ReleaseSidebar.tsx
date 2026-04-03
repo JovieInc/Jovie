@@ -50,7 +50,7 @@ import {
 } from '@/features/release/AlbumArtworkContextMenu';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { formatReleaseArtistLine } from '@/lib/discography/formatting';
-import type { ProviderKey, ReleaseSidebarTrack } from '@/lib/discography/types';
+import type { ProviderKey } from '@/lib/discography/types';
 import { usePlanGate } from '@/lib/queries';
 import type {
   AlbumArtBrandKitRecord,
