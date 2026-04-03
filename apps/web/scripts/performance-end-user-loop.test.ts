@@ -5,6 +5,7 @@ import {
   createEndUserLoopState,
   normalizeRawPageResults,
   refreshEndUserLoopStateConfig,
+  resolveServerBaseUrl,
 } from './performance-end-user-loop';
 import {
   createDashboardMeasurement,
@@ -215,6 +216,15 @@ describe('performance end-user loop', () => {
     expect(state.routeOrder).toEqual(['home', 'creator-releases']);
     expect(state.completedRoutes).toEqual(['public-profile-main']);
     expect(state.currentRouteId).toBe('home');
+  });
+
+  it('preserves the requested host when deriving the baseline server origin', () => {
+    expect(resolveServerBaseUrl('http://localhost:3000', 4100)).toBe(
+      'http://localhost:4100'
+    );
+    expect(resolveServerBaseUrl('http://127.0.0.1:3000', 4100)).toBe(
+      'http://127.0.0.1:4100'
+    );
   });
 
   it('filters stale failing route ids that are outside the selected routes', () => {

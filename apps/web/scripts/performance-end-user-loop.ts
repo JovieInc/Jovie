@@ -199,12 +199,23 @@ async function waitForServer(baseUrl: string, child: ReturnType<typeof spawn>) {
   throw new Error('Timed out waiting for the performance server to start.');
 }
 
+export function resolveServerBaseUrl(requestedBaseUrl: string, port: number) {
+  const parsedUrl = new URL(requestedBaseUrl);
+  parsedUrl.port = String(port);
+  parsedUrl.pathname = '';
+  parsedUrl.search = '';
+  parsedUrl.hash = '';
+  return parsedUrl.toString().replace(/\/$/, '');
+}
+
 async function startServer(
   artifactDir: string,
+  requestedBaseUrl: string,
   port: number,
   extraEnv?: NodeJS.ProcessEnv
 ) {
-  const baseUrl = `http://127.0.0.1:${port}`;
+  const baseUrl = resolveServerBaseUrl(requestedBaseUrl, port);
+  const hostname = new URL(baseUrl).hostname;
   const logPath = resolve(artifactDir, 'server.log');
   writeFileSync(logPath, '');
 
@@ -216,7 +227,7 @@ async function startServer(
       env: {
         ...process.env,
         ...extraEnv,
-        HOSTNAME: '127.0.0.1',
+        HOSTNAME: hostname,
         PORT: String(port),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -720,10 +731,12 @@ async function captureBaselineSummary(
   routes: readonly PerfRouteDefinition[],
   cliOptions: PerfLoopCliOptions
 ) {
-  buildProject();
+  if (!cliOptions.skipBuild) {
+    buildProject();
+  }
 
   const port = await findFreePort();
-  let server = await startServer(artifactDir, port);
+  let server = await startServer(artifactDir, cliOptions.baseUrl, port);
 
   try {
     let authPath = cliOptions.authPath
@@ -752,7 +765,7 @@ async function captureBaselineSummary(
           )}\nRetrying with loopback test-auth bypass enabled.\n`
         );
         await stopServer(server.child);
-        server = await startServer(artifactDir, port, {
+        server = await startServer(artifactDir, cliOptions.baseUrl, port, {
           E2E_USE_TEST_AUTH_BYPASS: '1',
           NEXT_PUBLIC_CLERK_MOCK: '1',
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
