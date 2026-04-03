@@ -60,7 +60,8 @@ export function ClientProviders({
 }: ClientProvidersProps) {
   const shouldSkipClerk = shouldBypassClerk(
     publishableKey,
-    publicEnv.NEXT_PUBLIC_CLERK_MOCK
+    publicEnv.NEXT_PUBLIC_CLERK_MOCK,
+    globalThis.location
   );
 
   if (shouldSkipClerk) {

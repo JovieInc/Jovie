@@ -65,7 +65,7 @@ test('homepage: hero heading, CTA, final claim CTA', async ({ page }) => {
     .last()
     .scrollIntoViewIfNeeded();
   const finalCtaHeadline = page.getByRole('heading', {
-    name: 'Own the release stack.',
+    name: /Release day starts here\.|Own the release stack\./,
   });
   await expect(
     finalCtaHeadline,

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { simpleEncryptUrl } from '@/lib/utils/url-encryption';
 import {
   decryptUrlRawKey,
@@ -43,6 +43,42 @@ describe('Raw-key AES-256-GCM URL encryption', () => {
     expect(() =>
       decryptUrlRawKey({ v: 1, encrypted: '', iv: '', authTag: '' })
     ).toThrow();
+  });
+
+  it('falls back to an ephemeral key in test env when URL_ENCRYPTION_KEY is unset', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalEncryptionKey = process.env.URL_ENCRYPTION_KEY;
+
+    try {
+      process.env.NODE_ENV = 'test';
+      delete process.env.URL_ENCRYPTION_KEY;
+
+      vi.resetModules();
+
+      const {
+        decryptUrlRawKey: decryptWithFallbackKey,
+        encryptUrlRawKey: encryptWithFallbackKey,
+      } = await import('@/lib/utils/url-encryption.server');
+
+      const url = 'https://example.com/test-fallback';
+      const encrypted = encryptWithFallbackKey(url);
+
+      expect(decryptWithFallbackKey(encrypted)).toBe(url);
+    } finally {
+      if (originalNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+
+      if (originalEncryptionKey === undefined) {
+        delete process.env.URL_ENCRYPTION_KEY;
+      } else {
+        process.env.URL_ENCRYPTION_KEY = originalEncryptionKey;
+      }
+
+      vi.resetModules();
+    }
   });
 });
 

@@ -1,6 +1,5 @@
 import { neon } from '@neondatabase/serverless';
 import { APP_ROUTES } from '@/constants/routes';
-import { hasClerkCredentials } from '../helpers/clerk-auth';
 import { expect, test } from './setup';
 import {
   assertNoCriticalErrors,
@@ -23,8 +22,15 @@ type PresenceMatchStatus =
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 const sql = databaseUrl ? neon(databaseUrl) : null;
+const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 
 let creatorContext: PresenceSeedContext | null = null;
+
+const PRESENCE_SUITE_EXTERNAL_IDS = [
+  'spotify-suggested',
+  'youtube-suggested',
+  'apple-confirmed',
+] as const;
 
 async function resolveCreatorContext(): Promise<PresenceSeedContext> {
   if (!sql) {
@@ -58,6 +64,11 @@ async function resetPresenceMatches(profileId: string): Promise<void> {
   await sql`
     delete from dsp_artist_matches
     where creator_profile_id = ${profileId}
+      and (
+        external_artist_id = ${PRESENCE_SUITE_EXTERNAL_IDS[0]}
+        or external_artist_id = ${PRESENCE_SUITE_EXTERNAL_IDS[1]}
+        or external_artist_id = ${PRESENCE_SUITE_EXTERNAL_IDS[2]}
+      )
   `;
 }
 
@@ -201,15 +212,10 @@ async function selectSpotifyInDialog(page: import('@playwright/test').Page) {
 test.describe
   .serial('Presence Page @presence', () => {
     test.skip(!databaseUrl, 'Presence E2E coverage requires DATABASE_URL');
-
-    test.beforeEach(async () => {
-      if (!hasClerkCredentials()) {
-        test.skip(
-          true,
-          'Presence E2E coverage requires authenticated Clerk credentials'
-        );
-      }
-    });
+    test.skip(
+      !useTestAuthBypass,
+      'Presence E2E coverage requires E2E_USE_TEST_AUTH_BYPASS=1'
+    );
 
     test.afterEach(async () => {
       if (creatorContext) {
@@ -287,13 +293,17 @@ test.describe
       await seedPresenceMatches(context.profileId);
       await openPresence(page);
 
-      await expect(page.getByText('Spotify Suggested')).toBeVisible();
-      await expect(page.getByText('Apple Confirmed')).toBeVisible();
+      await expect(
+        page.getByTestId('presence-match-row-spotify')
+      ).toBeVisible();
+      await expect(
+        page.getByTestId('presence-match-row-apple_music')
+      ).toBeVisible();
       await expect(page.getByRole('button', { name: 'Refresh' })).toHaveCount(
         0
       );
 
-      await page.getByText('Spotify Suggested').click();
+      await page.getByTestId('presence-match-row-spotify').click();
       await expect(
         page.getByRole('button', { name: 'Confirm Match' })
       ).toBeVisible();
@@ -303,12 +313,12 @@ test.describe
         page.getByRole('button', { name: 'Confirm Match' })
       ).toHaveCount(0);
 
-      await page.getByText('Spotify Suggested').click();
+      await page.getByTestId('presence-match-row-spotify').click();
       await expect(
         page.getByRole('button', { name: 'Confirm Match' })
       ).toBeVisible();
 
-      await page.getByText('Spotify Suggested').click();
+      await page.getByTestId('presence-match-row-spotify').click();
       await expect(
         page.getByRole('button', { name: 'Confirm Match' })
       ).toHaveCount(0);
@@ -321,7 +331,7 @@ test.describe
       await seedPresenceMatches(context.profileId);
       await openPresence(page);
 
-      await page.getByText('Spotify Suggested').click();
+      await page.getByTestId('presence-match-row-spotify').click();
       await page.getByRole('button', { name: 'Confirm Match' }).click();
 
       await expect
@@ -330,7 +340,7 @@ test.describe
         })
         .toBe('confirmed');
 
-      await page.getByText('YouTube Suggested').click();
+      await page.getByTestId('presence-match-row-youtube_music').click();
       await page.getByRole('button', { name: 'Reject' }).click();
 
       await expect
@@ -360,7 +370,7 @@ test.describe
         await seedPresenceMatches(context.profileId);
         await openPresence(page);
 
-        await page.getByText('Spotify Suggested').click();
+        await page.getByTestId('presence-match-row-spotify').click();
         await expect(
           page.getByRole('button', { name: 'Confirm Match' })
         ).toBeVisible();

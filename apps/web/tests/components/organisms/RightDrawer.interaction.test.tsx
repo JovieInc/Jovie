@@ -87,6 +87,29 @@ describe('RightDrawer', () => {
     );
   });
 
+  it('does not handle Escape when a modal dialog is open above the drawer', () => {
+    const onKeyDown = vi.fn();
+
+    render(
+      <>
+        <div role='dialog' aria-modal='true'>
+          Modal
+        </div>
+        <RightDrawer
+          isOpen={true}
+          width={360}
+          ariaLabel='Modal-aware drawer'
+          onKeyDown={onKeyDown}
+        >
+          <button type='button'>Inside</button>
+        </RightDrawer>
+      </>
+    );
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onKeyDown).not.toHaveBeenCalled();
+  });
+
   it('renders context menu wrapper when context menu items are provided', () => {
     render(
       <RightDrawer

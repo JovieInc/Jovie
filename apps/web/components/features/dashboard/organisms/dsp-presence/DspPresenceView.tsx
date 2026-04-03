@@ -58,7 +58,7 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
   const openAddPlatformDialog = useCallback(() => {
     // Delay opening so the initiating click is not treated as an outside
     // interaction by the controlled Radix dialog on the same event loop turn.
-    window.setTimeout(() => {
+    globalThis.setTimeout(() => {
       setIsAddPlatformDialogOpen(true);
     }, 0);
   }, []);

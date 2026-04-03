@@ -16,15 +16,27 @@ export function isMockPublishableKey(publishableKey: string): boolean {
   );
 }
 
+function isLivePublishableKey(publishableKey: string): boolean {
+  return publishableKey.trim().toLowerCase().startsWith('pk_live_');
+}
+
 export function shouldBypassClerk(
   publishableKey: string | undefined,
-  clerkMockFlag: string | undefined
+  clerkMockFlag: string | undefined,
+  locationLike:
+    | Pick<Location, 'hostname' | 'protocol'>
+    | Pick<URL, 'hostname' | 'protocol'>
+    | undefined = globalThis.window === undefined
+    ? undefined
+    : globalThis.location
 ): boolean {
   const normalizedKey = publishableKey?.trim();
   return (
     !normalizedKey ||
     clerkMockFlag === '1' ||
-    isMockPublishableKey(normalizedKey)
+    isMockPublishableKey(normalizedKey) ||
+    (isLivePublishableKey(normalizedKey) &&
+      shouldDisableClerkProxyForLocation(locationLike))
   );
 }
 

@@ -11,6 +11,33 @@ describe('clerkAvailability', () => {
     expect(shouldBypassClerk('   ', '0')).toBe(true);
   });
 
+  it('bypasses live Clerk keys on insecure private origins', () => {
+    expect(
+      shouldBypassClerk(
+        'pk_live_example',
+        '0',
+        new URL('http://localhost:3100')
+      )
+    ).toBe(true);
+    expect(
+      shouldBypassClerk(
+        'pk_live_example',
+        '0',
+        new URL('http://127.0.0.1:3100')
+      )
+    ).toBe(true);
+  });
+
+  it('keeps Clerk enabled for test keys on insecure private origins', () => {
+    expect(
+      shouldBypassClerk(
+        'pk_test_example',
+        '0',
+        new URL('http://localhost:3100')
+      )
+    ).toBe(false);
+  });
+
   it('treats non-Clerk publishable keys as mocked', () => {
     expect(isMockPublishableKey('mock-publishable-key')).toBe(true);
     expect(isMockPublishableKey('dummy')).toBe(true);
