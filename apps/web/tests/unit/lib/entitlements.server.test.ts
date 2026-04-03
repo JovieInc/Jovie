@@ -65,6 +65,7 @@ describe('getCurrentUserEntitlements', () => {
       contactsLimit: 100,
       smartLinksLimit: null,
       aiDailyMessageLimit: 10,
+      aiAlbumArtRunsPerRelease: 1,
       canAccessPreSave: false,
       canAccessTipping: false,
       canAccessUrlEncryption: false,
@@ -207,6 +208,7 @@ describe('getCurrentUserEntitlements', () => {
       contactsLimit: 100,
       smartLinksLimit: null,
       aiDailyMessageLimit: 10,
+      aiAlbumArtRunsPerRelease: 1,
       canAccessPreSave: false,
       canAccessTipping: false,
       canAccessUrlEncryption: false,
@@ -281,6 +283,7 @@ describe('getCurrentUserEntitlements', () => {
       contactsLimit: 5000,
       smartLinksLimit: null,
       aiDailyMessageLimit: 100,
+      aiAlbumArtRunsPerRelease: null,
       aiPitchGenPerRelease: null,
     });
   });
@@ -344,6 +347,7 @@ describe('getCurrentUserEntitlements', () => {
       contactsLimit: null,
       smartLinksLimit: null,
       aiDailyMessageLimit: 500,
+      aiAlbumArtRunsPerRelease: null,
       aiPitchGenPerRelease: null,
     });
   });
