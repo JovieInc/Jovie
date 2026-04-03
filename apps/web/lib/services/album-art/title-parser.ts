@@ -41,31 +41,80 @@ function looksLikeVersionLabel(value: string): boolean {
   );
 }
 
+function parseBracketSuffix(
+  displayTitle: string
+): { readonly baseTitle: string; readonly versionLabel: string } | null {
+  const closingCharacter = displayTitle.at(-1);
+  if (closingCharacter !== ')' && closingCharacter !== ']') {
+    return null;
+  }
+
+  const openingCharacter = closingCharacter === ')' ? '(' : '[';
+  const openingIndex = displayTitle.lastIndexOf(openingCharacter);
+  if (openingIndex <= 0) {
+    return null;
+  }
+
+  const versionLabel = normalizeWhitespace(
+    displayTitle.slice(openingIndex + 1, -1)
+  );
+  if (!versionLabel || !looksLikeVersionLabel(versionLabel)) {
+    return null;
+  }
+
+  const baseTitle = normalizeWhitespace(displayTitle.slice(0, openingIndex));
+  if (!baseTitle) {
+    return null;
+  }
+
+  return {
+    baseTitle,
+    versionLabel,
+  };
+}
+
+function parseDashSuffix(
+  displayTitle: string
+): { readonly baseTitle: string; readonly versionLabel: string } | null {
+  const separator = ' - ';
+  const separatorIndex = displayTitle.lastIndexOf(separator);
+  if (separatorIndex <= 0) {
+    return null;
+  }
+
+  const baseTitle = normalizeWhitespace(displayTitle.slice(0, separatorIndex));
+  const versionLabel = normalizeWhitespace(
+    displayTitle.slice(separatorIndex + separator.length)
+  );
+  if (!baseTitle || !versionLabel || !looksLikeVersionLabel(versionLabel)) {
+    return null;
+  }
+
+  return {
+    baseTitle,
+    versionLabel,
+  };
+}
+
 export function parseAlbumArtTitle(title: string): ParsedAlbumArtTitle {
   const displayTitle = normalizeWhitespace(title);
-  const bracketMatch = displayTitle.match(
-    /^(.*?)[\s]*[\(\[]([^\)\]]+)[\)\]]$/u
-  );
-  if (bracketMatch && looksLikeVersionLabel(bracketMatch[2] ?? '')) {
-    const baseTitle = normalizeWhitespace(bracketMatch[1] ?? displayTitle);
-    const versionLabel = normalizeWhitespace(bracketMatch[2] ?? '');
+  const bracketSuffix = parseBracketSuffix(displayTitle);
+  if (bracketSuffix) {
     return {
       displayTitle,
-      baseTitle,
-      normalizedBaseTitle: normalizeBaseTitle(baseTitle),
-      versionLabel,
+      baseTitle: bracketSuffix.baseTitle,
+      normalizedBaseTitle: normalizeBaseTitle(bracketSuffix.baseTitle),
+      versionLabel: bracketSuffix.versionLabel,
     };
   }
 
-  const dashMatch = displayTitle.match(/^(.*?)[\s]+-[\s]+(.+)$/u);
-  if (dashMatch && looksLikeVersionLabel(dashMatch[2] ?? '')) {
-    const baseTitle = normalizeWhitespace(dashMatch[1] ?? displayTitle);
-    const versionLabel = normalizeWhitespace(dashMatch[2] ?? '');
+  const dashSuffix = parseDashSuffix(displayTitle);
+  if (dashSuffix) {
     return {
       displayTitle,
-      baseTitle,
-      normalizedBaseTitle: normalizeBaseTitle(baseTitle),
-      versionLabel,
+      baseTitle: dashSuffix.baseTitle,
+      normalizedBaseTitle: normalizeBaseTitle(dashSuffix.baseTitle),
+      versionLabel: dashSuffix.versionLabel,
     };
   }
 

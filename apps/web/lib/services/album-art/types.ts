@@ -188,7 +188,11 @@ export interface AlbumArtGenerationSessionRecord {
 }
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  if (value === null) {
+    return false;
+  }
+
+  return typeof value === 'object';
 }
 
 function isLogoPosition(value: unknown): value is AlbumArtLogoPosition {

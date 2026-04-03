@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import {
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
   const put = await getVercelBlobUploader();
   const logoUrl = await uploadBufferToBlob(
     put,
-    `album-art/logos/profiles/${profileId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`,
+    `album-art/logos/profiles/${profileId}/${Date.now()}-${randomUUID()}.${extension}`,
     buffer,
     file.type
   );
