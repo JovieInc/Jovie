@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { OnboardingV2Form } from './onboarding-v2/OnboardingV2Form';
 
 /** Max age (ms) for a pendingClaim entry to be considered valid (10 minutes). */
@@ -59,30 +59,24 @@ export function OnboardingFormWrapper({
   existingBio = null,
   existingGenres = null,
 }: OnboardingFormWrapperProps) {
-  const [resolvedHandle, setResolvedHandle] = useState(initialHandle);
-
-  // Defer sessionStorage reads until after mount to keep the first client render
-  // aligned with the server HTML and avoid hydration-only hook-order errors.
-  useEffect(() => {
-    if (initialHandle) {
-      setResolvedHandle(initialHandle);
-      return;
+  // Resolve the handle synchronously on first render to avoid a key-change
+  // remount that causes a visible layout shift.  sessionStorage is available
+  // during the initial client render (CSR after server HTML hydration), so
+  // reading it eagerly is safe and keeps the form key stable.
+  const [resolvedHandle] = useState(() => {
+    if (initialHandle) return initialHandle;
+    const pending = readPendingClaimHandle();
+    if (pending) {
+      try {
+        globalThis.sessionStorage?.removeItem('pendingClaim');
+      } catch {
+        // sessionStorage may be unavailable in restricted contexts
+      }
     }
+    return pending || initialHandle;
+  });
 
-    const pendingHandle = readPendingClaimHandle();
-    if (!pendingHandle) {
-      return;
-    }
-
-    setResolvedHandle(pendingHandle);
-
-    try {
-      globalThis.sessionStorage?.removeItem('pendingClaim');
-    } catch {
-      // sessionStorage may be unavailable in restricted contexts
-    }
-  }, [initialHandle]);
-
+  // Stable key — never changes after mount, preventing full-form CLS.
   const formKey = resolvedHandle || '__empty__';
 
   return (

@@ -342,19 +342,12 @@ export function OnboardingProfileReviewStep({
           <div className='flex flex-col items-center gap-6 py-12'>
             <div className='w-full max-w-xs'>
               <div className='h-1.5 w-full overflow-hidden rounded-full bg-surface-1'>
-                <div className='h-full rounded-full bg-(--linear-accent) animate-[indeterminate_1.5s_ease-in-out_infinite]' />
+                <div className='h-full rounded-full bg-(--linear-accent) animate-[onboarding-indeterminate_1.5s_ease-in-out_infinite]' />
               </div>
             </div>
             <p className='text-[13px] text-secondary-token animate-pulse'>
               Setting up your profile...
             </p>
-            <style>{`
-              @keyframes indeterminate {
-                0% { width: 0%; margin-left: 0%; }
-                50% { width: 60%; margin-left: 20%; }
-                100% { width: 0%; margin-left: 100%; }
-              }
-            `}</style>
           </div>
         ) : (
           /* Live profile preview with editable fields */

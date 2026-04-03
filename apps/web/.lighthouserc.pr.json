@@ -12,31 +12,31 @@
           "assertions": {
             "errors-in-console": "warn",
             "interactive": [
-              "warn",
+              "error",
               {
                 "maxNumericValue": 4000
               }
             ],
             "first-contentful-paint": [
-              "warn",
+              "error",
               {
                 "maxNumericValue": 2500
               }
             ],
             "largest-contentful-paint": [
-              "warn",
+              "error",
               {
                 "maxNumericValue": 4000
               }
             ],
             "cumulative-layout-shift": [
-              "warn",
+              "error",
               {
                 "maxNumericValue": 0.1
               }
             ],
             "total-blocking-time": [
-              "warn",
+              "error",
               {
                 "maxNumericValue": 1500
               }
@@ -66,7 +66,7 @@
               }
             ],
             "categories:best-practices": [
-              "warn",
+              "error",
               {
                 "minScore": 0.7
               }
