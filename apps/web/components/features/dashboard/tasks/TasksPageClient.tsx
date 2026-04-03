@@ -36,6 +36,7 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActio
 import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
+import { TaskDescriptionHelper } from '@/components/features/dashboard/tasks/TaskDescriptionHelper';
 import { TaskListRow } from '@/components/features/dashboard/tasks/TaskListRow';
 import {
   HIDDEN_DIV_STYLES,
@@ -63,6 +64,8 @@ import {
   useUpdateTaskMutation,
 } from '@/lib/queries/useTaskMutations';
 import { useTaskQuery, useTasksQuery } from '@/lib/queries/useTasksQuery';
+import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
+import { readTaskDescriptionHelper } from '@/lib/tasks/task-description-helper';
 import type {
   TaskAssigneeKind,
   TaskPriority,
@@ -405,6 +408,48 @@ function TaskDocumentPanel({
   artistName?: string | null;
   isDesktopLayout: boolean;
 }>) {
+  const descriptionEditorRef = useRef<HTMLTextAreaElement>(null);
+  const [descriptionHelperDismissed, setDescriptionHelperDismissed] =
+    useState(false);
+  const metadataDescriptionHelper = readTaskDescriptionHelper(task?.metadata);
+  const descriptionHelper =
+    metadataDescriptionHelper ??
+    (task?.releaseId
+      ? (DEFAULT_RELEASE_TASK_TEMPLATE.find(
+          item =>
+            item.descriptionHelper &&
+            item.title === task.title &&
+            item.category === task.category
+        )?.descriptionHelper ?? null)
+      : null);
+  const showDescriptionHelper = Boolean(
+    task &&
+      descriptionHelper &&
+      description.trim() === '' &&
+      !descriptionHelperDismissed
+  );
+
+  useEffect(() => {
+    setDescriptionHelperDismissed(false);
+  }, [task?.id]);
+
+  const focusDescriptionEditor = useCallback(() => {
+    globalThis.requestAnimationFrame(() => {
+      descriptionEditorRef.current?.focus();
+    });
+  }, []);
+
+  const beginDescriptionEditing = useCallback(() => {
+    setDescriptionHelperDismissed(true);
+    focusDescriptionEditor();
+  }, [focusDescriptionEditor]);
+
+  const handleDescriptionFocus = useCallback(() => {
+    if (descriptionHelper && description.trim() === '') {
+      setDescriptionHelperDismissed(true);
+    }
+  }, [description, descriptionHelper]);
+
   if (!task) {
     return (
       <div className='flex min-h-0 flex-1 items-center justify-center px-6 py-6'>
@@ -562,13 +607,24 @@ function TaskDocumentPanel({
               )}
             </div>
 
-            <textarea
-              id='task-context-editor'
-              value={description}
-              onChange={event => onDescriptionChange(event.target.value)}
-              placeholder='Start writing...'
-              className='min-h-[520px] w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
-            />
+            <div className='relative'>
+              <textarea
+                ref={descriptionEditorRef}
+                id='task-context-editor'
+                aria-label='Task description'
+                value={description}
+                onFocus={handleDescriptionFocus}
+                onChange={event => onDescriptionChange(event.target.value)}
+                placeholder='Start writing...'
+                className='min-h-[520px] w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
+              />
+              {showDescriptionHelper && descriptionHelper ? (
+                <TaskDescriptionHelper
+                  helper={descriptionHelper}
+                  onBeginEditing={beginDescriptionEditing}
+                />
+              ) : null}
+            </div>
           </div>
         </div>
       </div>

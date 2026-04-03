@@ -45,12 +45,47 @@ const mockTaskTwo = {
   priority: 'medium',
 } as const;
 
+const mockTaskDescriptionHelper = {
+  title: 'Press Release',
+  intro: [
+    'Start drafting your press release here, or tag @Jovie and ask her to draft a first pass for you.',
+  ],
+  bullets: [
+    'What is being announced',
+    'Why this release matters now',
+    'Release date and key context',
+  ],
+  links: [
+    {
+      label: 'UnitedMasters Promote Tab',
+      href: 'https://support.unitedmasters.com/hc/en-us/articles/4407142673299-How-do-I-promote-my-music-using-UnitedMasters',
+    },
+  ],
+  footer: 'Keep it tight. One page is enough.',
+} as const;
+
+const mockHelperTask = {
+  ...mockTask,
+  id: 'task-helper',
+  taskNumber: 3,
+  title: 'Draft press release',
+  description: null,
+  status: 'todo',
+  priority: 'medium',
+  category: 'Press',
+  sourceTemplateId: 'template-press-release',
+  metadata: {
+    descriptionHelper: mockTaskDescriptionHelper,
+  },
+} as const;
+
 const mockCreateTask = vi.fn();
 const mockUpdateTask = vi.fn();
 const mockSetHeaderActions = vi.fn();
 let setHeaderActionsHost: ((actions: React.ReactNode) => void) | null = null;
 let mockIsXlUp = true;
 let mockIs2xlUp = true;
+let mockTasksData = [mockTask, mockTaskTwo];
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({
@@ -98,18 +133,13 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
 
 vi.mock('@/lib/queries/useTasksQuery', () => ({
   useTasksQuery: () => ({
-    data: { tasks: [mockTask, mockTaskTwo] },
+    data: { tasks: mockTasksData },
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
   }),
   useTaskQuery: (taskId: string | null) => ({
-    data:
-      taskId === 'task-1'
-        ? mockTask
-        : taskId === 'task-2'
-          ? mockTaskTwo
-          : undefined,
+    data: mockTasksData.find(task => task.id === taskId),
   }),
 }));
 
@@ -234,6 +264,7 @@ describe('TasksPageClient', () => {
     mockSetHeaderActions.mockReset();
     mockIsXlUp = true;
     mockIs2xlUp = true;
+    mockTasksData = [mockTask, mockTaskTwo];
   });
 
   afterEach(() => {
@@ -304,6 +335,150 @@ describe('TasksPageClient', () => {
         onError: expect.any(Function),
       })
     );
+  });
+
+  it('shows the empty-description helper for supported release tasks', () => {
+    mockTasksData = [mockHelperTask, mockTask];
+
+    renderPage();
+
+    expect(screen.getByTestId('task-description-helper')).toBeInTheDocument();
+    expect(screen.getByText('Press Release')).toBeInTheDocument();
+    expect(
+      screen.getByText(/tag @Jovie and ask her to draft a first pass/i)
+    ).toBeInTheDocument();
+  });
+
+  it('does not show the helper when the selected task already has a description', () => {
+    renderPage();
+
+    expect(
+      screen.queryByTestId('task-description-helper')
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Task description')).toHaveValue(
+      mockTask.description
+    );
+  });
+
+  it('does not show the helper for manual empty-description tasks', () => {
+    mockTasksData = [
+      {
+        ...mockTask,
+        id: 'manual-task',
+        description: null,
+        releaseId: null,
+        releaseTitle: null,
+        metadata: null,
+      },
+      mockTask,
+    ];
+
+    renderPage();
+
+    expect(
+      screen.queryByTestId('task-description-helper')
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Task description')).toBeInTheDocument();
+  });
+
+  it('hides the helper when the user clicks into the helper body', () => {
+    mockTasksData = [mockHelperTask, mockTask];
+
+    renderPage();
+
+    fireEvent.click(screen.getByTestId('task-description-helper'));
+
+    expect(
+      screen.queryByTestId('task-description-helper')
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Task description')).toBeInTheDocument();
+  });
+
+  it('shows the helper for existing release tasks without helper metadata', () => {
+    mockTasksData = [
+      {
+        ...mockHelperTask,
+        metadata: {
+          dueDaysOffset: -21,
+        },
+      },
+      mockTask,
+    ];
+
+    renderPage();
+
+    expect(screen.getByTestId('task-description-helper')).toBeInTheDocument();
+    expect(screen.getByText('Press Release')).toBeInTheDocument();
+  });
+
+  it('hides the helper when the description editor receives focus', () => {
+    mockTasksData = [mockHelperTask, mockTask];
+
+    renderPage();
+
+    fireEvent.focus(screen.getByLabelText('Task description'));
+
+    expect(
+      screen.queryByTestId('task-description-helper')
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides the helper and keeps typed text in the editor', () => {
+    mockTasksData = [mockHelperTask, mockTask];
+
+    renderPage();
+
+    const editor = screen.getByLabelText('Task description');
+
+    fireEvent.focus(editor);
+    fireEvent.change(editor, {
+      target: {
+        value: 'H',
+      },
+    });
+
+    expect(
+      screen.queryByTestId('task-description-helper')
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Task description')).toHaveValue('H');
+  });
+
+  it('hides the helper before pasted text is written into the editor', () => {
+    mockTasksData = [mockHelperTask, mockTask];
+
+    renderPage();
+
+    const editor = screen.getByLabelText('Task description');
+
+    fireEvent.focus(editor);
+    fireEvent.paste(editor, {
+      clipboardData: {
+        getData: (type: string) => (type === 'text' ? 'Press copy' : ''),
+      },
+    });
+    fireEvent.change(editor, {
+      target: {
+        value: 'Press copy',
+      },
+    });
+
+    expect(
+      screen.queryByTestId('task-description-helper')
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Task description')).toHaveValue('Press copy');
+  });
+
+  it('does not dirty the editor when a helper link is clicked', () => {
+    mockTasksData = [mockHelperTask, mockTask];
+
+    renderPage();
+
+    fireEvent.click(
+      screen.getByRole('link', { name: 'UnitedMasters Promote Tab' })
+    );
+
+    expect(screen.getByTestId('task-description-helper')).toBeInTheDocument();
+    expect(screen.getByLabelText('Task description')).toHaveValue('');
   });
 
   it('renders previous and next task navigation controls', () => {

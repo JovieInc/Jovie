@@ -2,7 +2,7 @@
  * Default Release Task Template
  *
  * Deterministic, per-release tasks that apply to every single release.
- * No outreach, no indeterminate items — only platform submissions and actions.
+ * Includes platform submissions, rollout prep, and core campaign work.
  *
  * Items marked ai_workflow are auto-completed by Jovie (locked, pre-checked).
  * Items with explainerText show a ⓘ popover with founder guidance.
@@ -10,11 +10,14 @@
  * due_days_offset: negative = before release, 0 = release day, positive = after
  */
 
+import type { TaskDescriptionHelperPayload } from '@/lib/tasks/task-description-helper';
+
 export type DefaultTemplateItem = {
   title: string;
   description?: string;
   explainerText?: string;
   learnMoreUrl?: string;
+  descriptionHelper?: TaskDescriptionHelperPayload;
   category: string;
   assigneeType: 'human' | 'ai_workflow';
   aiWorkflowId?: string;
@@ -64,6 +67,37 @@ export const DEFAULT_RELEASE_TASK_TEMPLATE: DefaultTemplateItem[] = [
     title: 'Complete distributor marketing/pitching form',
     explainerText:
       'Most distributors (AWAL, Symphonic, UnitedMasters) have a marketing highlights form for DSP pitching. Fill it out completely — this is how your distributor pitches on your behalf.',
+    descriptionHelper: {
+      title: 'Distributor Marketing Form',
+      intro: [
+        'Uploading the song is not the whole job. Many distributors have a separate marketing or pitching form that their team uses to pitch your release to DSPs. If you skip it, your release can miss playlist consideration before release day.',
+        'Fill this out early and give real context, not vague hype.',
+      ],
+      bullets: [
+        'The story or hook for the release',
+        'Why this song matters now',
+        'Collaborators, producers, and notable credits',
+        'Recent traction, streams, saves, social growth, sold-out shows, or press',
+        'What marketing is happening around release day',
+        'Why editorial teams should care about this release now',
+      ],
+      links: [
+        {
+          label: 'TuneCore Artist Pitch Forms',
+          href: 'https://support.tunecore.com/hc/en-gb/articles/17878146830228-Artist-Pitch-Forms',
+        },
+        {
+          label: 'Symphonic Marketing Drivers',
+          href: 'https://blog.symphonic.com/2024/02/09/marketing-drivers-are-now-in-symphonicms-2/',
+        },
+        {
+          label: 'UnitedMasters Promote Tab',
+          href: 'https://support.unitedmasters.com/hc/en-us/articles/4407142673299-How-do-I-promote-my-music-using-UnitedMasters',
+        },
+      ],
+      footer:
+        'If your distributor has its own release marketing portal, complete that before release day.',
+    },
     category: 'Distribution',
     assigneeType: 'human',
     priority: 'high',
@@ -78,6 +112,30 @@ export const DEFAULT_RELEASE_TASK_TEMPLATE: DefaultTemplateItem[] = [
     category: 'Artwork',
     assigneeType: 'human',
     priority: 'high',
+    dueDaysOffset: -21,
+  },
+  {
+    title: 'Draft press release',
+    explainerText:
+      'Write a concise press release that explains what is coming out, why it matters now, and who should care. This becomes the source copy for press outreach, blogs, and internal campaign materials.',
+    descriptionHelper: {
+      title: 'Press Release',
+      intro: [
+        'Start drafting your press release here, or tag @Jovie and ask her to draft a first pass for you.',
+      ],
+      bullets: [
+        'What is being announced',
+        'Why this release matters now',
+        'Release date and key context',
+        'Featured collaborators, producers, or credits',
+        'One short artist bio paragraph',
+        'Links or assets needed for the release package',
+      ],
+      footer: 'Keep it tight. One page is enough.',
+    },
+    category: 'Press',
+    assigneeType: 'human',
+    priority: 'medium',
     dueDaysOffset: -21,
   },
 
