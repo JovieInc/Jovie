@@ -146,6 +146,7 @@ export function OtpInput({
                 onBlur={handleBlur}
                 disabled={disabled}
                 autoComplete={isFirstInput ? 'one-time-code' : 'off'}
+                aria-invalid={error || undefined}
                 className={cn(
                   'absolute inset-0 h-full w-full bg-transparent text-center text-[1.3rem] font-sans sm:text-[1.45rem]',
                   'outline-none border-none',

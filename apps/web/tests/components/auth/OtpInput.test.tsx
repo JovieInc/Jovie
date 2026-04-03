@@ -146,10 +146,12 @@ describe('OtpInput', () => {
   });
 
   it('shows error styling when error prop is true', () => {
-    const { container } = render(<OtpInput error />);
+    render(<OtpInput error />);
 
-    const digitBox = container.querySelector('[class*="linear-error"]');
-    expect(digitBox).toBeInTheDocument();
+    expect(screen.getByLabelText('Digit 1 of 6')).toHaveAttribute(
+      'aria-invalid',
+      'true'
+    );
   });
 
   it('renders progress indicator on mobile', () => {
