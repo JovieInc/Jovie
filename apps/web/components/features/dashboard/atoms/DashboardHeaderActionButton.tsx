@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 
 export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'h-7 gap-1.5 rounded-md border-transparent bg-transparent px-1.5 text-[12px] font-[560] text-secondary-token shadow-none hover:border-transparent hover:bg-transparent hover:text-primary-token focus-visible:border-transparent focus-visible:bg-transparent active:border-transparent active:bg-transparent [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-7 gap-1.5 rounded-full border-transparent bg-transparent px-2 text-[12px] font-[560] text-secondary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0 [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_ACTIVE_CLASS =
@@ -20,7 +20,7 @@ export const DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS =
   'rounded-full border-transparent bg-transparent text-tertiary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0';
 
 export const DASHBOARD_HEADER_ACTION_ICON_BUTTON_ACTIVE_CLASS =
-  'border-transparent bg-surface-0 text-primary-token shadow-none';
+  'border-transparent bg-transparent text-primary-token shadow-none';
 
 export interface DashboardHeaderActionButtonProps {
   readonly ariaLabel: string;

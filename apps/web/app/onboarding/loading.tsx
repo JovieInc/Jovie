@@ -16,6 +16,7 @@ export default function OnboardingLoading() {
     <OnboardingExperienceShell
       mode='standalone'
       stableStageHeight='tall'
+      stageVariant='flat'
       sidePanel={
         <aside
           className='hidden xl:block'

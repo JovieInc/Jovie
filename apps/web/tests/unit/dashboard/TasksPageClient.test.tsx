@@ -20,8 +20,8 @@ const mockTask = {
   agentOutput: null,
   agentError: null,
   dueAt: null,
-  releaseId: null,
-  releaseTitle: null,
+  releaseId: 'release-1',
+  releaseTitle: 'QA Release',
   parentTaskId: null,
   category: null,
   scheduledFor: null,
@@ -47,6 +47,9 @@ const mockTaskTwo = {
 
 const mockCreateTask = vi.fn();
 const mockUpdateTask = vi.fn();
+const mockSetHeaderActions = vi.fn();
+let mockIsXlUp = true;
+let mockIs2xlUp = true;
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({
@@ -61,7 +64,7 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
 
 vi.mock('@/contexts/HeaderActionsContext', () => ({
   useSetHeaderActions: () => ({
-    setHeaderActions: vi.fn(),
+    setHeaderActions: mockSetHeaderActions,
   }),
 }));
 
@@ -69,9 +72,23 @@ vi.mock('@/hooks/useRegisterRightPanel', () => ({
   useRegisterRightPanel: vi.fn(),
 }));
 
+vi.mock('@/hooks/useBreakpoint', () => ({
+  useBreakpoint: (breakpoint: string) => {
+    if (breakpoint === '2xl') {
+      return mockIs2xlUp;
+    }
+
+    if (breakpoint === 'xl') {
+      return mockIsXlUp;
+    }
+
+    return false;
+  },
+}));
+
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
   useReleasesQuery: () => ({
-    data: [],
+    data: [{ id: 'release-1', title: 'QA Release' }],
   }),
 }));
 
@@ -83,7 +100,12 @@ vi.mock('@/lib/queries/useTasksQuery', () => ({
     refetch: vi.fn(),
   }),
   useTaskQuery: (taskId: string | null) => ({
-    data: taskId === 'task-1' ? mockTask : undefined,
+    data:
+      taskId === 'task-1'
+        ? mockTask
+        : taskId === 'task-2'
+          ? mockTaskTwo
+          : undefined,
   }),
 }));
 
@@ -101,8 +123,18 @@ vi.mock('@/lib/queries/useTaskMutations', () => ({
 vi.mock(
   '@/components/features/dashboard/atoms/DashboardHeaderActionButton',
   () => ({
-    DashboardHeaderActionButton: ({ ariaLabel }: { ariaLabel: string }) => (
-      <button type='button' aria-label={ariaLabel} />
+    DashboardHeaderActionButton: ({
+      ariaLabel,
+      onClick,
+      label,
+    }: {
+      ariaLabel: string;
+      onClick?: () => void;
+      label?: React.ReactNode;
+    }) => (
+      <button type='button' aria-label={ariaLabel} onClick={onClick}>
+        {label}
+      </button>
     ),
   })
 );
@@ -125,7 +157,31 @@ vi.mock('@/components/organisms/table', () => ({
   PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS: '',
   PAGE_TOOLBAR_ICON_CLASS: '',
   PAGE_TOOLBAR_ICON_STROKE_WIDTH: 1.75,
-  PageToolbar: ({ start }: { start: React.ReactNode }) => <div>{start}</div>,
+  PageToolbarActionButton: ({
+    label,
+    onClick,
+    ariaLabel,
+  }: {
+    label: React.ReactNode;
+    onClick?: () => void;
+    ariaLabel?: string;
+  }) => (
+    <button type='button' onClick={onClick} aria-label={ariaLabel}>
+      {label}
+    </button>
+  ),
+  PageToolbar: ({
+    start,
+    end,
+  }: {
+    start: React.ReactNode;
+    end?: React.ReactNode;
+  }) => (
+    <div>
+      {start}
+      {end}
+    </div>
+  ),
   UnifiedTable: () => <div data-testid='tasks-table' />,
   convertContextMenuItems: vi.fn(() => []),
 }));
@@ -157,6 +213,9 @@ describe('TasksPageClient', () => {
     vi.useFakeTimers();
     mockCreateTask.mockReset();
     mockUpdateTask.mockReset();
+    mockSetHeaderActions.mockReset();
+    mockIsXlUp = true;
+    mockIs2xlUp = true;
   });
 
   afterEach(() => {
@@ -187,6 +246,16 @@ describe('TasksPageClient', () => {
     expect(screen.getByText('Done')).toBeInTheDocument();
     expect(screen.getByText('High')).toBeInTheDocument();
     expect(screen.getByText('You')).toBeInTheDocument();
+  });
+
+  it('hides the task document when the right panel opens on constrained desktop widths', () => {
+    mockIs2xlUp = false;
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'QA Release' }));
+
+    expect(screen.getByTestId('task-document-pane')).toHaveClass('hidden');
+    expect(screen.getByTestId('tasks-table')).toBeInTheDocument();
   });
 
   it('autosaves document edits and removes the manual save button', () => {
@@ -228,6 +297,34 @@ describe('TasksPageClient', () => {
     expect(screen.getByRole('button', { name: 'Next task' })).toBeEnabled();
   });
 
+  it('promotes the header into search mode when search is triggered', () => {
+    renderPage();
+
+    expect(
+      screen.queryByRole('searchbox', { name: 'Search tasks' })
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search tasks' }));
+
+    expect(
+      screen.getByRole('searchbox', { name: 'Search tasks' })
+    ).toBeInTheDocument();
+  });
+
+  it('promotes the header into create mode when new task is triggered', () => {
+    renderPage();
+
+    const headerActions = mockSetHeaderActions.mock.calls.at(-1)?.[0];
+    expect(headerActions).toBeTruthy();
+
+    render(headerActions);
+    fireEvent.click(screen.getByRole('button', { name: 'Create task' }));
+
+    expect(screen.getByLabelText('New task name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+  });
+
   it('supports j and k keyboard navigation across visible tasks', () => {
     renderPage();
 
@@ -238,5 +335,14 @@ describe('TasksPageClient', () => {
 
     fireEvent.keyDown(window, { key: 'k' });
     expect(screen.getByLabelText('Task title')).toHaveValue(mockTask.title);
+  });
+
+  it('does not auto-select a task on narrower layouts', () => {
+    mockIsXlUp = false;
+
+    renderPage();
+
+    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+    expect(screen.getByTestId('tasks-table')).toBeInTheDocument();
   });
 });

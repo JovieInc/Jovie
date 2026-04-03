@@ -144,8 +144,38 @@ describe('surface elevation guardrails', () => {
 
     expect(onboardingForm).toContain('OnboardingExperienceShell');
     expect(onboardingLoading).toContain('OnboardingExperienceShell');
+    expect(onboardingLoading).toContain("stageVariant='flat'");
     expect(demoOnboarding).toContain('OnboardingExperienceShell');
     expect(demoShowcaseSurface).toContain('DemoOnboardingShowcase');
+  });
+
+  it('routes entry and auth-adjacent screens through AuthLayout', () => {
+    const signinPage = readFileSync(
+      join(ROOT, 'app/(auth)/signin/page.tsx'),
+      'utf-8'
+    );
+    const signupPage = readFileSync(
+      join(ROOT, 'app/(auth)/signup/page.tsx'),
+      'utf-8'
+    );
+    const userCreationFailed = readFileSync(
+      join(ROOT, 'app/error/user-creation-failed/page.tsx'),
+      'utf-8'
+    );
+    const onboardingCheckout = readFileSync(
+      join(ROOT, 'app/onboarding/checkout/page.tsx'),
+      'utf-8'
+    );
+    const waitlistSuccess = readFileSync(
+      join(ROOT, 'components/features/waitlist/WaitlistSuccessView.tsx'),
+      'utf-8'
+    );
+
+    expect(signinPage).toContain('<AuthLayout');
+    expect(signupPage).toContain('<AuthLayout');
+    expect(userCreationFailed).toContain('<AuthLayout');
+    expect(onboardingCheckout).toContain('<AuthLayout');
+    expect(waitlistSuccess).toContain('<AuthLayout');
   });
 
   it('keeps the tasks workspace inside a framed content panel', () => {
@@ -182,8 +212,25 @@ describe('surface elevation guardrails', () => {
     expect(presenceView).toContain('PageShell');
     expect(presenceView).toContain("data-testid='dsp-presence-content-panel'");
     expect(earningsView).toContain('PageShell');
+    expect(earningsView).toContain("maxWidth='wide'");
+    expect(earningsView).toContain("contentPadding='compact'");
     expect(earningsView).toContain(
       "data-testid='dashboard-earnings-content-panel'"
+    );
+  });
+
+  it('keeps release empty states on the shared shell inset instead of duplicating margins', () => {
+    const releaseMatrix = readFileSync(
+      join(
+        ROOT,
+        'components/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix.tsx'
+      ),
+      'utf-8'
+    );
+
+    expect(releaseMatrix).toContain("<PageShell className='mt-2.5'");
+    expect(releaseMatrix).toContain(
+      "<PageShell className='mt-2.5' data-testid='release-table-shell'>"
     );
   });
 

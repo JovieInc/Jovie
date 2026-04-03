@@ -408,114 +408,114 @@ export function DashboardTipping() {
   return (
     <>
       <h1 className='sr-only'>Earnings Dashboard</h1>
-      <PageShell data-testid='dashboard-earnings-workspace'>
-        <div className='flex-1 overflow-y-auto overflow-x-hidden'>
-          <div
-            className='mx-auto flex w-full max-w-[76rem] flex-col'
-            data-testid='dashboard-earnings-content-panel'
-          >
-            <div className='flex flex-col gap-4 p-3 sm:p-4'>
-              {hasVenmoHandle && !isEditing ? (
-                <div className='flex justify-end'>
-                  <VenmoConnectedBadge
-                    venmoHandle={artist.venmo_handle?.replace(/^@/, '') ?? ''}
-                    onEdit={() => {
-                      setIsEditing(true);
-                      setIsEditDialogOpen(true);
-                    }}
-                    onDisconnect={handleDisconnect}
-                  />
-                </div>
-              ) : null}
-
-              {!hasVenmoHandle && (
-                <>
-                  <ContentSurfaceCard className='px-6 py-12 sm:px-8 sm:py-14'>
-                    <div className='mx-auto flex max-w-md flex-col items-center text-center'>
-                      <div
-                        className='mb-4 flex h-11 w-11 items-center justify-center rounded-[10px] border border-accent/20 bg-accent/10'
-                        aria-hidden='true'
-                      >
-                        <Wallet className='h-5 w-5 text-accent-token' />
-                      </div>
-                      <h2 className='text-[17px] font-[590] tracking-[-0.011em] text-primary-token sm:text-[18px]'>
-                        Connect Venmo to unlock earnings
-                      </h2>
-                      <p className='mt-2 text-[13px] leading-5 text-secondary-token sm:text-[14px]'>
-                        Link your Venmo once to start receiving tips and reveal
-                        your full earnings dashboard.
-                      </p>
-                      <Button
-                        onClick={() => setIsConnectOpen(true)}
-                        variant='primary'
-                        size='sm'
-                        className='mt-5 rounded-[10px] text-[11px] font-[510] tracking-[-0.01em]'
-                      >
-                        Connect Venmo
-                      </Button>
-                    </div>
-                  </ContentSurfaceCard>
-                  <VenmoConnectDialog
-                    open={isConnectOpen}
-                    onClose={handleCloseConnect}
-                    venmoHandle={venmoHandle}
-                    onVenmoHandleChange={setVenmoHandle}
-                    onSave={handleSaveVenmo}
-                    isSaving={isSaving}
-                    saveSuccess={saveSuccess}
-                  />
-                </>
-              )}
-
-              {hasVenmoHandle && (
-                <>
-                  <ContentSurfaceCard className='overflow-hidden p-0'>
-                    <div className='grid grid-cols-1 gap-0 sm:grid-cols-[minmax(0,1fr)_320px]'>
-                      <div className='grid grid-cols-2 gap-0 [&>*]:border-b [&>*]:border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] sm:grid-cols-3 sm:[&>*]:border-b-0 sm:[&>*]:border-r sm:[&>*:last-child]:border-r-0'>
-                        <StatCard
-                          label='QR scans'
-                          value={qrTipClicks}
-                          description='Fans who scanned your QR'
-                          icon={ScanLine}
-                          iconChipClassName='border border-subtle bg-surface-1'
-                          iconClassName='text-success'
-                          bordered={false}
-                        />
-                        <StatCard
-                          label='Link clicks'
-                          value={linkTipClicks}
-                          description='Fans who clicked your link'
-                          icon={MousePointerClick}
-                          iconChipClassName='border border-subtle bg-surface-1'
-                          iconClassName='text-info'
-                          bordered={false}
-                        />
-                        <StatCard
-                          label='Total visits'
-                          value={tipClicks}
-                          description='QR + link combined'
-                          icon={BarChart3}
-                          iconChipClassName='border border-subtle bg-surface-1'
-                          iconClassName='text-accent'
-                          bordered={false}
-                        />
-                      </div>
-                      <div className='border-t border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-4 py-4 sm:border-l sm:border-t-0 sm:px-5'>
-                        <TipLinkSection
-                          tipUrl={tipUrls.tipUrl}
-                          tipRelativePathLink={tipUrls.tipRelativePathLink}
-                        />
-                      </div>
-                    </div>
-                  </ContentSurfaceCard>
-
-                  <EarningsTab />
-                </>
-              )}
-
-              <ShopifyStoreCard />
+      <PageShell
+        maxWidth='wide'
+        contentPadding='compact'
+        data-testid='dashboard-earnings-workspace'
+      >
+        <div
+          className='flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden'
+          data-testid='dashboard-earnings-content-panel'
+        >
+          {hasVenmoHandle && !isEditing ? (
+            <div className='flex justify-end'>
+              <VenmoConnectedBadge
+                venmoHandle={artist.venmo_handle?.replace(/^@/, '') ?? ''}
+                onEdit={() => {
+                  setIsEditing(true);
+                  setIsEditDialogOpen(true);
+                }}
+                onDisconnect={handleDisconnect}
+              />
             </div>
-          </div>
+          ) : null}
+
+          {!hasVenmoHandle && (
+            <>
+              <ContentSurfaceCard className='px-6 py-12 sm:px-8 sm:py-14'>
+                <div className='mx-auto flex max-w-md flex-col items-center text-center'>
+                  <div
+                    className='mb-4 flex h-11 w-11 items-center justify-center rounded-[10px] border border-accent/20 bg-accent/10'
+                    aria-hidden='true'
+                  >
+                    <Wallet className='h-5 w-5 text-accent-token' />
+                  </div>
+                  <h2 className='text-[17px] font-[590] tracking-[-0.011em] text-primary-token sm:text-[18px]'>
+                    Connect Venmo to unlock earnings
+                  </h2>
+                  <p className='mt-2 text-[13px] leading-5 text-secondary-token sm:text-[14px]'>
+                    Link your Venmo once to start receiving tips and reveal your
+                    full earnings dashboard.
+                  </p>
+                  <Button
+                    onClick={() => setIsConnectOpen(true)}
+                    variant='primary'
+                    size='sm'
+                    className='mt-5 rounded-[10px] text-[11px] font-[510] tracking-[-0.01em]'
+                  >
+                    Connect Venmo
+                  </Button>
+                </div>
+              </ContentSurfaceCard>
+              <VenmoConnectDialog
+                open={isConnectOpen}
+                onClose={handleCloseConnect}
+                venmoHandle={venmoHandle}
+                onVenmoHandleChange={setVenmoHandle}
+                onSave={handleSaveVenmo}
+                isSaving={isSaving}
+                saveSuccess={saveSuccess}
+              />
+            </>
+          )}
+
+          {hasVenmoHandle && (
+            <>
+              <ContentSurfaceCard className='overflow-hidden p-0'>
+                <div className='grid grid-cols-1 gap-0 sm:grid-cols-[minmax(0,1fr)_320px]'>
+                  <div className='grid grid-cols-2 gap-0 [&>*]:border-b [&>*]:border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] sm:grid-cols-3 sm:[&>*]:border-b-0 sm:[&>*]:border-r sm:[&>*:last-child]:border-r-0'>
+                    <StatCard
+                      label='QR scans'
+                      value={qrTipClicks}
+                      description='Fans who scanned your QR'
+                      icon={ScanLine}
+                      iconChipClassName='border border-subtle bg-surface-1'
+                      iconClassName='text-success'
+                      bordered={false}
+                    />
+                    <StatCard
+                      label='Link clicks'
+                      value={linkTipClicks}
+                      description='Fans who clicked your link'
+                      icon={MousePointerClick}
+                      iconChipClassName='border border-subtle bg-surface-1'
+                      iconClassName='text-info'
+                      bordered={false}
+                    />
+                    <StatCard
+                      label='Total visits'
+                      value={tipClicks}
+                      description='QR + link combined'
+                      icon={BarChart3}
+                      iconChipClassName='border border-subtle bg-surface-1'
+                      iconClassName='text-accent'
+                      bordered={false}
+                    />
+                  </div>
+                  <div className='border-t border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-4 py-4 sm:border-l sm:border-t-0 sm:px-5'>
+                    <TipLinkSection
+                      tipUrl={tipUrls.tipUrl}
+                      tipRelativePathLink={tipUrls.tipRelativePathLink}
+                    />
+                  </div>
+                </div>
+              </ContentSurfaceCard>
+
+              <EarningsTab />
+            </>
+          )}
+
+          <ShopifyStoreCard />
         </div>
       </PageShell>
 

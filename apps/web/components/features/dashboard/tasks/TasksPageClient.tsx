@@ -4,30 +4,23 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
-  Input,
   UserAvatar,
 } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
-  ArrowDown,
   ArrowLeft,
-  ArrowUp,
-  Bot,
-  Check,
   ChevronDown,
   Disc3,
   FileText,
-  Flag,
   MoreVertical,
   Plus,
-  User,
-  X,
 } from 'lucide-react';
 import {
+  type ComponentPropsWithoutRef,
   type FormEvent,
-  type ReactNode,
+  forwardRef,
   startTransition,
   useCallback,
   useDeferredValue,
@@ -41,24 +34,28 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import { providerConfig } from '@/app/app/(shell)/dashboard/releases/config';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
 import { TaskListRow } from '@/components/features/dashboard/tasks/TaskListRow';
 import {
   HIDDEN_DIV_STYLES,
   useTextareaAutosize,
 } from '@/components/jovie/hooks/useTextareaAutosize';
-import { AppSearchField } from '@/components/molecules/AppSearchField';
-import { TableFilterDropdown } from '@/components/molecules/filters';
+import {
+  TOOLBAR_MENU_CONTENT_CLASS,
+  TOOLBAR_MENU_SEPARATOR_CLASS,
+  ToolbarMenuChoiceItem,
+} from '@/components/molecules/menus/ToolbarMenuPrimitives';
 import { PageShell } from '@/components/organisms/PageShell';
 import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
-  PageToolbar,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import {
@@ -75,12 +72,12 @@ import type {
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
 import { isFormElement } from '@/lib/utils/keyboard';
+import { TaskWorkspaceHeaderBar } from './TaskWorkspaceHeaderBar';
 import {
-  getTaskAssigneeMeta,
-  getTaskPriorityFilterIcon,
-  getTaskPriorityMeta,
-  getTaskStatusFilterIcon,
-  getTaskVisualStage,
+  getTaskAssigneeVisual,
+  getTaskPriorityVisual,
+  getTaskStageVisual,
+  getTaskStatusVisual,
 } from './task-presentation';
 
 const columnHelper = createColumnHelper<TaskView>();
@@ -128,7 +125,7 @@ function TaskStageInline({
   task: TaskView;
   withChevron?: boolean;
 }>) {
-  const stage = getTaskVisualStage(task.status, task.agentStatus);
+  const stage = getTaskStageVisual(task.status, task.agentStatus);
   const accent = getAccentCssVars(stage.accent);
   const StageIcon = stage.icon;
 
@@ -138,13 +135,7 @@ function TaskStageInline({
       title={`Progress ${stage.label}`}
     >
       <StageIcon
-        className={cn(
-          'h-3.5 w-3.5',
-          task.status === 'done' && 'fill-current',
-          task.status === 'in_progress' &&
-            stage.percent === 50 &&
-            'animate-spin [animation-duration:3s]'
-        )}
+        className={cn('h-3.5 w-3.5', task.status === 'done' && 'fill-current')}
         style={{ color: accent.solid }}
       />
       <span className='font-[560] text-secondary-token'>{stage.label}</span>
@@ -162,24 +153,20 @@ function TaskPriorityInline({
   priority: TaskPriority;
   withChevron?: boolean;
 }>) {
-  const meta = getTaskPriorityMeta(priority);
-  if (!meta) {
-    return null;
-  }
-
-  const accent = getAccentCssVars(meta.accent);
+  const visual = getTaskPriorityVisual(priority);
+  const accent = getAccentCssVars(visual.accent);
 
   return (
     <span
       className='inline-flex items-center gap-1.5 text-secondary-token'
-      title={`Priority ${meta.label}`}
+      title={`Priority ${visual.label}`}
     >
       <span
         className='h-1.5 w-1.5 rounded-full'
         style={{ backgroundColor: accent.solid }}
         aria-hidden='true'
       />
-      <span className='font-[560] text-secondary-token'>{meta.label}</span>
+      <span className='font-[560] text-secondary-token'>{visual.label}</span>
       {withChevron ? (
         <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
       ) : null}
@@ -196,7 +183,7 @@ function TaskAssigneeInline({
   artistName?: string | null;
   withChevron?: boolean;
 }>) {
-  const meta = getTaskAssigneeMeta(assigneeKind, artistName);
+  const meta = getTaskAssigneeVisual(assigneeKind, artistName);
   const accent = getAccentCssVars(meta.accent);
 
   return (
@@ -205,12 +192,13 @@ function TaskAssigneeInline({
       title={`Assignee ${meta.label}`}
     >
       <span
+        aria-hidden='true'
         className='inline-flex rounded-full'
         style={{
           boxShadow: `0 0 0 1px color-mix(in oklab, ${accent.solid} 18%, transparent)`,
         }}
       >
-        <UserAvatar name={meta.name} size='xs' />
+        <UserAvatar name={meta.avatarName} size='xs' />
       </span>
       <span className='font-[560] text-secondary-token'>{meta.label}</span>
       {withChevron ? (
@@ -220,23 +208,77 @@ function TaskAssigneeInline({
   );
 }
 
-function TaskMetaTrigger({
-  children,
-  ariaLabel,
+function TaskStatusLeadingVisual({
+  status,
 }: Readonly<{
-  children: ReactNode;
-  ariaLabel: string;
+  status: TaskStatus;
 }>) {
+  const visual = getTaskStatusVisual(status);
+  const accent = getAccentCssVars(visual.accent);
+  const StatusIcon = visual.icon;
+
+  return (
+    <StatusIcon
+      className={cn('h-4 w-4', visual.filled && 'fill-current')}
+      style={{ color: accent.solid }}
+    />
+  );
+}
+
+function TaskPriorityLeadingVisual({
+  priority,
+}: Readonly<{
+  priority: TaskPriority;
+}>) {
+  const visual = getTaskPriorityVisual(priority);
+  const accent = getAccentCssVars(visual.accent);
+
+  return (
+    <span
+      className='inline-flex h-4 w-4 items-center justify-center'
+      aria-hidden='true'
+    >
+      <span
+        className='h-1.5 w-1.5 rounded-full'
+        style={{ backgroundColor: accent.solid }}
+      />
+    </span>
+  );
+}
+
+function TaskAssigneeLeadingVisual({
+  assigneeKind,
+  artistName,
+}: Readonly<{
+  assigneeKind: TaskAssigneeKind;
+  artistName?: string | null;
+}>) {
+  const meta = getTaskAssigneeVisual(assigneeKind, artistName);
+
+  return <UserAvatar name={meta.avatarName} size='xs' />;
+}
+
+const TaskMetaTrigger = forwardRef<
+  HTMLButtonElement,
+  ComponentPropsWithoutRef<'button'> & {
+    ariaLabel: string;
+  }
+>(function TaskMetaTrigger({ children, ariaLabel, className, ...props }, ref) {
   return (
     <button
+      ref={ref}
       type='button'
       aria-label={ariaLabel}
-      className='-mx-1 inline-flex min-w-0 items-center rounded-md px-1 py-1 text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token data-[state=open]:bg-surface-1 data-[state=open]:text-primary-token'
+      className={cn(
+        '-mx-1 inline-flex min-w-0 items-center rounded-md px-1 py-1 text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token data-[state=open]:bg-surface-1 data-[state=open]:text-primary-token',
+        className
+      )}
+      {...props}
     >
       {children}
     </button>
   );
-}
+});
 
 function TaskMetaMenuNumber({
   task,
@@ -264,60 +306,59 @@ function TaskMetaMenuNumber({
       <DropdownMenuContent
         align='start'
         sideOffset={8}
-        className='min-w-[13rem]'
+        className={TOOLBAR_MENU_CONTENT_CLASS}
       >
         {task.releaseId ? (
-          <DropdownMenuItem onSelect={() => onOpenRelease(task)}>
-            <Disc3 className='mr-2 h-4 w-4' />
-            Open Release
-          </DropdownMenuItem>
+          <ToolbarMenuChoiceItem
+            active={false}
+            leadingVisual={<Disc3 className='h-4 w-4' />}
+            label='Open Release'
+            onSelect={() => onOpenRelease(task)}
+          />
+        ) : null}
+        {task.releaseId ? (
+          <DropdownMenuSeparator className={TOOLBAR_MENU_SEPARATOR_CLASS} />
         ) : null}
         {TASK_STATUS_OPTIONS.map(([value, label]) => {
-          const Icon = getTaskStatusFilterIcon(value);
-
           return (
-            <DropdownMenuItem
+            <ToolbarMenuChoiceItem
               key={value}
+              active={task.status === value}
+              leadingVisual={<TaskStatusLeadingVisual status={value} />}
+              label={label}
               onSelect={() => onUpdateStatus(value)}
               disabled={task.status === value}
-            >
-              <Icon className='mr-2 h-4 w-4' />
-              <span className='flex-1'>{label}</span>
-              {task.status === value ? <Check className='h-4 w-4' /> : null}
-            </DropdownMenuItem>
+            />
           );
         })}
+        <DropdownMenuSeparator className={TOOLBAR_MENU_SEPARATOR_CLASS} />
         {TASK_PRIORITY_OPTIONS.map(([value, label]) => {
-          const Icon = getTaskPriorityFilterIcon(value);
-
           return (
-            <DropdownMenuItem
+            <ToolbarMenuChoiceItem
               key={value}
+              active={task.priority === value}
+              leadingVisual={<TaskPriorityLeadingVisual priority={value} />}
+              label={label}
               onSelect={() => onUpdatePriority(value)}
               disabled={task.priority === value}
-            >
-              <Icon className='mr-2 h-4 w-4' />
-              <span className='flex-1'>{label}</span>
-              {task.priority === value ? <Check className='h-4 w-4' /> : null}
-            </DropdownMenuItem>
+            />
           );
         })}
+        <DropdownMenuSeparator className={TOOLBAR_MENU_SEPARATOR_CLASS} />
         {TASK_ASSIGNEE_OPTIONS.map(([value, label]) => {
-          const meta = getTaskAssigneeMeta(value);
-          const Icon = meta.filterIcon;
-
           return (
-            <DropdownMenuItem
+            <ToolbarMenuChoiceItem
               key={value}
+              active={task.assigneeKind === value}
+              leadingVisual={
+                <span aria-hidden='true'>
+                  <TaskAssigneeLeadingVisual assigneeKind={value} />
+                </span>
+              }
+              label={label}
               onSelect={() => onUpdateAssignee(value)}
               disabled={task.assigneeKind === value}
-            >
-              <Icon className='mr-2 h-4 w-4' />
-              <span className='flex-1'>{label}</span>
-              {task.assigneeKind === value ? (
-                <Check className='h-4 w-4' />
-              ) : null}
-            </DropdownMenuItem>
+            />
           );
         })}
       </DropdownMenuContent>
@@ -337,10 +378,7 @@ function TaskDocumentPanel({
   onUpdatePriority,
   onUpdateAssignee,
   artistName,
-  canSelectPrevious,
-  canSelectNext,
-  onSelectPrevious,
-  onSelectNext,
+  isDesktopLayout,
 }: Readonly<{
   task: TaskView | null;
   title: string;
@@ -353,10 +391,7 @@ function TaskDocumentPanel({
   onUpdatePriority: (taskId: string, priority: TaskPriority) => void;
   onUpdateAssignee: (taskId: string, assigneeKind: TaskAssigneeKind) => void;
   artistName?: string | null;
-  canSelectPrevious: boolean;
-  canSelectNext: boolean;
-  onSelectPrevious: () => void;
-  onSelectNext: () => void;
+  isDesktopLayout: boolean;
 }>) {
   if (!task) {
     return (
@@ -378,154 +413,141 @@ function TaskDocumentPanel({
   return (
     <div className='flex min-h-0 min-w-0 flex-1 flex-col px-2 pb-2 pr-2 pt-2'>
       <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
-        <div className='flex flex-col gap-3 border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_68%,transparent)] px-5 py-3 sm:px-6 xl:flex-row xl:items-center xl:justify-between'>
-          <div className='flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-secondary-token'>
-            <TaskMetaMenuNumber
-              task={task}
-              onOpenRelease={onOpenRelease}
-              onUpdateStatus={status => onUpdateStatus(task.id, status)}
-              onUpdatePriority={priority => onUpdatePriority(task.id, priority)}
-              onUpdateAssignee={assigneeKind =>
-                onUpdateAssignee(task.id, assigneeKind)
-              }
-            />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <TaskMetaTrigger ariaLabel='Change task status'>
-                  <TaskStageInline task={task} withChevron />
-                </TaskMetaTrigger>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align='start' sideOffset={8}>
-                {TASK_STATUS_OPTIONS.map(([value, label]) => {
-                  const Icon = getTaskStatusFilterIcon(value);
-
-                  return (
-                    <DropdownMenuItem
-                      key={value}
-                      onSelect={() => onUpdateStatus(task.id, value)}
-                      disabled={task.status === value}
-                    >
-                      <Icon className='mr-2 h-4 w-4' />
-                      <span className='flex-1'>{label}</span>
-                      {task.status === value ? (
-                        <Check className='h-4 w-4' />
-                      ) : null}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <TaskMetaTrigger ariaLabel='Change task priority'>
-                  <TaskPriorityInline priority={task.priority} withChevron />
-                </TaskMetaTrigger>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align='start' sideOffset={8}>
-                {TASK_PRIORITY_OPTIONS.map(([value, label]) => {
-                  const Icon = getTaskPriorityFilterIcon(value);
-
-                  return (
-                    <DropdownMenuItem
-                      key={value}
-                      onSelect={() => onUpdatePriority(task.id, value)}
-                      disabled={task.priority === value}
-                    >
-                      <Icon className='mr-2 h-4 w-4' />
-                      <span className='flex-1'>{label}</span>
-                      {task.priority === value ? (
-                        <Check className='h-4 w-4' />
-                      ) : null}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <TaskMetaTrigger ariaLabel='Change task assignee'>
-                  <TaskAssigneeInline
-                    assigneeKind={task.assigneeKind}
-                    artistName={artistName}
-                    withChevron
-                  />
-                </TaskMetaTrigger>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align='start' sideOffset={8}>
-                {TASK_ASSIGNEE_OPTIONS.map(([value, label]) => {
-                  const meta = getTaskAssigneeMeta(value, artistName);
-                  const Icon = meta.filterIcon;
-
-                  return (
-                    <DropdownMenuItem
-                      key={value}
-                      onSelect={() => onUpdateAssignee(task.id, value)}
-                      disabled={task.assigneeKind === value}
-                    >
-                      <Icon className='mr-2 h-4 w-4' />
-                      <span className='flex-1'>{label}</span>
-                      {task.assigneeKind === value ? (
-                        <Check className='h-4 w-4' />
-                      ) : null}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {task.dueAt ? (
-              <ReleaseTaskDueBadge
-                dueDate={task.dueAt}
-                dueDaysOffset={null}
-                isCompleted={task.status === 'done'}
-              />
-            ) : null}
-            {hasRelease ? (
-              <button
-                type='button'
-                onClick={() => onOpenRelease(task)}
-                className='inline-flex min-w-0 items-center gap-1 text-secondary-token transition-colors hover:text-primary-token'
-              >
-                <Disc3 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-                <span className='truncate font-[560]'>{task.releaseTitle}</span>
-              </button>
-            ) : null}
-          </div>
-          <div className='flex shrink-0 items-center justify-end gap-1'>
-            <div className='hidden items-center gap-0.5 xl:flex'>
-              <button
-                type='button'
-                onClick={onSelectPrevious}
-                aria-label='Previous task'
-                disabled={!canSelectPrevious}
-                className='inline-flex h-7 w-7 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token disabled:cursor-default disabled:opacity-35'
-              >
-                <ArrowUp className='h-3.5 w-3.5' />
-              </button>
-              <button
-                type='button'
-                onClick={onSelectNext}
-                aria-label='Next task'
-                disabled={!canSelectNext}
-                className='inline-flex h-7 w-7 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token disabled:cursor-default disabled:opacity-35'
-              >
-                <ArrowDown className='h-3.5 w-3.5' />
-              </button>
-            </div>
-            <button
-              type='button'
-              onClick={onClose}
-              aria-label='Back to task list'
-              className='inline-flex h-8 w-8 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token xl:hidden'
-            >
-              <ArrowLeft className='h-4 w-4' />
-            </button>
-          </div>
-        </div>
-
         <div className='min-h-0 flex-1 overflow-y-auto'>
-          <div className='mx-auto flex w-full max-w-[46rem] flex-col gap-4 px-5 py-6 sm:px-8 sm:py-8'>
-            <div className='space-y-1'>
-              <TaskTitleEditor value={title} onChange={onTitleChange} />
+          <div className='mx-auto flex w-full max-w-[40rem] flex-col gap-3 px-4 pb-5 pt-4 sm:px-5 sm:pb-6 sm:pt-5'>
+            <TaskTitleEditor value={title} onChange={onTitleChange} />
+
+            <div className='flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_68%,transparent)] pb-3 text-[11px] text-secondary-token'>
+              <TaskMetaMenuNumber
+                task={task}
+                onOpenRelease={onOpenRelease}
+                onUpdateStatus={status => onUpdateStatus(task.id, status)}
+                onUpdatePriority={priority =>
+                  onUpdatePriority(task.id, priority)
+                }
+                onUpdateAssignee={assigneeKind =>
+                  onUpdateAssignee(task.id, assigneeKind)
+                }
+              />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <TaskMetaTrigger ariaLabel='Change task status'>
+                    <TaskStageInline task={task} withChevron />
+                  </TaskMetaTrigger>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align='start'
+                  sideOffset={8}
+                  className={TOOLBAR_MENU_CONTENT_CLASS}
+                >
+                  {TASK_STATUS_OPTIONS.map(([value, label]) => {
+                    return (
+                      <ToolbarMenuChoiceItem
+                        key={value}
+                        active={task.status === value}
+                        leadingVisual={
+                          <TaskStatusLeadingVisual status={value} />
+                        }
+                        label={label}
+                        onSelect={() => onUpdateStatus(task.id, value)}
+                        disabled={task.status === value}
+                      />
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <TaskMetaTrigger ariaLabel='Change task priority'>
+                    <TaskPriorityInline priority={task.priority} withChevron />
+                  </TaskMetaTrigger>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align='start'
+                  sideOffset={8}
+                  className={TOOLBAR_MENU_CONTENT_CLASS}
+                >
+                  {TASK_PRIORITY_OPTIONS.map(([value, label]) => {
+                    return (
+                      <ToolbarMenuChoiceItem
+                        key={value}
+                        active={task.priority === value}
+                        leadingVisual={
+                          <TaskPriorityLeadingVisual priority={value} />
+                        }
+                        label={label}
+                        onSelect={() => onUpdatePriority(task.id, value)}
+                        disabled={task.priority === value}
+                      />
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <TaskMetaTrigger ariaLabel='Change task assignee'>
+                    <TaskAssigneeInline
+                      assigneeKind={task.assigneeKind}
+                      artistName={artistName}
+                      withChevron
+                    />
+                  </TaskMetaTrigger>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align='start'
+                  sideOffset={8}
+                  className={TOOLBAR_MENU_CONTENT_CLASS}
+                >
+                  {TASK_ASSIGNEE_OPTIONS.map(([value, label]) => {
+                    return (
+                      <ToolbarMenuChoiceItem
+                        key={value}
+                        active={task.assigneeKind === value}
+                        leadingVisual={
+                          <span aria-hidden='true'>
+                            <TaskAssigneeLeadingVisual
+                              assigneeKind={value}
+                              artistName={artistName}
+                            />
+                          </span>
+                        }
+                        label={label}
+                        onSelect={() => onUpdateAssignee(task.id, value)}
+                        disabled={task.assigneeKind === value}
+                      />
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {task.dueAt ? (
+                <ReleaseTaskDueBadge
+                  dueDate={task.dueAt}
+                  dueDaysOffset={null}
+                  isCompleted={task.status === 'done'}
+                />
+              ) : null}
+              {hasRelease ? (
+                <button
+                  type='button'
+                  onClick={() => onOpenRelease(task)}
+                  className='inline-flex min-w-0 items-center gap-1 text-secondary-token transition-colors hover:text-primary-token'
+                >
+                  <Disc3 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
+                  <span className='truncate font-[560]'>
+                    {task.releaseTitle}
+                  </span>
+                </button>
+              ) : null}
+              {isDesktopLayout ? null : (
+                <button
+                  type='button'
+                  onClick={onClose}
+                  aria-label='Back to task list'
+                  className='inline-flex h-8 w-8 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
+                >
+                  <ArrowLeft className='h-4 w-4' />
+                </button>
+              )}
             </div>
 
             <textarea
@@ -533,7 +555,7 @@ function TaskDocumentPanel({
               value={description}
               onChange={event => onDescriptionChange(event.target.value)}
               placeholder='Start writing...'
-              className='min-h-[520px] w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-[1.95] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
+              className='min-h-[520px] w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
             />
           </div>
         </div>
@@ -567,7 +589,7 @@ function TaskTitleEditor({
         aria-label='Task title'
         onChange={event => onChange(event.target.value)}
         placeholder='Untitled Task'
-        className='w-full resize-none border-0 bg-transparent px-0 py-0 text-[clamp(1.85rem,3vw,2.75rem)] font-[620] leading-[1.04] tracking-[-0.045em] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)]'
+        className='w-full resize-none border-0 bg-transparent px-0 py-0 text-[clamp(1.7rem,2.6vw,2.45rem)] font-[620] leading-[1.06] tracking-[-0.04em] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)]'
         style={{
           height: measuredHeight,
           overflowY: isAtMaxHeight ? 'auto' : 'hidden',
@@ -578,10 +600,10 @@ function TaskTitleEditor({
         aria-hidden='true'
         style={{
           ...HIDDEN_DIV_STYLES,
-          fontSize: 'clamp(1.85rem, 3vw, 2.75rem)',
-          lineHeight: '1.04',
+          fontSize: 'clamp(1.7rem, 2.6vw, 2.45rem)',
+          lineHeight: '1.06',
           fontWeight: 620,
-          letterSpacing: '-0.045em',
+          letterSpacing: '-0.04em',
           padding: '0',
         }}
       />
@@ -646,6 +668,12 @@ function TaskEmptyState({
 
 export function TasksPageClient() {
   const { selectedProfile } = useDashboardData();
+  const { setHeaderActions } = useSetHeaderActions();
+  const isXlUp = useBreakpoint('xl');
+  const is2xlUp = useBreakpoint('2xl');
+  const [headerMode, setHeaderMode] = useState<'default' | 'search' | 'create'>(
+    'default'
+  );
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>(
@@ -655,8 +683,6 @@ export function TasksPageClient() {
     TaskAssigneeKind | 'all'
   >('all');
   const [draftTitle, setDraftTitle] = useState('');
-  const [isComposerOpen, setIsComposerOpen] = useState(false);
-  const [isToolbarMenuOpen, setIsToolbarMenuOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(
     null
@@ -668,7 +694,6 @@ export function TasksPageClient() {
   const createTaskMutation = useCreateTaskMutation();
   const updateTaskMutation = useUpdateTaskMutation();
   const { data: releases = [] } = useReleasesQuery(profileId ?? '');
-  const { setHeaderActions } = useSetHeaderActions();
 
   const filters = useMemo(
     () => ({
@@ -684,18 +709,30 @@ export function TasksPageClient() {
     profileId,
     filters
   );
-  const { data: selectedTaskData } = useTaskQuery(selectedTaskId, profileId);
   const tasks = useMemo(() => data?.tasks ?? [], [data?.tasks]);
+  const effectiveSelectedTaskId =
+    selectedTaskId ?? (isXlUp ? (tasks[0]?.id ?? null) : null);
+  const { data: selectedTaskData } = useTaskQuery(
+    effectiveSelectedTaskId,
+    profileId
+  );
   const selectedTask =
-    selectedTaskData ?? tasks.find(task => task.id === selectedTaskId) ?? null;
+    selectedTaskData ??
+    tasks.find(task => task.id === effectiveSelectedTaskId) ??
+    null;
   const selectedRelease =
     releases.find(release => release.id === selectedReleaseId) ?? null;
+  const shouldPrioritizeRightPanel = Boolean(selectedRelease) && !is2xlUp;
   const artistName = resolveArtistName(selectedProfile);
   const hasFilters =
     Boolean(deferredSearch.trim()) ||
     statusFilter !== 'all' ||
     priorityFilter !== 'all' ||
     assigneeFilter !== 'all';
+  const showTaskListPane =
+    isXlUp || !selectedTask || shouldPrioritizeRightPanel;
+  const showTaskDocumentPane =
+    (isXlUp || Boolean(selectedTask)) && !shouldPrioritizeRightPanel;
   const clearFilters = useCallback(() => {
     setSearch('');
     setStatusFilter('all');
@@ -703,8 +740,8 @@ export function TasksPageClient() {
     setAssigneeFilter('all');
   }, []);
   const showTaskWorkbenchEmptyState = !isLoading && tasks.length === 0;
-  const selectedTaskIndex = selectedTaskId
-    ? tasks.findIndex(task => task.id === selectedTaskId)
+  const selectedTaskIndex = effectiveSelectedTaskId
+    ? tasks.findIndex(task => task.id === effectiveSelectedTaskId)
     : -1;
   const canSelectPrevious = selectedTaskIndex > 0;
   const canSelectNext =
@@ -719,7 +756,7 @@ export function TasksPageClient() {
         options: TASK_STATUS_OPTIONS.map(([value, label]) => ({
           id: value,
           label,
-          iconName: getTaskStatusFilterIcon(value).name,
+          leadingVisual: <TaskStatusLeadingVisual status={value} />,
         })),
         selectedIds: statusFilter === 'all' ? [] : [statusFilter],
         onToggle: (value: string) =>
@@ -735,7 +772,7 @@ export function TasksPageClient() {
         options: TASK_PRIORITY_OPTIONS.map(([value, label]) => ({
           id: value,
           label,
-          iconName: getTaskPriorityFilterIcon(value).name,
+          leadingVisual: <TaskPriorityLeadingVisual priority={value} />,
         })),
         selectedIds: priorityFilter === 'all' ? [] : [priorityFilter],
         onToggle: (value: string) =>
@@ -751,7 +788,12 @@ export function TasksPageClient() {
         options: TASK_ASSIGNEE_OPTIONS.map(([value, label]) => ({
           id: value,
           label,
-          iconName: getTaskAssigneeMeta(value).filterIcon.name,
+          leadingVisual: (
+            <TaskAssigneeLeadingVisual
+              assigneeKind={value}
+              artistName={artistName}
+            />
+          ),
         })),
         selectedIds: assigneeFilter === 'all' ? [] : [assigneeFilter],
         onToggle: (value: string) =>
@@ -761,7 +803,7 @@ export function TasksPageClient() {
         searchPlaceholder: 'Search assignees...',
       },
     ],
-    [assigneeFilter, priorityFilter, statusFilter]
+    [artistName, assigneeFilter, priorityFilter, statusFilter]
   );
 
   useEffect(() => {
@@ -781,10 +823,24 @@ export function TasksPageClient() {
     }
   }, []);
 
-  const openTaskDocument = useCallback((task: TaskView) => {
-    setIsComposerOpen(false);
-    setSelectedTaskId(task.id);
-  }, []);
+  const openTaskDocument = useCallback(
+    (task: TaskView) => {
+      setHeaderMode(current => (current === 'create' ? 'default' : current));
+      if (!is2xlUp) {
+        setSelectedReleaseId(null);
+      }
+      setSelectedTaskId(task.id);
+    },
+    [is2xlUp]
+  );
+
+  useEffect(() => {
+    if (!selectedReleaseId || is2xlUp) {
+      return;
+    }
+
+    setHeaderMode(current => (current === 'create' ? 'default' : current));
+  }, [is2xlUp, selectedReleaseId]);
 
   useEffect(() => {
     if (isLoading) {
@@ -800,9 +856,13 @@ export function TasksPageClient() {
 
     const hasVisibleSelection = tasks.some(task => task.id === selectedTaskId);
     if (!hasVisibleSelection) {
+      if (!isXlUp && selectedTaskId === null) {
+        return;
+      }
+
       setSelectedTaskId(tasks[0]?.id ?? null);
     }
-  }, [isLoading, selectedTaskId, tasks]);
+  }, [isLoading, isXlUp, selectedTaskId, tasks]);
 
   const selectTaskByIndex = useCallback(
     (index: number) => {
@@ -925,7 +985,7 @@ export function TasksPageClient() {
             {
               id: 'open-release',
               label: 'Open Release',
-              icon: <FileText className='h-4 w-4' />,
+              icon: <Disc3 className='h-4 w-4' />,
               onClick: () => openReleaseSidebar(task),
             } satisfies ContextMenuItemType,
             { type: 'separator' } satisfies ContextMenuItemType,
@@ -934,10 +994,24 @@ export function TasksPageClient() {
       {
         id: 'change-status',
         label: 'Change Status',
-        icon: <Check className='h-4 w-4' />,
+        icon: (() => {
+          const StageIcon = getTaskStageVisual(
+            task.status,
+            task.agentStatus
+          ).icon;
+          return (
+            <StageIcon
+              className={cn(
+                'h-4 w-4',
+                task.status === 'done' && 'fill-current'
+              )}
+            />
+          );
+        })(),
         items: TASK_STATUS_OPTIONS.map(([value, label]) => ({
           id: `status-${value}`,
           label,
+          icon: <TaskStatusLeadingVisual status={value} />,
           onClick: () => updateTaskField(task.id, { status: value }),
           disabled: task.status === value,
         })),
@@ -945,10 +1019,11 @@ export function TasksPageClient() {
       {
         id: 'change-priority',
         label: 'Change Priority',
-        icon: <Flag className='h-4 w-4' />,
+        icon: <TaskPriorityLeadingVisual priority={task.priority} />,
         items: TASK_PRIORITY_OPTIONS.map(([value, label]) => ({
           id: `priority-${value}`,
           label,
+          icon: <TaskPriorityLeadingVisual priority={value} />,
           onClick: () => updateTaskField(task.id, { priority: value }),
           disabled: task.priority === value,
         })),
@@ -956,29 +1031,44 @@ export function TasksPageClient() {
       {
         id: 'change-assignee',
         label: 'Change Assignee',
-        icon:
-          task.assigneeKind === 'jovie' ? (
-            <Bot className='h-4 w-4' />
-          ) : (
-            <User className='h-4 w-4' />
-          ),
+        icon: (
+          <span aria-hidden='true'>
+            <TaskAssigneeLeadingVisual
+              assigneeKind={task.assigneeKind}
+              artistName={artistName}
+            />
+          </span>
+        ),
         items: [
           {
             id: 'assignee-human',
             label: 'You',
+            icon: (
+              <span aria-hidden='true'>
+                <TaskAssigneeLeadingVisual
+                  assigneeKind='human'
+                  artistName={artistName}
+                />
+              </span>
+            ),
             onClick: () => updateTaskField(task.id, { assigneeKind: 'human' }),
             disabled: task.assigneeKind === 'human',
           },
           {
             id: 'assignee-jovie',
             label: 'Jovie',
+            icon: (
+              <span aria-hidden='true'>
+                <TaskAssigneeLeadingVisual assigneeKind='jovie' />
+              </span>
+            ),
             onClick: () => updateTaskField(task.id, { assigneeKind: 'jovie' }),
             disabled: task.assigneeKind === 'jovie',
           },
         ],
       },
     ],
-    [openReleaseSidebar, openTaskDocument, updateTaskField]
+    [artistName, openReleaseSidebar, openTaskDocument, updateTaskField]
   );
 
   const sidebarPanel = selectedRelease ? (
@@ -995,6 +1085,30 @@ export function TasksPageClient() {
 
   useRegisterRightPanel(sidebarPanel);
 
+  const headerActions = useMemo(
+    () => (
+      <DashboardHeaderActionGroup>
+        <DashboardHeaderActionButton
+          ariaLabel='Create task'
+          icon={<Plus className='h-3.5 w-3.5' />}
+          label='New Task'
+          onClick={() => setHeaderMode('create')}
+          pressed={headerMode === 'create'}
+          hideLabelOnMobile
+        />
+      </DashboardHeaderActionGroup>
+    ),
+    [headerMode]
+  );
+
+  useEffect(() => {
+    setHeaderActions(headerActions);
+
+    return () => {
+      setHeaderActions(null);
+    };
+  }, [headerActions, setHeaderActions]);
+
   const columns = useMemo(
     () =>
       [
@@ -1007,37 +1121,35 @@ export function TasksPageClient() {
               task={info.row.original}
               onOpenRelease={openReleaseSidebar}
               artistName={artistName}
-              actionSlot={null}
+              isSelected={info.row.original.id === effectiveSelectedTaskId}
+              actionSlot={
+                <TableActionMenu
+                  items={convertContextMenuItems(
+                    getTaskContextMenuItems(info.row.original)
+                  )}
+                  trigger='custom'
+                >
+                  <button
+                    type='button'
+                    onClick={event => event.stopPropagation()}
+                    aria-label='Open task actions'
+                    className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-tertiary-token transition-[background-color,color,box-shadow] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'
+                  >
+                    <MoreVertical className='h-3.5 w-3.5' />
+                  </button>
+                </TableActionMenu>
+              }
             />
           ),
-          meta: { className: 'pl-2 pr-2' },
-        }),
-        columnHelper.display({
-          id: 'actions',
-          header: '',
-          size: 40,
-          enableSorting: false,
-          cell: info => (
-            <TableActionMenu
-              items={convertContextMenuItems(
-                getTaskContextMenuItems(info.row.original)
-              )}
-              trigger='custom'
-            >
-              <button
-                type='button'
-                onClick={event => event.stopPropagation()}
-                aria-label='Open task actions'
-                className='ml-auto inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-[background-color,color,box-shadow] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-              >
-                <MoreVertical className='h-3.5 w-3.5' />
-              </button>
-            </TableActionMenu>
-          ),
-          meta: { className: 'pl-0 pr-2' },
+          meta: { className: 'pl-2 pr-2.5' },
         }),
       ] as ColumnDef<TaskView, unknown>[],
-    [artistName, getTaskContextMenuItems, openReleaseSidebar]
+    [
+      artistName,
+      effectiveSelectedTaskId,
+      getTaskContextMenuItems,
+      openReleaseSidebar,
+    ]
   );
 
   const handleCreateTask = async (event: FormEvent<HTMLFormElement>) => {
@@ -1052,65 +1164,12 @@ export function TasksPageClient() {
       await createTaskMutation.mutateAsync({ title });
       setDraftTitle('');
       startTransition(() => {
-        setIsComposerOpen(false);
+        setHeaderMode('default');
       });
-      toast.success('Task created');
     } catch {
       toast.error("Couldn't create task");
     }
   };
-
-  const headerActions = useMemo(
-    () => (
-      <DropdownMenu
-        open={isToolbarMenuOpen}
-        onOpenChange={setIsToolbarMenuOpen}
-      >
-        <DropdownMenuTrigger asChild>
-          <div>
-            <DashboardHeaderActionButton
-              ariaLabel='Open task actions'
-              icon={<Plus className='h-3.5 w-3.5' />}
-              iconOnly
-              pressed={isToolbarMenuOpen || isComposerOpen}
-            />
-          </div>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align='end' sideOffset={8}>
-          <DropdownMenuItem
-            onSelect={() => {
-              setIsComposerOpen(true);
-            }}
-          >
-            <Plus className='mr-2 h-4 w-4' />
-            New Task
-          </DropdownMenuItem>
-          {hasFilters ? (
-            <DropdownMenuItem
-              onSelect={() => {
-                setSearch('');
-                setStatusFilter('all');
-                setPriorityFilter('all');
-                setAssigneeFilter('all');
-              }}
-            >
-              <X className='mr-2 h-4 w-4' />
-              Clear Filters
-            </DropdownMenuItem>
-          ) : null}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
-    [hasFilters, isComposerOpen, isToolbarMenuOpen]
-  );
-
-  useEffect(() => {
-    setHeaderActions(headerActions);
-
-    return () => {
-      setHeaderActions(null);
-    };
-  }, [headerActions, setHeaderActions]);
 
   return (
     <PageShell className='overflow-hidden' data-testid='tasks-workspace'>
@@ -1120,56 +1179,33 @@ export function TasksPageClient() {
         )}
         data-testid='tasks-content-panel'
       >
-        {isComposerOpen ? (
-          <form
-            onSubmit={handleCreateTask}
-            className='flex items-center gap-2 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-app-header py-3'
-          >
-            <Input
-              value={draftTitle}
-              onChange={event => setDraftTitle(event.target.value)}
-              placeholder='Draft press release, update bio, pitch sync supervisor...'
-              autoFocus
-            />
-            <Button
-              type='submit'
-              size='sm'
-              disabled={createTaskMutation.isPending}
-            >
-              Create
-            </Button>
-            <Button
-              type='button'
-              variant='secondary'
-              size='sm'
-              onClick={() => {
-                setDraftTitle('');
-                setIsComposerOpen(false);
-              }}
-            >
-              Cancel
-            </Button>
-          </form>
-        ) : null}
-
-        <PageToolbar
-          start={
-            <div className='flex min-w-0 flex-1 items-center gap-2'>
-              <AppSearchField
-                value={search}
-                onChange={setSearch}
-                placeholder='Search Tasks'
-                ariaLabel='Search tasks'
-                className='max-w-[280px] flex-1'
-                inputClassName='text-[12px]'
-              />
-              <TableFilterDropdown
-                categories={taskFilterCategories}
-                onClearAll={clearFilters}
-                iconOnly
-              />
-            </div>
-          }
+        <TaskWorkspaceHeaderBar
+          mode={headerMode}
+          search={search}
+          draftTitle={draftTitle}
+          taskCount={tasks.length}
+          onSearchChange={value => {
+            setSearch(value);
+            if (headerMode === 'default') {
+              setHeaderMode('search');
+            }
+          }}
+          onDraftTitleChange={setDraftTitle}
+          onEnterSearch={() => setHeaderMode('search')}
+          onExitSearch={() => setHeaderMode('default')}
+          onCancelCreate={() => {
+            setDraftTitle('');
+            setHeaderMode('default');
+          }}
+          onSubmitCreate={handleCreateTask}
+          createPending={createTaskMutation.isPending}
+          filterCategories={taskFilterCategories}
+          onClearFilters={clearFilters}
+          showTaskNavigation={isXlUp && Boolean(selectedTask)}
+          canSelectPrevious={canSelectPrevious}
+          canSelectNext={canSelectNext}
+          onSelectPrevious={selectPreviousTask}
+          onSelectNext={selectNextTask}
         />
 
         {isError ? (
@@ -1196,9 +1232,9 @@ export function TasksPageClient() {
             <div
               className={cn(
                 'min-h-0 min-w-0 shrink-0',
-                (selectedTask || showTaskWorkbenchEmptyState) &&
-                  'xl:w-[28rem] 2xl:w-[30rem] min-[1800px]:w-[32rem] xl:border-r xl:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]',
-                selectedTask ? 'hidden xl:block' : 'flex-1'
+                'xl:w-[31rem] 2xl:w-[33rem] min-[1800px]:w-[35rem] xl:border-r xl:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]',
+                showTaskListPane ? 'block' : 'hidden',
+                !selectedTask && 'flex-1'
               )}
             >
               {showTaskWorkbenchEmptyState ? (
@@ -1207,7 +1243,7 @@ export function TasksPageClient() {
                     <TaskEmptyState
                       hasFilters={hasFilters}
                       onClearFilters={clearFilters}
-                      onOpenComposer={() => setIsComposerOpen(true)}
+                      onOpenComposer={() => setHeaderMode('create')}
                     />
                   </div>
                 </div>
@@ -1222,26 +1258,19 @@ export function TasksPageClient() {
                   rowHeight={64}
                   skeletonRows={8}
                   className='text-[13px]'
-                  containerClassName='h-full px-2 pb-2 pt-1'
+                  containerClassName='h-full overflow-x-hidden pl-1.5 pr-3 pb-2 pt-0.5'
                   onRowClick={row => openTaskDocument(row)}
                   getContextMenuItems={getTaskContextMenuItems}
-                  getRowClassName={row =>
+                  getRowClassName={_row =>
                     cn(
-                      'rounded-[12px] border border-transparent transition-[background-color,border-color,box-shadow,opacity]',
-                      row.id === selectedTaskId
-                        ? 'border-[color-mix(in_oklab,var(--linear-app-frame-seam)_70%,transparent)] bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,var(--linear-app-content-surface))] shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_0_0_1px_color-mix(in_oklab,var(--color-accent-blue)_10%,transparent)]'
-                        : row.status === 'done'
-                          ? 'opacity-75'
-                          : row.status === 'cancelled'
-                            ? 'opacity-60'
-                            : 'hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_72%,transparent)]'
+                      'group/task-row bg-transparent shadow-none hover:bg-transparent focus-within:shadow-none focus-visible:bg-transparent focus-visible:shadow-none'
                     )
                   }
                   emptyState={
                     <TaskEmptyState
                       hasFilters={hasFilters}
                       onClearFilters={clearFilters}
-                      onOpenComposer={() => setIsComposerOpen(true)}
+                      onOpenComposer={() => setHeaderMode('create')}
                     />
                   }
                 />
@@ -1250,8 +1279,9 @@ export function TasksPageClient() {
             <div
               className={cn(
                 'min-h-0 min-w-0 flex-1',
-                selectedTask ? 'flex' : 'hidden xl:flex'
+                showTaskDocumentPane ? 'flex' : 'hidden'
               )}
+              data-testid='task-document-pane'
             >
               {selectedTask ? (
                 <TaskDocumentPanel
@@ -1272,10 +1302,7 @@ export function TasksPageClient() {
                     updateTaskField(taskId, { assigneeKind })
                   }
                   artistName={artistName}
-                  canSelectPrevious={canSelectPrevious}
-                  canSelectNext={canSelectNext}
-                  onSelectPrevious={selectPreviousTask}
-                  onSelectNext={selectNextTask}
+                  isDesktopLayout={isXlUp}
                 />
               ) : (
                 <TaskDocumentPanel
@@ -1290,10 +1317,7 @@ export function TasksPageClient() {
                   onUpdatePriority={() => {}}
                   onUpdateAssignee={() => {}}
                   artistName={artistName}
-                  canSelectPrevious={false}
-                  canSelectNext={false}
-                  onSelectPrevious={() => {}}
-                  onSelectNext={() => {}}
+                  isDesktopLayout={isXlUp}
                 />
               )}
             </div>

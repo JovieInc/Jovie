@@ -1,23 +1,25 @@
 import Link from 'next/link';
+import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
+import { cn } from '@/lib/utils';
 
 export function AuthUnavailableCard() {
   return (
     <div
       data-testid='auth-clerk-unavailable'
-      className='w-full rounded-[var(--radius-3xl)] border border-subtle bg-surface-0/95 px-6 py-7 text-center shadow-[0_24px_80px_rgba(0,0,0,0.48)] backdrop-blur-xl'
+      className={cn('w-full px-6 py-7 text-center', AUTH_SURFACE.card)}
     >
-      <p className='text-[0.75rem] font-[560] uppercase tracking-[0.14em] text-tertiary-token'>
+      <p className='text-[13px] font-[510] text-secondary-token'>
         Auth unavailable
       </p>
-      <h2 className='mt-3 text-[1.5rem] leading-[1.08] font-[590] tracking-[-0.03em] text-primary-token'>
+      <h2 className={cn(FORM_LAYOUT.title, 'mt-3')}>
         Clerk isn&apos;t configured here
       </h2>
-      <p className='mt-3 text-[0.9375rem] leading-[1.55] text-secondary-token'>
+      <p className={cn(FORM_LAYOUT.hint, 'mt-3')}>
         Clerk is not configured for this environment.
       </p>
       <Link
         href='/'
-        className='mt-5 inline-flex text-sm font-medium text-primary-token underline underline-offset-4 transition-opacity hover:opacity-90'
+        className='mt-5 inline-flex text-[13px] font-[510] text-primary-token underline underline-offset-4 transition-opacity hover:opacity-90'
       >
         Go to homepage
       </Link>

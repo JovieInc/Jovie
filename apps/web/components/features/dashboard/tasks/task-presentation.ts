@@ -1,18 +1,4 @@
-import {
-  AlertTriangle,
-  CheckCircle,
-  Circle,
-  CircleDashed,
-  Hash,
-  type LucideIcon,
-  SignalHigh,
-  SignalLow,
-  SignalMedium,
-  Sparkles,
-  User,
-  X,
-  XCircle,
-} from 'lucide-react';
+import { Circle, CircleDashed, type LucideIcon, XCircle } from 'lucide-react';
 import type {
   TaskAgentStatus,
   TaskAssigneeKind,
@@ -36,9 +22,20 @@ export interface TaskPriorityMeta {
 
 export interface TaskAssigneeMeta {
   readonly label: string;
-  readonly name: string;
+  readonly avatarName: string;
   readonly accent: AccentPaletteName;
-  readonly filterIcon: LucideIcon;
+}
+
+export interface TaskStatusVisual {
+  readonly label: string;
+  readonly accent: AccentPaletteName;
+  readonly icon: LucideIcon;
+  readonly filled: boolean;
+}
+
+export interface TaskPriorityVisual {
+  readonly label: string;
+  readonly accent: AccentPaletteName;
 }
 
 const TASK_VISUAL_STAGE_META: Record<
@@ -71,7 +68,7 @@ const TASK_VISUAL_STAGE_META: Record<
       : {
           label: 'In Progress',
           percent: 50,
-          accent: 'purple',
+          accent: 'blue',
           icon: Circle,
           isTerminal: false,
         },
@@ -79,80 +76,107 @@ const TASK_VISUAL_STAGE_META: Record<
     label: 'Done',
     percent: 100,
     accent: 'green',
-    icon: CheckCircle,
+    icon: Circle,
     isTerminal: true,
   }),
   cancelled: () => ({
     label: 'Cancelled',
     percent: 0,
     accent: 'gray',
-    icon: X,
+    icon: XCircle,
     isTerminal: true,
   }),
 };
 
-const TASK_PRIORITY_META: Record<TaskPriority, TaskPriorityMeta | null> = {
+const TASK_STATUS_VISUALS: Record<TaskStatus, TaskStatusVisual> = {
+  backlog: {
+    label: 'Backlog',
+    accent: 'gray',
+    icon: CircleDashed,
+    filled: false,
+  },
+  todo: {
+    label: 'Todo',
+    accent: 'blue',
+    icon: CircleDashed,
+    filled: false,
+  },
+  in_progress: {
+    label: 'In Progress',
+    accent: 'blue',
+    icon: Circle,
+    filled: false,
+  },
+  done: {
+    label: 'Done',
+    accent: 'green',
+    icon: Circle,
+    filled: true,
+  },
+  cancelled: {
+    label: 'Cancelled',
+    accent: 'gray',
+    icon: XCircle,
+    filled: false,
+  },
+};
+
+const TASK_PRIORITY_META: Record<TaskPriority, TaskPriorityVisual> = {
   urgent: { label: 'Urgent', accent: 'red' },
   high: { label: 'High', accent: 'orange' },
   medium: { label: 'Medium', accent: 'purple' },
   low: { label: 'Low', accent: 'teal' },
-  none: null,
+  none: { label: 'None', accent: 'gray' },
 };
 
-const TASK_STATUS_FILTER_ICONS: Record<TaskStatus, LucideIcon> = {
-  backlog: CircleDashed,
-  todo: CircleDashed,
-  in_progress: Circle,
-  done: CheckCircle,
-  cancelled: XCircle,
-};
-
-const TASK_PRIORITY_FILTER_ICONS: Record<TaskPriority, LucideIcon> = {
-  urgent: AlertTriangle,
-  high: SignalHigh,
-  medium: SignalMedium,
-  low: SignalLow,
-  none: Hash,
-};
-
-export function getTaskVisualStage(
+export function getTaskStageVisual(
   status: TaskStatus,
   agentStatus: TaskAgentStatus
 ): TaskVisualStage {
   return TASK_VISUAL_STAGE_META[status](agentStatus);
 }
 
-export function getTaskPriorityMeta(
+export function getTaskStatusVisual(status: TaskStatus): TaskStatusVisual {
+  return TASK_STATUS_VISUALS[status];
+}
+
+export function getTaskPriorityVisual(
   priority: TaskPriority
-): TaskPriorityMeta | null {
+): TaskPriorityVisual {
   return TASK_PRIORITY_META[priority];
 }
 
-export function getTaskStatusFilterIcon(status: TaskStatus): LucideIcon {
-  return TASK_STATUS_FILTER_ICONS[status];
-}
-
-export function getTaskPriorityFilterIcon(priority: TaskPriority): LucideIcon {
-  return TASK_PRIORITY_FILTER_ICONS[priority];
-}
-
-export function getTaskAssigneeMeta(
+export function getTaskAssigneeVisual(
   assigneeKind: TaskAssigneeKind,
   artistName?: string | null
 ): TaskAssigneeMeta {
   if (assigneeKind === 'jovie') {
     return {
       label: 'Jovie',
-      name: 'Jovie',
-      accent: 'pink',
-      filterIcon: Sparkles,
+      avatarName: 'Jovie',
+      accent: 'purple',
     };
   }
 
   return {
     label: 'You',
-    name: artistName ?? 'You',
+    avatarName: artistName?.trim() || 'You',
     accent: 'blue',
-    filterIcon: User,
   };
 }
+
+export const getTaskVisualStage = getTaskStageVisual;
+
+export function getTaskPriorityMeta(
+  priority: TaskPriority
+): TaskPriorityMeta | null {
+  const visual = getTaskPriorityVisual(priority);
+  return priority === 'none'
+    ? null
+    : {
+        label: visual.label,
+        accent: visual.accent,
+      };
+}
+
+export const getTaskAssigneeMeta = getTaskAssigneeVisual;

@@ -1,8 +1,13 @@
 'use client';
 
 import { MENU_ITEM_BASE } from '@jovie/ui';
+import { Check } from 'lucide-react';
 import { type ReactNode, useCallback } from 'react';
 import { cn } from '@/lib/utils';
+import {
+  TOOLBAR_MENU_ITEM_CLASS,
+  ToolbarMenuRow,
+} from '../menus/ToolbarMenuPrimitives';
 
 interface FilterCheckboxItemProps {
   readonly label: string;
@@ -66,28 +71,36 @@ export function FilterCheckboxItem({
       onKeyDown={handleKeyDown}
       className={cn(
         MENU_ITEM_BASE,
-        'w-full gap-2.5 rounded-[8px] border border-transparent px-2.5 py-2 text-[13px]',
+        TOOLBAR_MENU_ITEM_CLASS,
+        'w-full',
         checked
           ? 'bg-surface-1 text-primary-token'
           : 'text-secondary-token hover:text-primary-token'
       )}
     >
-      {icon && (
-        <span
-          className={cn(
-            'flex h-4 w-4 shrink-0 items-center justify-center',
-            checked ? 'text-primary-token' : 'text-tertiary-token'
-          )}
-        >
-          {icon}
-        </span>
-      )}
-      <span className='flex-1 truncate text-left'>{label}</span>
-      {count !== undefined && (
-        <span className='text-[10px] tabular-nums text-tertiary-token'>
-          {count}
-        </span>
-      )}
+      <ToolbarMenuRow
+        leadingVisual={
+          icon ? (
+            <span
+              className={cn(
+                checked ? 'text-primary-token' : 'text-tertiary-token'
+              )}
+            >
+              {icon}
+            </span>
+          ) : null
+        }
+        label={label}
+        trailingVisual={
+          count !== undefined ? (
+            <span className='text-[10px] tabular-nums text-tertiary-token'>
+              {count}
+            </span>
+          ) : checked ? (
+            <Check className='h-4 w-4 text-primary-token' />
+          ) : null
+        }
+      />
     </button>
   );
 }
