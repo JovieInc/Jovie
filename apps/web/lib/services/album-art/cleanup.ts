@@ -11,18 +11,27 @@ interface CleanupCandidate {
   readonly payloadJson: Record<string, unknown>;
 }
 
+interface CollectAlbumArtBlobUrlsOptions {
+  readonly preserveBackgroundUrls?: readonly string[];
+}
+
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
 export function collectAlbumArtBlobUrls(
-  payload: Record<string, unknown> | null | undefined
+  payload: Record<string, unknown> | null | undefined,
+  options: CollectAlbumArtBlobUrlsOptions = {}
 ): string[] {
   if (!payload || !Array.isArray(payload.options)) {
     return [];
   }
 
   const urls = new Set<string>();
+  const preserveBackgroundUrls = new Set(
+    options.preserveBackgroundUrls?.filter(url => url.startsWith('https://')) ??
+      []
+  );
 
   for (const option of payload.options) {
     if (!isObjectRecord(option)) {
@@ -31,6 +40,12 @@ export function collectAlbumArtBlobUrls(
 
     for (const key of ['previewUrl', 'finalImageUrl', 'backgroundUrl']) {
       const value = option[key];
+      if (
+        key === 'backgroundUrl' &&
+        preserveBackgroundUrls.has(String(value))
+      ) {
+        continue;
+      }
       if (typeof value === 'string' && value.startsWith('https://')) {
         urls.add(value);
       }
@@ -38,6 +53,39 @@ export function collectAlbumArtBlobUrls(
   }
 
   return [...urls];
+}
+
+export function getAppliedSessionBackgroundUrlsToPreserve(
+  payload: Record<string, unknown> | null | undefined
+): string[] {
+  if (!payload || !Array.isArray(payload.options)) {
+    return [];
+  }
+
+  const appliedBackgroundUrl = payload.appliedBackgroundUrl;
+  if (
+    typeof appliedBackgroundUrl === 'string' &&
+    appliedBackgroundUrl.startsWith('https://')
+  ) {
+    return [appliedBackgroundUrl];
+  }
+
+  const backgroundUrls = new Set<string>();
+  for (const option of payload.options) {
+    if (!isObjectRecord(option)) {
+      continue;
+    }
+
+    const backgroundUrl = option.backgroundUrl;
+    if (
+      typeof backgroundUrl === 'string' &&
+      backgroundUrl.startsWith('https://')
+    ) {
+      backgroundUrls.add(backgroundUrl);
+    }
+  }
+
+  return [...backgroundUrls];
 }
 
 async function deleteAlbumArtBlobs(urls: string[]): Promise<number> {
@@ -106,7 +154,13 @@ export async function cleanupExpiredAlbumArtSessions(): Promise<{
     let nextCleanupCompletedAt =
       typeof cleanupCompletedAt === 'string' ? cleanupCompletedAt : undefined;
 
-    const urls = collectAlbumArtBlobUrls(candidate.payloadJson);
+    const preserveBackgroundUrls =
+      candidate.status === 'applied'
+        ? getAppliedSessionBackgroundUrlsToPreserve(candidate.payloadJson)
+        : [];
+    const urls = collectAlbumArtBlobUrls(candidate.payloadJson, {
+      preserveBackgroundUrls,
+    });
     const deleted = await deleteAlbumArtBlobs(urls);
     if (deleted > 0) {
       blobsDeleted += deleted;

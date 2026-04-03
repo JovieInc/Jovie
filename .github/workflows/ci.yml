@@ -285,6 +285,16 @@ jobs:
         with:
           # Full history needed for turbo --affected merge-base detection
           fetch-depth: 0
+      - name: Configure Turbo affected range
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "TURBO_SCM_BASE=origin/${{ github.base_ref }}" >> $GITHUB_ENV
+          else
+            echo "TURBO_SCM_BASE=origin/main" >> $GITHUB_ENV
+          fi
+          echo "TURBO_SCM_HEAD=HEAD" >> $GITHUB_ENV
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache Turbo
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
@@ -1287,6 +1297,16 @@ jobs:
         with:
           # Full history needed for turbo --affected merge-base detection
           fetch-depth: 0
+      - name: Configure Turbo affected range
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "TURBO_SCM_BASE=origin/${{ github.base_ref }}" >> $GITHUB_ENV
+          else
+            echo "TURBO_SCM_BASE=origin/main" >> $GITHUB_ENV
+          fi
+          echo "TURBO_SCM_HEAD=HEAD" >> $GITHUB_ENV
 
       - name: Check for relevant changes
         id: check_changes
@@ -1376,11 +1396,25 @@ jobs:
     # Path-gated: skips test execution when no test-relevant files changed.
     if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        shard: ['1/8', '2/8', '3/8', '4/8', '5/8', '6/8', '7/8', '8/8']
+        shard:
+          [
+            '1/12',
+            '2/12',
+            '3/12',
+            '4/12',
+            '5/12',
+            '6/12',
+            '7/12',
+            '8/12',
+            '9/12',
+            '10/12',
+            '11/12',
+            '12/12',
+          ]
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -1404,6 +1438,17 @@ jobs:
       - name: Setup Node.js and pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
+
+      - name: Configure Turbo affected range
+        if: steps.check_changes.outputs.run_full_ci == 'true' && (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "TURBO_SCM_BASE=origin/${{ github.base_ref }}" >> $GITHUB_ENV
+          else
+            echo "TURBO_SCM_BASE=origin/main" >> $GITHUB_ENV
+          fi
+          echo "TURBO_SCM_HEAD=HEAD" >> $GITHUB_ENV
 
       - name: Load quarantined unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'

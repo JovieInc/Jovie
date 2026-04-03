@@ -19,6 +19,7 @@ import {
 } from '@/lib/db/schema/album-art';
 import { discogReleases } from '@/lib/db/schema/content';
 import { fetchWithTimeoutResponse } from '@/lib/queries/fetch';
+import { normalizeLogoAssetUrl, resolveUpdatedLogoAssetUrl } from './brand-kit';
 import { buildAlbumArtPrompt } from './prompt-builder';
 import { assertAlbumArtQuota, getRemainingAlbumArtRuns } from './quota';
 import { fetchLogoBuffer, renderAlbumArt } from './renderer';
@@ -41,8 +42,6 @@ import {
 } from './types';
 
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
-const TRUSTED_BLOB_HOST_SUFFIX = '.blob.vercel-storage.com';
-const TRUSTED_BLOB_HOST = 'blob.vercel-storage.com';
 
 async function deleteBlobUrlIfConfigured(url: string | null | undefined) {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
@@ -66,30 +65,6 @@ function resolveTemplateSourceType(params: {
   }
 
   return 'none' as const;
-}
-
-function normalizeLogoAssetUrl(url: string | null | undefined): string | null {
-  const trimmed = url?.trim() ?? '';
-  if (!trimmed) {
-    return null;
-  }
-
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(trimmed);
-  } catch {
-    throw new Error('Logo asset URL must be a valid URL');
-  }
-
-  const isTrustedBlobHost =
-    parsedUrl.hostname === TRUSTED_BLOB_HOST ||
-    parsedUrl.hostname.endsWith(TRUSTED_BLOB_HOST_SUFFIX);
-
-  if (parsedUrl.protocol !== 'https:' || !isTrustedBlobHost) {
-    throw new Error('Logo asset URL must use trusted blob storage');
-  }
-
-  return parsedUrl.toString();
 }
 
 async function uploadAlbumArtBuffer(params: {
@@ -522,7 +497,10 @@ export async function updateArtistBrandKit(params: {
     return null;
   }
 
-  const logoAssetUrl = normalizeLogoAssetUrl(params.logoAssetUrl);
+  const logoAssetUrl = resolveUpdatedLogoAssetUrl({
+    nextLogoAssetUrl: params.logoAssetUrl,
+    existingLogoAssetUrl: existing.logoAssetUrl,
+  });
   const nextIsDefault = params.isDefault ?? existing.isDefault;
 
   const updated =
@@ -717,7 +695,15 @@ export async function applyGeneratedAlbumArt(
 
   await db
     .update(albumArtGenerationSessions)
-    .set({ status: 'applied', updatedAt: new Date() })
+    .set({
+      status: 'applied',
+      payloadJson: {
+        ...session.payload,
+        appliedBackgroundUrl: option.backgroundUrl,
+        appliedOptionId: option.id,
+      } as unknown as Record<string, unknown>,
+      updatedAt: new Date(),
+    })
     .where(eq(albumArtGenerationSessions.id, input.sessionId));
 
   return { artworkUrl, sizes };
