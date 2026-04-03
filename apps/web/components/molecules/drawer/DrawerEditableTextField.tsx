@@ -136,53 +136,68 @@ export function DrawerEditableTextField({
   const visibleActions = actions.filter(
     action => hasValue || action.showWhenEmpty === true
   );
-
-  if (isEditing && editable) {
-    return (
-      <Input
-        ref={inputRef}
-        type={inputType}
-        value={draft}
-        onChange={event => setDraft(event.target.value)}
-        onBlur={handleCommit}
-        onKeyDown={event => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            handleCommit();
-          } else if (event.key === 'Escape') {
-            event.preventDefault();
-            cancel();
-          }
-        }}
-        placeholder={placeholder ?? emptyLabel}
-        aria-label={`Edit ${label}`}
-        className={cn(
-          'h-8 rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[13px] text-primary-token',
-          monospace && 'font-mono tracking-[0.02em]',
-          inputClassName
-        )}
-      />
-    );
-  }
-
+  const actionSlotIds = [
+    ...((copyValue ?? value) ? ['copy'] : []),
+    ...visibleActions.map(action => action.id),
+  ];
   const displayValue = value || emptyLabel;
 
   return (
     <div className={cn('flex min-w-0 items-center gap-1.5', className)}>
-      {editable ? (
-        <button
-          type='button'
-          onClick={() => setIsEditing(true)}
-          onDoubleClick={() => setIsEditing(true)}
-          className={cn(
-            '-mx-1 min-w-0 flex-1 cursor-text rounded-[8px] px-1 py-0.5 text-left transition-colors hover:bg-surface-0',
-            !hasValue && 'text-tertiary-token'
-          )}
-          aria-label={`Edit ${label}`}
-        >
+      <div className='min-w-0 flex-1'>
+        {isEditing && editable ? (
+          <Input
+            ref={inputRef}
+            type={inputType}
+            value={draft}
+            onChange={event => setDraft(event.target.value)}
+            onBlur={handleCommit}
+            onKeyDown={event => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                handleCommit();
+              } else if (event.key === 'Escape') {
+                event.preventDefault();
+                cancel();
+              }
+            }}
+            placeholder={placeholder ?? emptyLabel}
+            aria-label={`Edit ${label}`}
+            className={cn(
+              'h-8 w-full rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[13px] text-primary-token',
+              monospace && 'font-mono tracking-[0.02em]',
+              inputClassName
+            )}
+          />
+        ) : null}
+        {editable && !isEditing ? (
+          <button
+            type='button'
+            onClick={() => setIsEditing(true)}
+            onDoubleClick={() => setIsEditing(true)}
+            className={cn(
+              '-mx-1 w-full min-w-0 cursor-text rounded-[8px] px-1 py-0.5 text-left transition-colors hover:bg-surface-0',
+              !hasValue && 'text-tertiary-token'
+            )}
+            aria-label={`Edit ${label}`}
+          >
+            <span
+              className={cn(
+                'block truncate text-[13px] text-primary-token',
+                monospace && 'font-mono tracking-[0.02em]',
+                !hasValue && 'italic text-tertiary-token',
+                displayClassName,
+                !hasValue && emptyClassName
+              )}
+              title={hasValue ? (value ?? undefined) : undefined}
+            >
+              {displayValue}
+            </span>
+          </button>
+        ) : !editable ? (
           <span
             className={cn(
-              'block truncate text-[13px] text-primary-token',
+              'block min-w-0 w-full truncate text-[13px] text-primary-token',
               monospace && 'font-mono tracking-[0.02em]',
               !hasValue && 'italic text-tertiary-token',
               displayClassName,
@@ -192,71 +207,75 @@ export function DrawerEditableTextField({
           >
             {displayValue}
           </span>
-        </button>
-      ) : (
-        <span
-          className={cn(
-            'block min-w-0 flex-1 truncate text-[13px] text-primary-token',
-            monospace && 'font-mono tracking-[0.02em]',
-            !hasValue && 'italic text-tertiary-token',
-            displayClassName,
-            !hasValue && emptyClassName
-          )}
-          title={hasValue ? (value ?? undefined) : undefined}
-        >
-          {displayValue}
-        </span>
-      )}
-
-      <div className='flex shrink-0 items-center gap-0.5'>
-        {(copyValue ?? value) ? (
-          <DrawerInlineIconButton
-            onClick={event => {
-              event.stopPropagation();
-              handleCopyClick();
-            }}
-            aria-label={copyLabel ?? `Copy ${label}`}
-            className='text-tertiary-token'
-          >
-            {isSuccess ? (
-              <Check className='h-3.5 w-3.5 text-success' />
-            ) : (
-              <Copy className='h-3.5 w-3.5' />
-            )}
-          </DrawerInlineIconButton>
         ) : null}
-
-        {visibleActions.map(action =>
-          action.href ? (
-            <a
-              key={action.id}
-              href={action.href}
-              target='_blank'
-              rel='noreferrer'
-              aria-label={action.ariaLabel}
-              className='inline-flex h-6 w-6 items-center justify-center rounded-[6px] text-tertiary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
-              onClick={event => {
-                event.stopPropagation();
-                action.onClick?.();
-              }}
-            >
-              {action.icon ?? <ExternalLink className='h-3.5 w-3.5' />}
-            </a>
-          ) : (
-            <DrawerInlineIconButton
-              key={action.id}
-              onClick={event => {
-                event.stopPropagation();
-                action.onClick?.();
-              }}
-              aria-label={action.ariaLabel}
-              className='text-tertiary-token'
-            >
-              {action.icon ?? <ExternalLink className='h-3.5 w-3.5' />}
-            </DrawerInlineIconButton>
-          )
-        )}
       </div>
+
+      {actionSlotIds.length > 0 ? (
+        <div
+          data-slot='drawer-editable-text-field-actions'
+          className='flex shrink-0 items-center gap-0.5'
+          aria-hidden={isEditing ? 'true' : undefined}
+        >
+          {isEditing
+            ? actionSlotIds.map(slotId => (
+                <span
+                  key={`action-slot-placeholder-${slotId}`}
+                  className='h-6 w-6 shrink-0 rounded-[6px] opacity-0'
+                />
+              ))
+            : null}
+
+          {!isEditing && (copyValue ?? value) ? (
+            <DrawerInlineIconButton
+              onClick={event => {
+                event.stopPropagation();
+                handleCopyClick();
+              }}
+              aria-label={copyLabel ?? `Copy ${label}`}
+              className='h-6 w-6 text-tertiary-token'
+            >
+              {isSuccess ? (
+                <Check className='h-3.5 w-3.5 text-success' />
+              ) : (
+                <Copy className='h-3.5 w-3.5' />
+              )}
+            </DrawerInlineIconButton>
+          ) : null}
+
+          {!isEditing
+            ? visibleActions.map(action =>
+                action.href ? (
+                  <a
+                    key={action.id}
+                    href={action.href}
+                    target='_blank'
+                    rel='noreferrer'
+                    aria-label={action.ariaLabel}
+                    className='inline-flex h-6 w-6 items-center justify-center rounded-[6px] text-tertiary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
+                    onClick={event => {
+                      event.stopPropagation();
+                      action.onClick?.();
+                    }}
+                  >
+                    {action.icon ?? <ExternalLink className='h-3.5 w-3.5' />}
+                  </a>
+                ) : (
+                  <DrawerInlineIconButton
+                    key={action.id}
+                    onClick={event => {
+                      event.stopPropagation();
+                      action.onClick?.();
+                    }}
+                    aria-label={action.ariaLabel}
+                    className='h-6 w-6 text-tertiary-token'
+                  >
+                    {action.icon ?? <ExternalLink className='h-3.5 w-3.5' />}
+                  </DrawerInlineIconButton>
+                )
+              )
+            : null}
+        </div>
+      ) : null}
     </div>
   );
 }
