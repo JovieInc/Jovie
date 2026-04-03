@@ -181,6 +181,7 @@ function MenuItemLink({
   return (
     <Link
       href={item.href}
+      prefetch={false}
       className={cn(
         'flex items-center gap-3 rounded-[8px] px-3 py-2.5 text-[13px] font-[510] transition-all duration-150',
         'active:scale-[0.98]',

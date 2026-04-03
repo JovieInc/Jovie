@@ -72,6 +72,39 @@ export const ReleaseCell = memo(function ReleaseCell({
     [onSelect, release]
   );
 
+  const contentBody = (
+    <>
+      <div className='flex min-w-0 items-center gap-1.5 leading-none'>
+        <TruncatedText
+          lines={1}
+          className='min-w-0 flex-1 text-[13px] font-[510] leading-[1.15] tracking-[-0.012em] text-primary-token'
+          tooltipSide='top'
+          tooltipAlign='start'
+        >
+          {release.title}
+        </TruncatedText>
+        {showType && typeStyle && hasPreview && (
+          <span
+            className={cn(
+              'shrink-0 text-[10px] font-[510] leading-none tracking-normal',
+              typeStyle.text
+            )}
+          >
+            {typeStyle.label}
+          </span>
+        )}
+      </div>
+      {artistLine ? (
+        <TruncatedText
+          lines={1}
+          className='mt-px text-[11px] font-[400] leading-[1.2] tracking-[-0.005em] text-secondary-token'
+        >
+          {artistLine}
+        </TruncatedText>
+      ) : null}
+    </>
+  );
+
   return (
     <div className='flex min-w-0 items-center gap-2.5'>
       {/* Play/status indicator — 16px column */}
@@ -120,66 +153,10 @@ export const ReleaseCell = memo(function ReleaseCell({
           aria-label={`Open ${release.title}`}
           data-testid={`release-open-${release.id}`}
         >
-          <div className='flex min-w-0 items-center gap-1.5 leading-none'>
-            <TruncatedText
-              lines={1}
-              className='min-w-0 flex-1 text-[13px] font-[510] leading-[1.15] tracking-[-0.012em] text-primary-token'
-              tooltipSide='top'
-              tooltipAlign='start'
-            >
-              {release.title}
-            </TruncatedText>
-            {showType && typeStyle && hasPreview && (
-              <span
-                className={cn(
-                  'shrink-0 text-[10px] font-[510] leading-none tracking-normal',
-                  typeStyle.text
-                )}
-              >
-                {typeStyle.label}
-              </span>
-            )}
-          </div>
-          {artistLine ? (
-            <TruncatedText
-              lines={1}
-              className='mt-px text-[11px] font-[400] leading-[1.2] tracking-[-0.005em] text-secondary-token'
-            >
-              {artistLine}
-            </TruncatedText>
-          ) : null}
+          {contentBody}
         </button>
       ) : (
-        <div className='min-w-0 flex-1'>
-          <div className='flex min-w-0 items-center gap-1.5 leading-none'>
-            <TruncatedText
-              lines={1}
-              className='min-w-0 flex-1 text-[13px] font-[510] leading-[1.15] tracking-[-0.012em] text-primary-token'
-              tooltipSide='top'
-              tooltipAlign='start'
-            >
-              {release.title}
-            </TruncatedText>
-            {showType && typeStyle && hasPreview && (
-              <span
-                className={cn(
-                  'shrink-0 text-[10px] font-[510] leading-none tracking-normal',
-                  typeStyle.text
-                )}
-              >
-                {typeStyle.label}
-              </span>
-            )}
-          </div>
-          {artistLine ? (
-            <TruncatedText
-              lines={1}
-              className='mt-px text-[11px] font-[400] leading-[1.2] tracking-[-0.005em] text-secondary-token'
-            >
-              {artistLine}
-            </TruncatedText>
-          ) : null}
-        </div>
+        <div className='min-w-0 flex-1'>{contentBody}</div>
       )}
     </div>
   );

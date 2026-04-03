@@ -23,10 +23,7 @@ import { DemoReleaseLandingSurface } from './DemoReleaseLandingSurface';
 import { DemoReleasesExperience } from './DemoReleasesExperience';
 import { DemoReleaseTasksSurface } from './DemoReleaseTasksSurface';
 import { DemoSettingsPanel } from './DemoSettingsPanel';
-import {
-  DEMO_RELEASE_SIDEBAR_FIXTURES,
-  DEMO_RELEASE_VIEW_MODELS,
-} from './mock-release-data';
+import { DEMO_RELEASE_SIDEBAR_FIXTURES } from './mock-release-data';
 import type { DemoShowcaseSurfaceId } from './showcase-surfaces';
 
 type DemoRenderableSurfaceId = Exclude<DemoShowcaseSurfaceId, 'public-profile'>;
@@ -166,9 +163,7 @@ function DemoReleasesShowcaseState({
   return (
     <DemoAuthShell>
       <ReleasesExperience
-        releases={
-          state === 'disconnected' ? [] : DEMO_RELEASE_VIEW_MODELS.slice(0, 0)
-        }
+        releases={[]}
         providerConfig={providerConfig}
         primaryProviders={primaryProviderKeys}
         spotifyConnected={state !== 'disconnected'}

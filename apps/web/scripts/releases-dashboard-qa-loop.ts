@@ -1,7 +1,13 @@
 #!/usr/bin/env tsx
 
-import { type ChildProcess, spawn } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { APP_ROUTES } from '../constants/routes';
@@ -34,11 +40,19 @@ interface EvalResult {
   readonly stderr: string;
 }
 
+interface ManagedServerMetadata {
+  readonly pid: number;
+  readonly fingerprint: string;
+  readonly serverEntry: string;
+  readonly startedAt: string;
+}
+
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..', '..', '..');
 const qaRoot = resolve(repoRoot, '.context', 'qa', 'releases-dashboard');
 const historyRoot = resolve(qaRoot, 'history');
 const latestRoot = resolve(qaRoot, 'latest');
+const managedServerMetadataPath = resolve(qaRoot, 'managed-server.json');
 const baseUrl = 'http://127.0.0.1:3100';
 const sharedEnv = {
   BASE_URL: baseUrl,
@@ -194,6 +208,63 @@ function timestampLabel() {
   return new Date().toISOString().replaceAll(':', '-');
 }
 
+function getWorkspaceFingerprint() {
+  const headResult = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  const statusResult = spawnSync(
+    'git',
+    ['status', '--porcelain=v1', '--untracked-files=all'],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    }
+  );
+
+  const head =
+    headResult.status === 0 ? headResult.stdout.trim() : 'unknown-head';
+  const status =
+    statusResult.status === 0 ? statusResult.stdout.trim() : 'unknown-status';
+
+  return JSON.stringify({ head, status });
+}
+
+function readManagedServerMetadata(): ManagedServerMetadata | null {
+  if (!existsSync(managedServerMetadataPath)) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(
+      readFileSync(managedServerMetadataPath, 'utf8')
+    ) as ManagedServerMetadata;
+  } catch {
+    return null;
+  }
+}
+
+function writeManagedServerMetadata(metadata: ManagedServerMetadata) {
+  mkdirSync(dirname(managedServerMetadataPath), { recursive: true });
+  writeFileSync(
+    managedServerMetadataPath,
+    `${JSON.stringify(metadata, null, 2)}\n`
+  );
+}
+
+function removeManagedServerMetadata() {
+  rmSync(managedServerMetadataPath, { force: true });
+}
+
+function isProcessAlive(pid: number) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function pingServer(url: string) {
   try {
     const response = await fetch(`${url}/demo`, {
@@ -257,6 +328,53 @@ async function waitForTestAuthSession(url: string, timeoutMs = 180_000) {
     await new Promise(resolveTimer => setTimeout(resolveTimer, 2_000));
   }
   throw new Error(`Timed out waiting for ${url}/api/dev/test-auth/session`);
+}
+
+async function waitForServerShutdown(url: string, timeoutMs = 30_000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (!(await pingServer(url))) {
+      return;
+    }
+
+    await delay(500);
+  }
+
+  throw new Error(`Timed out waiting for ${url} to stop responding`);
+}
+
+async function resolveServerState() {
+  const reachable = await pingServer(baseUrl);
+  if (!reachable) {
+    return { reused: false } as const;
+  }
+
+  if (await isLikelyDevServer(baseUrl)) {
+    throw new Error(
+      'qa:releases:loop refuses to reuse a Next dev server on http://127.0.0.1:3100. Stop it and rerun so the loop can build and start a production server.'
+    );
+  }
+
+  const metadata = readManagedServerMetadata();
+  if (!metadata || !isProcessAlive(metadata.pid)) {
+    throw new Error(
+      'qa:releases:loop found an existing production server on http://127.0.0.1:3100 without matching managed-server metadata. Stop it and rerun so the loop can build a deterministic standalone server.'
+    );
+  }
+
+  const currentFingerprint = getWorkspaceFingerprint();
+  if (metadata.fingerprint === currentFingerprint) {
+    await waitForTestAuthSession(baseUrl);
+    return { reused: true } as const;
+  }
+
+  process.stderr.write(
+    `[qa] restarting stale managed server pid ${metadata.pid} because the workspace fingerprint changed\n`
+  );
+  process.kill(metadata.pid, 'SIGTERM');
+  await waitForServerShutdown(baseUrl);
+  removeManagedServerMetadata();
+  return { reused: false } as const;
 }
 
 function spawnWithCapture(
@@ -359,6 +477,16 @@ async function ensureManagedServer() {
     throw new Error('Failed to build @jovie/web for qa:releases:loop');
   }
 
+  const standaloneServerEntry = resolve(
+    repoRoot,
+    'apps/web/.next/standalone/apps/web/server.js'
+  );
+  if (!existsSync(standaloneServerEntry)) {
+    throw new Error(
+      `Could not find the Next.js standalone server entry after build: ${standaloneServerEntry}`
+    );
+  }
+
   const server = spawn(
     'doppler',
     [
@@ -369,7 +497,7 @@ async function ensureManagedServer() {
       'dev',
       '--',
       'node',
-      '.next/standalone/apps/web/server.js',
+      standaloneServerEntry,
     ],
     {
       cwd: repoRoot,
@@ -387,6 +515,15 @@ async function ensureManagedServer() {
 
   await waitForServer(baseUrl);
   await waitForTestAuthSession(baseUrl);
+  if (!server.pid) {
+    throw new Error('Managed QA server started without a PID');
+  }
+  writeManagedServerMetadata({
+    pid: server.pid,
+    fingerprint: getWorkspaceFingerprint(),
+    serverEntry: standaloneServerEntry,
+    startedAt: new Date().toISOString(),
+  });
   return server;
 }
 
@@ -520,32 +657,45 @@ async function main() {
   mkdirSync(latestRoot, { recursive: true });
 
   let server: ChildProcess | null = null;
-  const reusedServer = await pingServer(baseUrl);
-  if (reusedServer) {
-    if (await isLikelyDevServer(baseUrl)) {
-      throw new Error(
-        'qa:releases:loop refuses to reuse a Next dev server on http://127.0.0.1:3100. Stop it and rerun so the loop can build and start a production server.'
-      );
-    }
-    await waitForTestAuthSession(baseUrl);
-  } else {
+  const serverState = await resolveServerState();
+  if (!serverState.reused) {
     server = await ensureManagedServer();
   }
 
+  let didTeardown = false;
   const teardown = () => {
+    if (didTeardown) {
+      return;
+    }
+    didTeardown = true;
+
     if (server && !server.killed) {
       server.kill('SIGTERM');
+      removeManagedServerMetadata();
     }
   };
+
+  const removeTeardownListeners = () => {
+    process.removeListener('exit', teardown);
+    process.removeListener('SIGINT', handleSigint);
+    process.removeListener('SIGTERM', handleSigterm);
+  };
+
+  const handleSigint = () => {
+    removeTeardownListeners();
+    teardown();
+    process.exit(1);
+  };
+
+  const handleSigterm = () => {
+    removeTeardownListeners();
+    teardown();
+    process.exit(1);
+  };
+
   process.on('exit', teardown);
-  process.on('SIGINT', () => {
-    teardown();
-    process.exit(1);
-  });
-  process.on('SIGTERM', () => {
-    teardown();
-    process.exit(1);
-  });
+  process.on('SIGINT', handleSigint);
+  process.on('SIGTERM', handleSigterm);
 
   const runRoot = resolve(historyRoot, timestampLabel());
   const iterations: Array<{ number: number; evals: EvalResult[] }> = [];
@@ -577,6 +727,7 @@ async function main() {
     writeArtifacts(latestRoot, iterations, passed ? 'pass' : 'fail');
   }
 
+  removeTeardownListeners();
   teardown();
   process.exit(passed ? 0 : 1);
 }

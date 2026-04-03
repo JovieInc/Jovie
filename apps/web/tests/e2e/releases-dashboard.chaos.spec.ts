@@ -10,6 +10,15 @@ import {
 const RELEASES_ROUTE = '/app/dashboard/releases';
 const SAFE_CLICK_LIMIT = 8;
 const SIDEBAR_OPEN_TIMEOUT_MS = 30_000;
+const ALLOWED_SAFE_TESTIDS = [
+  'drawer-tab-playback',
+  'drawer-tab-links',
+  'drawer-tab-details',
+  'drawer-tab-lyrics',
+  'drawer-tab-tasks',
+  'drawer-tab-settings',
+  'release-sidebar-smart-link-copy',
+] as const;
 
 type ReleasesSurface = 'desktop' | 'mobile';
 
@@ -130,50 +139,29 @@ function collectSameOriginApiFailures(
 }
 
 async function sweepSafeClicks(page: import('@playwright/test').Page) {
-  const selectors = await page.evaluate(limit => {
-    const blocked = [
-      'delete',
-      'remove',
-      'sign out',
-      'log out',
-      'open',
-      'export',
-      'share',
-      'view profile',
-    ];
-    const nodes = Array.from(
-      document.querySelectorAll(
-        '[data-testid="releases-matrix"] button, [data-testid="release-sidebar"] button'
-      )
-    );
+  const selectors = await page.evaluate(
+    ({ allowedTestIds, limit }) => {
+      const nodes = Array.from(
+        document.querySelectorAll(
+          '[data-testid="releases-matrix"] button, [data-testid="release-sidebar"] button'
+        )
+      );
 
-    return nodes
-      .map(node => {
-        const element = node as HTMLElement;
-        const label =
-          element.getAttribute('aria-label')?.trim() ||
-          element.textContent?.trim() ||
-          '';
-        if (
-          !label ||
-          blocked.some(token => label.toLowerCase().includes(token))
-        ) {
-          return null;
-        }
+      return nodes
+        .map(node => {
+          const element = node as HTMLElement;
+          const testId = element.dataset.testid;
+          if (!testId || !allowedTestIds.includes(testId)) {
+            return null;
+          }
 
-        if (element.dataset.testid) {
-          return `[data-testid="${element.dataset.testid}"]`;
-        }
-
-        if (element.getAttribute('aria-label')) {
-          return `[aria-label="${element.getAttribute('aria-label')}"]`;
-        }
-
-        return null;
-      })
-      .filter((selector): selector is string => Boolean(selector))
-      .slice(0, limit);
-  }, SAFE_CLICK_LIMIT);
+          return `[data-testid="${testId}"]`;
+        })
+        .filter((selector): selector is string => Boolean(selector))
+        .slice(0, limit);
+    },
+    { allowedTestIds: [...ALLOWED_SAFE_TESTIDS], limit: SAFE_CLICK_LIMIT }
+  );
 
   for (const selector of selectors) {
     const locator = page.locator(selector).first();

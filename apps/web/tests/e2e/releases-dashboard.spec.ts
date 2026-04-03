@@ -54,13 +54,18 @@ async function getFirstReleaseTrigger(
     return page.locator('[data-testid^="mobile-release-row-"]').first();
   }
 
-  const getDesktopOpenButton = (scope: Locator) =>
-    scope.locator('[data-testid^="release-open-"]').first();
+  const findDesktopOpenButton = async (scope: Locator) => {
+    const openButton = scope.locator('[data-testid^="release-open-"]').first();
+    const isVisible = await openButton
+      .isVisible({ timeout: TIMEOUTS.QUICK_CHECK })
+      .catch(() => false);
+    return isVisible ? openButton : null;
+  };
 
   const taggedRow = page.getByTestId('release-row').first();
   if ((await taggedRow.count()) > 0) {
-    const openButton = getDesktopOpenButton(taggedRow);
-    if ((await openButton.count()) > 0) {
+    const openButton = await findDesktopOpenButton(taggedRow);
+    if (openButton) {
       return openButton;
     }
     const firstCell = taggedRow.locator('td').first();
@@ -71,8 +76,8 @@ async function getFirstReleaseTrigger(
   }
 
   const firstRow = page.locator('tbody tr').first();
-  const openButton = getDesktopOpenButton(firstRow);
-  if ((await openButton.count()) > 0) {
+  const openButton = await findDesktopOpenButton(firstRow);
+  if (openButton) {
     return openButton;
   }
 
@@ -98,6 +103,47 @@ async function waitForReleaseSidebar(page: Page) {
   return sidebar;
 }
 
+async function isReleaseSidebarSurfaceVisible(
+  page: Page,
+  timeout = TIMEOUTS.QUICK_CHECK
+) {
+  return page
+    .locator(
+      '[data-testid="drawer-loading-skeleton"], [data-testid="release-sidebar"]'
+    )
+    .first()
+    .isVisible({ timeout })
+    .catch(() => false);
+}
+
+async function didReleaseSidebarOpenStart(
+  page: Page,
+  previewToggle: Locator | null,
+  initialPreviewPressed: string | null
+) {
+  if (
+    await isReleaseSidebarSurfaceVisible(
+      page,
+      previewToggle ? 1_000 : TIMEOUTS.ELEMENT_CHECK
+    )
+  ) {
+    return true;
+  }
+
+  if (!previewToggle) {
+    return false;
+  }
+
+  const currentPreviewPressed = await previewToggle
+    .getAttribute('aria-pressed')
+    .catch(() => null);
+
+  return (
+    currentPreviewPressed === 'true' &&
+    currentPreviewPressed !== initialPreviewPressed
+  );
+}
+
 async function installClipboardSpy(page: Page) {
   await page.evaluate(() => {
     (window as unknown as { __releasesClipboard: string }).__releasesClipboard =
@@ -119,9 +165,9 @@ async function readClipboardSpy(page: Page) {
 }
 
 async function getSidebarSmartLinkUrl(sidebar: Locator) {
-  const smartLinkToken = sidebar
-    .locator('[title^="http://"], [title^="https://"]')
-    .first();
+  const smartLinkToken = sidebar.getByTestId(
+    'release-sidebar-canonical-smart-link'
+  );
   await expect(smartLinkToken).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
 
   const url = await smartLinkToken.getAttribute('title');
@@ -178,14 +224,87 @@ async function ensureReleasesVisible(
   return { matrix, surface: 'desktop' };
 }
 
-async function openFirstReleaseSidebar(page: Page) {
+type ReleaseSidebarOpenStrategy = 'row' | 'toggle-first';
+
+async function openFirstReleaseSidebar(
+  page: Page,
+  strategy: ReleaseSidebarOpenStrategy = 'toggle-first'
+) {
   const { surface } = await ensureReleasesVisible(page);
-  const firstReleaseTrigger = await getFirstReleaseTrigger(page, surface);
-  await firstReleaseTrigger.waitFor({
-    state: 'visible',
-    timeout: TIMEOUTS.ELEMENT_CHECK,
-  });
-  await firstReleaseTrigger.click();
+  if (await isReleaseSidebarSurfaceVisible(page)) {
+    return waitForReleaseSidebar(page);
+  }
+
+  const previewToggle =
+    surface === 'desktop'
+      ? page.getByRole('button', { name: 'Toggle release preview' })
+      : null;
+  const initialPreviewPressed = previewToggle
+    ? await previewToggle.getAttribute('aria-pressed').catch(() => null)
+    : null;
+  const tryPreviewToggle = async () => {
+    if (
+      !previewToggle ||
+      !(await previewToggle
+        .isVisible({ timeout: TIMEOUTS.QUICK_CHECK })
+        .catch(() => false))
+    ) {
+      return false;
+    }
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await previewToggle.click({ force: true });
+      if (
+        await didReleaseSidebarOpenStart(
+          page,
+          previewToggle,
+          initialPreviewPressed
+        )
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const tryRowTrigger = async () => {
+    const firstReleaseTrigger = await getFirstReleaseTrigger(page, surface);
+    await firstReleaseTrigger.waitFor({
+      state: 'visible',
+      timeout: TIMEOUTS.ELEMENT_CHECK,
+    });
+    await firstReleaseTrigger.scrollIntoViewIfNeeded().catch(() => {});
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await firstReleaseTrigger.click({ force: true });
+      if (
+        await didReleaseSidebarOpenStart(
+          page,
+          previewToggle,
+          initialPreviewPressed
+        )
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const sidebarOpened =
+    strategy === 'row'
+      ? (await tryRowTrigger()) ||
+        (surface === 'desktop' && (await tryPreviewToggle()))
+      : (surface === 'desktop' && (await tryPreviewToggle())) ||
+        (await tryRowTrigger());
+
+  if (!sidebarOpened) {
+    const fallbackTrigger = await getFirstReleaseTrigger(page, surface);
+    await fallbackTrigger.scrollIntoViewIfNeeded().catch(() => {});
+    await fallbackTrigger.click({ force: true });
+  }
+
   return waitForReleaseSidebar(page);
 }
 
@@ -260,7 +379,7 @@ test.describe('Releases dashboard', () => {
     });
     await installClipboardSpy(page);
 
-    const sidebar = await openFirstReleaseSidebar(page);
+    const sidebar = await openFirstReleaseSidebar(page, 'row');
     await expect(sidebar.getByTestId('drawer-tab-links')).toBeVisible();
     await expect(sidebar.getByTestId('drawer-tab-tasks')).toBeVisible();
     await sidebar.getByTestId('drawer-tab-links').click();
@@ -399,17 +518,8 @@ test.describe('Releases dashboard', () => {
     expect(smartLinkHandle).toBeTruthy();
 
     await sidebar.getByTestId('drawer-tab-links').click();
-    const smartLinkTokens = sidebar.locator(
-      '[title^="http://"], [title^="https://"]'
-    );
-    const count = await smartLinkTokens.count();
-    expect(count).toBeGreaterThan(0);
-
-    // Check that each smart link URL contains the artist handle
-    for (let i = 0; i < count; i++) {
-      const url = await smartLinkTokens.nth(i).getAttribute('title');
-      expect(url).toContain(`/${smartLinkHandle}/`);
-    }
+    const canonicalUrl = await getSidebarSmartLinkUrl(sidebar);
+    expect(canonicalUrl).toContain(`/${smartLinkHandle}/`);
   });
 
   test('shows release toolbar controls when releases exist @nightly', async ({

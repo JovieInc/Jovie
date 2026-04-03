@@ -108,12 +108,14 @@ function ReleaseSmartLinkControl({
           aria-hidden='true'
         />
         <span
+          data-testid='release-sidebar-canonical-smart-link'
           className='min-w-0 flex-1 truncate font-mono text-[10.5px] leading-none tracking-[-0.01em] text-secondary-token'
           title={smartLinkUrl}
         >
           {smartLinkLabel}
         </span>
         <DrawerInlineIconButton
+          data-testid='release-sidebar-smart-link-copy'
           onClick={async event => {
             event.stopPropagation();
             const copied = await copyToClipboard(smartLinkUrl);
@@ -129,6 +131,7 @@ function ReleaseSmartLinkControl({
           <Copy className='h-3 w-3' />
         </DrawerInlineIconButton>
         <DrawerInlineIconButton
+          data-testid='release-sidebar-smart-link-open'
           onClick={event => {
             event.stopPropagation();
             globalThis.open(smartLinkUrl, '_blank', 'noopener,noreferrer');
@@ -145,6 +148,7 @@ function ReleaseSmartLinkControl({
           items={shareItems}
           trigger={
             <DrawerInlineIconButton
+              data-testid='release-sidebar-smart-link-share'
               title='Share smart link'
               className='h-7 w-7 rounded-full text-tertiary-token'
             >

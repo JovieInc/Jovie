@@ -109,9 +109,6 @@ export const EXPECTED_ERROR_PATTERNS = [
   // React dev warning for script tags rendered inside components.
   // This is framework noise in local E2E and not a dashboard route regression.
   'encountered a script tag while rendering react component',
-
-  // Next.js dev + CSP on bypass-auth local runs can emit this React dev-only eval warning.
-  'eval() is not supported in this environment',
 ] as const;
 
 const EXPECTED_WARNING_PATTERNS = [
@@ -164,6 +161,12 @@ export interface SmokeTestContext {
  */
 export function isExpectedError(errorText: string): boolean {
   const lowerText = errorText.toLowerCase();
+  if (
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
+    lowerText.includes('eval() is not supported in this environment')
+  ) {
+    return true;
+  }
   if (
     lowerText.includes('clerk.accounts.dev/npm/@clerk/') &&
     lowerText.includes('redirect is not allowed for a preflight request')

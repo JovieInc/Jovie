@@ -2,16 +2,12 @@ import { headers } from 'next/headers';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import ChatLoading from './chat/loading';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
+import { LOADING_COPY_FONT_STYLE } from './loading-copy-font-style';
 import {
   isChatShellRoute,
   isReleasesShellRoute,
   resolveAppShellRequestPath,
 } from './shell-route-matches';
-
-const LOADING_COPY_FONT_STYLE = {
-  fontFamily:
-    'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-} as const;
 
 /**
  * Shell-level loading state shown during cross-section navigation

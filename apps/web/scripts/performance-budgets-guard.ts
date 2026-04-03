@@ -544,8 +544,8 @@ async function measureWarmNavigationRoute(
     routeReadyPromise = waitForExpectedUrl(page, expectedPaths);
   }
 
-  const warmShellResponse = await waitForWarmShellReady(page, route, startedAt);
   await routeReadyPromise;
+  const warmShellResponse = await waitForWarmShellReady(page, route, startedAt);
   const skeletonToContent = hasTimingBudget(route, 'skeleton-to-content')
     ? await waitForContentReady(page, route, startedAt)
     : 0;
@@ -725,9 +725,10 @@ async function warmRoute(
             timeout: NAVIGATION_TIMEOUT_MS,
             waitUntil: 'domcontentloaded',
           });
-          await waitForAnyVisible(page, route.readySelectors.content).catch(
-            () => undefined
-          );
+          await waitForAnyVisible(
+            page,
+            route.readySelectors.content ?? route.readySelectors.shell
+          ).catch(() => undefined);
         }
       );
       return;

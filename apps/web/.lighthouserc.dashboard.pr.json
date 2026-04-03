@@ -3,6 +3,18 @@
     "collect": {
       "numberOfRuns": 3,
       "puppeteerScript": "scripts/lighthouse-dashboard-auth.cjs",
+      "puppeteerLaunchOptions": {
+        "defaultViewport": {
+          "width": 1350,
+          "height": 940
+        },
+        "args": [
+          "--disable-backgrounding-occluded-windows",
+          "--disable-renderer-backgrounding",
+          "--disable-background-timer-throttling",
+          "--window-size=1350,940"
+        ]
+      },
       "settings": {
         "disableStorageReset": true
       }

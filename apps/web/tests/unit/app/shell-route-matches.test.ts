@@ -3,36 +3,44 @@ import {
   isReleasesShellRoute,
   resolveAppShellRequestPath,
 } from '@/app/app/(shell)/shell-route-matches';
+import { APP_ROUTES } from '@/constants/routes';
 
 describe('resolveAppShellRequestPath', () => {
+  const releasesDashboardGroupPath = `/app/(shell)/${APP_ROUTES.DASHBOARD_RELEASES.split(
+    '/'
+  )
+    .filter(Boolean)
+    .slice(1)
+    .join('/')}`;
+
   it('uses next-url when it is available', () => {
     expect(
       resolveAppShellRequestPath(
-        '/app/dashboard/releases?tab=links',
-        '/app/dashboard'
+        `${APP_ROUTES.DASHBOARD_RELEASES}?tab=links`,
+        APP_ROUTES.DASHBOARD
       )
-    ).toBe('/app/dashboard/releases');
+    ).toBe(APP_ROUTES.DASHBOARD_RELEASES);
   });
 
   it('falls back to x-matched-path when next-url is missing', () => {
-    expect(resolveAppShellRequestPath(null, '/app/dashboard/releases')).toBe(
-      '/app/dashboard/releases'
-    );
+    expect(
+      resolveAppShellRequestPath(null, APP_ROUTES.DASHBOARD_RELEASES)
+    ).toBe(APP_ROUTES.DASHBOARD_RELEASES);
   });
 
   it('strips route groups from x-matched-path when they are present', () => {
-    expect(
-      resolveAppShellRequestPath(null, '/app/(shell)/dashboard/releases')
-    ).toBe('/app/dashboard/releases');
+    expect(resolveAppShellRequestPath(null, releasesDashboardGroupPath)).toBe(
+      APP_ROUTES.DASHBOARD_RELEASES
+    );
   });
 
   it('accepts absolute header values', () => {
     expect(
       resolveAppShellRequestPath(
         null,
-        'https://jov.ie/app/dashboard/releases?tab=links'
+        `https://jov.ie${APP_ROUTES.DASHBOARD_RELEASES}?tab=links`
       )
-    ).toBe('/app/dashboard/releases');
+    ).toBe(APP_ROUTES.DASHBOARD_RELEASES);
   });
 
   it('returns null when no path-like header is present', () => {
@@ -42,12 +50,12 @@ describe('resolveAppShellRequestPath', () => {
 
 describe('isReleasesShellRoute', () => {
   it('matches the releases dashboard route', () => {
-    expect(isReleasesShellRoute('/app/dashboard/releases')).toBe(true);
+    expect(isReleasesShellRoute(APP_ROUTES.DASHBOARD_RELEASES)).toBe(true);
   });
 
   it('matches nested releases subroutes', () => {
-    expect(isReleasesShellRoute('/app/dashboard/releases/abc/tasks')).toBe(
-      true
-    );
+    expect(
+      isReleasesShellRoute(`${APP_ROUTES.DASHBOARD_RELEASES}/abc/tasks`)
+    ).toBe(true);
   });
 });

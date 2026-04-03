@@ -194,7 +194,7 @@ export function DashboardNav(_: DashboardNavProps) {
           item={item}
           isActive={isActive}
           shortcut={shortcut}
-          prefetch={isReleasesItem ? false : undefined}
+          prefetch={false}
           actions={isProfileItem ? profileActions : null}
           onClick={onClick}
           preventNavigation={demoUnavailable}

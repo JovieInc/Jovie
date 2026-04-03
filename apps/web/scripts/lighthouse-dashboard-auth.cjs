@@ -1,5 +1,5 @@
 const { spawnSync } = require('node:child_process');
-const { existsSync, mkdirSync, readFileSync } = require('node:fs');
+const { existsSync, mkdirSync, readFileSync, rmSync } = require('node:fs');
 const path = require('node:path');
 
 // Keep these aligned with the canonical definitions in
@@ -7,11 +7,21 @@ const path = require('node:path');
 // so importing the TypeScript source directly is not a safe option here.
 const TEST_MODE_COOKIE = '__e2e_test_mode';
 const TEST_USER_ID_COOKIE = '__e2e_test_user_id';
+const TEST_PERSONA_COOKIE = '__e2e_test_persona';
 const TEST_AUTH_BYPASS_MODE = 'bypass-auth';
 
 const webRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(webRoot, '..', '..');
 const defaultBaseUrl = process.env.BASE_URL || 'http://localhost:3000';
+const lighthouseOutputRoot = path.resolve(webRoot, '.lighthouseci');
+const lighthouseDashboardOutputDir = path.resolve(
+  lighthouseOutputRoot,
+  'dashboard-pr'
+);
+const lighthouseAssertionResultsPath = path.resolve(
+  lighthouseOutputRoot,
+  'assertion-results.json'
+);
 const defaultAuthStatePath = path.resolve(
   repoRoot,
   '.context',
@@ -19,6 +29,11 @@ const defaultAuthStatePath = path.resolve(
   'auth',
   'lighthouse-user.json'
 );
+const RELEASES_WARM_SELECTORS = [
+  '[data-testid="releases-matrix"]',
+  '[data-testid="release-table-shell"]',
+  '[data-testid="spotify-import-progress-banner"]',
+];
 
 function resolveBaseUrl() {
   return process.env.BASE_URL || defaultBaseUrl;
@@ -102,8 +117,16 @@ function authStateMatchesBaseUrl(filePath, baseUrl) {
 }
 
 function ensureChromiumPath() {
-  const chromePath = require('playwright').chromium.executablePath();
-  if (!chromePath || !existsSync(chromePath)) {
+  const candidatePaths = [
+    process.env.CHROME_PATH?.trim() || null,
+    process.platform === 'darwin'
+      ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+      : null,
+    require('playwright').chromium.executablePath(),
+  ].filter(Boolean);
+
+  const chromePath = candidatePaths.find(candidate => existsSync(candidate));
+  if (!chromePath) {
     throw new Error(
       'Playwright Chromium is not installed. Run `pnpm --filter=@jovie/web exec playwright install chromium` before running dashboard Lighthouse.'
     );
@@ -190,9 +213,32 @@ function ensureAuthState(baseUrl) {
   return authStatePath;
 }
 
+async function resolveBypassUserId(baseUrl, fallbackUserId, persona) {
+  if (!persona) {
+    return fallbackUserId;
+  }
+
+  const response = await fetch(new URL('/api/dev/test-auth/session', baseUrl), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ persona }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to resolve ${persona} Lighthouse test-auth session.`
+    );
+  }
+
+  const payload = await response.json();
+  return payload.userId?.trim() || fallbackUserId;
+}
+
 async function seedDashboardAuth(browser, { url }) {
   const origin = new URL(url).origin;
   const pathname = new URL(url).pathname;
+  const bypassPersona =
+    process.env.E2E_TEST_AUTH_PERSONA?.trim() === 'admin' ? 'admin' : 'creator';
   const page = await browser.newPage();
   const browserContext =
     typeof browser.defaultBrowserContext === 'function'
@@ -202,19 +248,21 @@ async function seedDashboardAuth(browser, { url }) {
         : null;
   const testUserId = process.env.E2E_CLERK_USER_ID?.trim();
   const warmRoute = async () => {
+    await page.bringToFront().catch(() => undefined);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.bringToFront().catch(() => undefined);
     if (pathname === '/app/dashboard/releases') {
-      await Promise.any([
-        page.waitForSelector('[data-testid="releases-matrix"]', {
-          timeout: 60_000,
-        }),
-        page.waitForSelector('[data-testid="release-table-shell"]', {
-          timeout: 60_000,
-        }),
-        page.waitForSelector('[data-testid="spotify-import-progress-banner"]', {
-          timeout: 60_000,
-        }),
-      ]).catch(() => undefined);
+      try {
+        await Promise.any(
+          RELEASES_WARM_SELECTORS.map(selector =>
+            page.waitForSelector(selector, { timeout: 60_000 })
+          )
+        );
+      } catch {
+        throw new Error(
+          `Timed out warming ${url}; no releases surface selector rendered (${RELEASES_WARM_SELECTORS.join(', ')}).`
+        );
+      }
     } else if (pathname.startsWith('/app')) {
       await page
         .waitForSelector('main', { timeout: 30_000 })
@@ -230,10 +278,12 @@ async function seedDashboardAuth(browser, { url }) {
       return;
     }
 
+    await page.bringToFront().catch(() => undefined);
     await page.goto(new URL('/app', origin).toString(), {
       waitUntil: 'domcontentloaded',
       timeout: 60_000,
     });
+    await page.bringToFront().catch(() => undefined);
     await page
       .waitForSelector('main', { timeout: 30_000 })
       .catch(() => undefined);
@@ -253,26 +303,49 @@ async function seedDashboardAuth(browser, { url }) {
     });
   };
 
-  if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1' && testUserId) {
-    const authCookies = [
-      {
-        name: TEST_MODE_COOKIE,
-        value: TEST_AUTH_BYPASS_MODE,
-        url: origin,
-        sameSite: 'Lax',
-      },
-      {
-        name: TEST_USER_ID_COOKIE,
-        value: testUserId,
-        url: origin,
-        sameSite: 'Lax',
-      },
-    ];
-    if (browserContext?.setCookie) {
-      await browserContext.setCookie(...authCookies);
+  if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
+    if (testUserId) {
+      const resolvedUserId = await resolveBypassUserId(
+        origin,
+        testUserId,
+        bypassPersona
+      );
+      const authCookies = [
+        {
+          name: TEST_MODE_COOKIE,
+          value: TEST_AUTH_BYPASS_MODE,
+          url: origin,
+          sameSite: 'Lax',
+        },
+        {
+          name: TEST_USER_ID_COOKIE,
+          value: resolvedUserId,
+          url: origin,
+          sameSite: 'Lax',
+        },
+        {
+          name: TEST_PERSONA_COOKIE,
+          value: bypassPersona,
+          url: origin,
+          sameSite: 'Lax',
+        },
+      ];
+      if (browserContext?.setCookie) {
+        await browserContext.setCookie(...authCookies);
+      } else {
+        await page.setCookie(...authCookies);
+      }
     } else {
-      await page.setCookie(...authCookies);
+      const redirectPath = pathname.startsWith('/app') ? pathname : '/app';
+      const authEnterUrl = new URL('/api/dev/test-auth/enter', origin);
+      authEnterUrl.searchParams.set('persona', bypassPersona);
+      authEnterUrl.searchParams.set('redirect', redirectPath);
+      await page.goto(authEnterUrl.toString(), {
+        waitUntil: 'domcontentloaded',
+        timeout: 60_000,
+      });
     }
+
     await warmRouteRepeatedly();
     await page.close();
     return;
@@ -315,8 +388,11 @@ async function seedDashboardAuth(browser, { url }) {
 function main() {
   const baseUrl = resolveBaseUrl();
   const collectUrls = resolveCollectUrls(baseUrl);
+  const useBypassAuth =
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
+    Boolean(process.env.E2E_CLERK_USER_ID?.trim());
   assertCiUsesSyntheticBypass();
-  const authStatePath = ensureAuthState(baseUrl);
+  const authStatePath = useBypassAuth ? null : ensureAuthState(baseUrl);
   const chromePath = ensureChromiumPath();
   const env = {
     ...process.env,
@@ -325,8 +401,10 @@ function main() {
     NODE_PATH: buildNodePath(),
   };
 
-  if (process.env.E2E_CLERK_USER_ID?.trim()) {
+  if (useBypassAuth) {
     env.E2E_USE_TEST_AUTH_BYPASS = '1';
+    env.E2E_TEST_AUTH_PERSONA =
+      process.env.E2E_TEST_AUTH_PERSONA?.trim() || 'creator';
     env.NEXT_PUBLIC_CLERK_MOCK = process.env.NEXT_PUBLIC_CLERK_MOCK || '1';
     env.NEXT_PUBLIC_CLERK_PROXY_DISABLED =
       process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED || '1';
@@ -335,6 +413,13 @@ function main() {
     delete env.NEXT_PUBLIC_CLERK_MOCK;
     delete env.NEXT_PUBLIC_CLERK_PROXY_DISABLED;
   }
+
+  // LHCI filesystem upload mode accumulates prior run artifacts unless the
+  // output directory is cleared first, which makes iterative local runs
+  // assert against stale reports and breaks the deterministic QA loop.
+  rmSync(lighthouseDashboardOutputDir, { recursive: true, force: true });
+  mkdirSync(lighthouseDashboardOutputDir, { recursive: true });
+  rmSync(lighthouseAssertionResultsPath, { force: true });
 
   const result = spawnSync(
     'pnpm',

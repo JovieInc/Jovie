@@ -255,7 +255,13 @@ test.describe('Releases Dashboard Health', () => {
           )
         ).toHaveCount(0);
 
-        await assertNoCriticalErrors(getContext(), testInfo);
+        const context = getContext();
+        const apiFailures = collectSameOriginApiFailures(
+          page.url(),
+          context.networkDiagnostics.failedResponses
+        );
+        await assertNoCriticalErrors(context, testInfo);
+        expect(apiFailures, JSON.stringify(apiFailures, null, 2)).toEqual([]);
         await assertAccessible(page);
       } finally {
         cleanup();

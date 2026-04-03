@@ -148,6 +148,8 @@ export function SegmentControl<T extends string = string>({
           </Tabs.Trigger>
         ))}
       </Tabs.List>
+      {/* Keep hidden panels mounted so each tab trigger has a valid aria-controls target
+          even when SegmentControl is used as a pure switcher with external content. */}
       {options.map(option => (
         <Tabs.Content
           key={`${option.value}-panel`}

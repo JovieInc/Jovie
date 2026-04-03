@@ -288,6 +288,7 @@ function SidebarHeaderNav({
       {!isInSettings && isDashboardOrAdmin && (
         <Link
           href={APP_ROUTES.CHAT}
+          prefetch={false}
           aria-label='New thread'
           className='ml-auto flex size-7 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground group-data-[collapsible=icon]:hidden'
         >
