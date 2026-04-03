@@ -1,12 +1,14 @@
 import { APP_ROUTES } from '../constants/routes';
 
-export type PerfMode = 'homepage' | 'dashboard';
+export type PerfMode = 'homepage' | 'dashboard' | 'route';
+export type PerfLoopScope = 'homepage' | 'route' | 'end-user';
 export type PerfPrimaryMetric = 'lighthouseScore' | 'warmShellResponseMs';
 
 type GuardrailDirection = 'higher-better' | 'lower-better';
 
 export interface PerfRunConfig {
   mode: PerfMode;
+  scope: PerfLoopScope;
   threshold: number;
   baseUrl: string;
   authPath?: string;
@@ -14,6 +16,7 @@ export interface PerfRunConfig {
   runsPerSample: number;
   artifactsDir: string;
   route?: string;
+  routeId?: string;
 }
 
 export interface PerfLoopCliOptions {
@@ -21,11 +24,16 @@ export interface PerfLoopCliOptions {
   authPath?: string;
   baseUrl: string;
   fresh: boolean;
+  groupIds: readonly string[];
   hypothesis?: string;
   maxNoProgress: number;
   mode: PerfMode;
+  optimizePassing: boolean;
+  resume: boolean;
   route?: string;
+  routeId?: string;
   runsPerSample: number;
+  scope: PerfLoopScope;
   skipBuild: boolean;
   threshold: number;
 }
@@ -113,6 +121,10 @@ export interface PerfRunState {
   iterations: PerfIterationResult[];
   noProgressCount: number;
   nextHypothesisIndex: number;
+}
+
+export function isRouteLikeMode(mode: PerfMode) {
+  return mode === 'dashboard' || mode === 'route';
 }
 
 interface LighthouseCategoryLike {
@@ -320,15 +332,20 @@ export function parsePerfLoopArgs(
   baseUrl = process.env.BASE_URL || 'http://localhost:3000'
 ): PerfLoopCliOptions {
   const options: PerfLoopCliOptions = {
+    groupIds: [],
     baseUrl,
     fresh: false,
     maxNoProgress: 3,
     mode: 'homepage',
+    optimizePassing: false,
+    resume: false,
     runsPerSample: 3,
+    scope: 'homepage',
     skipBuild: false,
     threshold: getDefaultThreshold('homepage'),
   };
   let thresholdProvided = false;
+  let scopeProvided = false;
 
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
@@ -338,12 +355,34 @@ export function parsePerfLoopArgs(
 
     if (arg === '--mode') {
       const value = args[index + 1];
-      if (value !== 'homepage' && value !== 'dashboard') {
-        throw new TypeError('Expected --mode homepage|dashboard');
+      if (value !== 'homepage' && value !== 'dashboard' && value !== 'route') {
+        throw new TypeError('Expected --mode homepage|dashboard|route');
       }
       options.mode = value;
+      if (!scopeProvided) {
+        options.scope = value === 'homepage' ? 'homepage' : 'route';
+      }
       if (!thresholdProvided) {
         options.threshold = getDefaultThreshold(value);
+      }
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--scope') {
+      const value = args[index + 1];
+      if (value !== 'homepage' && value !== 'route' && value !== 'end-user') {
+        throw new TypeError('Expected --scope homepage|route|end-user');
+      }
+      options.scope = value;
+      scopeProvided = true;
+      if (value === 'homepage') {
+        options.mode = 'homepage';
+      } else if (options.mode === 'homepage') {
+        options.mode = 'route';
+        if (!thresholdProvided) {
+          options.threshold = getDefaultThreshold('route');
+        }
       }
       index += 1;
       continue;
@@ -380,6 +419,16 @@ export function parsePerfLoopArgs(
       continue;
     }
 
+    if (arg === '--group') {
+      const value = args[index + 1];
+      if (!value) {
+        throw new TypeError('Expected a value for --group');
+      }
+      options.groupIds = [...options.groupIds, value];
+      index += 1;
+      continue;
+    }
+
     if (arg === '--artifacts-dir') {
       const value = args[index + 1];
       if (!value) {
@@ -390,14 +439,12 @@ export function parsePerfLoopArgs(
       continue;
     }
 
-    if (arg === '--runs-per-sample') {
+    if (arg === '--runs-per-sample' || arg === '--runs') {
       const value = Number(args[index + 1]);
       // Even sample counts bias median selection because medianSampleBy()
       // intentionally chooses a single representative run.
       if (!Number.isInteger(value) || value <= 0 || value % 2 === 0) {
-        throw new TypeError(
-          'Expected a positive odd integer for --runs-per-sample'
-        );
+        throw new TypeError(`Expected a positive odd integer for ${arg}`);
       }
       options.runsPerSample = value;
       index += 1;
@@ -426,6 +473,16 @@ export function parsePerfLoopArgs(
       continue;
     }
 
+    if (arg === '--route-id') {
+      const value = args[index + 1];
+      if (!value) {
+        throw new TypeError('Expected a value for --route-id');
+      }
+      options.routeId = value;
+      index += 1;
+      continue;
+    }
+
     if (arg === '--hypothesis') {
       const value = args[index + 1];
       if (!value) {
@@ -438,6 +495,16 @@ export function parsePerfLoopArgs(
 
     if (arg === '--fresh') {
       options.fresh = true;
+      continue;
+    }
+
+    if (arg === '--resume') {
+      options.resume = true;
+      continue;
+    }
+
+    if (arg === '--optimize-passing') {
+      options.optimizePassing = true;
       continue;
     }
 
@@ -607,7 +674,8 @@ export function createDashboardMeasurement(
 
 export function buildDashboardBudgetGuardArgs(
   resolvedAuthPath?: string,
-  route?: string
+  route?: string,
+  routeId?: string
 ) {
   const args = [
     'run',
@@ -619,9 +687,13 @@ export function buildDashboardBudgetGuardArgs(
     'tsx',
     PERFORMANCE_BUDGET_GUARD_SCRIPT,
     '--json',
-    '--path',
-    route || APP_ROUTES.DASHBOARD_RELEASES,
   ];
+
+  if (routeId) {
+    args.push('--route-id', routeId);
+  } else {
+    args.push('--path', route || APP_ROUTES.DASHBOARD_RELEASES);
+  }
 
   if (resolvedAuthPath) {
     args.push('--auth-path', resolvedAuthPath);
@@ -889,7 +961,7 @@ export function buildOptimizerPrompt(options: {
     'Primary metric:',
     state.config.mode === 'homepage'
       ? '- Lighthouse performance score for / with LCP <= 2500ms, FCP <= 1800ms, TBT <= 200ms, CLS <= 0.05, and no accessibility/SEO regression.'
-      : `- Warm authenticated navigation-to-visible-shell time for ${APP_ROUTES.DASHBOARD_RELEASES} with TTFB <= 500ms and skeleton-to-content <= 300ms.`,
+      : `- Route performance for ${state.config.routeId ?? state.config.route ?? APP_ROUTES.DASHBOARD_RELEASES} with TTFB <= 500ms and skeleton-to-content <= 300ms.`,
   ];
 
   if (nextHypothesis) {

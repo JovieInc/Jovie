@@ -62,19 +62,19 @@ test.describe('Homepage', () => {
       page.getByRole('heading', { name: 'The right action for every fan.' })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Claim your handle.' })
+      page.getByRole('heading', { name: 'Own the release stack.' })
     ).toBeVisible();
   });
 
-  test('final CTA renders with preserved ids and claim form', async ({
+  test('final CTA renders with live heading and signup action', async ({
     page,
   }) => {
-    const finalHeadline = page.getByTestId('final-cta-headline');
-    await expect(finalHeadline).toHaveText('Claim your handle.');
-
+    const finalHeadline = page.getByRole('heading', {
+      name: 'Own the release stack.',
+    });
     await expect(finalHeadline).toBeVisible();
     await expect(
-      page.getByTestId('final-cta-form').locator('input').first()
+      page.getByRole('link', { name: 'Start Free' }).last()
     ).toBeVisible();
   });
 

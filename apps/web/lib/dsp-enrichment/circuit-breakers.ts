@@ -72,6 +72,27 @@ const MUSICBRAINZ_CONFIG: Partial<CircuitBreakerConfig> = {
   minimumRequestCount: 10, // Need 10 requests before circuit can open
 };
 
+function isMusicBrainzRateLimitError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  if ('errorCode' in error) {
+    const errorCode = (error as Error & { errorCode?: string }).errorCode;
+    if (errorCode === 'RATE_LIMITED') return true;
+  }
+
+  if ('statusCode' in error) {
+    const statusCode = (error as Error & { statusCode?: number }).statusCode;
+    if (statusCode === 429) return true;
+  }
+
+  if ('status' in error) {
+    const status = (error as Error & { status?: number }).status;
+    if (status === 429) return true;
+  }
+
+  return false;
+}
+
 // ============================================================================
 // Circuit Breaker Instances
 // ============================================================================
@@ -99,6 +120,7 @@ export const deezerCircuitBreaker = new CircuitBreaker({
 export const musicBrainzCircuitBreaker = new CircuitBreaker({
   name: 'musicbrainz',
   ...MUSICBRAINZ_CONFIG,
+  shouldCount: (error: unknown) => !isMusicBrainzRateLimitError(error),
 });
 
 // ============================================================================

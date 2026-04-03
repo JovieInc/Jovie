@@ -8,6 +8,16 @@ import { DOMAIN_PATTERNS, PLATFORMS } from './registry';
 import type { DetectedLink, PlatformInfo } from './types';
 import { getValidationError, validateUrl } from './validator';
 
+function findPlatformByHost(normalizedUrl: string): PlatformInfo | null {
+  for (const { pattern, platformId } of DOMAIN_PATTERNS) {
+    if (pattern.test(normalizedUrl)) {
+      return PLATFORMS[platformId];
+    }
+  }
+
+  return null;
+}
+
 /**
  * Generate title for Spotify links based on URL structure
  */
@@ -94,14 +104,7 @@ export function detectPlatform(
   const normalizedUrl = normalizeUrl(url);
 
   // Find matching platform
-  let detectedPlatform: PlatformInfo | null = null;
-
-  for (const { pattern, platformId } of DOMAIN_PATTERNS) {
-    if (pattern.test(normalizedUrl)) {
-      detectedPlatform = PLATFORMS[platformId];
-      break;
-    }
-  }
+  const detectedPlatform = findPlatformByHost(normalizedUrl);
 
   // If no known platform matched, mark as unrecognized (website fallback removed)
   if (!detectedPlatform) {
@@ -135,6 +138,14 @@ export function detectPlatform(
     isValid,
     error: isValid ? undefined : getValidationError(detectedPlatform.id),
   };
+}
+
+export function detectPlatformByHost(url: string): PlatformInfo | null {
+  try {
+    return findPlatformByHost(normalizeUrl(url));
+  } catch {
+    return null;
+  }
 }
 
 /**

@@ -7,21 +7,26 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.110] - 2026-04-02
 
-> Reworked release and track sidebars around playback-first QA, hardened shared preview playback failure handling, and made public smart-link preview confidence explicit with Spotify and Apple fallback support.
+> Added a resumable end-user performance loop for core routes, tightened homepage perf handling during the redesign window, fixed the local auth bypass for loopback testing, and reworked release and track sidebars around playback-first QA with stronger preview fallback handling.
 
 ### Added
 
+- `/perf-loop all core pages` support via the new end-user performance orchestrator and command docs
 - Added dedicated playback cards for release and track sidebars with explicit preview/provider QA states
 - Added shared preview QA derivation and persistence metadata for preview verification and provider confidence
 
 ### Changed
 
+- Performance loop CLI now supports end-user scope, manifest route IDs, group filters, resume state, and a dedicated `perf:loop:end-user` entrypoint
+- Homepage perf work now lazy-loads the phone showcase path and reduces below-the-fold rendering cost while preserving the existing route UI
 - Replaced the release sidebar track list flow with a playback tab using inline disclosure rows
 - Moved track sidebars to playback-first and platforms-only tabs
 - Public smart-link pages now separate canonical provider links from search fallback links and surface fallback preview sources
 
 ### Fixed
 
+- Local dev test-auth bootstrap now keeps redirects host-stable so bypass cookies survive on `localhost` and `127.0.0.1`
+- Performance route selection and tests now cover manifest-ID driven route resolution and resumable end-user state flow
 - Shared audio playback now fails closed on missing media, rejected `play()` calls, and media errors
 - Preview fallback enrichment now tries Spotify and Apple preview sources when MusicFetch does not provide a usable preview
 - Tracks without preview-resolution metadata stay in `missing` instead of being mislabeled as `unknown`

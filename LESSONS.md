@@ -28,6 +28,13 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Rule:** When mocking a custom hook, destructure the hook's return type and ensure ALL fields are present in the mock — especially arrays (use `[]` as default). Partial mocks that omit array fields will crash on `.map()` / `.filter()` calls.
 
+
+### Local auth bypass must stay host-stable
+
+**Mistake:** Local perf auth bootstrap assumed the test-auth bypass was broken when `/api/dev/test-auth/enter` redirected a `127.0.0.1` request to `localhost`. The bypass cookies were host-only, so the redirected `/app` request arrived signed out and bounced to `/signin`.
+
+**Rule:** For local authenticated testing, keep test-auth redirects app-relative so bypass cookies survive on the original loopback host. When debugging local auth, verify whether the failure is a host mismatch (`localhost` vs `127.0.0.1`) before blaming Clerk or missing test users.
+
 ---
 
 ## Marketing Pages

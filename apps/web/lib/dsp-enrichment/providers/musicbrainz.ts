@@ -5,13 +5,14 @@
 
 import 'server-only';
 
+import { musicBrainzLookupLimiter } from '@/lib/rate-limit';
+import { logger } from '@/lib/utils/logger';
 import { musicBrainzCircuitBreaker } from '../circuit-breakers';
 import type { MusicBrainzArtist, MusicBrainzRecording } from '../types';
 
 const MUSICBRAINZ_API_BASE = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'Jovie/1.0.0 (https://jov.ie)';
 const REQUEST_TIMEOUT_MS = 10_000;
-const RATE_LIMIT_DELAY_MS = 1100;
 
 export class MusicBrainzError extends Error {
   constructor(
@@ -29,7 +30,11 @@ const DEFAULT_BASE_DELAY_MS = 1500;
 
 function isNonRetryableError(error: unknown): boolean {
   if (error instanceof MusicBrainzError) {
-    return error.statusCode === 404 || error.statusCode === 400;
+    return (
+      error.statusCode === 404 ||
+      error.statusCode === 400 ||
+      error.statusCode === 429
+    );
   }
   return false;
 }
@@ -63,6 +68,16 @@ async function withRetry<T>(
 }
 
 async function musicBrainzRequest<T>(endpoint: string): Promise<T> {
+  const limitResult =
+    await musicBrainzLookupLimiter.limit('musicbrainz:global');
+  if (!limitResult.success) {
+    throw new MusicBrainzError(
+      limitResult.reason ?? 'Rate limit exceeded',
+      429,
+      'RATE_LIMITED'
+    );
+  }
+
   const url = `${MUSICBRAINZ_API_BASE}${endpoint}${endpoint.includes('?') ? '&' : '?'}fmt=json`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -128,12 +143,17 @@ export async function bulkLookupMusicBrainzByIsrc(
 ): Promise<Map<string, MusicBrainzRecording>> {
   const results = new Map<string, MusicBrainzRecording>();
   for (const isrc of isrcs) {
-    const recordings = await lookupMusicBrainzByIsrc(isrc);
-    if (recordings.length > 0) {
-      results.set(isrc.toUpperCase(), recordings[0]);
+    try {
+      const recordings = await lookupMusicBrainzByIsrc(isrc);
+      if (recordings.length > 0) {
+        results.set(isrc.toUpperCase(), recordings[0]);
+      }
+    } catch (error) {
+      logger.warn('MusicBrainz ISRC lookup failed during bulk lookup', {
+        isrc,
+        error,
+      });
     }
-    // MusicBrainz API rate limit: max 1 request per second (terms of use requirement).
-    await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
   }
   return results;
 }
@@ -144,7 +164,7 @@ export async function getMusicBrainzArtist(
   try {
     const artist = await executeWithCircuitBreaker(async () => {
       return musicBrainzRequest<MusicBrainzArtist>(
-        `/artist/${encodeURIComponent(mbid)}?inc=aliases+tags+url-rels`
+        `/artist/${encodeURIComponent(mbid)}?inc=aliases+tags+genres+url-rels`
       );
     });
     return artist;
