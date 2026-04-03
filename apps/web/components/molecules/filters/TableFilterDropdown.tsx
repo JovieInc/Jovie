@@ -202,7 +202,7 @@ export function TableFilterDropdown<T extends string = string>({
   onClearAll,
   align = 'end',
   headerLabel,
-  shortcutHint = 'S',
+  shortcutHint,
 }: Readonly<TableFilterDropdownProps<T>>) {
   const [isOpen, setIsOpen] = useState(false);
   const hasAnyFilter = categories.some(category => category.selectedIds.length);

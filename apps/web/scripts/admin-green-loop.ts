@@ -258,7 +258,7 @@ async function watchUntilGreen() {
         filename.includes('/node_modules/') ||
         filename.includes('/.next/') ||
         filename.includes('/test-results/') ||
-        filename.startsWith('.context/')
+        filename.includes('.context/')
       ) {
         return;
       }

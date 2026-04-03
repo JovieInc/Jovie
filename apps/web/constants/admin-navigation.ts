@@ -266,7 +266,7 @@ export const ADMIN_LEGACY_REDIRECT_MAP = {
     view: 'ingest',
     href: buildAdminGrowthHref('ingest'),
   },
-  '/app/admin/growth/yc-metrics': {
+  [APP_ROUTES.ADMIN_GROWTH_YC_METRICS]: {
     workspace: 'overview',
     href: APP_ROUTES.ADMIN,
   },

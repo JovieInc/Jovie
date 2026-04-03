@@ -1,4 +1,5 @@
 import {
+  ADMIN_LEGACY_REDIRECT_MAP,
   buildAdminGrowthHref,
   buildAdminPeopleHref,
 } from '@/constants/admin-navigation';
@@ -23,9 +24,38 @@ export interface AdminRedirectDescriptor {
 }
 
 const FILTERED_SEARCH = 'E2E Admin';
+const ADMIN_PATH_PREFIX = `${APP_ROUTES.ADMIN}/`;
 
 function selectorForTestId(testId: string): string {
   return `[data-testid="${testId}"]`;
+}
+
+function toTitleCase(segment: string): string {
+  if (segment === 'yc') {
+    return 'YC';
+  }
+
+  return segment.charAt(0).toUpperCase() + segment.slice(1);
+}
+
+function getRedirectId(path: string): string {
+  const slug = path
+    .replace(ADMIN_PATH_PREFIX, '')
+    .replaceAll('/', '-')
+    .replace(/\[|\]/g, '');
+
+  return `${slug}-redirect`;
+}
+
+function getRedirectName(path: string): string {
+  const label = path
+    .replace(ADMIN_PATH_PREFIX, '')
+    .split('/')
+    .flatMap(segment => segment.split('-'))
+    .map(toTitleCase)
+    .join(' ');
+
+  return `Admin ${label} Redirect`;
 }
 
 export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
@@ -245,95 +275,13 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
   },
 ] as const;
 
-export const ADMIN_REDIRECT_SURFACES: readonly AdminRedirectDescriptor[] = [
-  {
-    id: 'waitlist-redirect',
-    name: 'Admin Waitlist Redirect',
-    path: APP_ROUTES.ADMIN_WAITLIST,
-    destination: buildAdminPeopleHref('waitlist'),
-  },
-  {
-    id: 'creators-redirect',
-    name: 'Admin Creators Redirect',
-    path: APP_ROUTES.ADMIN_CREATORS,
-    destination: buildAdminPeopleHref('creators'),
-  },
-  {
-    id: 'users-redirect',
-    name: 'Admin Users Redirect',
-    path: APP_ROUTES.ADMIN_USERS,
-    destination: buildAdminPeopleHref('users'),
-  },
-  {
-    id: 'releases-redirect',
-    name: 'Admin Releases Redirect',
-    path: APP_ROUTES.ADMIN_RELEASES,
-    destination: buildAdminPeopleHref('releases'),
-  },
-  {
-    id: 'feedback-redirect',
-    name: 'Admin Feedback Redirect',
-    path: APP_ROUTES.ADMIN_FEEDBACK,
-    destination: buildAdminPeopleHref('feedback'),
-  },
-  {
-    id: 'leads-redirect',
-    name: 'Admin Leads Redirect',
-    path: APP_ROUTES.ADMIN_LEADS,
-    destination: buildAdminGrowthHref('leads'),
-  },
-  {
-    id: 'outreach-redirect',
-    name: 'Admin Outreach Redirect',
-    path: APP_ROUTES.ADMIN_OUTREACH,
-    destination: buildAdminGrowthHref('outreach'),
-  },
-  {
-    id: 'outreach-email-redirect',
-    name: 'Admin Outreach Email Redirect',
-    path: APP_ROUTES.ADMIN_OUTREACH_EMAIL,
-    destination: buildAdminGrowthHref(
-      'outreach',
-      new URLSearchParams({ queue: 'email' })
-    ),
-  },
-  {
-    id: 'outreach-dm-redirect',
-    name: 'Admin Outreach DM Redirect',
-    path: APP_ROUTES.ADMIN_OUTREACH_DM,
-    destination: buildAdminGrowthHref(
-      'outreach',
-      new URLSearchParams({ queue: 'dm' })
-    ),
-  },
-  {
-    id: 'outreach-review-redirect',
-    name: 'Admin Outreach Review Redirect',
-    path: APP_ROUTES.ADMIN_OUTREACH_REVIEW,
-    destination: buildAdminGrowthHref(
-      'outreach',
-      new URLSearchParams({ queue: 'review' })
-    ),
-  },
-  {
-    id: 'campaigns-redirect',
-    name: 'Admin Campaigns Redirect',
-    path: APP_ROUTES.ADMIN_CAMPAIGNS,
-    destination: buildAdminGrowthHref('campaigns'),
-  },
-  {
-    id: 'ingest-redirect',
-    name: 'Admin Ingest Redirect',
-    path: APP_ROUTES.ADMIN_INGEST,
-    destination: buildAdminGrowthHref('ingest'),
-  },
-  {
-    id: 'yc-metrics-redirect',
-    name: 'Admin YC Metrics Redirect',
-    path: '/app/admin/growth/yc-metrics',
-    destination: APP_ROUTES.ADMIN,
-  },
-] as const;
+export const ADMIN_REDIRECT_SURFACES: readonly AdminRedirectDescriptor[] =
+  Object.entries(ADMIN_LEGACY_REDIRECT_MAP).map(([path, redirect]) => ({
+    id: getRedirectId(path),
+    name: getRedirectName(path),
+    path,
+    destination: redirect.href,
+  }));
 
 export const ADMIN_PRIMARY_NAV_SURFACES = ADMIN_RENDER_SURFACES.filter(
   surface => surface.primaryWorkspace

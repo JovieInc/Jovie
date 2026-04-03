@@ -1,5 +1,3 @@
-'use client';
-
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ReleaseDueBadge } from './ReleaseDueBadge';
@@ -21,6 +19,5 @@ describe('ReleaseDueBadge', () => {
     );
 
     expect(screen.getByText('Overdue')).toBeInTheDocument();
-    expect(screen.queryByText(/overdue/i)?.textContent).toBe('Overdue');
   });
 });

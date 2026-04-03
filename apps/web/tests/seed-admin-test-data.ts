@@ -12,11 +12,14 @@ import {
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries, waitlistSettings } from '@/lib/db/schema/waitlist';
+import { captureError } from '@/lib/error-tracking';
+import { hashClaimToken } from '@/lib/security/claim-token';
 import {
   ensureCreatorProfileRecord,
   ensureUserRecord,
   setActiveProfileForUser,
 } from '@/lib/testing/test-user-provision.server';
+import { logger } from '@/lib/utils/logger';
 
 const FIXTURE_BASE_TIME = new Date('2099-01-01T12:00:00.000Z');
 const FIXTURE_IMAGE =
@@ -322,7 +325,7 @@ async function seedLeads() {
       outreachRoute: fixture.outreachRoute,
       outreachStatus: fixture.outreachStatus,
       claimToken: fixture.claimToken,
-      claimTokenHash: fixture.claimToken,
+      claimTokenHash: await hashClaimToken(fixture.claimToken),
       outreachQueuedAt: null,
       priorityScore: fixture.priorityScore,
       emailInvalid: false,
@@ -480,22 +483,21 @@ async function main() {
   await ensureCampaignSettings();
   await seedIngestHistory();
 
-  console.log(
-    JSON.stringify(
-      {
-        ok: true,
-        profilesSeeded: profileIds.length,
-        waitlistSeeded: WAITLIST_FIXTURES.length,
-        feedbackSeeded: FEEDBACK_MESSAGES.length,
-        seededAt: new Date().toISOString(),
-      },
-      null,
-      2
-    )
+  logger.info(
+    'seed completed',
+    {
+      ok: true,
+      profilesSeeded: profileIds.length,
+      waitlistSeeded: WAITLIST_FIXTURES.length,
+      feedbackSeeded: FEEDBACK_MESSAGES.length,
+      seededAt: new Date().toISOString(),
+    },
+    'seed-admin-test-data'
   );
 }
 
 main().catch(error => {
-  console.error('[seed-admin-test-data] failed', error);
+  captureError('seed-admin-test-data failed', error);
+  logger.error('failed', { error }, 'seed-admin-test-data');
   process.exit(1);
 });

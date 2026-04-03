@@ -1,5 +1,3 @@
-'use client';
-
 import { DropdownMenu, DropdownMenuContent } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import { Circle } from 'lucide-react';

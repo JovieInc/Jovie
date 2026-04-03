@@ -313,7 +313,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
       FAST_ITERATION,
       'Rapid navigation stress test is excluded from the fast smoke gate'
     );
-    test.setTimeout(120_000); // 2 minutes
+    test.setTimeout(240_000); // Cold local bypass runs still compile several heavy routes
 
     const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
 

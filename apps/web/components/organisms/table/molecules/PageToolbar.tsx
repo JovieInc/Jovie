@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, TooltipShortcut } from '@jovie/ui';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 import { ACTION_BAR_BUTTON_CLASS, ActionBar } from './ActionBar';
@@ -122,13 +122,14 @@ export function PageToolbarTabButton({
   );
 }
 
-interface PageToolbarActionButtonProps {
+interface PageToolbarActionButtonProps
+  extends Omit<
+    ComponentProps<typeof Button>,
+    'children' | 'variant' | 'size' | 'type' | 'aria-label' | 'aria-pressed'
+  > {
   readonly label: ReactNode;
   readonly icon?: ReactNode;
   readonly active?: boolean;
-  readonly disabled?: boolean;
-  readonly onClick?: () => void;
-  readonly className?: string;
   readonly ariaPressed?: boolean;
   readonly ariaLabel?: string;
   readonly iconOnly?: boolean;
@@ -148,6 +149,7 @@ export function PageToolbarActionButton({
   iconOnly = false,
   tooltipLabel,
   tooltipShortcut,
+  ...buttonProps
 }: PageToolbarActionButtonProps) {
   const button = (
     <Button
@@ -156,6 +158,7 @@ export function PageToolbarActionButton({
       size='sm'
       onClick={onClick}
       disabled={disabled}
+      {...buttonProps}
       className={cn(
         PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
         iconOnly && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,

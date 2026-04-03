@@ -233,7 +233,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
       <button
         type='button'
         className={cn(
-          'inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-transparent bg-transparent text-tertiary-token transition-[background-color,color,box-shadow] duration-150 hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_74%,transparent)] hover:text-primary-token focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_74%,transparent)] focus-visible:ring-1 focus-visible:ring-focus',
+          'inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-transparent bg-transparent text-tertiary-token transition-[background-color,color,box-shadow] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-focus',
           triggerClassName
         )}
         aria-label={ariaLabel || 'More actions'}
@@ -257,15 +257,16 @@ export function CommonDropdown(props: CommonDropdownProps) {
         {searchable && (
           <div
             data-menu-header
-            className='relative border-b border-[color-mix(in_oklab,var(--linear-border-subtle)_70%,transparent)] px-2.5 pb-2 pt-2'
+            className='relative border-b border-subtle px-2.5 pb-2 pt-2'
           >
             <Search className='absolute left-5 top-[25px] h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
             <input
               type='text'
               placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className='w-full rounded-[8px] border border-[color-mix(in_oklab,var(--linear-border-subtle)_72%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_52%,transparent)] py-1.5 pl-8 pr-3 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/15'
+              className='w-full rounded-[8px] border border-subtle bg-surface-1 py-1.5 pl-8 pr-3 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/15'
             />
           </div>
         )}

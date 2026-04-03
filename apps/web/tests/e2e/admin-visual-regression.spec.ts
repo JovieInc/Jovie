@@ -354,10 +354,9 @@ async function openSurface(
   viewport: { width: number; height: number }
 ) {
   await page.setViewportSize(viewport);
-  await page.goto(surface.path, {
-    waitUntil: 'networkidle',
-    timeout: 90_000,
-  });
+  await page.goto(surface.path, { timeout: 90_000 });
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(2000);
 
   const locator = page.locator(getAdminSurfaceSelector(surface)).first();
   await expect(locator).toBeVisible({ timeout: 30_000 });

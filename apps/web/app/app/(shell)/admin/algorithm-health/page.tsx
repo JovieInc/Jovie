@@ -1,9 +1,7 @@
 import type { Metadata } from 'next';
-import {
-  ALGORITHM_HEALTH_E2E_REPORT,
-  AlgorithmHealthWorkspace,
-} from '@/components/features/admin/algorithm-health/AlgorithmHealthWorkspace';
+import { AlgorithmHealthWorkspace } from '@/components/features/admin/algorithm-health/AlgorithmHealthWorkspace';
 import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
+import { ALGORITHM_HEALTH_E2E_REPORT } from './fixture';
 
 interface AlgorithmHealthPageProps {
   readonly searchParams: Promise<{

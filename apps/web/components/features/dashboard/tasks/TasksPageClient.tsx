@@ -757,6 +757,7 @@ function MobileTaskScopeTabs({
               key={value}
               type='button'
               onClick={() => onChange(value)}
+              aria-pressed={isActive}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-[560] transition-[background-color,color] duration-150',
                 isActive
@@ -908,7 +909,6 @@ export function TasksPageClient() {
   const { selectedProfile } = useDashboardData();
   const { setHeaderActions } = useSetHeaderActions();
   const isXlUp = useBreakpoint('xl');
-  const is2xlUp = useBreakpoint('2xl');
   const canShowTaskDocumentAlongsideReleaseSidebar = useMediaQuery(
     '(min-width: 1720px)'
   );
@@ -992,6 +992,7 @@ export function TasksPageClient() {
     setStatusFilter('all');
     setPriorityFilter('all');
     setAssigneeFilter('all');
+    setMobileScope('all');
   }, []);
   const showTaskWorkbenchEmptyState = !isLoading && tasks.length === 0;
   const selectedTaskIndex = effectiveSelectedTaskId
@@ -1092,21 +1093,21 @@ export function TasksPageClient() {
   const openTaskDocument = useCallback(
     (task: TaskView) => {
       setHeaderMode(current => (current === 'create' ? 'default' : current));
-      if (!is2xlUp) {
+      if (!canShowTaskDocumentAlongsideReleaseSidebar) {
         setSelectedReleaseId(null);
       }
       setSelectedTaskId(task.id);
     },
-    [is2xlUp]
+    [canShowTaskDocumentAlongsideReleaseSidebar]
   );
 
   useEffect(() => {
-    if (!selectedReleaseId || is2xlUp) {
+    if (!selectedReleaseId || canShowTaskDocumentAlongsideReleaseSidebar) {
       return;
     }
 
     setHeaderMode(current => (current === 'create' ? 'default' : current));
-  }, [is2xlUp, selectedReleaseId]);
+  }, [canShowTaskDocumentAlongsideReleaseSidebar, selectedReleaseId]);
 
   useEffect(() => {
     if (isLoading) {
@@ -1599,7 +1600,7 @@ export function TasksPageClient() {
                     {mobileScopedTasks.length === 0 ? (
                       <div className='px-4 pt-6'>
                         <TaskEmptyState
-                          hasFilters={hasFilters}
+                          hasFilters={hasFilters || mobileScope !== 'all'}
                           onClearFilters={clearFilters}
                           onOpenComposer={() => setHeaderMode('create')}
                         />

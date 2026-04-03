@@ -211,14 +211,14 @@ export const SELECT_ITEM_BASE =
  * Compact menu item — smaller padding & font for dense UIs (tables, sidebars)
  */
 export const MENU_ITEM_COMPACT =
-  'relative flex min-h-8 cursor-default select-none items-center gap-2 rounded-[8px] px-2.5 py-1.5 text-[12.5px] font-[500] leading-4 outline-none ' +
+  'relative flex min-h-8 cursor-default select-none items-center gap-2 rounded-[8px] px-2.5 py-1 text-[12.5px] font-[400] leading-4 outline-none ' +
   'transition-colors duration-normal ease-interactive ' +
-  'text-(--linear-text-secondary) hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_78%,transparent)] hover:text-(--linear-text-primary) ' +
-  'data-[highlighted]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_78%,transparent)] data-[highlighted]:text-(--linear-text-primary) ' +
+  'text-secondary-token hover:bg-surface-1 hover:text-primary-token ' +
+  'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-[0.46] ' +
-  'focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_78%,transparent)] ' +
-  '[&_svg]:pointer-events-none [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0 [&_svg]:[stroke-width:1.5] [&_svg]:text-(--linear-text-tertiary) ' +
-  'hover:[&_svg]:text-(--linear-text-primary) data-[highlighted]:[&_svg]:text-(--linear-text-primary)';
+  'focus-visible:outline-none focus-visible:bg-surface-1 ' +
+  '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:[stroke-width:1.5] [&_svg]:text-tertiary-token ' +
+  'hover:[&_svg]:text-primary-token data-[highlighted]:[&_svg]:text-primary-token';
 
 /**
  * @deprecated Use MENU_ITEM_DESTRUCTIVE instead — identical styles.
@@ -288,7 +288,7 @@ export const subMenuContentClasses = [
  * Compact base — same surface/border/animation but tighter padding
  */
 export const DROPDOWN_CONTENT_COMPACT_BASE =
-  'z-[70] min-w-[184px] overflow-hidden rounded-[11px] border border-(--linear-border-subtle)/80 bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_90%,var(--linear-bg-surface-1))] p-1 text-(--linear-text-primary) shadow-[0_14px_36px_-18px_rgba(15,23,42,0.5),0_10px_18px_-14px_rgba(15,23,42,0.4)]';
+  'z-[70] min-w-[184px] overflow-hidden rounded-[11px] border border-subtle bg-surface-0 p-0.5 text-primary-token shadow-card-elevated';
 
 /**
  * Complete compact DropdownMenu content classes

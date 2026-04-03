@@ -62,14 +62,19 @@ test.describe('Admin GTM Health @smoke', () => {
 
     try {
       await expectAdminPage(page, getAdminSurfaceById('growth-leads').path);
-      await expect(page.getByText('GTM insights')).toBeVisible({
-        timeout: SMOKE_TIMEOUTS.VISIBILITY,
-      });
-      await expect(page.getByText('Pipeline controls')).toBeVisible({
+      await expect(page.getByTestId('admin-growth-view-leads')).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
       await expect(
-        page.getByText('Ramp recommendation', { exact: true })
+        page.getByRole('heading', { name: 'Lead pipeline' })
+      ).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
+      await expect(page.getByText('Unified URL intake')).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
+      await expect(
+        page.getByRole('button', { name: 'Search leads' })
       ).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });

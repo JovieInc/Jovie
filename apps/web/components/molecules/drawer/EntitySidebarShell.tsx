@@ -209,17 +209,25 @@ export function EntitySidebarShell({
           </DrawerSurfaceCard>
 
           {isMinimalHeader && !isEmpty && entityHeader ? (
-            <DrawerSurfaceCard
-              testId='entity-sidebar-entity-header'
-              variant={isQuietTone ? 'quiet' : 'card'}
-              className={cn(
-                'overflow-hidden lg:mx-0 lg:mt-0',
-                !isQuietTone &&
+            isQuietTone ? (
+              <div
+                data-testid='entity-sidebar-entity-header'
+                className='lg:mx-0 lg:mt-0'
+              >
+                {entityHeader}
+              </div>
+            ) : (
+              <DrawerSurfaceCard
+                testId='entity-sidebar-entity-header'
+                variant='card'
+                className={cn(
+                  'overflow-hidden lg:mx-0 lg:mt-0',
                   'border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,transparent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
-              )}
-            >
-              {entityHeader}
-            </DrawerSurfaceCard>
+                )}
+              >
+                {entityHeader}
+              </DrawerSurfaceCard>
+            )
           ) : null}
         </div>
 

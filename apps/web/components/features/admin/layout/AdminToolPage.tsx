@@ -20,7 +20,7 @@ export function AdminToolPage({
   testId,
   children,
   className,
-}: Readonly<AdminToolPageProps>) {
+}: AdminToolPageProps) {
   return (
     <PageShell>
       <PageContent noPadding>

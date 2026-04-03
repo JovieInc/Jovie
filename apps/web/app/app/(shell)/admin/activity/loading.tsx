@@ -5,6 +5,7 @@ const ADMIN_ACTIVITY_ROW_KEYS = Array.from(
   { length: 8 },
   (_, i) => `activity-row-${i + 1}`
 );
+const activityTabs = [{ value: 'activity', label: 'Activity' }] as const;
 
 export function AdminActivitySkeleton() {
   return (
@@ -62,8 +63,6 @@ export function AdminActivitySkeleton() {
 }
 
 export default function AdminActivityLoading() {
-  const activityTabs = [{ value: 'activity', label: 'Activity' }] as const;
-
   return (
     <AdminWorkspacePage
       title='Activity'
