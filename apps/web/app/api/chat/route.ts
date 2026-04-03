@@ -1289,6 +1289,14 @@ function createGenerateAlbumArtTool(
           };
         }
 
+        if (requestedMode === 'matching_variant' && !matchingTemplateRelease) {
+          return {
+            success: false as const,
+            error:
+              'No matching release-family template is available for this release yet.',
+          };
+        }
+
         const result = await generateAlbumArt({
           releaseId: release.id,
           profileId: resolvedProfileId,

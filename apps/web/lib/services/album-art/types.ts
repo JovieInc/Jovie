@@ -208,6 +208,210 @@ function isOverlayTone(value: unknown): value is AlbumArtOverlayTone {
   return value === 'light' || value === 'dark';
 }
 
+function isAlbumArtMode(value: unknown): value is AlbumArtMode {
+  return (
+    value === 'base' ||
+    value === 'matching_variant' ||
+    value === 'series_background_refresh'
+  );
+}
+
+function isTemplateSourceType(
+  value: unknown
+): value is AlbumArtTemplateSourceType {
+  return (
+    value === 'none' ||
+    value === 'release_family' ||
+    value === 'artist_brand_kit'
+  );
+}
+
+function isSessionStatus(value: unknown): value is AlbumArtSessionStatus {
+  return (
+    value === 'pending' ||
+    value === 'ready' ||
+    value === 'applied' ||
+    value === 'expired' ||
+    value === 'failed'
+  );
+}
+
+function isTemplateMode(value: unknown): value is AlbumArtTemplateMode {
+  return (
+    value === 'release_family_locked' || value === 'artist_series_template'
+  );
+}
+
+function isLayoutPreset(value: unknown): value is AlbumArtLayoutPreset {
+  return value === 'v1-title-artist-version';
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+
+function parseNullableString(value: unknown): string | null | undefined {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  return undefined;
+}
+
+function parseAlbumArtTemplate(
+  rawTemplate: unknown
+): AlbumArtTemplateLock | null | undefined {
+  if (rawTemplate === null) {
+    return null;
+  }
+
+  if (!isObjectRecord(rawTemplate)) {
+    return undefined;
+  }
+
+  if (
+    !isTemplateMode(rawTemplate.mode) ||
+    !isLayoutPreset(rawTemplate.layoutPreset) ||
+    !isNonEmptyString(rawTemplate.baseTitle) ||
+    !isNonEmptyString(rawTemplate.normalizedBaseTitle) ||
+    !isNonEmptyString(rawTemplate.artistText) ||
+    !isNonEmptyString(rawTemplate.backgroundAssetUrl) ||
+    !isNonEmptyString(rawTemplate.backgroundPrompt) ||
+    !isOverlayTone(rawTemplate.overlayTone) ||
+    !isNonEmptyString(rawTemplate.model) ||
+    !isNonEmptyString(rawTemplate.generatedAt) ||
+    Number.isNaN(Date.parse(rawTemplate.generatedAt))
+  ) {
+    return undefined;
+  }
+
+  const versionLabel = parseNullableString(rawTemplate.versionLabel);
+  const brandKitId = parseNullableString(rawTemplate.brandKitId);
+  const logoAssetUrl = parseNullableString(rawTemplate.logoAssetUrl);
+  const logoPosition =
+    rawTemplate.logoPosition === null
+      ? null
+      : isLogoPosition(rawTemplate.logoPosition)
+        ? rawTemplate.logoPosition
+        : undefined;
+  const logoOpacity =
+    typeof rawTemplate.logoOpacity === 'number'
+      ? rawTemplate.logoOpacity
+      : rawTemplate.logoOpacity === null
+        ? null
+        : undefined;
+
+  if (
+    versionLabel === undefined ||
+    brandKitId === undefined ||
+    logoAssetUrl === undefined ||
+    logoPosition === undefined ||
+    logoOpacity === undefined ||
+    typeof rawTemplate.sourceReleaseId !== 'string'
+  ) {
+    return undefined;
+  }
+
+  return {
+    version: 1,
+    source: 'ai_generated',
+    mode: rawTemplate.mode,
+    layoutPreset: rawTemplate.layoutPreset,
+    baseTitle: rawTemplate.baseTitle,
+    normalizedBaseTitle: rawTemplate.normalizedBaseTitle,
+    versionLabel,
+    artistText: rawTemplate.artistText,
+    backgroundAssetUrl: rawTemplate.backgroundAssetUrl,
+    backgroundPrompt: rawTemplate.backgroundPrompt,
+    overlayTone: rawTemplate.overlayTone,
+    sourceReleaseId: rawTemplate.sourceReleaseId,
+    brandKitId,
+    logoAssetUrl,
+    logoPosition,
+    logoOpacity,
+    model: rawTemplate.model,
+    generatedAt: rawTemplate.generatedAt,
+  };
+}
+
+function parseGenerationOption(
+  rawOption: unknown
+): AlbumArtGenerationOption | null {
+  if (!isObjectRecord(rawOption)) {
+    return null;
+  }
+
+  const template = parseAlbumArtTemplate(rawOption.template);
+  if (
+    !isNonEmptyString(rawOption.id) ||
+    !isNonEmptyString(rawOption.previewUrl) ||
+    !isNonEmptyString(rawOption.finalImageUrl) ||
+    !isNonEmptyString(rawOption.backgroundUrl) ||
+    !template
+  ) {
+    return null;
+  }
+
+  return {
+    id: rawOption.id,
+    previewUrl: rawOption.previewUrl,
+    finalImageUrl: rawOption.finalImageUrl,
+    backgroundUrl: rawOption.backgroundUrl,
+    template,
+  };
+}
+
+function createEmptyGenerationPayload(
+  mode: AlbumArtMode
+): AlbumArtGenerationPayload {
+  return {
+    title: '',
+    artistName: '',
+    prompt: '',
+    mode,
+    layoutPreset: 'v1-title-artist-version',
+    options: [],
+    sourceTemplateReleaseId: null,
+    brandKitId: null,
+  };
+}
+
+function parseGenerationPayload(
+  payload: unknown,
+  fallbackMode: AlbumArtMode
+): AlbumArtGenerationPayload {
+  if (!isObjectRecord(payload)) {
+    return createEmptyGenerationPayload(fallbackMode);
+  }
+
+  const sourceTemplateReleaseId =
+    parseNullableString(payload.sourceTemplateReleaseId) ?? null;
+  const brandKitId = parseNullableString(payload.brandKitId) ?? null;
+  const options = Array.isArray(payload.options)
+    ? payload.options
+        .map(rawOption => parseGenerationOption(rawOption))
+        .filter((option): option is AlbumArtGenerationOption => option !== null)
+    : [];
+
+  return {
+    title: typeof payload.title === 'string' ? payload.title : '',
+    artistName:
+      typeof payload.artistName === 'string' ? payload.artistName : '',
+    prompt: typeof payload.prompt === 'string' ? payload.prompt : '',
+    mode: isAlbumArtMode(payload.mode) ? payload.mode : fallbackMode,
+    layoutPreset: isLayoutPreset(payload.layoutPreset)
+      ? payload.layoutPreset
+      : 'v1-title-artist-version',
+    options,
+    sourceTemplateReleaseId,
+    brandKitId,
+  };
+}
+
 export function readReleaseAlbumArtMetadata(
   metadata: Record<string, unknown> | null | undefined
 ): ReleaseAlbumArtMetadata {
@@ -222,85 +426,10 @@ export function readReleaseAlbumArtMetadata(
       ? metadata.artworkOrigin
       : undefined;
 
-  const parsedVersionLabel =
-    typeof metadata.parsedVersionLabel === 'string'
-      ? metadata.parsedVersionLabel
-      : metadata.parsedVersionLabel === null
-        ? null
-        : undefined;
+  const parsedVersionLabel = parseNullableString(metadata.parsedVersionLabel);
 
-  const brandKitId =
-    typeof metadata.brandKitId === 'string'
-      ? metadata.brandKitId
-      : metadata.brandKitId === null
-        ? null
-        : undefined;
-
-  const rawTemplate = metadata.albumArtTemplate;
-  let albumArtTemplate: AlbumArtTemplateLock | null | undefined;
-
-  if (rawTemplate === null) {
-    albumArtTemplate = null;
-  } else if (isObjectRecord(rawTemplate)) {
-    albumArtTemplate = {
-      version: 1,
-      source: 'ai_generated',
-      mode:
-        rawTemplate.mode === 'artist_series_template'
-          ? 'artist_series_template'
-          : 'release_family_locked',
-      layoutPreset: 'v1-title-artist-version',
-      baseTitle:
-        typeof rawTemplate.baseTitle === 'string' ? rawTemplate.baseTitle : '',
-      normalizedBaseTitle:
-        typeof rawTemplate.normalizedBaseTitle === 'string'
-          ? rawTemplate.normalizedBaseTitle
-          : '',
-      versionLabel:
-        typeof rawTemplate.versionLabel === 'string'
-          ? rawTemplate.versionLabel
-          : null,
-      artistText:
-        typeof rawTemplate.artistText === 'string'
-          ? rawTemplate.artistText
-          : '',
-      backgroundAssetUrl:
-        typeof rawTemplate.backgroundAssetUrl === 'string'
-          ? rawTemplate.backgroundAssetUrl
-          : '',
-      backgroundPrompt:
-        typeof rawTemplate.backgroundPrompt === 'string'
-          ? rawTemplate.backgroundPrompt
-          : '',
-      overlayTone: isOverlayTone(rawTemplate.overlayTone)
-        ? rawTemplate.overlayTone
-        : 'light',
-      sourceReleaseId:
-        typeof rawTemplate.sourceReleaseId === 'string'
-          ? rawTemplate.sourceReleaseId
-          : '',
-      brandKitId:
-        typeof rawTemplate.brandKitId === 'string'
-          ? rawTemplate.brandKitId
-          : null,
-      logoAssetUrl:
-        typeof rawTemplate.logoAssetUrl === 'string'
-          ? rawTemplate.logoAssetUrl
-          : null,
-      logoPosition: isLogoPosition(rawTemplate.logoPosition)
-        ? rawTemplate.logoPosition
-        : null,
-      logoOpacity:
-        typeof rawTemplate.logoOpacity === 'number'
-          ? rawTemplate.logoOpacity
-          : null,
-      model: typeof rawTemplate.model === 'string' ? rawTemplate.model : '',
-      generatedAt:
-        typeof rawTemplate.generatedAt === 'string'
-          ? rawTemplate.generatedAt
-          : new Date(0).toISOString(),
-    };
-  }
+  const brandKitId = parseNullableString(metadata.brandKitId);
+  const albumArtTemplate = parseAlbumArtTemplate(metadata.albumArtTemplate);
 
   return {
     artworkOrigin,
@@ -347,20 +476,22 @@ export function mapBrandKitRecord(
 export function mapGenerationSessionRecord(
   session: AlbumArtGenerationSession
 ): AlbumArtGenerationSessionRecord {
+  const mode = isAlbumArtMode(session.mode) ? session.mode : 'base';
+
   return {
     id: session.id,
     profileId: session.profileId,
     releaseId: session.releaseId ?? null,
     draftKey: session.draftKey ?? null,
-    mode: session.mode as AlbumArtMode,
-    templateSourceType:
-      session.templateSourceType as AlbumArtTemplateSourceType,
+    mode,
+    templateSourceType: isTemplateSourceType(session.templateSourceType)
+      ? session.templateSourceType
+      : 'none',
     templateSourceId: session.templateSourceId ?? null,
-    status: session.status as AlbumArtSessionStatus,
+    status: isSessionStatus(session.status) ? session.status : 'failed',
     consumedRuns: session.consumedRuns,
     expiresAt: session.expiresAt.toISOString(),
-    payload: (session.payloadJson ??
-      {}) as unknown as AlbumArtGenerationPayload,
+    payload: parseGenerationPayload(session.payloadJson, mode),
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
   };

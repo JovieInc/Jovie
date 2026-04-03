@@ -28,10 +28,13 @@ function normalizeWhitespace(value: string): string {
 }
 
 function normalizeBaseTitle(value: string): string {
-  return normalizeWhitespace(value)
+  const whitespaceNormalized = normalizeWhitespace(value);
+  const normalized = whitespaceNormalized
     .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, ' ')
+    .replaceAll(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
+
+  return normalized || whitespaceNormalized.toLowerCase();
 }
 
 function looksLikeVersionLabel(value: string): boolean {

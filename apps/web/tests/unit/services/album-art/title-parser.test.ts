@@ -28,4 +28,13 @@ describe('parseAlbumArtTitle', () => {
       versionLabel: null,
     });
   });
+
+  it('preserves non-latin titles in normalized family keys', () => {
+    expect(parseAlbumArtTitle('シティ・ロード (Extended Mix)')).toEqual({
+      displayTitle: 'シティ・ロード (Extended Mix)',
+      baseTitle: 'シティ・ロード',
+      normalizedBaseTitle: 'シティ ロード',
+      versionLabel: 'Extended Mix',
+    });
+  });
 });
