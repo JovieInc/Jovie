@@ -82,6 +82,27 @@ describe('DrawerHeaderActions', () => {
     ]);
   });
 
+  it('keeps the overflow trigger borderless', () => {
+    render(
+      <DrawerHeaderActions
+        primaryActions={[]}
+        overflowActions={[
+          {
+            id: 'copy',
+            label: 'Copy profile link',
+            icon: Copy,
+            onClick: vi.fn(),
+          },
+        ]}
+      />
+    );
+
+    const trigger = screen.getByLabelText('More actions');
+    expect(trigger.className).toContain('border-transparent');
+    expect(trigger.className).not.toContain('border-(--linear-app-frame-seam)');
+    expect(trigger.className).not.toContain('border-subtle');
+  });
+
   it('reuses shared dropdown menu items when menuItems is provided', () => {
     render(
       <DrawerHeaderActions

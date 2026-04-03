@@ -30,6 +30,11 @@ export {
   type DrawerCardActionBarProps,
 } from './DrawerCardActionBar';
 export {
+  DrawerEditableTextField,
+  type DrawerEditableTextFieldAction,
+  type DrawerEditableTextFieldProps,
+} from './DrawerEditableTextField';
+export {
   DrawerEmptyState,
   type DrawerEmptyStateProps,
 } from './DrawerEmptyState';

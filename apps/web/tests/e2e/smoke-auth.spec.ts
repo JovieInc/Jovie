@@ -96,13 +96,10 @@ async function assertDashboardRouteLoaded(
 
   if (path === APP_ROUTES.DASHBOARD_EARNINGS) {
     await expect(
-      page
-        .getByRole('button', { name: /connect venmo/i })
-        .or(page.getByText(/connect venmo to unlock earnings/i))
-        .or(page.getByText(/share this link anywhere to receive tips/i))
-        .first(),
-      'Earnings: tipping UI did not render'
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+      page,
+      'Legacy earnings route did not redirect to artist profile tips'
+    ).toHaveURL(/\/app\/settings\/artist-profile\?tab=earn/);
+    return;
   }
 }
 
@@ -233,7 +230,10 @@ test.describe('Dashboard Navigation @smoke', () => {
           { path: APP_ROUTES.CHAT, name: 'Chat' },
           { path: APP_ROUTES.DASHBOARD_AUDIENCE, name: 'Audience' },
           { path: APP_ROUTES.DASHBOARD_RELEASES, name: 'Releases' },
-          { path: APP_ROUTES.DASHBOARD_EARNINGS, name: 'Earnings' },
+          {
+            path: APP_ROUTES.DASHBOARD_EARNINGS,
+            name: 'Legacy Earnings Redirect',
+          },
         ];
 
     const failures: string[] = [];

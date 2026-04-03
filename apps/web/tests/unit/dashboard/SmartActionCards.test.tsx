@@ -12,11 +12,18 @@ vi.mock('@/lib/queries', async importOriginal => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
-    useDashboardSocialLinksQuery: (profileId: string) => ({
-      data:
-        profileId === 'has-venmo'
-          ? [{ id: '1', platform: 'venmo', url: 'https://venmo.com/u/test' }]
-          : [],
+    useProfileMonetizationSummary: () => ({
+      data: {
+        paymentState: 'not_setup',
+        provider: 'none',
+        manageHref: '/app/settings/artist-profile',
+        tipUrl: null,
+        tipVisits: 0,
+        tipsReceived: 0,
+        totalReceivedCents: 0,
+        monthReceivedCents: 0,
+        narrative: 'Fans cannot tip until payouts are configured.',
+      },
       isLoading: false,
     }),
   };
@@ -79,12 +86,12 @@ function renderWithDashboard(
 }
 
 describe('SmartActionCards', () => {
-  it('shows Venmo card when no Venmo link', () => {
+  it('shows setup tips card when payouts are not configured', () => {
     const { getByText } = renderWithDashboard(
       {},
       { profileId: 'no-venmo', username: 'testartist' }
     );
-    expect(getByText('Accept tips from fans')).toBeDefined();
+    expect(getByText('Set Up Tips')).toBeDefined();
   });
 
   it('shows max 3 cards', () => {

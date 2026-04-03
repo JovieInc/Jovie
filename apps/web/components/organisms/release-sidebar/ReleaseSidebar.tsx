@@ -695,6 +695,7 @@ export function ReleaseSidebar({
                   <ReleaseMetadata
                     release={release}
                     isEditable={isEditable}
+                    variant='flat'
                     onSaveMetadata={readOnly ? undefined : onSaveMetadata}
                     onSavePrimaryIsrc={readOnly ? undefined : onSavePrimaryIsrc}
                     onCanvasStatusChange={
@@ -711,6 +712,7 @@ export function ReleaseSidebar({
                   lyrics={release.lyrics}
                   isEditable={isEditable}
                   isSaving={isLyricsSaving}
+                  variant='flat'
                   onSaveLyrics={onSaveLyrics}
                   onFormatLyrics={onFormatLyrics}
                 />

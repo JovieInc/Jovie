@@ -1,4 +1,8 @@
 import { contentSurfaceCardVariants } from '@/components/molecules/ContentSurfaceCard';
+import {
+  LINEAR_SURFACE,
+  LINEAR_SURFACE_TIER,
+} from '@/components/tokens/linear-surface';
 
 /**
  * Dashboard Card System Tokens
@@ -200,62 +204,6 @@ export const cardTokens = {
       hover:bg-[var(--color-interactive-hover)]
     `,
   },
-} as const;
-
-/**
- * Linear Surface Tokens
- *
- * Shared app-card system matching the flatter app-shell direction.
- * Tier-1 content surfaces stay border-defined and flat, while sidebars,
- * drawers, and popovers retain the stronger floating treatment.
- */
-const elevatedSidebarCardShadow =
-  'shadow-[0_1px_2px_rgba(0,0,0,0.06),0_3px_8px_-2px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_3px_8px_-2px_rgba(0,0,0,0.22)]';
-
-export const LINEAR_SURFACE = {
-  /** Drawer section card — border-separated section inside sidebars. */
-  drawerCard: `rounded-xl border border-(--linear-app-shell-border) bg-surface-1 ${elevatedSidebarCardShadow}`,
-
-  /** Smaller drawer section card — inline property groups. */
-  drawerCardSm: `rounded-xl border border-(--linear-app-shell-border) bg-surface-1 ${elevatedSidebarCardShadow}`,
-
-  /** Primary sidebar card — header/analytics cards in sidebars. */
-  sidebarCard: `rounded-xl border border-(--linear-app-shell-border) bg-surface-1 ${elevatedSidebarCardShadow}`,
-
-  /** Content container — wraps tables, mobile lists, empty states. */
-  contentContainer:
-    'rounded-xl border border-(--linear-app-shell-border) bg-surface-1 shadow-none',
-
-  /** Banner/callout card. */
-  bannerCard:
-    'rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 shadow-none',
-
-  /** Dialog inner card — sections inside dialogs. */
-  dialogCard:
-    'rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 shadow-none',
-
-  /** Sticky header — toolbar-like headers with backdrop blur. */
-  stickyHeader:
-    'border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
-
-  /** Toolbar / popover / dropdown — same surface. */
-  toolbar: 'border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
-
-  /** Popover container — the ONE surface that gets a shadow (floats above content). */
-  popover:
-    'rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-0 shadow-[var(--shadow-popover)]',
-} as const;
-
-export const LINEAR_SURFACE_TIER = {
-  drawerCard: 2,
-  drawerCardSm: 2,
-  sidebarCard: 2,
-  contentContainer: 1,
-  bannerCard: 1,
-  dialogCard: 1,
-  stickyHeader: 1,
-  toolbar: 1,
-  popover: 3,
 } as const;
 
 // Type exports for TypeScript consumers

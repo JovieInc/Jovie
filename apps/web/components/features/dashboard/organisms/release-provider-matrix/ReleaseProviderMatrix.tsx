@@ -724,10 +724,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             />
           )}
         {showEmptyState && (
-          <PageShell
-            className='mx-3 mt-2.5 lg:mx-4'
-            data-testid='release-table-shell'
-          >
+          <PageShell className='mt-2.5' data-testid='release-table-shell'>
             <ReleasesEmptyState
               onConnectSpotify={() => setSpotifySearchOpen(true)}
             />
@@ -802,10 +799,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
         {/* Show "No releases" state when connected but no releases and not importing */}
         {isConnected && rows.length === 0 && !isImporting && (
-          <PageShell
-            className='mx-3 lg:mx-4 mt-2.5'
-            data-testid='release-table-shell'
-          >
+          <PageShell className='mt-2.5' data-testid='release-table-shell'>
             <div className='flex min-h-[260px] w-full flex-1 flex-col items-center justify-center px-4 py-12 text-center'>
               <div className='flex h-12 w-12 items-center justify-center rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-1'>
                 <Icon

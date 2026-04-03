@@ -144,8 +144,38 @@ describe('surface elevation guardrails', () => {
 
     expect(onboardingForm).toContain('OnboardingExperienceShell');
     expect(onboardingLoading).toContain('OnboardingExperienceShell');
+    expect(onboardingLoading).toContain("stageVariant='flat'");
     expect(demoOnboarding).toContain('OnboardingExperienceShell');
     expect(demoShowcaseSurface).toContain('DemoOnboardingShowcase');
+  });
+
+  it('routes entry and auth-adjacent screens through AuthLayout', () => {
+    const signinPage = readFileSync(
+      join(ROOT, 'app/(auth)/signin/page.tsx'),
+      'utf-8'
+    );
+    const signupPage = readFileSync(
+      join(ROOT, 'app/(auth)/signup/page.tsx'),
+      'utf-8'
+    );
+    const userCreationFailed = readFileSync(
+      join(ROOT, 'app/error/user-creation-failed/page.tsx'),
+      'utf-8'
+    );
+    const onboardingCheckout = readFileSync(
+      join(ROOT, 'app/onboarding/checkout/page.tsx'),
+      'utf-8'
+    );
+    const waitlistSuccess = readFileSync(
+      join(ROOT, 'components/features/waitlist/WaitlistSuccessView.tsx'),
+      'utf-8'
+    );
+
+    expect(signinPage).toContain('<AuthLayout');
+    expect(signupPage).toContain('<AuthLayout');
+    expect(userCreationFailed).toContain('<AuthLayout');
+    expect(onboardingCheckout).toContain('<AuthLayout');
+    expect(waitlistSuccess).toContain('<AuthLayout');
   });
 
   it('keeps the tasks workspace inside a framed content panel', () => {
@@ -182,9 +212,24 @@ describe('surface elevation guardrails', () => {
     expect(presenceView).toContain('PageShell');
     expect(presenceView).toContain("data-testid='dsp-presence-content-panel'");
     expect(earningsView).toContain('PageShell');
+    expect(earningsView).toContain("maxWidth='wide'");
+    expect(earningsView).toContain("contentPadding='compact'");
     expect(earningsView).toContain(
       "data-testid='dashboard-earnings-content-panel'"
     );
+  });
+
+  it('keeps release empty states on the shared shell inset instead of duplicating margins', () => {
+    const releaseMatrix = readFileSync(
+      join(
+        ROOT,
+        'components/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix.tsx'
+      ),
+      'utf-8'
+    );
+
+    expect(releaseMatrix).toContain("className='mt-2.5'");
+    expect(releaseMatrix).toContain("data-testid='release-table-shell'");
   });
 
   it('keeps task and preview cards off the shell canvas token', () => {
@@ -231,11 +276,13 @@ describe('surface elevation guardrails', () => {
     );
 
     expect(shellFrame).toContain('lg:shadow-[var(--linear-app-shell-shadow)]');
-    expect(shellFrame).toContain('lg:ml-[var(--linear-app-shell-gap)]');
-    expect(sidebar).toContain(
-      'group-data-[variant=sidebar]:lg:shadow-[var(--linear-app-sidebar-shadow)]'
+    expect(shellFrame).toContain(
+      'lg:gap-[var(--linear-app-shell-gap)] lg:p-[var(--linear-app-shell-gap)]'
     );
     expect(linearTokens).toContain('--linear-app-sidebar-shadow:');
+    expect(sidebar).not.toContain(
+      'group-data-[variant=sidebar]:lg:shadow-[var(--linear-app-sidebar-shadow)]'
+    );
     expect(rightDrawer).toContain('bg-surface-0');
     // Mobile overlay retains shadow; desktop drawer is flat so elevation
     // comes from DrawerSurfaceCard cards inside the shell, not the outer aside.

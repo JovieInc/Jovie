@@ -6,12 +6,22 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   TooltipShortcut,
 } from '@jovie/ui';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { DropdownEmptyState } from '@/components/molecules/DropdownEmptyState';
+import {
+  TOOLBAR_MENU_CONTENT_CLASS,
+  TOOLBAR_MENU_ITEM_CLASS,
+  TOOLBAR_MENU_SEPARATOR_CLASS,
+  TOOLBAR_MENU_SUB_TRIGGER_CLASS,
+  ToolbarMenuRow,
+} from '@/components/molecules/menus/ToolbarMenuPrimitives';
 import {
   PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
@@ -19,7 +29,6 @@ import {
   PAGE_TOOLBAR_ICON_CLASS,
   PAGE_TOOLBAR_ICON_STROKE_WIDTH,
 } from '@/components/organisms/table';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
 import { FilterCheckboxItem } from './FilterCheckboxItem';
 import { FilterSearchInput } from './FilterSearchInput';
@@ -27,7 +36,9 @@ import { FilterSearchInput } from './FilterSearchInput';
 export interface TableFilterDropdownOption<T extends string = string> {
   readonly id: T;
   readonly label: string;
+  readonly leadingVisual?: ReactNode;
   readonly iconName?: string;
+  readonly iconClassName?: string;
   readonly count?: number;
 }
 
@@ -41,12 +52,13 @@ export interface TableFilterDropdownCategory<T extends string = string> {
   readonly searchPlaceholder?: string;
 }
 
-export interface TableFilterDropdownProps {
-  readonly categories: readonly TableFilterDropdownCategory[];
+export interface TableFilterDropdownProps<T extends string = string> {
+  readonly categories: readonly TableFilterDropdownCategory<T>[];
   readonly buttonClassName?: string;
   readonly iconOnly?: boolean;
   readonly emptyMessage?: string;
   readonly onClearAll?: () => void;
+  readonly align?: 'start' | 'end';
 }
 
 function TableFilterSection<T extends string>({
@@ -56,7 +68,6 @@ function TableFilterSection<T extends string>({
 }>) {
   const [search, setSearch] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
-  const shouldShowSearch = category.options.length > 6;
 
   const filteredOptions = useMemo(() => {
     if (!search.trim()) return category.options;
@@ -66,39 +77,19 @@ function TableFilterSection<T extends string>({
     );
   }, [category.options, search]);
 
-  const handleClear = useCallback(() => {
-    setSearch('');
-    searchRef.current?.focus();
-  }, []);
-
   return (
-    <div className='space-y-1.5'>
-      <div className='flex items-center gap-2 px-1'>
-        <Icon
-          name={category.iconName as 'Filter'}
-          className='h-3.5 w-3.5 text-tertiary-token'
-        />
-        <span className='text-[11px] font-[560] tracking-[0.02em] text-tertiary-token'>
-          {category.label}
-        </span>
-        {category.selectedIds.length > 0 ? (
-          <span className='rounded-full border border-(--linear-app-frame-seam) bg-surface-1 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token'>
-            {category.selectedIds.length}
-          </span>
-        ) : null}
-      </div>
-
-      {shouldShowSearch ? (
+    <div className='flex max-h-[320px] min-h-[220px] min-w-[260px] flex-col overflow-hidden'>
+      <div className='border-b border-(--linear-app-frame-seam) p-2'>
         <FilterSearchInput
           value={search}
           onChange={setSearch}
-          onClear={handleClear}
+          onClear={() => setSearch('')}
           placeholder={category.searchPlaceholder ?? `Search ${category.label}`}
           inputRef={searchRef}
         />
-      ) : null}
+      </div>
 
-      <div className='space-y-1'>
+      <div className='flex-1 overflow-y-auto p-1.5'>
         {filteredOptions.length === 0 ? (
           <DropdownEmptyState message='No options found' />
         ) : (
@@ -107,10 +98,15 @@ function TableFilterSection<T extends string>({
               key={option.id}
               label={option.label}
               icon={
-                option.iconName ? (
+                option.leadingVisual ? (
+                  option.leadingVisual
+                ) : option.iconName ? (
                   <Icon
-                    name={option.iconName as 'Filter'}
-                    className='h-3.5 w-3.5'
+                    name={option.iconName}
+                    className={cn(
+                      'h-3.5 w-3.5 text-tertiary-token',
+                      option.iconClassName
+                    )}
                   />
                 ) : undefined
               }
@@ -126,15 +122,53 @@ function TableFilterSection<T extends string>({
   );
 }
 
-export function TableFilterDropdown({
+function TableFilterSubmenu<T extends string>({
+  category,
+}: Readonly<{
+  category: TableFilterDropdownCategory<T>;
+}>) {
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger
+        inset={false}
+        className={TOOLBAR_MENU_SUB_TRIGGER_CLASS}
+      >
+        <ToolbarMenuRow
+          leadingVisual={
+            <Icon
+              name={category.iconName}
+              className='h-3.5 w-3.5 text-secondary-token'
+            />
+          }
+          label={category.label}
+          trailingVisual={
+            category.selectedIds.length > 0 ? (
+              <span className='inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-surface-1 px-1.5 text-[11px] tabular-nums text-secondary-token'>
+                {category.selectedIds.length}
+              </span>
+            ) : null
+          }
+        />
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent
+        sideOffset={8}
+        className={cn(TOOLBAR_MENU_CONTENT_CLASS, 'p-0')}
+      >
+        <TableFilterSection category={category} />
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+export function TableFilterDropdown<T extends string = string>({
   categories,
   buttonClassName,
-  iconOnly = false,
+  iconOnly = true,
   emptyMessage = 'No filters found',
   onClearAll,
-}: Readonly<TableFilterDropdownProps>) {
+  align = 'end',
+}: Readonly<TableFilterDropdownProps<T>>) {
   const [isOpen, setIsOpen] = useState(false);
-
   const hasAnyFilter = categories.some(category => category.selectedIds.length);
 
   const handleOpenChange = useCallback((open: boolean) => {
@@ -171,39 +205,38 @@ export function TableFilterDropdown({
       </TooltipShortcut>
 
       <DropdownMenuContent
-        align='start'
+        align={align}
         sideOffset={4}
         className={cn(
-          LINEAR_SURFACE.popover,
-          'flex min-w-[240px] max-w-[calc(100vw-16px)] flex-col overflow-hidden'
+          TOOLBAR_MENU_CONTENT_CLASS,
+          'flex min-w-[240px] max-w-[calc(100vw-16px)] flex-col'
         )}
         onCloseAutoFocus={event => event.preventDefault()}
       >
-        <div className='max-h-[340px] space-y-3 overflow-y-auto p-2'>
-          {categories.length === 0 ? (
-            <DropdownEmptyState message={emptyMessage} />
-          ) : (
-            categories.map((category, index) => (
-              <div key={category.id} className='space-y-3'>
-                {index > 0 ? <DropdownMenuSeparator /> : null}
-                <TableFilterSection category={category} />
-              </div>
-            ))
-          )}
-        </div>
+        {categories.length === 0 ? (
+          <DropdownEmptyState message={emptyMessage} />
+        ) : (
+          categories.map(category => (
+            <TableFilterSubmenu key={category.id} category={category} />
+          ))
+        )}
 
         {hasAnyFilter && onClearAll ? (
           <>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className={TOOLBAR_MENU_SEPARATOR_CLASS} />
             <DropdownMenuItem
-              className='text-tertiary-token hover:text-primary-token'
+              className={TOOLBAR_MENU_ITEM_CLASS}
               onSelect={event => {
                 event.preventDefault();
                 onClearAll();
               }}
             >
-              <Icon name='X' className='h-3.5 w-3.5' strokeWidth={2} />
-              <span>Clear all filters</span>
+              <ToolbarMenuRow
+                leadingVisual={
+                  <Icon name='X' className='h-3.5 w-3.5' strokeWidth={2} />
+                }
+                label='Clear All Filters'
+              />
             </DropdownMenuItem>
           </>
         ) : null}

@@ -604,20 +604,14 @@ const CREATOR_SHELL_ROUTES = [
     path: APP_ROUTES.DASHBOARD_EARNINGS,
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
-    measureMode: 'page-load',
+    measureMode: 'redirect',
     readySelectors: {
-      content: [
-        'button:has-text("Connect Venmo")',
-        ':text-matches("connect venmo|share this link anywhere", "i")',
-      ],
+      content: ['section#artist-profile'],
+      redirectDestinations: [`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn`],
     },
     timings: [
-      { metric: 'first-contentful-paint', budget: 1800 },
-      { metric: 'largest-contentful-paint', budget: 3000 },
-      { metric: 'cumulative-layout-shift', budget: 0.1 },
-      { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1600 },
-      { metric: 'skeleton-to-content', budget: 600 },
+      { metric: 'redirect-complete', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1200 },
     ],
     resourceSizes: ACCOUNT_BILLING_RESOURCE_BUDGETS,
     priority: 5,
@@ -808,7 +802,7 @@ const CREATOR_ALIAS_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: ['h2#contacts-heading'],
+      content: ['section#contacts'],
       redirectDestinations: [APP_ROUTES.SETTINGS_CONTACTS],
     },
     timings: [
@@ -828,7 +822,7 @@ const CREATOR_ALIAS_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: ['h2#touring-heading'],
+      content: ['section#touring'],
       redirectDestinations: [APP_ROUTES.SETTINGS_TOURING],
     },
     timings: [
@@ -848,11 +842,8 @@ const CREATOR_ALIAS_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: [
-        'button:has-text("Connect Venmo")',
-        ':text-matches("connect venmo|share this link anywhere", "i")',
-      ],
-      redirectDestinations: [APP_ROUTES.EARNINGS],
+      content: ['section#artist-profile'],
+      redirectDestinations: [`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn`],
     },
     timings: [
       { metric: 'redirect-complete', budget: 100 },
@@ -871,7 +862,7 @@ const CREATOR_ALIAS_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: ['h2#contacts-heading'],
+      content: ['section#contacts'],
       redirectDestinations: [APP_ROUTES.SETTINGS_CONTACTS],
     },
     timings: [
@@ -891,7 +882,7 @@ const CREATOR_ALIAS_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: ['h2#touring-heading'],
+      content: ['section#touring'],
       redirectDestinations: [APP_ROUTES.SETTINGS_TOURING],
     },
     timings: [

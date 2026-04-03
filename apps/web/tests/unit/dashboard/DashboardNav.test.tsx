@@ -15,12 +15,15 @@ describe('DashboardNav', () => {
   });
 
   it('renders primary navigation items', () => {
-    const { getByRole } = renderDashboardNav({ renderFn: fastRender });
+    const { getByRole, queryByRole } = renderDashboardNav({
+      renderFn: fastRender,
+    });
 
     expect(getByRole('button', { name: 'Profile' })).toBeDefined();
     expect(getByRole('link', { name: 'Releases' })).toBeDefined();
     expect(getByRole('link', { name: 'Tasks' })).toBeDefined();
     expect(getByRole('link', { name: 'Audience' })).toBeDefined();
+    expect(queryByRole('link', { name: 'Earnings' })).toBeNull();
   });
 
   it('applies active state to current page', () => {

@@ -3,7 +3,6 @@
 import {
   Badge,
   type CommonDropdownItem,
-  Input,
   Label,
   Select,
   SelectContent,
@@ -15,6 +14,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
   DrawerCardActionBar,
+  DrawerEditableTextField,
   DrawerPropertyRow,
   DrawerSurfaceCard,
   DrawerTabbedCard,
@@ -43,16 +43,6 @@ function getPreferredChannelLabel(
   return 'Select preferred';
 }
 
-type EditableField =
-  | 'role'
-  | 'personName'
-  | 'companyName'
-  | 'email'
-  | 'phone'
-  | 'territories'
-  | 'preferredChannel'
-  | null;
-
 interface ContactDetailSidebarProps {
   readonly contact: EditableContact | null;
   readonly isOpen: boolean;
@@ -73,9 +63,6 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   contextMenuItems,
 }: ContactDetailSidebarProps) {
   const [activeTab, setActiveTab] = useState<'info' | 'territories'>('info');
-  const [editingField, setEditingField] = useState<EditableField>(null);
-  const [editValue, setEditValue] = useState<string>('');
-  const inputRef = useRef<HTMLInputElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Use a ref so the debounced timeout always calls the latest onSave,
@@ -119,64 +106,6 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       }
     };
   }, []);
-
-  // Reset editing state when contact changes
-  useEffect(() => {
-    setEditingField(null);
-    setEditValue('');
-  }, [contact?.id]);
-
-  // Focus input when editing starts
-  useEffect(() => {
-    if (editingField && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editingField]);
-
-  const startEditing = useCallback(
-    (field: EditableField) => {
-      if (!contact || !field) return;
-      setEditingField(field);
-      const value = contact[field as keyof EditableContact];
-      setEditValue(typeof value === 'string' ? value : '');
-    },
-    [contact]
-  );
-
-  const saveField = useCallback(() => {
-    if (!editingField || !contact) return;
-
-    const trimmedValue = editValue.trim();
-    const currentValue = contact[editingField as keyof EditableContact];
-
-    // Only update if value changed
-    if (trimmedValue !== currentValue) {
-      onUpdate({ [editingField]: trimmedValue || null });
-      debouncedSave();
-    }
-
-    setEditingField(null);
-    setEditValue('');
-  }, [editingField, editValue, contact, onUpdate, debouncedSave]);
-
-  const cancelEditing = useCallback(() => {
-    setEditingField(null);
-    setEditValue('');
-  }, []);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        saveField();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        cancelEditing();
-      }
-    },
-    [saveField, cancelEditing]
-  );
 
   const handleRoleChange = useCallback(
     (newRole: string) => {
@@ -243,53 +172,56 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   const hasEmailAndPhone = Boolean(contact?.email) && Boolean(contact?.phone);
 
   const renderEditableField = (
-    field: EditableField,
+    field: 'personName' | 'companyName' | 'email' | 'phone',
     label: string,
     value: string | null | undefined,
     placeholder: string
   ) => {
-    const isEditing = editingField === field;
-    const displayValue = value || (
-      <span className='text-tertiary-token italic'>{placeholder}</span>
-    );
-
-    // Use consistent grid layout for both states to prevent layout shift
-    // Both states use h-8 (32px) height to match the input height
-    if (isEditing) {
-      return (
-        <DrawerPropertyRow
-          label={label}
-          value={
-            <Input
-              ref={inputRef}
-              value={editValue}
-              onChange={e => setEditValue(e.target.value)}
-              onBlur={saveField}
-              onKeyDown={handleKeyDown}
-              placeholder={placeholder}
-              className='h-8 text-[13px]'
-            />
-          }
-          labelWidth={96}
-          className='px-0 py-0'
-          labelClassName='normal-case tracking-normal text-[12px]'
-          valueClassName='overflow-visible'
-        />
-      );
-    }
-
     return (
       <DrawerPropertyRow
         label={label}
         value={
-          <span className='truncate text-[13px] text-primary-token'>
-            {displayValue}
-          </span>
+          <DrawerEditableTextField
+            label={label}
+            value={value}
+            editable
+            placeholder={placeholder}
+            emptyLabel={placeholder}
+            inputType={
+              field === 'email' ? 'email' : field === 'phone' ? 'tel' : 'text'
+            }
+            onSave={async nextValue => {
+              onUpdate({ [field]: nextValue } as Partial<EditableContact>);
+              debouncedSave();
+            }}
+            copyValue={value ?? null}
+            actions={
+              field === 'email' && value
+                ? [
+                    {
+                      id: 'open-email',
+                      ariaLabel: 'Open email',
+                      href: `mailto:${value}`,
+                    },
+                  ]
+                : field === 'phone' && value
+                  ? [
+                      {
+                        id: 'open-phone',
+                        ariaLabel: 'Call phone number',
+                        href: `tel:${value}`,
+                      },
+                    ]
+                  : []
+            }
+            displayClassName='truncate text-[13px] text-primary-token'
+            emptyClassName='text-tertiary-token italic'
+            inputClassName='h-8 text-[13px]'
+          />
         }
         labelWidth={96}
-        interactive
-        onClick={() => startEditing(field)}
         labelClassName='normal-case tracking-normal text-[12px]'
+        valueClassName='overflow-visible'
       />
     );
   };

@@ -2,16 +2,15 @@
 
 import { Button } from '@jovie/ui';
 import {
-  AlertCircle,
   ArrowRight,
   Check,
+  Circle,
+  CircleDashed,
   Disc3,
   ExternalLink,
-  Link2,
   Loader2,
   Music2,
   RefreshCw,
-  Sparkles,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -31,7 +30,6 @@ import { OnboardingExperienceShell } from '@/components/features/onboarding/Onbo
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthBackButton } from '@/features/auth';
-import { PREVIEW_PANEL_WIDTH } from '@/features/dashboard/layout/PreviewPanel';
 import { useHandleValidation } from '@/features/dashboard/organisms/apple-style-onboarding/useHandleValidation';
 import {
   type AutoConnectedArtistSelection,
@@ -49,8 +47,8 @@ import {
   ONBOARDING_PREVIEW_SNAPSHOT_KEY,
   ONBOARDING_WELCOME_REPLY_KEY,
 } from '@/lib/onboarding/session-keys';
-import type { AvatarQuality } from '@/lib/profile/avatar-quality';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 
 const DISCOVERY_POLL_INTERVAL_MS = 1200;
 const DISCOVERY_STAGE_TIMEOUT_MS = 10000;
@@ -66,6 +64,28 @@ type StepId =
   | 'releases'
   | 'late-arrivals'
   | 'profile-ready';
+
+const STEP_ORDER: StepId[] = [
+  'handle',
+  'spotify',
+  'artist-confirm',
+  'upgrade',
+  'dsp',
+  'social',
+  'releases',
+  'late-arrivals',
+  'profile-ready',
+];
+
+const SIDEBAR_STEPS: ReadonlyArray<Readonly<{ id: StepId; label: string }>> = [
+  { id: 'handle', label: 'Handle' },
+  { id: 'spotify', label: 'Spotify' },
+  { id: 'upgrade', label: 'Plan' },
+  { id: 'dsp', label: 'DSPs' },
+  { id: 'social', label: 'Social' },
+  { id: 'releases', label: 'Releases' },
+  { id: 'profile-ready', label: 'Finish' },
+];
 
 interface SelectedArtist {
   id: string;
@@ -146,7 +166,6 @@ interface LateArrival {
 
 interface OnboardingV2FormProps {
   readonly existingAvatarUrl?: string | null;
-  readonly existingAvatarQuality?: AvatarQuality | null;
   readonly existingBio?: string | null;
   readonly existingGenres?: string[] | null;
   readonly initialDisplayName?: string;
@@ -164,6 +183,29 @@ interface StepFrameProps {
   readonly children: React.ReactNode;
   readonly prompt?: string;
   readonly title: string;
+}
+
+function getSidebarStepState(step: StepId, currentStep: StepId) {
+  const currentIndex = STEP_ORDER.indexOf(currentStep);
+  const stepIndex = STEP_ORDER.indexOf(step);
+
+  if (stepIndex <= currentIndex) {
+    return 'complete';
+  }
+
+  return 'pending';
+}
+
+function normalizeSidebarCurrentStep(currentStep: StepId): StepId {
+  if (currentStep === 'artist-confirm') {
+    return 'spotify';
+  }
+
+  if (currentStep === 'late-arrivals') {
+    return 'releases';
+  }
+
+  return currentStep;
 }
 
 function normalizeSelectedArtist(
@@ -248,18 +290,7 @@ function addLateArrivalSuffix(
   currentStep: StepId,
   stage: 'dsp' | 'social' | 'releases'
 ): boolean {
-  const order: StepId[] = [
-    'handle',
-    'spotify',
-    'artist-confirm',
-    'upgrade',
-    'dsp',
-    'social',
-    'releases',
-    'late-arrivals',
-    'profile-ready',
-  ];
-  return order.indexOf(currentStep) > order.indexOf(stage);
+  return STEP_ORDER.indexOf(currentStep) > STEP_ORDER.indexOf(stage);
 }
 
 function mergeSelectedArtist(
@@ -436,10 +467,7 @@ async function fetchDiscoverySnapshot(
 function StepFrame({ actions, children, prompt, title }: StepFrameProps) {
   return (
     <div className='mx-auto flex w-full max-w-2xl flex-col gap-6'>
-      <div className='space-y-2'>
-        <p className='text-[11px] font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
-          Onboarding
-        </p>
+      <div className='space-y-3'>
         <h1 className='text-3xl font-[620] tracking-[-0.04em] text-primary-token sm:text-[2.7rem]'>
           {title}
         </h1>
@@ -461,15 +489,46 @@ function StepFrame({ actions, children, prompt, title }: StepFrameProps) {
   );
 }
 
+function FlatPanel({
+  children,
+  className,
+}: Readonly<{
+  children: React.ReactNode;
+  className?: string;
+}>) {
+  return (
+    <div
+      className={cn(
+        'border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] pb-5',
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function InlineNotice({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <div className='border-b border-[color-mix(in_oklab,var(--color-destructive)_28%,transparent)] pb-4 text-sm leading-6 text-secondary-token'>
+      {children}
+    </div>
+  );
+}
+
 function EmptyState({
   body,
   title,
 }: Readonly<{ body: string; title: string }>) {
   return (
-    <ContentSurfaceCard className='border-dashed p-5'>
+    <div className='border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_58%,transparent)] pb-5'>
       <p className='text-sm font-[560] text-primary-token'>{title}</p>
       <p className='mt-1 text-sm leading-6 text-secondary-token'>{body}</p>
-    </ContentSurfaceCard>
+    </div>
   );
 }
 
@@ -478,7 +537,7 @@ function SelectedArtistCard({
   isLoading,
 }: Readonly<{ artist: SelectedArtist | null; isLoading: boolean }>) {
   return (
-    <ContentSurfaceCard className='p-5'>
+    <FlatPanel>
       <div className='flex items-center gap-4'>
         {artist?.imageUrl ? (
           <Image
@@ -526,213 +585,55 @@ function SelectedArtistCard({
           </Button>
         ) : null}
       </div>
-    </ContentSurfaceCard>
+    </FlatPanel>
   );
 }
 
-function PreviewPanel({
-  avatarQuality,
-  discoverySnapshot,
-  existingAvatarUrl,
-  existingBio,
-  existingGenres,
-  selectedArtist,
+function OnboardingSidebar({
+  currentStep,
 }: Readonly<{
-  avatarQuality: AvatarQuality | null;
-  discoverySnapshot: DiscoverySnapshot | null;
-  existingAvatarUrl: string | null;
-  existingBio: string | null;
-  existingGenres: string[] | null;
-  selectedArtist: SelectedArtist | null;
+  currentStep: StepId;
 }>) {
-  const profile = discoverySnapshot?.profile;
-  const previewAvatarUrl = profile?.avatarUrl ?? existingAvatarUrl;
-  const isUsingExistingAvatar =
-    !profile?.avatarUrl && Boolean(existingAvatarUrl);
-  const activeLinks = (discoverySnapshot?.socialItems ?? []).filter(
-    item => item.kind === 'link' && item.state === 'active'
-  );
+  const displayStep = normalizeSidebarCurrentStep(currentStep);
 
   return (
-    <aside
-      className='max-xl:hidden'
-      style={{ width: `${PREVIEW_PANEL_WIDTH}px` }}
-    >
-      <div className='sticky top-8 space-y-4'>
-        <ContentSurfaceCard className='overflow-hidden p-5'>
-          <div className='flex items-center gap-3'>
-            {previewAvatarUrl ? (
-              <Image
-                src={previewAvatarUrl}
-                alt=''
-                width={56}
-                height={56}
-                className='h-14 w-14 rounded-full object-cover'
-                unoptimized
-              />
-            ) : (
-              <div className='flex h-14 w-14 items-center justify-center rounded-full bg-surface-0 text-tertiary-token'>
-                <Sparkles className='h-5 w-5' />
-              </div>
-            )}
-            <div className='min-w-0'>
-              <p className='truncate text-base font-[590] text-primary-token'>
-                {profile?.displayName || selectedArtist?.name || 'Your profile'}
-              </p>
-              <p className='truncate text-sm text-secondary-token'>
-                @{profile?.username ?? 'pending'}
-              </p>
-            </div>
-          </div>
+    <nav aria-label='Onboarding steps'>
+      <ul className='space-y-1.5'>
+        {SIDEBAR_STEPS.map(step => {
+          const state = getSidebarStepState(step.id, displayStep);
+          const Icon = state === 'complete' ? Circle : CircleDashed;
+          const isCurrent = step.id === displayStep;
 
-          {isUsingExistingAvatar && avatarQuality?.status === 'low' ? (
-            <div className='mt-3 flex items-start gap-2 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-left text-[12px] text-secondary-token'>
-              <AlertCircle
-                className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'
-                aria-hidden='true'
-              />
-              <p>
-                This photo is only {avatarQuality.width}x{avatarQuality.height}.
-                Jovie profiles look best at 512x512 or higher, so swap in a
-                sharper image if you have one.
-              </p>
-            </div>
-          ) : null}
-
-          <div className='mt-4 grid grid-cols-3 gap-2 text-center'>
-            <div className='rounded-2xl bg-surface-0 px-3 py-2'>
-              <p className='text-lg font-[590] text-primary-token'>
-                {discoverySnapshot?.counts.releaseCount ?? 0}
-              </p>
-              <p className='text-[11px] uppercase tracking-[0.12em] text-tertiary-token'>
-                Releases
-              </p>
-            </div>
-            <div className='rounded-2xl bg-surface-0 px-3 py-2'>
-              <p className='text-lg font-[590] text-primary-token'>
-                {discoverySnapshot?.counts.dspCount ?? (selectedArtist ? 1 : 0)}
-              </p>
-              <p className='text-[11px] uppercase tracking-[0.12em] text-tertiary-token'>
-                DSPs
-              </p>
-            </div>
-            <div className='rounded-2xl bg-surface-0 px-3 py-2'>
-              <p className='text-lg font-[590] text-primary-token'>
-                {discoverySnapshot?.counts.activeSocialCount ?? 0}
-              </p>
-              <p className='text-[11px] uppercase tracking-[0.12em] text-tertiary-token'>
-                Social
-              </p>
-            </div>
-          </div>
-        </ContentSurfaceCard>
-
-        <ContentSurfaceCard className='p-5'>
-          <p className='text-[11px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
-            Profile preview
-          </p>
-          <div className='mt-3 space-y-3'>
-            {profile?.bio || existingBio ? (
-              <p className='text-sm leading-6 text-secondary-token'>
-                {profile?.bio ?? existingBio}
-              </p>
-            ) : (
-              <p className='text-sm leading-6 text-secondary-token'>
-                Your profile summary will keep getting better as discovery
-                finishes.
-              </p>
-            )}
-
-            {(profile?.genres ?? existingGenres)?.length ? (
-              <div className='flex flex-wrap gap-2'>
-                {(profile?.genres ?? existingGenres ?? [])
-                  .slice(0, 4)
-                  .map(genre => (
-                    <span
-                      key={genre}
-                      className='rounded-full bg-surface-0 px-2.5 py-1 text-[11px] text-secondary-token'
-                    >
-                      {genre}
-                    </span>
-                  ))}
-              </div>
-            ) : null}
-
-            {activeLinks.length > 0 ? (
-              <div className='space-y-2'>
-                {activeLinks.slice(0, 4).map(link => (
-                  <div
-                    key={`${link.kind}:${link.id}`}
-                    className='flex items-center justify-between rounded-2xl bg-surface-0 px-3 py-2'
-                  >
-                    <div className='min-w-0'>
-                      <p className='truncate text-sm font-[560] text-primary-token'>
-                        {link.platformLabel}
-                      </p>
-                      <p className='truncate text-xs text-secondary-token'>
-                        {link.username || link.url}
-                      </p>
-                    </div>
-                    <Link2 className='h-4 w-4 shrink-0 text-tertiary-token' />
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </ContentSurfaceCard>
-
-        <ContentSurfaceCard className='p-5'>
-          <p className='text-[11px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
-            Recent releases
-          </p>
-          <div className='mt-3 space-y-2'>
-            {(discoverySnapshot?.releases ?? []).length === 0 ? (
-              <p className='text-sm text-secondary-token'>
-                Releases will appear here as soon as discovery finishes.
-              </p>
-            ) : (
-              discoverySnapshot?.releases.map(release => (
-                <div
-                  key={release.id}
-                  className='flex items-center gap-3 rounded-2xl bg-surface-0 px-3 py-2'
-                >
-                  {release.artworkUrl ? (
-                    <Image
-                      src={release.artworkUrl}
-                      alt=''
-                      width={40}
-                      height={40}
-                      className='h-10 w-10 rounded-xl object-cover'
-                      unoptimized
-                    />
-                  ) : (
-                    <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-surface-1 text-tertiary-token'>
-                      <Disc3 className='h-4 w-4' />
-                    </div>
+          return (
+            <li key={step.id} aria-current={isCurrent ? 'step' : undefined}>
+              <div
+                className={cn(
+                  'flex items-center gap-3 rounded-xl px-2 py-2 text-[13px] transition-colors',
+                  isCurrent
+                    ? 'bg-surface-1 text-primary-token'
+                    : 'text-secondary-token'
+                )}
+              >
+                <Icon
+                  className={cn(
+                    'h-4 w-4 shrink-0',
+                    state === 'complete'
+                      ? 'fill-current text-primary-token'
+                      : 'text-tertiary-token'
                   )}
-                  <div className='min-w-0'>
-                    <p className='truncate text-sm font-[560] text-primary-token'>
-                      {release.title}
-                    </p>
-                    <p className='text-xs text-secondary-token'>
-                      {release.releaseDate
-                        ? new Date(release.releaseDate).getFullYear()
-                        : 'New release'}
-                    </p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </ContentSurfaceCard>
-      </div>
-    </aside>
+                />
+                <span className='font-[560]'>{step.label}</span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }
 
 export function OnboardingV2Form({
   existingAvatarUrl = null,
-  existingAvatarQuality = null,
   existingBio = null,
   existingGenres = null,
   initialDisplayName = '',
@@ -1542,9 +1443,7 @@ export function OnboardingV2Form({
             prompt='Search for your artist page or paste a Spotify artist URL. We will start importing as soon as you choose one.'
           >
             {discoveryError ? (
-              <ContentSurfaceCard className='border-error/50 p-4 text-sm text-secondary-token'>
-                {discoveryError}
-              </ContentSurfaceCard>
+              <InlineNotice>{discoveryError}</InlineNotice>
             ) : null}
 
             <div className='relative'>
@@ -1568,7 +1467,7 @@ export function OnboardingV2Form({
               {renderSpotifySearchResults(artistResults)}
             </div>
 
-            <ContentSurfaceCard className='p-5'>
+            <FlatPanel>
               <p className='text-sm font-[560] text-primary-token'>
                 What happens next
               </p>
@@ -1580,7 +1479,7 @@ export function OnboardingV2Form({
                   one.
                 </li>
               </ul>
-            </ContentSurfaceCard>
+            </FlatPanel>
           </StepFrame>
         );
 
@@ -1665,17 +1564,15 @@ export function OnboardingV2Form({
             }
           >
             {discoveryError ? (
-              <ContentSurfaceCard className='border-error/50 p-4 text-sm text-secondary-token'>
-                {discoveryError}
-              </ContentSurfaceCard>
+              <InlineNotice>{discoveryError}</InlineNotice>
             ) : null}
 
             {discoverySnapshot?.dspItems.length ? (
               discoverySnapshot.dspItems.map(item => (
-                <ContentSurfaceCard key={item.id} className='p-5'>
+                <FlatPanel key={item.id}>
                   <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
                     <div className='min-w-0'>
-                      <p className='text-[11px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                      <p className='text-[11px] font-[560] text-tertiary-token'>
                         {item.providerLabel}
                       </p>
                       <p className='truncate text-base font-[580] text-primary-token'>
@@ -1722,7 +1619,7 @@ export function OnboardingV2Form({
                       ) : null}
                     </div>
                   </div>
-                </ContentSurfaceCard>
+                </FlatPanel>
               ))
             ) : (
               <EmptyState
@@ -1750,9 +1647,7 @@ export function OnboardingV2Form({
             }
           >
             {discoveryError ? (
-              <ContentSurfaceCard className='border-error/50 p-4 text-sm text-secondary-token'>
-                {discoveryError}
-              </ContentSurfaceCard>
+              <InlineNotice>{discoveryError}</InlineNotice>
             ) : null}
 
             {(discoverySnapshot?.socialItems.length ?? 0) > 0 ? (
@@ -1763,13 +1658,10 @@ export function OnboardingV2Form({
                     : item.state === 'suggested';
 
                 return (
-                  <ContentSurfaceCard
-                    key={`${item.kind}:${item.id}`}
-                    className='p-5'
-                  >
+                  <FlatPanel key={`${item.kind}:${item.id}`}>
                     <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
                       <div className='min-w-0'>
-                        <p className='text-[11px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                        <p className='text-[11px] font-[560] text-tertiary-token'>
                           {item.platformLabel}
                         </p>
                         <p className='truncate text-base font-[580] text-primary-token'>
@@ -1815,7 +1707,7 @@ export function OnboardingV2Form({
                         ) : null}
                       </div>
                     </div>
-                  </ContentSurfaceCard>
+                  </FlatPanel>
                 );
               })
             ) : (
@@ -1841,7 +1733,7 @@ export function OnboardingV2Form({
           >
             {discoverySnapshot?.releases.length ? (
               discoverySnapshot.releases.map(release => (
-                <ContentSurfaceCard key={release.id} className='p-5'>
+                <FlatPanel key={release.id}>
                   <div className='flex items-center gap-4'>
                     {release.artworkUrl ? (
                       <Image
@@ -1868,7 +1760,7 @@ export function OnboardingV2Form({
                       </p>
                     </div>
                   </div>
-                </ContentSurfaceCard>
+                </FlatPanel>
               ))
             ) : (
               <EmptyState
@@ -1892,14 +1784,14 @@ export function OnboardingV2Form({
             }
           >
             {lateArrivals.map(item => (
-              <ContentSurfaceCard key={item.id} className='p-5'>
-                <p className='text-[11px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+              <FlatPanel key={item.id}>
+                <p className='text-[11px] font-[560] text-tertiary-token'>
                   {item.subtitle}
                 </p>
                 <p className='mt-1 text-base font-[580] text-primary-token'>
                   {item.title}
                 </p>
-              </ContentSurfaceCard>
+              </FlatPanel>
             ))}
           </StepFrame>
         );
@@ -1916,10 +1808,10 @@ export function OnboardingV2Form({
               </Button>
             }
           >
-            <ContentSurfaceCard className='p-5'>
+            <FlatPanel>
               <div className='grid gap-4 sm:grid-cols-3'>
                 <div>
-                  <p className='text-[11px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                  <p className='text-[11px] font-[560] text-tertiary-token'>
                     Releases
                   </p>
                   <p className='mt-1 text-2xl font-[620] text-primary-token'>
@@ -1927,7 +1819,7 @@ export function OnboardingV2Form({
                   </p>
                 </div>
                 <div>
-                  <p className='text-[11px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                  <p className='text-[11px] font-[560] text-tertiary-token'>
                     DSPs
                   </p>
                   <p className='mt-1 text-2xl font-[620] text-primary-token'>
@@ -1935,7 +1827,7 @@ export function OnboardingV2Form({
                   </p>
                 </div>
                 <div>
-                  <p className='text-[11px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                  <p className='text-[11px] font-[560] text-tertiary-token'>
                     Social
                   </p>
                   <p className='mt-1 text-2xl font-[620] text-primary-token'>
@@ -1943,9 +1835,9 @@ export function OnboardingV2Form({
                   </p>
                 </div>
               </div>
-            </ContentSurfaceCard>
+            </FlatPanel>
 
-            <ContentSurfaceCard className='p-5'>
+            <FlatPanel className='border-b-0 pb-0'>
               <label
                 className='text-sm font-[560] text-primary-token'
                 htmlFor='onboarding-anything-else'
@@ -1954,12 +1846,12 @@ export function OnboardingV2Form({
               </label>
               <textarea
                 id='onboarding-anything-else'
-                className='mt-3 min-h-[120px] w-full rounded-[20px] border border-subtle bg-surface-1 px-4 py-3 text-sm text-primary-token outline-none placeholder:text-tertiary-token'
+                className='mt-3 min-h-[120px] w-full border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] bg-transparent px-0 py-3 text-sm text-primary-token outline-none placeholder:text-tertiary-token'
                 onChange={event => setAnythingElse(event.target.value)}
                 placeholder='Optional context for your first Jovie chat…'
                 value={anythingElse}
               />
-            </ContentSurfaceCard>
+            </FlatPanel>
           </StepFrame>
         );
     }
@@ -1969,6 +1861,9 @@ export function OnboardingV2Form({
     <OnboardingExperienceShell
       mode='standalone'
       stableStageHeight={currentStep === 'handle' ? 'tall' : 'default'}
+      sidebar={<OnboardingSidebar currentStep={currentStep} />}
+      sidebarTitle='Jovie Setup'
+      stageVariant='flat'
       topBar={
         currentStep === 'spotify' ||
         currentStep === 'artist-confirm' ||
@@ -1977,16 +1872,6 @@ export function OnboardingV2Form({
             <AuthBackButton onClick={handleGoBack} ariaLabel='Go back' />
           </div>
         ) : null
-      }
-      sidePanel={
-        <PreviewPanel
-          avatarQuality={existingAvatarQuality}
-          discoverySnapshot={discoverySnapshot}
-          existingAvatarUrl={existingAvatarUrl}
-          existingBio={existingBio}
-          existingGenres={existingGenres}
-          selectedArtist={selectedArtist}
-        />
       }
       data-testid='onboarding-experience-shell'
     >

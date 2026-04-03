@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.111] - 2026-04-02
+
+> Moved tips into Artist Profile so payout setup, tip links, and QR sharing live next to the public profile editor, while legacy earnings routes now land on the new surface and tip traffic stays aligned with analytics.
+
+### Added
+
+- Added a shared monetization summary model and API that powers the new tips card in Artist Profile and the preview drawer Earn tab
+
+### Changed
+
+- Replaced the standalone earnings workspace with a compact Tips panel in `Settings > Artist Profile`, moved shop setup onto the same page, and removed the primary Earnings nav item
+- Legacy earnings and tipping routes now redirect to `Settings > Artist Profile ?tab=earn#tips`
+- Smart setup prompts now use generic tips and payments copy instead of Venmo-specific language
+- Analytics now shows a single `Tip Link Visits` metric when tip traffic exists
+
+### Fixed
+
+- Tip visit totals now count all tracked tip-link visits so the new tips surfaces match analytics
+- Preserved existing getting-started checklist completion for the renamed tips task
+- [internal] Updated route-matrix and performance-manifest expectations to the new redirects and current settings section selectors
+
 ## [26.4.110] - 2026-04-02
 
 > Added a resumable end-user performance loop for core routes, tightened homepage perf handling during the redesign window, fixed the local auth bypass for loopback testing, and reworked release and track sidebars around playback-first QA with stronger preview fallback handling.

@@ -22,6 +22,7 @@ const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
 const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 const sentryE2eEnabled =
   process.env.SENTRY_E2E_REPORTING === '1' && Boolean(process.env.SENTRY_DSN);
+const shouldSerializeLocalBypassRuns = !isCI && useTestAuthBypass;
 
 const videoMode: 'off' | 'retain-on-failure' =
   isCI && isSmokeOnly ? 'off' : 'retain-on-failure';
@@ -38,6 +39,18 @@ function getRetries(): number {
 }
 
 function getWorkers(): number | undefined {
+  const explicitWorkers = process.env.PLAYWRIGHT_WORKERS;
+  if (explicitWorkers) {
+    const parsedWorkers = Number.parseInt(explicitWorkers, 10);
+    if (Number.isFinite(parsedWorkers) && parsedWorkers > 0) {
+      return parsedWorkers;
+    }
+  }
+
+  if (shouldSerializeLocalBypassRuns) {
+    return 1;
+  }
+
   if (!isCI) return undefined;
   return isSmokeOnly ? 8 : 4;
 }
@@ -56,7 +69,7 @@ export default defineConfig({
   testDir: './tests/e2e',
   // Exclude nightly tests - they run via playwright.config.nightly.ts on schedule
   testIgnore: ['**/nightly/**'],
-  fullyParallel: true,
+  fullyParallel: !shouldSerializeLocalBypassRuns,
   forbidOnly: isCI,
   // Smoke tests: fewer retries for faster feedback; full suite: more resilience
   retries: getRetries(),

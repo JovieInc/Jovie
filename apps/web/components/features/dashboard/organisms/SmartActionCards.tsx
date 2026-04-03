@@ -8,7 +8,7 @@ import {
   ShoppingBag,
 } from 'lucide-react';
 import Link from 'next/link';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
@@ -16,7 +16,7 @@ import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCom
 import { useClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
-import { useDashboardSocialLinksQuery } from '@/lib/queries';
+import { useProfileMonetizationSummary } from '@/lib/queries';
 
 interface ActionCardProps {
   readonly icon: React.ReactNode;
@@ -81,7 +81,9 @@ export const SmartActionCards = memo(function SmartActionCards({
   onFeedbackClick,
 }: SmartActionCardsProps) {
   const { profileCompletion, selectedProfile } = useDashboardData();
-  const { data: socialLinks } = useDashboardSocialLinksQuery(profileId ?? '');
+  const { data: monetizationSummary } = useProfileMonetizationSummary(
+    Boolean(profileId)
+  );
   const notifications = useNotifications();
   const { copy } = useClipboard({
     onSuccess: () => notifications.success('Profile link copied!'),
@@ -93,10 +95,6 @@ export const SmartActionCards = memo(function SmartActionCards({
     unknown
   > | null;
 
-  const hasVenmo = useMemo(
-    () => (socialLinks ?? []).some(l => l.platform === 'venmo'),
-    [socialLinks]
-  );
   const hasShopify = isShopEnabled(profileSettings);
   const isProfileComplete = (profileCompletion?.percentage ?? 0) >= 100;
 
@@ -113,14 +111,41 @@ export const SmartActionCards = memo(function SmartActionCards({
   const showProfileCompletion = !isProfileComplete;
 
   // 2. Build action cards
-  if (!hasVenmo) {
+  if (
+    monetizationSummary &&
+    (monetizationSummary.paymentState === 'needs_profile_url' ||
+      monetizationSummary.paymentState === 'not_setup' ||
+      monetizationSummary.paymentState === 'setup_incomplete')
+  ) {
+    const tipsHref =
+      monetizationSummary.paymentState === 'not_setup' &&
+      monetizationSummary.manageHref !== APP_ROUTES.SETTINGS_PAYMENTS
+        ? `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#tips`
+        : monetizationSummary.manageHref;
+
+    const tipsHeading =
+      monetizationSummary.paymentState === 'needs_profile_url'
+        ? 'Finish Profile URL'
+        : monetizationSummary.paymentState === 'setup_incomplete'
+          ? 'Finish Payments Setup'
+          : monetizationSummary.manageHref === APP_ROUTES.SETTINGS_PAYMENTS
+            ? 'Set Up Payments'
+            : 'Set Up Tips';
+
+    const tipsSubtext =
+      monetizationSummary.paymentState === 'needs_profile_url'
+        ? 'Tip links and QR codes need a public profile handle'
+        : monetizationSummary.paymentState === 'setup_incomplete'
+          ? 'Complete payouts to turn tips on'
+          : 'Let fans support you directly from your profile';
+
     cards.push(
       <ActionCard
         key='tips'
         icon={<BadgeDollarSign className='h-4 w-4' />}
-        heading='Accept tips from fans'
-        subtext='Connect Venmo to receive tips on your profile'
-        href={APP_ROUTES.CHAT_PROFILE_PANEL}
+        heading={tipsHeading}
+        subtext={tipsSubtext}
+        href={tipsHref}
       />
     );
   }

@@ -2,17 +2,13 @@
 
 import { Input } from '@jovie/ui';
 import * as React from 'react';
+import {
+  AUTH_TEXT_INPUT_BASE_CLASS,
+  AUTH_TEXT_INPUT_VARIANT_CLASS,
+} from '@/components/atoms/auth-text-input-styles';
 import { cn } from '@/lib/utils';
 
-const authTextInputClasses =
-  'border border-subtle bg-surface-0 text-primary-token placeholder:text-tertiary-token rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/40 focus-visible:ring-offset-2 h-button-md min-h-button-md px-3 text-caption font-caption';
-
 type AuthTextInputVariant = 'default' | 'otp';
-
-const variantClasses: Record<AuthTextInputVariant, string> = {
-  default: '',
-  otp: 'text-2xl tracking-[0.3em] text-center font-sans',
-} as const;
 
 export interface AuthTextInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
@@ -27,7 +23,11 @@ export const AuthTextInput = React.forwardRef<
     <Input
       ref={ref}
       inputSize='lg'
-      className={cn(authTextInputClasses, variantClasses[variant], className)}
+      className={cn(
+        AUTH_TEXT_INPUT_BASE_CLASS,
+        AUTH_TEXT_INPUT_VARIANT_CLASS[variant],
+        className
+      )}
       {...props}
     />
   );

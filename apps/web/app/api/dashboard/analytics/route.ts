@@ -129,6 +129,7 @@ export async function GET(request: Request) {
         {
           profile_views: 0,
           unique_users: 0,
+          tip_link_visits: 0,
           top_cities: [],
           top_countries: [],
           top_referrers: [],

@@ -78,13 +78,6 @@ export const primaryNavigation: NavItem[] = [
     icon: Radio,
     description: 'See your profiles across streaming platforms',
   },
-  {
-    name: 'Earnings',
-    href: APP_ROUTES.DASHBOARD_EARNINGS,
-    id: 'earnings',
-    icon: HandCoins,
-    description: 'QR codes, tip links, and payout settings',
-  },
 ];
 
 export const settingsNavItem: NavItem = {
