@@ -36,6 +36,7 @@ export interface TaskStatusVisual {
 export interface TaskPriorityVisual {
   readonly label: string;
   readonly accent: AccentPaletteName;
+  readonly bars: number;
 }
 
 const TASK_VISUAL_STAGE_META: Record<
@@ -122,11 +123,11 @@ const TASK_STATUS_VISUALS: Record<TaskStatus, TaskStatusVisual> = {
 };
 
 const TASK_PRIORITY_META: Record<TaskPriority, TaskPriorityVisual> = {
-  urgent: { label: 'Urgent', accent: 'red' },
-  high: { label: 'High', accent: 'orange' },
-  medium: { label: 'Medium', accent: 'purple' },
-  low: { label: 'Low', accent: 'teal' },
-  none: { label: 'None', accent: 'gray' },
+  urgent: { label: 'Urgent', accent: 'red', bars: 4 },
+  high: { label: 'High', accent: 'orange', bars: 3 },
+  medium: { label: 'Medium', accent: 'purple', bars: 2 },
+  low: { label: 'Low', accent: 'teal', bars: 1 },
+  none: { label: 'None', accent: 'gray', bars: 0 },
 };
 
 export function getTaskStageVisual(

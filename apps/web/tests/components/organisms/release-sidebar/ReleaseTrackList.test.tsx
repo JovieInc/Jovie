@@ -160,14 +160,14 @@ describe('ReleaseTrackList', () => {
     );
 
     expect(screen.getByTestId('release-preview-summary')).toHaveTextContent(
-      'Previews: 0 verified, 0 fallback, 0 unknown'
+      'Audio Previews: none'
     );
     expect(
       screen.getByTestId('release-track-status-track_1')
     ).toHaveTextContent('Not checked');
     expect(
       screen.getByTestId('release-track-provider-summary-track_1')
-    ).toHaveTextContent('1 canonical, 1 fallback, 2 unknown');
+    ).toHaveTextContent('1 linked, 1 unconfirmed, 2 pending');
 
     const disclosure = screen.getByRole('button', { expanded: false });
 

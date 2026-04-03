@@ -111,7 +111,7 @@ function getProviderConfidenceLabel(
 ): string | null {
   switch (confidence) {
     case 'search_fallback':
-      return 'Search fallback';
+      return 'Unconfirmed';
     case 'manual_override':
       return 'Manual override';
     default:
@@ -205,7 +205,7 @@ export function ReleaseTrackList({
       <DrawerSurfaceCard
         className={cn(
           LINEAR_SURFACE.drawerCardSm,
-          'overflow-hidden px-3 py-2.5'
+          'overflow-hidden px-2.5 py-2'
         )}
         data-testid='release-playback-summary'
       >
@@ -213,16 +213,30 @@ export function ReleaseTrackList({
           className='text-[11px] text-tertiary-token'
           data-testid='release-preview-summary'
         >
-          Previews: {previewCounts.verified} verified, {previewCounts.fallback}{' '}
-          fallback, {previewCounts.unknown} unknown
+          Audio Previews:{' '}
+          {[
+            previewCounts.verified > 0 && `${previewCounts.verified} ready`,
+            previewCounts.fallback > 0 &&
+              `${previewCounts.fallback} unconfirmed`,
+            previewCounts.unknown > 0 && `${previewCounts.unknown} pending`,
+          ]
+            .filter(Boolean)
+            .join(', ') || 'none'}
         </p>
         <p
           className='mt-1 text-[11px] text-tertiary-token'
           data-testid='release-provider-summary'
         >
-          Providers: {providerCounts.canonical} canonical,{' '}
-          {providerCounts.searchFallback} fallback, {providerCounts.unknown}{' '}
-          unknown
+          Providers:{' '}
+          {[
+            providerCounts.canonical > 0 &&
+              `${providerCounts.canonical} linked`,
+            providerCounts.searchFallback > 0 &&
+              `${providerCounts.searchFallback} unconfirmed`,
+            providerCounts.unknown > 0 && `${providerCounts.unknown} pending`,
+          ]
+            .filter(Boolean)
+            .join(', ') || 'none'}
         </p>
       </DrawerSurfaceCard>
 
@@ -392,10 +406,10 @@ function TrackPlaybackRow({
                 className='mt-1 text-[10px] text-tertiary-token'
                 data-testid={`release-track-provider-summary-${track.id}`}
               >
-                {summary?.canonical ?? 0} canonical,{' '}
-                {summary?.searchFallback ?? 0} fallback
+                {summary?.canonical ?? 0} linked, {summary?.searchFallback ?? 0}{' '}
+                unconfirmed
                 {summary && summary.unknown > 0
-                  ? `, ${summary.unknown} unknown`
+                  ? `, ${summary.unknown} pending`
                   : ''}
               </p>
               <p
@@ -485,14 +499,14 @@ function TrackPlaybackRow({
             <div className='space-y-2'>
               {canonicalProviders.length > 0 ? (
                 <ProviderGroup
-                  title='Canonical DSPs'
+                  title='Linked DSPs'
                   providers={canonicalProviders}
                   testId={`release-track-canonical-providers-${track.id}`}
                 />
               ) : null}
               {fallbackProviders.length > 0 ? (
                 <ProviderGroup
-                  title='Search Fallback'
+                  title='Unconfirmed DSPs'
                   providers={fallbackProviders}
                   testId={`release-track-fallback-providers-${track.id}`}
                 />
