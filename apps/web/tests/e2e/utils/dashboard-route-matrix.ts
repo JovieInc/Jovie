@@ -427,7 +427,7 @@ const billingRoutes = [
 
 const marketingRoutes = [
   {
-    path: '/',
+    path: APP_ROUTES.HOME,
     name: 'Homepage',
     kind: 'render',
     surface: 'marketing',
@@ -445,7 +445,7 @@ const marketingRoutes = [
     performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
   },
   {
-    path: '/about',
+    path: APP_ROUTES.ABOUT,
     name: 'About',
     kind: 'render',
     surface: 'marketing',
@@ -594,14 +594,14 @@ export const EXCLUDED_ROUTES: Record<string, string> = {
   '/investor-portal': 'Investor portal (admin-managed)',
   '/investor-portal/:slug': 'Investor portal detail',
   '/investor-portal/respond': 'Investor portal response',
-  '/[username]/contact': 'Profile contact form',
-  '/[username]/notifications': 'Profile notifications',
-  '/[username]/tip': 'Profile tipping',
-  '/[username]/claim': 'Profile claim flow',
-  '/[username]/:slug': 'Release page (dynamic)',
-  '/[username]/:slug/sounds': 'Release sounds (dynamic)',
-  '/[username]/:slug/:trackSlug': 'Track page (dynamic)',
-  '/[username]/...slug': 'Catch-all profile route',
+  '/:username/contact': 'Profile contact form',
+  '/:username/notifications': 'Profile notifications',
+  '/:username/tip': 'Profile tipping',
+  '/:username/claim': 'Profile claim flow',
+  '/:username/:slug': 'Release page (dynamic)',
+  '/:username/:slug/sounds': 'Release sounds (dynamic)',
+  '/:username/:slug/:trackSlug': 'Track page (dynamic)',
+  '/:username/...slug': 'Catch-all profile route',
 };
 
 const fastHealthPaths = new Set([

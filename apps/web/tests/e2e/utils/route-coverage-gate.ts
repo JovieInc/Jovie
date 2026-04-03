@@ -49,7 +49,8 @@ export function findAllPageFiles(dir: string = APP_ROOT): string[] {
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(currentDir, { withFileTypes: true });
-    } catch {
+    } catch (err) {
+      console.debug(`[route-coverage] Skipping ${currentDir}: ${err}`);
       return;
     }
 

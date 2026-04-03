@@ -38,10 +38,11 @@ function getAllExcludedPatterns(): string[] {
 
 function isExcluded(normalizedRoute: string, patterns: string[]): boolean {
   for (const pattern of patterns) {
-    if (pattern === normalizedRoute) return true;
+    const normalizedPattern = normalizeDynamicSegments(pattern);
+    if (normalizedPattern === normalizedRoute) return true;
     // Wildcard matching: /ui/* matches /ui/buttons
-    if (pattern.endsWith('/*')) {
-      const prefix = pattern.slice(0, -2);
+    if (normalizedPattern.endsWith('/*')) {
+      const prefix = normalizedPattern.slice(0, -2);
       if (
         normalizedRoute === prefix ||
         normalizedRoute.startsWith(prefix + '/')
@@ -106,13 +107,18 @@ describe('route coverage', () => {
       );
     }
 
-    // Track the coverage percentage
+    // Track the coverage percentage with registered vs excluded breakdown
     const totalRoutes = allPages.length;
-    const coveredRoutes = totalRoutes - uncataloged.length;
+    const registeredCount = [...allPages].filter(f => {
+      const r = normalizeDynamicSegments(filePathToRoutePath(f));
+      return registeredRoutes.has(r);
+    }).length;
+    const excludedCount = totalRoutes - registeredCount - uncataloged.length;
+    const coveredRoutes = registeredCount + excludedCount;
     const coveragePercent = Math.round((coveredRoutes / totalRoutes) * 100);
 
     console.log(
-      `Route coverage: ${coveredRoutes}/${totalRoutes} (${coveragePercent}%)`
+      `Route coverage: ${registeredCount} registered, ${excludedCount} excluded, ${uncataloged.length} uncataloged / ${totalRoutes} total (${coveragePercent}%)`
     );
 
     // Soft gate: expect at least 50% coverage
