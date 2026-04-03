@@ -10,6 +10,7 @@ import {
   createDashboardMeasurement,
   createEmptyRunState,
 } from './performance-optimizer-lib';
+import { requiresDashboardAuth } from './performance-optimizer-shared';
 
 describe('performance optimizer helpers', () => {
   it('filters perf artifacts from the changed-files list', () => {
@@ -99,5 +100,11 @@ describe('performance optimizer helpers', () => {
     expect(getNextHypothesisIndex(0, 4)).toBe(1);
     expect(getNextHypothesisIndex(3, 4)).toBe(3);
     expect(getNextHypothesisIndex(0, 0)).toBe(0);
+  });
+
+  it('does not require auth for manifest-backed public routes', () => {
+    expect(requiresDashboardAuth(undefined, 'public-profile-main')).toBe(false);
+    expect(requiresDashboardAuth('/[username]')).toBe(false);
+    expect(requiresDashboardAuth('/app/dashboard/releases')).toBe(true);
   });
 });

@@ -24,6 +24,10 @@ import {
   type PerfRunConfig,
   type PerfRunState,
 } from './performance-optimizer-lib';
+import {
+  getEndUserPerfRouteById,
+  getEndUserPerfRouteManifest,
+} from './performance-route-manifest';
 
 interface CommandResult {
   readonly code: number;
@@ -297,6 +301,18 @@ function parseJsonOutput(output: string, message: string) {
   return JSON.parse(jsonString) as unknown;
 }
 
+export function requiresDashboardAuth(route?: string, routeId?: string) {
+  const matchedRoute = routeId
+    ? getEndUserPerfRouteById(routeId)
+    : route
+      ? getEndUserPerfRouteManifest().find(
+          candidate => candidate.path === route
+        )
+      : undefined;
+
+  return matchedRoute?.requiresAuth ?? true;
+}
+
 function measureDashboardSample(
   baseUrl: string,
   authPath?: string,
@@ -305,7 +321,9 @@ function measureDashboardSample(
 ) {
   const env: NodeJS.ProcessEnv = { ...process.env, BASE_URL: baseUrl };
   const resolvedAuthPath = resolveAuthPath(authPath);
-  if (!process.env.CLERK_SESSION_COOKIE && !resolvedAuthPath) {
+  const requiresAuth = requiresDashboardAuth(route, routeId);
+
+  if (requiresAuth && !process.env.CLERK_SESSION_COOKIE && !resolvedAuthPath) {
     throw new Error(
       'Dashboard mode requires CLERK_SESSION_COOKIE or --auth-path pointing to a Clerk storage state file.'
     );

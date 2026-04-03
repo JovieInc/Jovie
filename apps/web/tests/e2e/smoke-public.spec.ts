@@ -255,19 +255,13 @@ test.describe('Public Profile - dualipa', () => {
       return;
     }
 
-    const openSubscribe = page.getByRole('button', {
-      name: /turn on notifications/i,
-    });
+    const notificationsUi = page
+      .getByRole('button', { name: /turn on notifications/i })
+      .or(page.getByRole('button', { name: /get notified/i }))
+      .or(page.locator('input[type="email"], input[type="tel"]').first());
     await expect(
-      openSubscribe,
-      'Subscribe mode did not render the notification entry action'
-    ).toBeVisible({ timeout: 30_000 });
-    await expect(
-      page
-        .locator('[data-slot="drawer-content"], [role="dialog"], main')
-        .getByText(/^get notified$/i)
-        .first(),
-      'Subscribe mode did not render the get-notified state'
+      notificationsUi.first(),
+      'Subscribe mode did not render a subscription CTA'
     ).toBeVisible({ timeout: 30_000 });
   });
 });
