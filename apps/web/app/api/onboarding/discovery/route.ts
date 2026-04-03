@@ -12,6 +12,7 @@ import {
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { isActiveDiscoveryJob } from '@/lib/discovery/is-active-discovery-job';
 import { captureError } from '@/lib/error-tracking';
 import { getHometownFromSettings } from '@/types/db';
 
@@ -199,6 +200,7 @@ export async function GET(request: Request) {
       db
         .select({
           status: ingestionJobs.status,
+          createdAt: ingestionJobs.createdAt,
           updatedAt: ingestionJobs.updatedAt,
         })
         .from(ingestionJobs)
@@ -244,6 +246,24 @@ export async function GET(request: Request) {
         match =>
           match.status === 'confirmed' || match.status === 'auto_confirmed'
       ).length + (profile.spotifyId ? 1 : 0);
+    const latestMatchUpdatedAt =
+      dspMatches.length > 0
+        ? dspMatches.reduce<Date | null>(
+            (latest, match) =>
+              !match.updatedAt || (latest && latest >= match.updatedAt)
+                ? latest
+                : match.updatedAt,
+            null
+          )
+        : null;
+    const hasOnlyTerminalMatches =
+      dspMatches.length > 0 &&
+      dspMatches.every(
+        match =>
+          match.status === 'confirmed' ||
+          match.status === 'auto_confirmed' ||
+          match.status === 'rejected'
+      );
 
     return NextResponse.json(
       {
@@ -299,9 +319,11 @@ export async function GET(request: Request) {
             activeSocialCount: activeSocialCountResult[0]?.value ?? 0,
             dspCount: confirmedDspCount,
           },
-          hasPendingDiscoveryJob:
-            latestDiscoveryJob[0]?.status === 'pending' ||
-            latestDiscoveryJob[0]?.status === 'processing',
+          hasPendingDiscoveryJob: isActiveDiscoveryJob(
+            latestDiscoveryJob[0],
+            latestMatchUpdatedAt,
+            hasOnlyTerminalMatches
+          ),
         },
       },
       { status: 200, headers: NO_STORE_HEADERS }

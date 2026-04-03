@@ -14,7 +14,7 @@ import {
 import { cn } from '@/lib/utils';
 
 export const DRAWER_HEADER_ICON_BUTTON_CLASSNAME =
-  'h-7 w-7 rounded-full border border-(--linear-app-frame-seam) bg-surface-1 shadow-[var(--linear-app-drawer-shadow)] hover:bg-surface-1 focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 active:bg-surface-1';
+  'h-7 w-7 rounded-full border border-transparent bg-transparent shadow-none hover:bg-surface-1 focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) active:bg-surface-1';
 
 export interface DrawerHeaderAction {
   readonly id: string;

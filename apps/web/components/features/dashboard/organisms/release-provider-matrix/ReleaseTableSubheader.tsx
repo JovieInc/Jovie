@@ -332,18 +332,16 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             tooltipLabel='Search'
             className='h-7 text-[12px] text-tertiary-token hover:text-primary-token'
           />
-          {showToolbarExtras && (
-            <ReleaseFilterDropdown
-              filters={filters}
-              onFiltersChange={onFiltersChange}
-              counts={counts}
-              buttonClassName={cn(
-                PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-                'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3'
-              )}
-              iconOnly
-            />
-          )}
+          <ReleaseFilterDropdown
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            counts={counts}
+            buttonClassName={cn(
+              PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+              'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3'
+            )}
+            iconOnly
+          />
           {showToolbarExtras && (
             <LinearStyleDisplayMenu
               groupByYear={groupByYear}

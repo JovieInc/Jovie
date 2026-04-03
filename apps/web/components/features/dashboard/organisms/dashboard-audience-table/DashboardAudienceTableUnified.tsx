@@ -15,6 +15,7 @@ import { memo, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
 import { EmptyState } from '@/components/organisms/EmptyState';
+import { PageShell } from '@/components/organisms/PageShell';
 import {
   AudienceMobileCard,
   type ContextMenuItemType,
@@ -28,7 +29,6 @@ import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/Dashboard
 import { AnalyticsSidebar } from '@/features/dashboard/organisms/AnalyticsSidebar';
 import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelContext';
 import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar';
-import { PageShell } from '@/components/organisms/PageShell';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { queryKeys } from '@/lib/queries';

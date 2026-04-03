@@ -2,6 +2,10 @@
 
 import { Input } from '@jovie/ui';
 import * as React from 'react';
+import {
+  AUTH_TEXT_INPUT_BASE_CLASS,
+  AUTH_TEXT_INPUT_VARIANT_CLASS,
+} from '@/components/atoms/auth-text-input-styles';
 import { cn } from '@/lib/utils';
 
 type AuthInputVariant = 'default' | 'otp';
@@ -18,29 +22,6 @@ interface AuthInputProps
    */
   readonly error?: boolean;
 }
-
-const authInputClasses = cn(
-  // Base styling - subtle borders for premium feel
-  'border border-subtle bg-surface-0 text-primary-token',
-  'placeholder:text-tertiary-token',
-  'rounded-full',
-  // Focus ring
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40 focus-visible:ring-offset-2',
-  // Mobile-optimized sizing
-  'h-(--linear-button-height-md) sm:h-(--linear-button-height-md) min-h-[40px] px-3',
-  // Typography
-  'text-(--linear-caption-size) font-(--linear-caption-weight)',
-  // Touch optimizations
-  'touch-manipulation',
-  '[-webkit-tap-highlight-color:transparent]',
-  // Transitions
-  'transition-colors duration-150'
-);
-
-const variantClasses: Record<AuthInputVariant, string> = {
-  default: '',
-  otp: 'text-2xl tracking-[0.3em] text-center font-sans',
-} as const;
 
 /**
  * Auth-optimized input component with mobile keyboard optimizations.
@@ -95,8 +76,8 @@ export const AuthInput = React.forwardRef<HTMLInputElement, AuthInputProps>(
         placeholder={placeholder}
         variant={error ? 'error' : 'default'}
         className={cn(
-          authInputClasses,
-          variantClasses[variant],
+          AUTH_TEXT_INPUT_BASE_CLASS,
+          AUTH_TEXT_INPUT_VARIANT_CLASS[variant],
           error && 'border-destructive focus-visible:ring-destructive',
           className
         )}

@@ -26,16 +26,31 @@ export function DrawerTabbedCard({
   return (
     <DrawerSurfaceCard
       variant='card'
-      className={cn('overflow-hidden p-2.5', className)}
+      className={cn(
+        'flex h-full min-h-0 flex-col overflow-hidden p-2.5',
+        className
+      )}
       testId={testId}
     >
-      <div className={cn('flex items-start gap-2', tabsContainerClassName)}>
+      <div
+        className={cn(
+          'flex shrink-0 items-start gap-2',
+          tabsContainerClassName
+        )}
+      >
         <div className='min-w-0 flex-1 [&>*]:w-full'>{tabs}</div>
         {controls ? (
           <div className='shrink-0 self-center'>{controls}</div>
         ) : null}
       </div>
-      <div className={cn('pt-2', contentClassName)}>{children}</div>
+      <div
+        className={cn(
+          'min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pb-2 pr-2 pt-2',
+          contentClassName
+        )}
+      >
+        {children}
+      </div>
     </DrawerSurfaceCard>
   );
 }

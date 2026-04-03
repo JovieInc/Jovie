@@ -4,6 +4,10 @@ import { MENU_ITEM_BASE } from '@jovie/ui';
 import { Check } from 'lucide-react';
 import { type ReactNode, useCallback } from 'react';
 import { cn } from '@/lib/utils';
+import {
+  TOOLBAR_MENU_ITEM_CLASS,
+  ToolbarMenuRow,
+} from '../menus/ToolbarMenuPrimitives';
 
 interface FilterCheckboxItemProps {
   readonly label: string;
@@ -54,6 +58,17 @@ export function FilterCheckboxItem({
     },
     [onCheckedChange, searchInputRef]
   );
+  const trailingVisual =
+    count !== undefined || checked ? (
+      <span className='flex items-center gap-1'>
+        {count !== undefined ? (
+          <span className='text-[10px] tabular-nums text-tertiary-token'>
+            {count}
+          </span>
+        ) : null}
+        {checked ? <Check className='h-4 w-4 text-primary-token' /> : null}
+      </span>
+    ) : null;
 
   return (
     <button
@@ -67,31 +82,28 @@ export function FilterCheckboxItem({
       onKeyDown={handleKeyDown}
       className={cn(
         MENU_ITEM_BASE,
-        'w-full rounded-[6px] border border-transparent',
-        checked && 'text-primary-token'
+        TOOLBAR_MENU_ITEM_CLASS,
+        'w-full',
+        checked
+          ? 'bg-surface-1 text-primary-token'
+          : 'text-secondary-token hover:text-primary-token'
       )}
     >
-      <span
-        className={cn(
-          'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
-          checked
-            ? 'border-(--linear-accent) bg-(--linear-accent) text-white'
-            : 'border-subtle bg-surface-1'
-        )}
-      >
-        {checked && <Check className='h-3 w-3' />}
-      </span>
-      {icon && (
-        <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token'>
-          {icon}
-        </span>
-      )}
-      <span className='flex-1 truncate text-left'>{label}</span>
-      {count !== undefined && (
-        <span className='text-[10px] tabular-nums text-tertiary-token'>
-          {count}
-        </span>
-      )}
+      <ToolbarMenuRow
+        leadingVisual={
+          icon ? (
+            <span
+              className={cn(
+                checked ? 'text-primary-token' : 'text-tertiary-token'
+              )}
+            >
+              {icon}
+            </span>
+          ) : null
+        }
+        label={label}
+        trailingVisual={trailingVisual}
+      />
     </button>
   );
 }

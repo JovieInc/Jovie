@@ -31,7 +31,7 @@ export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
 
 export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
-  'h-7.5 rounded-[10px] px-2.5 text-[11.5px] font-[540] text-tertiary-token [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-7.5 rounded-full border-transparent bg-transparent px-2.5 text-[11.5px] font-[540] text-tertiary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token hover:shadow-none focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0 active:shadow-none [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS =
@@ -39,11 +39,11 @@ export const PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS =
 
 export const PAGE_TOOLBAR_MENU_TRIGGER_CLASS = cn(
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-  'min-w-[112px] justify-between gap-1.5 px-3 text-secondary-token'
+  'min-w-[112px] justify-between gap-1.5 rounded-full px-3 text-secondary-token'
 );
 
 export const PAGE_TOOLBAR_ACTION_ACTIVE_CLASS =
-  'border-default bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,white_4%)] text-primary-token shadow-[0_1px_1px_rgba(0,0,0,0.04),0_6px_12px_-10px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.03)]';
+  'border-transparent bg-transparent text-primary-token shadow-none';
 
 export const PAGE_TOOLBAR_ICON_CLASS = 'h-3.5 w-3.5';
 export const PAGE_TOOLBAR_ICON_STROKE_WIDTH = 2;

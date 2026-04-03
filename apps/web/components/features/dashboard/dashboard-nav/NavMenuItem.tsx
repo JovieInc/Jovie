@@ -127,9 +127,9 @@ export function NavMenuItem({
       {/* Fixed-width icon container keeps sidebar glyphs optically quiet. */}
       <span
         data-sidebar-icon
-        className='flex size-3 shrink-0 items-center justify-center'
+        className='flex h-4 w-4 shrink-0 items-center justify-center'
       >
-        <item.icon className='size-3' aria-hidden='true' />
+        <item.icon className='h-4 w-4' strokeWidth={1.9} aria-hidden='true' />
       </span>
       <span className='truncate group-data-[collapsible=icon]:hidden'>
         {item.name}

@@ -7,15 +7,21 @@
  */
 
 export type {
+  LinearSurface,
+  LinearSurfaceTier,
+} from '@/components/tokens/linear-surface';
+export {
+  LINEAR_SURFACE,
+  LINEAR_SURFACE_TIER,
+} from '@/components/tokens/linear-surface';
+export type {
   CardBorder,
   CardPadding,
   CardRadius,
   CardShadow,
   CardStatus,
   CardVariant,
-  LinearSurface,
-  LinearSurfaceTier,
 } from './card-tokens';
-export { cardTokens, LINEAR_SURFACE, LINEAR_SURFACE_TIER } from './card-tokens';
+export { cardTokens } from './card-tokens';
 
 export { mobileReleaseTokens } from './mobile-tokens';

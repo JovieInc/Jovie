@@ -199,11 +199,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <Script
-          id='theme-init'
-          src='/theme-init.js'
-          strategy='beforeInteractive'
-        />
+        <Script src='/theme-init.js' strategy='beforeInteractive' />
       </head>
       <body className={bodyClassName}>
         {FlagBadgeProvider ? (

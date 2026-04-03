@@ -49,6 +49,61 @@ function ThemeKeyboardShortcut({ isEnabled }: { isEnabled: boolean }) {
   return null;
 }
 
+function SearchKeyboardShortcut() {
+  useEffect(() => {
+    function getVisibleSearchField() {
+      return Array.from(
+        document.querySelectorAll<HTMLInputElement>(
+          'input[data-app-search-field="true"]'
+        )
+      ).find(input => {
+        if (input.disabled || input.readOnly) return false;
+        return input.getClientRects().length > 0;
+      });
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key !== '/') return;
+      if (isFormElement(event.target)) return;
+
+      const searchField = getVisibleSearchField();
+
+      if (searchField) {
+        event.preventDefault();
+        searchField.focus();
+        searchField.select();
+        return;
+      }
+
+      const searchTrigger = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[data-app-search-trigger="true"]'
+        )
+      ).find(element => element.getClientRects().length > 0);
+
+      if (!searchTrigger) return;
+
+      event.preventDefault();
+      searchTrigger.click();
+
+      globalThis.requestAnimationFrame(() => {
+        const promotedSearchField = getVisibleSearchField();
+        promotedSearchField?.focus();
+        promotedSearchField?.select();
+      });
+    }
+
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => {
+      globalThis.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  return null;
+}
+
 // Lazy load non-critical providers to reduce initial bundle size
 // SSR enabled to allow page content to render server-side for SEO
 // Analytics components inside LazyProviders remain client-only
@@ -151,6 +206,7 @@ function CoreProvidersInner({
       disableTransitionOnChange
       storageKey='jovie-theme'
     >
+      <SearchKeyboardShortcut />
       <ThemeKeyboardShortcut isEnabled={themeEnabled} />
       <TooltipProvider delayDuration={1200}>
         <LazyProviders enableAnalytics={enableAnalytics}>
