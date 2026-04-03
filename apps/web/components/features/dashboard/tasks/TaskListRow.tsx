@@ -117,7 +117,9 @@ export function TaskListRow({
       <div className='min-w-0'>
         <p
           className={cn(
-            'truncate text-[12.75px] font-[590] leading-[17px] text-primary-token',
+            'truncate text-[12.75px] font-[590] leading-[17px] text-[color-mix(in_oklab,var(--text-primary)_84%,var(--text-secondary))]',
+            isSelected &&
+              'text-[color-mix(in_oklab,var(--text-primary)_92%,var(--text-secondary))]',
             isDone && 'text-secondary-token',
             isCancelled && 'text-tertiary-token'
           )}

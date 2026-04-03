@@ -16,6 +16,7 @@ import {
   FileText,
   MoreVertical,
   Plus,
+  Search,
 } from 'lucide-react';
 import {
   type ComponentPropsWithoutRef,
@@ -46,6 +47,7 @@ import {
   TOOLBAR_MENU_SEPARATOR_CLASS,
   ToolbarMenuChoiceItem,
 } from '@/components/molecules/menus/ToolbarMenuPrimitives';
+import { ReleaseDueBadge } from '@/components/molecules/ReleaseDueBadge';
 import { PageShell } from '@/components/organisms/PageShell';
 import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import {
@@ -56,6 +58,7 @@ import {
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import {
@@ -114,6 +117,53 @@ const NOOP_TASK_ASSIGNEE_UPDATE = (
   _taskId: string,
   _assigneeKind: TaskAssigneeKind
 ) => {};
+
+type MobileTaskScope = 'all' | 'open' | 'done';
+
+const MOBILE_TASK_SCOPE_OPTIONS = [
+  ['all', 'All'],
+  ['open', 'Open'],
+  ['done', 'Done'],
+] as const satisfies ReadonlyArray<readonly [MobileTaskScope, string]>;
+
+function compareTaskCompletionOrder(
+  left: Readonly<TaskView>,
+  right: Readonly<TaskView>
+): number {
+  const leftDone = left.status === 'done';
+  const rightDone = right.status === 'done';
+
+  if (leftDone === rightDone) {
+    return 0;
+  }
+
+  return leftDone ? 1 : -1;
+}
+
+function getMobileScopedTasks(
+  tasks: ReadonlyArray<TaskView>,
+  scope: MobileTaskScope
+): TaskView[] {
+  if (scope === 'open') {
+    return tasks.filter(task => task.status !== 'done');
+  }
+
+  if (scope === 'done') {
+    return tasks.filter(task => task.status === 'done');
+  }
+
+  return [...tasks];
+}
+
+function partitionTasksForMobile(tasks: ReadonlyArray<TaskView>): {
+  readonly activeTasks: TaskView[];
+  readonly completedTasks: TaskView[];
+} {
+  return {
+    activeTasks: tasks.filter(task => task.status !== 'done'),
+    completedTasks: tasks.filter(task => task.status === 'done'),
+  };
+}
 
 function resolveArtistName(
   profile: Readonly<{
@@ -282,7 +332,7 @@ const TaskMetaTrigger = forwardRef<
       type='button'
       aria-label={ariaLabel}
       className={cn(
-        '-mx-1 inline-flex min-w-0 items-center rounded-md px-1 py-1 text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token data-[state=open]:bg-surface-1 data-[state=open]:text-primary-token',
+        '-mx-1 inline-flex min-w-0 items-center rounded-full px-1.5 py-1 text-secondary-token transition-[background-color,color] duration-150 hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,transparent)] hover:text-primary-token data-[state=open]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,transparent)] data-[state=open]:text-primary-token',
         className
       )}
       {...props}
@@ -318,6 +368,7 @@ function TaskMetaMenuNumber({
       <DropdownMenuContent
         align='start'
         sideOffset={8}
+        data-menu-surface='toolbar'
         className={TOOLBAR_MENU_CONTENT_CLASS}
       >
         {task.releaseId ? (
@@ -423,9 +474,12 @@ function TaskDocumentPanel({
   const hasRelease = Boolean(task.releaseId && task.releaseTitle);
 
   return (
-    <div className='flex min-h-0 min-w-0 flex-1 flex-col px-2 pb-2 pr-2 pt-2'>
+    <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-2 pb-2 pr-2 pt-2'>
       <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
-        <div className='min-h-0 flex-1 overflow-y-auto'>
+        <div
+          className='min-h-0 flex-1 overflow-y-auto overscroll-contain'
+          data-testid='task-document-scroll-region'
+        >
           <div className='mx-auto flex w-full max-w-[40rem] flex-col gap-3 px-4 pb-5 pt-4 sm:px-5 sm:pb-6 sm:pt-5'>
             <TaskTitleEditor value={title} onChange={onTitleChange} />
 
@@ -450,6 +504,7 @@ function TaskDocumentPanel({
                 <DropdownMenuContent
                   align='start'
                   sideOffset={8}
+                  data-menu-surface='toolbar'
                   className={TOOLBAR_MENU_CONTENT_CLASS}
                 >
                   {TASK_STATUS_OPTIONS.map(([value, label]) => {
@@ -477,6 +532,7 @@ function TaskDocumentPanel({
                 <DropdownMenuContent
                   align='start'
                   sideOffset={8}
+                  data-menu-surface='toolbar'
                   className={TOOLBAR_MENU_CONTENT_CLASS}
                 >
                   {TASK_PRIORITY_OPTIONS.map(([value, label]) => {
@@ -508,6 +564,7 @@ function TaskDocumentPanel({
                 <DropdownMenuContent
                   align='start'
                   sideOffset={8}
+                  data-menu-surface='toolbar'
                   className={TOOLBAR_MENU_CONTENT_CLASS}
                 >
                   {TASK_ASSIGNEE_OPTIONS.map(([value, label]) => {
@@ -567,7 +624,7 @@ function TaskDocumentPanel({
               value={description}
               onChange={event => onDescriptionChange(event.target.value)}
               placeholder='Start writing...'
-              className='min-h-[520px] w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
+              className='min-h-[520px] w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-[1.8] text-[color-mix(in_oklab,var(--text-primary)_86%,var(--text-secondary))] outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
             />
           </div>
         </div>
@@ -678,11 +735,181 @@ function TaskEmptyState({
   );
 }
 
+function MobileTaskScopeTabs({
+  scope,
+  counts,
+  onChange,
+}: Readonly<{
+  scope: MobileTaskScope;
+  counts: Readonly<Record<MobileTaskScope, number>>;
+  onChange: (scope: MobileTaskScope) => void;
+}>) {
+  return (
+    <div className='px-3 pb-1 pt-2'>
+      <div className='inline-flex rounded-full bg-surface-1 p-1'>
+        {MOBILE_TASK_SCOPE_OPTIONS.map(([value, label]) => {
+          const isActive = scope === value;
+
+          return (
+            <button
+              key={value}
+              type='button'
+              onClick={() => onChange(value)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-[560] transition-[background-color,color] duration-150',
+                isActive
+                  ? 'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,transparent)] text-primary-token shadow-[0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)]'
+                  : 'text-secondary-token hover:text-primary-token'
+              )}
+            >
+              <span>{label}</span>
+              <span className='text-[10px] text-tertiary-token'>
+                {counts[value]}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MobileTaskSection({
+  title,
+  tasks,
+  selectedTaskId,
+  artistName,
+  onOpenTask,
+  onOpenRelease,
+}: Readonly<{
+  title: string;
+  tasks: ReadonlyArray<TaskView>;
+  selectedTaskId: string | null;
+  artistName?: string | null;
+  onOpenTask: (task: TaskView) => void;
+  onOpenRelease: (task: TaskView) => void;
+}>) {
+  if (tasks.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className='px-3 pb-4'>
+      <div className='mb-2 flex items-center justify-between px-1'>
+        <h2 className='text-[11px] font-[560] text-tertiary-token'>{title}</h2>
+        <span className='text-[10px] text-tertiary-token'>{tasks.length}</span>
+      </div>
+      <div className='overflow-hidden rounded-[18px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_65%,transparent)]'>
+        {tasks.map(task => (
+          <MobileTaskListItem
+            key={task.id}
+            task={task}
+            artistName={artistName}
+            onOpenTask={onOpenTask}
+            onOpenRelease={onOpenRelease}
+            isSelected={task.id === selectedTaskId}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MobileTaskListItem({
+  task,
+  artistName,
+  onOpenTask,
+  onOpenRelease,
+  isSelected,
+}: Readonly<{
+  task: TaskView;
+  artistName?: string | null;
+  onOpenTask: (task: TaskView) => void;
+  onOpenRelease: (task: TaskView) => void;
+  isSelected: boolean;
+}>) {
+  const stage = getTaskStageVisual(task.status, task.agentStatus);
+  const priority = getTaskPriorityVisual(task.priority);
+  const assignee = getTaskAssigneeVisual(task.assigneeKind, artistName);
+  const accent = getAccentCssVars(stage.accent);
+  const priorityAccent = getAccentCssVars(priority.accent);
+  const StageIcon = stage.icon;
+
+  return (
+    <button
+      type='button'
+      onClick={() => onOpenTask(task)}
+      data-testid='mobile-task-row'
+      className={cn(
+        'flex w-full items-start gap-3 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_58%,transparent)] px-4 py-3 text-left transition-[background-color,color] duration-150 last:border-b-0',
+        isSelected
+          ? 'bg-[color-mix(in_oklab,var(--linear-row-hover)_68%,var(--linear-app-content-surface))]'
+          : 'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_56%,transparent)]'
+      )}
+    >
+      <span
+        className='mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center'
+        style={{ color: accent.solid }}
+      >
+        <StageIcon
+          className={cn(
+            'h-3.5 w-3.5',
+            task.status === 'done' && 'fill-current'
+          )}
+        />
+      </span>
+
+      <span className='min-w-0 flex-1'>
+        <span className='block truncate text-[14px] font-[560] leading-[1.25] text-primary-token'>
+          {task.title}
+        </span>
+        <span className='mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-secondary-token'>
+          <span className='truncate'>{stage.label}</span>
+          <span className='text-tertiary-token'>J-{task.taskNumber}</span>
+          <span className='inline-flex items-center gap-1'>
+            <span
+              className='h-1.5 w-1.5 rounded-full'
+              style={{ backgroundColor: priorityAccent.solid }}
+              aria-hidden='true'
+            />
+            <span>{priority.label}</span>
+          </span>
+          <span className='truncate'>{assignee.label}</span>
+        </span>
+        {task.releaseTitle ? (
+          <span className='mt-1.5 flex min-w-0 items-center gap-1.5 text-[10.5px] text-tertiary-token'>
+            <Disc3 className='h-3 w-3 shrink-0' />
+            <span className='min-w-0 truncate'>{task.releaseTitle}</span>
+          </span>
+        ) : null}
+      </span>
+
+      <span className='mt-0.5 flex shrink-0 flex-col items-end gap-1'>
+        {task.dueAt ? (
+          <ReleaseDueBadge
+            dueDate={task.dueAt}
+            dueDaysOffset={null}
+            isCompleted={task.status === 'done'}
+          />
+        ) : null}
+        {task.releaseTitle ? (
+          <span className='text-[10px] font-[560] text-tertiary-token'>
+            Release
+          </span>
+        ) : null}
+      </span>
+    </button>
+  );
+}
+
 export function TasksPageClient() {
   const { selectedProfile } = useDashboardData();
   const { setHeaderActions } = useSetHeaderActions();
   const isXlUp = useBreakpoint('xl');
   const is2xlUp = useBreakpoint('2xl');
+  const canShowTaskDocumentAlongsideReleaseSidebar = useMediaQuery(
+    '(min-width: 1720px)'
+  );
   const [headerMode, setHeaderMode] = useState<'default' | 'search' | 'create'>(
     'default'
   );
@@ -694,6 +921,7 @@ export function TasksPageClient() {
   const [assigneeFilter, setAssigneeFilter] = useState<
     TaskAssigneeKind | 'all'
   >('all');
+  const [mobileScope, setMobileScope] = useState<MobileTaskScope>('all');
   const [draftTitle, setDraftTitle] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(
@@ -723,20 +951,30 @@ export function TasksPageClient() {
     profileId,
     filters
   );
-  const tasks = useMemo(() => data?.tasks ?? [], [data?.tasks]);
+  const tasks = useMemo(() => {
+    const nextTasks = data?.tasks ?? [];
+    return [...nextTasks].sort(compareTaskCompletionOrder);
+  }, [data?.tasks]);
+  const mobileScopedTasks = useMemo(
+    () => getMobileScopedTasks(tasks, mobileScope),
+    [mobileScope, tasks]
+  );
+  const visibleTasks = isXlUp ? tasks : mobileScopedTasks;
   const effectiveSelectedTaskId =
-    selectedTaskId ?? (isXlUp ? (tasks[0]?.id ?? null) : null);
+    selectedTaskId ?? (isXlUp ? (visibleTasks[0]?.id ?? null) : null);
   const { data: selectedTaskData } = useTaskQuery(
     effectiveSelectedTaskId,
     profileId
   );
   const selectedTask =
     selectedTaskData ??
+    visibleTasks.find(task => task.id === effectiveSelectedTaskId) ??
     tasks.find(task => task.id === effectiveSelectedTaskId) ??
     null;
   const selectedRelease =
     releases.find(release => release.id === selectedReleaseId) ?? null;
-  const shouldPrioritizeRightPanel = Boolean(selectedRelease) && !is2xlUp;
+  const shouldPrioritizeRightPanel =
+    Boolean(selectedRelease) && !canShowTaskDocumentAlongsideReleaseSidebar;
   const artistName = resolveArtistName(selectedProfile);
   const hasFilters =
     Boolean(deferredSearch.trim()) ||
@@ -755,11 +993,23 @@ export function TasksPageClient() {
   }, []);
   const showTaskWorkbenchEmptyState = !isLoading && tasks.length === 0;
   const selectedTaskIndex = effectiveSelectedTaskId
-    ? tasks.findIndex(task => task.id === effectiveSelectedTaskId)
+    ? visibleTasks.findIndex(task => task.id === effectiveSelectedTaskId)
     : -1;
   const canSelectPrevious = selectedTaskIndex > 0;
   const canSelectNext =
-    selectedTaskIndex !== -1 && selectedTaskIndex < tasks.length - 1;
+    selectedTaskIndex !== -1 && selectedTaskIndex < visibleTasks.length - 1;
+  const mobileScopeCounts = useMemo(
+    () => ({
+      all: tasks.length,
+      open: tasks.filter(task => task.status !== 'done').length,
+      done: tasks.filter(task => task.status === 'done').length,
+    }),
+    [tasks]
+  );
+  const mobileTaskSections = useMemo(
+    () => partitionTasksForMobile(mobileScopedTasks),
+    [mobileScopedTasks]
+  );
 
   const taskFilterCategories = useMemo(
     () => [
@@ -868,26 +1118,28 @@ export function TasksPageClient() {
       return;
     }
 
-    const hasVisibleSelection = tasks.some(task => task.id === selectedTaskId);
+    const hasVisibleSelection = visibleTasks.some(
+      task => task.id === selectedTaskId
+    );
     if (!hasVisibleSelection) {
       if (!isXlUp && selectedTaskId === null) {
         return;
       }
 
-      setSelectedTaskId(tasks[0]?.id ?? null);
+      setSelectedTaskId(visibleTasks[0]?.id ?? null);
     }
-  }, [isLoading, isXlUp, selectedTaskId, tasks]);
+  }, [isLoading, isXlUp, selectedTaskId, tasks, visibleTasks]);
 
   const selectTaskByIndex = useCallback(
     (index: number) => {
-      const nextTask = tasks[index];
+      const nextTask = visibleTasks[index];
       if (!nextTask) {
         return;
       }
 
       openTaskDocument(nextTask);
     },
-    [openTaskDocument, tasks]
+    [openTaskDocument, visibleTasks]
   );
 
   const selectPreviousTask = useCallback(() => {
@@ -1210,34 +1462,36 @@ export function TasksPageClient() {
         )}
         data-testid='tasks-content-panel'
       >
-        <TaskWorkspaceHeaderBar
-          mode={headerMode}
-          search={search}
-          draftTitle={draftTitle}
-          taskCount={tasks.length}
-          onSearchChange={value => {
-            setSearch(value);
-            if (headerMode === 'default') {
-              setHeaderMode('search');
-            }
-          }}
-          onDraftTitleChange={setDraftTitle}
-          onEnterSearch={() => setHeaderMode('search')}
-          onExitSearch={() => setHeaderMode('default')}
-          onCancelCreate={() => {
-            setDraftTitle('');
-            setHeaderMode('default');
-          }}
-          onSubmitCreate={handleCreateTask}
-          createPending={createTaskMutation.isPending}
-          filterCategories={taskFilterCategories}
-          onClearFilters={clearFilters}
-          showTaskNavigation={isXlUp && Boolean(selectedTask)}
-          canSelectPrevious={canSelectPrevious}
-          canSelectNext={canSelectNext}
-          onSelectPrevious={selectPreviousTask}
-          onSelectNext={selectNextTask}
-        />
+        {isXlUp || headerMode !== 'default' ? (
+          <TaskWorkspaceHeaderBar
+            mode={headerMode}
+            search={search}
+            draftTitle={draftTitle}
+            taskCount={visibleTasks.length}
+            onSearchChange={value => {
+              setSearch(value);
+              if (headerMode === 'default') {
+                setHeaderMode('search');
+              }
+            }}
+            onDraftTitleChange={setDraftTitle}
+            onEnterSearch={() => setHeaderMode('search')}
+            onExitSearch={() => setHeaderMode('default')}
+            onCancelCreate={() => {
+              setDraftTitle('');
+              setHeaderMode('default');
+            }}
+            onSubmitCreate={handleCreateTask}
+            createPending={createTaskMutation.isPending}
+            filterCategories={taskFilterCategories}
+            onClearFilters={clearFilters}
+            showTaskNavigation={isXlUp && Boolean(selectedTask)}
+            canSelectPrevious={canSelectPrevious}
+            canSelectNext={canSelectNext}
+            onSelectPrevious={selectPreviousTask}
+            onSelectNext={selectNextTask}
+          />
+        ) : null}
 
         {isError ? (
           <div className='flex min-h-[240px] flex-1 flex-col items-center justify-center gap-3 px-6 text-center'>
@@ -1259,13 +1513,14 @@ export function TasksPageClient() {
             </Button>
           </div>
         ) : (
-          <div className='flex min-h-0 flex-1'>
+          <div className='flex min-h-0 flex-1 overflow-hidden p-3'>
             <div
+              data-testid='task-list-pane'
               className={cn(
-                'min-h-0 min-w-0 shrink-0',
+                'min-h-0 min-w-0 shrink-0 overflow-hidden',
                 'xl:w-[31rem] 2xl:w-[33rem] min-[1800px]:w-[35rem] xl:border-r xl:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]',
                 showTaskListPane ? 'block' : 'hidden',
-                !selectedTask && 'flex-1'
+                (!selectedTask || !showTaskDocumentPane) && 'flex-1'
               )}
             >
               {showTaskWorkbenchEmptyState ? (
@@ -1278,9 +1533,9 @@ export function TasksPageClient() {
                     />
                   </div>
                 </div>
-              ) : (
+              ) : isXlUp ? (
                 <UnifiedTable
-                  data={tasks}
+                  data={visibleTasks}
                   columns={columns}
                   isLoading={isLoading}
                   getRowId={row => row.id}
@@ -1289,7 +1544,7 @@ export function TasksPageClient() {
                   rowHeight={64}
                   skeletonRows={8}
                   className='text-[13px]'
-                  containerClassName='h-full overflow-x-hidden pl-1.5 pr-3 pb-2 pt-0.5'
+                  containerClassName='h-full overflow-y-auto overflow-x-hidden pl-1.5 pr-3 pb-2 pt-0.5'
                   onRowClick={row => openTaskDocument(row)}
                   getContextMenuItems={getTaskContextMenuItems}
                   getRowClassName={_row =>
@@ -1305,11 +1560,83 @@ export function TasksPageClient() {
                     />
                   }
                 />
+              ) : (
+                <div
+                  className='flex h-full min-h-0 flex-col overflow-hidden'
+                  data-testid='mobile-task-list'
+                >
+                  <div className='flex items-center justify-between px-4 pb-1 pt-3'>
+                    <div>
+                      <h1 className='text-[1.9rem] font-[620] tracking-[-0.05em] text-primary-token'>
+                        My Tasks
+                      </h1>
+                      <p className='mt-1 text-[12px] text-secondary-token'>
+                        {mobileScopeCounts.all} total tasks
+                      </p>
+                    </div>
+                    <button
+                      type='button'
+                      onClick={() =>
+                        setHeaderMode(current =>
+                          current === 'search' ? 'default' : 'search'
+                        )
+                      }
+                      aria-label='Search tasks'
+                      className='inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-1 text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token'
+                    >
+                      <Search className='h-4 w-4' />
+                    </button>
+                  </div>
+                  <MobileTaskScopeTabs
+                    scope={mobileScope}
+                    counts={mobileScopeCounts}
+                    onChange={setMobileScope}
+                  />
+                  <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6'>
+                    {mobileScopedTasks.length === 0 ? (
+                      <div className='px-4 pt-6'>
+                        <TaskEmptyState
+                          hasFilters={hasFilters}
+                          onClearFilters={clearFilters}
+                          onOpenComposer={() => setHeaderMode('create')}
+                        />
+                      </div>
+                    ) : mobileScope === 'all' ? (
+                      <>
+                        <MobileTaskSection
+                          title='Open'
+                          tasks={mobileTaskSections.activeTasks}
+                          selectedTaskId={selectedTaskId}
+                          artistName={artistName}
+                          onOpenTask={openTaskDocument}
+                          onOpenRelease={openReleaseSidebar}
+                        />
+                        <MobileTaskSection
+                          title='Done'
+                          tasks={mobileTaskSections.completedTasks}
+                          selectedTaskId={selectedTaskId}
+                          artistName={artistName}
+                          onOpenTask={openTaskDocument}
+                          onOpenRelease={openReleaseSidebar}
+                        />
+                      </>
+                    ) : (
+                      <MobileTaskSection
+                        title={mobileScope === 'open' ? 'Open' : 'Done'}
+                        tasks={mobileScopedTasks}
+                        selectedTaskId={selectedTaskId}
+                        artistName={artistName}
+                        onOpenTask={openTaskDocument}
+                        onOpenRelease={openReleaseSidebar}
+                      />
+                    )}
+                  </div>
+                </div>
               )}
             </div>
             <div
               className={cn(
-                'min-h-0 min-w-0 flex-1',
+                'min-h-0 min-w-0 flex-1 overflow-hidden',
                 showTaskDocumentPane ? 'flex' : 'hidden'
               )}
               data-testid='task-document-pane'

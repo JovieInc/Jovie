@@ -117,28 +117,6 @@ export function TaskWorkspaceHeaderBar({
           </>
         ) : (
           <>
-            {showTaskNavigation ? (
-              <div className='flex items-center gap-0.5'>
-                <AppIconButton
-                  ariaLabel='Previous task'
-                  onClick={onSelectPrevious}
-                  tooltipLabel='Previous task'
-                  disabled={!canSelectPrevious}
-                  className='rounded-full border-transparent bg-transparent text-tertiary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0 disabled:opacity-35'
-                >
-                  <ArrowUp className='h-3.5 w-3.5' />
-                </AppIconButton>
-                <AppIconButton
-                  ariaLabel='Next task'
-                  onClick={onSelectNext}
-                  tooltipLabel='Next task'
-                  disabled={!canSelectNext}
-                  className='rounded-full border-transparent bg-transparent text-tertiary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0 disabled:opacity-35'
-                >
-                  <ArrowDown className='h-3.5 w-3.5' />
-                </AppIconButton>
-              </div>
-            ) : null}
             {mode === 'search' ? (
               <DashboardHeaderActionButton
                 ariaLabel='Close search'
@@ -165,8 +143,32 @@ export function TaskWorkspaceHeaderBar({
                 onClearAll={onClearFilters}
                 iconOnly
                 align='end'
+                headerLabel='Filter Tasks'
+                shortcutHint='S'
               />
             </div>
+            {showTaskNavigation ? (
+              <div className='flex items-center gap-0.5'>
+                <AppIconButton
+                  ariaLabel='Previous task'
+                  onClick={onSelectPrevious}
+                  tooltipLabel='Previous task'
+                  disabled={!canSelectPrevious}
+                  className='rounded-full border-transparent bg-transparent text-tertiary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0 disabled:opacity-35'
+                >
+                  <ArrowUp className='h-3.5 w-3.5' />
+                </AppIconButton>
+                <AppIconButton
+                  ariaLabel='Next task'
+                  onClick={onSelectNext}
+                  tooltipLabel='Next task'
+                  disabled={!canSelectNext}
+                  className='rounded-full border-transparent bg-transparent text-tertiary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0 disabled:opacity-35'
+                >
+                  <ArrowDown className='h-3.5 w-3.5' />
+                </AppIconButton>
+              </div>
+            ) : null}
           </>
         )}
       </div>

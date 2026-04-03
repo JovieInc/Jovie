@@ -9,13 +9,6 @@ interface ReleaseDueBadgeProps {
   readonly onSetDate?: () => void;
 }
 
-function formatOverdue(absDays: number): string {
-  if (absDays <= 6) return `${absDays}d overdue`;
-  if (absDays < 30) return `${Math.round(absDays / 7)}w overdue`;
-  if (absDays <= 364) return `${Math.round(absDays / 30)}mo overdue`;
-  return `${Math.round(absDays / 365)}y overdue`;
-}
-
 function formatRelativeDue(dueDate: Date): {
   label: string;
   variant: 'future' | 'soon' | 'overdue' | 'stale' | 'today';
@@ -27,7 +20,7 @@ function formatRelativeDue(dueDate: Date): {
   if (diffDays < 0) {
     const absDays = Math.abs(diffDays);
     return {
-      label: formatOverdue(absDays),
+      label: 'Overdue',
       variant: absDays > 90 ? 'stale' : 'overdue',
     };
   }

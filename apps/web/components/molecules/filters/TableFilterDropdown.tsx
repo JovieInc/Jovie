@@ -17,6 +17,8 @@ import { Icon } from '@/components/atoms/Icon';
 import { DropdownEmptyState } from '@/components/molecules/DropdownEmptyState';
 import {
   TOOLBAR_MENU_CONTENT_CLASS,
+  TOOLBAR_MENU_HEADER_BADGE_CLASS,
+  TOOLBAR_MENU_HEADER_CLASS,
   TOOLBAR_MENU_ITEM_CLASS,
   TOOLBAR_MENU_SEPARATOR_CLASS,
   TOOLBAR_MENU_SUB_TRIGGER_CLASS,
@@ -59,12 +61,18 @@ export interface TableFilterDropdownProps<T extends string = string> {
   readonly emptyMessage?: string;
   readonly onClearAll?: () => void;
   readonly align?: 'start' | 'end';
+  readonly headerLabel?: string;
+  readonly shortcutHint?: string;
 }
 
 function TableFilterSection<T extends string>({
   category,
+  headerLabel,
+  shortcutHint,
 }: Readonly<{
   category: TableFilterDropdownCategory<T>;
+  headerLabel?: string;
+  shortcutHint?: string;
 }>) {
   const [search, setSearch] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
@@ -79,17 +87,31 @@ function TableFilterSection<T extends string>({
 
   return (
     <div className='flex max-h-[320px] min-h-[220px] min-w-[260px] flex-col overflow-hidden'>
-      <div className='border-b border-(--linear-app-frame-seam) p-2'>
-        <FilterSearchInput
-          value={search}
-          onChange={setSearch}
-          onClear={() => setSearch('')}
-          placeholder={category.searchPlaceholder ?? `Search ${category.label}`}
-          inputRef={searchRef}
-        />
+      <div data-menu-header>
+        <div className={TOOLBAR_MENU_HEADER_CLASS}>
+          <span className='truncate text-[11px] font-[600] text-tertiary-token'>
+            {headerLabel ?? category.label}
+          </span>
+          {shortcutHint ? (
+            <span className={TOOLBAR_MENU_HEADER_BADGE_CLASS}>
+              {shortcutHint}
+            </span>
+          ) : null}
+        </div>
+        <div className='px-2.5 pb-2 pt-1.5'>
+          <FilterSearchInput
+            value={search}
+            onChange={setSearch}
+            onClear={() => setSearch('')}
+            placeholder={
+              category.searchPlaceholder ?? `Search ${category.label}`
+            }
+            inputRef={searchRef}
+          />
+        </div>
       </div>
 
-      <div className='flex-1 overflow-y-auto p-1.5'>
+      <div className='flex-1 overflow-y-auto px-1 pb-1'>
         {filteredOptions.length === 0 ? (
           <DropdownEmptyState message='No options found' />
         ) : (
@@ -124,8 +146,12 @@ function TableFilterSection<T extends string>({
 
 function TableFilterSubmenu<T extends string>({
   category,
+  headerLabel,
+  shortcutHint,
 }: Readonly<{
   category: TableFilterDropdownCategory<T>;
+  headerLabel?: string;
+  shortcutHint?: string;
 }>) {
   return (
     <DropdownMenuSub>
@@ -152,9 +178,14 @@ function TableFilterSubmenu<T extends string>({
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent
         sideOffset={8}
+        data-menu-surface='toolbar'
         className={cn(TOOLBAR_MENU_CONTENT_CLASS, 'p-0')}
       >
-        <TableFilterSection category={category} />
+        <TableFilterSection
+          category={category}
+          headerLabel={headerLabel}
+          shortcutHint={shortcutHint}
+        />
       </DropdownMenuSubContent>
     </DropdownMenuSub>
   );
@@ -167,6 +198,8 @@ export function TableFilterDropdown<T extends string = string>({
   emptyMessage = 'No filters found',
   onClearAll,
   align = 'end',
+  headerLabel,
+  shortcutHint = 'S',
 }: Readonly<TableFilterDropdownProps<T>>) {
   const [isOpen, setIsOpen] = useState(false);
   const hasAnyFilter = categories.some(category => category.selectedIds.length);
@@ -207,6 +240,7 @@ export function TableFilterDropdown<T extends string = string>({
       <DropdownMenuContent
         align={align}
         sideOffset={4}
+        data-menu-surface='toolbar'
         className={cn(
           TOOLBAR_MENU_CONTENT_CLASS,
           'flex min-w-[240px] max-w-[calc(100vw-16px)] flex-col'
@@ -217,7 +251,12 @@ export function TableFilterDropdown<T extends string = string>({
           <DropdownEmptyState message={emptyMessage} />
         ) : (
           categories.map(category => (
-            <TableFilterSubmenu key={category.id} category={category} />
+            <TableFilterSubmenu
+              key={category.id}
+              category={category}
+              headerLabel={headerLabel}
+              shortcutHint={shortcutHint}
+            />
           ))
         )}
 
