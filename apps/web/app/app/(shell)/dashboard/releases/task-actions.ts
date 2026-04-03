@@ -228,6 +228,13 @@ export async function getReleaseTasks(
   );
 }
 
+function resolveAssigneeKind(
+  assigneeType: 'human' | 'ai_workflow' | undefined
+): 'jovie' | 'human' | undefined {
+  if (assigneeType === undefined) return undefined;
+  return assigneeType === 'ai_workflow' ? 'jovie' : 'human';
+}
+
 export async function updateReleaseTask(
   taskId: string,
   data: {
@@ -242,12 +249,7 @@ export async function updateReleaseTask(
   await updateTask(taskId, {
     status: data.status,
     priority: data.priority,
-    assigneeKind:
-      data.assigneeType === undefined
-        ? undefined
-        : data.assigneeType === 'ai_workflow'
-          ? 'jovie'
-          : 'human',
+    assigneeKind: resolveAssigneeKind(data.assigneeType),
     title: data.title,
     description: data.description,
     dueAt: data.dueDate,

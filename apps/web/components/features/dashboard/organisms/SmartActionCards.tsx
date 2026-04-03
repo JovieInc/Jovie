@@ -123,21 +123,27 @@ export const SmartActionCards = memo(function SmartActionCards({
         ? `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#tips`
         : monetizationSummary.manageHref;
 
-    const tipsHeading =
-      monetizationSummary.paymentState === 'needs_profile_url'
-        ? 'Finish Profile URL'
-        : monetizationSummary.paymentState === 'setup_incomplete'
-          ? 'Finish Payments Setup'
-          : monetizationSummary.manageHref === APP_ROUTES.SETTINGS_PAYMENTS
-            ? 'Set Up Payments'
-            : 'Set Up Tips';
+    let tipsHeading: string;
+    if (monetizationSummary.paymentState === 'needs_profile_url') {
+      tipsHeading = 'Finish Profile URL';
+    } else if (monetizationSummary.paymentState === 'setup_incomplete') {
+      tipsHeading = 'Finish Payments Setup';
+    } else if (
+      monetizationSummary.manageHref === APP_ROUTES.SETTINGS_PAYMENTS
+    ) {
+      tipsHeading = 'Set Up Payments';
+    } else {
+      tipsHeading = 'Set Up Tips';
+    }
 
-    const tipsSubtext =
-      monetizationSummary.paymentState === 'needs_profile_url'
-        ? 'Tip links and QR codes need a public profile handle'
-        : monetizationSummary.paymentState === 'setup_incomplete'
-          ? 'Complete payouts to turn tips on'
-          : 'Let fans support you directly from your profile';
+    let tipsSubtext: string;
+    if (monetizationSummary.paymentState === 'needs_profile_url') {
+      tipsSubtext = 'Tip links and QR codes need a public profile handle';
+    } else if (monetizationSummary.paymentState === 'setup_incomplete') {
+      tipsSubtext = 'Complete payouts to turn tips on';
+    } else {
+      tipsSubtext = 'Let fans support you directly from your profile';
+    }
 
     cards.push(
       <ActionCard
