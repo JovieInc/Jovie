@@ -11,6 +11,9 @@ export function TaskDescriptionHelper({
   helper,
   onBeginEditing,
 }: TaskDescriptionHelperProps) {
+  const introKeyCounts = new Map<string, number>();
+  const bulletKeyCounts = new Map<string, number>();
+
   return (
     <div className='absolute inset-0 min-h-[520px]'>
       <button
@@ -25,21 +28,29 @@ export function TaskDescriptionHelper({
           <h3 className='text-[13px] font-[600] text-primary-token'>
             {helper.title}
           </h3>
-          {helper.intro.map(paragraph => (
-            <p
-              key={paragraph}
-              className='text-[13px] leading-6 text-secondary-token'
-            >
-              {paragraph}
-            </p>
-          ))}
+          {helper.intro.map(paragraph => {
+            const occurrence = introKeyCounts.get(paragraph) ?? 0;
+            introKeyCounts.set(paragraph, occurrence + 1);
+
+            return (
+              <p
+                key={`intro-${paragraph}-${occurrence}`}
+                className='text-[13px] leading-6 text-secondary-token'
+              >
+                {paragraph}
+              </p>
+            );
+          })}
         </div>
 
         {helper.bullets && helper.bullets.length > 0 ? (
           <ul className='space-y-1.5 pl-4 text-[13px] leading-6 text-secondary-token marker:text-tertiary-token'>
-            {helper.bullets.map(bullet => (
-              <li key={bullet}>{bullet}</li>
-            ))}
+            {helper.bullets.map(bullet => {
+              const occurrence = bulletKeyCounts.get(bullet) ?? 0;
+              bulletKeyCounts.set(bullet, occurrence + 1);
+
+              return <li key={`bullet-${bullet}-${occurrence}`}>{bullet}</li>;
+            })}
           </ul>
         ) : null}
 
