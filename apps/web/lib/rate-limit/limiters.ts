@@ -551,6 +551,17 @@ export const appleMusicSearchLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for MusicBrainz lookups.
+ * Limit: 1 request per second across the configured backend.
+ */
+export const musicBrainzLookupLimiter = createRateLimiter(
+  RATE_LIMITERS.musicBrainzLookup,
+  {
+    requireRedis: process.env.NODE_ENV === 'production',
+  }
+);
+
+/**
  * Rate limiter for DSP artist discovery
  * Limit: 10 discoveries per minute per user
  * Protects 3rd-party platform APIs (Apple Music, Deezer, MusicBrainz)
@@ -880,6 +891,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     aiChat: aiChatLimiter,
     bandsintownSync: bandsintownSyncLimiter,
     appleMusicSearch: appleMusicSearchLimiter,
+    musicBrainzLookup: musicBrainzLookupLimiter,
     appleMusicRescanFree: _appleMusicRescanFreeLimiter,
     appleMusicRescanPaid: _appleMusicRescanPaidLimiter,
     releaseRefreshFree: _releaseRefreshFreeLimiter,
