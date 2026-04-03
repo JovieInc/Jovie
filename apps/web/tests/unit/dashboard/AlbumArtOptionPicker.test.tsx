@@ -51,4 +51,22 @@ describe('AlbumArtOptionPicker', () => {
       screen.getByRole('button', { name: 'Use Series Template' })
     ).toBeInTheDocument();
   });
+
+  it('shows the brand kit selector even when no template is preselected', () => {
+    render(
+      <AlbumArtOptionPicker
+        {...baseProps}
+        onUseSeriesTemplate={vi.fn()}
+        brandKitOptions={[
+          { id: 'brand-kit-default', name: 'Armada', isDefault: false },
+          { id: 'brand-kit-alt', name: 'Spinnin', isDefault: false },
+        ]}
+        selectedBrandKitId={null}
+        onSelectBrandKit={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Series Template')).toBeInTheDocument();
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
+  });
 });

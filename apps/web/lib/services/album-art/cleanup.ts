@@ -1,5 +1,5 @@
 import { del } from '@vercel/blob';
-import { and, eq, lt, ne } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, lt, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { albumArtGenerationSessions } from '@/lib/db/schema/album-art';
 import { env } from '@/lib/env-server';
@@ -47,7 +47,13 @@ async function deleteAlbumArtBlobs(urls: string[]): Promise<number> {
 
   const token = env.BLOB_READ_WRITE_TOKEN;
   if (!token) {
-    return 0;
+    logger.error(
+      '[album-art-cleanup] Missing blob token for album art cleanup',
+      {
+        urlCount: urls.length,
+      }
+    );
+    return -1;
   }
 
   try {
@@ -77,7 +83,8 @@ export async function cleanupExpiredAlbumArtSessions(): Promise<{
     .where(
       and(
         lt(albumArtGenerationSessions.expiresAt, now),
-        ne(albumArtGenerationSessions.status, 'applied')
+        ne(albumArtGenerationSessions.status, 'applied'),
+        drizzleSql`coalesce(${albumArtGenerationSessions.payloadJson} ->> 'cleanupCompletedAt', '') = ''`
       )
     )) as CleanupCandidate[];
 
@@ -85,24 +92,33 @@ export async function cleanupExpiredAlbumArtSessions(): Promise<{
     return { expiredSessions: 0, blobsDeleted: 0 };
   }
 
+  let expiredSessions = 0;
   let blobsDeleted = 0;
 
   for (const candidate of candidates) {
     const cleanupCompletedAt = candidate.payloadJson.cleanupCompletedAt;
-    const shouldDeleteBlobs =
-      typeof cleanupCompletedAt !== 'string' || cleanupCompletedAt.length === 0;
+    const alreadyCleaned =
+      typeof cleanupCompletedAt === 'string' && cleanupCompletedAt.length > 0;
+    if (alreadyCleaned) {
+      continue;
+    }
+
     let nextCleanupCompletedAt =
       typeof cleanupCompletedAt === 'string' ? cleanupCompletedAt : undefined;
 
-    if (shouldDeleteBlobs) {
-      const urls = collectAlbumArtBlobUrls(candidate.payloadJson);
-      const deleted = await deleteAlbumArtBlobs(urls);
-      if (deleted > 0) {
-        blobsDeleted += deleted;
-      }
-      if (deleted >= 0) {
-        nextCleanupCompletedAt = now.toISOString();
-      }
+    const urls = collectAlbumArtBlobUrls(candidate.payloadJson);
+    const deleted = await deleteAlbumArtBlobs(urls);
+    if (deleted > 0) {
+      blobsDeleted += deleted;
+    }
+    if (deleted >= 0) {
+      nextCleanupCompletedAt = now.toISOString();
+    }
+
+    const shouldMarkExpired = candidate.status !== 'expired';
+    const shouldPersistCleanupCompletion = Boolean(nextCleanupCompletedAt);
+    if (!shouldMarkExpired && !shouldPersistCleanupCompletion) {
+      continue;
     }
 
     await db
@@ -120,17 +136,22 @@ export async function cleanupExpiredAlbumArtSessions(): Promise<{
       .where(
         and(
           eq(albumArtGenerationSessions.id, candidate.id),
-          ne(albumArtGenerationSessions.status, 'applied')
+          ne(albumArtGenerationSessions.status, 'applied'),
+          drizzleSql`coalesce(${albumArtGenerationSessions.payloadJson} ->> 'cleanupCompletedAt', '') = ''`
         )
       );
+
+    if (shouldMarkExpired) {
+      expiredSessions += 1;
+    }
   }
 
   logger.info(
-    `[album-art-cleanup] Expired ${candidates.length} sessions and deleted ${blobsDeleted} blobs`
+    `[album-art-cleanup] Expired ${expiredSessions} sessions and deleted ${blobsDeleted} blobs`
   );
 
   return {
-    expiredSessions: candidates.length,
+    expiredSessions,
     blobsDeleted,
   };
 }

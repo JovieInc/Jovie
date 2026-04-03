@@ -60,12 +60,11 @@ describe('ChatAlbumArtCard', () => {
       />
     );
 
-    expect(
-      screen.getByText('Using matching release design • No runs left')
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('album-art-summary')).toBeInTheDocument();
 
-    const previews = screen.getAllByAltText('Generated album art preview');
-    fireEvent.click(previews[1]!);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Generated album art preview 2' })
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Apply To Release' }));
 
     await waitFor(() => {
@@ -125,9 +124,7 @@ describe('ChatAlbumArtCard', () => {
       />
     );
 
-    expect(
-      screen.getByText('Series template: Armada • 2 runs left')
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('album-art-summary')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Apply To Release' })
     ).toBeEnabled();

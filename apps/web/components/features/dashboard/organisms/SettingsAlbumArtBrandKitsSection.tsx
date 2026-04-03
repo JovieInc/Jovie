@@ -144,12 +144,14 @@ export function SettingsAlbumArtBrandKitsSection({
       <div className='space-y-4 px-4 py-4 sm:px-5'>
         <div className='grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px_120px]'>
           <Input
+            aria-label='Series Name'
             value={name}
             onChange={event => setName(event.target.value)}
             placeholder='Series Name'
             className={INPUT_CLASS}
           />
           <select
+            aria-label='Logo Position'
             value={logoPosition}
             onChange={event =>
               setLogoPosition(
@@ -174,6 +176,7 @@ export function SettingsAlbumArtBrandKitsSection({
               min='0.2'
               max='1'
               step='0.05'
+              aria-label='Logo Opacity'
               value={logoOpacity}
               onChange={event => setLogoOpacity(Number(event.target.value))}
               className='w-full'

@@ -162,6 +162,13 @@
       "when": 1775166991358,
       "tag": "0022_magical_mathemanic",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1775243593825,
+      "tag": "0023_lazy_slyde",
+      "breakpoints": true
     }
   ]
 }

@@ -1,3 +1,4 @@
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
   index,
@@ -7,6 +8,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
@@ -39,10 +41,9 @@ export const artistBrandKits = pgTable(
   },
   table => ({
     profileIndex: index('artist_brand_kits_profile_id_idx').on(table.profileId),
-    defaultIndex: index('artist_brand_kits_profile_default_idx').on(
-      table.profileId,
-      table.isDefault
-    ),
+    defaultIndex: uniqueIndex('artist_brand_kits_profile_default_unique_idx')
+      .on(table.profileId)
+      .where(drizzleSql`${table.isDefault} = true`),
   })
 );
 
@@ -82,6 +83,9 @@ export const albumArtGenerationSessions = pgTable(
       table.profileId,
       table.status
     ),
+    cleanupIndex: index('album_art_sessions_cleanup_idx')
+      .on(table.expiresAt)
+      .where(drizzleSql`${table.status} <> 'applied'`),
   })
 );
 

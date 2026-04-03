@@ -652,6 +652,17 @@ export function ReleaseSidebar({
     );
   }, [release?.brandKitId, release?.defaultAlbumArtBrandKitId, release?.id]);
 
+  const currentReleaseIdRef = useRef<string | null>(release?.id ?? null);
+
+  useEffect(() => {
+    currentReleaseIdRef.current = release?.id ?? null;
+    setAlbumArtResult(null);
+    setSelectedAlbumArtOptionId(null);
+    setIsGeneratingAlbumArt(false);
+    setIsApplyingAlbumArt(false);
+    setLastAlbumArtMode('base');
+  }, [release?.id]);
+
   useEffect(() => {
     if (!release) {
       setArtistBrandKits([]);
@@ -689,6 +700,7 @@ export function ReleaseSidebar({
         return;
       }
 
+      const requestReleaseId = release.id;
       setIsGeneratingAlbumArt(true);
       try {
         const result =
@@ -701,6 +713,10 @@ export function ReleaseSidebar({
                 releaseId: release.id,
                 brandKitId: mode === 'series' ? selectedBrandKitId : null,
               });
+
+        if (currentReleaseIdRef.current !== requestReleaseId) {
+          return;
+        }
 
         setAlbumArtResult(result);
         setSelectedAlbumArtOptionId(result.options[0]?.id ?? null);

@@ -62,7 +62,6 @@ export function AlbumArtOptionPicker({
     !hasOptions &&
     Boolean(onUseSeriesTemplate) &&
     brandKitOptions.length > 1 &&
-    Boolean(selectedBrandKitId) &&
     Boolean(onSelectBrandKit);
   const selectedBrandKitName =
     brandKitOptions.find(option => option.id === selectedBrandKitId)?.name ??
@@ -136,11 +135,13 @@ export function AlbumArtOptionPicker({
       {hasOptions ? (
         <>
           <div className='mt-3 grid grid-cols-3 gap-2'>
-            {result?.options.map(option => (
+            {result?.options.map((option, index) => (
               <button
                 key={option.id}
                 type='button'
                 onClick={() => onSelectOption(option.id)}
+                aria-label={`Album art option ${index + 1}`}
+                aria-pressed={selectedOptionId === option.id}
                 className={cn(
                   'relative overflow-hidden rounded-[12px] border transition-colors',
                   selectedOptionId === option.id
@@ -148,6 +149,7 @@ export function AlbumArtOptionPicker({
                     : 'border-subtle hover:border-default'
                 )}
               >
+                <span className='sr-only'>{`Album art option ${index + 1}`}</span>
                 <div className='relative aspect-square w-full'>
                   <Image
                     src={option.previewUrl}

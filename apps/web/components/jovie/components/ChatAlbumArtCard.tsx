@@ -92,7 +92,10 @@ export function ChatAlbumArtCard({
         (brandKitName ||
           usedMatchingTemplate ||
           quotaRemaining !== undefined) ? (
-          <p className='mt-1 text-[11px] text-tertiary-token'>
+          <p
+            data-testid='album-art-summary'
+            className='mt-1 text-[11px] text-tertiary-token'
+          >
             {[
               usedMatchingTemplate ? 'Using matching release design' : null,
               brandKitName ? `Series template: ${brandKitName}` : null,
@@ -110,11 +113,12 @@ export function ChatAlbumArtCard({
       {state === 'success' && options?.length ? (
         <>
           <div className='grid grid-cols-3 gap-2 p-3'>
-            {options.map(option => (
+            {options.map((option, index) => (
               <button
                 key={option.id}
                 type='button'
                 onClick={() => setSelectedOptionId(option.id)}
+                aria-label={`Generated album art preview ${index + 1}`}
                 aria-pressed={selectedOptionId === option.id}
                 className={cn(
                   'relative aspect-square overflow-hidden rounded-[12px] border transition-colors',
@@ -123,6 +127,7 @@ export function ChatAlbumArtCard({
                     : 'border-subtle hover:border-default'
                 )}
               >
+                <span className='sr-only'>{`Generated album art preview ${index + 1}`}</span>
                 <Image
                   src={option.previewUrl}
                   alt='Generated album art preview'

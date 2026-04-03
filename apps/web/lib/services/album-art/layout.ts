@@ -37,7 +37,11 @@ function splitTitleLines(value: string, maxLineLength: number): string[] {
     lines.push(current);
   }
 
-  return lines.slice(0, 2);
+  if (lines.length <= 2) {
+    return lines;
+  }
+
+  return [lines[0] ?? value, lines.slice(1).join(' ')];
 }
 
 export function buildAlbumArtLayout(params: {

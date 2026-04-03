@@ -2523,6 +2523,7 @@ export async function createArtistAlbumArtBrandKit(params: {
 }) {
   noStore();
 
+  const { userId } = await getCachedAuth();
   const profile = await requireProfile();
   const result = await createArtistBrandKit({
     profileId: profile.id,
@@ -2533,6 +2534,10 @@ export async function createArtistAlbumArtBrandKit(params: {
     isDefault: params.isDefault,
   });
 
+  if (userId) {
+    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  }
+  revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.SETTINGS);
   return result;
 }
@@ -2547,6 +2552,7 @@ export async function updateArtistAlbumArtBrandKit(params: {
 }) {
   noStore();
 
+  const { userId } = await getCachedAuth();
   const profile = await requireProfile();
   const result = await updateArtistBrandKit({
     profileId: profile.id,
@@ -2558,6 +2564,10 @@ export async function updateArtistAlbumArtBrandKit(params: {
     isDefault: params.isDefault,
   });
 
+  if (userId) {
+    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  }
+  revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.SETTINGS);
   return result;
 }
@@ -2565,12 +2575,17 @@ export async function updateArtistAlbumArtBrandKit(params: {
 export async function deleteArtistAlbumArtBrandKit(brandKitId: string) {
   noStore();
 
+  const { userId } = await getCachedAuth();
   const profile = await requireProfile();
   await deleteArtistBrandKit({
     profileId: profile.id,
     brandKitId,
   });
 
+  if (userId) {
+    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  }
+  revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.SETTINGS);
 }
 

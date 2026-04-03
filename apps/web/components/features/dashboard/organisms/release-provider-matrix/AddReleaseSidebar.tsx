@@ -221,22 +221,7 @@ export function AddReleaseSidebar({
       onCreated(createdRelease);
       onClose();
 
-      if (generatedSession && generatedOptionId) {
-        void (async () => {
-          try {
-            const applied = await applyGeneratedReleaseAlbumArt({
-              releaseId,
-              sessionId: generatedSession.sessionId,
-              optionId: generatedOptionId,
-            });
-            onArtworkUploaded?.(createdRelease.id, applied.artworkUrl);
-          } catch {
-            toast.warning(
-              'Release created, but generated artwork could not be applied. You can retry from the release drawer.'
-            );
-          }
-        })();
-      } else if (artworkFile) {
+      if (artworkFile) {
         void (async () => {
           const formData = new FormData();
           formData.append('file', artworkFile);
@@ -267,6 +252,21 @@ export function AddReleaseSidebar({
           } catch {
             toast.warning(
               'Release created, but artwork upload failed. You can retry from the release drawer.'
+            );
+          }
+        })();
+      } else if (generatedSession && generatedOptionId) {
+        void (async () => {
+          try {
+            const applied = await applyGeneratedReleaseAlbumArt({
+              releaseId,
+              sessionId: generatedSession.sessionId,
+              optionId: generatedOptionId,
+            });
+            onArtworkUploaded?.(createdRelease.id, applied.artworkUrl);
+          } catch {
+            toast.warning(
+              'Release created, but generated artwork could not be applied. You can retry from the release drawer.'
             );
           }
         })();

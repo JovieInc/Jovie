@@ -1,27 +1,37 @@
 import 'server-only';
 
-import { and, count, eq, gt, isNotNull } from 'drizzle-orm';
+import { and, eq, gt, sum } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { albumArtGenerationSessions } from '@/lib/db/schema/album-art';
 
 export async function getRemainingAlbumArtRuns(params: {
   readonly profileId: string;
   readonly releaseId?: string;
+  readonly draftKey?: string;
   readonly runLimit: number | null;
 }): Promise<number | null> {
-  if (params.runLimit === null || !params.releaseId) {
+  if (params.runLimit === null) {
+    return null;
+  }
+
+  const scopeFilter = params.releaseId
+    ? eq(albumArtGenerationSessions.releaseId, params.releaseId)
+    : params.draftKey
+      ? eq(albumArtGenerationSessions.draftKey, params.draftKey)
+      : null;
+
+  if (!scopeFilter) {
     return null;
   }
 
   const [result] = await db
-    .select({ value: count() })
+    .select({ value: sum(albumArtGenerationSessions.consumedRuns) })
     .from(albumArtGenerationSessions)
     .where(
       and(
         eq(albumArtGenerationSessions.profileId, params.profileId),
-        eq(albumArtGenerationSessions.releaseId, params.releaseId),
-        gt(albumArtGenerationSessions.consumedRuns, 0),
-        isNotNull(albumArtGenerationSessions.releaseId)
+        scopeFilter,
+        gt(albumArtGenerationSessions.consumedRuns, 0)
       )
     );
 
@@ -31,6 +41,7 @@ export async function getRemainingAlbumArtRuns(params: {
 export async function assertAlbumArtQuota(params: {
   readonly profileId: string;
   readonly releaseId?: string;
+  readonly draftKey?: string;
   readonly runLimit: number | null;
 }): Promise<number | null> {
   const remaining = await getRemainingAlbumArtRuns(params);
