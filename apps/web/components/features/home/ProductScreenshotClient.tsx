@@ -32,25 +32,10 @@ export function ProductScreenshotClient({
   title,
   width,
 }: ProductScreenshotClientProps) {
-  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
+  const [isAvailable, setIsAvailable] = useState(true);
 
   useEffect(() => {
-    const controller = new AbortController();
-
-    fetch(src, { method: 'HEAD', signal: controller.signal })
-      .then(response => {
-        const contentType = response.headers.get('content-type') ?? '';
-        setIsAvailable(response.ok && contentType.startsWith('image/'));
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setIsAvailable(false);
-        }
-      });
-
-    return () => {
-      controller.abort();
-    };
+    setIsAvailable(true);
   }, [src]);
 
   return (
@@ -65,6 +50,9 @@ export function ProductScreenshotClient({
       quality={quality}
       sizes={sizes}
       src={src}
+      onImageError={() => {
+        setIsAvailable(false);
+      }}
       testId={testId}
       title={title}
       width={width}

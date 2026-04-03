@@ -6,7 +6,8 @@ interface ProductScreenshotFrameProps {
   readonly chrome: 'window' | 'minimal';
   readonly className?: string;
   readonly height: number;
-  readonly isAvailable: boolean | null;
+  readonly isAvailable: boolean;
+  readonly onImageError?: () => void;
   readonly priority: boolean;
   readonly quality?: number;
   readonly sizes?: string;
@@ -21,6 +22,7 @@ function renderScreenshotContent({
   aspectRatio,
   height,
   isAvailable,
+  onImageError,
   priority,
   quality,
   sizes,
@@ -33,6 +35,7 @@ function renderScreenshotContent({
   | 'aspectRatio'
   | 'height'
   | 'isAvailable'
+  | 'onImageError'
   | 'priority'
   | 'quality'
   | 'sizes'
@@ -61,25 +64,17 @@ function renderScreenshotContent({
     );
   }
 
-  if (isAvailable === true) {
-    return (
-      <Image
-        src={src}
-        alt={alt}
-        width={width}
-        height={height}
-        priority={priority}
-        quality={quality}
-        sizes={sizes}
-        className='w-full'
-      />
-    );
-  }
-
   return (
-    <div
-      className='w-full animate-pulse bg-surface-1'
-      style={{ aspectRatio }}
+    <Image
+      src={src}
+      alt={alt}
+      width={width}
+      height={height}
+      priority={priority}
+      quality={quality}
+      sizes={sizes}
+      className='w-full'
+      onError={onImageError}
     />
   );
 }
