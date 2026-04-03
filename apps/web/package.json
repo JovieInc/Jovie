@@ -112,6 +112,7 @@
     "test:a11y": "vitest run --config=vitest.config.storybook.mts",
     "test:visual-a11y": "pnpm run e2e:visual && pnpm run test:a11y",
     "perf:auth": "tsx scripts/performance-auth.ts",
+    "qa:routes": "tsx scripts/route-qa.ts",
     "perf:loop": "tsx scripts/performance-optimizer.ts",
     "perf:loop:end-user": "tsx scripts/performance-optimizer.ts --scope end-user",
     "perf:overnight": "tsx scripts/performance-overnight.ts"
