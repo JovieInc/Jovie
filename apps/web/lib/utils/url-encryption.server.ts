@@ -23,27 +23,31 @@ const isBuildTime =
   process.env.NEXT_PHASE === 'phase-production-build';
 
 const ENCRYPTION_KEY = env.URL_ENCRYPTION_KEY;
+const runtimeEnvironment = env.VERCEL_ENV || env.NODE_ENV || 'development';
+const allowsEphemeralDevKey =
+  runtimeEnvironment === 'development' || runtimeEnvironment === 'test';
 
 // Generate a development-only key at runtime (not hardcoded in source)
-// This key changes on each server restart, which is acceptable for development
-const DEV_FALLBACK_KEY = isTestTime
-  ? crypto.randomBytes(32).toString('base64')
-  : undefined;
+// This key changes on each server restart, which is acceptable for local dev
+// and ephemeral test servers such as Playwright smoke runs in CI.
+const DEV_FALLBACK_KEY =
+  isTestTime || allowsEphemeralDevKey
+    ? crypto.randomBytes(32).toString('base64')
+    : undefined;
 
 if (!isBuildTime && !ENCRYPTION_KEY) {
-  const vercelEnvValue = env.VERCEL_ENV || env.NODE_ENV || 'development';
-
-  if (vercelEnvValue === 'production' || vercelEnvValue === 'preview') {
+  if (runtimeEnvironment === 'production' || runtimeEnvironment === 'preview') {
     throw new Error(
       '[url-encryption] URL_ENCRYPTION_KEY must be set to a secure value in production/preview environments. ' +
         'Generate a key with: openssl rand -base64 32'
     );
   }
 
-  if (vercelEnvValue === 'development') {
+  if (allowsEphemeralDevKey) {
     captureWarning(
       '[url-encryption] WARNING: URL_ENCRYPTION_KEY not set. ' +
-        'URL encryption will fail in this environment. Generate a secure key with: openssl rand -base64 32'
+        'Using an ephemeral runtime key for this development/test environment. ' +
+        'Generate a secure key with: openssl rand -base64 32'
     );
   }
 }

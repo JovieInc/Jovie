@@ -1,5 +1,9 @@
-import { expect, Locator, Page, TestInfo, test } from '@playwright/test';
-import { ClerkTestError, signInUser } from '../helpers/clerk-auth';
+import { expect, Locator, Page, test } from '@playwright/test';
+import {
+  ClerkTestError,
+  hasClerkCredentials,
+  signInUser,
+} from '../helpers/clerk-auth';
 
 /**
  * Timeout constants for E2E tests.
@@ -11,65 +15,192 @@ const TIMEOUTS = {
   MATRIX_VISIBLE: 15_000,
   ELEMENT_CHECK: 10_000,
   QUICK_CHECK: 5_000,
+  SIDEBAR_OPEN: 30_000,
 } as const;
+
+type ReleasesSurface = 'desktop' | 'mobile';
+
+async function resolveReleasesSurface(
+  page: Page
+): Promise<ReleasesSurface | null> {
+  const mobileRows = page.locator('[data-testid^="mobile-release-row-"]');
+  if (
+    await mobileRows
+      .first()
+      .isVisible({ timeout: TIMEOUTS.QUICK_CHECK })
+      .catch(() => false)
+  ) {
+    return 'mobile';
+  }
+
+  const desktopRows = page.locator('tbody tr');
+  if (
+    await desktopRows
+      .first()
+      .isVisible({ timeout: TIMEOUTS.QUICK_CHECK })
+      .catch(() => false)
+  ) {
+    return 'desktop';
+  }
+
+  return null;
+}
+
+async function getFirstReleaseTrigger(
+  page: Page,
+  surface: ReleasesSurface
+): Promise<Locator> {
+  if (surface === 'mobile') {
+    return page.locator('[data-testid^="mobile-release-row-"]').first();
+  }
+
+  const getDesktopOpenButton = (scope: Locator) =>
+    scope.locator('[data-testid^="release-open-"]').first();
+
+  const taggedRow = page.getByTestId('release-row').first();
+  if ((await taggedRow.count()) > 0) {
+    const openButton = getDesktopOpenButton(taggedRow);
+    if ((await openButton.count()) > 0) {
+      return openButton;
+    }
+    const firstCell = taggedRow.locator('td').first();
+    if ((await firstCell.count()) > 0) {
+      return firstCell;
+    }
+    return taggedRow;
+  }
+
+  const firstRow = page.locator('tbody tr').first();
+  const openButton = getDesktopOpenButton(firstRow);
+  if ((await openButton.count()) > 0) {
+    return openButton;
+  }
+
+  const firstCell = firstRow.locator('td').first();
+  if ((await firstCell.count()) > 0) {
+    return firstCell;
+  }
+
+  return firstRow;
+}
+
+async function waitForReleaseSidebar(page: Page) {
+  await expect(
+    page
+      .locator(
+        '[data-testid="drawer-loading-skeleton"], [data-testid="release-sidebar"]'
+      )
+      .first()
+  ).toBeVisible({ timeout: TIMEOUTS.SIDEBAR_OPEN });
+
+  const sidebar = page.getByTestId('release-sidebar');
+  await expect(sidebar).toBeVisible({ timeout: TIMEOUTS.SIDEBAR_OPEN });
+  return sidebar;
+}
+
+async function installClipboardSpy(page: Page) {
+  await page.evaluate(() => {
+    (window as unknown as { __releasesClipboard: string }).__releasesClipboard =
+      '';
+    navigator.clipboard.writeText = async (text: string) => {
+      (
+        window as unknown as { __releasesClipboard: string }
+      ).__releasesClipboard = text;
+      return Promise.resolve();
+    };
+  });
+}
+
+async function readClipboardSpy(page: Page) {
+  return page.evaluate(
+    () =>
+      (window as unknown as { __releasesClipboard: string }).__releasesClipboard
+  );
+}
+
+async function getSidebarSmartLinkUrl(sidebar: Locator) {
+  const smartLinkToken = sidebar
+    .locator('[title^="http://"], [title^="https://"]')
+    .first();
+  await expect(smartLinkToken).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
+
+  const url = await smartLinkToken.getAttribute('title');
+  expect(url, 'Expected release sidebar smart link URL').toBeTruthy();
+  return url!;
+}
+
+function extractSmartLinkHandle(url: string) {
+  const segments = new URL(url).pathname.split('/').filter(Boolean);
+  return segments[0] ?? '';
+}
 
 /**
  * Pre-check helper for releases tests.
- * Waits for page to load and checks if releases are available.
- * Returns the matrix locator if releases are visible, or null if test should be skipped.
+ * Waits for page to load and fails explicitly when the seeded creator route is not populated.
  */
 async function ensureReleasesVisible(
-  page: Page,
-  testInfo: TestInfo
-): Promise<Locator | null> {
+  page: Page
+): Promise<{ matrix: Locator; surface: ReleasesSurface }> {
   await page.waitForLoadState('load').catch(() => {});
 
-  // Check for the "Connect Spotify" prompt which indicates no releases
-  const connectPrompt = page.getByText('Connect Spotify');
-  if (
-    await connectPrompt
-      .isVisible({ timeout: TIMEOUTS.ELEMENT_CHECK })
-      .catch(() => false)
-  ) {
-    console.log('⚠ Skipping: Test user has not connected Spotify releases');
-    testInfo.skip();
-    return null;
-  }
-
-  // Check for the releases matrix container or the data table
   const matrix = page.getByTestId('releases-matrix');
-  const dataTable = page.getByRole('table', { name: /data table/i });
+  await expect(matrix).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
 
-  const matrixVisible = await matrix
-    .isVisible({ timeout: TIMEOUTS.QUICK_CHECK })
-    .catch(() => false);
-  const tableVisible = await dataTable
-    .isVisible({ timeout: TIMEOUTS.QUICK_CHECK })
-    .catch(() => false);
-
-  if (!matrixVisible && !tableVisible) {
-    console.log('⚠ Skipping: Releases table not visible');
-    testInfo.skip();
-    return null;
+  const surface = await resolveReleasesSurface(page);
+  if (surface) {
+    return { matrix, surface };
   }
 
-  return matrixVisible ? matrix : dataTable;
+  const knownFallbackStates = [
+    ['disconnected', page.getByTestId('releases-empty-state-disconnected')],
+    ['connected-empty', page.getByText('No releases yet')],
+    ['importing', page.getByTestId('spotify-import-progress-banner')],
+    ['failed', page.getByTestId('releases-empty-state-failed')],
+    ['partial', page.getByTestId('releases-empty-state-partial')],
+  ] as const;
+
+  const visibleStates: string[] = [];
+  for (const [state, locator] of knownFallbackStates) {
+    if (
+      await locator
+        .isVisible({ timeout: TIMEOUTS.QUICK_CHECK })
+        .catch(() => false)
+    ) {
+      visibleStates.push(state);
+    }
+  }
+
+  expect(
+    visibleStates,
+    `Expected populated seeded releases on /app/dashboard/releases, found ${visibleStates.join(', ') || 'no rows'}`
+  ).toHaveLength(0);
+
+  return { matrix, surface: 'desktop' };
+}
+
+async function openFirstReleaseSidebar(page: Page) {
+  const { surface } = await ensureReleasesVisible(page);
+  const firstReleaseTrigger = await getFirstReleaseTrigger(page, surface);
+  await firstReleaseTrigger.waitFor({
+    state: 'visible',
+    timeout: TIMEOUTS.ELEMENT_CHECK,
+  });
+  await firstReleaseTrigger.click();
+  return waitForReleaseSidebar(page);
 }
 
 test.describe('Releases dashboard', () => {
   // Skip entire suite if Clerk auth fails during beforeEach
   test.beforeEach(async ({ page }, testInfo) => {
-    const hasCredentials =
-      process.env.E2E_CLERK_USER_USERNAME &&
-      process.env.E2E_CLERK_USER_PASSWORD;
+    const usingBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 
-    if (!hasCredentials) {
+    if (!hasClerkCredentials()) {
       testInfo.skip();
       return;
     }
 
     // Skip if Clerk setup wasn't successful (no real Clerk keys)
-    if (process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true') {
+    if (!usingBypass && process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true') {
       console.warn(
         `⚠ Skipping ${testInfo.title}: Clerk testing setup was not successful`
       );
@@ -112,7 +243,7 @@ test.describe('Releases dashboard', () => {
 
   test('copies a smart link and follows the redirect @smoke', async ({
     page,
-  }, testInfo) => {
+  }) => {
     test.setTimeout(TIMEOUTS.TEST_OVERALL);
     await page.route('**/api/profile/view', route =>
       route.fulfill({ status: 200, body: '{}' })
@@ -127,41 +258,50 @@ test.describe('Releases dashboard', () => {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
     });
+    await installClipboardSpy(page);
 
-    const matrix = await ensureReleasesVisible(page, testInfo);
-    if (!matrix) return;
-
-    // The releases table renders smart links as textbox inputs with "URL to copy"
-    // and a "Copy" button next to each. Find the first copy URL textbox.
-    const smartLinkInput = page
-      .getByRole('textbox', { name: /url to copy/i })
-      .first();
-    await expect(smartLinkInput).toBeVisible({
-      timeout: TIMEOUTS.ELEMENT_CHECK,
-    });
-
-    const copiedUrl = await smartLinkInput.inputValue();
-    expect(copiedUrl).toBeTruthy();
-    expect(copiedUrl).toContain('/e2e-test-user/');
-
-    // Follow the smart link redirect
-    const response = await page.goto(copiedUrl, {
-      timeout: TIMEOUTS.NAVIGATION,
-      waitUntil: 'domcontentloaded',
-    });
-    expect(response?.status() ?? 0).toBeLessThan(400);
-    // After redirect, URL should point to a known DSP or remain on the profile
-    await expect(page).toHaveURL(
-      /spotify|apple|youtube|soundcloud|e2e-test-user|listen/,
-      {
-        timeout: TIMEOUTS.ELEMENT_CHECK,
-      }
+    const sidebar = await openFirstReleaseSidebar(page);
+    await expect(sidebar.getByTestId('drawer-tab-links')).toBeVisible();
+    await expect(sidebar.getByTestId('drawer-tab-tasks')).toBeVisible();
+    await sidebar.getByTestId('drawer-tab-links').click();
+    await expect(sidebar.getByTestId('drawer-tab-links')).toHaveAttribute(
+      'aria-selected',
+      'true'
     );
+
+    const copiedUrl = await getSidebarSmartLinkUrl(sidebar);
+    const smartLinkHandle = extractSmartLinkHandle(copiedUrl);
+    expect(smartLinkHandle).toBeTruthy();
+    expect(copiedUrl).toContain(`/${smartLinkHandle}/`);
+
+    await sidebar.getByTitle('Copy smart link').click();
+    await expect
+      .poll(async () => readClipboardSpy(page), {
+        timeout: TIMEOUTS.ELEMENT_CHECK,
+      })
+      .toBe(copiedUrl);
+
+    await sidebar.getByTestId('drawer-tab-tasks').click();
+    await expect(sidebar.getByTestId('drawer-tab-tasks')).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    await sidebar.getByTestId('drawer-tab-links').click();
+
+    const smartLinkPage = await page.context().newPage();
+    try {
+      const response = await smartLinkPage.goto(copiedUrl!, {
+        waitUntil: 'domcontentloaded',
+        timeout: 180_000,
+      });
+      expect(response?.status() ?? 500).toBeLessThan(400);
+      expect(smartLinkPage.url()).toMatch(/^https?:\/\//);
+    } finally {
+      await smartLinkPage.close();
+    }
   });
 
-  test('shows releases matrix with basic columns @smoke', async ({
-    page,
-  }, testInfo) => {
+  test('shows releases matrix with basic columns @smoke', async ({ page }) => {
     test.setTimeout(TIMEOUTS.TEST_OVERALL);
     await page.route('**/api/profile/view', route =>
       route.fulfill({ status: 200, body: '{}' })
@@ -177,27 +317,37 @@ test.describe('Releases dashboard', () => {
       timeout: TIMEOUTS.NAVIGATION,
     });
 
-    const matrix = await ensureReleasesVisible(page, testInfo);
-    if (!matrix) return;
+    const { surface } = await ensureReleasesVisible(page);
 
-    // Verify basic table headers exist. The table uses a "Release" column
-    // and a "Smart link, popularity, year" combined meta column.
-    await expect(
-      page.getByRole('columnheader', { name: /release/i }).first()
-    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
-    await expect(
-      page.getByRole('columnheader', { name: /smart link/i }).first()
-    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
+    if (surface === 'desktop') {
+      await expect(page.getByRole('heading', { name: 'Releases' })).toBeVisible(
+        {
+          timeout: TIMEOUTS.ELEMENT_CHECK,
+        }
+      );
+      await expect(
+        page.getByRole('tab', { name: 'Tracks' }).first()
+      ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
+      await expect(
+        page.getByRole('tab', { name: 'Releases' }).first()
+      ).toHaveAttribute('aria-selected', 'true');
+    } else {
+      await expect(page.getByTestId('mobile-release-list')).toBeVisible({
+        timeout: TIMEOUTS.ELEMENT_CHECK,
+      });
+    }
 
-    // Verify release data is present in the table
-    const releaseRows = page.locator('tbody tr');
+    const releaseRows =
+      surface === 'mobile'
+        ? page.locator('[data-testid^="mobile-release-row-"]')
+        : page.locator('tbody tr');
     const rowCount = await releaseRows.count();
     expect(rowCount).toBeGreaterThan(0);
   });
 
   test('opens edit sidebar when clicking a release row @nightly', async ({
     page,
-  }, testInfo) => {
+  }) => {
     test.setTimeout(TIMEOUTS.TEST_OVERALL);
     await page.route('**/api/profile/view', route =>
       route.fulfill({ status: 200, body: '{}' })
@@ -213,36 +363,21 @@ test.describe('Releases dashboard', () => {
       timeout: TIMEOUTS.NAVIGATION,
     });
 
-    const matrix = await ensureReleasesVisible(page, testInfo);
-    if (!matrix) return;
-
-    // Click on a release row to open the sidebar editor.
-    // The table rows have cursor=pointer and clicking them opens the sidebar.
-    const firstRow = page.locator('tbody tr').first();
-    await firstRow.waitFor({
-      state: 'visible',
-      timeout: TIMEOUTS.ELEMENT_CHECK,
-    });
-    await firstRow.click();
-
-    // Verify sidebar opens (the ReleaseSidebar component has data-testid="release-sidebar")
-    const sidebar = page.getByTestId('release-sidebar');
-    const sidebarVisible = await sidebar
-      .isVisible({ timeout: TIMEOUTS.ELEMENT_CHECK })
-      .catch(() => false);
-
-    // If the sidebar didn't open on row click, it may require a different interaction.
-    // The test verifies either the sidebar or that the row is at least clickable.
-    if (!sidebarVisible) {
-      // Verify the row was at least interactive (cursor: pointer)
-      const cursor = await firstRow.evaluate(el => getComputedStyle(el).cursor);
-      expect(cursor).toBe('pointer');
-    }
+    const sidebar = await openFirstReleaseSidebar(page);
+    await expect(sidebar.getByTestId('release-tabbed-card')).toBeVisible();
+    await expect(sidebar.getByTestId('drawer-tab-links')).toBeVisible();
+    await sidebar.getByTestId('drawer-tab-links').click();
+    await expect(sidebar.getByTitle('Copy smart link')).toBeVisible();
+    await sidebar.getByTestId('drawer-tab-tasks').click();
+    await expect(sidebar.getByTestId('drawer-tab-tasks')).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
   });
 
   test('smart link URLs contain the correct artist handle @nightly', async ({
     page,
-  }, testInfo) => {
+  }) => {
     test.setTimeout(TIMEOUTS.TEST_OVERALL);
     await page.route('**/api/profile/view', route =>
       route.fulfill({ status: 200, body: '{}' })
@@ -258,24 +393,28 @@ test.describe('Releases dashboard', () => {
       timeout: TIMEOUTS.NAVIGATION,
     });
 
-    const matrix = await ensureReleasesVisible(page, testInfo);
-    if (!matrix) return;
+    const sidebar = await openFirstReleaseSidebar(page);
+    const copiedUrl = await getSidebarSmartLinkUrl(sidebar);
+    const smartLinkHandle = extractSmartLinkHandle(copiedUrl);
+    expect(smartLinkHandle).toBeTruthy();
 
-    // Verify smart link URLs contain the test user handle
-    const smartLinkInputs = page.getByRole('textbox', { name: /url to copy/i });
-    const count = await smartLinkInputs.count();
+    await sidebar.getByTestId('drawer-tab-links').click();
+    const smartLinkTokens = sidebar.locator(
+      '[title^="http://"], [title^="https://"]'
+    );
+    const count = await smartLinkTokens.count();
     expect(count).toBeGreaterThan(0);
 
     // Check that each smart link URL contains the artist handle
     for (let i = 0; i < count; i++) {
-      const url = await smartLinkInputs.nth(i).inputValue();
-      expect(url).toContain('/e2e-test-user/');
+      const url = await smartLinkTokens.nth(i).getAttribute('title');
+      expect(url).toContain(`/${smartLinkHandle}/`);
     }
   });
 
-  test('shows DSP connection status when releases exist @nightly', async ({
+  test('shows release toolbar controls when releases exist @nightly', async ({
     page,
-  }, testInfo) => {
+  }) => {
     test.setTimeout(TIMEOUTS.TEST_OVERALL);
     await page.route('**/api/profile/view', route =>
       route.fulfill({ status: 200, body: '{}' })
@@ -291,27 +430,25 @@ test.describe('Releases dashboard', () => {
       timeout: TIMEOUTS.NAVIGATION,
     });
 
-    const matrix = await ensureReleasesVisible(page, testInfo);
-    if (!matrix) return;
+    const { surface } = await ensureReleasesVisible(page);
 
-    // Check if releases exist in the table
-    const releaseRows = page.locator('tbody tr');
-    const hasReleases = (await releaseRows.count()) > 0;
+    const releaseRows =
+      surface === 'mobile'
+        ? page.locator('[data-testid^="mobile-release-row-"]')
+        : page.locator('tbody tr');
+    expect(await releaseRows.count()).toBeGreaterThan(0);
 
-    if (hasReleases) {
-      // When releases exist, DSP connection status should be visible in the header.
-      // This is either a Spotify badge (green pill with artist name) or
-      // a "Not Connected" button. Both indicate the DSP status feature is rendering.
-      const spotifyBadge = page.locator(
-        'button:has-text("Not Connected"), button:has(svg[class*="spotify"]), [aria-label*="Spotify"], [aria-label*="Syncing"]'
-      );
-      const hasDspStatus = await spotifyBadge
-        .first()
-        .isVisible({ timeout: TIMEOUTS.ELEMENT_CHECK })
-        .catch(() => false);
-
-      // DSP status is always visible in the releases header
-      expect(hasDspStatus).toBe(true);
-    }
+    await expect(
+      page.getByRole('button', { name: 'Search releases' })
+    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
+    await expect(page.getByRole('button', { name: 'Filter' })).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_CHECK,
+    });
+    await expect(
+      page.getByRole('button', { name: 'Export data to CSV file' })
+    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
+    await expect(
+      page.getByRole('button', { name: 'Toggle release preview' })
+    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
   });
 });

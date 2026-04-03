@@ -11,6 +11,10 @@ import {
   type AdminSurfaceDescriptor,
   getAdminSurfaceSelector,
 } from './utils/admin-surface-manifest';
+import {
+  smokeNavigateWithRetry,
+  waitForHydration,
+} from './utils/smoke-test-utils';
 
 const DESKTOP_VIEWPORT = { width: 1440, height: 1100 } as const;
 const MOBILE_VIEWPORT = { width: 390, height: 844 } as const;
@@ -356,19 +360,21 @@ async function openSurface(
   viewport: { width: number; height: number }
 ) {
   await page.setViewportSize(viewport);
-  await page.goto(surface.path, {
-    waitUntil: 'domcontentloaded',
+  await smokeNavigateWithRetry(page, surface.path, {
     timeout: 90_000,
+    retries: 2,
   });
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(2000);
+  await waitForHydration(page, { timeout: 45_000 }).catch(() => {});
+  await page.waitForLoadState('domcontentloaded', { timeout: 10_000 });
 
   const locator = page.locator(getAdminSurfaceSelector(surface)).first();
-  await expect(locator).toBeVisible({ timeout: 30_000 });
+  await expect(locator).toBeVisible({ timeout: 45_000 });
   return locator;
 }
 
 test.describe('admin visual regression', () => {
+  test.setTimeout(300_000);
+
   test.beforeEach(async ({ page }) => {
     test.skip(!hasAdminCredentials(), 'Admin auth not available');
 

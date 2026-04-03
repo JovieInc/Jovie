@@ -11,6 +11,12 @@ if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
 }
 
 const isCI = !!process.env.CI;
+const baseURL = process.env.BASE_URL || 'http://localhost:3100';
+const managedWebServerUrl = new URL(baseURL);
+if (!managedWebServerUrl.port) {
+  managedWebServerUrl.port = '3100';
+}
+const managedWebServerPort = managedWebServerUrl.port;
 
 /**
  * Nightly E2E Test Configuration
@@ -43,7 +49,7 @@ export default defineConfig({
   },
 
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:3100',
+    baseURL,
     trace: 'on-first-retry',
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',
@@ -99,10 +105,10 @@ export default defineConfig({
           env: {
             ...process.env,
             NODE_ENV: 'test',
-            PORT: '3100',
+            PORT: managedWebServerPort,
             NEXT_DISABLE_TOOLBAR: '1',
           },
-          url: 'http://localhost:3100',
+          url: managedWebServerUrl.origin,
           reuseExistingServer: !isCI,
           timeout: 90000,
           stdout: 'pipe',

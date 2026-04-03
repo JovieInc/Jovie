@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from 'node:child_process';
+import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { type FSWatcher, watch } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
@@ -231,6 +231,90 @@ function getServerLogSnippet(buffer: readonly string[]): string {
   return buffer.join('\n');
 }
 
+function extractConflictingNextDevPid(
+  buffer: readonly string[]
+): number | null {
+  const joinedLogs = buffer.join('\n');
+  if (!joinedLogs.includes('Another next dev server is already running.')) {
+    return null;
+  }
+
+  const match = joinedLogs.match(/PID:\s+(\d+)/);
+  if (!match) {
+    return null;
+  }
+
+  const pid = Number.parseInt(match[1], 10);
+  return Number.isFinite(pid) ? pid : null;
+}
+
+async function forceKillPid(pid: number): Promise<void> {
+  try {
+    process.kill(pid, 'SIGTERM');
+  } catch {
+    return;
+  }
+
+  await sleep(1_000);
+
+  try {
+    process.kill(pid, 0);
+    process.kill(pid, 'SIGKILL');
+  } catch {
+    // Process is already gone.
+  }
+}
+
+async function cleanupLingeringNextServers(): Promise<void> {
+  const result = spawnSync('ps', ['-axo', 'pid=,command='], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  });
+
+  if (result.status !== 0 || !result.stdout) {
+    return;
+  }
+
+  const matchingPids = result.stdout
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .flatMap(line => {
+      const [pidText, ...commandParts] = line.split(/\s+/);
+      const command = commandParts.join(' ');
+
+      if (!command.includes(WEB_ROOT) || !command.includes('next-server')) {
+        return [];
+      }
+
+      const pid = Number.parseInt(pidText, 10);
+      return Number.isFinite(pid) ? [pid] : [];
+    });
+
+  if (matchingPids.length === 0) {
+    return;
+  }
+
+  for (const pid of matchingPids) {
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {
+      // Best effort cleanup.
+    }
+  }
+
+  await sleep(1_000);
+
+  for (const pid of matchingPids) {
+    try {
+      process.kill(pid, 0);
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // Process is already gone.
+    }
+  }
+}
+
 async function waitForServerReady(
   server: ChildProcess,
   recentLogs: readonly string[],
@@ -278,17 +362,35 @@ async function stopServer(server: ChildProcess | null): Promise<void> {
     return;
   }
 
+  const signalTarget =
+    typeof server.pid === 'number' && process.platform !== 'win32'
+      ? -server.pid
+      : server.pid;
   const exited = new Promise<void>(resolveExit => {
     server.once('exit', () => resolveExit());
   });
 
-  server.kill('SIGTERM');
+  if (typeof signalTarget === 'number') {
+    try {
+      process.kill(signalTarget, 'SIGTERM');
+    } catch {
+      // Best effort shutdown.
+    }
+  }
 
   await Promise.race([
     exited,
     sleep(SERVER_SHUTDOWN_TIMEOUT_MS).then(async () => {
-      if (server.exitCode === null && server.signalCode === null) {
-        server.kill('SIGKILL');
+      if (
+        server.exitCode === null &&
+        server.signalCode === null &&
+        typeof signalTarget === 'number'
+      ) {
+        try {
+          process.kill(signalTarget, 'SIGKILL');
+        } catch {
+          // Best effort shutdown.
+        }
         await exited;
       }
     }),
@@ -305,21 +407,38 @@ function createManagedServer(runtime: AdminGreenRuntime) {
       return;
     }
 
-    recentLogs.length = 0;
-    server = spawn('pnpm', ['run', 'dev:local:playwright'], {
-      cwd: WEB_ROOT,
-      env: runtime.serverEnv,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    const bootServer = async () => {
+      await cleanupLingeringNextServers();
+      recentLogs.length = 0;
+      server = spawn('pnpm', ['run', 'dev:local:playwright'], {
+        cwd: WEB_ROOT,
+        env: runtime.serverEnv,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: process.platform !== 'win32',
+      });
 
-    server.stdout?.on('data', chunk => {
-      pushServerLog(recentLogs, chunk, 'stdout');
-    });
-    server.stderr?.on('data', chunk => {
-      pushServerLog(recentLogs, chunk, 'stderr');
-    });
+      server.stdout?.on('data', chunk => {
+        pushServerLog(recentLogs, chunk, 'stdout');
+      });
+      server.stderr?.on('data', chunk => {
+        pushServerLog(recentLogs, chunk, 'stderr');
+      });
 
-    await waitForServerReady(server, recentLogs, runtime);
+      await waitForServerReady(server, recentLogs, runtime);
+    };
+
+    try {
+      await bootServer();
+    } catch (error) {
+      const conflictPid = extractConflictingNextDevPid(recentLogs);
+      if (!conflictPid) {
+        throw error;
+      }
+
+      await forceKillPid(conflictPid);
+      server = null;
+      await bootServer();
+    }
   };
 
   const ensure = async () => {
@@ -459,17 +578,26 @@ async function runPass(
   const results: GoalResult[] = [];
 
   for (const goal of goals) {
-    results.push(await runGoal(goal, runtime));
+    if (goal.id === 'seed-admin-data') {
+      results.push(await runGoal(goal, runtime));
+      continue;
+    }
+
+    const managedServer = createManagedServer(runtime);
+    await managedServer.ensure();
+
+    try {
+      results.push(await runGoal(goal, runtime));
+    } finally {
+      await managedServer.dispose();
+    }
   }
 
   await writeReport(mode, results, runtime);
   return results;
 }
 
-async function watchUntilGreen(
-  managedServer: ReturnType<typeof createManagedServer>,
-  runtime: AdminGreenRuntime
-) {
+async function watchUntilGreen(runtime: AdminGreenRuntime) {
   let running = false;
   let queued = false;
   let watcher: FSWatcher | null = null;
@@ -501,7 +629,6 @@ async function watchUntilGreen(
     running = true;
 
     try {
-      await managedServer.ensure();
       const results = await runPass('verify', runtime);
       if (results.every(result => result.status === 'green')) {
         finish();
@@ -558,34 +685,23 @@ async function watchUntilGreen(
 async function main() {
   const mode = parseMode(process.argv[2]);
   const runtime = createRuntime(await resolveServerPort());
-  const managedServer = createManagedServer(runtime);
-
-  const cleanup = async () => {
-    await managedServer.dispose();
-  };
 
   process.once('SIGINT', () => {
-    void cleanup().finally(() => process.exit(130));
+    process.exit(130);
   });
   process.once('SIGTERM', () => {
-    void cleanup().finally(() => process.exit(143));
+    process.exit(143);
   });
 
-  try {
-    await managedServer.ensure();
-
-    if (mode === 'watch') {
-      await watchUntilGreen(managedServer, runtime);
-      process.exitCode = 0;
-      return;
-    }
-
-    const results = await runPass(mode, runtime);
-    const exitCode = results.every(result => result.status === 'green') ? 0 : 1;
-    process.exitCode = exitCode;
-  } finally {
-    await cleanup();
+  if (mode === 'watch') {
+    await watchUntilGreen(runtime);
+    process.exitCode = 0;
+    return;
   }
+
+  const results = await runPass(mode, runtime);
+  const exitCode = results.every(result => result.status === 'green') ? 0 : 1;
+  process.exitCode = exitCode;
 }
 
 main().catch(async error => {

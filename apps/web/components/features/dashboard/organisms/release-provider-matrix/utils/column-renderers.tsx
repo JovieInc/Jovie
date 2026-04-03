@@ -167,11 +167,20 @@ export function createActionsHeaderRenderer(
 // ============================================================================
 
 /** Creates a cell renderer for the release column */
-export function createReleaseCellRenderer(artistName?: string | null) {
+export function createReleaseCellRenderer(
+  artistName: string | null | undefined,
+  onOpen?: (release: ReleaseViewModel) => void
+) {
   return function ReleaseCellRenderer({
     row,
   }: CellContext<ReleaseViewModel, unknown>) {
-    return <ReleaseCell release={row.original} artistName={artistName} />;
+    return (
+      <ReleaseCell
+        release={row.original}
+        artistName={artistName}
+        onSelect={onOpen}
+      />
+    );
   };
 }
 
@@ -180,7 +189,8 @@ export function createExpandableReleaseCellRenderer(
   artistName: string | null | undefined,
   isExpanded: (releaseId: string) => boolean,
   isLoading: (releaseId: string) => boolean,
-  onToggleExpansion: (release: ReleaseViewModel) => void
+  onToggleExpansion: (release: ReleaseViewModel) => void,
+  onOpen?: (release: ReleaseViewModel) => void
 ) {
   return function ExpandableReleaseCellRenderer({
     row,
@@ -200,7 +210,11 @@ export function createExpandableReleaseCellRenderer(
             onToggleExpansion(release);
           }}
         />
-        <ReleaseCell release={release} artistName={artistName} />
+        <ReleaseCell
+          release={release}
+          artistName={artistName}
+          onSelect={onOpen}
+        />
       </div>
     );
   };
@@ -288,7 +302,7 @@ export function createRightMetaCellRenderer(
         <PopularityIcon popularity={release.spotifyPopularity} />
 
         <span
-          className='inline-flex w-[64px] shrink-0 justify-end text-right tabular-nums text-[11px] font-[400] text-quaternary-token'
+          className='inline-flex w-[64px] shrink-0 justify-end text-right tabular-nums text-[11px] font-[400] text-secondary-token'
           title={yearTitle}
         >
           {dateLabel}

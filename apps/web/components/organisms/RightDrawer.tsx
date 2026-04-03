@@ -22,6 +22,21 @@ function useBodyScrollLock(isOpen: boolean, isMobile: boolean) {
   }, [isMobile, isOpen]);
 }
 
+function hasOpenModalDialog() {
+  return Array.from(
+    document.querySelectorAll<HTMLElement>(
+      '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]'
+    )
+  ).some(element => {
+    const style = window.getComputedStyle(element);
+    return (
+      element.getAttribute('aria-hidden') !== 'true' &&
+      style.display !== 'none' &&
+      style.visibility !== 'hidden'
+    );
+  });
+}
+
 export interface RightDrawerProps
   extends Omit<
     React.HTMLAttributes<HTMLElement>,
@@ -64,6 +79,14 @@ export function RightDrawer({
     if (!isOpen || !onKeyDown) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (event.defaultPrevented || hasOpenModalDialog()) {
+          return;
+        }
+        onKeyDown(event);
+        return;
+      }
+
       // Only handle events when the drawer or its children have focus
       if (
         asideRef.current &&

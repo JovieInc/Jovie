@@ -529,25 +529,23 @@ async function measureWarmNavigationRoute(
     `${parsedUrl.pathname}${parsedUrl.search}`
   );
   const navTriggerSelector = route.readySelectors.navTrigger?.[0];
+  let routeReadyPromise: Promise<unknown> | null = null;
   if (visibleTrigger) {
-    await Promise.all([
-      waitForExpectedUrl(page, expectedPaths),
-      visibleTrigger.click({ noWaitAfter: true }),
-    ]);
+    routeReadyPromise = waitForExpectedUrl(page, expectedPaths);
+    await visibleTrigger.click({ noWaitAfter: true });
   } else if (navTriggerSelector) {
-    await Promise.all([
-      waitForExpectedUrl(page, expectedPaths),
-      page.locator(navTriggerSelector).first().click({ noWaitAfter: true }),
-    ]);
+    routeReadyPromise = waitForExpectedUrl(page, expectedPaths);
+    await page.locator(navTriggerSelector).first().click({ noWaitAfter: true });
   } else {
     await page.goto(url, {
       timeout: NAVIGATION_TIMEOUT_MS,
       waitUntil: 'domcontentloaded',
     });
-    await waitForExpectedUrl(page, expectedPaths);
+    routeReadyPromise = waitForExpectedUrl(page, expectedPaths);
   }
 
   const warmShellResponse = await waitForWarmShellReady(page, route, startedAt);
+  await routeReadyPromise;
   const skeletonToContent = hasTimingBudget(route, 'skeleton-to-content')
     ? await waitForContentReady(page, route, startedAt)
     : 0;
@@ -721,16 +719,18 @@ async function warmRoute(
   try {
     const page = await context.newPage();
     if (route.warmupStrategy === 'authenticated-shell') {
-      await page.goto(resolveRouteUrl(baseUrl, APP_ROUTES.DASHBOARD), {
-        timeout: NAVIGATION_TIMEOUT_MS,
-        waitUntil: 'domcontentloaded',
-      });
-      await waitForAnyVisible(
-        page,
-        route.readySelectors.navTrigger ?? [
-          'nav[aria-label="Dashboard navigation"]',
-        ]
-      ).catch(() => undefined);
+      await measureWarmNavigationRoute(page, route, baseUrl, url).catch(
+        async () => {
+          await page.goto(url, {
+            timeout: NAVIGATION_TIMEOUT_MS,
+            waitUntil: 'domcontentloaded',
+          });
+          await waitForAnyVisible(page, route.readySelectors.content).catch(
+            () => undefined
+          );
+        }
+      );
+      return;
     }
 
     await page.goto(url, {

@@ -185,12 +185,14 @@ export function ReleaseTrackList({
     () => summarizeReleaseProviderCounts(tracks ?? []),
     [tracks]
   );
-  const liveAnnouncement =
-    playbackState.playbackStatus === 'error'
-      ? 'Preview unavailable.'
-      : playbackState.trackTitle
-        ? `Now playing ${playbackState.trackTitle}.`
-        : '';
+  let liveAnnouncement: string;
+  if (playbackState.playbackStatus === 'error') {
+    liveAnnouncement = 'Preview unavailable.';
+  } else if (playbackState.trackTitle) {
+    liveAnnouncement = `Now playing ${playbackState.trackTitle}.`;
+  } else {
+    liveAnnouncement = '';
+  }
 
   if (release.totalTracks === 0) return null;
 

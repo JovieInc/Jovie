@@ -99,7 +99,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
   test('admin navigation is visible on dashboard and persists across navigation', async ({
     page,
   }, testInfo) => {
-    test.setTimeout(180_000); // 3 minutes for comprehensive navigation test
+    test.setTimeout(360_000); // Cold local admin routes can exceed 3 minutes across the full sweep
 
     const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
 

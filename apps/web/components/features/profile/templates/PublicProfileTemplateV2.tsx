@@ -283,7 +283,7 @@ export function PublicProfileTemplateV2({
     }
 
     const handlePopState = () => {
-      void applyRequestedMode(getModeFromLocation());
+      applyRequestedMode(getModeFromLocation());
     };
 
     globalThis.addEventListener('popstate', handlePopState);
@@ -379,7 +379,7 @@ export function PublicProfileTemplateV2({
           // button and uses this handler to jump down to the tour section.
           onClick: () => {
             setHistoryMode('tour');
-            void scrollToTourSection();
+            scrollToTourSection();
           },
           ariaLabel: `Get tickets for ${artist.name}`,
         };

@@ -77,10 +77,19 @@ export function ReleaseModeMockCard({
   const visibleLabels = isCompact ? release.labels.slice(0, 3) : release.labels;
   const stateMetaLabel = release.state === 'presave' ? 'Countdown' : 'Status';
 
+  let aspectRatio: string;
+  if (isCompact) {
+    aspectRatio = '9 / 16';
+  } else if (isComparison) {
+    aspectRatio = '11 / 13';
+  } else {
+    aspectRatio = '16 / 10';
+  }
+
   return (
     <MarketingSurfaceCard
       testId={testId}
-      aspectRatio={isCompact ? '9 / 16' : isComparison ? '11 / 13' : '16 / 10'}
+      aspectRatio={aspectRatio}
       variant={isCompact ? 'floating' : 'panel'}
       glowTone={release.artworkTone}
       className={cn('h-full', className)}

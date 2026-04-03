@@ -61,18 +61,18 @@ export function SmartLinkAudioPreview({
   const currentTimeFormatted = formatDuration(Math.round(currentTime) * 1000);
   const durationFormatted =
     duration > 0 ? formatDuration(Math.round(duration) * 1000) : null;
-  const fallbackSourceLabel =
-    previewVerification === 'fallback'
-      ? previewSource
-        ? ({
-            spotify: 'Spotify preview',
-            apple_music: 'Apple Music preview',
-            deezer: 'Deezer preview',
-            musicfetch: 'MusicFetch preview',
-            audio_url: 'Stored audio',
-          }[previewSource] ?? 'Fallback preview')
-        : 'Fallback preview'
-      : null;
+  let fallbackSourceLabel: string | null = null;
+  if (previewVerification === 'fallback') {
+    const sourceLabels: Record<string, string> = {
+      spotify: 'Spotify preview',
+      apple_music: 'Apple Music preview',
+      deezer: 'Deezer preview',
+      musicfetch: 'MusicFetch preview',
+      audio_url: 'Stored audio',
+    };
+    fallbackSourceLabel =
+      (previewSource && sourceLabels[previewSource]) ?? 'Fallback preview';
+  }
 
   return (
     <div className='space-y-1.5'>

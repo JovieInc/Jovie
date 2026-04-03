@@ -12,6 +12,7 @@ import { PageShell } from '@/components/organisms/PageShell';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useDspEnrichmentStatusQuery } from '@/lib/queries/useDspEnrichmentStatusQuery';
+import { AddPlatformDialog } from './AddPlatformDialog';
 import { DspPresenceEmptyState } from './DspPresenceEmptyState';
 import { DspPresenceSidebar } from './DspPresenceSidebar';
 import { DspPresenceSummary } from './DspPresenceSummary';
@@ -27,6 +28,7 @@ interface DspPresenceViewProps {
 
 export function DspPresenceView({ data }: DspPresenceViewProps) {
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [isAddPlatformDialogOpen, setIsAddPlatformDialogOpen] = useState(false);
   const dashboardData = useDashboardData();
   const router = useRouter();
 
@@ -52,6 +54,14 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
   const selectedItem =
     data.items.find(i => i.matchId === selectedMatchId) ?? null;
   const isSidebarOpen = selectedItem !== null;
+
+  const openAddPlatformDialog = useCallback(() => {
+    // Delay opening so the initiating click is not treated as an outside
+    // interaction by the controlled Radix dialog on the same event loop turn.
+    globalThis.setTimeout(() => {
+      setIsAddPlatformDialogOpen(true);
+    }, 0);
+  }, []);
 
   // Clear stale selection when item disappears from data (e.g. after reject)
   useEffect(() => {
@@ -111,11 +121,11 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
     <DspPresenceSummary
       confirmedCount={data.confirmedCount}
       suggestedCount={data.suggestedCount}
-      existingProviderIds={existingProviderIds}
       profileId={profileId}
       isAdmin={isAdmin}
       spotifyId={spotifyId}
       enrichmentStatus={enrichmentStatus}
+      onAddPlatform={openAddPlatformDialog}
     />
   );
 
@@ -126,8 +136,13 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
           className='flex h-full min-h-0 flex-1 items-center justify-center'
           data-testid='dsp-presence-content-panel'
         >
-          <DspPresenceEmptyState existingProviderIds={existingProviderIds} />
+          <DspPresenceEmptyState onAddPlatform={openAddPlatformDialog} />
         </div>
+        <AddPlatformDialog
+          open={isAddPlatformDialogOpen}
+          onClose={() => setIsAddPlatformDialogOpen(false)}
+          existingProviderIds={existingProviderIds}
+        />
       </PageShell>
     );
   }
@@ -146,6 +161,11 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
           />
         </div>
       </div>
+      <AddPlatformDialog
+        open={isAddPlatformDialogOpen}
+        onClose={() => setIsAddPlatformDialogOpen(false)}
+        existingProviderIds={existingProviderIds}
+      />
     </PageShell>
   );
 }

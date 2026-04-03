@@ -17,6 +17,7 @@ import {
   MoreVertical,
   Plus,
   Search,
+  Trash2,
 } from 'lucide-react';
 import {
   type ComponentPropsWithoutRef,
@@ -37,6 +38,7 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActio
 import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
+import { TaskDescriptionHelper } from '@/components/features/dashboard/tasks/TaskDescriptionHelper';
 import { TaskListRow } from '@/components/features/dashboard/tasks/TaskListRow';
 import {
   HIDDEN_DIV_STYLES,
@@ -63,9 +65,15 @@ import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import {
   useCreateTaskMutation,
+  useDeleteTaskMutation,
   useUpdateTaskMutation,
 } from '@/lib/queries/useTaskMutations';
 import { useTaskQuery, useTasksQuery } from '@/lib/queries/useTasksQuery';
+import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
+import {
+  readTaskDescriptionHelper,
+  type TaskDescriptionHelperPayload,
+} from '@/lib/tasks/task-description-helper';
 import type {
   TaskAssigneeKind,
   TaskPriority,
@@ -435,6 +443,20 @@ function TaskMetaMenuNumber({
   );
 }
 
+function findTemplateDescriptionHelper(
+  title: string,
+  category: string | null
+): TaskDescriptionHelperPayload | null {
+  return (
+    DEFAULT_RELEASE_TASK_TEMPLATE.find(
+      item =>
+        item.descriptionHelper &&
+        item.title === title &&
+        item.category === category
+    )?.descriptionHelper ?? null
+  );
+}
+
 function TaskDocumentPanel({
   task,
   title,
@@ -462,6 +484,43 @@ function TaskDocumentPanel({
   artistName?: string | null;
   isDesktopLayout: boolean;
 }>) {
+  const descriptionEditorRef = useRef<HTMLTextAreaElement>(null);
+  const [descriptionHelperDismissed, setDescriptionHelperDismissed] =
+    useState(false);
+  const metadataDescriptionHelper = readTaskDescriptionHelper(task?.metadata);
+  const descriptionHelper =
+    metadataDescriptionHelper ??
+    (task?.releaseId
+      ? findTemplateDescriptionHelper(task.title, task.category)
+      : null);
+  const showDescriptionHelper = Boolean(
+    task &&
+      descriptionHelper &&
+      description.trim() === '' &&
+      !descriptionHelperDismissed
+  );
+
+  useEffect(() => {
+    setDescriptionHelperDismissed(false);
+  }, [task?.id]);
+
+  const focusDescriptionEditor = useCallback(() => {
+    globalThis.requestAnimationFrame(() => {
+      descriptionEditorRef.current?.focus();
+    });
+  }, []);
+
+  const beginDescriptionEditing = useCallback(() => {
+    setDescriptionHelperDismissed(true);
+    focusDescriptionEditor();
+  }, [focusDescriptionEditor]);
+
+  const handleDescriptionFocus = useCallback(() => {
+    if (descriptionHelper && description.trim() === '') {
+      setDescriptionHelperDismissed(true);
+    }
+  }, [description, descriptionHelper]);
+
   if (!task) {
     return (
       <div className='flex min-h-0 flex-1 items-center justify-center px-6 py-6'>
@@ -625,13 +684,24 @@ function TaskDocumentPanel({
               )}
             </div>
 
-            <textarea
-              id='task-context-editor'
-              value={description}
-              onChange={event => onDescriptionChange(event.target.value)}
-              placeholder='Start writing...'
-              className='min-h-[520px] w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-[1.8] text-[color-mix(in_oklab,var(--text-primary)_86%,var(--text-secondary))] outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
-            />
+            <div className='relative'>
+              <textarea
+                ref={descriptionEditorRef}
+                id='task-context-editor'
+                aria-label='Task description'
+                value={description}
+                onFocus={handleDescriptionFocus}
+                onChange={event => onDescriptionChange(event.target.value)}
+                placeholder='Start writing...'
+                className='min-h-[520px] w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
+              />
+              {showDescriptionHelper && descriptionHelper ? (
+                <TaskDescriptionHelper
+                  helper={descriptionHelper}
+                  onBeginEditing={beginDescriptionEditing}
+                />
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
@@ -650,8 +720,8 @@ function TaskTitleEditor({
   const { measuredHeight, isAtMaxHeight, containerRef, hiddenDivRef } =
     useTextareaAutosize({
       value,
-      minHeight: 54,
-      maxHeight: 220,
+      minHeight: 48,
+      maxHeight: 176,
       textareaRef,
     });
 
@@ -664,7 +734,7 @@ function TaskTitleEditor({
         aria-label='Task title'
         onChange={event => onChange(event.target.value)}
         placeholder='Untitled Task'
-        className='w-full resize-none border-0 bg-transparent px-0 py-0 text-[clamp(1.7rem,2.6vw,2.45rem)] font-[620] leading-[1.06] tracking-[-0.04em] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)]'
+        className='w-full resize-none border-0 bg-transparent px-0 py-0 text-[clamp(1.55rem,1.9vw,2.15rem)] font-[620] leading-[1.06] tracking-[-0.04em] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)]'
         style={{
           height: measuredHeight,
           overflowY: isAtMaxHeight ? 'auto' : 'hidden',
@@ -675,7 +745,7 @@ function TaskTitleEditor({
         aria-hidden='true'
         style={{
           ...HIDDEN_DIV_STYLES,
-          fontSize: 'clamp(1.7rem, 2.6vw, 2.45rem)',
+          fontSize: 'clamp(1.55rem, 1.9vw, 2.15rem)',
           lineHeight: '1.06',
           fontWeight: 620,
           letterSpacing: '-0.04em',
@@ -787,12 +857,14 @@ function MobileTaskSection({
   selectedTaskId,
   artistName,
   onOpenTask,
+  onOpenRelease,
 }: Readonly<{
   title: string;
   tasks: ReadonlyArray<TaskView>;
   selectedTaskId: string | null;
   artistName?: string | null;
   onOpenTask: (task: TaskView) => void;
+  onOpenRelease: (task: TaskView) => void;
 }>) {
   if (tasks.length === 0) {
     return null;
@@ -811,6 +883,7 @@ function MobileTaskSection({
             task={task}
             artistName={artistName}
             onOpenTask={onOpenTask}
+            onOpenRelease={onOpenRelease}
             isSelected={task.id === selectedTaskId}
           />
         ))}
@@ -823,11 +896,13 @@ function MobileTaskListItem({
   task,
   artistName,
   onOpenTask,
+  onOpenRelease,
   isSelected,
 }: Readonly<{
   task: TaskView;
   artistName?: string | null;
   onOpenTask: (task: TaskView) => void;
+  onOpenRelease: (task: TaskView) => void;
   isSelected: boolean;
 }>) {
   const stage = getTaskStageVisual(task.status, task.agentStatus);
@@ -934,7 +1009,9 @@ export function TasksPageClient() {
   const deferredSearch = useDeferredValue(search);
   const profileId = selectedProfile?.id;
   const createTaskMutation = useCreateTaskMutation();
+  const deleteTaskMutation = useDeleteTaskMutation();
   const updateTaskMutation = useUpdateTaskMutation();
+  const { mutate: deleteTask } = deleteTaskMutation;
   const { mutate: updateTask, isPending: isUpdatingTask } = updateTaskMutation;
   const { data: releases = [] } = useReleasesQuery(profileId ?? '');
 
@@ -1257,6 +1334,25 @@ export function TasksPageClient() {
     [updateTask]
   );
 
+  const handleDeleteTask = useCallback(
+    (task: TaskView) => {
+      const shouldDelete = globalThis.confirm(
+        `Delete "${task.title}"? This can't be undone.`
+      );
+
+      if (!shouldDelete) {
+        return;
+      }
+
+      deleteTask(task.id, {
+        onError: () => {
+          toast.error("Couldn't delete task");
+        },
+      });
+    },
+    [deleteTask]
+  );
+
   const getTaskContextMenuItems = useCallback(
     (task: TaskView): ContextMenuItemType[] => [
       {
@@ -1278,7 +1374,7 @@ export function TasksPageClient() {
         : []),
       {
         id: 'change-status',
-        label: 'Change Status',
+        label: 'Status',
         icon: (() => {
           const StageIcon = getTaskStageVisual(
             task.status,
@@ -1303,7 +1399,7 @@ export function TasksPageClient() {
       },
       {
         id: 'change-priority',
-        label: 'Change Priority',
+        label: 'Priority',
         icon: <TaskPriorityLeadingVisual priority={task.priority} />,
         items: TASK_PRIORITY_OPTIONS.map(([value, label]) => ({
           id: `priority-${value}`,
@@ -1315,7 +1411,7 @@ export function TasksPageClient() {
       },
       {
         id: 'change-assignee',
-        label: 'Change Assignee',
+        label: 'Assignee',
         icon: (
           <span aria-hidden='true'>
             <TaskAssigneeLeadingVisual
@@ -1352,8 +1448,22 @@ export function TasksPageClient() {
           },
         ],
       },
+      { type: 'separator' },
+      {
+        id: 'delete-task',
+        label: 'Delete Task',
+        icon: <Trash2 className='h-4 w-4' />,
+        destructive: true,
+        onClick: () => handleDeleteTask(task),
+      },
     ],
-    [artistName, openReleaseSidebar, openTaskDocument, updateTaskField]
+    [
+      artistName,
+      handleDeleteTask,
+      openReleaseSidebar,
+      openTaskDocument,
+      updateTaskField,
+    ]
   );
 
   const sidebarPanel = selectedRelease ? (
@@ -1509,7 +1619,7 @@ export function TasksPageClient() {
               type='button'
               variant='secondary'
               size='sm'
-              onClick={() => void refetch()}
+              onClick={() => refetch()}
             >
               Retry
             </Button>
@@ -1519,11 +1629,13 @@ export function TasksPageClient() {
             <div
               data-testid='task-list-pane'
               className={cn(
-                'min-h-0 min-w-0 shrink-0 overflow-hidden',
+                'min-h-0 min-w-0',
                 TASK_WORKSPACE_PANE_CLASSNAME,
-                'xl:w-[29rem] 2xl:w-[31rem] min-[1800px]:w-[33rem]',
+                selectedTask && showTaskDocumentPane
+                  ? 'xl:flex-none xl:basis-[32rem] xl:min-w-[28rem] xl:max-w-[36rem] xl:border-r xl:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
+                  : 'flex-1',
                 showTaskListPane ? 'block' : 'hidden',
-                (!selectedTask || !showTaskDocumentPane) && 'flex-1'
+                !selectedTask && 'xl:max-w-none'
               )}
             >
               {showTaskWorkbenchEmptyState ? (
@@ -1547,7 +1659,8 @@ export function TasksPageClient() {
                   rowHeight={64}
                   skeletonRows={8}
                   className='text-[13px]'
-                  containerClassName='h-full overflow-y-auto overflow-x-hidden px-0 pb-3 pt-2'
+                  containerClassName='h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5'
+                  minWidth='100%'
                   onRowClick={row => openTaskDocument(row)}
                   getContextMenuItems={getTaskContextMenuItems}
                   getRowClassName={_row =>
@@ -1609,6 +1722,7 @@ export function TasksPageClient() {
                           selectedTaskId={selectedTaskId}
                           artistName={artistName}
                           onOpenTask={openTaskDocument}
+                          onOpenRelease={openReleaseSidebar}
                         />
                         <MobileTaskSection
                           title='Closed'
@@ -1616,6 +1730,7 @@ export function TasksPageClient() {
                           selectedTaskId={selectedTaskId}
                           artistName={artistName}
                           onOpenTask={openTaskDocument}
+                          onOpenRelease={openReleaseSidebar}
                         />
                       </>
                     ) : (
@@ -1625,6 +1740,7 @@ export function TasksPageClient() {
                         selectedTaskId={selectedTaskId}
                         artistName={artistName}
                         onOpenTask={openTaskDocument}
+                        onOpenRelease={openReleaseSidebar}
                       />
                     )}
                   </div>

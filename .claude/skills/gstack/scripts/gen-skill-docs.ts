@@ -12,6 +12,7 @@
 import { COMMAND_DESCRIPTIONS } from '../browse/src/commands';
 import { SNAPSHOT_FLAGS } from '../browse/src/snapshot';
 import { discoverTemplates } from './discover-skills';
+import { processVoiceTriggers, stripVoiceTriggersBlock } from './voice-triggers';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { Host, TemplateContext } from './resolvers/types';
@@ -163,8 +164,10 @@ policy:
  */
 function transformFrontmatter(content: string, host: Host): string {
   if (host === 'claude') {
-    // Strip sensitive: field from Claude output (only Factory uses it)
-    return content.replace(/^sensitive:\s*true\n/m, '');
+    // Strip fields not used by Claude: sensitive (Factory-only), voice-triggers (folded into description by preprocessing)
+    content = content.replace(/^sensitive:\s*true\n/m, '');
+    content = stripVoiceTriggersBlock(content);
+    return content;
   }
 
   const fmStart = content.indexOf('---\n');
@@ -364,13 +367,22 @@ function processTemplate(tmplPath: string, host: Host = 'claude'): { outputPath:
     throw new Error(`Unresolved placeholders in ${relTmplPath}: ${remaining.join(', ')}`);
   }
 
+  // Preprocess voice triggers: fold into description, strip field from frontmatter.
+  // Must run BEFORE transformFrontmatter so all hosts see the updated description,
+  // and BEFORE extractedDescription is used by external host metadata.
+  content = processVoiceTriggers(content);
+
+  // Re-extract description AFTER voice trigger preprocessing so Codex openai.yaml
+  // metadata gets the updated description with voice triggers included.
+  const postProcessDescription = extractNameAndDescription(content).description;
+
   // For Claude: strip sensitive: field (only Factory uses it)
   // For external hosts: route output, transform frontmatter, rewrite paths
   let symlinkLoop = false;
   if (host === 'claude') {
     content = transformFrontmatter(content, host);
   } else {
-    const result = processExternalHost(content, tmplContent, host, skillDir, extractedDescription, ctx, extractedName || undefined);
+    const result = processExternalHost(content, tmplContent, host, skillDir, postProcessDescription, ctx, extractedName || undefined);
     content = result.content;
     outputPath = result.outputPath;
     symlinkLoop = result.symlinkLoop;

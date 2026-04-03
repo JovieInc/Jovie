@@ -114,6 +114,7 @@ export const SwipeToReveal = memo(function SwipeToReveal({
   const enabled = forceEnabled ?? isTouchDevice;
   const group = useContext(SwipeGroupContext);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const [actionsVisible, setActionsVisible] = useState(false);
 
   // Group coordination
   const isControlled = Boolean(group && itemId);
@@ -133,12 +134,29 @@ export const SwipeToReveal = memo(function SwipeToReveal({
     onCloseProp?.();
   }, [isControlled, itemId, group, onCloseProp]);
 
-  const { isOpen, close, handlers, style } = useSwipeToReveal({
-    actionsWidth,
-    enabled,
-    onOpen: handleOpen,
-    onClose: handleClose,
-  });
+  const { isOpen, close, handlers, style, isDragging, offsetX } =
+    useSwipeToReveal({
+      actionsWidth,
+      enabled,
+      onOpen: handleOpen,
+      onClose: handleClose,
+    });
+
+  useEffect(() => {
+    const shouldShowActions = isOpen || isDragging || offsetX !== 0;
+    if (shouldShowActions) {
+      setActionsVisible(true);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setActionsVisible(false);
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [isDragging, isOpen, offsetX]);
 
   // Close when another item in the group opens
   useEffect(() => {
@@ -173,16 +191,19 @@ export const SwipeToReveal = memo(function SwipeToReveal({
     return <>{children}</>;
   }
 
+  const actionsHidden = !actionsVisible;
+
   return (
     <div ref={wrapperRef} className={cn('relative overflow-hidden', className)}>
       {/* Actions container - positioned behind the content */}
       <div
         className={cn(
           'absolute inset-y-0 right-0 flex items-stretch',
+          actionsHidden && 'pointer-events-none invisible',
           actionsClassName
         )}
         style={{ width: actionsWidth }}
-        aria-hidden={!isOpen}
+        aria-hidden={actionsHidden}
       >
         {actions}
       </div>

@@ -117,6 +117,8 @@ export function EntitySidebarShell({
   const showMinimalHeaderBar = !(isMinimalHeader && hideMinimalHeaderBar);
   const renderMinimalTabsInHeader =
     isMinimalHeader && minimalTabsPlacement === 'header';
+  const quietRailClassName =
+    'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_93%,var(--linear-app-shell-border)_7%)] shadow-[-1px_0_0_0_color-mix(in_oklab,var(--linear-app-shell-border)_56%,transparent)] dark:bg-transparent dark:shadow-none';
   const resolvedHeaderTitle = isMinimalHeader
     ? (title ?? <span className='sr-only'>{ariaLabel}</span>)
     : title;
@@ -145,7 +147,7 @@ export function EntitySidebarShell({
           variant='card'
           className={cn(
             'overflow-hidden lg:mx-0 lg:mt-0',
-            'border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-surface-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+            'border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,transparent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
           )}
         >
           {entityHeader}
@@ -165,7 +167,8 @@ export function EntitySidebarShell({
       <div
         className={cn(
           'flex h-full min-h-0 flex-col gap-1.5 px-1.5 py-1.5 lg:px-0 lg:py-0',
-          isQuietTone && 'gap-1'
+          isQuietTone && 'gap-1',
+          isQuietTone && quietRailClassName
         )}
       >
         <div className={cn('shrink-0', drawerSectionGapClassName)}>
@@ -174,7 +177,7 @@ export function EntitySidebarShell({
             className={cn(
               'overflow-hidden lg:rounded-[18px]',
               !isQuietTone &&
-                'border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-surface-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] lg:border'
+                'border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,transparent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] lg:border'
             )}
           >
             <div

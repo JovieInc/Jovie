@@ -40,6 +40,19 @@ describe('DrawerSurfaceCard', () => {
     expect(className).toContain('shadow-[');
   });
 
+  it('uses the quieter drawer treatment without adding floating shadows', () => {
+    render(
+      <DrawerSurfaceCard testId='surface-card' variant='quiet'>
+        Quiet
+      </DrawerSurfaceCard>
+    );
+
+    expect(screen.getByTestId('surface-card')).toHaveAttribute(
+      'data-surface-variant',
+      'quiet'
+    );
+  });
+
   it('keeps elevated shadows scoped to floating sidebar and drawer surfaces', () => {
     expect(LINEAR_SURFACE.drawerCard).toContain('shadow-[');
     expect(LINEAR_SURFACE.drawerCardSm).toContain('shadow-[');

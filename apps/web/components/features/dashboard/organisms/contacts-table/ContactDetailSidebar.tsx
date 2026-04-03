@@ -43,6 +43,24 @@ function getPreferredChannelLabel(
   return 'Select preferred';
 }
 
+function contactFieldActions(field: string, value: string | null | undefined) {
+  if (field === 'email' && value) {
+    return [
+      { id: 'open-email', ariaLabel: 'Open email', href: `mailto:${value}` },
+    ];
+  }
+  if (field === 'phone' && value) {
+    return [
+      {
+        id: 'open-phone',
+        ariaLabel: 'Call phone number',
+        href: `tel:${value}`,
+      },
+    ];
+  }
+  return [];
+}
+
 interface ContactDetailSidebarProps {
   readonly contact: EditableContact | null;
   readonly isOpen: boolean;
@@ -177,6 +195,15 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     value: string | null | undefined,
     placeholder: string
   ) => {
+    let inputType: 'email' | 'tel' | 'text';
+    if (field === 'email') {
+      inputType = 'email';
+    } else if (field === 'phone') {
+      inputType = 'tel';
+    } else {
+      inputType = 'text';
+    }
+
     return (
       <DrawerPropertyRow
         label={label}
@@ -187,33 +214,13 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             editable
             placeholder={placeholder}
             emptyLabel={placeholder}
-            inputType={
-              field === 'email' ? 'email' : field === 'phone' ? 'tel' : 'text'
-            }
+            inputType={inputType}
             onSave={async nextValue => {
               onUpdate({ [field]: nextValue } as Partial<EditableContact>);
               debouncedSave();
             }}
             copyValue={value ?? null}
-            actions={
-              field === 'email' && value
-                ? [
-                    {
-                      id: 'open-email',
-                      ariaLabel: 'Open email',
-                      href: `mailto:${value}`,
-                    },
-                  ]
-                : field === 'phone' && value
-                  ? [
-                      {
-                        id: 'open-phone',
-                        ariaLabel: 'Call phone number',
-                        href: `tel:${value}`,
-                      },
-                    ]
-                  : []
-            }
+            actions={contactFieldActions(field, value)}
             displayClassName='truncate text-[13px] text-primary-token'
             emptyClassName='text-tertiary-token italic'
             inputClassName='h-8 text-[13px]'

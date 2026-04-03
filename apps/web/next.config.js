@@ -7,6 +7,9 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 const { version: APP_VERSION } = require('../../version.json');
 
 const nextConfig = {
+  // Local and CI E2E runs use loopback hosts (`localhost` and `127.0.0.1`).
+  // Allow both so Next dev accepts asset/server-action requests from either host.
+  allowedDevOrigins: ['localhost', '127.0.0.1', '::1', '[::1]'],
   // Move dev indicator to top-right so it doesn't overlap the DevToolbar
   devIndicators: {
     position: 'top-right',

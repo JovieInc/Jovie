@@ -2,17 +2,40 @@ import type { ReactNode } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 const navLabelWidths = ['w-16', 'w-20', 'w-14', 'w-14', 'w-14'] as const;
+const LOADING_COPY_FONT_STYLE = {
+  fontFamily:
+    'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+} as const;
 
 function DefaultContentSkeleton() {
   return (
-    <div className='flex-1 min-h-0 min-w-0 overflow-hidden flex items-center justify-center'>
-      <div className='w-full max-w-2xl px-4 space-y-6'>
-        <div className='flex justify-center'>
-          <LoadingSkeleton height='h-6' width='w-48' rounded='md' />
-        </div>
-        <div className='space-y-3'>
-          <LoadingSkeleton height='h-4' width='w-full' rounded='sm' />
-          <LoadingSkeleton height='h-4' width='w-3/4' rounded='sm' />
+    <div className='flex flex-1 min-h-0 min-w-0 items-center justify-center overflow-hidden'>
+      <div className='w-full max-w-2xl px-4'>
+        <div className='rounded-[20px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-5 py-6 shadow-none'>
+          <p
+            className='text-[12px] font-medium text-secondary-token'
+            style={LOADING_COPY_FONT_STYLE}
+          >
+            Workspace
+          </p>
+          <h2
+            className='mt-2 text-[28px] font-[590] leading-[1.05] tracking-[-0.035em] text-primary-token'
+            style={LOADING_COPY_FONT_STYLE}
+          >
+            Loading your workspace
+          </h2>
+          <p
+            className='mt-3 max-w-[34rem] text-[14px] leading-[21px] text-secondary-token'
+            style={LOADING_COPY_FONT_STYLE}
+          >
+            Preparing your dashboard, smart links, messages, and latest
+            activity.
+          </p>
+          <div className='mt-6 space-y-3'>
+            <LoadingSkeleton height='h-4' width='w-full' rounded='sm' />
+            <LoadingSkeleton height='h-4' width='w-3/4' rounded='sm' />
+            <LoadingSkeleton height='h-4' width='w-2/3' rounded='sm' />
+          </div>
         </div>
       </div>
     </div>
@@ -72,7 +95,12 @@ export function DashboardShellSkeleton({
         <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>
           {/* Header skeleton */}
           <div className='flex h-12 items-center gap-3 border-b border-(--linear-app-frame-seam) px-4'>
-            <LoadingSkeleton height='h-4' width='w-32' rounded='sm' />
+            <p
+              className='truncate text-[13px] font-[560] tracking-[-0.014em] text-primary-token'
+              style={LOADING_COPY_FONT_STYLE}
+            >
+              Loading your workspace
+            </p>
             <div className='flex-1' />
             <LoadingSkeleton height='h-7' width='w-20' rounded='md' />
           </div>
