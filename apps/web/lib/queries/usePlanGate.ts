@@ -50,6 +50,8 @@ export interface PlanGateEntitlements {
   aiCanUseTools: boolean;
   /** Pro: can create releases manually (not just auto-sync) */
   canCreateManualReleases: boolean;
+  /** Pro: can access metadata submission workflows */
+  canAccessMetadataSubmissionAgent: boolean;
   /** Pro: can access future/unreleased release smartlinks */
   canAccessFutureReleases: boolean;
   /** Pro: can send notifications to subscribers */
