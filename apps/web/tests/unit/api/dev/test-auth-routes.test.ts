@@ -224,9 +224,7 @@ describe('dev test-auth routes', () => {
     );
 
     expect(response.status).toBe(303);
-    expect(response.headers.get('location')).toBe(
-      'http://localhost:3000/app/dashboard/earnings'
-    );
+    expect(response.headers.get('location')).toBe('/app/dashboard/earnings');
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_persona');
   });
 

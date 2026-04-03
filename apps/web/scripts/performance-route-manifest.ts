@@ -194,8 +194,8 @@ const HOME_ROUTE = {
   warmupStrategy: 'public-route',
   measureMode: 'interactive-shell',
   readySelectors: {
-    shell: ['[data-testid="homepage-shell"]'],
-    content: ['[data-testid="homepage-primary-cta"]'],
+    shell: ['#home-hero-heading'],
+    content: ['#home-hero-heading', 'a[href="/signup"]'],
   },
   timings: [
     { metric: 'first-contentful-paint', budget: 2000 },
