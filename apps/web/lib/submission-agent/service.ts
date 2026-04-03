@@ -619,27 +619,26 @@ export async function getMetadataSubmissionStatus(params: {
     throw new Error('requestId or profileId is required');
   }
 
-  const requestRows = params.requestId
-    ? await db
-        .select()
-        .from(metadataSubmissionRequests)
-        .where(eq(metadataSubmissionRequests.id, params.requestId))
-        .orderBy(desc(metadataSubmissionRequests.createdAt))
-    : await db
-        .select()
-        .from(metadataSubmissionRequests)
-        .where(
-          params.releaseId
-            ? and(
-                eq(
-                  metadataSubmissionRequests.creatorProfileId,
-                  params.profileId!
-                ),
-                eq(metadataSubmissionRequests.releaseId, params.releaseId)
-              )
-            : eq(metadataSubmissionRequests.creatorProfileId, params.profileId!)
+  let requestRows;
+  if (params.requestId) {
+    requestRows = await db
+      .select()
+      .from(metadataSubmissionRequests)
+      .where(eq(metadataSubmissionRequests.id, params.requestId))
+      .orderBy(desc(metadataSubmissionRequests.createdAt));
+  } else {
+    const whereClause = params.releaseId
+      ? and(
+          eq(metadataSubmissionRequests.creatorProfileId, params.profileId!),
+          eq(metadataSubmissionRequests.releaseId, params.releaseId)
         )
-        .orderBy(desc(metadataSubmissionRequests.createdAt));
+      : eq(metadataSubmissionRequests.creatorProfileId, params.profileId!);
+    requestRows = await db
+      .select()
+      .from(metadataSubmissionRequests)
+      .where(whereClause)
+      .orderBy(desc(metadataSubmissionRequests.createdAt));
+  }
 
   const requestIds = requestRows.map(request => request.id);
   if (requestIds.length === 0) {

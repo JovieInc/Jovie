@@ -419,14 +419,15 @@ export async function updateTask(
   await assertReleaseAccess(profileId, data.releaseId);
 
   const nextStatus = data.status ?? existingTask.status;
-  const completedAt =
-    data.completedAt !== undefined
-      ? data.completedAt
-      : data.status
-        ? nextStatus === 'done'
-          ? (existingTask.completedAt ?? new Date())
-          : null
-        : existingTask.completedAt;
+  let completedAt: Date | null | undefined;
+  if (data.completedAt !== undefined) {
+    completedAt = data.completedAt;
+  } else if (!data.status) {
+    completedAt = existingTask.completedAt;
+  } else {
+    completedAt =
+      nextStatus === 'done' ? (existingTask.completedAt ?? new Date()) : null;
+  }
 
   const [updated] = await db
     .update(tasks)

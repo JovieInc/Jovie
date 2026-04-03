@@ -150,30 +150,30 @@ export function resolveProfileMonetizationSummary(
     input.stripePayoutsEnabled === true;
   const stripeIncomplete = hasStripeAccount && !stripeReady;
 
-  const paymentState: ProfilePaymentState = !hasProfileUrl
-    ? 'needs_profile_url'
-    : stripeReady
-      ? resolveReadyState(input.tipVisits, input.tipsReceived)
-      : stripeIncomplete
-        ? 'setup_incomplete'
-        : hasVenmoSetup
-          ? resolveReadyState(input.tipVisits, input.tipsReceived)
-          : 'not_setup';
+  let paymentState: ProfilePaymentState;
+  if (!hasProfileUrl) {
+    paymentState = 'needs_profile_url';
+  } else if (stripeReady || hasVenmoSetup) {
+    paymentState = resolveReadyState(input.tipVisits, input.tipsReceived);
+  } else if (stripeIncomplete) {
+    paymentState = 'setup_incomplete';
+  } else {
+    paymentState = 'not_setup';
+  }
 
-  const provider: ProfileMonetizationSummaryResponse['provider'] = stripeReady
-    ? 'stripe'
-    : stripeIncomplete
-      ? 'stripe'
-      : hasVenmoSetup && hasProfileUrl
-        ? 'venmo'
-        : 'none';
+  let provider: ProfileMonetizationSummaryResponse['provider'];
+  if (stripeReady || stripeIncomplete) {
+    provider = 'stripe';
+  } else if (hasVenmoSetup && hasProfileUrl) {
+    provider = 'venmo';
+  } else {
+    provider = 'none';
+  }
 
   const manageHref: AppRoute =
-    paymentState === 'needs_profile_url'
-      ? APP_ROUTES.SETTINGS_ARTIST_PROFILE
-      : input.stripeConnectEnabled
-        ? APP_ROUTES.SETTINGS_PAYMENTS
-        : APP_ROUTES.SETTINGS_ARTIST_PROFILE;
+    input.stripeConnectEnabled && paymentState !== 'needs_profile_url'
+      ? APP_ROUTES.SETTINGS_PAYMENTS
+      : APP_ROUTES.SETTINGS_ARTIST_PROFILE;
 
   const tipUrl =
     hasProfileUrl && (stripeReady || hasVenmoSetup)
