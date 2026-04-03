@@ -5,6 +5,8 @@ import {
   STREAMING_DSP_KEYS,
 } from '@/lib/dsp-registry';
 import { captureError } from '@/lib/error-tracking';
+import { buildSpotifyTrackUrl } from '@/lib/spotify';
+import { spotifyClient } from '@/lib/spotify/client';
 
 import {
   isMusicfetchAvailable,
@@ -78,6 +80,13 @@ export function buildSearchUrl(
 export interface AppleMusicLookupResult {
   url: string;
   trackId: string | null;
+  previewUrl: string | null;
+}
+
+export interface SpotifyLookupResult {
+  url: string;
+  trackId: string;
+  previewUrl: string | null;
 }
 
 export interface DeezerLookupResult {
@@ -187,10 +196,16 @@ export async function lookupAppleMusicByIsrc(
       'itunes.apple.com',
       'music.apple.com'
     );
+    const previewUrl =
+      typeof match.previewUrl === 'string' &&
+      match.previewUrl.startsWith('https://')
+        ? match.previewUrl
+        : null;
 
     return {
       url: canonicalUrl,
       trackId,
+      previewUrl,
     };
   } catch (error) {
     Sentry.addBreadcrumb({
@@ -202,6 +217,49 @@ export async function lookupAppleMusicByIsrc(
         storefront,
         error: error instanceof Error ? error.message : String(error),
       },
+    });
+    return null;
+  }
+}
+
+export async function lookupSpotifyByIsrc(
+  isrc: string,
+  options: { market?: string } = {}
+): Promise<SpotifyLookupResult | null> {
+  const market = options.market ?? 'US';
+
+  try {
+    const payload = await spotifyClient.requestJson<{
+      tracks?: {
+        items?: Array<{
+          id: string;
+          preview_url: string | null;
+          external_urls?: { spotify?: string };
+        }>;
+      };
+    }>(
+      `/search?q=${encodeURIComponent(`isrc:${isrc}`)}&type=track&limit=1&market=${encodeURIComponent(market)}`
+    );
+
+    const match = payload.tracks?.items?.[0];
+    if (!match?.id) return null;
+
+    const previewUrl =
+      typeof match.preview_url === 'string' &&
+      match.preview_url.startsWith('https://')
+        ? match.preview_url
+        : null;
+
+    return {
+      url: match.external_urls?.spotify ?? buildSpotifyTrackUrl(match.id),
+      trackId: match.id,
+      previewUrl,
+    };
+  } catch (error) {
+    captureError('Spotify ISRC lookup failed', error, {
+      route: 'discography',
+      isrc,
+      market,
     });
     return null;
   }

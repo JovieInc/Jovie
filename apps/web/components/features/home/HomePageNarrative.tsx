@@ -10,8 +10,8 @@ import Link from 'next/link';
 import { DspLogo } from '@/components/atoms/DspLogo';
 import { Container } from '@/components/site/Container';
 import { APP_ROUTES } from '@/constants/routes';
+import { LazyPhoneShowcase } from '@/features/home/LazyPhoneShowcase';
 import { ProductScreenshot } from '@/features/home/ProductScreenshot';
-import { PhoneShowcase } from '@/features/home/phone-showcase-primitives';
 
 const TRUST_PLATFORMS = [
   'spotify',
@@ -81,6 +81,11 @@ const PROFILE_MODES: readonly ProfileMode[] = [
     outcome: 'Boost streams',
   },
 ] as const;
+
+const DEFERRED_SECTION_STYLE = {
+  contentVisibility: 'auto',
+  containIntrinsicSize: 'auto 1200px',
+} as const;
 
 interface SectionHeaderProps {
   readonly eyebrow: string;
@@ -169,10 +174,12 @@ function HomeHero() {
                 alt='Jovie dashboard showing releases, smart links, artist data, and workflow'
                 width={2880}
                 height={1800}
+                sizes='(max-width: 640px) calc(100vw - 42px), (max-width: 1023px) calc(100vw - 48px), (max-width: 1279px) 46vw, 560px'
                 title='Jovie release command center'
                 chrome='minimal'
                 priority
                 skipCheck
+                quality={70}
                 testId='homepage-hero-screenshot'
                 className='rounded-[1.35rem]'
               />
@@ -211,7 +218,10 @@ function HomeTrustBar() {
 
 function ArtistProfileSection() {
   return (
-    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-28'>
+    <section
+      className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-28'
+      style={DEFERRED_SECTION_STYLE}
+    >
       <Container size='homepage'>
         <div className='mx-auto grid max-w-[1120px] gap-12 lg:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)] lg:items-center'>
           <div className='max-w-[34rem]'>
@@ -244,7 +254,7 @@ function ArtistProfileSection() {
           </div>
 
           <div className='flex justify-center lg:justify-end'>
-            <PhoneShowcase modes={PROFILE_MODES} />
+            <LazyPhoneShowcase modes={PROFILE_MODES} />
           </div>
         </div>
       </Container>
@@ -254,7 +264,10 @@ function ArtistProfileSection() {
 
 function SmartLinksSection() {
   return (
-    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-28'>
+    <section
+      className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-28'
+      style={DEFERRED_SECTION_STYLE}
+    >
       <Container size='homepage'>
         <div className='mx-auto max-w-[1120px]'>
           <div className='grid gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(22rem,0.95fr)] lg:items-end'>
@@ -309,7 +322,10 @@ function SmartLinksSection() {
 
 function AiContextSection() {
   return (
-    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-28'>
+    <section
+      className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-28'
+      style={DEFERRED_SECTION_STYLE}
+    >
       <Container size='homepage'>
         <div className='mx-auto grid max-w-[1120px] gap-10 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-start'>
           <div>
@@ -376,7 +392,10 @@ function AiContextSection() {
 
 function MonitoringSection() {
   return (
-    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-28'>
+    <section
+      className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-28'
+      style={DEFERRED_SECTION_STYLE}
+    >
       <Container size='homepage'>
         <div className='mx-auto max-w-[1120px]'>
           <div className='grid gap-10 lg:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)] lg:items-end'>
@@ -431,7 +450,10 @@ function MonitoringSection() {
 
 function TasksSection() {
   return (
-    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-28'>
+    <section
+      className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-28'
+      style={DEFERRED_SECTION_STYLE}
+    >
       <Container size='homepage'>
         <div className='mx-auto max-w-[1120px]'>
           <div className='grid gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start'>

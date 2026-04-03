@@ -54,6 +54,19 @@ describe('performance budgets guard', () => {
     expect(selected.some(route => route.id === 'creator-releases')).toBe(true);
   });
 
+  it('selects manifest routes by route id even when the path contains placeholders', async () => {
+    const routes = await loadGuardManifestRoutes();
+    const selected = selectGuardRoutes(
+      routes,
+      parseGuardCliArgs(['--route-id', 'onboarding-resume-spotify'])
+    );
+
+    expect(selected.map(route => route.id)).toEqual([
+      'onboarding-resume-spotify',
+    ]);
+    expect(selected[0]?.path).toContain('resume=spotify');
+  });
+
   it('fails loudly when an authenticated route is measured without auth state', async () => {
     await expect(
       runPerformanceBudgetsGuard({

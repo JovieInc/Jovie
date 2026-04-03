@@ -22,6 +22,9 @@ export type ReleaseTrack = Pick<
   | 'previewUrl'
   | 'audioUrl'
   | 'audioFormat'
+  | 'previewSource'
+  | 'previewVerification'
+  | 'providerConfidenceSummary'
   | 'providers'
 >;
 

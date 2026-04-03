@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ReleaseTrackList } from '@/components/organisms/release-sidebar/ReleaseTrackList';
@@ -78,9 +79,10 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerSection: ({ children }: { children: React.ReactNode }) => (
     <section>{children}</section>
   ),
-  DrawerSurfaceCard: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
+  DrawerSurfaceCard: ({
+    children,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
 }));
 
 vi.mock('@/lib/queries', () => ({
@@ -107,13 +109,13 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 }));
 
 describe('ReleaseTrackList', () => {
-  it('shows provider icons in the track platform submenu', () => {
+  it('renders playback summary and expanded provider grouping', async () => {
+    const user = userEvent.setup();
     const release = createMockRelease();
 
     render(
       <ReleaseTrackList
         release={release}
-        showHeading={false}
         tracksOverride={[
           {
             id: 'track_1',
@@ -130,11 +132,26 @@ describe('ReleaseTrackList', () => {
             previewUrl: null,
             audioUrl: null,
             audioFormat: null,
+            previewSource: null,
+            previewVerification: 'missing',
+            providerConfidenceSummary: {
+              canonical: 1,
+              searchFallback: 1,
+              unknown: 2,
+              unresolvedProviders: ['apple_music', 'youtube'],
+            },
             providers: [
               {
                 key: 'spotify',
                 label: 'Spotify',
                 url: 'https://open.spotify.com/track/123',
+                confidence: 'canonical',
+              },
+              {
+                key: 'soundcloud',
+                label: 'SoundCloud',
+                url: 'https://soundcloud.com/track/123',
+                confidence: 'search_fallback',
               },
             ],
           },
@@ -142,12 +159,28 @@ describe('ReleaseTrackList', () => {
       />
     );
 
+    expect(screen.getByTestId('release-preview-summary')).toHaveTextContent(
+      'Previews: 0 verified, 0 fallback, 0 unknown'
+    );
     expect(
-      screen.getByRole('button', { name: /open on platform/i })
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('provider-icon-spotify')).toBeInTheDocument();
+      screen.getByTestId('release-track-status-track_1')
+    ).toHaveTextContent('Not checked');
     expect(
-      screen.getByRole('button', { name: /spotify/i })
+      screen.getByTestId('release-track-provider-summary-track_1')
+    ).toHaveTextContent('1 canonical, 1 fallback, 2 unknown');
+
+    const disclosure = screen.getByRole('button', { expanded: false });
+
+    await user.click(disclosure);
+
+    expect(
+      screen.getByTestId('release-track-canonical-providers-track_1')
     ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('release-track-fallback-providers-track_1')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('release-track-unresolved-track_1')
+    ).toHaveTextContent('Unresolved: Apple Music, YouTube');
   });
 });
