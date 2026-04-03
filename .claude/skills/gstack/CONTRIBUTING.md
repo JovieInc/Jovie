@@ -342,14 +342,24 @@ call picks it up immediately. No restart needed.
 
 ### Going back to the stable global install
 
-Remove the project-local symlink. Claude Code falls back to `~/.claude/skills/gstack/`:
+Remove the project-local install root and then either recreate the global install
+or remove the per-skill directories before relinking. The per-skill directories
+(`qa/`, `ship/`, etc.) contain absolute `SKILL.md` symlinks, so deleting only
+`.claude/skills/gstack` leaves those entries pointing at the vendored checkout.
 
 ```bash
-rm .claude/skills/gstack
+rm -rf .claude/skills/gstack
+
+# Option A: recreate the global install and relink to ~/.claude/skills/gstack
+cd ~/.claude/skills/gstack && ./setup
+
+# Option B: remove the per-skill directories first, then rerun global setup
+rm -rf .claude/skills/qa .claude/skills/ship .claude/skills/review
+cd ~/.claude/skills/gstack && ./setup
 ```
 
-The per-skill directories (`qa/`, `ship/`, etc.) contain SKILL.md symlinks that point
-to `gstack/...`, so they'll resolve to the global install automatically.
+If you have more per-skill directories than the examples above, remove the rest
+of them too so their `SKILL.md` symlinks stop pointing at the vendored copy.
 
 ### Switching prefix mode
 

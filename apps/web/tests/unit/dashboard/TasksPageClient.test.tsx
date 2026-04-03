@@ -162,6 +162,7 @@ let mockIsXlUp = true;
 let mockIs2xlUp = true;
 let mockTasksData = [mockTask, mockTaskTwo];
 let mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
+const mockUnifiedTable = vi.fn();
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({
@@ -306,7 +307,16 @@ vi.mock('@/components/organisms/table', () => ({
       {end}
     </div>
   ),
-  UnifiedTable: () => <div data-testid='tasks-table' />,
+  UnifiedTable: (props: { minWidth?: string; containerClassName?: string }) => {
+    mockUnifiedTable(props);
+    return (
+      <div
+        data-testid='tasks-table'
+        data-min-width={props.minWidth ?? ''}
+        data-container-class-name={props.containerClassName ?? ''}
+      />
+    );
+  },
   convertContextMenuItems: vi.fn(() => []),
 }));
 
@@ -352,6 +362,7 @@ describe('TasksPageClient', () => {
     mockCreateTask.mockReset();
     mockUpdateTask.mockReset();
     mockSetHeaderActions.mockReset();
+    mockUnifiedTable.mockReset();
     mockIsXlUp = true;
     mockIs2xlUp = true;
     mockTasksData = [mockTask, mockTaskTwo];
@@ -380,6 +391,14 @@ describe('TasksPageClient', () => {
     expect(titleEditor).toHaveValue(mockTaskTwo.title);
   });
 
+  it('keeps the tasks subheader at the same compact header height as the page header', () => {
+    renderPage();
+
+    expect(screen.getByTestId('tasks-workspace-subheader').className).toContain(
+      'h-[var(--linear-app-header-height-compact)]'
+    );
+  });
+
   it('shows the compact progress metadata for the selected task', () => {
     renderPage();
 
@@ -395,6 +414,19 @@ describe('TasksPageClient', () => {
     expect(
       screen.getByTestId('task-document-scroll-region')
     ).toBeInTheDocument();
+  });
+
+  it('pins the tasks table to the pane width instead of inheriting a wider table minimum', () => {
+    renderPage();
+
+    expect(screen.getByTestId('tasks-table')).toHaveAttribute(
+      'data-min-width',
+      '100%'
+    );
+    expect(screen.getByTestId('tasks-table')).toHaveAttribute(
+      'data-container-class-name',
+      'h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5'
+    );
   });
 
   it('hides the task document when the right panel opens on constrained desktop widths', () => {
@@ -456,7 +488,7 @@ describe('TasksPageClient', () => {
       screen.queryByTestId('task-description-helper')
     ).not.toBeInTheDocument();
     expect(screen.getByLabelText('Task description')).toHaveValue(
-      mockTask.description
+      mockTaskTwo.description
     );
   });
 

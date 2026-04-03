@@ -181,13 +181,16 @@ and new version. Migrations handle state fixes that `./setup` alone can't cover
 
 ```bash
 MIGRATIONS_DIR="$INSTALL_DIR/gstack-upgrade/migrations"
+NEW_VERSION=$(cat "$INSTALL_DIR/VERSION" 2>/dev/null || echo "unknown")
 if [ -d "$MIGRATIONS_DIR" ]; then
-  for migration in $(find "$MIGRATIONS_DIR" -maxdepth 1 -name 'v*.sh' -type f 2>/dev/null | sort -V); do
+  find "$MIGRATIONS_DIR" -maxdepth 1 -name 'v*.sh' -type f 2>/dev/null | sort -V | while IFS= read -r migration; do
     # Extract version from filename: v0.15.2.0.sh → 0.15.2.0
     m_ver="$(basename "$migration" .sh | sed 's/^v//')"
-    # Run if this migration version is newer than old version
-    # (simple string compare works for dotted versions with same segment count)
-    if [ "$OLD_VERSION" != "unknown" ] && [ "$(printf '%s\n%s' "$OLD_VERSION" "$m_ver" | sort -V | head -1)" = "$OLD_VERSION" ] && [ "$OLD_VERSION" != "$m_ver" ]; then
+    # Run only for OLD_VERSION < m_ver <= NEW_VERSION
+    if [ "$OLD_VERSION" != "unknown" ] && [ "$NEW_VERSION" != "unknown" ] \
+       && [ "$(printf '%s\n%s' "$OLD_VERSION" "$m_ver" | sort -V | head -1)" = "$OLD_VERSION" ] \
+       && [ "$OLD_VERSION" != "$m_ver" ] \
+       && [ "$(printf '%s\n%s' "$m_ver" "$NEW_VERSION" | sort -V | tail -1)" = "$NEW_VERSION" ]; then
       echo "Running migration $m_ver..."
       bash "$migration" || echo "  Warning: migration $m_ver had errors (non-fatal)"
     fi

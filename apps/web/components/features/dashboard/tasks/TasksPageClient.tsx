@@ -706,8 +706,8 @@ function TaskTitleEditor({
   const { measuredHeight, isAtMaxHeight, containerRef, hiddenDivRef } =
     useTextareaAutosize({
       value,
-      minHeight: 54,
-      maxHeight: 220,
+      minHeight: 48,
+      maxHeight: 176,
       textareaRef,
     });
 
@@ -720,7 +720,7 @@ function TaskTitleEditor({
         aria-label='Task title'
         onChange={event => onChange(event.target.value)}
         placeholder='Untitled Task'
-        className='w-full resize-none border-0 bg-transparent px-0 py-0 text-[clamp(1.7rem,2.6vw,2.45rem)] font-[620] leading-[1.06] tracking-[-0.04em] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)]'
+        className='w-full resize-none border-0 bg-transparent px-0 py-0 text-[clamp(1.55rem,1.9vw,2.15rem)] font-[620] leading-[1.06] tracking-[-0.04em] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)]'
         style={{
           height: measuredHeight,
           overflowY: isAtMaxHeight ? 'auto' : 'hidden',
@@ -731,7 +731,7 @@ function TaskTitleEditor({
         aria-hidden='true'
         style={{
           ...HIDDEN_DIV_STYLES,
-          fontSize: 'clamp(1.7rem, 2.6vw, 2.45rem)',
+          fontSize: 'clamp(1.55rem, 1.9vw, 2.15rem)',
           lineHeight: '1.06',
           fontWeight: 620,
           letterSpacing: '-0.04em',
@@ -1580,11 +1580,13 @@ export function TasksPageClient() {
             <div
               data-testid='task-list-pane'
               className={cn(
-                'min-h-0 min-w-0 shrink-0 overflow-hidden',
+                'min-h-0 min-w-0',
                 TASK_WORKSPACE_PANE_CLASSNAME,
-                'xl:w-[29rem] 2xl:w-[31rem] min-[1800px]:w-[33rem]',
+                selectedTask && showTaskDocumentPane
+                  ? 'xl:flex-none xl:basis-[32rem] xl:min-w-[28rem] xl:max-w-[36rem] xl:border-r xl:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
+                  : 'flex-1',
                 showTaskListPane ? 'block' : 'hidden',
-                (!selectedTask || !showTaskDocumentPane) && 'flex-1'
+                !selectedTask && 'xl:max-w-none'
               )}
             >
               {showTaskWorkbenchEmptyState ? (
@@ -1608,7 +1610,8 @@ export function TasksPageClient() {
                   rowHeight={64}
                   skeletonRows={8}
                   className='text-[13px]'
-                  containerClassName='h-full overflow-y-auto overflow-x-hidden px-0 pb-3 pt-2'
+                  containerClassName='h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5'
+                  minWidth='100%'
                   onRowClick={row => openTaskDocument(row)}
                   getContextMenuItems={getTaskContextMenuItems}
                   getRowClassName={_row =>

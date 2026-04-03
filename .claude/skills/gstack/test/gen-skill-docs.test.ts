@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'bun:test';
 import { COMMAND_DESCRIPTIONS } from '../browse/src/commands';
 import { SNAPSHOT_FLAGS } from '../browse/src/snapshot';
+import { extractVoiceTriggers, processVoiceTriggers } from '../scripts/voice-triggers';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -2583,15 +2584,15 @@ describe('gen-skill-docs prefix warning (#620/#578)', () => {
 });
 
 describe('voice-triggers processing', () => {
-  const { extractVoiceTriggers, processVoiceTriggers } = require('../scripts/gen-skill-docs') as {
-    extractVoiceTriggers: (content: string) => string[];
-    processVoiceTriggers: (content: string) => string;
-  };
-
   test('extractVoiceTriggers parses valid YAML list', () => {
     const content = `---\nname: cso\ndescription: |\n  Security audit.\nvoice-triggers:\n  - "see-so"\n  - "security review"\n---\nBody`;
     const triggers = extractVoiceTriggers(content);
     expect(triggers).toEqual(['see-so', 'security review']);
+  });
+
+  test('extractVoiceTriggers supports unquoted and single-quoted YAML items', () => {
+    const content = `---\nname: cso\ndescription: |\n  Security audit.\nvoice-triggers:\n  - see so\n  - 'security review'\n---\nBody`;
+    expect(extractVoiceTriggers(content)).toEqual(['see so', 'security review']);
   });
 
   test('extractVoiceTriggers returns [] when no field present', () => {

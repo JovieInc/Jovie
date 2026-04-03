@@ -13,6 +13,7 @@ export function TaskDescriptionHelper({
 }: TaskDescriptionHelperProps) {
   const introKeyCounts = new Map<string, number>();
   const bulletKeyCounts = new Map<string, number>();
+  const linkKeyCounts = new Map<string, number>();
 
   return (
     <div className='absolute inset-0 min-h-[520px]'>
@@ -56,18 +57,24 @@ export function TaskDescriptionHelper({
 
         {helper.links && helper.links.length > 0 ? (
           <ul className='space-y-1.5 text-[12px] leading-5 text-secondary-token'>
-            {helper.links.map(link => (
-              <li key={link.href}>
-                <a
-                  href={link.href}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  className='pointer-events-auto text-[var(--linear-accent,#5e6ad2)] hover:underline focus-visible:outline-none focus-visible:underline'
-                >
-                  {link.label}
-                </a>
-              </li>
-            ))}
+            {helper.links.map(link => {
+              const linkKey = `${link.href}:${link.label}`;
+              const occurrence = linkKeyCounts.get(linkKey) ?? 0;
+              linkKeyCounts.set(linkKey, occurrence + 1);
+
+              return (
+                <li key={`link-${linkKey}-${occurrence}`}>
+                  <a
+                    href={link.href}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='pointer-events-auto text-[var(--linear-accent,#5e6ad2)] hover:underline focus-visible:outline-none focus-visible:underline'
+                  >
+                    {link.label}
+                  </a>
+                </li>
+              );
+            })}
           </ul>
         ) : null}
 
