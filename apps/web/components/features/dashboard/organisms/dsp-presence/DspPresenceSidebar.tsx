@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import type { DspPresenceItem } from '@/app/app/(shell)/dashboard/presence/actions';
 import { Icon } from '@/components/atoms/Icon';
@@ -201,10 +202,19 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
 
 function SuggestedMatchActions({ matchId }: { readonly matchId: string }) {
   const dashboardData = useDashboardData();
+  const router = useRouter();
   const profileId = dashboardData.selectedProfile?.id;
 
   const { confirmMatch, rejectMatch, isConfirming, isRejecting } =
-    useDspMatchActions({ profileId: profileId ?? '' });
+    useDspMatchActions({
+      profileId: profileId ?? '',
+      onConfirmSuccess: () => {
+        router.refresh();
+      },
+      onRejectSuccess: () => {
+        router.refresh();
+      },
+    });
 
   const isLoading = isConfirming || isRejecting;
 

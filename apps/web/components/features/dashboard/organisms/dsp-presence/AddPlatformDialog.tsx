@@ -112,7 +112,7 @@ export function AddPlatformDialog({
         Link your artist profile on a streaming platform
       </DialogDescription>
 
-      <form onSubmit={handleSubmit} className='mt-5 space-y-4'>
+      <form noValidate onSubmit={handleSubmit} className='mt-5 space-y-4'>
         {/* Provider picker */}
         {availableProviders.length === 0 ? (
           <p className='text-[13px] text-tertiary-token text-center py-4'>
