@@ -56,20 +56,20 @@ export function ProfileNavButton({
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <CircleIconButton
-            size='xs'
-            variant='surface'
+            size='md'
+            variant='pearl'
             ariaLabel='Open profile menu'
             className={cn(
-              'group relative overflow-hidden backdrop-blur-md',
-              'transition-[opacity,transform,filter,background-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90',
+              'group backdrop-blur-xl',
+              'transition-[opacity,transform,filter,background-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-95',
               className
             )}
           >
             <BrandLogo
-              size={24}
+              size={22}
               tone='auto'
               className={cn(
-                'opacity-60 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100',
+                'opacity-72 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100',
                 loading && 'animate-pulse'
               )}
             />
@@ -145,15 +145,15 @@ export function ProfileNavButton({
   return (
     <CircleIconButton
       asChild
-      size='xs'
-      variant='surface'
+      size='md'
+      variant='pearl'
       ariaLabel='Back to profile'
-      className={cn('backdrop-blur-md', className)}
+      className={cn('backdrop-blur-xl text-primary-token/76', className)}
     >
       <Link href={`/${artistHandle}`} data-testid='back-button'>
         <ArrowLeft
           className={cn(
-            'h-4 w-4 text-secondary-token',
+            'h-[17px] w-[17px] text-primary-token/78',
             'transition-all duration-300 ease-out',
             'animate-in fade-in zoom-in-90 slide-in-from-right-1 duration-300'
           )}

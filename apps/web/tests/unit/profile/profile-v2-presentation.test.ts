@@ -10,7 +10,7 @@ describe('resolveProfileV2Presentation', () => {
     ['profile', { initialOverlay: null, scrollTarget: null }],
     ['tour', { initialOverlay: null, scrollTarget: 'tour' }],
     ['tip', { initialOverlay: 'tip', scrollTarget: null }],
-    ['about', { initialOverlay: null, scrollTarget: null }],
+    ['about', { initialOverlay: null, scrollTarget: 'about' }],
     ['listen', { initialOverlay: 'listen', scrollTarget: null }],
     ['subscribe', { initialOverlay: 'subscribe', scrollTarget: null }],
     ['contact', { initialOverlay: 'contact', scrollTarget: null }],

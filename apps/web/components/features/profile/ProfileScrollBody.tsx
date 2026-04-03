@@ -37,6 +37,7 @@ interface ProfileScrollBodyProps {
   readonly hasTip: boolean;
   readonly primaryActionKind: PrimaryActionKind;
   readonly subscribeTwoStep?: boolean;
+  readonly aboutSectionRef: RefObject<HTMLElement | null>;
   readonly subscribeSectionRef: RefObject<HTMLElement | null>;
   readonly subscribeModeActive?: boolean;
   readonly onTipClick: () => void;
@@ -51,18 +52,25 @@ const condensedDateFormatter = new Intl.DateTimeFormat('en-US', {
 
 function SectionLabel({ children }: { readonly children: React.ReactNode }) {
   return (
-    <p className='text-[0.72rem] font-[590] uppercase tracking-[0.18em] text-secondary-token'>
+    <p className='text-[13px] font-[560] tracking-[-0.015em] text-secondary-token'>
       {children}
     </p>
   );
 }
 
+const panelClassName =
+  'rounded-[28px] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] px-5 py-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl';
+const flatSurfaceClassName =
+  'rounded-[26px] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl';
+
 function ArtistBioSection({
   artist,
   genres,
+  aboutSectionRef,
 }: {
   readonly artist: Artist;
   readonly genres?: string[] | null;
+  readonly aboutSectionRef: RefObject<HTMLElement | null>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const bio = artist.tagline?.trim() ?? '';
@@ -81,13 +89,17 @@ function ArtistBioSection({
   }
 
   return (
-    <section aria-labelledby='profile-about-heading' className='space-y-3'>
+    <section
+      ref={aboutSectionRef}
+      aria-labelledby='profile-about-heading'
+      className='space-y-3'
+    >
       <SectionLabel>About</SectionLabel>
 
       {bio ? (
-        <div className='rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] px-5 py-4 shadow-[0_16px_50px_rgba(0,0,0,0.12)]'>
+        <div className={panelClassName}>
           {metaLine ? (
-            <div className='mb-3 inline-flex max-w-full items-center gap-2 rounded-full border border-white/8 bg-black/10 px-3 py-1.5 text-[0.78rem] text-secondary-token'>
+            <div className='mb-3 inline-flex max-w-full items-center gap-2 rounded-full border border-subtle/70 bg-surface-2/80 px-3 py-1.5 text-[0.78rem] text-secondary-token'>
               <MapPin className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
               <span className='truncate'>{metaLine}</span>
             </div>
@@ -111,7 +123,7 @@ function ArtistBioSection({
       ) : (
         <div
           id='profile-about-heading'
-          className='inline-flex max-w-full items-center gap-2 rounded-full border border-white/8 bg-white/[0.05] px-3 py-2 text-[0.82rem] text-secondary-token'
+          className='inline-flex max-w-full items-center gap-2 rounded-full border border-subtle/70 bg-surface-1/75 px-3 py-2 text-[0.82rem] text-secondary-token'
         >
           <MapPin className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
           <span className='truncate'>{metaLine}</span>
@@ -172,10 +184,16 @@ function TourDateRow({
   const location = [tourDate.city, tourDate.region, tourDate.country]
     .filter(Boolean)
     .join(', ');
+  const canBuyTickets =
+    Boolean(tourDate.ticketUrl) &&
+    tourDate.ticketStatus !== 'cancelled' &&
+    tourDate.ticketStatus !== 'sold_out';
 
   return (
-    <article className='grid gap-4 border-t border-white/8 py-4 first:border-t-0 first:pt-0 last:pb-0 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-center'>
-      <div className='flex h-[64px] w-[64px] flex-col items-center justify-center rounded-[20px] border border-white/8 bg-black/10 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'>
+    <article
+      className={`${flatSurfaceClassName} grid gap-4 px-4 py-4 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-center`}
+    >
+      <div className='flex h-[64px] w-[64px] flex-col items-center justify-center rounded-[20px] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-active)] text-center shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl'>
         <span className='text-[0.68rem] font-[590] uppercase tracking-[0.18em] text-secondary-token'>
           {new Intl.DateTimeFormat('en-US', { month: 'short' }).format(
             new Date(tourDate.startDate)
@@ -200,17 +218,21 @@ function TourDateRow({
         ) : null}
       </div>
 
-      {tourDate.ticketUrl ? (
+      {canBuyTickets ? (
         <a
-          href={tourDate.ticketUrl}
+          href={tourDate.ticketUrl as string}
           target='_blank'
           rel='noopener noreferrer'
-          className='inline-flex min-h-11 items-center justify-center rounded-full border border-white/10 bg-white/6 px-4 py-2.5 text-sm font-[590] text-primary-token transition-[background-color,border-color] hover:border-white/18 hover:bg-white/10'
+          className='inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--profile-pearl-primary-bg)] px-4 py-2.5 text-[15px] font-semibold tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-[var(--profile-pearl-shadow)] transition-[opacity,transform] hover:opacity-92 active:scale-[0.985]'
           onClick={handleTicketClick}
         >
           Tickets
         </a>
-      ) : null}
+      ) : (
+        <span className='inline-flex min-h-11 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] px-4 py-2.5 text-[15px] font-medium tracking-[-0.015em] text-tertiary-token shadow-[var(--profile-pearl-shadow)]'>
+          {tourDate.ticketStatus === 'sold_out' ? 'Sold out' : 'No tickets'}
+        </span>
+      )}
     </article>
   );
 }
@@ -247,10 +269,7 @@ function TourSection({
       className='space-y-3'
     >
       <SectionLabel>Tour</SectionLabel>
-      <div
-        id='profile-tour-heading'
-        className='rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] px-5 py-4 shadow-[0_16px_50px_rgba(0,0,0,0.12)]'
-      >
+      <div id='profile-tour-heading' className='space-y-3'>
         {visibleDates.map(tourDate => (
           <TourDateRow
             key={tourDate.id}
@@ -263,7 +282,7 @@ function TourSection({
         {sortedDates.length > 4 ? (
           <button
             type='button'
-            className='mt-5 text-sm font-[590] text-primary-token transition-opacity hover:opacity-75'
+            className='inline-flex min-h-11 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] px-4 py-2.5 text-[15px] font-[560] tracking-[-0.015em] text-primary-token shadow-[var(--profile-pearl-shadow)] transition-[background-color,transform] hover:bg-[var(--profile-pearl-bg-hover)] active:scale-[0.985]'
             onClick={() => setExpanded(current => !current)}
           >
             {expanded
@@ -298,7 +317,7 @@ function UtilityRail({
         {hasContacts ? (
           <button
             type='button'
-            className='inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/6 px-4 py-2.5 text-sm font-[590] text-primary-token transition-[background-color,border-color] hover:border-white/18 hover:bg-white/10'
+            className='inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] px-4 py-2.5 text-[15px] font-[560] tracking-[-0.015em] text-primary-token shadow-[var(--profile-pearl-shadow)] transition-[background-color,transform] hover:bg-[var(--profile-pearl-bg-hover)] active:scale-[0.985]'
             onClick={onContactClick}
           >
             <Mail className='h-4 w-4' aria-hidden='true' />
@@ -308,7 +327,7 @@ function UtilityRail({
         {hasTip ? (
           <button
             type='button'
-            className='inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/6 px-4 py-2.5 text-sm font-[590] text-primary-token transition-[background-color,border-color] hover:border-white/18 hover:bg-white/10'
+            className='inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] px-4 py-2.5 text-[15px] font-[560] tracking-[-0.015em] text-primary-token shadow-[var(--profile-pearl-shadow)] transition-[background-color,transform] hover:bg-[var(--profile-pearl-bg-hover)] active:scale-[0.985]'
             onClick={onTipClick}
           >
             <HandCoins className='h-4 w-4' aria-hidden='true' />
@@ -336,14 +355,15 @@ function SubscribeSection({
       ref={subscribeSectionRef}
       aria-labelledby='profile-subscribe-heading'
       className='space-y-3'
+      data-testid='subscribe-cta-container'
     >
       <SectionLabel>Get Notified</SectionLabel>
-      <div
-        id='profile-subscribe-heading'
-        className='rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] px-5 py-4 shadow-[0_16px_50px_rgba(0,0,0,0.12)]'
-      >
+      <div id='profile-subscribe-heading' className={panelClassName}>
         {subscribeTwoStep ? (
-          <TwoStepNotificationsCTA artist={artist} />
+          <TwoStepNotificationsCTA
+            artist={artist}
+            startExpanded={subscribeModeActive}
+          />
         ) : (
           <ArtistNotificationsCTA
             key={subscribeModeActive ? 'subscribe-focus' : 'subscribe-default'}
@@ -369,6 +389,7 @@ export function ProfileScrollBody({
   tourDates,
   hasTip,
   subscribeTwoStep = false,
+  aboutSectionRef,
   subscribeSectionRef,
   subscribeModeActive = false,
   onTipClick,
@@ -382,7 +403,13 @@ export function ProfileScrollBody({
       className='min-h-0 flex-1 overflow-y-auto'
       aria-label='Artist profile'
     >
-      <div className='space-y-7 px-5 pb-[max(env(safe-area-inset-bottom),28px)] pt-6 md:space-y-8 md:px-7 md:pb-8 md:pt-7'>
+      <div
+        className={`px-5 pb-[max(env(safe-area-inset-bottom),28px)] md:px-7 md:pb-8 ${
+          subscribeModeActive
+            ? 'space-y-6 pt-4 md:space-y-7 md:pt-6'
+            : 'space-y-7 pt-6 md:space-y-8 md:pt-7'
+        }`}
+      >
         <SubscribeSection
           artist={artist}
           subscribeTwoStep={subscribeTwoStep}
@@ -420,7 +447,11 @@ export function ProfileScrollBody({
           onContactClick={onContactClick}
         />
 
-        <ArtistBioSection artist={artist} genres={genres} />
+        <ArtistBioSection
+          artist={artist}
+          genres={genres}
+          aboutSectionRef={aboutSectionRef}
+        />
         <SocialLinksSection artist={artist} socialLinks={socialLinks} />
       </div>
     </main>

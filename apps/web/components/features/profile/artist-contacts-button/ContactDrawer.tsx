@@ -64,13 +64,13 @@ export function ContactDrawer({
           return (
             <div
               key={contact.id}
-              className='flex items-center justify-between gap-3 rounded-[24px] border border-white/8 bg-white/[0.045] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition-[background-color,border-color] duration-150 ease-out hover:border-white/12 hover:bg-white/[0.06]'
+              className='flex items-center justify-between gap-4 rounded-[26px] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] px-4 py-4 shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl transition-[background-color,border-color] duration-150 ease-out hover:bg-[var(--profile-pearl-bg-hover)]'
               data-testid='contact-drawer-item'
             >
               {primaryHref ? (
                 <a
                   href={primaryHref}
-                  className='flex flex-1 flex-col items-start gap-1 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+                  className='flex min-w-0 flex-1 flex-col items-start gap-1.5 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
                   onClick={() => trackAction(primary, contact)}
                 >
                   <div className='flex flex-wrap items-center gap-2'>
@@ -93,7 +93,7 @@ export function ContactDrawer({
                   ) : null}
                 </a>
               ) : null}
-              <div className='flex items-center gap-2'>
+              <div className='flex shrink-0 items-center gap-2'>
                 {contact.channels.map(channel => {
                   const channelHref = getActionHref(channel);
                   if (!channelHref) return null;
@@ -107,7 +107,7 @@ export function ContactDrawer({
                     <a
                       key={`${contact.id}-${channel.type}`}
                       href={channelHref}
-                      className='flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/[0.05] text-primary-token transition-[background-color,border-color] hover:border-white/14 hover:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+                      className='flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-active)] text-primary-token shadow-[var(--profile-pearl-shadow)] transition-[background-color,border-color] hover:bg-[var(--profile-pearl-bg-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
                       aria-label={`${channelLabel} ${contact.roleLabel}`}
                       onClick={() => trackAction(channel, contact)}
                       data-testid='contact-drawer-channel-action'

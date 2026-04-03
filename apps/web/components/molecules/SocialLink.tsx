@@ -1,6 +1,7 @@
 'use client';
 
 import { memo } from 'react';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { track } from '@/lib/analytics';
 import { getSocialDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
@@ -64,17 +65,23 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
   };
 
   return (
-    <a
-      href={link.url}
-      target='_blank'
-      rel='noopener noreferrer'
-      onClick={handleClick}
-      className='group flex h-11 min-w-11 items-center justify-center rounded-full border border-white/8 bg-white/[0.045] text-secondary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition-[background-color,border-color,color,transform] hover:border-white/14 hover:bg-white/[0.08] hover:text-primary-token active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
-      title={`Follow on ${link.platform}`}
-      aria-label={`Follow ${artistName} on ${link.platform}`}
+    <CircleIconButton
+      asChild
+      size='md'
+      variant='pearl'
+      ariaLabel={`Follow ${artistName} on ${link.platform}`}
+      className='text-primary-token/72 shadow-none hover:text-primary-token'
     >
-      <SocialIcon platform={link.platform} className='h-4 w-4' />
-    </a>
+      <a
+        href={link.url}
+        target='_blank'
+        rel='noopener noreferrer'
+        onClick={handleClick}
+        title={`Follow on ${link.platform}`}
+      >
+        <SocialIcon platform={link.platform} className='h-4 w-4' />
+      </a>
+    </CircleIconButton>
   );
 }
 

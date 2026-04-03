@@ -232,6 +232,31 @@ describe('StaticArtistPage', () => {
     expect(screen.getByTestId('notifications-cta')).toBeDefined();
   });
 
+  it('renders a compact empty state in tour mode when no dates exist', () => {
+    render(
+      <StaticArtistPage
+        mode='tour'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Tour dates'
+        showTipButton={false}
+        showBackButton={true}
+        tourDates={[]}
+      />
+    );
+
+    expect(screen.getByTestId('tour-empty-state')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /is not currently on tour\. Get notified when dates are announced\./i
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /turn on notifications/i })
+    ).toBeInTheDocument();
+  });
+
   it('keeps contact mode on the legacy template when no contacts exist', () => {
     render(
       <StaticArtistPage
