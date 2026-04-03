@@ -103,7 +103,12 @@ describe('context-aware link ordering', () => {
       createLink('4', 'tiktok', 'https://tiktok.com/@artist'),
     ];
 
-    const result = getHeaderSocialLinks(links, undefined, undefined, 'instagram');
+    const result = getHeaderSocialLinks(
+      links,
+      undefined,
+      undefined,
+      'instagram'
+    );
 
     expect(result.map(link => link.platform)).toEqual([
       'tiktok',

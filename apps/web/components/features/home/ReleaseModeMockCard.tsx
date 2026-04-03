@@ -75,11 +75,12 @@ export function ReleaseModeMockCard({
       : 'border-emerald-400/20 bg-emerald-400/10 text-emerald-100/88';
   const stateLabel = release.state === 'presave' ? 'Presave' : 'Live';
   const visibleLabels = isCompact ? release.labels.slice(0, 3) : release.labels;
+  const stateMetaLabel = release.state === 'presave' ? 'Countdown' : 'Status';
 
   return (
     <MarketingSurfaceCard
       testId={testId}
-      aspectRatio={isCompact ? '9 / 16' : isComparison ? '5 / 6' : '16 / 10'}
+      aspectRatio={isCompact ? '9 / 16' : isComparison ? '11 / 13' : '16 / 10'}
       variant={isCompact ? 'floating' : 'panel'}
       glowTone={release.artworkTone}
       className={cn('h-full', className)}
@@ -123,12 +124,9 @@ export function ReleaseModeMockCard({
               tone={release.artworkTone}
               compact={isCompact || isComparison}
             />
-            <div className='mt-3'>
-              <p className='mt-1 text-[11px] leading-5 text-white/44'>
-                {release.artist}
-                <br />
-                {release.releaseLabel}
-              </p>
+            <div className='mt-3 flex items-center justify-between gap-3 text-[11px] leading-5 text-white/44'>
+              <p>{release.artist}</p>
+              <p className='text-right'>{release.releaseLabel}</p>
             </div>
           </div>
 
@@ -167,10 +165,17 @@ export function ReleaseModeMockCard({
               </div>
             </div>
 
-            <div className='mt-3 flex items-center justify-between gap-3 rounded-[0.95rem] border border-white/8 bg-white/[0.03] px-3 py-2.5'>
+            <div
+              className={cn(
+                'mt-3 flex items-center justify-between gap-3 rounded-[0.95rem] px-3 py-2.5',
+                isComparison
+                  ? 'border border-white/6 bg-white/[0.02]'
+                  : 'border border-white/8 bg-white/[0.03]'
+              )}
+            >
               <div>
                 <p className='text-[10px] font-medium tracking-[0.02em] text-white/40'>
-                  {release.state === 'presave' ? 'Countdown' : 'Status'}
+                  {stateMetaLabel}
                 </p>
                 <p className='mt-1 text-[12px] text-white/82'>
                   {release.stateDetail}
@@ -188,20 +193,34 @@ export function ReleaseModeMockCard({
               </div>
             </div>
 
-            <div className='mt-3 rounded-[0.95rem] border border-white/8 bg-white/[0.03] px-3 py-3'>
-              <p className='text-[10px] font-medium tracking-[0.02em] text-white/40'>
-                Label Partners
-              </p>
-              <div className='mt-3 flex flex-wrap items-center gap-x-4 gap-y-3'>
-                {visibleLabels.map(label => (
-                  <HomepageLabelLogoMark
-                    key={`${release.id}-${label}`}
-                    partner={label}
-                    className='text-white/72'
-                  />
-                ))}
+            {isComparison ? (
+              <div className='mt-4 border-t border-white/6 pt-3'>
+                <div className='flex flex-wrap items-center gap-x-4 gap-y-2'>
+                  {visibleLabels.map(label => (
+                    <HomepageLabelLogoMark
+                      key={`${release.id}-${label}`}
+                      partner={label}
+                      className='text-white/68'
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className='mt-3 rounded-[0.95rem] border border-white/8 bg-white/[0.03] px-3 py-3'>
+                <p className='text-[10px] font-medium tracking-[0.02em] text-white/40'>
+                  Label Partners
+                </p>
+                <div className='mt-3 flex flex-wrap items-center gap-x-4 gap-y-3'>
+                  {visibleLabels.map(label => (
+                    <HomepageLabelLogoMark
+                      key={`${release.id}-${label}`}
+                      partner={label}
+                      className='text-white/72'
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
             {isCompact && release.labels.length > visibleLabels.length ? (
               <p className='mt-3 text-[10px] text-white/34'>

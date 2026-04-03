@@ -121,10 +121,7 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
 
   if (data.items.length === 0) {
     return (
-      <PageShell
-        toolbar={toolbar}
-        data-testid='dsp-presence-workspace'
-      >
+      <PageShell toolbar={toolbar} data-testid='dsp-presence-workspace'>
         <div
           className='flex h-full min-h-0 flex-1 items-center justify-center'
           data-testid='dsp-presence-content-panel'
@@ -136,10 +133,7 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
   }
 
   return (
-    <PageShell
-      toolbar={toolbar}
-      data-testid='dsp-presence-workspace'
-    >
+    <PageShell toolbar={toolbar} data-testid='dsp-presence-workspace'>
       <div
         className='flex min-h-0 flex-1 overflow-hidden'
         data-testid='dsp-presence-content-panel'

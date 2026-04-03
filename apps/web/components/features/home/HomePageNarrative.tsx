@@ -31,7 +31,7 @@ function SectionHeader({ eyebrow, title, body }: Readonly<SectionHeaderProps>) {
     <div className='max-w-[34rem]'>
       <p className='homepage-section-eyebrow'>{eyebrow}</p>
       <h2 className='marketing-h2-linear mt-4 text-primary-token'>{title}</h2>
-      <p className='mt-4 max-w-[32rem] text-[15px] leading-[1.7] text-secondary-token sm:text-[16px]'>
+      <p className='mt-5 max-w-[30rem] text-[15px] leading-[1.75] text-secondary-token sm:text-[16px]'>
         {body}
       </p>
     </div>
@@ -120,7 +120,7 @@ function HomeTrustBar() {
 
 function ArtistProfileSection() {
   return (
-    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-28'>
+    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
       <Container size='homepage'>
         <div className='mx-auto grid max-w-[1120px] gap-12 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:items-center'>
           <div className='max-w-[34rem]'>
@@ -144,17 +144,17 @@ function ArtistProfileSection() {
 
 function ReleaseDestinationsSection() {
   return (
-    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-28'>
+    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
       <Container size='homepage'>
         <div className='mx-auto max-w-[1120px]'>
-          <div className='grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:items-end'>
+          <div className='grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:items-end'>
             <SectionHeader
               eyebrow='Release Destinations'
               title='Every release gets a clean destination.'
               body='Presave before launch. Go live on the same surface when the record drops.'
             />
 
-            <div className='border-t border-subtle pt-6'>
+            <div className='border-t border-subtle pt-7'>
               <div className='flex flex-wrap items-center gap-x-6 gap-y-3 text-sm'>
                 <span className='font-[560] text-primary-token'>
                   Presave first
@@ -209,8 +209,8 @@ function ReleaseDestinationsSection() {
               />
             </div>
 
-            <div className='relative mt-12 hidden min-h-[32rem] lg:block'>
-              <div className='absolute left-0 top-0 z-20 w-[24rem] rotate-[-2deg]'>
+            <div className='relative mt-14 hidden min-h-[34rem] lg:block'>
+              <div className='absolute left-0 top-0 z-20 w-[23.5rem] rotate-[-2deg]'>
                 <ReleaseModeMockCard
                   release={HOME_RELEASE_DESTINATION_PRESAVE_MOCK}
                   variant='comparison'
@@ -218,7 +218,7 @@ function ReleaseDestinationsSection() {
                 />
               </div>
 
-              <div className='absolute right-0 top-10 z-10 w-[24rem] rotate-[1.5deg]'>
+              <div className='absolute right-0 top-12 z-10 w-[23.5rem] rotate-[1.5deg]'>
                 <ReleaseModeMockCard
                   release={HOME_RELEASE_DESTINATION_LIVE_MOCK}
                   variant='comparison'
@@ -228,7 +228,7 @@ function ReleaseDestinationsSection() {
 
               <div
                 data-testid='homepage-release-destination-notification'
-                className='absolute bottom-6 left-1/2 z-30 w-[30rem] -translate-x-1/2 rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(18,20,28,0.96),rgba(10,12,18,0.94))] px-5 py-3 shadow-[0_24px_70px_rgba(0,0,0,0.28)]'
+                className='absolute bottom-5 left-1/2 z-30 w-[28rem] -translate-x-1/2 rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(18,20,28,0.96),rgba(10,12,18,0.94))] px-5 py-3 shadow-[0_24px_70px_rgba(0,0,0,0.28)]'
               >
                 <div className='flex items-center justify-center gap-3'>
                   <div className='flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04]'>
@@ -252,17 +252,17 @@ function ReleaseDestinationsSection() {
 
 function ReleaseOperatingSystemSection() {
   return (
-    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-28'>
+    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
       <Container size='homepage'>
         <div className='mx-auto max-w-[1120px]'>
-          <div className='grid gap-10 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-end'>
+          <div className='grid gap-12 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-end'>
             <SectionHeader
               eyebrow='Release Operating System'
               title='Context, monitoring, and tasks in one system.'
               body='Jovie knows the release, watches the rollout, and keeps the work attached to it.'
             />
 
-            <div className='border-t border-subtle pt-6 text-sm'>
+            <div className='border-t border-subtle pt-7 text-sm'>
               <span className='font-[560] text-primary-token'>
                 One working view
               </span>
@@ -272,7 +272,7 @@ function ReleaseOperatingSystemSection() {
             </div>
           </div>
 
-          <div className='mt-10 lg:mt-12'>
+          <div className='mt-12 lg:mt-14'>
             <ReleaseOperatingSystemShowcase />
           </div>
         </div>
