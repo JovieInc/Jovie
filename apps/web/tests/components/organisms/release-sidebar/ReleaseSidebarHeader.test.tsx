@@ -2,6 +2,14 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockToastError = vi.fn();
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: (...args: unknown[]) => mockToastError(...args),
+  },
+}));
+
 const { useReleaseHeaderParts } = await import(
   '@/components/organisms/release-sidebar/ReleaseSidebarHeader'
 );
@@ -55,6 +63,12 @@ function TestHarness(props: Parameters<typeof useReleaseHeaderParts>[0]) {
 describe('useReleaseHeaderParts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(globalThis.navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
+    });
   });
 
   it('omits duplicate visible header copy and smart-link primary actions', () => {
@@ -79,5 +93,27 @@ describe('useReleaseHeaderParts', () => {
     expect(
       screen.getByRole('button', { name: /copy release id/i })
     ).toBeInTheDocument();
+  });
+
+  it('uses toast feedback instead of native alerts when copy fails', async () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+    Object.defineProperty(globalThis.navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: vi.fn().mockRejectedValue(new Error('clipboard blocked')),
+      },
+    });
+
+    render(<TestHarness release={release} hasRelease />);
+
+    await user.click(screen.getByRole('button', { name: /copy release id/i }));
+
+    expect(mockToastError).toHaveBeenCalledWith(
+      'Failed to copy the release ID. Your browser may not allow clipboard access.'
+    );
+    expect(alertSpy).not.toHaveBeenCalled();
+
+    alertSpy.mockRestore();
   });
 });

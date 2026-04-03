@@ -338,6 +338,44 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
   ReleaseSidebar: () => null,
 }));
 
+vi.mock('@/components/molecules/ConfirmDialog', () => ({
+  ConfirmDialog: ({
+    open,
+    onOpenChange,
+    onConfirm,
+    title,
+    description,
+    confirmLabel = 'Confirm',
+    cancelLabel = 'Cancel',
+  }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onConfirm: () => void | Promise<void>;
+    title: string;
+    description: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+  }) =>
+    open ? (
+      <div data-testid='confirm-dialog'>
+        <div>{title}</div>
+        <div>{description}</div>
+        <button type='button' onClick={() => onOpenChange(false)}>
+          {cancelLabel}
+        </button>
+        <button
+          type='button'
+          onClick={() => {
+            void onConfirm();
+            onOpenChange(false);
+          }}
+        >
+          {confirmLabel}
+        </button>
+      </div>
+    ) : null,
+}));
+
 const { TasksPageClient } = await import(
   '@/components/features/dashboard/tasks/TasksPageClient'
 );
@@ -699,7 +737,6 @@ describe('TasksPageClient', () => {
   });
 
   it('confirms before deleting a task from the context menu', () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderPage();
 
     const tableProps = mockUnifiedTable.mock.calls.at(-1)?.[0] as
@@ -715,23 +752,28 @@ describe('TasksPageClient', () => {
       ?.getContextMenuItems?.(mockTaskTwo)
       ?.find(item => item.id === 'delete-task');
 
-    deleteItem?.onClick?.();
+    act(() => {
+      deleteItem?.onClick?.();
+    });
 
-    expect(confirmSpy).toHaveBeenCalledWith(
+    expect(screen.getByTestId('confirm-dialog')).toHaveTextContent(
+      'Delete task'
+    );
+    expect(screen.getByTestId('confirm-dialog')).toHaveTextContent(
       `Delete "${mockTaskTwo.title}"? This can't be undone.`
     );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
     expect(mockDeleteTask).toHaveBeenCalledWith(
       mockTaskTwo.id,
       expect.objectContaining({
         onError: expect.any(Function),
       })
     );
-
-    confirmSpy.mockRestore();
   });
 
   it('does not delete a task when the context menu confirmation is cancelled', () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderPage();
 
     const tableProps = mockUnifiedTable.mock.calls.at(-1)?.[0] as
@@ -747,11 +789,13 @@ describe('TasksPageClient', () => {
       ?.getContextMenuItems?.(mockTaskTwo)
       ?.find(item => item.id === 'delete-task');
 
-    deleteItem?.onClick?.();
+    act(() => {
+      deleteItem?.onClick?.();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(mockDeleteTask).not.toHaveBeenCalled();
-
-    confirmSpy.mockRestore();
   });
 
   it('supports j and k keyboard navigation across visible tasks', () => {

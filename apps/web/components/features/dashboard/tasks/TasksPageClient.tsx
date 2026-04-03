@@ -44,6 +44,7 @@ import {
   HIDDEN_DIV_STYLES,
   useTextareaAutosize,
 } from '@/components/jovie/hooks/useTextareaAutosize';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
   TOOLBAR_MENU_CONTENT_CLASS,
   TOOLBAR_MENU_SEPARATOR_CLASS,
@@ -1000,6 +1001,9 @@ export function TasksPageClient() {
   const [mobileScope, setMobileScope] = useState<MobileTaskScope>('all');
   const [draftTitle, setDraftTitle] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [pendingDeleteTask, setPendingDeleteTask] = useState<TaskView | null>(
+    null
+  );
   const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(
     null
   );
@@ -1334,24 +1338,26 @@ export function TasksPageClient() {
     [updateTask]
   );
 
-  const handleDeleteTask = useCallback(
-    (task: TaskView) => {
-      const shouldDelete = globalThis.confirm(
-        `Delete "${task.title}"? This can't be undone.`
-      );
+  const handleDeleteTask = useCallback((task: TaskView) => {
+    setPendingDeleteTask(task);
+  }, []);
 
-      if (!shouldDelete) {
-        return;
-      }
+  const confirmDeleteTask = useCallback(() => {
+    if (!pendingDeleteTask) {
+      return;
+    }
 
-      deleteTask(task.id, {
-        onError: () => {
-          toast.error("Couldn't delete task");
-        },
-      });
-    },
-    [deleteTask]
-  );
+    const taskToDelete = pendingDeleteTask;
+    deleteTask(taskToDelete.id, {
+      onError: () => {
+        toast.error("Couldn't delete task");
+      },
+    });
+
+    if (selectedTaskId === taskToDelete.id) {
+      setSelectedTaskId(null);
+    }
+  }, [deleteTask, pendingDeleteTask, selectedTaskId]);
 
   const getTaskContextMenuItems = useCallback(
     (task: TaskView): ContextMenuItemType[] => [
@@ -1796,6 +1802,24 @@ export function TasksPageClient() {
           </div>
         )}
       </section>
+      <ConfirmDialog
+        open={Boolean(pendingDeleteTask)}
+        onOpenChange={open => {
+          if (!open) {
+            setPendingDeleteTask(null);
+          }
+        }}
+        title='Delete task'
+        description={
+          pendingDeleteTask
+            ? `Delete "${pendingDeleteTask.title}"? This can't be undone.`
+            : "Delete this task? This can't be undone."
+        }
+        confirmLabel='Delete'
+        variant='destructive'
+        isLoading={deleteTaskMutation.isPending}
+        onConfirm={confirmDeleteTask}
+      />
     </PageShell>
   );
 }

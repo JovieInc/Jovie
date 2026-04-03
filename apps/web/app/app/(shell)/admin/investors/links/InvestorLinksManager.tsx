@@ -16,6 +16,7 @@ import {
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
@@ -363,6 +364,7 @@ function LinkActions({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const shareableUrl = `${BASE_URL}/investor-portal?t=${link.token}`;
@@ -439,14 +441,7 @@ function LinkActions({
               className='flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] text-destructive transition-colors hover:bg-destructive/8'
               onClick={() => {
                 setMenuOpen(false);
-                // Deactivates the link (soft-delete) — confirm first
-                if (
-                  globalThis.confirm(
-                    `Delete "${link.label}"? The link will be permanently removed.`
-                  )
-                ) {
-                  onDelete(link.id);
-                }
+                setDeleteDialogOpen(true);
               }}
             >
               <Trash2 className='h-3.5 w-3.5' />
@@ -454,6 +449,17 @@ function LinkActions({
             </button>
           </div>
         )}
+        <ConfirmDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          title='Delete investor link'
+          description={`Delete "${link.label}"? The link will be permanently removed.`}
+          confirmLabel='Delete'
+          variant='destructive'
+          onConfirm={async () => {
+            await onDelete(link.id);
+          }}
+        />
       </div>
     </div>
   );
