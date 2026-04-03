@@ -649,6 +649,7 @@ async function fetchTippingStatsWithSession(
       () =>
         tx
           .select({
+            total: drizzleSql<number>`count(*)`,
             qr: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') = 'qr')`,
             link: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') = 'link')`,
           })
@@ -667,7 +668,7 @@ async function fetchTippingStatsWithSession(
     const clickStats = clickStatsResult?.[0];
 
     return {
-      tipClicks: Number((clickStats?.qr ?? 0) + (clickStats?.link ?? 0)),
+      tipClicks: Number(clickStats?.total ?? 0),
       qrTipClicks: Number(clickStats?.qr ?? 0),
       linkTipClicks: Number(clickStats?.link ?? 0),
       tipsSubmitted: Number(tipTotalsRaw?.tipsSubmitted ?? 0),

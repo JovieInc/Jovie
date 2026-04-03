@@ -142,7 +142,7 @@ async function fetchArtistContext(
       .then(r => r[0]),
     db
       .select({
-        total: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') in ('qr', 'link'))`,
+        total: drizzleSql<number>`count(*)`,
       })
       .from(clickEvents)
       .where(

@@ -599,9 +599,9 @@ test.describe('Content Gate — Authenticated Pages', () => {
           },
           {
             path: APP_ROUTES.DASHBOARD_EARNINGS,
-            name: 'Earnings',
+            name: 'Legacy Earnings Redirect',
             minLength: 10,
-            readyText: /earnings|tips|revenue/i,
+            readyText: /tips|profile|support you directly/i,
           },
           { path: APP_ROUTES.CHAT, name: 'Chat' },
         ];

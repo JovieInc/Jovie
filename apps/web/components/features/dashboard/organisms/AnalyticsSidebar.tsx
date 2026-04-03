@@ -242,6 +242,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
   });
 
   const loading = isLoading;
+  const showTipLinkVisits = (data?.tip_link_visits ?? 0) > 0;
 
   const stages = [
     { label: 'Profile Views', value: data?.profile_views ?? 0 },
@@ -311,6 +312,14 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
               value={formatMetricValue(loading, data?.listen_clicks)}
             />
           </div>
+          {showTipLinkVisits ? (
+            <div className='px-3 py-2'>
+              <StatTile
+                label='Tip Link Visits'
+                value={formatMetricValue(loading, data?.tip_link_visits)}
+              />
+            </div>
+          ) : null}
         </DrawerStatGrid>
         <DrawerTabbedCard
           testId='analytics-sidebar-tabbed-card'

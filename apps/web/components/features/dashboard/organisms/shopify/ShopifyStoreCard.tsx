@@ -121,9 +121,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
           >
             <ShoppingBag className='h-3.5 w-3.5 text-secondary-token' />
           </div>
-          <h3 className='text-[13px] font-[510] text-primary-token'>
-            Shopify Store
-          </h3>
+          <h3 className='text-[13px] font-[510] text-primary-token'>Shop</h3>
         </div>
 
         <p className='text-[12.5px] leading-5 text-secondary-token'>

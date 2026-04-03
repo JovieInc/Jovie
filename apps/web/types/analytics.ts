@@ -48,6 +48,7 @@ export type DashboardAnalyticsResponse = {
   total_clicks?: number;
   spotify_clicks?: number;
   social_clicks?: number;
+  tip_link_visits?: number;
   recent_clicks?: number;
   view?: DashboardAnalyticsView;
 };

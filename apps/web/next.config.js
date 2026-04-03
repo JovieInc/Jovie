@@ -228,15 +228,29 @@ const nextConfig = {
       { source: '/app/contact', destination: '/app/settings/contacts' },
       { source: '/app/profile', destination: '/app/chat?panel=profile' },
       { source: '/app/contacts', destination: '/app/settings/contacts' },
-      { source: '/app/tipping', destination: '/app/earnings' },
+      {
+        source: '/app/earnings',
+        destination: '/app/settings/artist-profile?tab=earn#tips',
+      },
+      {
+        source: '/app/tipping',
+        destination: '/app/settings/artist-profile?tab=earn#tips',
+      },
       { source: '/app/tour-dates', destination: '/app/settings/touring' },
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },
       {
+        source: '/app/dashboard/earnings',
+        destination: '/app/settings/artist-profile?tab=earn#tips',
+      },
+      {
         source: '/app/dashboard/links',
         destination: '/app/chat?panel=profile',
       },
-      { source: '/app/dashboard/tipping', destination: '/app/earnings' },
+      {
+        source: '/app/dashboard/tipping',
+        destination: '/app/settings/artist-profile?tab=earn#tips',
+      },
       {
         source: '/app/dashboard/profile',
         destination: '/app/chat?panel=profile',
@@ -283,6 +297,38 @@ const nextConfig = {
       {
         source: '/app/settings/branding',
         destination: '/app/settings/artist-profile',
+      },
+      {
+        source: '/app/admin/waitlist',
+        destination: '/app/admin/people?view=waitlist',
+      },
+      {
+        source: '/app/admin/creators',
+        destination: '/app/admin/people?view=creators',
+      },
+      {
+        source: '/app/admin/users',
+        destination: '/app/admin/people?view=users',
+      },
+      {
+        source: '/app/admin/feedback',
+        destination: '/app/admin/people?view=feedback',
+      },
+      {
+        source: '/app/admin/leads',
+        destination: '/app/admin/growth?view=leads',
+      },
+      {
+        source: '/app/admin/outreach',
+        destination: '/app/admin/growth?view=outreach',
+      },
+      {
+        source: '/app/admin/campaigns',
+        destination: '/app/admin/growth?view=campaigns',
+      },
+      {
+        source: '/app/admin/ingest',
+        destination: '/app/admin/growth?view=ingest',
       },
     ].map(route => ({
       ...route,
@@ -331,10 +377,6 @@ const nextConfig = {
       {
         source: '/app/audience',
         destination: '/app/dashboard/audience',
-      },
-      {
-        source: '/app/earnings',
-        destination: '/app/dashboard/earnings',
       },
       {
         source: '/app/insights',

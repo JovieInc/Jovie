@@ -116,6 +116,7 @@ export async function getUserDashboardAnalytics(
             total_clicks: AggregateValue;
             spotify_clicks: AggregateValue;
             social_clicks: AggregateValue;
+            tip_link_visits: AggregateValue;
             recent_clicks: AggregateValue;
             listen_clicks: AggregateValue;
             subscribers: AggregateValue;
@@ -213,6 +214,7 @@ export async function getUserDashboardAnalytics(
               (select count(*) from ranged_events) as total_clicks,
               (select count(*) from ranged_events where link_type = 'listen') as spotify_clicks,
               (select count(*) from ranged_events where link_type = 'social') as social_clicks,
+              (select count(*) from ranged_events where link_type = 'tip') as tip_link_visits,
               (select count(*) from recent_events) as recent_clicks,
               (select count(*) from ranged_events where link_type = 'listen') as listen_clicks,
               (select count(*) from notification_recent) as subscribers,
@@ -266,6 +268,7 @@ export async function getUserDashboardAnalytics(
         url: row.url ?? '',
         clicks: Number(row.clicks),
       })),
+      tip_link_visits: Number(aggregates?.tip_link_visits ?? 0),
     };
 
     if (view === 'traffic') {

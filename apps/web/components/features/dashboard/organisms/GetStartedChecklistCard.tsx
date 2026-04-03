@@ -19,6 +19,10 @@ interface ChecklistItem {
   action?: 'copy-url';
 }
 
+const CHECKLIST_ITEM_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  'set-up-tips': ['connect-venmo'],
+};
+
 const CHECKLIST_ITEMS: ChecklistItem[] = [
   {
     id: 'share-instagram',
@@ -43,10 +47,10 @@ const CHECKLIST_ITEMS: ChecklistItem[] = [
     href: `${APP_ROUTES.SETTINGS}/referral`,
   },
   {
-    id: 'connect-venmo',
-    label: 'Connect Venmo for tips',
+    id: 'set-up-tips',
+    label: 'Set Up Tips',
     description: 'Let fans support you directly',
-    href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    href: `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#tips`,
   },
 ];
 
@@ -62,7 +66,16 @@ function loadCompleted(userId: string): Set<string> {
   try {
     const raw = localStorage.getItem(getStorageKey(userId));
     if (!raw) return new Set();
-    return new Set(JSON.parse(raw) as string[]);
+    const stored = JSON.parse(raw) as string[];
+    const normalized = new Set(stored);
+
+    for (const [itemId, aliases] of Object.entries(CHECKLIST_ITEM_ALIASES)) {
+      if (aliases.some(alias => normalized.has(alias))) {
+        normalized.add(itemId);
+      }
+    }
+
+    return normalized;
   } catch {
     return new Set();
   }
