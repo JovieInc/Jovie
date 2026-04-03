@@ -313,8 +313,8 @@ export function ProfileTipsSurface({
             <Image
               src={qrPreviewUrl}
               alt='Tip QR code'
-              width={isDrawer ? 156 : 148}
-              height={isDrawer ? 156 : 148}
+              width={isDrawer ? 132 : 124}
+              height={isDrawer ? 132 : 124}
               unoptimized
               className='h-full w-full rounded-[10px] bg-white object-contain'
             />

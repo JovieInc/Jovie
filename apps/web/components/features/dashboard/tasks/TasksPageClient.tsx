@@ -1339,7 +1339,7 @@ export function TasksPageClient() {
         : []),
       {
         id: 'change-status',
-        label: 'Change Status',
+        label: 'Status',
         icon: (() => {
           const StageIcon = getTaskStageVisual(
             task.status,
@@ -1364,7 +1364,7 @@ export function TasksPageClient() {
       },
       {
         id: 'change-priority',
-        label: 'Change Priority',
+        label: 'Priority',
         icon: <TaskPriorityLeadingVisual priority={task.priority} />,
         items: TASK_PRIORITY_OPTIONS.map(([value, label]) => ({
           id: `priority-${value}`,
@@ -1376,7 +1376,7 @@ export function TasksPageClient() {
       },
       {
         id: 'change-assignee',
-        label: 'Change Assignee',
+        label: 'Assignee',
         icon: (
           <span aria-hidden='true'>
             <TaskAssigneeLeadingVisual
