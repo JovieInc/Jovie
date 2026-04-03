@@ -50,7 +50,8 @@ export type NumericEntitlement =
   | 'contactsLimit'
   | 'smartLinksLimit'
   | 'aiDailyMessageLimit'
-  | 'aiPitchGenPerRelease';
+  | 'aiPitchGenPerRelease'
+  | 'aiAlbumArtRunsPerRelease';
 
 // ---------------------------------------------------------------------------
 // Plan entitlements shape
@@ -64,6 +65,7 @@ export interface PlanEntitlements {
     smartLinksLimit: number | null;
     aiDailyMessageLimit: number;
     aiPitchGenPerRelease: number | null;
+    aiAlbumArtRunsPerRelease: number | null;
   };
   marketing: {
     displayName: string;
@@ -112,6 +114,7 @@ const PRO_LIMITS: PlanEntitlements['limits'] = {
   smartLinksLimit: null,
   aiDailyMessageLimit: 100,
   aiPitchGenPerRelease: null,
+  aiAlbumArtRunsPerRelease: null,
 };
 
 const PRO_FEATURES: readonly string[] = [
@@ -177,6 +180,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       smartLinksLimit: null,
       aiDailyMessageLimit: 10,
       aiPitchGenPerRelease: 1,
+      aiAlbumArtRunsPerRelease: 1,
     },
     marketing: {
       displayName: 'Free',
@@ -252,6 +256,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       smartLinksLimit: null,
       aiDailyMessageLimit: 500,
       aiPitchGenPerRelease: null,
+      aiAlbumArtRunsPerRelease: null,
     },
     marketing: {
       displayName: 'Max',

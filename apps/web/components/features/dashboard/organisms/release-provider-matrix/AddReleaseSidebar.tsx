@@ -10,9 +10,15 @@ import {
 } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { createRelease } from '@/app/app/(shell)/dashboard/releases/actions';
+import {
+  applyGeneratedReleaseAlbumArt,
+  createRelease,
+  generateDraftAlbumArtOptions,
+  getArtistAlbumArtBrandKits,
+} from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { AlbumArtOptionPicker } from '@/components/features/dashboard/organisms/album-art/AlbumArtOptionPicker';
 import {
   DrawerButton,
   DrawerFormField,
@@ -27,6 +33,11 @@ import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { ReleaseFields } from '@/components/organisms/release-sidebar/ReleaseFields';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { findMatchingReleaseFamilyTemplate } from '@/lib/services/album-art/template-matcher';
+import type {
+  AlbumArtBrandKitRecord,
+  AlbumArtGenerationResult,
+} from '@/lib/services/album-art/types';
 import { cn } from '@/lib/utils';
 
 const RELEASE_TYPE_OPTIONS = [
@@ -47,6 +58,7 @@ type ReleaseType = (typeof RELEASE_TYPE_OPTIONS)[number]['value'];
 export interface AddReleaseSidebarProps {
   readonly isOpen: boolean;
   readonly artistName?: string | null;
+  readonly existingReleases: readonly ReleaseViewModel[];
   readonly onClose: () => void;
   readonly onCreated: (release: ReleaseViewModel) => void;
   readonly onArtworkUploaded?: (releaseId: string, artworkUrl: string) => void;
@@ -55,6 +67,7 @@ export interface AddReleaseSidebarProps {
 export function AddReleaseSidebar({
   isOpen,
   artistName,
+  existingReleases,
   onClose,
   onCreated,
   onArtworkUploaded,
@@ -68,7 +81,20 @@ export function AddReleaseSidebar({
   const [stagedArtworkPreviewUrl, setStagedArtworkPreviewUrl] = useState<
     string | null
   >(null);
+  const [generatedAlbumArt, setGeneratedAlbumArt] =
+    useState<AlbumArtGenerationResult | null>(null);
+  const [selectedGeneratedOptionId, setSelectedGeneratedOptionId] = useState<
+    string | null
+  >(null);
+  const [artistBrandKits, setArtistBrandKits] = useState<
+    readonly AlbumArtBrandKitRecord[]
+  >([]);
+  const [selectedBrandKitId, setSelectedBrandKitId] = useState<string | null>(
+    null
+  );
+  const [isGeneratingAlbumArt, setIsGeneratingAlbumArt] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [draftKey] = useState(() => crypto.randomUUID());
 
   const releaseTypeLabel =
     RELEASE_TYPE_OPTIONS.find(option => option.value === releaseType)?.label ??
@@ -86,6 +112,9 @@ export function AddReleaseSidebar({
     setIsExplicit(false);
     setStagedArtworkFile(null);
     replaceStagedArtworkPreview(null);
+    setGeneratedAlbumArt(null);
+    setSelectedGeneratedOptionId(null);
+    setSelectedBrandKitId(null);
   }, [replaceStagedArtworkPreview]);
 
   useEffect(() => {
@@ -93,6 +122,49 @@ export function AddReleaseSidebar({
       resetForm();
     }
   }, [isOpen, resetForm]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isOpen) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const kits = await getArtistAlbumArtBrandKits();
+        if (!cancelled) {
+          setArtistBrandKits(kits);
+        }
+      } catch {
+        if (!cancelled) {
+          setArtistBrandKits([]);
+          toast.error('Failed to load series templates.');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    setSelectedBrandKitId(currentSelection => {
+      if (
+        currentSelection &&
+        artistBrandKits.some(kit => kit.id === currentSelection)
+      ) {
+        return currentSelection;
+      }
+
+      return (
+        artistBrandKits.find(kit => kit.isDefault)?.id ??
+        artistBrandKits[0]?.id ??
+        null
+      );
+    });
+  }, [artistBrandKits]);
 
   useEffect(() => {
     return () => {
@@ -141,13 +213,30 @@ export function AddReleaseSidebar({
       const releaseId = result.releaseId;
       const artworkFile = stagedArtworkFile;
       const createdRelease = result.release;
+      const generatedSession = generatedAlbumArt;
+      const generatedOptionId = selectedGeneratedOptionId;
 
       toast.success(result.message);
       resetForm();
       onCreated(createdRelease);
       onClose();
 
-      if (artworkFile) {
+      if (generatedSession && generatedOptionId) {
+        void (async () => {
+          try {
+            const applied = await applyGeneratedReleaseAlbumArt({
+              releaseId,
+              sessionId: generatedSession.sessionId,
+              optionId: generatedOptionId,
+            });
+            onArtworkUploaded?.(createdRelease.id, applied.artworkUrl);
+          } catch {
+            toast.warning(
+              'Release created, but generated artwork could not be applied. You can retry from the release drawer.'
+            );
+          }
+        })();
+      } else if (artworkFile) {
         void (async () => {
           const formData = new FormData();
           formData.append('file', artworkFile);
@@ -197,8 +286,58 @@ export function AddReleaseSidebar({
     releaseType,
     resetForm,
     stagedArtworkFile,
+    generatedAlbumArt,
+    selectedGeneratedOptionId,
     title,
   ]);
+
+  const matchingTemplate = findMatchingReleaseFamilyTemplate({
+    title,
+    releases: existingReleases,
+  });
+
+  const handleGenerateAlbumArt = useCallback(
+    async (mode: 'base' | 'matching' | 'series') => {
+      if (!title.trim()) {
+        toast.error('Title is required before generating album art.');
+        return;
+      }
+
+      setIsGeneratingAlbumArt(true);
+      try {
+        const result = await generateDraftAlbumArtOptions({
+          draftKey,
+          title: title.trim(),
+          releaseType,
+          genres,
+          brandKitId: mode === 'series' ? selectedBrandKitId : null,
+          sourceReleaseId:
+            mode === 'matching' ? matchingTemplate.sourceReleaseId : null,
+        });
+        setGeneratedAlbumArt(result);
+        setSelectedGeneratedOptionId(result.options[0]?.id ?? null);
+        replaceStagedArtworkPreview(result.options[0]?.previewUrl ?? null);
+        setStagedArtworkFile(null);
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : 'Failed to generate album art.'
+        );
+      } finally {
+        setIsGeneratingAlbumArt(false);
+      }
+    },
+    [
+      draftKey,
+      genres,
+      matchingTemplate.sourceReleaseId,
+      releaseType,
+      replaceStagedArtworkPreview,
+      selectedBrandKitId,
+      title,
+    ]
+  );
 
   const handleClose = useCallback(() => {
     if (isSubmitting) {
@@ -279,6 +418,51 @@ export function AddReleaseSidebar({
         collapsible={false}
         surfaceClassName='space-y-3.5'
       >
+        {!stagedArtworkPreviewUrl || generatedAlbumArt ? (
+          <AlbumArtOptionPicker
+            title='Album Art'
+            description='Generate the cover before you create the release, reuse a matching remix design, or keep a uniform single-series layout.'
+            result={generatedAlbumArt}
+            selectedOptionId={selectedGeneratedOptionId}
+            brandKitOptions={artistBrandKits.map(brandKit => ({
+              id: brandKit.id,
+              name: brandKit.name,
+              isDefault: brandKit.isDefault,
+            }))}
+            selectedBrandKitId={selectedBrandKitId}
+            onSelectBrandKit={setSelectedBrandKitId}
+            onSelectOption={optionId => {
+              setSelectedGeneratedOptionId(optionId);
+              const option = generatedAlbumArt?.options.find(
+                item => item.id === optionId
+              );
+              replaceStagedArtworkPreview(option?.previewUrl ?? null);
+            }}
+            onGenerate={() => void handleGenerateAlbumArt('base')}
+            onUseMatching={
+              matchingTemplate.sourceReleaseId
+                ? () => void handleGenerateAlbumArt('matching')
+                : null
+            }
+            onUseSeriesTemplate={
+              selectedBrandKitId
+                ? () => void handleGenerateAlbumArt('series')
+                : null
+            }
+            onApply={null}
+            onRegenerate={() => void handleGenerateAlbumArt('base')}
+            onCancel={() => {
+              setGeneratedAlbumArt(null);
+              setSelectedGeneratedOptionId(null);
+              replaceStagedArtworkPreview(null);
+            }}
+            isGenerating={isGeneratingAlbumArt}
+            quotaRemaining={
+              generatedAlbumArt?.quota.remainingRunsForRelease ?? null
+            }
+          />
+        ) : null}
+
         <DrawerFormField label='Title' htmlFor='release-title'>
           <Input
             id='release-title'

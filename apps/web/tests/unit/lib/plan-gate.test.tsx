@@ -72,6 +72,7 @@ describe('usePlanGate', () => {
     expect(result.current.canGenerateReleasePlans).toBe(false);
     expect(result.current.analyticsRetentionDays).toBe(30);
     expect(result.current.contactsLimit).toBe(100);
+    expect(result.current.aiAlbumArtRunsPerRelease).toBe(1);
     expect(result.current.isError).toBe(false);
   });
 
@@ -102,6 +103,7 @@ describe('usePlanGate', () => {
     expect(result.current.canGenerateReleasePlans).toBe(true);
     expect(result.current.analyticsRetentionDays).toBe(180);
     expect(result.current.contactsLimit).toBe(5000);
+    expect(result.current.aiAlbumArtRunsPerRelease).toBeNull();
   });
 
   it('returns max entitlements for a max user', async () => {
@@ -120,6 +122,7 @@ describe('usePlanGate', () => {
 
     expect(result.current.analyticsRetentionDays).toBeNull();
     expect(result.current.contactsLimit).toBeNull();
+    expect(result.current.aiAlbumArtRunsPerRelease).toBeNull();
   });
 
   it('exposes isError when billing fetch fails', async () => {
@@ -150,5 +153,6 @@ describe('usePlanGate', () => {
     expect(result.current.isPro).toBe(false);
     expect(result.current.analyticsRetentionDays).toBe(30);
     expect(result.current.contactsLimit).toBe(100);
+    expect(result.current.aiAlbumArtRunsPerRelease).toBe(1);
   });
 });

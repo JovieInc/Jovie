@@ -328,4 +328,5 @@ export interface UserEntitlements {
   smartLinksLimit: number | null; // null = unlimited, 25 for free tier
   aiDailyMessageLimit: number;
   aiPitchGenPerRelease: number | null;
+  aiAlbumArtRunsPerRelease: number | null;
 }

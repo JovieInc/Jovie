@@ -63,6 +63,7 @@ describe('Entitlement Registry Consistency', () => {
       'smartLinksLimit',
       'aiDailyMessageLimit',
       'aiPitchGenPerRelease',
+      'aiAlbumArtRunsPerRelease',
     ];
 
     for (const planId of planIds) {
@@ -152,6 +153,12 @@ describe('Entitlement Registry Consistency', () => {
     expect(ENTITLEMENT_REGISTRY.pro.marketing.features).toContain(
       'Release notifications'
     );
+  });
+
+  it('album art run limits match the new plan policy', () => {
+    expect(ENTITLEMENT_REGISTRY.free.limits.aiAlbumArtRunsPerRelease).toBe(1);
+    expect(ENTITLEMENT_REGISTRY.pro.limits.aiAlbumArtRunsPerRelease).toBeNull();
+    expect(ENTITLEMENT_REGISTRY.max.limits.aiAlbumArtRunsPerRelease).toBeNull();
   });
 
   it('paid plan marketing lists reference free features', () => {

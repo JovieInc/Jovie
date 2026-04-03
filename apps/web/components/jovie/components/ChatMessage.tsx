@@ -19,6 +19,7 @@ import {
   type ToolInvocationPart,
 } from '../types';
 import { getMessageText } from '../utils';
+import { ChatAlbumArtCard } from './ChatAlbumArtCard';
 import { ChatAnalyticsCard } from './ChatAnalyticsCard';
 import { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
 import { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
@@ -133,6 +134,42 @@ function renderToolCard(
           state={result.success ? 'success' : 'error'}
           releaseTitle={result.releaseTitle}
           pitches={result.pitches}
+          error={result.error}
+        />
+      );
+    }
+  }
+
+  if (toolInvocation.toolName === 'generateAlbumArt') {
+    if (toolInvocation.state === 'call') {
+      return <ChatAlbumArtCard state='loading' />;
+    }
+
+    if (toolInvocation.state === 'result') {
+      const result = toolInvocation.result as {
+        success: boolean;
+        releaseId?: string;
+        sessionId?: string;
+        releaseTitle?: string;
+        brandKitName?: string | null;
+        quota?: {
+          remainingRunsForRelease?: number | null;
+        };
+        usedMatchingTemplate?: boolean;
+        options?: Array<{ id: string; previewUrl: string }>;
+        error?: string;
+      };
+
+      return (
+        <ChatAlbumArtCard
+          state={result.success ? 'success' : 'error'}
+          releaseId={result.releaseId}
+          sessionId={result.sessionId}
+          releaseTitle={result.releaseTitle}
+          brandKitName={result.brandKitName}
+          quotaRemaining={result.quota?.remainingRunsForRelease ?? null}
+          usedMatchingTemplate={result.usedMatchingTemplate}
+          options={result.options}
           error={result.error}
         />
       );

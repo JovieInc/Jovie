@@ -653,6 +653,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             <AddReleaseSidebar
               isOpen={addReleaseOpen}
               artistName={artistName}
+              existingReleases={releases}
               onClose={closeAddRelease}
               onCreated={handleAddReleaseCreated}
               onArtworkUploaded={handleReleaseArtworkUploaded}
@@ -752,6 +753,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     canEditSmartLinks,
     handleCanvasStatusUpdate,
     releaseSidebarHandlers,
+    releases,
   ]);
 
   useRegisterRightPanel(sidebarPanel);

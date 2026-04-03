@@ -6,6 +6,7 @@
  *
  * Sub-jobs:
  * - Cleanup orphaned photos: every day
+ * - Cleanup expired album art sessions: every day
  * - Cleanup expired idempotency keys: every day
  * - Billing reconciliation: every day (safety net for webhooks)
  * - Data retention: Sundays only (heavy operation)
@@ -20,6 +21,7 @@ import { NextResponse } from 'next/server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { captureError } from '@/lib/error-tracking';
+import { cleanupExpiredAlbumArtSessions } from '@/lib/services/album-art/cleanup';
 import { logger } from '@/lib/utils/logger';
 import { runReconciliation } from '../billing-reconciliation/route';
 import { cleanupExpiredKeys } from '../cleanup-idempotency-keys/route';
@@ -71,12 +73,18 @@ export async function GET(request: Request) {
     cleanupOrphanedPhotos
   );
 
-  // 2. Cleanup expired idempotency keys
+  // 2. Cleanup expired album art sessions
+  results.cleanupAlbumArt = await runSubJob(
+    'cleanupAlbumArt',
+    cleanupExpiredAlbumArtSessions
+  );
+
+  // 3. Cleanup expired idempotency keys
   results.cleanupKeys = await runSubJob('cleanupKeys', async () => ({
     deleted: await cleanupExpiredKeys(),
   }));
 
-  // 3. Billing reconciliation (daily safety net for webhooks)
+  // 4. Billing reconciliation (daily safety net for webhooks)
   results.billingReconciliation = await runSubJob(
     'billingReconciliation',
     async () => {
@@ -90,7 +98,7 @@ export async function GET(request: Request) {
     }
   );
 
-  // 4. Data retention — Sundays only (heavy operation)
+  // 5. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
   results.dataRetention = isSunday
     ? await runSubJob('dataRetention', runDataRetentionCleanup)

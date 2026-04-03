@@ -4,6 +4,7 @@ const mockRunDataRetentionCleanup = vi.hoisted(() => vi.fn());
 const mockRunReconciliation = vi.hoisted(() => vi.fn());
 const mockCleanupExpiredKeys = vi.hoisted(() => vi.fn());
 const mockCleanupOrphanedPhotos = vi.hoisted(() => vi.fn());
+const mockCleanupExpiredAlbumArtSessions = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/analytics/data-retention', () => ({
   runDataRetentionCleanup: mockRunDataRetentionCleanup,
@@ -32,6 +33,10 @@ vi.mock('@/app/api/cron/cleanup-photos/route', () => ({
   cleanupOrphanedPhotos: mockCleanupOrphanedPhotos,
 }));
 
+vi.mock('@/lib/services/album-art/cleanup', () => ({
+  cleanupExpiredAlbumArtSessions: mockCleanupExpiredAlbumArtSessions,
+}));
+
 describe('GET /api/cron/daily-maintenance', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -43,6 +48,10 @@ describe('GET /api/cron/daily-maintenance', () => {
     mockCleanupOrphanedPhotos.mockResolvedValue({
       deleted: 1,
       blobsDeleted: 1,
+    });
+    mockCleanupExpiredAlbumArtSessions.mockResolvedValue({
+      expiredSessions: 2,
+      blobsDeleted: 6,
     });
     mockCleanupExpiredKeys.mockResolvedValue(2);
     mockRunReconciliation.mockResolvedValue({
@@ -82,6 +91,7 @@ describe('GET /api/cron/daily-maintenance', () => {
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
     expect(data.results.cleanupPhotos.success).toBe(true);
+    expect(data.results.cleanupAlbumArt.success).toBe(true);
     expect(data.results.cleanupKeys.success).toBe(true);
     expect(data.results.billingReconciliation.success).toBe(true);
     expect(data.results.dataRetention.success).toBe(true);

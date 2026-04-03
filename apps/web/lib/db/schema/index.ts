@@ -19,6 +19,20 @@ export {
   selectCampaignSettingsSchema,
 } from './admin';
 
+// Album Art
+export {
+  type AlbumArtGenerationSession,
+  type ArtistBrandKit,
+  albumArtGenerationSessions,
+  artistBrandKits,
+  insertAlbumArtGenerationSessionSchema,
+  insertArtistBrandKitSchema,
+  type NewAlbumArtGenerationSession,
+  type NewArtistBrandKit,
+  selectAlbumArtGenerationSessionSchema,
+  selectArtistBrandKitSchema,
+} from './album-art';
+
 // Analytics (Clicks, Audience, Tips, Blocks)
 export {
   type AudienceBlock,

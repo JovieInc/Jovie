@@ -110,6 +110,7 @@ export type ReleaseType =
   | 'mixtape'
   | 'other';
 
+import type { AlbumArtTemplateLock } from '@/lib/services/album-art/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 
 export type { CanvasStatus } from '@/lib/services/canvas/types';
@@ -167,6 +168,12 @@ export interface ReleaseViewModel {
     generatedAt: string;
     modelUsed: string;
   } | null;
+  artworkOrigin?: 'ingested' | 'uploaded' | 'ai_generated';
+  albumArtTemplate?: AlbumArtTemplateLock | null;
+  parsedVersionLabel?: string | null;
+  brandKitId?: string | null;
+  matchingAlbumArtSourceReleaseId?: string | null;
+  defaultAlbumArtBrandKitId?: string | null;
 }
 
 /** Track view model for display in expandable release rows */

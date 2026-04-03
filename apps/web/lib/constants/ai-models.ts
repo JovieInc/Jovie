@@ -20,5 +20,8 @@ export const INSIGHT_MODEL = 'anthropic/claude-haiku-4-5-20251001';
 /** Model used for AI-generated playlist pitches */
 export const PITCH_MODEL = 'anthropic/claude-haiku-4-5-20251001';
 
+/** Model used for AI-generated album art backgrounds */
+export const ALBUM_ART_IMAGE_MODEL = 'google/imagen-4.0-generate-001';
+
 /** Lightweight model used for generating conversation titles */
 export const TITLE_MODEL = 'google/gemini-2.0-flash';

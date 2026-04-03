@@ -94,6 +94,8 @@ export interface PlanGateEntitlements {
   aiDailyMessageLimit: number;
   /** AI pitch generations per release based on plan (null = unlimited) */
   aiPitchGenPerRelease: number | null;
+  /** AI album art generation runs per release based on plan (null = unlimited) */
+  aiAlbumArtRunsPerRelease: number | null;
 }
 
 /**

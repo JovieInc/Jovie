@@ -34,6 +34,13 @@ import {
   createRateLimitHeaders,
 } from '@/lib/rate-limit';
 import {
+  generateAlbumArt,
+  listArtistBrandKits,
+} from '@/lib/services/album-art/service';
+import { findDefaultArtistBrandKit } from '@/lib/services/album-art/template-matcher';
+import { parseAlbumArtTitle } from '@/lib/services/album-art/title-parser';
+import { readReleaseAlbumArtMetadata } from '@/lib/services/album-art/types';
+import {
   buildCanvasMetadata,
   getCanvasStatusFromMetadata,
   summarizeCanvasStatus,
@@ -200,6 +207,29 @@ function findReleaseByTitle(
   return (
     releases.find(r => r.title.toLowerCase() === lower) ??
     releases.find(r => r.title.toLowerCase().includes(lower)) ??
+    null
+  );
+}
+
+function findBrandKitByName<
+  TBrandKit extends {
+    readonly id: string;
+    readonly name: string;
+  },
+>(brandKits: readonly TBrandKit[], name: string): TBrandKit | null {
+  const normalizedName = name.trim().toLowerCase();
+
+  if (!normalizedName) {
+    return null;
+  }
+
+  return (
+    brandKits.find(
+      brandKit => brandKit.name.toLowerCase() === normalizedName
+    ) ??
+    brandKits.find(brandKit =>
+      brandKit.name.toLowerCase().includes(normalizedName)
+    ) ??
     null
   );
 }
@@ -1167,6 +1197,151 @@ function createGenerateReleasePitchTool(resolvedProfileId: string) {
   });
 }
 
+function createGenerateAlbumArtTool(
+  artistContext: ArtistContext,
+  resolvedProfileId: string
+) {
+  return tool({
+    description:
+      'Generate album art previews for an existing release. Use this when the artist wants cover art options, matching remix artwork, or a branded single-series look.',
+    inputSchema: z.object({
+      releaseTitle: z
+        .string()
+        .max(200)
+        .describe('The release title to generate album art for'),
+      mode: z
+        .enum(['base', 'matching_variant', 'series_background_refresh'])
+        .optional()
+        .describe('Optional album art mode'),
+      brandKitName: z
+        .string()
+        .max(120)
+        .optional()
+        .describe(
+          'Optional series template name to use when mode is series_background_refresh'
+        ),
+    }),
+    execute: async ({ releaseTitle, mode, brandKitName }) => {
+      try {
+        const [releases, entitlements, brandKits] = await Promise.all([
+          fetchReleasesForChat(resolvedProfileId),
+          getCurrentUserEntitlements(),
+          listArtistBrandKits(resolvedProfileId),
+        ]);
+
+        const release = findReleaseByTitle(releases, releaseTitle);
+        if (!release) {
+          return {
+            success: false as const,
+            error: `Release "${releaseTitle}" not found. Available releases: ${formatAvailableReleases(releases)}`,
+          };
+        }
+
+        const parsedTitle = parseAlbumArtTitle(release.title);
+        const matchingTemplateRelease =
+          parsedTitle.versionLabel === null
+            ? null
+            : (releases.find(candidate => {
+                if (candidate.id === release.id) {
+                  return false;
+                }
+                const template =
+                  readReleaseAlbumArtMetadata(candidate.metadata)
+                    .albumArtTemplate ?? null;
+                return (
+                  template?.normalizedBaseTitle ===
+                  parsedTitle.normalizedBaseTitle
+                );
+              }) ?? null);
+
+        const requestedMode = mode ?? 'base';
+        const defaultBrandKit = findDefaultArtistBrandKit(brandKits);
+        const selectedBrandKit =
+          requestedMode === 'series_background_refresh'
+            ? brandKitName
+              ? findBrandKitByName(brandKits, brandKitName)
+              : defaultBrandKit
+            : null;
+
+        if (
+          requestedMode === 'series_background_refresh' &&
+          brandKitName &&
+          !selectedBrandKit
+        ) {
+          const availableBrandKits = brandKits.map(brandKit => brandKit.name);
+          return {
+            success: false as const,
+            error:
+              availableBrandKits.length > 0
+                ? `Brand kit "${brandKitName}" not found. Available series templates: ${availableBrandKits.join(', ')}`
+                : 'No series templates are set up yet. Create one in Artist Profile settings first.',
+          };
+        }
+
+        if (
+          requestedMode === 'series_background_refresh' &&
+          !selectedBrandKit
+        ) {
+          return {
+            success: false as const,
+            error:
+              'No series templates are set up yet. Create one in Artist Profile settings first.',
+          };
+        }
+
+        const result = await generateAlbumArt({
+          releaseId: release.id,
+          profileId: resolvedProfileId,
+          title: release.title,
+          artistName: artistContext.displayName,
+          releaseType: release.releaseType as
+            | 'single'
+            | 'ep'
+            | 'album'
+            | 'compilation'
+            | 'live'
+            | 'mixtape'
+            | 'other',
+          genres: artistContext.genres,
+          mode: requestedMode,
+          sourceTemplateReleaseId:
+            requestedMode === 'matching_variant'
+              ? (matchingTemplateRelease?.id ?? null)
+              : null,
+          brandKitId:
+            requestedMode === 'series_background_refresh'
+              ? (selectedBrandKit?.id ?? null)
+              : null,
+          runLimit: entitlements.aiAlbumArtRunsPerRelease,
+        });
+
+        return {
+          success: true as const,
+          releaseId: release.id,
+          sessionId: result.sessionId,
+          releaseTitle: release.title,
+          quota: result.quota,
+          brandKitName: selectedBrandKit?.name ?? null,
+          options: result.options.map(option => ({
+            id: option.id,
+            previewUrl: option.previewUrl,
+          })),
+          usedMatchingTemplate: result.usedMatchingTemplate,
+          usedBrandKit: result.usedBrandKit,
+        };
+      } catch (error) {
+        return {
+          success: false as const,
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Failed to generate album art.',
+        };
+      }
+    },
+  });
+}
+
 /**
  * Build tools available on ALL plans (including Free).
  * These are basic profile management tools that don't require a paid plan.
@@ -1214,6 +1389,10 @@ function buildChatTools(
           createRelease: createReleaseTool(resolvedProfileId),
           generateReleasePitch:
             createGenerateReleasePitchTool(resolvedProfileId),
+          generateAlbumArt: createGenerateAlbumArtTool(
+            artistContext,
+            resolvedProfileId
+          ),
         }
       : {}),
   };

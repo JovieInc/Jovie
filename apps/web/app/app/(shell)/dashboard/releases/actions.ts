@@ -75,6 +75,19 @@ import {
 } from '@/lib/rate-limit';
 import { trackServerEvent } from '@/lib/server-analytics';
 import {
+  applyGeneratedAlbumArt,
+  createArtistBrandKit,
+  deleteArtistBrandKit,
+  generateAlbumArt,
+  listArtistBrandKits,
+  updateArtistBrandKit,
+} from '@/lib/services/album-art/service';
+import {
+  findDefaultArtistBrandKit,
+  findMatchingReleaseFamilyTemplate,
+} from '@/lib/services/album-art/template-matcher';
+import { readReleaseAlbumArtMetadata } from '@/lib/services/album-art/types';
+import {
   buildCanvasMetadata,
   getCanvasStatusFromMetadata,
 } from '@/lib/services/canvas/service';
@@ -245,6 +258,9 @@ function mapReleaseToViewModel(
   profileId: string,
   profileHandle: string
 ): ReleaseViewModel {
+  const albumArtMetadata = readReleaseAlbumArtMetadata(
+    release.metadata as Record<string, unknown> | null
+  );
   // Use the new short URL format: /{handle}/{slug}
   const slug = release.slug;
 
@@ -289,6 +305,10 @@ function mapReleaseToViewModel(
         release.metadata as Record<string, unknown> | null
       )?.lyrics?.toString() || undefined,
     previewUrl: release.trackSummary?.primaryPreviewUrl || null,
+    artworkOrigin: albumArtMetadata.artworkOrigin,
+    albumArtTemplate: albumArtMetadata.albumArtTemplate ?? null,
+    parsedVersionLabel: albumArtMetadata.parsedVersionLabel ?? null,
+    brandKitId: albumArtMetadata.brandKitId ?? null,
   };
 }
 
@@ -300,11 +320,30 @@ async function fetchReleaseMatrixCore(
   profileHandle: string
 ): Promise<ReleaseViewModel[]> {
   const providerLabels = buildProviderLabels();
-  const releases = await getReleasesFromDb(profileId);
-
-  return releases.map(release =>
+  const [releases, brandKits] = await Promise.all([
+    getReleasesFromDb(profileId),
+    listArtistBrandKits(profileId),
+  ]);
+  const mappedReleases = releases.map(release =>
     mapReleaseToViewModel(release, providerLabels, profileId, profileHandle)
   );
+  const defaultBrandKit = findDefaultArtistBrandKit(brandKits);
+
+  return mappedReleases.map(release => {
+    const matchingTemplate = findMatchingReleaseFamilyTemplate({
+      releaseId: release.id,
+      title: release.title,
+      releases: mappedReleases,
+    });
+
+    return {
+      ...release,
+      parsedVersionLabel:
+        release.parsedVersionLabel ?? matchingTemplate.parsedTitle.versionLabel,
+      matchingAlbumArtSourceReleaseId: matchingTemplate.sourceReleaseId,
+      defaultAlbumArtBrandKitId: defaultBrandKit?.id ?? null,
+    };
+  });
 }
 
 export interface ReleaseProfileContext {
@@ -2334,4 +2373,196 @@ export async function createRelease(formData: {
       message: 'Failed to create release. Please try again.',
     };
   }
+}
+
+async function getOwnedReleaseForAlbumArt(
+  releaseId: string,
+  profileId?: string
+): Promise<{
+  profile: Awaited<ReturnType<typeof requireProfile>>;
+  release: ReleaseWithProviders;
+}> {
+  const profile = await requireProfile(profileId);
+  const release = await getReleaseById(releaseId);
+
+  if (!release || release.creatorProfileId !== profile.id) {
+    throw new Error('Release not found');
+  }
+
+  return { profile, release };
+}
+
+export async function generateReleaseAlbumArtOptions(params: {
+  releaseId: string;
+  brandKitId?: string | null;
+}): Promise<Awaited<ReturnType<typeof generateAlbumArt>>> {
+  noStore();
+
+  const [{ profile, release }, entitlements] = await Promise.all([
+    getOwnedReleaseForAlbumArt(params.releaseId),
+    getCurrentUserEntitlements(),
+  ]);
+
+  return generateAlbumArt({
+    releaseId: release.id,
+    profileId: profile.id,
+    title: release.title,
+    artistName:
+      release.artistNames?.join(', ') || profile.handle || 'Unknown Artist',
+    releaseType: release.releaseType,
+    genres: release.genres ?? [],
+    mode: params.brandKitId ? 'series_background_refresh' : 'base',
+    brandKitId: params.brandKitId ?? null,
+    runLimit: entitlements.aiAlbumArtRunsPerRelease,
+  });
+}
+
+export async function generateMatchingReleaseAlbumArtVariant(params: {
+  releaseId: string;
+  sourceReleaseId: string;
+}): Promise<Awaited<ReturnType<typeof generateAlbumArt>>> {
+  noStore();
+
+  const [{ profile, release }, entitlements] = await Promise.all([
+    getOwnedReleaseForAlbumArt(params.releaseId),
+    getCurrentUserEntitlements(),
+  ]);
+
+  return generateAlbumArt({
+    releaseId: release.id,
+    profileId: profile.id,
+    title: release.title,
+    artistName:
+      release.artistNames?.join(', ') || profile.handle || 'Unknown Artist',
+    releaseType: release.releaseType,
+    genres: release.genres ?? [],
+    mode: 'matching_variant',
+    sourceTemplateReleaseId: params.sourceReleaseId,
+    runLimit: entitlements.aiAlbumArtRunsPerRelease,
+  });
+}
+
+export async function generateDraftAlbumArtOptions(params: {
+  draftKey: string;
+  title: string;
+  releaseType: 'single' | 'ep' | 'album' | 'compilation' | 'live';
+  genres?: string[];
+  brandKitId?: string | null;
+  sourceReleaseId?: string | null;
+}): Promise<Awaited<ReturnType<typeof generateAlbumArt>>> {
+  noStore();
+
+  const [profile, entitlements] = await Promise.all([
+    requireProfile(),
+    getCurrentUserEntitlements(),
+  ]);
+
+  return generateAlbumArt({
+    draftKey: params.draftKey,
+    profileId: profile.id,
+    title: params.title,
+    artistName: profile.handle || 'Unknown Artist',
+    releaseType: params.releaseType,
+    genres: params.genres ?? [],
+    mode: params.sourceReleaseId
+      ? 'matching_variant'
+      : params.brandKitId
+        ? 'series_background_refresh'
+        : 'base',
+    brandKitId: params.brandKitId ?? null,
+    sourceTemplateReleaseId: params.sourceReleaseId ?? null,
+    runLimit: entitlements.aiAlbumArtRunsPerRelease,
+  });
+}
+
+export async function applyGeneratedReleaseAlbumArt(params: {
+  releaseId: string;
+  sessionId: string;
+  optionId: string;
+}): Promise<{ artworkUrl: string; sizes: Record<string, string> }> {
+  noStore();
+
+  const { profile } = await getOwnedReleaseForAlbumArt(params.releaseId);
+  const result = await applyGeneratedAlbumArt({
+    releaseId: params.releaseId,
+    profileId: profile.id,
+    sessionId: params.sessionId,
+    optionId: params.optionId,
+  });
+
+  const { userId } = await getCachedAuth();
+  if (userId) {
+    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  }
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  revalidatePath(APP_ROUTES.RELEASES);
+
+  return result;
+}
+
+export async function createArtistAlbumArtBrandKit(params: {
+  name: string;
+  logoAssetUrl?: string | null;
+  logoPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  logoOpacity?: number;
+  isDefault?: boolean;
+}) {
+  noStore();
+
+  const profile = await requireProfile();
+  const result = await createArtistBrandKit({
+    profileId: profile.id,
+    name: params.name,
+    logoAssetUrl: params.logoAssetUrl,
+    logoPosition: params.logoPosition,
+    logoOpacity: params.logoOpacity,
+    isDefault: params.isDefault,
+  });
+
+  revalidatePath(APP_ROUTES.SETTINGS);
+  return result;
+}
+
+export async function updateArtistAlbumArtBrandKit(params: {
+  brandKitId: string;
+  name: string;
+  logoAssetUrl?: string | null;
+  logoPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  logoOpacity?: number;
+  isDefault?: boolean;
+}) {
+  noStore();
+
+  const profile = await requireProfile();
+  const result = await updateArtistBrandKit({
+    profileId: profile.id,
+    brandKitId: params.brandKitId,
+    name: params.name,
+    logoAssetUrl: params.logoAssetUrl,
+    logoPosition: params.logoPosition,
+    logoOpacity: params.logoOpacity,
+    isDefault: params.isDefault,
+  });
+
+  revalidatePath(APP_ROUTES.SETTINGS);
+  return result;
+}
+
+export async function deleteArtistAlbumArtBrandKit(brandKitId: string) {
+  noStore();
+
+  const profile = await requireProfile();
+  await deleteArtistBrandKit({
+    profileId: profile.id,
+    brandKitId,
+  });
+
+  revalidatePath(APP_ROUTES.SETTINGS);
+}
+
+export async function getArtistAlbumArtBrandKits() {
+  noStore();
+
+  const profile = await requireProfile();
+  return listArtistBrandKits(profile.id);
 }

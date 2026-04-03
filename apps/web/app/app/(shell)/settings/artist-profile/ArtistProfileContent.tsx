@@ -4,6 +4,7 @@ import { ExternalLink, PanelRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
+import { SettingsAlbumArtBrandKitsSection } from '@/features/dashboard/organisms/SettingsAlbumArtBrandKitsSection';
 import { SettingsBrandingSection } from '@/features/dashboard/organisms/SettingsBrandingSection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 import { SettingsTipsSection } from '@/features/dashboard/organisms/SettingsTipsSection';
@@ -79,6 +80,7 @@ export function ArtistProfileContent() {
             onArtistUpdate={setArtist}
             isPro={isPro}
           />
+          <SettingsAlbumArtBrandKitsSection artist={artist} />
           <SettingsTipsSection />
           <ShopifyStoreCard />
         </div>

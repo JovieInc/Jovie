@@ -18,8 +18,15 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
-import { updateAllowArtworkDownloads } from '@/app/app/(shell)/dashboard/releases/actions';
+import {
+  applyGeneratedReleaseAlbumArt,
+  generateMatchingReleaseAlbumArtVariant,
+  generateReleaseAlbumArtOptions,
+  getArtistAlbumArtBrandKits,
+  updateAllowArtworkDownloads,
+} from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
+import { AlbumArtOptionPicker } from '@/components/features/dashboard/organisms/album-art/AlbumArtOptionPicker';
 import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks';
 import {
   DrawerAsyncToggle,
@@ -43,8 +50,12 @@ import {
 } from '@/features/release/AlbumArtworkContextMenu';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { formatReleaseArtistLine } from '@/lib/discography/formatting';
-import type { ProviderKey } from '@/lib/discography/types';
+import type { ProviderKey, ReleaseSidebarTrack } from '@/lib/discography/types';
 import { usePlanGate } from '@/lib/queries';
+import type {
+  AlbumArtBrandKitRecord,
+  AlbumArtGenerationResult,
+} from '@/lib/services/album-art/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -592,6 +603,155 @@ export function ReleaseSidebar({
   ]);
 
   const tabActions = activeTab === 'links' ? platformTabActions : null;
+  const [albumArtResult, setAlbumArtResult] =
+    useState<AlbumArtGenerationResult | null>(null);
+  const [selectedAlbumArtOptionId, setSelectedAlbumArtOptionId] = useState<
+    string | null
+  >(null);
+  const [isGeneratingAlbumArt, setIsGeneratingAlbumArt] = useState(false);
+  const [isApplyingAlbumArt, setIsApplyingAlbumArt] = useState(false);
+  const [lastAlbumArtMode, setLastAlbumArtMode] = useState<
+    'base' | 'matching' | 'series'
+  >('base');
+  const [artistBrandKits, setArtistBrandKits] = useState<
+    readonly AlbumArtBrandKitRecord[]
+  >([]);
+  const [selectedBrandKitId, setSelectedBrandKitId] = useState<string | null>(
+    release?.brandKitId ?? release?.defaultAlbumArtBrandKitId ?? null
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isOpen || !release || release.artworkUrl) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const kits = await getArtistAlbumArtBrandKits();
+        if (!cancelled) {
+          setArtistBrandKits(kits);
+        }
+      } catch {
+        if (!cancelled) {
+          setArtistBrandKits([]);
+          toast.error('Failed to load series templates.');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, release, release?.artworkUrl, release?.id]);
+
+  useEffect(() => {
+    setSelectedBrandKitId(
+      release?.brandKitId ?? release?.defaultAlbumArtBrandKitId ?? null
+    );
+  }, [release?.brandKitId, release?.defaultAlbumArtBrandKitId, release?.id]);
+
+  useEffect(() => {
+    if (!release) {
+      setArtistBrandKits([]);
+      setSelectedBrandKitId(null);
+      return;
+    }
+
+    setSelectedBrandKitId(currentSelection => {
+      if (
+        currentSelection &&
+        artistBrandKits.some(kit => kit.id === currentSelection)
+      ) {
+        return currentSelection;
+      }
+
+      return (
+        release.brandKitId ??
+        release.defaultAlbumArtBrandKitId ??
+        artistBrandKits.find(kit => kit.isDefault)?.id ??
+        artistBrandKits[0]?.id ??
+        null
+      );
+    });
+  }, [
+    artistBrandKits,
+    release,
+    release?.brandKitId,
+    release?.defaultAlbumArtBrandKitId,
+    release?.id,
+  ]);
+
+  const handleGeneratedAlbumArt = useCallback(
+    async (mode: 'base' | 'matching' | 'series') => {
+      if (!release) {
+        return;
+      }
+
+      setIsGeneratingAlbumArt(true);
+      try {
+        const result =
+          mode === 'matching' && release.matchingAlbumArtSourceReleaseId
+            ? await generateMatchingReleaseAlbumArtVariant({
+                releaseId: release.id,
+                sourceReleaseId: release.matchingAlbumArtSourceReleaseId,
+              })
+            : await generateReleaseAlbumArtOptions({
+                releaseId: release.id,
+                brandKitId: mode === 'series' ? selectedBrandKitId : null,
+              });
+
+        setAlbumArtResult(result);
+        setSelectedAlbumArtOptionId(result.options[0]?.id ?? null);
+        setLastAlbumArtMode(mode);
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : 'Failed to generate album art.'
+        );
+      } finally {
+        setIsGeneratingAlbumArt(false);
+      }
+    },
+    [release, selectedBrandKitId]
+  );
+
+  const handleApplyGeneratedAlbumArt = useCallback(async () => {
+    if (!release || !albumArtResult || !selectedAlbumArtOptionId) {
+      return;
+    }
+
+    setIsApplyingAlbumArt(true);
+    try {
+      const applied = await applyGeneratedReleaseAlbumArt({
+        releaseId: release.id,
+        sessionId: albumArtResult.sessionId,
+        optionId: selectedAlbumArtOptionId,
+      });
+      const selectedOption = albumArtResult.options.find(
+        option => option.id === selectedAlbumArtOptionId
+      );
+      onReleaseChange?.({
+        ...release,
+        artworkUrl: applied.artworkUrl,
+        artworkOrigin: 'ai_generated',
+        albumArtTemplate: selectedOption?.template ?? null,
+        parsedVersionLabel: selectedOption?.template.versionLabel ?? null,
+        brandKitId: selectedOption?.template.brandKitId ?? null,
+      });
+      setAlbumArtResult(null);
+      setSelectedAlbumArtOptionId(null);
+      toast.success('Album art applied.');
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to apply album art.'
+      );
+    } finally {
+      setIsApplyingAlbumArt(false);
+    }
+  }, [albumArtResult, onReleaseChange, release, selectedAlbumArtOptionId]);
 
   return (
     <EntitySidebarShell
@@ -644,6 +804,48 @@ export function ReleaseSidebar({
       {release && (
         <div className='flex min-h-full flex-col'>
           <div className='min-h-0 flex-1'>
+            {!release.artworkUrl && isEditable && !readOnly ? (
+              <div className='mb-3'>
+                <AlbumArtOptionPicker
+                  title='Album Art'
+                  description='Generate text-safe covers, reuse matching remix designs, or keep a uniform single-series format.'
+                  result={albumArtResult}
+                  selectedOptionId={selectedAlbumArtOptionId}
+                  brandKitOptions={artistBrandKits.map(brandKit => ({
+                    id: brandKit.id,
+                    name: brandKit.name,
+                    isDefault: brandKit.isDefault,
+                  }))}
+                  selectedBrandKitId={selectedBrandKitId}
+                  onSelectBrandKit={setSelectedBrandKitId}
+                  onSelectOption={setSelectedAlbumArtOptionId}
+                  onGenerate={() => void handleGeneratedAlbumArt('base')}
+                  onUseMatching={
+                    release.matchingAlbumArtSourceReleaseId
+                      ? () => void handleGeneratedAlbumArt('matching')
+                      : null
+                  }
+                  onUseSeriesTemplate={
+                    selectedBrandKitId
+                      ? () => void handleGeneratedAlbumArt('series')
+                      : null
+                  }
+                  onApply={() => void handleApplyGeneratedAlbumArt()}
+                  onRegenerate={() =>
+                    void handleGeneratedAlbumArt(lastAlbumArtMode)
+                  }
+                  onCancel={() => {
+                    setAlbumArtResult(null);
+                    setSelectedAlbumArtOptionId(null);
+                  }}
+                  isGenerating={isGeneratingAlbumArt}
+                  isApplying={isApplyingAlbumArt}
+                  quotaRemaining={
+                    albumArtResult?.quota.remainingRunsForRelease ?? null
+                  }
+                />
+              </div>
+            ) : null}
             <DrawerTabbedCard
               testId='release-tabbed-card'
               surfaceVariant='quiet'

@@ -147,6 +147,7 @@ export const TOOL_LABELS: Record<string, string> = {
   createRelease: 'Creating release...',
   submitFeedback: 'Submitting feedback...',
   generateReleasePitch: 'Generating pitches...',
+  generateAlbumArt: 'Generating album art...',
 };
 
 /** A chat suggestion card with icon, label, and prompt */
