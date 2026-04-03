@@ -17,6 +17,7 @@ import {
   MoreVertical,
   Plus,
   Search,
+  Trash2,
 } from 'lucide-react';
 import {
   type ComponentPropsWithoutRef,
@@ -64,6 +65,7 @@ import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import {
   useCreateTaskMutation,
+  useDeleteTaskMutation,
   useUpdateTaskMutation,
 } from '@/lib/queries/useTaskMutations';
 import { useTaskQuery, useTasksQuery } from '@/lib/queries/useTasksQuery';
@@ -995,7 +997,9 @@ export function TasksPageClient() {
   const deferredSearch = useDeferredValue(search);
   const profileId = selectedProfile?.id;
   const createTaskMutation = useCreateTaskMutation();
+  const deleteTaskMutation = useDeleteTaskMutation();
   const updateTaskMutation = useUpdateTaskMutation();
+  const { mutate: deleteTask } = deleteTaskMutation;
   const { mutate: updateTask, isPending: isUpdatingTask } = updateTaskMutation;
   const { data: releases = [] } = useReleasesQuery(profileId ?? '');
 
@@ -1318,6 +1322,25 @@ export function TasksPageClient() {
     [updateTask]
   );
 
+  const handleDeleteTask = useCallback(
+    (task: TaskView) => {
+      const shouldDelete = globalThis.confirm(
+        `Delete "${task.title}"? This can't be undone.`
+      );
+
+      if (!shouldDelete) {
+        return;
+      }
+
+      deleteTask(task.id, {
+        onError: () => {
+          toast.error("Couldn't delete task");
+        },
+      });
+    },
+    [deleteTask]
+  );
+
   const getTaskContextMenuItems = useCallback(
     (task: TaskView): ContextMenuItemType[] => [
       {
@@ -1413,8 +1436,22 @@ export function TasksPageClient() {
           },
         ],
       },
+      { type: 'separator' },
+      {
+        id: 'delete-task',
+        label: 'Delete Task',
+        icon: <Trash2 className='h-4 w-4' />,
+        destructive: true,
+        onClick: () => handleDeleteTask(task),
+      },
     ],
-    [artistName, openReleaseSidebar, openTaskDocument, updateTaskField]
+    [
+      artistName,
+      handleDeleteTask,
+      openReleaseSidebar,
+      openTaskDocument,
+      updateTaskField,
+    ]
   );
 
   const sidebarPanel = selectedRelease ? (

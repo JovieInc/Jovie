@@ -155,6 +155,7 @@ const mockHelperTask = {
 } as const;
 
 const mockCreateTask = vi.fn();
+const mockDeleteTask = vi.fn();
 const mockUpdateTask = vi.fn();
 const mockSetHeaderActions = vi.fn();
 let setHeaderActionsHost: ((actions: React.ReactNode) => void) | null = null;
@@ -227,6 +228,10 @@ vi.mock('@/lib/queries/useTasksQuery', () => ({
 vi.mock('@/lib/queries/useTaskMutations', () => ({
   useCreateTaskMutation: () => ({
     mutateAsync: mockCreateTask,
+    isPending: false,
+  }),
+  useDeleteTaskMutation: () => ({
+    mutate: mockDeleteTask,
     isPending: false,
   }),
   useUpdateTaskMutation: () => ({
@@ -360,6 +365,7 @@ describe('TasksPageClient', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mockCreateTask.mockReset();
+    mockDeleteTask.mockReset();
     mockUpdateTask.mockReset();
     mockSetHeaderActions.mockReset();
     mockUnifiedTable.mockReset();
@@ -660,6 +666,86 @@ describe('TasksPageClient', () => {
     expect(menuRows.some(row => row.textContent?.includes('In Progress'))).toBe(
       true
     );
+  });
+
+  it('adds a destructive delete action to the task context menu', () => {
+    renderPage();
+
+    const tableProps = mockUnifiedTable.mock.calls.at(-1)?.[0] as
+      | {
+          getContextMenuItems?: (task: typeof mockTaskTwo) => ReadonlyArray<{
+            readonly id: string;
+            readonly label?: string;
+            readonly destructive?: boolean;
+          }>;
+        }
+      | undefined;
+
+    const deleteItem = tableProps
+      ?.getContextMenuItems?.(mockTaskTwo)
+      ?.find(item => item.id === 'delete-task');
+
+    expect(deleteItem).toMatchObject({
+      id: 'delete-task',
+      label: 'Delete Task',
+      destructive: true,
+    });
+  });
+
+  it('confirms before deleting a task from the context menu', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderPage();
+
+    const tableProps = mockUnifiedTable.mock.calls.at(-1)?.[0] as
+      | {
+          getContextMenuItems?: (task: typeof mockTaskTwo) => ReadonlyArray<{
+            readonly id: string;
+            readonly onClick?: () => void;
+          }>;
+        }
+      | undefined;
+
+    const deleteItem = tableProps
+      ?.getContextMenuItems?.(mockTaskTwo)
+      ?.find(item => item.id === 'delete-task');
+
+    deleteItem?.onClick?.();
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      `Delete "${mockTaskTwo.title}"? This can't be undone.`
+    );
+    expect(mockDeleteTask).toHaveBeenCalledWith(
+      mockTaskTwo.id,
+      expect.objectContaining({
+        onError: expect.any(Function),
+      })
+    );
+
+    confirmSpy.mockRestore();
+  });
+
+  it('does not delete a task when the context menu confirmation is cancelled', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderPage();
+
+    const tableProps = mockUnifiedTable.mock.calls.at(-1)?.[0] as
+      | {
+          getContextMenuItems?: (task: typeof mockTaskTwo) => ReadonlyArray<{
+            readonly id: string;
+            readonly onClick?: () => void;
+          }>;
+        }
+      | undefined;
+
+    const deleteItem = tableProps
+      ?.getContextMenuItems?.(mockTaskTwo)
+      ?.find(item => item.id === 'delete-task');
+
+    deleteItem?.onClick?.();
+
+    expect(mockDeleteTask).not.toHaveBeenCalled();
+
+    confirmSpy.mockRestore();
   });
 
   it('supports j and k keyboard navigation across visible tasks', () => {
