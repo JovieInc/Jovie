@@ -275,45 +275,6 @@ const THEME_ENABLED_PREFIXES = [
   '/waitlist',
 ] as const;
 
-const PUBLIC_ROUTE_THEME_EXCLUSIONS = new Set([
-  '.well-known',
-  'about',
-  'account',
-  'actions',
-  'ai',
-  'alternatives',
-  'api',
-  'app',
-  'artist-profiles',
-  'artist-selection',
-  'artists',
-  'billing',
-  'blog',
-  'changelog',
-  'claim',
-  'compare',
-  'demo',
-  'engagement-engine',
-  'error',
-  'go',
-  'hud',
-  'investor-portal',
-  'investors',
-  'launch',
-  'legal',
-  'llms-full.txt',
-  'llms.txt',
-  'new',
-  'onboarding',
-  'pricing',
-  'signin',
-  'signup',
-  'support',
-  'tips',
-  'ui',
-  'waitlist',
-]);
-
 type CoreProviderVariant = 'full' | 'homepage' | 'public';
 
 export function getCoreProviderVariant(pathname: string): CoreProviderVariant {
@@ -327,14 +288,7 @@ export function getCoreProviderVariant(pathname: string): CoreProviderVariant {
 }
 
 export function isThemeEnabledRoute(pathname: string): boolean {
-  if (THEME_ENABLED_PREFIXES.some(prefix => pathname.startsWith(prefix))) {
-    return true;
-  }
-
-  const [firstSegment] = pathname.split('/').filter(Boolean);
-  return (
-    Boolean(firstSegment) && !PUBLIC_ROUTE_THEME_EXCLUSIONS.has(firstSegment)
-  );
+  return THEME_ENABLED_PREFIXES.some(prefix => pathname.startsWith(prefix));
 }
 
 export function CoreProviders({
@@ -344,10 +298,6 @@ export function CoreProviders({
   const pathname = usePathname() ?? '';
   const variant = useMemo(() => getCoreProviderVariant(pathname), [pathname]);
   const themeEnabled = useMemo(() => isThemeEnabledRoute(pathname), [pathname]);
-  const themeDefaultMode = useMemo<ThemeMode>(
-    () => (themeEnabled && variant === 'public' ? 'system' : initialThemeMode),
-    [initialThemeMode, themeEnabled, variant]
-  );
   const isHomepageVariant = variant === 'homepage';
   const isPublicVariant = variant === 'public';
   const isTestRuntime = env.IS_TEST || env.IS_E2E;
@@ -369,7 +319,7 @@ export function CoreProviders({
         <CoreProvidersInner
           enableAnalytics={enableAnalytics}
           enableMonitoring={!isPublicVariant && !isTestRuntime}
-          initialThemeMode={themeDefaultMode}
+          initialThemeMode={initialThemeMode}
           themeEnabled={themeEnabled}
           usePacer={!isPublicVariant}
         >

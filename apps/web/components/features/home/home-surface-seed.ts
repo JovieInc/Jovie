@@ -60,15 +60,15 @@ export const HOME_HERO_TASKS: readonly HomepageTaskCard[] = [
 export const HOME_RELEASE_DESTINATION_PRESAVE_MOCK: HomepageReleaseMock = {
   id: 'afterlight-presave',
   title: 'Afterlight',
-  artist: 'Tim White and Luna Grey',
+  artist: 'Tim White',
   releaseLabel: 'Drops April 19, 2026',
   modeLabel: 'Countdown Presave',
   state: 'presave',
-  stateDetail: '12 days left',
-  primaryMetricLabel: 'Presaves',
-  primaryMetricValue: '214',
-  secondaryMetricLabel: 'SMS signups',
-  secondaryMetricValue: '63',
+  stateDetail: 'Presave is open',
+  primaryMetricLabel: 'Momentum',
+  primaryMetricValue: 'Building',
+  secondaryMetricLabel: 'Fan action',
+  secondaryMetricValue: 'Join in',
   labels: ['orchard', 'armada', 'awal'],
   artworkTone: 'violet',
 } as const;
@@ -78,15 +78,15 @@ export const HOME_HERO_RELEASE_MOCK = HOME_RELEASE_DESTINATION_PRESAVE_MOCK;
 export const HOME_RELEASE_DESTINATION_LIVE_MOCK: HomepageReleaseMock = {
   id: 'take-me-over-live',
   title: 'Take Me Over',
-  artist: 'Tim White and Sora Vale',
+  artist: 'Tim White',
   releaseLabel: 'Released October 1, 2014',
   modeLabel: 'Live Smart Link',
   state: 'live',
   stateDetail: 'Streaming everywhere now',
-  primaryMetricLabel: 'Total clicks',
-  primaryMetricValue: '480',
-  secondaryMetricLabel: 'Last 7 days',
-  secondaryMetricValue: '86',
+  primaryMetricLabel: 'Status',
+  primaryMetricValue: 'Listening',
+  secondaryMetricLabel: 'Fan action',
+  secondaryMetricValue: 'Share it',
   labels: ['umg', 'orchard', 'awal', 'armada'],
   artworkTone: 'blue',
 } as const;
@@ -95,7 +95,7 @@ export const HOME_SMARTLINK_RELEASE_MOCK = HOME_RELEASE_DESTINATION_LIVE_MOCK;
 
 export const HOME_RELEASE_AI_CONTEXT = [
   'Release: Take Me Over',
-  'Catalog: 21 synced',
+  'Catalog: latest release loaded',
   'Profile: Tim White verified',
 ] as const;
 

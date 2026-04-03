@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
+import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { calculateDistanceMiles } from '@/lib/geo';
 
@@ -26,12 +27,45 @@ interface TourDateWithProximity {
   readonly isNearby: boolean;
 }
 
+function getTicketStatusClassName(
+  ticketStatus: TourDateViewModel['ticketStatus'],
+  canBuyTickets: boolean,
+  compact: boolean
+): string {
+  if (ticketStatus === 'sold_out') {
+    return 'text-[rgb(118,114,255)]';
+  }
+
+  if (canBuyTickets) {
+    return compact ? 'text-white/62' : 'text-secondary-token';
+  }
+
+  return compact ? 'text-white/34' : 'text-tertiary-token';
+}
+
+function getTicketStatusLabel(
+  ticketStatus: TourDateViewModel['ticketStatus'],
+  canBuyTickets: boolean
+): string {
+  if (ticketStatus === 'sold_out') {
+    return 'Sold out';
+  }
+
+  if (canBuyTickets) {
+    return 'Tickets';
+  }
+
+  return 'No tickets';
+}
+
 function TourDateRow({
+  artistHandle,
   date,
   distanceMiles,
   showNearbyBadge,
   compact = false,
 }: {
+  readonly artistHandle: string;
   readonly date: TourDateViewModel;
   readonly distanceMiles: number | null;
   readonly showNearbyBadge: boolean;
@@ -49,6 +83,34 @@ function TourDateRow({
   const dayLabel = new Intl.DateTimeFormat('en-US', {
     day: 'numeric',
   }).format(parsedDate);
+  const handleTicketClick = useTourDateTicketClick(
+    artistHandle,
+    date.id,
+    date.ticketUrl
+  );
+  const ticketStatusClassName = getTicketStatusClassName(
+    date.ticketStatus,
+    canBuyTickets,
+    compact
+  );
+  const ticketStatusLabel = getTicketStatusLabel(
+    date.ticketStatus,
+    canBuyTickets
+  );
+
+  const ticketStatusContent = canBuyTickets ? (
+    <a
+      href={date.ticketUrl ?? undefined}
+      onClick={handleTicketClick}
+      target='_blank'
+      rel='noopener noreferrer'
+      className={ticketStatusClassName}
+    >
+      {ticketStatusLabel}
+    </a>
+  ) : (
+    <p className={ticketStatusClassName}>{ticketStatusLabel}</p>
+  );
 
   if (compact) {
     return (
@@ -76,21 +138,9 @@ function TourDateRow({
           <p className='text-[0.92rem] font-[590] tracking-[-0.015em] text-white/78'>
             {monthLabel} {dayLabel}
           </p>
-          <p
-            className={`mt-1 text-[0.82rem] font-[590] tracking-[-0.01em] ${
-              date.ticketStatus === 'sold_out'
-                ? 'text-[rgb(118,114,255)]'
-                : canBuyTickets
-                  ? 'text-white/62'
-                  : 'text-white/34'
-            }`}
-          >
-            {date.ticketStatus === 'sold_out'
-              ? 'Sold out'
-              : canBuyTickets
-                ? 'Tickets'
-                : 'No tickets'}
-          </p>
+          <div className='mt-1 text-[0.82rem] font-[590] tracking-[-0.01em]'>
+            {ticketStatusContent}
+          </div>
         </div>
       </div>
     );
@@ -126,21 +176,9 @@ function TourDateRow({
         <p className='text-[0.92rem] font-[590] tracking-[-0.015em] text-primary-token'>
           {monthLabel} {dayLabel}
         </p>
-        <p
-          className={`mt-1 text-[0.82rem] font-[590] tracking-[-0.01em] ${
-            date.ticketStatus === 'sold_out'
-              ? 'text-[rgb(118,114,255)]'
-              : canBuyTickets
-                ? 'text-secondary-token'
-                : 'text-tertiary-token'
-          }`}
-        >
-          {date.ticketStatus === 'sold_out'
-            ? 'Sold out'
-            : canBuyTickets
-              ? 'Tickets'
-              : 'No tickets'}
-        </p>
+        <div className='mt-1 text-[0.82rem] font-[590] tracking-[-0.01em]'>
+          {ticketStatusContent}
+        </div>
       </div>
     </div>
   );
@@ -200,6 +238,7 @@ function TourDatesContent({
           {nearby.map(item => (
             <TourDateRow
               key={item.date.id}
+              artistHandle={artist.handle}
               date={item.date}
               distanceMiles={item.distanceMiles}
               showNearbyBadge
@@ -217,6 +256,7 @@ function TourDatesContent({
           {remaining.map(item => (
             <TourDateRow
               key={item.date.id}
+              artistHandle={artist.handle}
               date={item.date}
               distanceMiles={item.distanceMiles}
               showNearbyBadge={false}
@@ -278,7 +318,7 @@ export function TourModePanel({
   const hasNoDates = tourDates.length === 0;
 
   const listHeader = (
-    <div className='mb-4 flex items-center justify-between gap-3 rounded-[16px] border border-white/6 bg-white/[0.035] px-3 py-3'>
+    <div className='mb-4 flex items-center gap-3 rounded-[16px] border border-white/6 bg-white/[0.035] px-3 py-3'>
       <div className='inline-flex min-w-0 items-center gap-2 rounded-[12px] bg-white/[0.04] px-3 py-2 text-[0.85rem] font-medium text-white/48'>
         <MapPin className='h-3.5 w-3.5 shrink-0' />
         <span className='truncate'>
@@ -290,9 +330,6 @@ export function TourModePanel({
             : 'All upcoming shows'}
         </span>
       </div>
-      <span className='shrink-0 text-[0.82rem] font-medium text-white/42'>
-        Filter
-      </span>
     </div>
   );
 
