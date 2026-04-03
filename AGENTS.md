@@ -53,6 +53,15 @@ ALL commands that need secrets MUST be prefixed with Doppler, and local/dev comm
 
 Reason: local agents and worktrees should not rely on whatever Doppler scope happens to be active in the shell.
 
+### Local Auth Bypass For Perf And E2E
+
+When local perf or E2E work needs an authenticated session on loopback/private hosts, prefer the repo's dev auth bypass before assuming Clerk bootstrap is required or broken.
+
+- Enable `E2E_USE_TEST_AUTH_BYPASS=1` for local authenticated test runs.
+- Use `/api/dev/test-auth/session` to mint bypass cookies for programmatic flows and `/api/dev/test-auth/enter?persona=...&redirect=/app` for browser bootstrap flows.
+- Validate the loopback host you are actually using (`localhost` vs `127.0.0.1`) because host-only cookies do not cross between them.
+- If auth bootstrap fails locally, debug the bypass route/cookie flow first instead of treating it as an expected limitation.
+
 ### If Doppler is not installed
 
 ```bash

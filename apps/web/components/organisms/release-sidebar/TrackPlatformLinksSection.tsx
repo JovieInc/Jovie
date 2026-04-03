@@ -17,15 +17,17 @@ export interface TrackPlatformLink {
 interface TrackPlatformLinksSectionProps {
   readonly providers: TrackPlatformLink[];
   readonly emptyMessage?: string;
+  readonly title?: string;
 }
 
 export function TrackPlatformLinksSection({
   providers,
+  title = 'DSPs',
   emptyMessage = 'No DSP links available for this track.',
 }: TrackPlatformLinksSectionProps) {
   return (
     <DrawerLinkSection
-      title='DSPs'
+      title={title}
       isEmpty={providers.length === 0}
       emptyMessage={emptyMessage}
       emptyStateTestId='track-platforms-empty'

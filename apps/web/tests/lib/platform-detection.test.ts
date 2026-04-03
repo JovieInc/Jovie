@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { detectPlatform, normalizeUrl } from '@/lib/utils/platform-detection';
+import {
+  detectPlatform,
+  detectPlatformByHost,
+  normalizeUrl,
+} from '@/lib/utils/platform-detection';
 
 describe('Platform Detection', () => {
   describe('Unsafe inputs', () => {
@@ -177,6 +181,25 @@ describe('Platform Detection', () => {
       expect(detected.platform.id).toBe('linktree');
       expect(detected.normalizedUrl).toContain('https://linktr.ee/example');
       expect(detected.isValid).toBe(true);
+    });
+  });
+
+  describe('Host-only detection', () => {
+    it('recognizes known hosts even when the full URL would fail platform validation', () => {
+      const platform = detectPlatformByHost(
+        'https://open.spotify.com/weird/path/that-still-identifies-host'
+      );
+
+      expect(platform?.id).toBe('spotify');
+    });
+
+    it('recognizes Bandsintown and Wikidata hosts', () => {
+      expect(
+        detectPlatformByHost('https://www.bandsintown.com/a/test-artist')?.id
+      ).toBe('bandsintown');
+      expect(
+        detectPlatformByHost('https://www.wikidata.org/wiki/Q42')?.id
+      ).toBe('wikidata');
     });
   });
 });

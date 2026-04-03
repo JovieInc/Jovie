@@ -29,7 +29,7 @@ import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
-import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import type { ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
@@ -163,46 +163,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       }
     },
     [rows, openEditor]
-  );
-
-  const handleTrackClickFromRelease = useCallback(
-    (track: {
-      id: string;
-      title: string;
-      slug: string;
-      smartLinkPath: string;
-      trackNumber: number;
-      discNumber: number;
-      durationMs: number | null;
-      isrc: string | null;
-      isExplicit: boolean;
-      providers: Array<{ key: ProviderKey; label: string; url: string }>;
-      releaseId: string;
-      previewUrl?: string | null;
-      audioUrl?: string | null;
-      audioFormat?: string | null;
-    }) => {
-      const parentRelease = rows.find(r => r.id === track.releaseId);
-      openTrackDrawer({
-        id: track.id,
-        title: track.title,
-        slug: track.slug,
-        smartLinkPath: track.smartLinkPath,
-        trackNumber: track.trackNumber,
-        discNumber: track.discNumber,
-        durationMs: track.durationMs,
-        isrc: track.isrc,
-        isExplicit: track.isExplicit,
-        previewUrl: track.previewUrl ?? null,
-        audioUrl: track.audioUrl ?? null,
-        audioFormat: track.audioFormat ?? null,
-        providers: track.providers,
-        releaseTitle: parentRelease?.title ?? '',
-        releaseArtworkUrl: parentRelease?.artworkUrl,
-        releaseId: track.releaseId,
-      });
-    },
-    [rows, openTrackDrawer]
   );
 
   // Table display preferences (column visibility)
@@ -693,7 +653,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           onCanvasStatusUpdate={
             experienceAdapter?.onCanvasStatusUpdate ?? handleCanvasStatusUpdate
           }
-          onTrackClick={handleTrackClickFromRelease}
         />
       </Suspense>
     );
@@ -714,12 +673,13 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleAddReleaseCreated,
     handleReleaseArtworkUploaded,
     handleBackToReleaseFromTrack,
-    handleTrackClickFromRelease,
     refreshingReleaseId,
     handleAddUrl,
     isRescanningIsrc,
     handleArtworkUpload,
     handleReleaseChange,
+    handleSaveMetadata,
+    handleSavePrimaryIsrc,
     handleSaveLyrics,
     handleSaveTargetPlaylists,
     isLyricsSaving,
