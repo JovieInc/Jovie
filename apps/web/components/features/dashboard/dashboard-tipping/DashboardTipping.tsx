@@ -30,9 +30,9 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
+import { PageShell } from '@/components/organisms/PageShell';
 import { BASE_URL } from '@/constants/domains';
 import { CopyToClipboardButton } from '@/features/dashboard/molecules/CopyToClipboardButton';
-import { PageShell } from '@/components/organisms/PageShell';
 import { EarningsTab } from '@/features/dashboard/organisms/EarningsTab';
 import { ShopifyStoreCard } from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
 import { cn } from '@/lib/utils';

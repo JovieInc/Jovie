@@ -1,6 +1,7 @@
 'use client';
 
 import { Plus } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -22,12 +23,15 @@ import {
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { BASE_URL } from '@/constants/domains';
+import { APP_ROUTES } from '@/constants/routes';
+import { ProfileTipsSurface } from '@/features/dashboard/molecules/ProfileTipsSurface';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
   useDeletePressPhotoMutation,
   usePressPhotosQuery,
   usePressPhotoUploadMutation,
+  useProfileMonetizationSummary,
   useProfileSaveMutation,
   useRemoveSocialLinkMutation,
 } from '@/lib/queries';
@@ -66,6 +70,23 @@ const LINK_ACTION_CATEGORIES: ReadonlySet<CategoryOption> = new Set([
   'dsp',
   'earnings',
 ]);
+
+function resolveCategoryFromTab(
+  tab: string | null
+): CategoryOption | 'about' | null {
+  switch (tab) {
+    case 'social':
+      return 'social';
+    case 'music':
+      return 'dsp';
+    case 'earn':
+      return 'earnings';
+    case 'about':
+      return 'about';
+    default:
+      return null;
+  }
+}
 
 let tempLinkIdCounter = 0;
 
@@ -180,6 +201,12 @@ export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { data: monetizationSummary } = useProfileMonetizationSummary(
+    Boolean(selectedProfile)
+  );
 
   // Keep a ref to the latest previewData so async callbacks avoid stale closures
   const previewDataRef = useRef(previewData);
@@ -189,6 +216,8 @@ export function ProfileContactSidebar() {
   const [selectedCategory, setSelectedCategory] = useState<
     CategoryOption | 'about'
   >('social');
+  const selectedCategoryRef = useRef<CategoryOption | 'about'>('social');
+  selectedCategoryRef.current = selectedCategory;
 
   // Mutations for profile editing
   const profileMutation = useProfileSaveMutation();
@@ -205,6 +234,8 @@ export function ProfileContactSidebar() {
 
   // Add link state
   const [isAddingLink, setIsAddingLink] = useState(false);
+  const isAddingLinkRef = useRef(false);
+  isAddingLinkRef.current = isAddingLink;
 
   // Track temp link IDs with pending server adds. If user deletes a temp link
   // while its confirm-link request is in flight, we queue a server delete for
@@ -226,6 +257,24 @@ export function ProfileContactSidebar() {
       setSelectedCategory(resolvedCategory);
     }
   }, [resolvedCategory, selectedCategory]);
+
+  useEffect(() => {
+    const requestedCategory = resolveCategoryFromTab(searchParams.get('tab'));
+    if (
+      requestedCategory &&
+      requestedCategory !== selectedCategoryRef.current
+    ) {
+      setSelectedCategory(requestedCategory);
+    }
+
+    if (
+      requestedCategory === 'earnings' &&
+      searchParams.get('addLink') === '1' &&
+      !isAddingLinkRef.current
+    ) {
+      setIsAddingLink(true);
+    }
+  }, [searchParams]);
 
   const supportsAddAction = LINK_ACTION_CATEGORIES.has(
     resolvedCategory as CategoryOption
@@ -389,6 +438,49 @@ export function ProfileContactSidebar() {
   const handleAddLink = useCallback((_category?: string) => {
     setIsAddingLink(true);
   }, []);
+
+  const handleSetUsername = useCallback(() => {
+    if (pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE) {
+      const usernameInput = document.getElementById('username');
+      if (usernameInput instanceof HTMLInputElement) {
+        usernameInput.focus();
+        usernameInput.select();
+        usernameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+    }
+
+    router.push(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}#username`);
+  }, [pathname, router]);
+
+  const handleSetUpTips = useCallback(() => {
+    if (monetizationSummary?.manageHref === APP_ROUTES.SETTINGS_PAYMENTS) {
+      router.push(monetizationSummary.manageHref);
+      return;
+    }
+
+    setSelectedCategory('earnings');
+    setIsAddingLink(true);
+
+    if (pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE) {
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.set('tab', 'earn');
+      nextParams.set('addLink', '1');
+      const nextSearch = nextParams.toString();
+      router.replace(`${pathname}${nextSearch ? `?${nextSearch}` : ''}#tips`, {
+        scroll: false,
+      });
+    }
+  }, [monetizationSummary, pathname, router, searchParams]);
+
+  const handleManagePayments = useCallback(() => {
+    if (!monetizationSummary) return;
+    router.push(monetizationSummary.manageHref);
+  }, [monetizationSummary, router]);
+
+  const handleViewAnalytics = useCallback(() => {
+    router.push(APP_ROUTES.DASHBOARD_AUDIENCE);
+  }, [router]);
 
   // Handle smart add — receives a detected link from SidebarLinkInput
   const handleSmartAddLink = useCallback(
@@ -642,6 +734,18 @@ export function ProfileContactSidebar() {
               />
             ) : (
               <>
+                {resolvedCategory === 'earnings' && monetizationSummary ? (
+                  <div className='mb-2.5'>
+                    <ProfileTipsSurface
+                      summary={monetizationSummary}
+                      variant='drawer'
+                      onSetUsername={handleSetUsername}
+                      onSetUpTips={handleSetUpTips}
+                      onManagePayments={handleManagePayments}
+                      onViewAnalytics={handleViewAnalytics}
+                    />
+                  </div>
+                ) : null}
                 <ProfileLinkList
                   links={links}
                   selectedCategory={resolvedCategory as CategoryOption}

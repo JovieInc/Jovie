@@ -9,6 +9,7 @@ import { DashboardRefreshButton } from '@/features/dashboard/molecules/Dashboard
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { usePlanGate } from '@/lib/queries';
 import { captureException } from '@/lib/sentry/client-lite';
+import { cn } from '@/lib/utils';
 import { RangeToggle } from './RangeToggle';
 import { useDashboardAnalyticsState } from './useDashboardAnalytics';
 
@@ -172,6 +173,7 @@ export function DashboardAnalytics() {
   }
 
   const fmt = numberFormatter;
+  const showTipLinkVisits = (data?.tip_link_visits ?? 0) > 0;
 
   return (
     <div className='max-w-5xl space-y-8'>
@@ -240,7 +242,12 @@ export function DashboardAnalytics() {
         {!loading &&
           typeof data?.listen_clicks === 'number' &&
           typeof data?.identified_users === 'number' && (
-            <div className='grid grid-cols-2 gap-3 sm:grid-cols-4'>
+            <div
+              className={cn(
+                'grid grid-cols-2 gap-3',
+                showTipLinkVisits ? 'sm:grid-cols-5' : 'sm:grid-cols-4'
+              )}
+            >
               <StatCard
                 label='Capture Rate'
                 value={`${data.capture_rate ?? 0}%`}
@@ -259,6 +266,12 @@ export function DashboardAnalytics() {
                 value={fmt.format(data.total_clicks ?? 0)}
                 meta='All time'
               />
+              {showTipLinkVisits ? (
+                <StatCard
+                  label='Tip Link Visits'
+                  value={fmt.format(data.tip_link_visits ?? 0)}
+                />
+              ) : null}
             </div>
           )}
 

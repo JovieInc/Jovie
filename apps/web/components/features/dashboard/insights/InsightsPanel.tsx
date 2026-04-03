@@ -4,11 +4,11 @@ import { useMemo, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { PageShell } from '@/components/organisms/PageShell';
 import {
   PageToolbar,
   PageToolbarActionButton,
 } from '@/components/organisms/table';
-import { PageShell } from '@/components/organisms/PageShell';
 import { useGenerateInsightsMutation, useInsightsQuery } from '@/lib/queries';
 import type { InsightCategory, InsightResponse } from '@/types/insights';
 import { InsightCard } from './InsightCard';
@@ -178,10 +178,7 @@ export function InsightsPanel() {
   );
 
   return (
-    <PageShell
-      toolbar={toolbar}
-      data-testid='dashboard-insights-workspace'
-    >
+    <PageShell toolbar={toolbar} data-testid='dashboard-insights-workspace'>
       <div className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden'>
         <div className='flex flex-col gap-4 px-3 py-2.5 sm:px-4 sm:py-3.5'>
           {/* Category filter pills */}

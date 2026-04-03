@@ -422,6 +422,7 @@ export {
   type PricingOptionsResponse,
   usePricingOptionsQuery,
 } from './usePricingOptionsQuery';
+export { useProfileMonetizationSummary } from './useProfileMonetizationSummary';
 // Profile editor mutations (TanStack Query + Pacer integration)
 export {
   type ProfileData,

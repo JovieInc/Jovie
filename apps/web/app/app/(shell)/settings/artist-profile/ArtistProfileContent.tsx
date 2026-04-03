@@ -6,7 +6,9 @@ import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelCo
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { SettingsBrandingSection } from '@/features/dashboard/organisms/SettingsBrandingSection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
+import { SettingsTipsSection } from '@/features/dashboard/organisms/SettingsTipsSection';
 import { SettingsProfileSection } from '@/features/dashboard/organisms/settings-profile-section';
+import { ShopifyStoreCard } from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
 import { useSettingsContext } from '@/features/dashboard/organisms/useSettingsContext';
 
 function MobileProfilePanelTrigger() {
@@ -24,7 +26,7 @@ function MobileProfilePanelTrigger() {
           Links, music &amp; more
         </p>
         <p className='mt-0.5 text-[13px] text-secondary-token'>
-          Manage social links, music, earnings, and about info
+          Manage social links, music, tips, and about info
         </p>
       </div>
       <PanelRight
@@ -64,6 +66,8 @@ export function ArtistProfileContent() {
             onArtistUpdate={setArtist}
             isPro={isPro}
           />
+          <SettingsTipsSection />
+          <ShopifyStoreCard />
         </div>
       </SettingsSection>
       <MobileProfilePanelTrigger />
