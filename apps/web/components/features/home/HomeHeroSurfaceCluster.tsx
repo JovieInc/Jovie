@@ -1,6 +1,6 @@
-import { HOME_HERO_RELEASE_MOCK, HOME_HERO_TASKS } from './home-surface-seed';
+import { BellRing } from 'lucide-react';
+import { HOME_HERO_TASKS } from './home-surface-seed';
 import { MarketingSurfaceCard } from './MarketingSurfaceCard';
-import { ReleaseModeMockCard } from './ReleaseModeMockCard';
 
 const TASK_STATUS_STYLES = {
   ready: {
@@ -98,7 +98,7 @@ function HeroProfilePanel() {
         aria-hidden='true'
         className='pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.42),transparent)]'
       />
-      <div className='relative min-h-[18rem] w-full px-6 pb-5 pt-5'>
+      <div className='relative min-h-[14rem] w-full px-5 pb-4 pt-4'>
         <div
           aria-hidden='true'
           className='pointer-events-none absolute inset-x-8 bottom-0 h-20 rounded-full bg-[radial-gradient(circle,rgba(0,0,0,0.46),transparent_70%)] blur-2xl'
@@ -112,21 +112,74 @@ function HeroProfilePanel() {
           chrome='framed'
           glowTone='violet'
           imageClassName='object-contain scale-[1.02]'
-          className='relative mx-auto h-full w-full max-w-[12.25rem] bg-[linear-gradient(180deg,rgba(18,19,24,0.94),rgba(8,9,13,0.98))] shadow-[0_34px_90px_rgba(0,0,0,0.5)]'
+          className='relative mx-auto h-full w-full max-w-[10rem] bg-[linear-gradient(180deg,rgba(18,19,24,0.94),rgba(8,9,13,0.98))] shadow-[0_34px_90px_rgba(0,0,0,0.5)]'
         />
       </div>
     </div>
   );
 }
 
+const HERO_DSPS = [
+  { name: 'Spotify', action: 'Play' },
+  { name: 'Apple Music', action: 'Listen' },
+  { name: 'YouTube Music', action: 'Watch' },
+  { name: 'Amazon Music', action: 'Stream' },
+] as const;
+
 function HeroSmartLinkPanel() {
   return (
-    <ReleaseModeMockCard
-      release={HOME_HERO_RELEASE_MOCK}
-      variant='compact'
-      testId='homepage-hero-release-card'
-      className='shadow-[0_30px_90px_rgba(0,0,0,0.44),0_10px_32px_rgba(0,0,0,0.26)]'
-    />
+    <div
+      data-testid='homepage-hero-release-card'
+      className='relative overflow-hidden rounded-[1.35rem] border border-white/10 bg-[linear-gradient(180deg,rgba(19,21,29,0.98),rgba(12,13,20,0.94))] shadow-[0_30px_90px_rgba(0,0,0,0.44)]'
+    >
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(129,140,248,0.14),transparent_50%)]'
+      />
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)]'
+      />
+
+      <div className='relative p-4'>
+        <div className='overflow-hidden rounded-xl bg-[linear-gradient(135deg,rgba(113,112,255,0.4),rgba(46,18,94,0.6))]'>
+          <div className='flex min-h-[5rem] flex-col justify-end p-3'>
+            <p className='text-[10px] text-white/60'>Single</p>
+            <p className='text-[14px] font-[580] text-white'>The Deep End</p>
+            <p className='text-[10px] text-white/50'>Tim White</p>
+          </div>
+        </div>
+
+        <div className='mt-3 space-y-1.5'>
+          {HERO_DSPS.map(dsp => (
+            <div
+              key={dsp.name}
+              className='flex items-center justify-between rounded-lg bg-white/[0.04] px-3 py-2'
+            >
+              <span className='text-[11px] font-[530] text-white/80'>
+                {dsp.name}
+              </span>
+              <span className='text-[10px] text-white/35'>{dsp.action}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HeroNotificationCard() {
+  return (
+    <div className='rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(18,20,28,0.96),rgba(10,12,18,0.94))] px-4 py-2.5 shadow-[0_20px_60px_rgba(0,0,0,0.3)]'>
+      <div className='flex items-center gap-2.5'>
+        <div className='flex h-6 w-6 items-center justify-center rounded-full border border-violet-400/20 bg-violet-400/10'>
+          <BellRing className='h-3 w-3 text-violet-300' aria-hidden='true' />
+        </div>
+        <p className='text-[11px] font-[530] text-white/80'>
+          1,247 fans notified
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -142,20 +195,28 @@ export function HomeHeroSurfaceCluster() {
           <div className='sm:ml-auto sm:max-w-[20rem]'>
             <HeroTaskPanel />
           </div>
+          <div className='flex justify-center'>
+            <HeroNotificationCard />
+          </div>
         </div>
       </div>
 
-      <div className='relative hidden h-[27rem] w-[32rem] lg:block'>
-        <div className='absolute left-0 top-[2.5rem] z-20 w-[9rem] rotate-[-1.5deg]'>
-          <HeroSmartLinkPanel />
-        </div>
+      <div className='relative hidden min-h-[30rem] lg:block'>
+        <div className='flex items-start gap-4'>
+          <div className='w-[10.5rem] shrink-0 pt-8 rotate-[-1.5deg]'>
+            <HeroSmartLinkPanel />
+          </div>
 
-        <div className='absolute right-0 top-0 z-10 w-[19rem]'>
-          <HeroProfilePanel />
-        </div>
+          <div className='w-[14.5rem] shrink-0'>
+            <HeroProfilePanel />
+          </div>
 
-        <div className='absolute bottom-[0.5rem] right-0 z-30 w-[14rem]'>
-          <HeroTaskPanel />
+          <div className='w-[13rem] shrink-0 pt-12 rotate-[1deg]'>
+            <HeroTaskPanel />
+            <div className='mt-3'>
+              <HeroNotificationCard />
+            </div>
+          </div>
         </div>
       </div>
     </>
