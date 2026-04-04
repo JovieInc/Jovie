@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.114] - 2026-04-03
+
+> Tightened compact dropdown styling to canonical design tokens and refreshed gstack skill docs to the latest generated templates.
+
+### Changed
+
+- Updated `MENU_ITEM_COMPACT` and `DROPDOWN_CONTENT_COMPACT_BASE` in `packages/ui/lib/dropdown-styles.ts` to use `--linear-*` radius, surface, border, and text tokens for consistency with the Linear token system
+- Updated compact dropdown tests to assert compact padding semantics directly in `packages/ui/lib/dropdown-styles.test.ts`
+- Regenerated gstack skill documentation updates in `.claude/skills/gstack/{checkpoint,design-html,health,learn}/SKILL.md`
+
 ## [26.4.113] - 2026-04-03
 
 > Public profiles ship the V2 template globally: immersive hero, content-aware section ordering, share button, and a batch of reliability fixes that make profiles load faster and stay fresher.
