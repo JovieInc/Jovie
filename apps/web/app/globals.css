@@ -77,8 +77,13 @@ body:has(.profile-viewport) {
   & .space-y-4 > * + * {
     margin-top: 0 !important;
   }
-  /* Kill footer disclaimer */
+  /* Collapse footer but keep it in flow for error tooltips */
   & .relative.min-h-5 {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+  /* Hide the disclaimer text (not errors) */
+  & .relative.min-h-5 > p {
     display: none !important;
   }
   /* Standalone primary button: match composer pill dimensions exactly */

@@ -262,18 +262,6 @@ export function ProfileCompactTemplate({
                   />
 
                   <div className='flex items-center gap-2'>
-                    {/* Play button in header */}
-                    {mergedDSPs.length > 0 ? (
-                      <button
-                        type='button'
-                        onClick={handlePlayClick}
-                        className={`flex h-8 w-8 items-center justify-center rounded-full ${glass.border} bg-black/25 text-white/70 ${glass.blur} transition-colors duration-150 hover:bg-black/40`}
-                        aria-label={`Play ${artist.name}`}
-                      >
-                        <Play className='ml-px h-[14px] w-[14px] fill-current' />
-                      </button>
-                    ) : null}
-
                     {/* ─── Dropdown ─── */}
                     <div ref={menuRef} className='relative'>
                       <button
@@ -347,9 +335,9 @@ export function ProfileCompactTemplate({
                   </div>
                 </div>
 
-                {/* Artist name */}
-                <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
-                  <h1 className='flex items-center gap-1.5 text-[34px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
+                {/* Artist name + play */}
+                <div className='absolute inset-x-0 bottom-5 z-10 flex items-end justify-between px-5'>
+                  <h1 className='flex min-w-0 items-center gap-1.5 text-[34px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
                     {artist.name}
                     {artist.is_verified ? (
                       <BadgeCheck
@@ -361,6 +349,16 @@ export function ProfileCompactTemplate({
                       />
                     ) : null}
                   </h1>
+                  {mergedDSPs.length > 0 ? (
+                    <button
+                      type='button'
+                      onClick={handlePlayClick}
+                      className='mb-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.2)] transition-transform duration-150 hover:scale-[1.06] active:scale-95'
+                      aria-label={`Play ${artist.name}`}
+                    >
+                      <Play className='ml-0.5 h-3.5 w-3.5 fill-current text-black/85' />
+                    </button>
+                  ) : null}
                 </div>
               </header>
 
@@ -491,16 +489,21 @@ export function ProfileCompactTemplate({
                 {/* Powered by */}
                 <a
                   href={BASE_URL}
-                  className='flex items-center justify-center gap-1 pt-1 text-[10px] font-[450] text-white/20 transition-colors duration-150 hover:text-white/40'
+                  className='flex items-center justify-center gap-1.5 pt-1 text-white/20 transition-colors duration-150 hover:text-white/40'
                 >
+                  <span className='text-[9px] font-[510] uppercase tracking-[0.12em]'>
+                    Powered by
+                  </span>
                   <BrandLogo
-                    size={10}
+                    size={12}
                     tone='white'
                     rounded={false}
-                    className='opacity-40'
+                    className='opacity-[inherit]'
                     aria-hidden
                   />
-                  jovie
+                  <span className='text-[11px] font-[590] tracking-[-0.01em]'>
+                    Jovie
+                  </span>
                 </a>
               </div>
             </div>
