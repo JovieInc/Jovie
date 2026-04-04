@@ -173,8 +173,8 @@ jobs:
       - name: Slack alert (main CI unhealthy)
         if: ${{ steps.evaluate.outputs.should_alert == 'true' && env.SLACK_WEBHOOK_URL != '' }}
         run: |
-          DETAILS_JSON=$(jq -Rn --arg text "${{ steps.evaluate.outputs.details }}" '$text')
-          SUMMARY_JSON=$(jq -Rn --arg text "${{ steps.evaluate.outputs.summary }}" '$text')
+          DETAILS_JSON=$(jq -Rn --arg text "$DETAILS" '$text')
+          SUMMARY_JSON=$(jq -Rn --arg text "$SUMMARY" '$text')
           PAYLOAD=$(cat <<EOF
           {
             "text": "🚨 Main CI health monitor detected an issue",
@@ -182,11 +182,11 @@ jobs:
               {
                 "color": "danger",
                 "fields": [
-                  { "title": "Repository", "value": "${{ github.repository }}", "short": true },
+                  { "title": "Repository", "value": "$GH_REPOSITORY", "short": true },
                   { "title": "Branch", "value": "main", "short": true },
                   { "title": "Summary", "value": ${SUMMARY_JSON}, "short": false },
                   { "title": "Details", "value": ${DETAILS_JSON}, "short": false },
-                  { "title": "Run", "value": "<${{ steps.evaluate.outputs.run_url }}|View failing or stale run>", "short": false }
+                  { "title": "Run", "value": "<$RUN_URL|View failing or stale run>", "short": false }
                 ]
               }
             ]
@@ -198,6 +198,10 @@ jobs:
             --data "$PAYLOAD" \
             "$SLACK_WEBHOOK_URL"
         env:
+          DETAILS: ${{ steps.evaluate.outputs.details }}
+          SUMMARY: ${{ steps.evaluate.outputs.summary }}
+          RUN_URL: ${{ steps.evaluate.outputs.run_url }}
+          GH_REPOSITORY: ${{ github.repository }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Auto-rerun failed deploy (self-healing)
@@ -232,7 +236,10 @@ jobs:
 
       - name: Fail job when unhealthy
         if: ${{ steps.evaluate.outputs.should_alert == 'true' }}
+        env:
+          SUMMARY: ${{ steps.evaluate.outputs.summary }}
+          DETAILS: ${{ steps.evaluate.outputs.details }}
         run: |
-          echo "${{ steps.evaluate.outputs.summary }}"
-          echo "${{ steps.evaluate.outputs.details }}"
+          echo "$SUMMARY"
+          echo "$DETAILS"
           exit 1
