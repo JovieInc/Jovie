@@ -333,26 +333,18 @@ const getCachedProfileAndLinks = async (username: string) => {
     return fetchProfileAndLinks(username);
   }
 
-  // Fetch the profile data
-  const data = await fetchProfileAndLinks(username);
-
-  // Only cache successful results — not_found and error are always fresh
-  if (data.status !== 'ok') {
-    return data;
-  }
-
-  // Cache the successful result with unstable_cache for 1 hour
+  // Single fetch path via unstable_cache. The cached function is the sole
+  // fetch path, eliminating the previous double-fetch on first visit.
   try {
     const cachedFetch = unstable_cache(
       async () => {
-        // Re-fetch on revalidation
-        const freshData = await fetchProfileAndLinks(username);
-        if (freshData.status !== 'ok') {
-          // Profile was removed or errored — don't cache, throw to prevent
-          // stale success from being served
-          throw new Error(`Profile ${username} no longer available`);
+        const data = await fetchProfileAndLinks(username);
+        if (data.status !== 'ok') {
+          // Don't cache not_found or error results — throw to prevent
+          // stale success from being served on background revalidation
+          throw new Error(`Profile ${username} status: ${data.status}`);
         }
-        return freshData;
+        return data;
       },
       [`public-profile-${username}`],
       {
@@ -362,8 +354,8 @@ const getCachedProfileAndLinks = async (username: string) => {
     );
     return await cachedFetch();
   } catch {
-    // Cache layer failure — return the fresh data we already have
-    return data;
+    // Cache miss for non-ok status, or cache layer failure — fetch fresh
+    return fetchProfileAndLinks(username);
   }
 };
 
@@ -383,6 +375,34 @@ function getProfileV2Gate(): boolean {
 
 function getSubscribeCTAVariant(): SubscribeCTAVariant {
   return 'two_step';
+}
+
+/**
+ * Pre-render featured artist profiles at build time to eliminate cold-start latency.
+ * Limited to 100 profiles to keep build times reasonable.
+ */
+export async function generateStaticParams() {
+  try {
+    const { db } = await import('@/lib/db');
+    const { creatorProfiles } = await import('@/lib/db/schema/profiles');
+    const { eq, and } = await import('drizzle-orm');
+
+    const featured = await db
+      .select({ username: creatorProfiles.username })
+      .from(creatorProfiles)
+      .where(
+        and(
+          eq(creatorProfiles.isPublic, true),
+          eq(creatorProfiles.isFeatured, true)
+        )
+      )
+      .limit(100);
+
+    return featured.map(row => ({ username: row.username }));
+  } catch {
+    // Build-time DB failures should not block deployment
+    return [];
+  }
 }
 
 interface Props {
@@ -685,12 +705,10 @@ export default async function ArtistPage({
     // Secret not configured — visit tracking will proceed without token auth
   }
 
-  // Tour dates are parallelized. Flags are now synchronous code-level reads.
+  // Tour dates are always fetched (non-blocking — errors fall back to empty).
   const showLatestRelease = getLatestReleaseGate();
   const subscribeCTAVariant = getSubscribeCTAVariant();
-  const tourDates = await (profileV2Enabled || mode === 'tour'
-    ? getPublicTourDates(profile.id)
-    : Promise.resolve([] as TourDateViewModel[]));
+  const tourDatesPromise = getPublicTourDates(profile.id);
 
   const latestRelease = showLatestRelease ? fetchedLatestRelease : null;
   const subscribeTwoStep = subscribeCTAVariant === 'two_step';
@@ -722,6 +740,14 @@ export default async function ArtistPage({
     profile,
     genres,
     links
+  );
+
+  // Await tour dates (started above, non-blocking — errors resolve to empty)
+  // Sort server-side so the client doesn't need a useMemo sort
+  const tourDates = (
+    await tourDatesPromise.catch(() => [] as TourDateViewModel[])
+  ).sort(
+    (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
 
   return (

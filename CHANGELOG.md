@@ -7,8 +7,27 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.113] - 2026-04-03
 
+> Public profiles ship the V2 template globally: immersive hero, content-aware section ordering, share button, and a batch of reliability fixes that make profiles load faster and stay fresher.
+
+### Added
+
+- Share button in V2 hero with `navigator.share()` on mobile and clipboard fallback on desktop, with check-icon success feedback
+- "View as visitor" button in artist profile settings linking to the public profile
+- `generateStaticParams` for featured artist profiles, pre-rendering up to 100 at build time
+- Server-side tour date sorting (removed client-side useMemo)
+- 3-second timeout on OG image data fetch with reliable fallback to branded Jovie card
+- `requestIdleCallback` deferral for profile view tracking to avoid blocking first paint
+
 ### Changed
 
+- Enabled `PROFILE_V2` and `LATEST_RELEASE_CARD` feature flags (V2 template is now the default for all public profiles)
+- Tour dates are now always fetched regardless of template version (non-blocking with error fallback)
+- Profile scroll body reordered: Featured Content, Tour, Subscribe, Connect, About, Follow (previously Subscribe was first)
+- V2 hero shows 3 social links (up from 2) alongside Share and Notify buttons
+- Bio truncation threshold increased from 190 to 300 characters and 3 to 5 lines before "Read more"
+- Renamed social links section from "Elsewhere" to "Follow"
+- Hero image sizes tightened from 3-breakpoint to 2-breakpoint for better mobile image optimization
+- Profile skeleton rewritten to match V2 full-bleed hero layout (prevents layout shift on cold loads)
 - Dashboard header no longer shows a shadow line between the header and content area
 - Content shell spacing is now visually consistent on all edges
 - Tasks toolbar sits as a full-width subheader matching the dashboard header height
@@ -16,6 +35,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Priority indicators use signal bars that fill proportionally (urgent=4, high=3, medium=2, low=1) instead of uniform colored dots
 - Overdue badge is now hidden on cancelled tasks
 - Playback stats use plain language: "linked" instead of "canonical", "unconfirmed" instead of "fallback", "pending" instead of "unknown", and zero counts are hidden
+
+### Fixed
+
+- `ProfileFeaturedCard` now receives actual tour dates instead of empty array, restoring tour CTA
+- `unstable_cache` double-fetch eliminated by restructuring cached function as sole fetch path
+- `SettingsSection` now supports `headerAction` prop for inline action buttons
 
 ## [26.4.112] - 2026-04-03
 

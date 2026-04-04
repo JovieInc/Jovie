@@ -1,8 +1,10 @@
 'use client';
 
-import { Bell, Play, Ticket } from 'lucide-react';
+import { Bell, Check, Play, Share2, Ticket } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialLink } from '@/components/molecules/SocialLink';
+import { BASE_URL } from '@/constants/app';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
 type HeroRelease = {
@@ -65,6 +67,40 @@ export function ArtistHero({
   compact = false,
 }: ArtistHeroProps) {
   const eyebrow = getReleaseEyebrow(latestRelease);
+  const [shareSuccess, setShareSuccess] = useState(false);
+  const shareTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleShare = useCallback(async () => {
+    const profileUrl = `${BASE_URL}/${artist.handle}`;
+    const shareData = { title: artist.name, url: profileUrl };
+
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(profileUrl);
+      }
+      setShareSuccess(true);
+      if (shareTimeoutRef.current) clearTimeout(shareTimeoutRef.current);
+      shareTimeoutRef.current = setTimeout(() => setShareSuccess(false), 2000);
+    } catch (error) {
+      // AbortError = user cancelled share sheet, do nothing
+      if (error instanceof Error && error.name === 'AbortError') return;
+      // Fallback: try clipboard if share failed for another reason
+      try {
+        await navigator.clipboard.writeText(profileUrl);
+        setShareSuccess(true);
+        if (shareTimeoutRef.current) clearTimeout(shareTimeoutRef.current);
+        shareTimeoutRef.current = setTimeout(
+          () => setShareSuccess(false),
+          2000
+        );
+      } catch {
+        // Silent failure — no toast, no error state
+      }
+    }
+  }, [artist.handle, artist.name]);
+
   const heroPearlClassName =
     'border border-white/12 bg-white/8 shadow-[0_12px_30px_rgba(0,0,0,0.18)] backdrop-blur-2xl';
   const primaryActionClassName =
@@ -85,7 +121,7 @@ export function ArtistHero({
           alt={artist.name}
           fill
           priority={true}
-          sizes='(max-width: 767px) 100vw, (max-width: 1280px) 46vw, 620px'
+          sizes='(max-width: 767px) 100vw, 620px'
           className='object-cover object-center md:scale-[1.02]'
           fallbackVariant='avatar'
           fallbackClassName='bg-surface-2'
@@ -119,6 +155,25 @@ export function ArtistHero({
                 artistName={artist.name}
               />
             ))}
+            <button
+              type='button'
+              onClick={handleShare}
+              className={`${heroPearlClassName} inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-4 text-[15px] font-[590] tracking-[-0.015em] text-white/88 transition-[background-color,border-color,color,opacity] hover:bg-white/12 hover:text-white hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]`}
+              aria-label={
+                shareSuccess
+                  ? `Copied ${artist.name}'s profile link`
+                  : `Share ${artist.name}'s profile`
+              }
+            >
+              {shareSuccess ? (
+                <Check className='h-[17px] w-[17px]' aria-hidden='true' />
+              ) : (
+                <Share2 className='h-[17px] w-[17px]' aria-hidden='true' />
+              )}
+              <span className='sr-only md:not-sr-only md:inline'>
+                {shareSuccess ? 'Copied' : 'Share'}
+              </span>
+            </button>
             <button
               type='button'
               onClick={onBellClick}
