@@ -2,6 +2,7 @@
 
 import { Bell, Mail, MoreHorizontal, Play, Share2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialLink } from '@/components/molecules/SocialLink';
 import {
@@ -229,9 +230,13 @@ export function ProfileCompactTemplate({
 
                 {/* Top bar: jovie brand + menu */}
                 <div className='relative z-10 flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),20px)]'>
-                  <span className='text-[15px] font-[510] tracking-[0.5px] text-white/55 [text-shadow:0_1px_8px_rgba(0,0,0,0.6)]'>
-                    jovie
-                  </span>
+                  <BrandLogo
+                    size={24}
+                    tone='white'
+                    rounded={false}
+                    className='opacity-50 drop-shadow-[0_1px_6px_rgba(0,0,0,0.5)]'
+                    aria-hidden={false}
+                  />
 
                   {/* Dropdown menu */}
                   <div ref={menuRef} className='relative'>
