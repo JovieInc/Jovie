@@ -647,11 +647,11 @@ export async function seedScreenshotData() {
   await db
     .update(creatorProfiles)
     .set({
-      displayName: 'Aria Chen',
-      bio: 'Electronic artist & producer. Blending ambient textures with driving rhythms.',
+      displayName: 'Tim White',
+      bio: 'Independent electronic artist building momentum with every release.',
     })
     .where(eq(creatorProfiles.id, profile.id));
-  console.log('  ✓ Updated profile display name to "Aria Chen"\n');
+  console.log('  ✓ Updated profile display name to "Tim White"\n');
 
   // Ensure all required providers exist
   console.log('  Ensuring providers exist...');

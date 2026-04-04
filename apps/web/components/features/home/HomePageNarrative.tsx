@@ -97,22 +97,16 @@ function HomeHero() {
 
 function HomeTrustBar() {
   return (
-    <section className='border-y border-subtle bg-page/95'>
+    <section className='bg-page py-8 sm:py-10'>
       <Container size='homepage'>
-        <div className='mx-auto flex max-w-[1120px] flex-col gap-5 py-5 md:flex-row md:items-center md:justify-between'>
-          <p className='text-[11px] text-tertiary-token'>
-            Trusted by artists on
-          </p>
-
-          <div className='flex flex-wrap items-center gap-x-6 gap-y-3 opacity-85 sm:gap-x-8'>
-            {TRUST_LABELS.map(partner => (
-              <HomepageLabelLogoMark
-                key={partner}
-                partner={partner}
-                className='text-primary-token opacity-72'
-              />
-            ))}
-          </div>
+        <div className='mx-auto flex max-w-[1120px] items-center justify-center gap-x-10 sm:gap-x-14 lg:gap-x-20'>
+          {TRUST_LABELS.map(partner => (
+            <HomepageLabelLogoMark
+              key={partner}
+              partner={partner}
+              className='text-primary-token opacity-[0.38]'
+            />
+          ))}
         </div>
       </Container>
     </section>
@@ -340,22 +334,12 @@ function CommandCenterSection() {
             <div>
               <p className='homepage-section-eyebrow'>Task & Playbook</p>
               <h2 className='marketing-h2-linear mt-4 text-primary-token'>
-                Command center for your career.
+                A command center for your career.
               </h2>
               <p className='mt-5 max-w-[28rem] text-[15px] leading-[1.7] text-secondary-token'>
                 Jovie generates a release playbook from your brief. Tasks track
                 themselves.
               </p>
-
-              <div className='mt-8 flex items-center gap-4'>
-                {TRUST_LABELS.map(partner => (
-                  <HomepageLabelLogoMark
-                    key={partner}
-                    partner={partner}
-                    className='text-white/30'
-                  />
-                ))}
-              </div>
             </div>
 
             <div className='rounded-2xl bg-white/[0.04] p-5'>
@@ -363,53 +347,61 @@ function CommandCenterSection() {
                 <p className='text-[11px] font-medium text-white/40'>
                   Release playbook
                 </p>
-                <p className='text-[11px] text-white/25'>3 of 4 done</p>
+                <span className='rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[11px] font-medium text-white/60'>
+                  Generate Release Plan
+                </span>
               </div>
 
               <div className='space-y-0'>
-                {[
-                  {
-                    title: 'Metadata verified',
-                    detail: 'ISRC and UPC synced',
-                    done: true,
-                  },
-                  {
-                    title: 'Upload Canvas to Spotify',
-                    detail: 'Started today',
-                    done: true,
-                  },
-                  {
-                    title: 'Pitch to editorial playlists',
-                    detail: 'Due in 3 days',
-                    done: true,
-                  },
-                  {
-                    title: 'Schedule launch day posts',
-                    detail: 'Queued',
-                    done: false,
-                  },
-                ].map(item => (
-                  <div
-                    key={item.title}
-                    className='flex items-center justify-between border-t border-white/6 py-3'
-                  >
-                    <div className='flex items-center gap-3'>
-                      {item.done ? (
-                        <CheckCircle2 className='h-3.5 w-3.5 text-emerald-400/70' />
-                      ) : (
-                        <Circle className='h-3.5 w-3.5 text-white/20' />
-                      )}
-                      <span
-                        className={`text-[13px] ${item.done ? 'text-white/40 line-through' : 'text-white/80'}`}
-                      >
-                        {item.title}
-                      </span>
-                    </div>
-                    <span className='text-[11px] text-white/25'>
-                      {item.detail}
+                <div className='flex items-center justify-between border-t border-white/6 py-3'>
+                  <div className='flex items-center gap-3'>
+                    <CheckCircle2 className='h-3.5 w-3.5 text-emerald-400' />
+                    <span className='text-[13px] text-white/40 line-through'>
+                      Metadata verified
                     </span>
                   </div>
-                ))}
+                  <span className='text-[11px] text-white/25'>
+                    ISRC and UPC synced
+                  </span>
+                </div>
+
+                <div className='relative flex items-center justify-between border-t border-white/6 py-3'>
+                  <div className='flex items-center gap-3'>
+                    <span className='h-3.5 w-3.5 rounded-full border-2 border-sky-400' />
+                    <span className='text-[13px] text-white/80'>
+                      Upload Canvas to Spotify
+                    </span>
+                  </div>
+                  <div className='flex items-center gap-2'>
+                    <span className='rounded-full border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 text-[9px] font-medium text-sky-300/80'>
+                      In progress
+                    </span>
+                  </div>
+                </div>
+
+                <div className='flex items-center justify-between border-t border-white/6 py-3'>
+                  <div className='flex items-center gap-3'>
+                    <Circle className='h-3.5 w-3.5 text-white/20' />
+                    <span className='text-[13px] text-white/80'>
+                      Pitch to editorial playlists
+                    </span>
+                  </div>
+                  <span className='text-[11px] text-white/25'>
+                    Due in 3 days
+                  </span>
+                </div>
+
+                <div className='relative flex items-center justify-between border-t border-white/6 py-3'>
+                  <div className='flex items-center gap-3'>
+                    <CheckCircle2 className='h-3.5 w-3.5 text-emerald-400' />
+                    <span className='text-[13px] text-white/40 line-through'>
+                      Schedule launch day posts
+                    </span>
+                  </div>
+                  <span className='rounded-full border border-violet-400/20 bg-violet-400/10 px-2 py-0.5 text-[9px] font-medium text-violet-300/80'>
+                    Automated by Jovie
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -419,44 +411,121 @@ function CommandCenterSection() {
   );
 }
 
+function MomentumCurve() {
+  return (
+    <svg viewBox='0 0 400 120' className='h-full w-full' aria-hidden='true'>
+      <line
+        x1='0'
+        y1='119'
+        x2='400'
+        y2='119'
+        stroke='rgba(255,255,255,0.06)'
+        strokeWidth='1'
+      />
+      <path
+        d='M 0 100 C 60 95, 100 70, 140 58 S 220 30, 280 20 S 360 10, 400 6'
+        fill='none'
+        stroke='rgba(113,112,255,0.5)'
+        strokeWidth='2'
+      />
+      <path
+        d='M 0 100 C 60 95, 100 70, 140 58 S 220 30, 280 20 S 360 10, 400 6'
+        fill='url(#momentum-fill)'
+        opacity='0.15'
+      />
+      <defs>
+        <linearGradient id='momentum-fill' x1='0' y1='0' x2='0' y2='1'>
+          <stop offset='0%' stopColor='rgb(113,112,255)' />
+          <stop offset='100%' stopColor='transparent' />
+        </linearGradient>
+      </defs>
+      {[
+        { x: 60, y: 96, label: 'Release 1' },
+        { x: 140, y: 58, label: 'Release 2' },
+        { x: 230, y: 28, label: 'Release 3' },
+        { x: 320, y: 14, label: 'Release 4' },
+      ].map(dot => (
+        <g key={dot.label}>
+          <circle cx={dot.x} cy={dot.y} r='4' fill='rgb(113,112,255)' />
+          <circle cx={dot.x} cy={dot.y} r='8' fill='rgba(113,112,255,0.2)' />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function FlatlineCurve() {
+  return (
+    <svg viewBox='0 0 400 120' className='h-full w-full' aria-hidden='true'>
+      <line
+        x1='0'
+        y1='119'
+        x2='400'
+        y2='119'
+        stroke='rgba(255,255,255,0.06)'
+        strokeWidth='1'
+      />
+      <path
+        d='M 0 70 Q 30 65, 60 72 T 120 68 T 180 74 T 240 70 T 300 73 T 360 69 T 400 72'
+        fill='none'
+        stroke='rgba(255,255,255,0.15)'
+        strokeWidth='1.5'
+        strokeDasharray='4 3'
+      />
+      {[60, 140, 230, 320].map(x => (
+        <circle
+          key={x}
+          cx={x}
+          cy={70 + (x % 3) * 2 - 2}
+          r='3'
+          fill='rgba(255,255,255,0.12)'
+        />
+      ))}
+    </svg>
+  );
+}
+
 function WorkflowSection() {
   return (
     <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
       <Container size='homepage'>
         <div className='mx-auto max-w-[1120px]'>
-          <SectionHeader
-            eyebrow='Full Release Lifecycle'
-            title='Momentum starts with a system.'
-            body='Before, during, and after the drop. One system covers the whole arc.'
-          />
+          <div className='grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:items-center'>
+            <div>
+              <p className='homepage-section-eyebrow'>Full Release Lifecycle</p>
+              <h2 className='marketing-h2-linear mt-4 text-primary-token'>
+                Never start from zero.
+              </h2>
+              <p className='mt-5 max-w-[28rem] text-[15px] leading-[1.7] text-secondary-token'>
+                Every release picks up where the last one left off.
+              </p>
+            </div>
 
-          <div className='mt-12 flex flex-col gap-0 sm:flex-row sm:items-stretch'>
-            {[
-              {
-                phase: 'Before',
-                line: 'Pitch, metadata, assets.',
-              },
-              {
-                phase: 'Launch',
-                line: 'Links live, fans notified, streams tracked.',
-              },
-              {
-                phase: 'After',
-                line: 'Playlist tracking, follow-ups, momentum.',
-              },
-            ].map((step, i) => (
-              <div
-                key={step.phase}
-                className={`flex-1 border-t border-white/8 py-6 sm:border-l sm:border-t-0 sm:pl-6 ${i === 0 ? 'sm:border-l-0 sm:pl-0' : ''}`}
-              >
-                <p className='text-[11px] font-medium text-white/40'>
-                  {step.phase}
-                </p>
-                <p className='mt-2 text-[13px] leading-relaxed text-white/60'>
-                  {step.line}
-                </p>
+            <div className='space-y-4'>
+              <div className='rounded-2xl bg-white/[0.04] p-5'>
+                <div className='flex items-center justify-between'>
+                  <p className='text-[12px] font-[530] text-white/70'>
+                    With Jovie
+                  </p>
+                  <p className='text-[10px] text-emerald-400/60'>Compounding</p>
+                </div>
+                <div className='mt-3 h-[5.5rem]'>
+                  <MomentumCurve />
+                </div>
               </div>
-            ))}
+
+              <div className='rounded-2xl bg-white/[0.03] p-5'>
+                <div className='flex items-center justify-between'>
+                  <p className='text-[12px] font-[530] text-white/30'>
+                    Without
+                  </p>
+                  <p className='text-[10px] text-white/15'>Flatline</p>
+                </div>
+                <div className='mt-3 h-[3.5rem]'>
+                  <FlatlineCurve />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </Container>

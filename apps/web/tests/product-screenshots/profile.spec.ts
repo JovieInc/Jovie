@@ -52,7 +52,9 @@ test.describe('Product Screenshots – Public Profile', () => {
     // Wait for profile content to load — look for profile-specific elements
     // (not img[alt] which matches hidden dark-mode logos)
     await page
-      .locator('[data-testid="profile-header"], h1, main img[alt]:visible')
+      .locator(
+        '[data-testid="profile-header"]:visible, h1:visible, main img[alt]:visible'
+      )
       .first()
       .waitFor({ state: 'visible', timeout: TIMEOUTS.CONTENT_VISIBLE });
 
@@ -84,7 +86,9 @@ test.describe('Product Screenshots – Public Profile', () => {
     await assertProfileLoaded(page);
 
     await page
-      .locator('[data-testid="profile-header"], h1, main img[alt]:visible')
+      .locator(
+        '[data-testid="profile-header"]:visible, h1:visible, main img[alt]:visible'
+      )
       .first()
       .waitFor({ state: 'visible', timeout: TIMEOUTS.CONTENT_VISIBLE });
 
