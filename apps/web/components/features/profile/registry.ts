@@ -128,7 +128,9 @@ export function getProfileModeHref(
   }
 
   if (mode === 'profile') {
-    return `/${handle}`;
+    return normalizedSuffix
+      ? `/${handle}?${normalizedSuffix.slice(1)}`
+      : `/${handle}`;
   }
 
   return `/${handle}?mode=${mode}${normalizedSuffix}`;

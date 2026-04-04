@@ -269,12 +269,15 @@ function TourDatesContent({
   );
 }
 
-export function TourModePanel({
+export function TourDrawerContent({
   artist,
   tourDates,
-}: Readonly<TourModePanelProps>) {
-  const isMobile = useBreakpointDown('md');
-  const router = useRouter();
+  compact = false,
+}: Readonly<{
+  readonly artist: Artist;
+  readonly tourDates: TourDateViewModel[];
+  readonly compact?: boolean;
+}>) {
   const { location } = useUserLocation();
 
   const { nearbyDates, remainingDates } = useMemo(() => {
@@ -314,8 +317,18 @@ export function TourModePanel({
     return { nearbyDates, remainingDates };
   }, [tourDates, location]);
 
-  const showSummaryHeader = tourDates.length > 0;
-  const hasNoDates = tourDates.length === 0;
+  if (tourDates.length === 0) {
+    return (
+      <div className='mx-auto w-full max-w-[32rem]'>
+        <TourDatesContent
+          artist={artist}
+          nearby={nearbyDates}
+          remaining={remainingDates}
+          compact={false}
+        />
+      </div>
+    );
+  }
 
   const listHeader = (
     <div className='mb-4 flex items-center gap-3 rounded-[16px] border border-white/6 bg-white/[0.035] px-3 py-3'>
@@ -333,38 +346,36 @@ export function TourModePanel({
     </div>
   );
 
-  const content = (
-    <div className='rounded-[28px] border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]'>
-      {showSummaryHeader && (
-        <p className='mb-4 text-sm text-secondary-token'>
-          {tourDates.length} upcoming{' '}
-          {tourDates.length === 1 ? 'show' : 'shows'}
-        </p>
-      )}
+  return (
+    <div
+      className='rounded-[28px] border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]'
+      data-testid='tour-drawer-content'
+    >
+      <p className='mb-4 text-sm text-secondary-token'>
+        {tourDates.length} upcoming {tourDates.length === 1 ? 'show' : 'shows'}
+      </p>
       {listHeader}
       <TourDatesContent
         artist={artist}
         nearby={nearbyDates}
         remaining={remainingDates}
-        compact
+        compact={compact}
       />
     </div>
   );
+}
+
+export function TourModePanel({
+  artist,
+  tourDates,
+}: Readonly<TourModePanelProps>) {
+  const isMobile = useBreakpointDown('md');
+  const router = useRouter();
+  const hasNoDates = tourDates.length === 0;
 
   if (hasNoDates) {
-    const emptyContent = (
-      <div className='mx-auto w-full max-w-[32rem]'>
-        <TourDatesContent
-          artist={artist}
-          nearby={nearbyDates}
-          remaining={remainingDates}
-          compact={false}
-        />
-      </div>
-    );
-
     if (!isMobile) {
-      return emptyContent;
+      return <TourDrawerContent artist={artist} tourDates={tourDates} />;
     }
 
     return (
@@ -372,11 +383,9 @@ export function TourModePanel({
         open
         onOpenChange={open => !open && router.replace(`/${artist.handle}`)}
         title='Tour Dates'
-        contentClassName='bg-[rgb(24,24,28)] border-white/8'
-        bodyClassName='bg-[rgb(24,24,28)] px-4 pt-2'
         dataTestId='tour-drawer'
       >
-        {emptyContent}
+        <TourDrawerContent artist={artist} tourDates={tourDates} />
       </ProfileDrawerShell>
     );
   }
@@ -384,7 +393,7 @@ export function TourModePanel({
   if (!isMobile) {
     return (
       <div className='max-h-[min(62vh,560px)] overflow-y-auto pr-1'>
-        {content}
+        <TourDrawerContent artist={artist} tourDates={tourDates} compact />
       </div>
     );
   }
@@ -398,7 +407,7 @@ export function TourModePanel({
       bodyClassName='bg-[rgb(24,24,28)] px-4 pt-2'
       dataTestId='tour-drawer'
     >
-      {content}
+      <TourDrawerContent artist={artist} tourDates={tourDates} compact />
     </ProfileDrawerShell>
   );
 }

@@ -2,13 +2,13 @@ import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
+import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import ChatLoading from './chat/loading';
 import { DashboardShellContent } from './DashboardShellContent';
-import { DashboardShellSkeleton } from './DashboardShellSkeleton';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
 import {
   isChatShellRoute,
@@ -44,19 +44,11 @@ export default async function AppShellLayout({
 
     let shellFallback: React.ReactNode;
     if (isChatShellRoute(pathname)) {
-      shellFallback = (
-        <DashboardShellSkeleton>
-          <ChatLoading />
-        </DashboardShellSkeleton>
-      );
+      shellFallback = <AppShellSkeleton main={<ChatLoading />} />;
     } else if (isReleasesShellRoute(pathname)) {
-      shellFallback = (
-        <DashboardShellSkeleton>
-          <ReleaseTableSkeleton />
-        </DashboardShellSkeleton>
-      );
+      shellFallback = <AppShellSkeleton main={<ReleaseTableSkeleton />} />;
     } else {
-      shellFallback = <DashboardShellSkeleton />;
+      shellFallback = <AppShellSkeleton />;
     }
 
     // Ban check moved inside DashboardShellContent (runs in parallel with

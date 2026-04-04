@@ -1391,6 +1391,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Fixed an issue where waitlist approvals in the admin board could appear successful without fully updating the user's account
+- Invited people on the waitlist can now be fully approved from the admin board
 - [internal] Fixed an issue where waitlist approvals in the admin board could appear successful without fully updating the user's account
 - [internal] Invited people on the waitlist can now be fully approved from the admin board
 - Fixed a rare routing issue where people still on the waitlist could briefly land on onboarding
@@ -1401,6 +1403,21 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Document all 11 custom ESLint rules, 12 Claude hooks, canonical import paths, and file creation templates in AGENTS.md so agents stop failing on preventable mistakes
+- Fix duplicate guardrail numbering (#10/#11/#12 → #13/#14/#15) and incorrect cache preset references (`DYNAMIC_CACHE` → actual presets from `cache-strategies.ts`)
+### Added
+
+- AES-256-GCM encryption for wrapped links with versioned envelope format (`v: 1`), replacing base64 obfuscation
+- Zod input validation schemas for `/api/wrap-link` (POST/PUT/DELETE) with SSRF-safe URL validation
+- Zod input validation for `/api/growth-access-request` replacing manual string checks
+- Migration script (`scripts/migrate-wrapped-links.ts`) to re-encrypt legacy base64 wrapped links to AES-GCM
+- Documented contact obfuscation threat model (intentional anti-scraping, not cryptographic protection)
+- 25 new tests: encryption round-trip, versioned envelope detection, legacy format fallback, schema validation
+
+### Changed
+
+- Link wrapping now stores encrypted URLs as versioned JSON envelopes instead of raw base64
+- Decrypt path auto-detects format: AES-GCM envelope (`v: 1`) or legacy base64 fallback
 - [internal] Document all 11 custom ESLint rules, 12 Claude hooks, canonical import paths, and file creation templates in AGENTS.md so agents stop failing on preventable mistakes
 - [internal] Fix duplicate guardrail numbering (#10/#11/#12 → #13/#14/#15) and incorrect cache preset references (`DYNAMIC_CACHE` → actual presets from `cache-strategies.ts`)
 ### Added
@@ -1422,6 +1439,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Use Clerk's prebuilt auth components on `/signin` and `/signup` so sign-in, sign-up, and Google OAuth flows no longer depend on the fragile custom multi-step auth runtime
+- Update auth page and smoke tests to validate the rendered Clerk flows and canonical auth-route navigation instead of the removed custom stepper UI
+
+### Changed
+
+- Update auth testing docs to explain the Clerk Playwright setup, signed-out auth-page coverage, and gstack `/browse` QA flow
 - Improved sign-in and sign-up reliability
 - [internal] Use Clerk's prebuilt auth components on `/signin` and `/signup` so sign-in, sign-up, and Google OAuth flows no longer depend on the fragile custom multi-step auth runtime
 - [internal] Update auth page and smoke tests to validate the rendered Clerk flows and canonical auth-route navigation instead of the removed custom stepper UI
@@ -1436,6 +1459,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Fix duplicate "Jovie" in public profile page title — browser tab showed "Tim White | Jovie | Jovie" instead of "Tim White | Jovie"
 ### Added
 
+- Dev toolbar "Clear" button to nuke all cookies, localStorage, and sessionStorage in one click — fixes environment cross-contamination when testing dev and production in the same browser
+- Server-side `/api/dev/clear-session` endpoint with prefix-based Clerk cookie deletion (catches suffixed variants like `__session_<suffix>`) and production guard
+- Toolbar state (`__dev_toolbar` cookie and localStorage keys) preserved across session clear so the toolbar stays visible after reload
 - [internal] Dev toolbar "Clear" button to nuke all cookies, localStorage, and sessionStorage in one click — fixes environment cross-contamination when testing dev and production in the same browser
 - [internal] Server-side `/api/dev/clear-session` endpoint with prefix-based Clerk cookie deletion (catches suffixed variants like `__session_<suffix>`) and production guard
 - [internal] Toolbar state (`__dev_toolbar` cookie and localStorage keys) preserved across session clear so the toolbar stays visible after reload
@@ -1445,6 +1471,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Added
 
 - Blog author sections now pull display name, avatar, and verified badge from the author's Jovie profile instead of hardcoded frontmatter
+- Batch profile query `getProfilesByUsernames` for efficient blog index rendering
+- `resolveAuthor` helper with graceful fallback to frontmatter when profile is not found
+### Fixed
+
+- Fix feature flags not showing in dev toolbar — toolbar was outside the FeatureFlagsProvider tree so the flags panel never rendered
+- Extract shared `FF_OVERRIDES_KEY` constant to prevent key drift between toolbar and provider
 - [internal] Batch profile query `getProfilesByUsernames` for efficient blog index rendering
 - [internal] `resolveAuthor` helper with graceful fallback to frontmatter when profile is not found
 ### Fixed
@@ -1456,6 +1488,20 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Fix deploy failure caused by out-of-order migration journal timestamps — Drizzle was silently skipping migration 0007 because its timestamp was earlier than an already-applied migration
+- Add monotonic timestamp validation to `validate-migrations.sh` CI guard to prevent future out-of-order journal entries
+### Added
+
+- `scripts/browse-auth.ts` — Playwright script to authenticate Clerk test users for gstack `/browse` headless QA sessions
+  - Auto-creates test user via Clerk API if not found
+  - Uses `+clerk_test` email suffix with magic OTP code `424242`
+  - Exports session cookies to `/tmp/browse-clerk-cookies.json` for import into browse
+  - Replicates `@clerk/testing/playwright` behavior with `context.route()` for reliable token injection
+
+### Fixed
+
+- Handle both `UseSignInReturn` and `SignInSignalValue` types from Clerk v6 in auth hooks
+- Add type overlays for `SignInResource`/`SignUpResource` to match runtime Signal API
 - [internal] Fix deploy failure caused by out-of-order migration journal timestamps — Drizzle was silently skipping migration 0007 because its timestamp was earlier than an already-applied migration
 - [internal] Add monotonic timestamp validation to `validate-migrations.sh` CI guard to prevent future out-of-order journal entries
 ### Added
@@ -1884,6 +1930,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - [internal] Retry counter bug: was counting JSONB status entries instead of actual retry attempts, causing infinite retries for persistently failing events
+- Updated cookie policy to reflect how tracking works
+- Refreshed landing page messaging to better explain what Jovie does
 - Updated cookie policy
 - Refreshed landing page messaging
 - [internal] Cookie policy updated to reflect server-side forwarding (no third-party scripts injected)
@@ -2004,6 +2052,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Cookie consent banner now only appears in regions where it's legally required (EU, UK, Brazil, South Korea, and US privacy states like California)
+- If we can't determine your location, the banner won't show unless required as a safety fallback
 - Cookie consent banner now only appears where legally required
 - [internal] Added state/province-level detection for US and Canada using Vercel `x-vercel-ip-country-region` header
 - [internal] When visitor geo cannot be determined, the banner no longer shows (previously showed as fail-safe)
@@ -2155,6 +2205,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Homepage "See it in action" section now shows real creator profiles from the platform
 - [internal] Tim's profile (`jov.ie/tim`) pinned as first card, remaining slots filled from featured creators
+- [internal] Section visibility gated by Statsig `show_see_it_in_action` gate (off by default in production)
 - [internal] Section visibility gated by feature flag (off by default in production)
 - [internal] New `getCreatorByHandle()` cached function for single-profile lookup with timeout guards
 

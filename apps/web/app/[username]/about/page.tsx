@@ -1,13 +1,14 @@
-import { redirect } from 'next/navigation';
-import { getProfileModeHref } from '@/features/profile/registry';
+import { redirectToProfileMode } from '../_lib/mode-route-redirect';
 
 interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
+  readonly searchParams: Promise<{
+    readonly source?: string | string[];
+  }>;
 }
 
-export default async function AboutPage({ params }: Props) {
-  const { username } = await params;
-  redirect(getProfileModeHref(username, 'about'));
+export default async function AboutPage({ params, searchParams }: Props) {
+  await redirectToProfileMode(params, searchParams, 'about');
 }

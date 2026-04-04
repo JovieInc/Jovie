@@ -23,22 +23,14 @@ import type {
   DiscogRelease,
 } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
-import {
-  FEATURE_FLAGS,
-  type SubscribeCTAVariant,
-} from '@/lib/feature-flags/shared';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { getProfileOgImageUrl } from '@/lib/profile/og-image';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
-import {
-  getProfileWithLinks as getCreatorProfileWithLinks,
-  getProfileWithUser as getCreatorProfileWithUser,
-} from '@/lib/services/profile';
-import { getProfileSocialLinks } from '@/lib/services/profile/queries';
+import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { isDspPlatform } from '@/lib/services/social-links/types';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
-import { toISOStringOrFallback, toISOStringSafe } from '@/lib/utils/date';
+import { toISOStringSafe } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import {
   USERNAME_MAX_LENGTH,
@@ -48,7 +40,6 @@ import {
 import type { PublicContact } from '@/types/contacts';
 import {
   CreatorProfile,
-  type CreatorType,
   convertCreatorProfileToArtist,
   LegacySocialLink,
 } from '@/types/db';
@@ -365,18 +356,6 @@ const getProfileAndLinks = cache(async (username: string) => {
   return getCachedProfileAndLinks(username.toLowerCase());
 });
 
-function getLatestReleaseGate(): boolean {
-  return FEATURE_FLAGS.LATEST_RELEASE_CARD;
-}
-
-function getProfileV2Gate(): boolean {
-  return FEATURE_FLAGS.PROFILE_V2;
-}
-
-function getSubscribeCTAVariant(): SubscribeCTAVariant {
-  return 'two_step';
-}
-
 /**
  * Pre-render featured artist profiles at build time to eliminate cold-start latency.
  * Limited to 100 profiles to keep build times reasonable.
@@ -411,18 +390,7 @@ interface Props {
   }>;
   readonly searchParams?: Promise<{
     mode?: ProfileMode;
-    ff_profile_v2?: string;
   }>;
-}
-
-function isDevProfileV2OverrideEnabled(searchParams?: {
-  ff_profile_v2?: string;
-}): boolean {
-  if (process.env.NODE_ENV === 'production') {
-    return false;
-  }
-
-  return searchParams?.ff_profile_v2 === '1';
 }
 
 async function getPublicTourDates(
@@ -438,179 +406,6 @@ async function getPublicTourDates(
     return [];
   }
 }
-
-function mapProfileResultToCreatorProfile(result: {
-  id: string;
-  userId: string | null;
-  creatorType: string | null;
-  username: string;
-  displayName: string | null;
-  bio: string | null;
-  avatarUrl: string | null;
-  spotifyUrl: string | null;
-  appleMusicUrl: string | null;
-  youtubeUrl: string | null;
-  spotifyId: string | null;
-  appleMusicId?: string | null;
-  youtubeMusicId?: string | null;
-  deezerId?: string | null;
-  tidalId?: string | null;
-  soundcloudId?: string | null;
-  isPublic: boolean | null;
-  isVerified: boolean | null;
-  isClaimed: boolean | null;
-  settings: unknown;
-  theme: unknown;
-  location?: string | null;
-  activeSinceYear?: number | null;
-  isFeatured?: boolean | null;
-  marketingOptOut?: boolean | null;
-  profileViews?: number | null;
-  usernameNormalized: string;
-  createdAt: Date | string | null;
-  updatedAt: Date | string | null;
-}): CreatorProfile {
-  return {
-    id: result.id,
-    user_id: result.userId,
-    creator_type: (result.creatorType ?? 'artist') as CreatorType,
-    username: result.username,
-    display_name: result.displayName,
-    bio: result.bio,
-    avatar_url: result.avatarUrl,
-    spotify_url: result.spotifyUrl,
-    apple_music_url: result.appleMusicUrl,
-    youtube_url: result.youtubeUrl,
-    spotify_id: result.spotifyId,
-    apple_music_id: result.appleMusicId ?? null,
-    youtube_music_id: result.youtubeMusicId ?? null,
-    deezer_id: result.deezerId ?? null,
-    tidal_id: result.tidalId ?? null,
-    soundcloud_id: result.soundcloudId ?? null,
-    is_public: !!result.isPublic,
-    is_verified: !!result.isVerified,
-    is_claimed: !!result.isClaimed,
-    claim_token: null,
-    claimed_at: null,
-    settings: (result.settings as Record<string, unknown> | null) ?? null,
-    theme: (result.theme as Record<string, unknown> | null) ?? null,
-    location: result.location ?? null,
-    active_since_year: result.activeSinceYear ?? null,
-    is_featured: result.isFeatured || false,
-    marketing_opt_out: result.marketingOptOut || false,
-    profile_views: result.profileViews || 0,
-    username_normalized: result.usernameNormalized,
-    search_text:
-      `${result.displayName || ''} ${result.username} ${result.bio || ''}`
-        .toLowerCase()
-        .trim(),
-    display_title: result.displayName || result.username,
-    profile_completion_pct: 0,
-    created_at: toISOStringOrFallback(result.createdAt),
-    updated_at: toISOStringOrFallback(result.updatedAt),
-  };
-}
-
-async function renderListenMode(
-  username: string,
-  isPublicNoAuthSmoke: boolean
-) {
-  // viewerCountryCode is intentionally omitted — the static render passes null
-  // and StaticArtistPage reads the country-code cookie client-side on hydration.
-  const viewerCountryCode = null;
-  const profileResult = await getLightweightProfile(username);
-  if (!profileResult) {
-    notFound();
-  }
-
-  // Fetch social links for DSP resolution (~3ms on indexed columns)
-  let socialLinks: LegacySocialLink[] = [];
-  try {
-    const rawSocialLinks = await getProfileSocialLinks(
-      profileResult.profile.id
-    );
-    socialLinks = rawSocialLinks.map(link => ({
-      id: link.id,
-      artist_id: profileResult.profile.id,
-      platform: (link.platform ?? '').toLowerCase(),
-      url: link.url,
-      clicks: link.clicks || 0,
-      created_at: toISOStringSafe(link.createdAt),
-    }));
-  } catch (error) {
-    await captureError(
-      'Error fetching profile social links (listen mode)',
-      error,
-      {
-        profileId: profileResult.profile.id,
-        route: '/[username]',
-        mode: 'listen',
-      }
-    );
-  }
-
-  const artist = convertCreatorProfileToArtist(profileResult.profile);
-  const subtitle = getProfileModeSubtitle('listen');
-  const schemas = generateProfileStructuredData(
-    profileResult.profile,
-    profileResult.genres,
-    socialLinks
-  );
-
-  const body = (
-    <>
-      {isPublicNoAuthSmoke ? null : (
-        <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
-      )}
-      {!profileResult.profile.is_claimed && (
-        <ClaimBanner profileHandle={artist.handle} displayName={artist.name} />
-      )}
-      {isPublicNoAuthSmoke ? null : (
-        <JoviePixel profileId={profileResult.profile.id} />
-      )}
-      <StaticArtistPage
-        mode='listen'
-        artist={artist}
-        socialLinks={socialLinks}
-        viewerCountryCode={viewerCountryCode}
-        contacts={[]}
-        subtitle={subtitle}
-        showTipButton={profileResult.hasVenmoLink}
-        showBackButton={true}
-        showTourButton={true}
-        enableDynamicEngagement={profileResult.creatorIsPro}
-        latestRelease={null}
-        photoDownloadSizes={[]}
-        allowPhotoDownloads={false}
-        subscribeTwoStep={false}
-        genres={profileResult.genres}
-        tourDates={[]}
-        showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
-      />
-      {isPublicNoAuthSmoke ? null : (
-        <DesktopQrOverlayClient handle={artist.handle} />
-      )}
-    </>
-  );
-
-  return { schemas, body };
-}
-
-const getLightweightProfile = cache(async (username: string) => {
-  const result = await getCreatorProfileWithUser(username.toLowerCase());
-  if (!result?.isPublic) {
-    return null;
-  }
-
-  return {
-    profile: mapProfileResultToCreatorProfile(result),
-    creatorIsPro: Boolean(result.userIsPro),
-    creatorClerkId:
-      typeof result.userClerkId === 'string' ? result.userClerkId : null,
-    genres: result.genres ?? null,
-    hasVenmoLink: Boolean(result.venmoHandle),
-  };
-});
 
 export default async function ArtistPage({
   params,
@@ -630,35 +425,7 @@ export default async function ArtistPage({
   const resolvedSearchParams = await searchParams;
   const mode = getProfileMode(resolvedSearchParams?.mode);
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
-  const profileV2Enabled = isDevProfileV2OverrideEnabled(resolvedSearchParams)
-    ? true
-    : getProfileV2Gate();
-
-  // NOTE: headers() is intentionally not called here.
-  // - Block check runs in middleware (proxy.ts) before this page renders,
-  //   so blocked visitors are redirected before any RSC/ISR content is served.
-  // - viewerCountryCode is set as a client-readable cookie (COUNTRY_CODE_COOKIE)
-  //   by middleware; StaticArtistPage reads it on mount for DSP geo-sorting.
-  // Removing these dynamic function calls allows this page to participate in ISR.
   const viewerCountryCode = null;
-
-  if (mode === 'listen' && !profileV2Enabled) {
-    const { schemas, body } = await renderListenMode(
-      username,
-      isPublicNoAuthSmoke
-    );
-    return (
-      <>
-        <script type='application/ld+json'>
-          {safeJsonLdStringify(schemas.musicGroupSchema)}
-        </script>
-        <script type='application/ld+json'>
-          {safeJsonLdStringify(schemas.breadcrumbSchema)}
-        </script>
-        {body}
-      </>
-    );
-  }
 
   const profileResult = await getProfileAndLinks(username);
   const {
@@ -705,13 +472,8 @@ export default async function ArtistPage({
     // Secret not configured — visit tracking will proceed without token auth
   }
 
-  // Tour dates are always fetched (non-blocking — errors fall back to empty).
-  const showLatestRelease = getLatestReleaseGate();
-  const subscribeCTAVariant = getSubscribeCTAVariant();
   const tourDatesPromise = getPublicTourDates(profile.id);
-
-  const latestRelease = showLatestRelease ? fetchedLatestRelease : null;
-  const subscribeTwoStep = subscribeCTAVariant === 'two_step';
+  const latestRelease = fetchedLatestRelease;
 
   const publicContacts: PublicContact[] = toPublicContacts(
     contacts,
@@ -783,13 +545,12 @@ export default async function ArtistPage({
         photoDownloadSizes={photoDownloadSizes}
         allowPhotoDownloads={allowPhotoDownloads}
         pressPhotos={pressPhotos}
-        subscribeTwoStep={subscribeTwoStep}
+        subscribeTwoStep
         genres={genres}
         tourDates={tourDates}
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
-        profileV2Enabled={profileV2Enabled}
       />
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
@@ -802,49 +563,6 @@ const PROFILE_NOT_FOUND_METADATA: Metadata = {
   title: 'Profile Not Found',
   description: 'The requested profile could not be found.',
 };
-
-function buildListenModeMetadata(profile: CreatorProfile): Metadata {
-  const artistName = profile.display_name || profile.username;
-  const profileUrl = `${BASE_URL}/${profile.username}?mode=listen`;
-
-  return {
-    title: artistName,
-    description: `Open ${artistName} on Spotify, Apple Music, and more from one Jovie listen page.`,
-    metadataBase: new URL(BASE_URL),
-    alternates: {
-      canonical: profileUrl,
-    },
-    openGraph: {
-      type: 'profile',
-      title: `${artistName} | Jovie`,
-      description: `Open ${artistName} on Spotify, Apple Music, and more from one Jovie listen page.`,
-      url: profileUrl,
-      siteName: 'Jovie',
-      locale: 'en_US',
-      images: [
-        {
-          url: getProfileOgImageUrl(profile.username),
-          width: 1200,
-          height: 630,
-          alt: `${artistName} listen page`,
-        },
-      ],
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `${artistName} | Jovie`,
-      description: `Open ${artistName} on Spotify, Apple Music, and more from one Jovie listen page.`,
-      creator: '@jovieapp',
-      site: '@jovieapp',
-      images: [
-        {
-          url: getProfileOgImageUrl(profile.username),
-          alt: `${artistName} listen page`,
-        },
-      ],
-    },
-  };
-}
 
 function buildProfileDescription(
   profile: CreatorProfile,
@@ -947,22 +665,8 @@ function buildProfileMetadata(
 }
 
 // Generate metadata for the page with comprehensive SEO
-export async function generateMetadata({
-  params,
-  searchParams,
-}: Props): Promise<Metadata> {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
-  const resolvedSearchParams = await searchParams;
-  const mode = getProfileMode(resolvedSearchParams?.mode);
-  const profileV2Enabled = getProfileV2Gate();
-
-  if (mode === 'listen' && !profileV2Enabled) {
-    const lightweightProfile = await getLightweightProfile(username);
-    return lightweightProfile
-      ? buildListenModeMetadata(lightweightProfile.profile)
-      : PROFILE_NOT_FOUND_METADATA;
-  }
-
   const profileResult = await getProfileAndLinks(username);
   const { profile, genres, status } = profileResult;
 
