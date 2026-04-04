@@ -82,9 +82,20 @@ body:has(.profile-viewport) {
     min-height: 0 !important;
     height: auto !important;
   }
-  /* Hide the disclaimer text (not errors) */
+  /* Hide the disclaimer text by default (errors still render) */
   & .relative.min-h-5 > p {
     display: none !important;
+  }
+}
+
+/* When subscribe is active, show the disclaimer (fades via the component's own opacity transition) */
+.compact-subscribe-active {
+  & .relative.min-h-5 > p {
+    display: block !important;
+    font-size: 10px !important;
+    color: rgba(255, 255, 255, 0.3) !important;
+    text-align: center !important;
+    padding-top: 4px !important;
   }
   /* Standalone primary button: match composer pill dimensions exactly */
   & > div > .space-y-3 > button[class*="bg-[var(--profile-pearl-primary-bg)]"],

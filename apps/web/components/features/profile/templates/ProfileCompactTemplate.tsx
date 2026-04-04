@@ -92,9 +92,10 @@ export function ProfileCompactTemplate({
 }: ProfileCompactTemplateProps) {
   const [listenOpen, setListenOpen] = useState(mode === 'listen');
   const [contactOpen, setContactOpen] = useState(mode === 'contact');
+  const [subscribeActive, setSubscribeActive] = useState(mode === 'subscribe');
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const subscribeSectionRef = useRef<HTMLElement | null>(null);
+  const subscribeSectionRef = useRef<HTMLDivElement | null>(null);
 
   const mergedDSPs = useMemo(
     () =>
@@ -364,8 +365,12 @@ export function ProfileCompactTemplate({
 
               {/* ─── Content ─── */}
               <div className='relative z-10 flex flex-col gap-3 px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3'>
-                {/* Featured card: release or tour date */}
-                {latestRelease ? (
+                {/* Featured card OR subscribe heading (mutually exclusive) */}
+                {subscribeActive ? (
+                  <p className='text-center text-[13px] font-[450] leading-relaxed text-white/50'>
+                    Never miss a release from {artist.name}.
+                  </p>
+                ) : latestRelease ? (
                   <button
                     type='button'
                     onClick={handlePlayClick}
@@ -439,26 +444,29 @@ export function ProfileCompactTemplate({
                 ) : null}
 
                 {/* Subscribe */}
-                <section
+                <div
                   ref={subscribeSectionRef}
                   data-testid='compact-subscribe'
-                  className='compact-subscribe-section'
+                  className={`compact-subscribe-section${subscribeActive ? ' compact-subscribe-active' : ''}`}
+                  onClickCapture={() => {
+                    if (!subscribeActive) setSubscribeActive(true);
+                  }}
                 >
                   {subscribeTwoStep ? (
                     <TwoStepNotificationsCTA
                       artist={artist}
-                      startExpanded={mode === 'subscribe'}
+                      startExpanded={subscribeActive || mode === 'subscribe'}
                     />
                   ) : (
                     <ArtistNotificationsCTA
                       artist={artist}
                       variant='button'
-                      autoOpen={mode === 'subscribe'}
+                      autoOpen={subscribeActive || mode === 'subscribe'}
                       forceExpanded
                       hideListenFallback
                     />
                   )}
-                </section>
+                </div>
 
                 {/* Social icons — flat, no chrome */}
                 {visibleSocialLinks.length > 0 ? (
