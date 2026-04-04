@@ -1,0 +1,1 @@
+/Users/timwhite/conductor/workspaces/jovie/tokyo/.claude/skills/gstack/investigate/SKILL.md
