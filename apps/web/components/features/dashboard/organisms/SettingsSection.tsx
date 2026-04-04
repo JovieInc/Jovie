@@ -12,6 +12,7 @@ export interface SettingsSectionProps {
   readonly className?: string;
   readonly titleClassName?: string;
   readonly descriptionClassName?: string;
+  readonly headerAction?: React.ReactNode;
 }
 
 export function SettingsSection({
@@ -22,6 +23,7 @@ export function SettingsSection({
   className,
   titleClassName,
   descriptionClassName,
+  headerAction,
 }: SettingsSectionProps) {
   const headingId = `${id}-heading`;
   const descriptionId = description ? `${id}-description` : undefined;
@@ -33,11 +35,19 @@ export function SettingsSection({
       aria-describedby={descriptionId}
       className={cn('scroll-mt-6', className)}
     >
-      <PageHeader
-        title={title}
-        description={description}
-        className={cn('border-b border-subtle/80', titleClassName)}
-      />
+      <div
+        className={cn(
+          'flex items-center justify-between border-b border-subtle/80',
+          titleClassName
+        )}
+      >
+        <PageHeader
+          title={title}
+          description={description}
+          className='border-b-0'
+        />
+        {headerAction}
+      </div>
       <div
         className={cn(
           'space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)',

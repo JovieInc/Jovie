@@ -62,7 +62,7 @@ describe('profile V2 layout constraints', () => {
 
     expect(screen.getByTestId('image-with-fallback')).toHaveAttribute(
       'data-sizes',
-      '(max-width: 767px) 100vw, (max-width: 1280px) 46vw, 620px'
+      '(max-width: 767px) 100vw, 620px'
     );
   });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { PanelRight } from 'lucide-react';
+import { ExternalLink, PanelRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
@@ -53,6 +53,19 @@ export function ArtistProfileContent() {
         id='artist-profile'
         title='Artist Profile'
         description='Photo, name, username, and branding.'
+        headerAction={
+          artist.handle ? (
+            <a
+              href={`/${artist.handle}`}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='inline-flex items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 py-1.5 text-[13px] font-[510] text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
+            >
+              View as visitor
+              <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />
+            </a>
+          ) : null
+        }
       >
         <div className='space-y-4'>
           <SettingsProfileSection

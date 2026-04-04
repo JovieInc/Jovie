@@ -35,16 +35,26 @@ export function ProfileViewTracker({
     if (hasTracked.current) return;
     hasTracked.current = true;
 
-    track('profile_view', {
-      handle,
-      artist_id: artistId,
-      source: source ?? (document.referrer || 'direct'),
-    });
+    // Defer tracking to avoid blocking first paint
+    const doTrack = () => {
+      track('profile_view', {
+        handle,
+        artist_id: artistId,
+        source: source ?? (document.referrer || 'direct'),
+      });
 
-    const sent = postJsonBeacon('/api/profile/view', { handle });
-    if (sent) return;
+      const sent = postJsonBeacon('/api/profile/view', { handle });
+      if (sent) return;
 
-    trackViewRef.current.mutate({ handle });
+      trackViewRef.current.mutate({ handle });
+    };
+
+    if (typeof globalThis.requestIdleCallback === 'function') {
+      globalThis.requestIdleCallback(doTrack);
+    } else {
+      // Safari fallback
+      setTimeout(doTrack, 0);
+    }
   }, [handle, artistId, source]);
 
   // This component renders nothing - it's purely for tracking

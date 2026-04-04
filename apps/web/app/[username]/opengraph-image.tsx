@@ -108,10 +108,18 @@ export default async function Image({
   > | null = null;
 
   try {
-    [profileResult, releaseStats] = await Promise.all([
-      getProfileWithLinks(normalizedUsername),
-      getReleaseStatsByUsername(normalizedUsername),
+    // 3-second timeout ensures the fallback image renders reliably
+    // even if the DB is slow (edge runtime has a 25s budget, but we want fast OG)
+    const result = await Promise.race([
+      Promise.all([
+        getProfileWithLinks(normalizedUsername),
+        getReleaseStatsByUsername(normalizedUsername),
+      ]),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('OG image data fetch timeout')), 3000)
+      ),
     ]);
+    [profileResult, releaseStats] = result;
   } catch {
     return fallbackImage(normalizedUsername);
   }
