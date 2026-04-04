@@ -50,6 +50,20 @@ body:has(.linear-marketing) {
   overscroll-behavior: auto;
 }
 
+/* Public profile pages use document scrolling (same as marketing). */
+html:has(.profile-viewport) {
+  height: auto;
+  min-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: auto;
+}
+body:has(.profile-viewport) {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+  overscroll-behavior: auto;
+}
+
 /* PWA standalone mode polish — native-feel when installed */
 @media (display-mode: standalone) {
   body {

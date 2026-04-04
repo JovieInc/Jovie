@@ -179,7 +179,7 @@ export function ProfileCompactTemplate({
 
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
-      <div className='relative min-h-[100dvh] overflow-hidden bg-[color:var(--profile-stage-bg)] text-primary-token'>
+      <div className='profile-viewport relative min-h-[100dvh] overflow-x-hidden bg-[color:var(--profile-stage-bg)] text-primary-token'>
         {/* Ambient background */}
         <div className='absolute inset-0' aria-hidden='true'>
           <div className='absolute inset-[-10%]'>
@@ -200,7 +200,7 @@ export function ProfileCompactTemplate({
         <div className='relative mx-auto flex min-h-[100dvh] w-full max-w-[680px] items-stretch justify-center md:items-center md:px-6 md:py-8'>
           <main className='relative flex w-full items-stretch md:items-center'>
             <div
-              className='relative flex min-h-[100dvh] w-full max-w-[430px] flex-col overflow-hidden bg-[color:var(--profile-content-bg)] md:mx-auto md:min-h-[min(920px,calc(100dvh-64px))] md:rounded-[30px] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
+              className='relative flex w-full max-w-[430px] flex-col bg-[color:var(--profile-content-bg)] md:mx-auto md:min-h-[min(920px,calc(100dvh-64px))] md:overflow-hidden md:rounded-[30px] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
               data-testid='profile-compact-shell'
             >
               <div className='pointer-events-none absolute inset-0 bg-[var(--profile-panel-gradient)]' />
