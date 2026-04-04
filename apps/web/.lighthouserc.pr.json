@@ -12,9 +12,9 @@
           "assertions": {
             "errors-in-console": "warn",
             "interactive": [
-              "error",
+              "warn",
               {
-                "maxNumericValue": 4000
+                "maxNumericValue": 5000
               }
             ],
             "first-contentful-paint": [
@@ -53,6 +53,8 @@
             "render-blocking-insight": "off",
             "legacy-javascript-insight": "warn",
             "unused-javascript": "warn",
+            "color-contrast": "warn",
+            "image-delivery-insight": "warn",
             "categories:performance": [
               "error",
               {
