@@ -17,6 +17,7 @@ import * as schema from '@/lib/db/schema';
 import {
   audienceMembers,
   clickEvents,
+  dailyProfileViews,
   notificationSubscriptions,
   tips,
 } from '@/lib/db/schema/analytics';
@@ -32,6 +33,21 @@ import {
 import { scraperConfigs } from '@/lib/db/schema/ingestion';
 import { socialAccounts, socialLinks } from '@/lib/db/schema/links';
 import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
+import {
+  chunk,
+  FAN_NAMES,
+  generateReferrerHistory,
+  hockeyStickDate,
+  PROFILE_VOLUME,
+  pickCity,
+  pickCountry,
+  pickDeviceType,
+  pickWeightedLinkType,
+  pickWeightedReferrer,
+} from './seed-helpers';
+
+const SEED_FINGERPRINT_PREFIX = 'seed_fp_';
+const SEED_TESTNET_IP_PREFIX = '203.0.113.';
 
 // Load .env.local first to override defaults, then fallback to .env
 dotenvConfig({ path: '.env.local', override: true });
@@ -246,13 +262,6 @@ function makeArtist(
     discography: options.discography,
     contacts: options.contacts,
   };
-}
-
-// Helper to generate random date within a range
-function randomDate(start: Date, end: Date): Date {
-  return new Date(
-    start.getTime() + Math.random() * (end.getTime() - start.getTime())
-  );
 }
 
 // Sample discographies for featured artists
@@ -1314,32 +1323,11 @@ async function seedUserSettings(userId: string) {
     .onConflictDoNothing();
 }
 
-async function seedAudienceMembers(profileId: string, displayName: string) {
-  const countries = [
-    'US',
-    'GB',
-    'CA',
-    'AU',
-    'DE',
-    'FR',
-    'JP',
-    'BR',
-    'MX',
-    'ES',
-  ];
-  const cities = [
-    'New York',
-    'Los Angeles',
-    'London',
-    'Toronto',
-    'Sydney',
-    'Berlin',
-    'Paris',
-    'Tokyo',
-    'Sao Paulo',
-    'Mexico City',
-  ];
-  const deviceTypes = ['mobile', 'desktop', 'tablet', 'unknown'] as const;
+async function seedAudienceMembers(
+  profileId: string,
+  _displayName: string,
+  scale = 0.5
+) {
   const memberTypes = [
     'anonymous',
     'email',
@@ -1347,104 +1335,122 @@ async function seedAudienceMembers(profileId: string, displayName: string) {
     'spotify',
     'customer',
   ] as const;
-  const intentLevels = ['high', 'medium', 'low'] as const;
+  const memberCount = Math.floor(150 + scale * 150);
 
-  // Generate 20-50 audience members per profile
-  const memberCount = 20 + Math.floor(Math.random() * 30);
+  // Clean existing seed data for idempotency
+  await db.delete(audienceMembers).where(
+    drizzleSql`creator_profile_id = ${profileId} AND (
+        fingerprint LIKE ${`${SEED_FINGERPRINT_PREFIX}%`}
+        OR fingerprint LIKE 'fp_%'
+      )`
+  );
 
   const audienceRows = [];
 
   for (let i = 0; i < memberCount; i++) {
-    const countryIdx = Math.floor(Math.random() * countries.length);
-    const memberType =
-      memberTypes[Math.floor(Math.random() * memberTypes.length)];
-    const firstSeen = randomDate(new Date('2024-01-01'), new Date());
-    const lastSeen = randomDate(firstSeen, new Date());
+    // Type distribution: 40% anonymous, 25% email, 15% spotify, 10% customer, 10% sms
+    let memberType: (typeof memberTypes)[number];
+    const tr = Math.random();
+    if (tr < 0.4) memberType = 'anonymous';
+    else if (tr < 0.65) memberType = 'email';
+    else if (tr < 0.8) memberType = 'spotify';
+    else if (tr < 0.9) memberType = 'customer';
+    else memberType = 'sms';
+
+    const country = pickCountry();
+    const city = pickCity(country);
+    const firstSeen = hockeyStickDate(90);
+    const lastSeen = new Date(
+      firstSeen.getTime() + Math.random() * (Date.now() - firstSeen.getTime())
+    );
     const visits = 1 + Math.floor(Math.random() * 50);
-    const engagementScore = Math.floor(Math.random() * 100);
+
+    // Bell curve engagement with 10% superfans
+    let engagementScore: number;
+    if (Math.random() < 0.1) {
+      engagementScore = 80 + Math.floor(Math.random() * 20);
+    } else {
+      engagementScore = Math.floor(30 + Math.random() * 40);
+    }
+
+    // Intent levels: 20% high, 50% medium, 30% low
+    let intentLevel: 'high' | 'medium' | 'low';
+    const ir = Math.random();
+    if (ir < 0.2) intentLevel = 'high';
+    else if (ir < 0.7) intentLevel = 'medium';
+    else intentLevel = 'low';
+
+    const name =
+      memberType !== 'anonymous' ? FAN_NAMES[i % FAN_NAMES.length] : null;
+    const tags: string[] = [];
+    if (engagementScore > 80) tags.push('superfan');
+    if (memberType === 'customer') tags.push('customer', 'tipper');
 
     audienceRows.push({
       creatorProfileId: profileId,
       type: memberType,
-      displayName: memberType !== 'anonymous' ? `Fan ${i + 1}` : null,
+      displayName: name,
       firstSeenAt: firstSeen,
       lastSeenAt: lastSeen,
       visits,
       engagementScore,
-      intentLevel:
-        intentLevels[Math.floor(Math.random() * intentLevels.length)],
-      geoCity: cities[countryIdx],
-      geoCountry: countries[countryIdx],
-      deviceType: deviceTypes[Math.floor(Math.random() * deviceTypes.length)],
-      referrerHistory: [
-        { source: 'instagram', timestamp: firstSeen.toISOString() },
-      ],
+      intentLevel,
+      geoCity: city,
+      geoCountry: country,
+      deviceType: pickDeviceType(),
+      referrerHistory: generateReferrerHistory(firstSeen),
       latestActions: [
         { action: 'profile_view', timestamp: lastSeen.toISOString() },
       ],
       email:
         memberType === 'email' || memberType === 'customer'
-          ? `fan${i}@example.com`
+          ? `seed.aud.${profileId.slice(0, 6)}.${i}@example.com`
           : null,
-      phone: memberType === 'sms' ? `+1555${String(i).padStart(7, '0')}` : null,
+      phone:
+        memberType === 'sms'
+          ? `+1555${profileId.slice(0, 4)}${String(i).padStart(4, '0')}`
+          : null,
       spotifyConnected: memberType === 'spotify',
       purchaseCount:
         memberType === 'customer' ? 1 + Math.floor(Math.random() * 5) : 0,
-      tags: engagementScore > 70 ? ['superfan'] : [],
-      fingerprint: `fp_${profileId.slice(0, 8)}_${i}`,
+      tags,
+      fingerprint: `${SEED_FINGERPRINT_PREFIX}${profileId.slice(0, 8)}_${i}`,
+      updatedAt: lastSeen,
     });
   }
 
-  if (audienceRows.length > 0) {
-    await db.insert(audienceMembers).values(audienceRows).onConflictDoNothing();
+  for (const batch of chunk(audienceRows, 500)) {
+    await db.insert(audienceMembers).values(batch).onConflictDoNothing();
   }
 }
 
-async function seedClickEvents(profileId: string, linkIds: string[]) {
-  const countries = [
-    'US',
-    'GB',
-    'CA',
-    'AU',
-    'DE',
-    'FR',
-    'JP',
-    'BR',
-    'MX',
-    'ES',
-  ];
-  const cities = [
-    'New York',
-    'Los Angeles',
-    'London',
-    'Toronto',
-    'Sydney',
-    'Berlin',
-    'Paris',
-    'Tokyo',
-    'Sao Paulo',
-    'Mexico City',
-  ];
-  const devices = ['mobile', 'desktop', 'tablet'];
+async function seedClickEvents(
+  profileId: string,
+  linkIds: string[],
+  scale = 0.5
+) {
   const browsers = ['Chrome', 'Safari', 'Firefox', 'Edge'];
   const oses = ['iOS', 'Android', 'Windows', 'macOS', 'Linux'];
-  const linkTypes = ['listen', 'social', 'tip', 'other'] as const;
-  const referrers = [
-    'https://instagram.com',
-    'https://twitter.com',
-    'https://google.com',
-    'direct',
-    null,
-  ];
+  const clickCount = Math.floor(300 + scale * 300);
 
-  // Generate 50-150 click events per profile
-  const clickCount = 50 + Math.floor(Math.random() * 100);
+  // Clean existing seed clicks for idempotency
+  await db.delete(clickEvents).where(
+    drizzleSql`creator_profile_id = ${profileId} AND (
+        ip_address LIKE ${`${SEED_TESTNET_IP_PREFIX}%`}
+        OR ip_address LIKE '192.168.%'
+      )`
+  );
 
   const clickRows = [];
 
   for (let i = 0; i < clickCount; i++) {
-    const countryIdx = Math.floor(Math.random() * countries.length);
-    const clickDate = randomDate(new Date('2024-01-01'), new Date());
+    const clickDate = hockeyStickDate(90);
+    const dayOfWeek = clickDate.getUTCDay();
+    // Weekend dip: skip ~33% of weekend clicks
+    if ((dayOfWeek === 0 || dayOfWeek === 6) && Math.random() < 0.33) continue;
+
+    const country = pickCountry();
+    const city = pickCity(country);
 
     clickRows.push({
       creatorProfileId: profileId,
@@ -1452,27 +1458,75 @@ async function seedClickEvents(profileId: string, linkIds: string[]) {
         linkIds.length > 0
           ? linkIds[Math.floor(Math.random() * linkIds.length)]
           : null,
-      linkType: linkTypes[Math.floor(Math.random() * linkTypes.length)],
-      ipAddress: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
+      linkType: pickWeightedLinkType(),
+      ipAddress: `${SEED_TESTNET_IP_PREFIX}${Math.floor(Math.random() * 255)}`,
       userAgent: `Mozilla/5.0 (${oses[Math.floor(Math.random() * oses.length)]}) ${browsers[Math.floor(Math.random() * browsers.length)]}`,
-      referrer: referrers[Math.floor(Math.random() * referrers.length)],
-      country: countries[countryIdx],
-      city: cities[countryIdx],
-      deviceType: devices[Math.floor(Math.random() * devices.length)],
+      referrer: pickWeightedReferrer(),
+      country,
+      city,
+      deviceType: pickDeviceType(),
       os: oses[Math.floor(Math.random() * oses.length)],
       browser: browsers[Math.floor(Math.random() * browsers.length)],
-      isBot: Math.random() < 0.02, // 2% bot traffic
+      isBot: Math.random() < 0.02,
       createdAt: clickDate,
     });
   }
 
-  if (clickRows.length > 0) {
-    await db.insert(clickEvents).values(clickRows);
+  for (const batch of chunk(clickRows, 500)) {
+    await db.insert(clickEvents).values(batch);
   }
 }
 
-async function seedTips(profileId: string) {
-  const currencies = ['USD', 'EUR', 'GBP', 'CAD', 'AUD'] as const;
+async function seedDailyProfileViews(profileId: string, scale = 0.5) {
+  // Never delete existing rows here. This seed path runs in shared environments
+  // too, and destructive clears can wipe legitimate analytics history.
+
+  const rows = [];
+  const now = new Date();
+  const dayCount = 90;
+
+  // 2-3 random spike days
+  const spikeDays = new Set<number>();
+  while (spikeDays.size < 2 + Math.floor(Math.random() * 2)) {
+    spikeDays.add(Math.floor(Math.random() * dayCount));
+  }
+
+  for (let daysAgo = 0; daysAgo < dayCount; daysAgo++) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - daysAgo);
+    const dayOfWeek = date.getUTCDay();
+
+    // Hockey-stick: grows from ~10 to ~(60*scale + 40)
+    const progress = (dayCount - daysAgo) / dayCount;
+    const baseViews = Math.floor(
+      10 + progress ** 2 * 60 * scale + Math.random() * 10
+    );
+    let viewCount = baseViews;
+
+    // Weekend dip
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      viewCount = Math.floor(viewCount * 0.7);
+    }
+
+    // Spike days: 2.5-3x
+    if (spikeDays.has(daysAgo)) {
+      viewCount = Math.floor(viewCount * (2.5 + Math.random() * 0.5));
+    }
+
+    rows.push({
+      creatorProfileId: profileId,
+      viewDate: date.toISOString().split('T')[0],
+      viewCount,
+    });
+  }
+
+  for (const batch of chunk(rows, 500)) {
+    await db.insert(dailyProfileViews).values(batch).onConflictDoNothing();
+  }
+}
+
+async function seedTips(profileId: string, scale = 0.5) {
+  const currencies = ['USD', 'EUR', 'GBP'] as const;
   const messages = [
     'Love your music!',
     'Keep up the great work!',
@@ -1482,9 +1536,14 @@ async function seedTips(profileId: string) {
     null,
     null,
   ];
+  const tipCount = Math.floor(15 + scale * 15);
 
-  // Generate 5-20 tips per featured profile
-  const tipCount = 5 + Math.floor(Math.random() * 15);
+  // Clean existing seed tips for idempotency
+  await db
+    .delete(tips)
+    .where(
+      drizzleSql`creator_profile_id = ${profileId} AND payment_intent_id LIKE 'pi_seed_%'`
+    );
 
   const tipRows = [];
 
@@ -1492,15 +1551,24 @@ async function seedTips(profileId: string) {
     const amount = [500, 1000, 2000, 2500, 5000, 10000][
       Math.floor(Math.random() * 6)
     ];
-    const tipDate = randomDate(new Date('2024-01-01'), new Date());
+    const tipDate = hockeyStickDate(90);
     const isAnonymous = Math.random() < 0.3;
+
+    // Currency: 90% USD, 5% EUR, 5% GBP
+    let currency: (typeof currencies)[number];
+    const cr = Math.random();
+    if (cr < 0.9) currency = 'USD';
+    else if (cr < 0.95) currency = 'EUR';
+    else currency = 'GBP';
 
     tipRows.push({
       creatorProfileId: profileId,
       amountCents: amount,
-      currency: currencies[Math.floor(Math.random() * currencies.length)],
+      currency,
       paymentIntentId: `pi_seed_${profileId.slice(0, 8)}_${i}_${Date.now()}`,
-      contactEmail: isAnonymous ? null : `tipper${i}@example.com`,
+      contactEmail: isAnonymous
+        ? null
+        : `tipper${i}_${profileId.slice(0, 6)}@example.com`,
       message: messages[Math.floor(Math.random() * messages.length)],
       isAnonymous,
       createdAt: tipDate,
@@ -1512,54 +1580,71 @@ async function seedTips(profileId: string) {
   }
 }
 
-async function seedNotificationSubscriptions(profileId: string) {
-  const countries = ['US', 'GB', 'CA', 'AU', 'DE'];
-  const cities = ['New York', 'Los Angeles', 'London', 'Toronto', 'Sydney'];
-  const sources = ['website', 'mobile_app', 'qr_code', 'instagram_bio'];
+async function seedNotificationSubscriptions(profileId: string, scale = 0.5) {
+  const sources = ['website', 'qr_code', 'instagram_bio', 'tiktok_bio'];
+  const emailSubCount = Math.floor(50 + scale * 30);
+  const smsSubCount = Math.floor(20 + scale * 20);
 
-  // Generate 10-30 email subscribers per profile
-  const emailSubCount = 10 + Math.floor(Math.random() * 20);
+  // Clean existing seed subscriptions for idempotency
+  await db.delete(notificationSubscriptions).where(
+    drizzleSql`creator_profile_id = ${profileId} AND (
+        email LIKE 'seed.sub.%'
+        OR email LIKE 'subscriber%@example.com'
+      )`
+  );
+  await db.delete(notificationSubscriptions).where(
+    drizzleSql`creator_profile_id = ${profileId} AND (
+        phone LIKE ${`+1555${profileId.slice(0, 4)}%`}
+        OR phone LIKE ${`+1555%${profileId.slice(0, 4)}`}
+      )`
+  );
+
   const emailRows = [];
   for (let i = 0; i < emailSubCount; i++) {
-    const countryIdx = Math.floor(Math.random() * countries.length);
+    const country = pickCountry();
+    const city = pickCity(country);
+    const createdAt = hockeyStickDate(90);
+
     emailRows.push({
       creatorProfileId: profileId,
       channel: 'email' as const,
-      email: `subscriber${i}_${profileId.slice(0, 8)}@example.com`,
-      countryCode: countries[countryIdx],
-      city: cities[countryIdx],
-      ipAddress: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
+      email: `seed.sub.${profileId.slice(0, 6)}.${i}@example.com`,
+      countryCode: country,
+      city,
+      ipAddress: `${SEED_TESTNET_IP_PREFIX}${Math.floor(Math.random() * 255)}`,
       source: sources[Math.floor(Math.random() * sources.length)],
+      createdAt,
     });
   }
 
-  if (emailRows.length > 0) {
-    await db
-      .insert(notificationSubscriptions)
-      .values(emailRows)
-      .onConflictDoNothing();
-  }
-
-  // Generate 5-15 SMS subscribers per profile
-  const smsSubCount = 5 + Math.floor(Math.random() * 10);
   const smsRows = [];
   for (let i = 0; i < smsSubCount; i++) {
-    const countryIdx = Math.floor(Math.random() * countries.length);
+    const country = pickCountry();
+    const city = pickCity(country);
+    const createdAt = hockeyStickDate(90);
+
     smsRows.push({
       creatorProfileId: profileId,
       channel: 'sms' as const,
-      phone: `+1555${String(i).padStart(7, '0')}${profileId.slice(0, 4)}`,
-      countryCode: countries[countryIdx],
-      city: cities[countryIdx],
-      ipAddress: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
+      phone: `+1555${profileId.slice(0, 4)}${String(i).padStart(4, '0')}`,
+      countryCode: country,
+      city,
+      ipAddress: `${SEED_TESTNET_IP_PREFIX}${Math.floor(Math.random() * 255)}`,
       source: sources[Math.floor(Math.random() * sources.length)],
+      createdAt,
     });
   }
 
-  if (smsRows.length > 0) {
+  for (const batch of chunk(emailRows, 500)) {
     await db
       .insert(notificationSubscriptions)
-      .values(smsRows)
+      .values(batch)
+      .onConflictDoNothing();
+  }
+  for (const batch of chunk(smsRows, 500)) {
+    await db
+      .insert(notificationSubscriptions)
+      .values(batch)
       .onConflictDoNothing();
   }
 }
@@ -1665,16 +1750,16 @@ async function seedDatabase() {
         .where(drizzleSql`creator_profile_id = ${profileId}`);
       const linkIds = links.map(l => l.id);
 
-      // Seed analytics data for featured/verified profiles
-      if (artist.profile.isFeatured || artist.profile.isVerified) {
-        console.log(
-          `  📊 Seeding analytics for ${artist.profile.displayName}...`
-        );
-        await seedAudienceMembers(profileId, artist.profile.displayName);
-        await seedClickEvents(profileId, linkIds);
-        await seedTips(profileId);
-        await seedNotificationSubscriptions(profileId);
-      }
+      // Seed analytics data for ALL profiles, scaled by volume tier
+      const scale = PROFILE_VOLUME[artist.profile.username] ?? 0.3;
+      console.log(
+        `  📊 Seeding analytics for ${artist.profile.displayName} (scale=${scale})...`
+      );
+      await seedAudienceMembers(profileId, artist.profile.displayName, scale);
+      await seedClickEvents(profileId, linkIds, scale);
+      await seedDailyProfileViews(profileId, scale);
+      await seedTips(profileId, scale);
+      await seedNotificationSubscriptions(profileId, scale);
     }
 
     console.log('\n🎉 Database seeding completed successfully!');
@@ -1697,6 +1782,7 @@ async function seedDatabase() {
     const notificationCount = await db.select().from(notificationSubscriptions);
     const settingsCount = await db.select().from(userSettings);
     const scraperCount = await db.select().from(scraperConfigs);
+    const profileViewCount = await db.select().from(dailyProfileViews);
 
     console.log(`  • Providers: ${providerCount.length}`);
     console.log(`  • Users: ${userCount.length}`);
@@ -1710,6 +1796,7 @@ async function seedDatabase() {
     console.log(`  • Social Accounts: ${socialAccountCount.length}`);
     console.log(`  • Audience Members: ${audienceCount.length}`);
     console.log(`  • Click Events: ${clickCount.length}`);
+    console.log(`  • Daily Profile Views: ${profileViewCount.length}`);
     console.log(`  • Tips: ${tipCount.length}`);
     console.log(`  • Notification Subscriptions: ${notificationCount.length}`);
     console.log(`  • User Settings: ${settingsCount.length}`);

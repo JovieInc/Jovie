@@ -166,7 +166,9 @@ export async function getUserDashboardAnalytics(
               limit 5
             ),
             top_referrers as (
-              select r->>'url' as referrer, count(*) as count
+              -- Defensive: coalesce url/source keys. Production writes 'url' (see /api/audience/visit/route.ts),
+              -- but seed data historically wrote 'source'. Coalesce ensures both formats surface correctly.
+              select coalesce(r->>'url', r->>'source') as referrer, count(*) as count
               from ${audienceMembers},
                 jsonb_array_elements(
                   case when jsonb_typeof(${audienceMembers.referrerHistory}) = 'array'
@@ -176,8 +178,8 @@ export async function getUserDashboardAnalytics(
                 ) as r
               where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
                 and ${audienceMembers.lastSeenAt} >= ${sqlTimestamp(startDate)}
-                and r->>'url' is not null
-              group by r->>'url'
+                and coalesce(r->>'url', r->>'source') is not null
+              group by coalesce(r->>'url', r->>'source')
               order by count desc
               limit 5
             ),
