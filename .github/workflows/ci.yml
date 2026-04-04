@@ -1402,18 +1402,22 @@ jobs:
       matrix:
         shard:
           [
-            '1/12',
-            '2/12',
-            '3/12',
-            '4/12',
-            '5/12',
-            '6/12',
-            '7/12',
-            '8/12',
-            '9/12',
-            '10/12',
-            '11/12',
-            '12/12',
+            '1/16',
+            '2/16',
+            '3/16',
+            '4/16',
+            '5/16',
+            '6/16',
+            '7/16',
+            '8/16',
+            '9/16',
+            '10/16',
+            '11/16',
+            '12/16',
+            '13/16',
+            '14/16',
+            '15/16',
+            '16/16',
           ]
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
@@ -1482,7 +1486,7 @@ jobs:
           fi
           # Use forked pool with limited workers to reduce CI flakiness from memory pressure
           export NODE_OPTIONS="--max-old-space-size=4096"
-          VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
+          VITEST_CI_FLAGS="--pool=forks --maxWorkers=1"
           # Mitigate low-frequency flakes by retrying failed tests once in CI
           RETRY_FLAG="--retry=1"
           # Use shard-specific output file so Codecov Test Analytics receives all shards
@@ -1520,7 +1524,7 @@ jobs:
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Run packages/ui unit tests
-        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '1/12'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '1/16'
         run: pnpm turbo test --filter=@jovie/ui
 
       - name: Upload coverage to Codecov
