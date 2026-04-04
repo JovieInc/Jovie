@@ -1,1 +1,0 @@
-/Users/timwhite/conductor/workspaces/jovie/khartoum/.claude/skills/gstack/setup-browser-cookies/SKILL.md
