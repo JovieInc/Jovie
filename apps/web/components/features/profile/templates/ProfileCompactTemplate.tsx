@@ -11,7 +11,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
-import { SocialLink } from '@/components/molecules/SocialLink';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import {
   ProfileNotificationsContext,
   useProfileShell,
@@ -398,20 +398,29 @@ export function ProfileCompactTemplate({
                   )}
                 </section>
 
-                {/* Social icons */}
+                {/* Social icons — flat, no chrome */}
                 {visibleSocialLinks.length > 0 ? (
                   <nav
-                    className='flex items-center justify-center gap-5'
+                    className='flex items-center justify-center gap-4'
                     aria-label='Social links'
                   >
-                    {visibleSocialLinks.map(link => (
-                      <SocialLink
-                        key={link.id}
-                        link={link}
-                        handle={artist.handle}
-                        artistName={artist.name}
-                      />
-                    ))}
+                    {visibleSocialLinks.map(link =>
+                      link.platform && link.url ? (
+                        <a
+                          key={link.id}
+                          href={link.url}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          className='text-white/35 transition-colors duration-150 hover:text-white/70'
+                          aria-label={`${link.platform}`}
+                        >
+                          <SocialIcon
+                            platform={link.platform}
+                            className='h-[18px] w-[18px]'
+                          />
+                        </a>
+                      ) : null
+                    )}
                   </nav>
                 ) : null}
               </div>
