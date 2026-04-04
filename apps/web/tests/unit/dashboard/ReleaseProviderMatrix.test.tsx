@@ -27,13 +27,24 @@ import {
  * Heavy children are mocked to avoid Vitest memory limits.
  */
 
+const mockRouterPush = vi.fn();
 const mockRouterRefresh = vi.fn();
+const mockInstantiateReleaseTasks = vi.fn().mockResolvedValue(undefined);
+const mockUsePlanGate = vi.fn(() => ({
+  isLoading: false,
+  smartLinksLimit: null,
+  isPro: true,
+  canCreateManualReleases: true,
+  canGenerateReleasePlans: true,
+  canEditSmartLinks: true,
+  canAccessFutureReleases: true,
+}));
 
 // ── Mock dependencies ──
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
-    push: vi.fn(),
+    push: mockRouterPush,
     replace: vi.fn(),
     refresh: mockRouterRefresh,
     back: vi.fn(),
@@ -49,6 +60,12 @@ vi.mock('@/components/organisms/AuthShellWrapper', () => ({
     tableMeta: { rowCount: null, toggle: null, rightPanelWidth: null },
     setTableMeta: vi.fn(),
   }),
+}));
+
+vi.mock('@/components/molecules/UpgradeButton', () => ({
+  UpgradeButton: ({ children }: { children: React.ReactNode }) => (
+    <button type='button'>{children}</button>
+  ),
 }));
 
 vi.mock('sonner', () => ({
@@ -71,6 +88,10 @@ vi.mock('@/hooks/useClipboard', () => ({
 
 vi.mock('@/lib/utils/platform-detection', () => ({
   getBaseUrl: () => 'https://test.jov.ie',
+}));
+
+vi.mock('@/app/app/(shell)/dashboard/releases/task-actions', () => ({
+  instantiateReleaseTasks: mockInstantiateReleaseTasks,
 }));
 
 // Mock TanStack Query mutations
@@ -119,13 +140,7 @@ vi.mock('@/lib/queries', () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
-  usePlanGate: () => ({
-    smartLinksLimit: null,
-    isPro: true,
-    canCreateManualReleases: true,
-    canEditSmartLinks: true,
-    canAccessFutureReleases: true,
-  }),
+  usePlanGate: () => mockUsePlanGate(),
   QueryErrorBoundary: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
   ),
@@ -157,9 +172,25 @@ vi.mock('@/features/dashboard/atoms/DashboardHeaderActionGroup', () => ({
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/ReleaseTable',
   () => ({
-    ReleaseTable: ({ releases }: { releases: Array<{ id: string }> }) => (
+    ReleaseTable: ({
+      releases,
+      onEdit,
+    }: {
+      releases: Array<{ id: string; title?: string }>;
+      onEdit?: (release: { id: string; title?: string }) => void;
+    }) => (
       <div data-testid='release-table'>
         ids:{releases.map(release => release.id).join(',')}
+        {releases.map(release => (
+          <button
+            key={release.id}
+            type='button'
+            data-testid={`edit-release-${release.id}`}
+            onClick={() => onEdit?.(release)}
+          >
+            edit-{release.id}
+          </button>
+        ))}
       </div>
     ),
   })
@@ -462,6 +493,15 @@ describe('ReleaseProviderMatrix', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     capturedOnArtworkUploaded = null;
+    mockUsePlanGate.mockReturnValue({
+      smartLinksLimit: null,
+      isPro: true,
+      canCreateManualReleases: true,
+      canGenerateReleasePlans: true,
+      canEditSmartLinks: true,
+      canAccessFutureReleases: true,
+    });
+    mockInstantiateReleaseTasks.mockResolvedValue(undefined);
   });
 
   describe('conditional rendering', () => {
@@ -622,7 +662,7 @@ describe('ReleaseProviderMatrix', () => {
       });
     });
 
-    it('inserts a created release locally and opens the release drawer without router refresh', async () => {
+    it('inserts a created release locally and keeps the drawer closed while the modal is open', async () => {
       renderWithProviders(
         <ReleaseProviderMatrix
           releases={[makeRelease('existing-release')]}
@@ -649,12 +689,205 @@ describe('ReleaseProviderMatrix', () => {
           'ids:created-release,existing-release'
         );
       });
+      expect(screen.queryByTestId('release-sidebar')).not.toBeInTheDocument();
+      expect(
+        await screen.findByRole('heading', { name: 'Generate Release Plan' })
+      ).toBeInTheDocument();
+      expect(mockRouterRefresh).not.toHaveBeenCalled();
+    });
+
+    it('prompts pro users to generate a release plan after creating a release', async () => {
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease('existing-release')]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+      );
+
       await waitFor(() => {
-        expect(screen.getByTestId('release-sidebar')).toHaveTextContent(
-          'created-release:Created Release'
+        expect(
+          screen.getByTestId('mock-add-release-sidebar')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
+
+      expect(
+        await screen.findByRole('heading', { name: 'Generate Release Plan' })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Create the step-by-step tasks for this release and jump straight into the plan.'
+        )
+      ).toBeInTheDocument();
+    });
+
+    it('generates a release plan and routes to the release tasks page', async () => {
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease('existing-release')]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('mock-add-release-sidebar')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Generate Release Plan' })
+      );
+
+      await waitFor(() => {
+        expect(mockInstantiateReleaseTasks).toHaveBeenCalledWith(
+          'created-release'
         );
       });
-      expect(mockRouterRefresh).not.toHaveBeenCalled();
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        '/app/dashboard/releases/created-release/tasks'
+      );
+    });
+
+    it('shows the upgrade prompt for free users after creating a release', async () => {
+      mockUsePlanGate.mockReturnValue({
+        isLoading: false,
+        smartLinksLimit: 10,
+        isPro: false,
+        canCreateManualReleases: true,
+        canGenerateReleasePlans: false,
+        canEditSmartLinks: false,
+        canAccessFutureReleases: false,
+      });
+
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease('existing-release')]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('mock-add-release-sidebar')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
+
+      expect(
+        await screen.findByRole('heading', {
+          name: 'Upgrade To Generate A Release Plan',
+        })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Generate Release Plan' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('keeps the post-create modal neutral while release plan entitlements are loading', async () => {
+      mockUsePlanGate.mockReturnValue({
+        isLoading: true,
+        smartLinksLimit: null,
+        isPro: false,
+        canCreateManualReleases: true,
+        canGenerateReleasePlans: false,
+        canEditSmartLinks: true,
+        canAccessFutureReleases: true,
+      });
+
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease('existing-release')]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('mock-add-release-sidebar')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
+
+      expect(
+        await screen.findByRole('heading', { name: 'Release Plan' })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Checking whether this workspace can generate tasks for the release plan.'
+        )
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Loading...' })).toBeDisabled();
+      expect(
+        screen.queryByRole('heading', {
+          name: 'Upgrade To Generate A Release Plan',
+        })
+      ).not.toBeInTheDocument();
+    });
+
+    it('closes the modal and leaves the new release visible when the user chooses maybe later', async () => {
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease('existing-release')]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('mock-add-release-sidebar')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Maybe Later' })
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.queryByRole('heading', { name: 'Generate Release Plan' })
+        ).not.toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId('release-table')).toHaveTextContent(
+        'ids:created-release,existing-release'
+      );
+      expect(screen.queryByTestId('release-sidebar')).not.toBeInTheDocument();
     });
 
     it('updates the open release drawer when the release changes after it opens', async () => {
@@ -678,6 +911,15 @@ describe('ReleaseProviderMatrix', () => {
       });
 
       fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('heading', { name: 'Generate Release Plan' })
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Maybe Later' }));
+      fireEvent.click(screen.getByTestId('edit-release-created-release'));
 
       await waitFor(() => {
         expect(screen.getByTestId('release-sidebar')).toHaveTextContent(
@@ -715,6 +957,15 @@ describe('ReleaseProviderMatrix', () => {
       });
 
       fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('heading', { name: 'Generate Release Plan' })
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Maybe Later' }));
+      fireEvent.click(screen.getByTestId('edit-release-created-release'));
 
       await waitFor(() => {
         expect(screen.getByTestId('release-sidebar')).toHaveTextContent(

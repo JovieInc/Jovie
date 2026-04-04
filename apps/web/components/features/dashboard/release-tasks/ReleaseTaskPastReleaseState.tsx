@@ -25,7 +25,7 @@ export function ReleaseTaskPastReleaseState({
         className='text-[11px] text-tertiary-token hover:text-secondary-token underline transition-colors disabled:cursor-not-allowed disabled:opacity-50'
         aria-busy={isLoading}
       >
-        {isLoading ? 'Setting up...' : 'Set up tasks anyway'}
+        {isLoading ? 'Generating...' : 'Generate Release Plan Anyway'}
       </button>
     </div>
   );

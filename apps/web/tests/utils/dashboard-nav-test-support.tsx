@@ -11,6 +11,10 @@ import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 
 export const mockUsePathname = vi.fn<() => string>(() => APP_ROUTES.CHAT);
 export const mockUseTaskStatsQuery = vi.fn(() => ({ data: undefined }));
+export const mockUsePlanGate = vi.fn(() => ({
+  canAccessTasksWorkspace: true,
+  isLoading: false,
+}));
 export const mockToastInfo = vi.fn();
 
 vi.mock('next/navigation', () => ({
@@ -73,6 +77,16 @@ vi.mock('@/lib/queries/useTasksQuery', () => ({
   useTaskStatsQuery: (...args: unknown[]) => mockUseTaskStatsQuery(...args),
 }));
 
+vi.mock('@/lib/queries', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/queries')>('@/lib/queries');
+
+  return {
+    ...actual,
+    usePlanGate: (...args: unknown[]) => mockUsePlanGate(...args),
+  };
+});
+
 vi.mock('@jovie/ui', async () => {
   const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
 
@@ -122,6 +136,11 @@ export function resetDashboardNavTestMocks() {
   mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
   mockUseTaskStatsQuery.mockReset();
   mockUseTaskStatsQuery.mockReturnValue({ data: undefined });
+  mockUsePlanGate.mockReset();
+  mockUsePlanGate.mockReturnValue({
+    canAccessTasksWorkspace: true,
+    isLoading: false,
+  });
   mockToastInfo.mockReset();
 }
 

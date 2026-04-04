@@ -111,7 +111,10 @@ export interface UseReleaseProviderMatrixReturn {
   totalOverrides: number;
   openEditor: (release: ReleaseViewModel) => void;
   closeEditor: () => void;
-  handleReleaseCreated: (createdRelease: ReleaseViewModel) => void;
+  handleReleaseCreated: (
+    createdRelease: ReleaseViewModel,
+    options?: { readonly openEditor?: boolean }
+  ) => void;
   updateRow: (updated: ReleaseViewModel) => void;
   patchRow: (releaseId: string, patch: Partial<ReleaseViewModel>) => void;
   handleReleaseArtworkUploaded: (releaseId: string, artworkUrl: string) => void;
