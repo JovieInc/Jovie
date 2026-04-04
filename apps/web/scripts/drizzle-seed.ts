@@ -1405,7 +1405,11 @@ async function seedAudienceMembers(
       geoCity: city,
       geoCountry: country,
       deviceType: pickDeviceType(),
-      referrerHistory: generateReferrerHistory(firstSeen),
+      referrerHistory: generateReferrerHistory(
+        firstSeen,
+        Math.min(visits, 3),
+        lastSeen
+      ),
       latestActions: [
         { action: 'profile_view', timestamp: lastSeen.toISOString() },
       ],

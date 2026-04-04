@@ -184,9 +184,9 @@ export function fanEmail(name: string): string {
 }
 
 /**
- * Generate 0-3 referrer history entries with correct `url` key format.
- * Entries are only added for non-null referrers; direct-traffic picks are skipped,
- * so the result can be an empty array.
+ * Generate referrer history entries with correct `url` key format.
+ * Default count is 1-3 when not specified; entries are only added for non-null
+ * referrers (direct-traffic picks are skipped), so the result can be empty.
  * Matches the production format used by /api/audience/visit/route.ts:303.
  */
 export function generateReferrerHistory(

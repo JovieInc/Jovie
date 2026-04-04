@@ -1569,7 +1569,7 @@ async function seedDemoClicks(profileId: string, linkIds: string[]) {
 
   for (let i = 0; i < 800; i++) {
     const clickDate = hockeyStickDate(90);
-    const dayOfWeek = clickDate.getDay();
+    const dayOfWeek = clickDate.getUTCDay();
     // Weekday-weighted: skip ~33% of weekend clicks
     if ((dayOfWeek === 0 || dayOfWeek === 6) && Math.random() < 0.33) continue;
 
@@ -1641,7 +1641,7 @@ async function seedDemoProfileViews(profileId: string) {
   for (let daysAgo = 0; daysAgo < 90; daysAgo++) {
     const date = new Date(now);
     date.setDate(date.getDate() - daysAgo);
-    const dayOfWeek = date.getDay();
+    const dayOfWeek = date.getUTCDay();
 
     // Hockey-stick: start ~15-25, grow to ~80-120
     const progress = (90 - daysAgo) / 90; // 0 = oldest, 1 = today
