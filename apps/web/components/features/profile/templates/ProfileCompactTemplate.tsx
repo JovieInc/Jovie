@@ -1,6 +1,13 @@
 'use client';
 
-import { Bell, Mail, MoreHorizontal, Play, Share2 } from 'lucide-react';
+import {
+  BadgeCheck,
+  Bell,
+  Mail,
+  MoreHorizontal,
+  Play,
+  Share2,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
@@ -308,8 +315,17 @@ export function ProfileCompactTemplate({
 
                 {/* Artist name */}
                 <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
-                  <h1 className='text-[34px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
+                  <h1 className='flex items-center gap-1.5 text-[34px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
                     {artist.name}
+                    {artist.is_verified ? (
+                      <BadgeCheck
+                        className='h-5 w-5 shrink-0 drop-shadow-[0_1px_4px_rgba(0,0,0,0.3)]'
+                        fill='#3b82f6'
+                        stroke='white'
+                        strokeWidth={2}
+                        aria-label='Verified'
+                      />
+                    ) : null}
                   </h1>
                 </div>
               </header>
