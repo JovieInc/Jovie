@@ -31,6 +31,7 @@ const mockRouterPush = vi.fn();
 const mockRouterRefresh = vi.fn();
 const mockInstantiateReleaseTasks = vi.fn().mockResolvedValue(undefined);
 const mockUsePlanGate = vi.fn(() => ({
+  isLoading: false,
   smartLinksLimit: null,
   isPro: true,
   canCreateManualReleases: true,
@@ -764,6 +765,7 @@ describe('ReleaseProviderMatrix', () => {
 
     it('shows the upgrade prompt for free users after creating a release', async () => {
       mockUsePlanGate.mockReturnValue({
+        isLoading: false,
         smartLinksLimit: 10,
         isPro: false,
         canCreateManualReleases: true,
@@ -800,6 +802,54 @@ describe('ReleaseProviderMatrix', () => {
       ).toBeInTheDocument();
       expect(
         screen.queryByRole('button', { name: 'Generate Release Plan' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('keeps the post-create modal neutral while release plan entitlements are loading', async () => {
+      mockUsePlanGate.mockReturnValue({
+        isLoading: true,
+        smartLinksLimit: null,
+        isPro: false,
+        canCreateManualReleases: true,
+        canGenerateReleasePlans: false,
+        canEditSmartLinks: true,
+        canAccessFutureReleases: true,
+      });
+
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease('existing-release')]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('mock-add-release-sidebar')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
+
+      expect(
+        await screen.findByRole('heading', { name: 'Release Plan' })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Checking whether this workspace can generate tasks for the release plan.'
+        )
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Loading...' })).toBeDisabled();
+      expect(
+        screen.queryByRole('heading', {
+          name: 'Upgrade To Generate A Release Plan',
+        })
       ).not.toBeInTheDocument();
     });
 

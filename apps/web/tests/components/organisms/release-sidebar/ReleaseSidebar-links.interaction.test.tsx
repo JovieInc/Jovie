@@ -446,6 +446,26 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.queryByTestId('task-checklist')).not.toBeInTheDocument();
   });
 
+  it('shows a loading state instead of the lock card while task access is resolving', async () => {
+    mockUsePlanGate.mockReturnValue({
+      canAccessTasksWorkspace: false,
+      isLoading: true,
+    });
+
+    const user = userEvent.setup();
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    await user.click(screen.getByTestId('drawer-tab-tasks'));
+
+    expect(
+      screen.getByTestId('release-tasks-loading-state')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('compact-release-plan-upgrade-card')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('task-checklist')).not.toBeInTheDocument();
+  });
+
   it('does not render the generic Releases title row above the entity card', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 

@@ -160,4 +160,15 @@ describe('DashboardNav', () => {
       enabled: false,
     });
   });
+
+  it('does not render the Pro badge while task entitlements are loading', () => {
+    mockUsePlanGate.mockReturnValueOnce({
+      canAccessTasksWorkspace: false,
+      isLoading: true,
+    });
+
+    const { queryByText } = renderDashboardNav({ renderFn: fastRender });
+
+    expect(queryByText('Pro')).toBeNull();
+  });
 });

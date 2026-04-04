@@ -218,6 +218,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Smart link gating
   const planGate = usePlanGate();
+  const releasePlanEntitlementOverride =
+    experienceAdapter?.entitlements?.canGenerateReleasePlans;
   const {
     smartLinksLimit,
     isPro,
@@ -229,6 +231,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     ...planGate,
     ...experienceAdapter?.entitlements,
   };
+  const isReleasePlanGateLoading =
+    planGate.isLoading && releasePlanEntitlementOverride === undefined;
 
   /** Soft cap: show a "request higher limit" banner (not a hard lock) */
   const SMART_LINK_SOFT_CAP = 100;
@@ -937,14 +941,18 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         size='sm'
       >
         <DialogTitle>
-          {canGenerateReleasePlans
-            ? 'Generate Release Plan'
-            : 'Upgrade To Generate A Release Plan'}
+          {isReleasePlanGateLoading
+            ? 'Release Plan'
+            : canGenerateReleasePlans
+              ? 'Generate Release Plan'
+              : 'Upgrade To Generate A Release Plan'}
         </DialogTitle>
         <DialogDescription>
-          {canGenerateReleasePlans
-            ? 'Create the step-by-step tasks for this release and jump straight into the plan.'
-            : 'Upgrade to turn this release into a step-by-step plan with tasks you can assign to Jovie AI.'}
+          {isReleasePlanGateLoading
+            ? 'Checking whether this workspace can generate tasks for the release plan.'
+            : canGenerateReleasePlans
+              ? 'Create the step-by-step tasks for this release and jump straight into the plan.'
+              : 'Upgrade to turn this release into a step-by-step plan with tasks you can assign to Jovie AI.'}
         </DialogDescription>
         <DialogBody className='space-y-2'>
           <p className='text-[13px] text-secondary-token'>
@@ -961,7 +969,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           >
             Maybe Later
           </Button>
-          {canGenerateReleasePlans ? (
+          {isReleasePlanGateLoading ? (
+            <Button type='button' size='sm' disabled>
+              Loading...
+            </Button>
+          ) : canGenerateReleasePlans ? (
             <Button
               type='button'
               size='sm'
