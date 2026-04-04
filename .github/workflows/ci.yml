@@ -2864,12 +2864,17 @@ jobs:
           set -euo pipefail
 
           api_url="${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100"
-          response=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "$api_url")
-          job_url=$(RESPONSE="$response" JOB_NAME="${{ github.job }}" python - <<'PY'
+          job_url=$(
+            curl -sS \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "$api_url" \
+              | JOB_NAME="${{ github.job }}" python - <<'PY'
           import json
           import os
+          import sys
 
-          data = json.loads(os.environ["RESPONSE"])
+          data = json.load(sys.stdin)
           job_name = os.environ["JOB_NAME"]
           job = next((item for item in data.get("jobs", []) if item.get("name") == job_name), None)
           print(job.get("html_url", "") if job else "")
