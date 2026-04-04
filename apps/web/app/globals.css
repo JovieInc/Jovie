@@ -64,6 +64,72 @@ body:has(.profile-viewport) {
   overscroll-behavior: auto;
 }
 
+/* Compact profile — override CTA component styles to fit the unified card */
+.compact-subscribe-section {
+  /* Tighten the heading */
+  & p[class*="text-balance"][class*="font-[640]"] {
+    font-size: 15px !important;
+    font-weight: 510 !important;
+    text-align: left !important;
+    padding: 12px 12px 0;
+    letter-spacing: -0.01em;
+    color: rgba(255, 255, 255, 0.85);
+  }
+  /* Tighten spacing inside the CTA */
+  & > div > .space-y-3 {
+    gap: 8px;
+  }
+  & > div > .space-y-3 > .space-y-3 {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  /* Make the pearl composer blend with the card (no extra border/bg) */
+  & [data-testid="subscription-pearl-composer"] {
+    border-color: rgba(255, 255, 255, 0.06) !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    box-shadow: none !important;
+    margin: 0 8px;
+  }
+  /* Glass action button (override solid pearl primary) */
+  & button[class*="bg-[var(--profile-pearl-primary-bg)]"] {
+    height: 36px !important;
+    font-size: 13px !important;
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: rgba(255, 255, 255, 0.88) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: blur(20px);
+  }
+  & button[class*="bg-[var(--profile-pearl-primary-bg)]"]:hover {
+    background: rgba(255, 255, 255, 0.15) !important;
+  }
+  /* Full-width link-style primary buttons */
+  & a[class*="bg-[var(--profile-pearl-primary-bg)]"] {
+    height: 36px !important;
+    font-size: 13px !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: rgba(255, 255, 255, 0.88) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: blur(20px);
+  }
+  /* Shrink the input */
+  & input[data-testid="subscription-input"] {
+    height: 36px !important;
+    font-size: 14px !important;
+    font-weight: 450 !important;
+  }
+  /* Hide the footer disclaimer area to save space */
+  & .relative.min-h-5 {
+    min-height: 0 !important;
+    height: 0 !important;
+    overflow: hidden;
+  }
+  /* Bottom padding */
+  padding-bottom: 8px;
+}
+
 /* PWA standalone mode polish — native-feel when installed */
 @media (display-mode: standalone) {
   body {

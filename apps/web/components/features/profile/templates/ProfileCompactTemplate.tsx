@@ -314,14 +314,16 @@ export function ProfileCompactTemplate({
                 </div>
               </header>
 
-              {/* ─── Content ─── */}
-              <div className='relative z-10 flex flex-col gap-3 px-5 pb-[max(env(safe-area-inset-bottom),32px)] pt-4'>
-                {/* Mini player */}
+              {/* ─── Unified card ─── */}
+              <div
+                className={`relative z-10 mx-4 mb-[max(env(safe-area-inset-bottom),24px)] mt-3 overflow-hidden rounded-2xl border ${glass.border} ${glass.bg} ${glass.shadow} ${glass.blur}`}
+              >
+                {/* Player row */}
                 {latestRelease || mergedDSPs.length > 0 ? (
                   <button
                     type='button'
                     onClick={handlePlayClick}
-                    className={`group flex items-center gap-2.5 rounded-[14px] border ${glass.border} ${glass.bg} px-2.5 py-2 ${glass.shadow} ${glass.blur} transition-all duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                    className='group flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-white/[0.04] active:bg-white/[0.06]'
                     aria-label={
                       latestRelease
                         ? `Play ${latestRelease.title}`
@@ -329,7 +331,7 @@ export function ProfileCompactTemplate({
                     }
                   >
                     {latestRelease?.artworkUrl ? (
-                      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-[8px]'>
+                      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-lg'>
                         <ImageWithFallback
                           src={latestRelease.artworkUrl}
                           alt={latestRelease.title}
@@ -340,11 +342,11 @@ export function ProfileCompactTemplate({
                         />
                       </div>
                     ) : (
-                      <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-white/[0.06]'>
+                      <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/[0.06]'>
                         <Play className='h-3.5 w-3.5 fill-current text-white/60' />
                       </div>
                     )}
-                    <div className='min-w-0 flex-1 text-left'>
+                    <div className='min-w-0 flex-1'>
                       <p className='truncate text-[13px] font-[510] leading-[1.15] text-white/88'>
                         {latestRelease?.title ?? 'Listen'}
                       </p>
@@ -360,10 +362,16 @@ export function ProfileCompactTemplate({
                   </button>
                 ) : null}
 
-                {/* Subscribe */}
+                {/* Separator */}
+                {(latestRelease || mergedDSPs.length > 0) && (
+                  <div className='mx-3 h-px bg-white/[0.06]' />
+                )}
+
+                {/* Subscribe row */}
                 <section
                   ref={subscribeSectionRef}
                   data-testid='compact-subscribe'
+                  className='compact-subscribe-section'
                 >
                   {subscribeTwoStep ? (
                     <TwoStepNotificationsCTA
@@ -371,35 +379,34 @@ export function ProfileCompactTemplate({
                       startExpanded={mode === 'subscribe'}
                     />
                   ) : (
-                    <div
-                      className={`overflow-hidden rounded-[14px] border ${glass.border} ${glass.bg} ${glass.shadow} ${glass.blur}`}
-                    >
-                      <ArtistNotificationsCTA
-                        artist={artist}
-                        variant='button'
-                        autoOpen={mode === 'subscribe'}
-                        forceExpanded
-                        hideListenFallback
-                      />
-                    </div>
+                    <ArtistNotificationsCTA
+                      artist={artist}
+                      variant='button'
+                      autoOpen={mode === 'subscribe'}
+                      forceExpanded
+                      hideListenFallback
+                    />
                   )}
                 </section>
 
-                {/* Social icons */}
+                {/* Separator + Social icons */}
                 {visibleSocialLinks.length > 0 ? (
-                  <nav
-                    className='flex items-center justify-center gap-5 pt-0.5'
-                    aria-label='Social links'
-                  >
-                    {visibleSocialLinks.map(link => (
-                      <SocialLink
-                        key={link.id}
-                        link={link}
-                        handle={artist.handle}
-                        artistName={artist.name}
-                      />
-                    ))}
-                  </nav>
+                  <>
+                    <div className='mx-3 h-px bg-white/[0.06]' />
+                    <nav
+                      className='flex items-center justify-center gap-5 py-2.5'
+                      aria-label='Social links'
+                    >
+                      {visibleSocialLinks.map(link => (
+                        <SocialLink
+                          key={link.id}
+                          link={link}
+                          handle={artist.handle}
+                          artistName={artist.name}
+                        />
+                      ))}
+                    </nav>
+                  </>
                 ) : null}
               </div>
             </div>
