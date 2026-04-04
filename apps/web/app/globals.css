@@ -111,6 +111,10 @@ body:has(.profile-viewport) {
     padding-top: 4px !important;
     padding-bottom: 4px !important;
   }
+  /* Force inner flex row to fill width so button sits right */
+  & [data-testid="subscription-pearl-composer"] > div {
+    width: 100% !important;
+  }
   /* Inner action button inside composer */
   &
     [data-testid="subscription-pearl-composer"]
