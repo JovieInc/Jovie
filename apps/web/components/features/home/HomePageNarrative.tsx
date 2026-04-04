@@ -108,7 +108,7 @@ function HomeTrustBar() {
       <Container size='homepage'>
         <div className='mx-auto flex max-w-[1120px] flex-col gap-5 py-5 md:flex-row md:items-center md:justify-between'>
           <p className='text-[11px] text-tertiary-token'>
-            Connected with leading label partners
+            Trusted by artists on
           </p>
 
           <div className='flex flex-wrap items-center gap-x-6 gap-y-3 opacity-85 sm:gap-x-8'>
@@ -300,7 +300,7 @@ function AutomatedMomentumSection() {
                 <div className='flex items-center gap-3'>
                   <span className='h-2 w-2 rounded-full bg-violet-400' />
                   <p className='text-[14px] font-[530] text-white'>
-                    &ldquo;Midnight Sun&rdquo; drops in 48 hours
+                    &ldquo;The Sound&rdquo; drops in 48 hours
                   </p>
                 </div>
                 <p className='mt-1 pl-5 text-[12px] text-white/40'>
@@ -344,9 +344,7 @@ function CommandCenterSection() {
       <Container size='homepage'>
         <div className='mx-auto max-w-[1120px]'>
           <div className='text-center'>
-            <p className='homepage-section-eyebrow mx-auto'>
-              Release Operating System
-            </p>
+            <p className='homepage-section-eyebrow mx-auto'>Task & Playbook</p>
             <h2 className='marketing-h2-linear mx-auto mt-4 text-primary-token'>
               Command center for your career.
             </h2>
@@ -498,7 +496,7 @@ function FinalCallToAction() {
             Now make it hit.
           </h2>
           <p className='mx-auto mt-6 max-w-[28rem] text-[17px] leading-[1.7] text-secondary-token sm:text-[18px]'>
-            Free to start. No credit card.
+            No credit card required.
           </p>
 
           <div className='mt-10'>

@@ -58,8 +58,8 @@ export const HOME_HERO_TASKS: readonly HomepageTaskCard[] = [
 ] as const;
 
 export const HOME_RELEASE_DESTINATION_PRESAVE_MOCK: HomepageReleaseMock = {
-  id: 'afterlight-presave',
-  title: 'Afterlight',
+  id: 'the-sound-presave',
+  title: 'The Sound',
   artist: 'Tim White',
   releaseLabel: 'Drops April 19, 2026',
   modeLabel: 'Countdown Presave',
