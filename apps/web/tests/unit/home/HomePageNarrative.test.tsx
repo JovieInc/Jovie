@@ -61,7 +61,7 @@ describe('HomePageNarrative', () => {
     ).toBeGreaterThan(0);
     expect(
       screen.getByRole('heading', {
-        name: 'Context, monitoring, and tasks in one system.',
+        name: 'Your release operating system.',
       })
     ).toBeInTheDocument();
     expect(

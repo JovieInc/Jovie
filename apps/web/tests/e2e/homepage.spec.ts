@@ -75,7 +75,7 @@ test.describe('Homepage', () => {
     ).toHaveCount(0);
     await expect(
       page.getByRole('heading', {
-        name: 'Context, monitoring, and tasks in one system.',
+        name: 'Your release operating system.',
       })
     ).toBeVisible();
 

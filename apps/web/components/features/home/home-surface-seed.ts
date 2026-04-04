@@ -33,7 +33,7 @@ export interface HomepageReleaseMock {
 export const HOME_HERO_TASKS: readonly HomepageTaskCard[] = [
   {
     id: 'editorial-pitch',
-    title: 'Submit editorial pitch',
+    title: 'Submit pitch',
     statusTone: 'ready',
     statusLabel: 'Ready',
     dueLabel: 'Due Tuesday',
@@ -41,7 +41,7 @@ export const HOME_HERO_TASKS: readonly HomepageTaskCard[] = [
   },
   {
     id: 'release-assets',
-    title: 'Build release assets',
+    title: 'Build assets',
     statusTone: 'today',
     statusLabel: 'In progress',
     dueLabel: 'Today',
@@ -53,7 +53,7 @@ export const HOME_HERO_TASKS: readonly HomepageTaskCard[] = [
     statusTone: 'blocked',
     statusLabel: 'Queued',
     dueLabel: 'Launch day',
-    meta: 'Audience send',
+    meta: 'Audience',
   },
 ] as const;
 

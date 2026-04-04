@@ -1,4 +1,11 @@
-import { BellRing } from 'lucide-react';
+import {
+  BellRing,
+  CheckCircle2,
+  Circle,
+  Pencil,
+  Rocket,
+  TrendingUp,
+} from 'lucide-react';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
 import { APP_ROUTES } from '@/constants/routes';
@@ -28,10 +35,10 @@ interface SectionHeaderProps {
 
 function SectionHeader({ eyebrow, title, body }: Readonly<SectionHeaderProps>) {
   return (
-    <div className='max-w-[34rem]'>
+    <div className='max-w-[36rem]'>
       <p className='homepage-section-eyebrow'>{eyebrow}</p>
       <h2 className='marketing-h2-linear mt-4 text-primary-token'>{title}</h2>
-      <p className='mt-5 max-w-[30rem] text-[15px] leading-[1.75] text-secondary-token sm:text-[16px]'>
+      <p className='mt-5 max-w-[32rem] text-[15px] leading-[1.75] text-secondary-token sm:text-[16px]'>
         {body}
       </p>
     </div>
@@ -53,18 +60,19 @@ function HomeHero() {
 
       <Container size='homepage'>
         <div className='mx-auto max-w-[1120px]'>
-          <div className='grid items-center gap-12 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:gap-14'>
-            <div className='max-w-[34rem]'>
+          <div className='grid items-center gap-12 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-10 xl:grid-cols-[minmax(0,1.22fr)_minmax(0,0.78fr)]'>
+            <div>
               <p className='homepage-section-eyebrow'>
                 The release system for independent artists
               </p>
               <h1
                 id='home-hero-heading'
-                className='marketing-h1-linear mt-5 max-w-[10ch] text-primary-token'
+                className='marketing-h1-linear mt-5 text-primary-token'
               >
-                Drop more music. Crush every release.
+                Drop more music.
+                <br className='hidden xl:inline' /> Crush every release.
               </h1>
-              <p className='mt-5 max-w-[31rem] text-[17px] leading-[1.7] text-secondary-token sm:text-[18px]'>
+              <p className='mt-5 max-w-[33rem] text-[17px] leading-[1.7] text-secondary-token sm:text-[18px]'>
                 One system to make every release count, every time.
               </p>
 
@@ -209,8 +217,8 @@ function ReleaseDestinationsSection() {
               />
             </div>
 
-            <div className='relative mt-14 hidden min-h-[34rem] lg:block'>
-              <div className='absolute left-0 top-0 z-20 w-[23.5rem] rotate-[-2deg]'>
+            <div className='relative mt-14 hidden min-h-[36rem] lg:block'>
+              <div className='absolute left-0 top-0 z-20 w-[22rem] rotate-[-2deg]'>
                 <ReleaseModeMockCard
                   release={HOME_RELEASE_DESTINATION_PRESAVE_MOCK}
                   variant='comparison'
@@ -218,7 +226,7 @@ function ReleaseDestinationsSection() {
                 />
               </div>
 
-              <div className='absolute right-0 top-12 z-10 w-[23.5rem] rotate-[1.5deg]'>
+              <div className='absolute right-0 top-8 z-10 w-[22rem] rotate-[1.5deg]'>
                 <ReleaseModeMockCard
                   release={HOME_RELEASE_DESTINATION_LIVE_MOCK}
                   variant='comparison'
@@ -258,7 +266,7 @@ function ReleaseOperatingSystemSection() {
           <div className='grid gap-12 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-end'>
             <SectionHeader
               eyebrow='Release Operating System'
-              title='Context, monitoring, and tasks in one system.'
+              title='Your release operating system.'
               body='Jovie knows the release, watches the rollout, and keeps the work attached to it.'
             />
 
@@ -281,34 +289,224 @@ function ReleaseOperatingSystemSection() {
   );
 }
 
-function FinalCallToAction() {
+function AutomatedMomentumSection() {
   return (
-    <section className='bg-page py-20 sm:py-24 lg:py-28'>
+    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
       <Container size='homepage'>
-        <div className='mx-auto flex max-w-[1120px] flex-col gap-8 border-t border-subtle pt-12 sm:pt-14 lg:flex-row lg:items-end lg:justify-between'>
-          <div className='max-w-[38rem]'>
-            <p className='homepage-section-eyebrow'>Meet Jovie</p>
-            <h2 className='marketing-h2-linear mt-4 text-primary-token'>
-              Release day starts here.
-            </h2>
-            <p className='mt-4 max-w-[32rem] text-[15px] leading-[1.7] text-secondary-token sm:text-[16px]'>
-              Profiles, smart links, context, monitoring, and tasks. All on
-              Jovie.
+        <div className='mx-auto max-w-[1120px]'>
+          <div className='grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center'>
+            <div className='space-y-3'>
+              <div className='rounded-2xl bg-white/[0.04] px-5 py-4'>
+                <div className='flex items-center gap-3'>
+                  <span className='h-2 w-2 rounded-full bg-violet-400' />
+                  <p className='text-[14px] font-[530] text-white'>
+                    &ldquo;Midnight Sun&rdquo; drops in 48 hours
+                  </p>
+                </div>
+                <p className='mt-1 pl-5 text-[12px] text-white/40'>
+                  1,247 fans notified automatically
+                </p>
+              </div>
+
+              <div className='rounded-2xl bg-white/[0.04] px-5 py-4'>
+                <div className='flex items-center gap-3'>
+                  <span className='h-2 w-2 rounded-full bg-emerald-400' />
+                  <p className='text-[14px] font-[530] text-white'>
+                    Now streaming everywhere
+                  </p>
+                </div>
+                <p className='mt-1 pl-5 text-[12px] text-white/40'>
+                  Smart link live. Fans redirected by timezone.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p className='homepage-section-eyebrow'>Automated</p>
+              <h2 className='marketing-h2-linear mt-4 text-primary-token'>
+                Fans know before you do.
+              </h2>
+              <p className='mt-4 max-w-[28rem] text-[15px] leading-[1.7] text-secondary-token'>
+                Presave fans get notified the second it drops. In their
+                timezone.
+              </p>
+            </div>
+          </div>
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+function CommandCenterSection() {
+  return (
+    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
+      <Container size='homepage'>
+        <div className='mx-auto max-w-[1120px]'>
+          <div className='text-center'>
+            <p className='homepage-section-eyebrow mx-auto'>
+              Release Operating System
             </p>
+            <h2 className='marketing-h2-linear mx-auto mt-4 text-primary-token'>
+              Command center for your career.
+            </h2>
           </div>
 
-          <div className='flex flex-wrap items-center gap-3 lg:justify-end'>
+          <div className='mt-14 grid gap-3 lg:grid-cols-3'>
+            <div className='rounded-2xl bg-white/[0.04] p-6'>
+              <div className='flex items-center gap-2'>
+                <Circle className='h-3.5 w-3.5 text-white/25' />
+                <span className='text-[11px] font-medium text-white/40'>
+                  To do
+                </span>
+              </div>
+              <h3 className='mt-4 text-[15px] font-[560] text-white'>
+                Pitch to editorial playlists
+              </h3>
+              <p className='mt-2 text-[12px] text-white/35'>Due in 3 days</p>
+            </div>
+
+            <div className='rounded-2xl bg-white/[0.04] p-6'>
+              <div className='flex items-center gap-2'>
+                <span className='h-3.5 w-3.5 rounded-full border-2 border-sky-400' />
+                <span className='text-[11px] font-medium text-sky-400/70'>
+                  In progress
+                </span>
+              </div>
+              <h3 className='mt-4 text-[15px] font-[560] text-white'>
+                Upload Canvas to Spotify
+              </h3>
+              <p className='mt-2 text-[12px] text-white/35'>Started today</p>
+            </div>
+
+            <div className='rounded-2xl bg-white/[0.04] p-6'>
+              <div className='flex items-center gap-2'>
+                <CheckCircle2 className='h-3.5 w-3.5 text-emerald-400' />
+                <span className='text-[11px] font-medium text-emerald-400/70'>
+                  Done
+                </span>
+              </div>
+              <h3 className='mt-4 text-[15px] font-[560] text-white'>
+                Metadata verified
+              </h3>
+              <p className='mt-2 text-[12px] text-white/35'>
+                ISRC and UPC synced
+              </p>
+            </div>
+          </div>
+
+          <div className='mt-3 grid gap-3 lg:grid-cols-2'>
+            <div className='rounded-2xl bg-white/[0.04] p-6'>
+              <p className='text-[11px] font-medium text-white/40'>
+                Jovie generated
+              </p>
+              <h3 className='mt-3 text-[15px] font-[560] text-white'>
+                Release playbook ready
+              </h3>
+              <p className='mt-2 text-[12px] text-white/35'>
+                4 tasks created from your release brief. 1 done, 1 in progress,
+                2 to go.
+              </p>
+            </div>
+
+            <div className='rounded-2xl bg-white/[0.04] p-6'>
+              <p className='text-[11px] font-medium text-white/40'>
+                Monitoring
+              </p>
+              <h3 className='mt-3 text-[15px] font-[560] text-white'>
+                All platforms synced
+              </h3>
+              <div className='mt-3 flex items-center gap-4'>
+                {TRUST_LABELS.map(partner => (
+                  <HomepageLabelLogoMark
+                    key={partner}
+                    partner={partner}
+                    className='text-white/40'
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+function WorkflowSection() {
+  return (
+    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
+      <Container size='homepage'>
+        <div className='mx-auto max-w-[1120px]'>
+          <div className='text-center'>
+            <p className='homepage-section-eyebrow mx-auto'>
+              Full Release Lifecycle
+            </p>
+            <h2 className='marketing-h2-linear mx-auto mt-4 text-primary-token'>
+              Momentum starts with a system.
+            </h2>
+          </div>
+
+          <div className='mt-14 grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
+            <div className='rounded-2xl bg-white/[0.04] p-6'>
+              <Pencil className='h-5 w-5 text-white/30' aria-hidden='true' />
+              <h3 className='mt-4 text-[15px] font-[560] text-white'>
+                Pre-release
+              </h3>
+              <p className='mt-2 text-[12px] leading-5 text-white/40'>
+                Pitch, metadata, and assets ready before anyone hears it.
+              </p>
+            </div>
+
+            <div className='rounded-2xl bg-white/[0.04] p-6'>
+              <Rocket className='h-5 w-5 text-white/30' aria-hidden='true' />
+              <h3 className='mt-4 text-[15px] font-[560] text-white'>
+                Launch day
+              </h3>
+              <p className='mt-2 text-[12px] leading-5 text-white/40'>
+                Smart links live, fans notified, streams tracked in real time.
+              </p>
+            </div>
+
+            <div className='rounded-2xl bg-white/[0.04] p-6'>
+              <TrendingUp
+                className='h-5 w-5 text-white/30'
+                aria-hidden='true'
+              />
+              <h3 className='mt-4 text-[15px] font-[560] text-white'>
+                Post-release
+              </h3>
+              <p className='mt-2 text-[12px] leading-5 text-white/40'>
+                Playlist tracking, follow-ups, and momentum that compounds.
+              </p>
+            </div>
+          </div>
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+function FinalCallToAction() {
+  return (
+    <section className='bg-page py-28 sm:py-36 lg:py-44'>
+      <Container size='homepage'>
+        <div className='mx-auto max-w-[1120px] text-center'>
+          <h2 className='marketing-h1-linear text-primary-token'>
+            You made the song.
+            <br />
+            Now make it hit.
+          </h2>
+          <p className='mx-auto mt-6 max-w-[28rem] text-[17px] leading-[1.7] text-secondary-token sm:text-[18px]'>
+            Free to start. No credit card.
+          </p>
+
+          <div className='mt-10'>
             <Link
               href={APP_ROUTES.SIGNUP}
-              className='btn-linear-signup focus-ring-themed inline-flex h-10 items-center px-4'
+              className='btn-linear-signup focus-ring-themed inline-flex h-12 items-center px-6 text-[15px]'
             >
               Start Free
-            </Link>
-            <Link
-              href={APP_ROUTES.SIGNIN}
-              className='inline-flex h-10 items-center rounded-full border border-subtle px-4 text-sm font-medium text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
-            >
-              Log In
             </Link>
           </div>
         </div>
@@ -324,7 +522,10 @@ export function HomePageNarrative() {
       <HomeTrustBar />
       <ArtistProfileSection />
       <ReleaseDestinationsSection />
+      <AutomatedMomentumSection />
       <ReleaseOperatingSystemSection />
+      <CommandCenterSection />
+      <WorkflowSection />
       <FinalCallToAction />
     </>
   );
