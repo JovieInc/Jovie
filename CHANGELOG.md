@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.115] - 2026-04-04
+
+> Added workflow linting to CI so broken GitHub Actions YAML gets caught before it hits production.
+
+### Added
+
+- Actionlint GitHub Actions workflow (`actionlint.yml`) validates all workflow YAML on every push and PR
+- SHA-pinned actions for supply-chain security, explicit permissions, and 5-minute timeout
+
 ## [26.4.114] - 2026-04-03
 
 > Tightened compact dropdown styling to canonical design tokens and refreshed gstack skill docs to the latest generated templates.
