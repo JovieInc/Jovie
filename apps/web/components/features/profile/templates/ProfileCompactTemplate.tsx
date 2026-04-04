@@ -25,6 +25,16 @@ import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
+/* ─── Design tokens (aligned with DESIGN.md System B dark) ─── */
+const glass = {
+  bg: 'bg-white/[0.05]',
+  bgHover: 'hover:bg-white/[0.08]',
+  border: 'border-white/[0.08]',
+  shadow:
+    'shadow-[inset_0_0.5px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(0,0,0,0.2)]',
+  blur: 'backdrop-blur-2xl',
+} as const;
+
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
   readonly artist: Artist;
@@ -174,13 +184,10 @@ export function ProfileCompactTemplate({
     return () => document.removeEventListener('keydown', handleKey);
   }, [menuOpen]);
 
-  const menuItemClassName =
-    'flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-[14px] font-[510] text-white/90 transition-colors hover:bg-white/10';
-
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div className='profile-viewport relative min-h-[100dvh] overflow-x-hidden bg-[color:var(--profile-stage-bg)] text-primary-token'>
-        {/* Ambient background */}
+        {/* ─── Ambient background ─── */}
         <div className='absolute inset-0' aria-hidden='true'>
           <div className='absolute inset-[-10%]'>
             <ImageWithFallback
@@ -190,13 +197,13 @@ export function ProfileCompactTemplate({
               sizes='100vw'
               className='scale-[1.05] object-cover opacity-28 blur-[84px] saturate-[0.88]'
               fallbackVariant='avatar'
-              fallbackClassName='bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_48%)]'
+              fallbackClassName='bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_48%)]'
             />
           </div>
-          <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_26%),linear-gradient(180deg,rgba(6,8,13,0.34)_0%,rgba(7,8,10,0.82)_42%,rgba(8,9,10,0.98)_100%)]' />
+          <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_26%),linear-gradient(180deg,rgba(6,8,13,0.34)_0%,rgba(7,8,10,0.82)_42%,rgba(8,9,10,0.98)_100%)]' />
         </div>
 
-        {/* Card container */}
+        {/* ─── Card container ─── */}
         <div className='relative mx-auto flex min-h-[100dvh] w-full max-w-[680px] items-stretch justify-center md:items-center md:px-6 md:py-8'>
           <main className='relative flex w-full items-stretch md:items-center'>
             <div
@@ -205,7 +212,7 @@ export function ProfileCompactTemplate({
             >
               <div className='pointer-events-none absolute inset-0 bg-[var(--profile-panel-gradient)]' />
 
-              {/* Hero */}
+              {/* ─── Hero ─── */}
               <header
                 className='relative w-full'
                 style={{ aspectRatio: '3 / 4' }}
@@ -223,53 +230,52 @@ export function ProfileCompactTemplate({
                   />
                 </div>
 
-                {/* Top gradient for branding visibility */}
-                <div className='pointer-events-none absolute inset-x-0 top-0 h-[40%] bg-[linear-gradient(to_bottom,rgba(0,0,0,0.5)_0%,rgba(0,0,0,0.2)_50%,transparent_100%)]' />
-                {/* Bottom gradient for name legibility */}
-                <div className='pointer-events-none absolute inset-x-0 bottom-0 h-[60%] bg-[linear-gradient(to_top,var(--profile-stage-bg)_0%,rgba(5,6,8,0.8)_40%,transparent_100%)]' />
+                {/* Top vignette */}
+                <div className='pointer-events-none absolute inset-x-0 top-0 h-[36%] bg-[linear-gradient(to_bottom,rgba(0,0,0,0.45)_0%,rgba(0,0,0,0.15)_55%,transparent_100%)]' />
+                {/* Bottom gradient */}
+                <div className='pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-[linear-gradient(to_top,var(--profile-stage-bg)_0%,rgba(5,6,8,0.75)_45%,transparent_100%)]' />
 
-                {/* Top bar: jovie brand + menu */}
+                {/* Top bar */}
                 <div className='relative z-10 flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),20px)]'>
                   <BrandLogo
-                    size={24}
+                    size={22}
                     tone='white'
                     rounded={false}
-                    className='opacity-50 drop-shadow-[0_1px_6px_rgba(0,0,0,0.5)]'
+                    className='opacity-45 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
                     aria-hidden={false}
                   />
 
-                  {/* Dropdown menu */}
+                  {/* ─── Dropdown ─── */}
                   <div ref={menuRef} className='relative'>
                     <button
                       type='button'
                       onClick={() => setMenuOpen(prev => !prev)}
-                      className='flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/30 text-white/80 backdrop-blur-xl transition-colors hover:bg-black/45'
+                      className={`flex h-8 w-8 items-center justify-center rounded-full ${glass.border} bg-black/25 text-white/70 ${glass.blur} transition-colors duration-150 hover:bg-black/40`}
                       aria-label='More options'
                       aria-expanded={menuOpen}
                       aria-haspopup='menu'
                     >
-                      <MoreHorizontal className='h-4 w-4' />
+                      <MoreHorizontal className='h-[15px] w-[15px]' />
                     </button>
 
                     {menuOpen ? (
                       <div
-                        className='absolute right-0 top-full z-50 mt-2 min-w-[200px] overflow-hidden rounded-2xl border border-white/12 bg-black/80 p-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.5)] backdrop-blur-2xl'
+                        className={`absolute right-0 top-full z-50 mt-1.5 min-w-[188px] overflow-hidden rounded-[14px] border ${glass.border} bg-black/75 p-1 shadow-[0_12px_40px_rgba(0,0,0,0.5)] ${glass.blur}`}
                         role='menu'
                       >
                         <button
                           type='button'
                           role='menuitem'
-                          className={menuItemClassName}
+                          className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
                           onClick={handleShare}
                         >
-                          <Share2 className='h-4 w-4 text-white/60' />
+                          <Share2 className='h-[14px] w-[14px] text-white/50' />
                           Share Profile
                         </button>
-
                         <button
                           type='button'
                           role='menuitem'
-                          className={menuItemClassName}
+                          className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
                           onClick={() => {
                             setMenuOpen(false);
                             subscribeSectionRef.current?.scrollIntoView({
@@ -278,21 +284,20 @@ export function ProfileCompactTemplate({
                             });
                           }}
                         >
-                          <Bell className='h-4 w-4 text-white/60' />
+                          <Bell className='h-[14px] w-[14px] text-white/50' />
                           Get Notified
                         </button>
-
                         {hasContacts ? (
                           <button
                             type='button'
                             role='menuitem'
-                            className={menuItemClassName}
+                            className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
                             onClick={() => {
                               setMenuOpen(false);
                               setContactOpen(true);
                             }}
                           >
-                            <Mail className='h-4 w-4 text-white/60' />
+                            <Mail className='h-[14px] w-[14px] text-white/50' />
                             Contact
                           </button>
                         ) : null}
@@ -302,21 +307,21 @@ export function ProfileCompactTemplate({
                 </div>
 
                 {/* Artist name */}
-                <div className='absolute inset-x-0 bottom-6 z-10 px-6'>
-                  <h1 className='text-[38px] font-[590] leading-[1.05] tracking-[-0.8px] text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.5)]'>
+                <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
+                  <h1 className='text-[34px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
                     {artist.name}
                   </h1>
                 </div>
               </header>
 
-              {/* Content: player + subscribe + socials */}
-              <div className='relative z-10 flex flex-col gap-4 px-5 pb-[max(env(safe-area-inset-bottom),40px)] pt-5'>
-                {/* Mini player card — liquid glass */}
+              {/* ─── Content ─── */}
+              <div className='relative z-10 flex flex-col gap-3 px-5 pb-[max(env(safe-area-inset-bottom),32px)] pt-4'>
+                {/* Mini player */}
                 {latestRelease || mergedDSPs.length > 0 ? (
                   <button
                     type='button'
                     onClick={handlePlayClick}
-                    className='group flex items-center gap-3 rounded-2xl border border-white/[0.12] bg-white/[0.06] px-3 py-2.5 shadow-[inset_0_0.5px_0_rgba(255,255,255,0.1),0_2px_12px_rgba(0,0,0,0.2)] backdrop-blur-2xl transition-all duration-200 hover:bg-white/[0.09] hover:shadow-[inset_0_0.5px_0_rgba(255,255,255,0.14),0_4px_20px_rgba(0,0,0,0.25)] active:scale-[0.985]'
+                    className={`group flex items-center gap-2.5 rounded-[14px] border ${glass.border} ${glass.bg} px-2.5 py-2 ${glass.shadow} ${glass.blur} transition-all duration-150 ${glass.bgHover} active:scale-[0.985]`}
                     aria-label={
                       latestRelease
                         ? `Play ${latestRelease.title}`
@@ -324,33 +329,33 @@ export function ProfileCompactTemplate({
                     }
                   >
                     {latestRelease?.artworkUrl ? (
-                      <div className='relative h-11 w-11 shrink-0 overflow-hidden rounded-[10px] border border-white/[0.08] shadow-[0_2px_8px_rgba(0,0,0,0.2)]'>
+                      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-[8px]'>
                         <ImageWithFallback
                           src={latestRelease.artworkUrl}
                           alt={latestRelease.title}
                           fill
-                          sizes='44px'
+                          sizes='40px'
                           className='object-cover'
                           fallbackVariant='release'
                         />
                       </div>
                     ) : (
-                      <div className='flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border border-white/[0.08] bg-white/[0.06]'>
-                        <Play className='h-4 w-4 fill-current text-white/70' />
+                      <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-white/[0.06]'>
+                        <Play className='h-3.5 w-3.5 fill-current text-white/60' />
                       </div>
                     )}
                     <div className='min-w-0 flex-1 text-left'>
-                      <p className='truncate text-[13px] font-[510] leading-tight text-white/90'>
+                      <p className='truncate text-[13px] font-[510] leading-[1.15] text-white/88'>
                         {latestRelease?.title ?? 'Listen'}
                       </p>
-                      <p className='mt-0.5 truncate text-[12px] font-[400] leading-tight text-white/45'>
+                      <p className='mt-px truncate text-[11px] font-[400] leading-[1.2] text-white/40'>
                         {latestRelease
                           ? `${artist.name}${dspCountLabel}`
                           : `${mergedDSPs.length} platforms`}
                       </p>
                     </div>
-                    <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/90 shadow-[0_1px_4px_rgba(0,0,0,0.15)] transition-transform duration-200 group-hover:scale-105'>
-                      <Play className='ml-0.5 h-3 w-3 fill-current text-black/85' />
+                    <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_0_0_0.5px_rgba(0,0,0,0.04)] transition-transform duration-150 group-hover:scale-[1.06]'>
+                      <Play className='ml-px h-2.5 w-2.5 fill-current text-black/80' />
                     </div>
                   </button>
                 ) : null}
@@ -366,20 +371,24 @@ export function ProfileCompactTemplate({
                       startExpanded={mode === 'subscribe'}
                     />
                   ) : (
-                    <ArtistNotificationsCTA
-                      artist={artist}
-                      variant='button'
-                      autoOpen={mode === 'subscribe'}
-                      forceExpanded
-                      hideListenFallback
-                    />
+                    <div
+                      className={`overflow-hidden rounded-[14px] border ${glass.border} ${glass.bg} ${glass.shadow} ${glass.blur}`}
+                    >
+                      <ArtistNotificationsCTA
+                        artist={artist}
+                        variant='button'
+                        autoOpen={mode === 'subscribe'}
+                        forceExpanded
+                        hideListenFallback
+                      />
+                    </div>
                   )}
                 </section>
 
                 {/* Social icons */}
                 {visibleSocialLinks.length > 0 ? (
                   <nav
-                    className='flex items-center justify-center gap-6 pt-1'
+                    className='flex items-center justify-center gap-5 pt-0.5'
                     aria-label='Social links'
                   >
                     {visibleSocialLinks.map(link => (
@@ -397,7 +406,7 @@ export function ProfileCompactTemplate({
           </main>
         </div>
 
-        {/* Listen drawer */}
+        {/* ─── Drawers ─── */}
         {mergedDSPs.length > 0 ? (
           <ListenDrawer
             open={listenOpen}
@@ -408,7 +417,6 @@ export function ProfileCompactTemplate({
           />
         ) : null}
 
-        {/* Contact drawer */}
         {hasContacts ? (
           <ContactDrawer
             open={contactOpen}
