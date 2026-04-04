@@ -345,7 +345,7 @@ export function ProfileCompactTemplate({
                     }
                   >
                     {latestRelease?.artworkUrl ? (
-                      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.3)]'>
+                      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md shadow-[0_2px_8px_rgba(0,0,0,0.3)]'>
                         <ImageWithFallback
                           src={latestRelease.artworkUrl}
                           alt={latestRelease.title}
@@ -356,7 +356,7 @@ export function ProfileCompactTemplate({
                         />
                       </div>
                     ) : (
-                      <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/[0.08]'>
+                      <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white/[0.08]'>
                         <Play className='h-3.5 w-3.5 fill-current text-white/60' />
                       </div>
                     )}
