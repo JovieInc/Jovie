@@ -2,3 +2,8 @@ self-hosted-runner:
   labels:
     - ubicloud-standard-2
     - ubicloud-standard-8
+
+paths:
+  .github/workflows/**/*.{yml,yaml}:
+    ignore:
+      - "shellcheck reported issue in this script: SC[0-9]+:(info|style|warning):"
