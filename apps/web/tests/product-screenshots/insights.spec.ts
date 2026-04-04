@@ -22,7 +22,9 @@ import {
 
 test.describe('Product Screenshots – Insights Dashboard', () => {
   test.beforeEach(async ({ page }, testInfo) => {
-    if (shouldSkipAuth(testInfo)) return;
+    const skipAuth =
+      typeof shouldSkipAuth === 'function' ? shouldSkipAuth(testInfo) : false;
+    if (skipAuth) return;
     await signInUser(page);
   });
 
@@ -34,10 +36,9 @@ test.describe('Product Screenshots – Insights Dashboard', () => {
       timeout: TIMEOUTS.NAVIGATION,
     });
 
-    // Wait for the insights content to render — look for heading or insight cards
+    // Wait for the insights panel itself, not incidental headings elsewhere.
     await page
-      .locator('h1, h2, [data-testid="insights-panel"]')
-      .first()
+      .locator('[data-testid="insights-panel"]')
       .waitFor({ state: 'visible', timeout: TIMEOUTS.CONTENT_VISIBLE });
 
     await waitForSettle(page);

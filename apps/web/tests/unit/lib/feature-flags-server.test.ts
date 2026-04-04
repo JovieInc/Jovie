@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { logger } from '@/lib/utils/logger';
 
 // Mock statsig-node before importing the module under test
 vi.mock('statsig-node', () => ({
@@ -26,14 +28,14 @@ describe('Statsig server initialization', () => {
   });
 
   it('warns only once when server secret is missing across multiple checkGate calls', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
 
     const { checkGate } = await import('@/lib/feature-flags/server');
 
     // Call checkGate multiple times — each internally calls initializeStatsig()
-    await checkGate('user-1', 'subscribe_cta_experiment' as any);
-    await checkGate('user-2', 'subscribe_cta_experiment' as any);
-    await checkGate('user-3', 'subscribe_cta_experiment' as any);
+    await checkGate('user-1', FEATURE_FLAG_KEYS.SUBSCRIBE_CTA_EXPERIMENT);
+    await checkGate('user-2', FEATURE_FLAG_KEYS.SUBSCRIBE_CTA_EXPERIMENT);
+    await checkGate('user-3', FEATURE_FLAG_KEYS.SUBSCRIBE_CTA_EXPERIMENT);
 
     const statsigWarnings = warnSpy.mock.calls.filter(
       args =>

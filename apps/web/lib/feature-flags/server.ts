@@ -1,13 +1,7 @@
 import 'server-only';
-import Statsig from 'statsig-node';
+import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
-
-export {
-  FEATURE_FLAG_KEYS,
-  type FeatureFlagKey,
-  type FeatureFlagsBootstrap,
-  type SubscribeCTAVariant,
-} from './shared';
+import { logger } from '@/lib/utils/logger';
 
 import {
   FEATURE_FLAG_KEYS,
@@ -16,11 +10,35 @@ import {
   type SubscribeCTAVariant,
 } from './shared';
 
+type StatsigClient = typeof import('statsig-node').default;
+
 let statsigInitialized = false;
+let statsigClient: StatsigClient | null = null;
+let statsigImportFailed = false;
 // Suppresses the "no secret" warning after the first call within a process lifetime.
 // Resets on cold start; intentional — prevents 48+ duplicate warnings per page render.
 let statsigWarnedNoSecret = false;
-const isE2ERuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
+const isE2ERuntime = publicEnv.NEXT_PUBLIC_E2E_MODE === '1';
+
+async function getStatsigClient(): Promise<StatsigClient | null> {
+  if (statsigClient) {
+    return statsigClient;
+  }
+
+  if (statsigImportFailed) {
+    return null;
+  }
+
+  try {
+    const statsigModule = await import('statsig-node');
+    statsigClient = statsigModule.default;
+    return statsigClient;
+  } catch (error) {
+    statsigImportFailed = true;
+    logger.error('Statsig SDK is unavailable', error, 'Statsig');
+    return null;
+  }
+}
 
 /**
  * Initialize Statsig server SDK
@@ -32,7 +50,7 @@ async function initializeStatsig(): Promise<void> {
   const serverSecret = env.STATSIG_SERVER_SECRET;
   if (!serverSecret) {
     if (!statsigWarnedNoSecret) {
-      console.warn(
+      logger.warn(
         '[Statsig] Server secret not configured - feature flags will use defaults'
       );
       statsigWarnedNoSecret = true;
@@ -41,15 +59,20 @@ async function initializeStatsig(): Promise<void> {
   }
 
   try {
-    await Statsig.initialize(serverSecret, {
+    const statsig = await getStatsigClient();
+    if (!statsig) {
+      return;
+    }
+
+    await statsig.initialize(serverSecret, {
       environment: {
         tier: env.VERCEL_ENV || env.NODE_ENV || 'development',
       },
     });
     statsigInitialized = true;
-    console.log('[Statsig] Server SDK initialized');
+    logger.info('[Statsig] Server SDK initialized', undefined, 'Statsig');
   } catch (error) {
-    console.error('[Statsig] Failed to initialize server SDK:', error);
+    logger.error('[Statsig] Failed to initialize server SDK', error, 'Statsig');
   }
 }
 
@@ -76,7 +99,12 @@ export async function checkGate(
   }
 
   try {
-    const gate = Statsig.getFeatureGateSync(
+    const statsig = await getStatsigClient();
+    if (!statsig) {
+      return defaultValue;
+    }
+
+    const gate = statsig.getFeatureGateSync(
       { userID: userId ?? 'anonymous' },
       gateKey
     );
@@ -86,7 +114,7 @@ export async function checkGate(
     }
     return gate.value;
   } catch (error) {
-    console.error(`[Statsig] Error checking gate ${gateKey}:`, error);
+    logger.error(`[Statsig] Error checking gate ${gateKey}`, error, 'Statsig');
     return defaultValue;
   }
 }
@@ -106,15 +134,21 @@ export async function getExperiment(
   await initializeStatsig();
   if (!statsigInitialized) return {};
   try {
-    const experiment = await Statsig.getExperiment(
+    const statsig = await getStatsigClient();
+    if (!statsig) {
+      return {};
+    }
+
+    const experiment = await statsig.getExperiment(
       { userID: userId ?? 'anonymous' },
       experimentKey
     );
     return experiment.value;
   } catch (error) {
-    console.error(
-      `[Statsig] Error getting experiment ${experimentKey}:`,
-      error
+    logger.error(
+      `[Statsig] Error getting experiment ${experimentKey}`,
+      error,
+      'Statsig'
     );
     return {};
   }
@@ -173,7 +207,10 @@ export async function getFeatureFlagsBootstrap(
  */
 export async function shutdownStatsig(): Promise<void> {
   if (statsigInitialized) {
-    await Statsig.shutdown();
+    const statsig = await getStatsigClient();
+    if (statsig) {
+      await statsig.shutdown();
+    }
     statsigInitialized = false;
   }
 }
