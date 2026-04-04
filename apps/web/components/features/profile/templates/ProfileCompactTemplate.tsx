@@ -134,7 +134,7 @@ export function ProfileCompactTemplate({
   });
 
   const visibleSocialLinks = useMemo(() => {
-    return getHeaderSocialLinks(socialLinks, viewerCountryCode, 4);
+    return getHeaderSocialLinks(socialLinks, viewerCountryCode, 2);
   }, [socialLinks, viewerCountryCode]);
 
   const dspCountLabel =
