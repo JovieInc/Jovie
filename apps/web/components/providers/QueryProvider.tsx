@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-query';
 import dynamic from 'next/dynamic';
 import { type ReactNode, useState } from 'react';
+import { isDevChromeDisabledClient } from '@/lib/demo-recording';
 
 // Lazy load devtools only in development to avoid production bundle bloat
 const ReactQueryDevtools = dynamic(
@@ -20,7 +21,7 @@ const ReactQueryDevtools = dynamic(
 
 function DevToolsLoader() {
   // Only render devtools in development to avoid any production overhead
-  if (process.env.NODE_ENV !== 'development') {
+  if (process.env.NODE_ENV !== 'development' || isDevChromeDisabledClient()) {
     return null;
   }
   return (

@@ -19,7 +19,7 @@ function makeTask(
 ): ReleaseTaskView {
   return {
     id,
-    releaseId: 'rel-midnight-express',
+    releaseId: 'rel-revival',
     creatorProfileId: 'demo-profile',
     templateItemId: null,
     title,
@@ -141,7 +141,7 @@ export function DemoReleaseTasksSurface() {
                 Release Tasks
               </p>
               <h2 className='mt-2 text-[24px] font-[580] tracking-[-0.03em] text-primary-token'>
-                Midnight Express
+                Revival
               </h2>
               <p className='mt-2 max-w-[34rem] text-sm leading-6 text-secondary-token'>
                 Every launch task stays attached to the release, from creative
@@ -150,7 +150,7 @@ export function DemoReleaseTasksSurface() {
             </div>
 
             <div className='rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-white/72'>
-              Apr 14 Release
+              Sep 12 Release
             </div>
           </div>
 

@@ -21,7 +21,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-02T20:59:13.169Z",
+    "capturedAt": "2026-04-04T03:24:52.085Z",
     "gitSha": null,
     "imagePath": "release-landing-desktop.png",
     "publicExportPath": "release-landing-desktop.png"
@@ -35,7 +35,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-02T20:59:36.767Z",
+    "capturedAt": "2026-04-04T03:25:15.512Z",
     "gitSha": null,
     "imagePath": "release-tasks-desktop.png",
     "publicExportPath": "release-tasks-active.png"

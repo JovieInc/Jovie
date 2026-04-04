@@ -194,7 +194,8 @@ export default async function RootLayout({
       data-clerk-mock={clerkMockEnabled ? '1' : undefined}
       data-clerk-proxy-disabled={clerkProxyDisabled ? '1' : undefined}
       data-e2e-mode={isE2EClientRuntime ? '1' : undefined}
-      data-demo-recording={isDemoRecording ? 'true' : undefined}
+      data-demo-recording={isDemoRecording ? '1' : undefined}
+      data-dev-chrome-disabled={shouldRenderDevChrome ? undefined : '1'}
       data-scroll-behavior='smooth'
       suppressHydrationWarning
     >
