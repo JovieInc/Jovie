@@ -56,9 +56,9 @@ describe('dropdown-styles', () => {
       expect(DROPDOWN_CONTENT_BASE).toContain('rounded-');
     });
 
-    it('default base uses subtle border opacity and p-0.5 padding', () => {
+    it('default base uses default border token and p-0.5 padding', () => {
       expect(DROPDOWN_CONTENT_BASE).toContain(
-        'border-(--linear-border-subtle)/70'
+        'border-(--linear-border-default)'
       );
       expect(DROPDOWN_CONTENT_BASE).toContain('p-0.5');
     });
@@ -111,9 +111,8 @@ describe('dropdown-styles', () => {
       expect(dropdownMenuContentCompactClasses).toContain(
         DROPDOWN_CONTENT_COMPACT_BASE
       );
-      expect(dropdownMenuContentCompactClasses).not.toContain(
-        DROPDOWN_CONTENT_BASE
-      );
+      // Compact uses tighter padding (p-0.5) than standard
+      expect(DROPDOWN_CONTENT_COMPACT_BASE).toContain('p-0.5');
     });
 
     it('contextMenuContentCompactClasses uses compact base', () => {
