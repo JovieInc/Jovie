@@ -67,20 +67,20 @@ jobs:
             TOTAL_TESTS=$(jq -r '[.suites[].specs[]] | length' "$RESULTS_DIR/results.json")
             PASSED_TESTS=$(jq -r '[.suites[].specs[] | select(.outcome == "expected")] | length' "$RESULTS_DIR/results.json")
 
-            echo "total_tests=$TOTAL_TESTS" >> $GITHUB_OUTPUT
-            echo "passed_tests=$PASSED_TESTS" >> $GITHUB_OUTPUT
-            echo "failed_tests<<EOF" >> $GITHUB_OUTPUT
-            echo "$FAILED_TESTS" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            echo "total_tests=$TOTAL_TESTS" >> "$GITHUB_OUTPUT"
+            echo "passed_tests=$PASSED_TESTS" >> "$GITHUB_OUTPUT"
+            echo "failed_tests<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$FAILED_TESTS" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
 
             if [ "$PASSED_TESTS" -lt "$TOTAL_TESTS" ]; then
-              echo "test_status=failed" >> $GITHUB_OUTPUT
+              echo "test_status=failed" >> "$GITHUB_OUTPUT"
             else
-              echo "test_status=passed" >> $GITHUB_OUTPUT
+              echo "test_status=passed" >> "$GITHUB_OUTPUT"
             fi
           else
-            echo "test_status=error" >> $GITHUB_OUTPUT
-            echo "failed_tests=Test results file not found" >> $GITHUB_OUTPUT
+            echo "test_status=error" >> "$GITHUB_OUTPUT"
+            echo "failed_tests=Test results file not found" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload test results

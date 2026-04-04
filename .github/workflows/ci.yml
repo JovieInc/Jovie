@@ -60,7 +60,7 @@ jobs:
           if [[ "$FULL_CI_LABEL" == "true" ]]; then
             echo "Forcing full CI run due to 'testing' label"
             for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_e2e run_drizzle has_code_changes; do
-              echo "$t=true" >> $GITHUB_OUTPUT
+              echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
           fi
@@ -73,7 +73,7 @@ jobs:
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
             for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_e2e run_drizzle has_code_changes; do
-              echo "$t=true" >> $GITHUB_OUTPUT
+              echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
           else
@@ -84,71 +84,71 @@ jobs:
           if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
             echo "Only documentation files changed"
             for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_e2e run_drizzle has_code_changes; do
-              echo "$t=false" >> $GITHUB_OUTPUT
+              echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
           fi
 
-          echo "has_code_changes=true" >> $GITHUB_OUTPUT
+          echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
 
           # Build paths
           BUILD_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|apps/web/instrumentation.*\.ts|apps/web/sentry\..*\.config\.ts|apps/web/middleware\.ts|package.*\.json|turbo\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$BUILD_PATTERN"; then
             RUN_BUILD=true
-            echo "run_build=true" >> $GITHUB_OUTPUT
+            echo "run_build=true" >> "$GITHUB_OUTPUT"
           else
             RUN_BUILD=false
-            echo "run_build=false" >> $GITHUB_OUTPUT
+            echo "run_build=false" >> "$GITHUB_OUTPUT"
           fi
 
           # Test paths
           TEST_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/tests/unit/|apps/web/__tests__/|packages/|.*\.test\.|.*\.spec\.|apps/web/package.*\.json|package.*\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$TEST_PATTERN"; then
             RUN_TEST=true
-            echo "run_test=true" >> $GITHUB_OUTPUT
+            echo "run_test=true" >> "$GITHUB_OUTPUT"
           else
             RUN_TEST=false
-            echo "run_test=false" >> $GITHUB_OUTPUT
+            echo "run_test=false" >> "$GITHUB_OUTPUT"
           fi
 
           PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.pr\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
           if echo "$CHANGED_FILES" | grep -q -E "$PUBLIC_LIGHTHOUSE_PATTERN"; then
-            echo "run_public_lighthouse=true" >> $GITHUB_OUTPUT
+            echo "run_public_lighthouse=true" >> "$GITHUB_OUTPUT"
           else
-            echo "run_public_lighthouse=false" >> $GITHUB_OUTPUT
+            echo "run_public_lighthouse=false" >> "$GITHUB_OUTPUT"
           fi
 
           DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.dashboard\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs)$'
           if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$DASHBOARD_LIGHTHOUSE_PATTERN"; then
-            echo "run_dashboard_lighthouse=true" >> $GITHUB_OUTPUT
+            echo "run_dashboard_lighthouse=true" >> "$GITHUB_OUTPUT"
           else
-            echo "run_dashboard_lighthouse=false" >> $GITHUB_OUTPUT
+            echo "run_dashboard_lighthouse=false" >> "$GITHUB_OUTPUT"
           fi
 
           # E2E paths
           E2E_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/tests/e2e/|apps/web/tests/smoke/|apps/web/playwright\.config\.|apps/web/package.*\.json|package.*\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$E2E_PATTERN"; then
-            echo "run_e2e=true" >> $GITHUB_OUTPUT
+            echo "run_e2e=true" >> "$GITHUB_OUTPUT"
           else
-            echo "run_e2e=false" >> $GITHUB_OUTPUT
+            echo "run_e2e=false" >> "$GITHUB_OUTPUT"
           fi
 
           # Drizzle paths
           DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts))'
           if echo "$CHANGED_FILES" | grep -q -E "$DRIZZLE_PATTERN"; then
-            echo "run_drizzle=true" >> $GITHUB_OUTPUT
+            echo "run_drizzle=true" >> "$GITHUB_OUTPUT"
           else
-            echo "run_drizzle=false" >> $GITHUB_OUTPUT
+            echo "run_drizzle=false" >> "$GITHUB_OUTPUT"
           fi
 
           # Fork guard: disable E2E for forks (no secrets)
           if [[ "$IS_FORK" == "true" ]]; then
             echo "Fork PR: disabling e2e and build"
-            echo "run_e2e=false" >> $GITHUB_OUTPUT
-            echo "run_build=false" >> $GITHUB_OUTPUT
-            echo "run_public_lighthouse=false" >> $GITHUB_OUTPUT
-            echo "run_dashboard_lighthouse=false" >> $GITHUB_OUTPUT
-            echo "run_test=false" >> $GITHUB_OUTPUT
+            echo "run_e2e=false" >> "$GITHUB_OUTPUT"
+            echo "run_build=false" >> "$GITHUB_OUTPUT"
+            echo "run_public_lighthouse=false" >> "$GITHUB_OUTPUT"
+            echo "run_dashboard_lighthouse=false" >> "$GITHUB_OUTPUT"
+            echo "run_test=false" >> "$GITHUB_OUTPUT"
           fi
 
   ci-env-example-guard:
@@ -290,11 +290,11 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "TURBO_SCM_BASE=origin/${{ github.base_ref }}" >> $GITHUB_ENV
+            echo "TURBO_SCM_BASE=origin/${{ github.base_ref }}" >> "$GITHUB_ENV"
           else
-            echo "TURBO_SCM_BASE=origin/main" >> $GITHUB_ENV
+            echo "TURBO_SCM_BASE=origin/main" >> "$GITHUB_ENV"
           fi
-          echo "TURBO_SCM_HEAD=HEAD" >> $GITHUB_ENV
+          echo "TURBO_SCM_HEAD=HEAD" >> "$GITHUB_ENV"
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache Turbo
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
@@ -342,10 +342,10 @@ jobs:
           # Check if any backend-related files changed (migrations, lib/db, API routes, etc.)
           if echo "$CHANGED_FILES" | grep -E '^(drizzle/migrations/|apps/web/lib/db/|apps/web/app/api/)' > /dev/null; then
             echo "Backend changes detected, Neon DB required"
-            echo "needs_db=true" >> $GITHUB_OUTPUT
+            echo "needs_db=true" >> "$GITHUB_OUTPUT"
           else
             echo "No backend changes detected, skipping Neon DB creation"
-            echo "needs_db=false" >> $GITHUB_OUTPUT
+            echo "needs_db=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -383,7 +383,7 @@ jobs:
           SUFFIX="${RUN_ID}-${RUN_ATTEMPT}"
           FINAL="${BASE}-${SUFFIX}"
           echo "Using sanitized branch name: $FINAL"
-          echo "name=$FINAL" >> $GITHUB_OUTPUT
+          echo "name=$FINAL" >> "$GITHUB_OUTPUT"
       - name: Create or reuse Neon branch (with retry)
         id: create-branch
         if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
@@ -426,7 +426,7 @@ jobs:
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> $GITHUB_OUTPUT
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> "$GITHUB_OUTPUT"
 
       # Skip notification (updated condition)
       - name: Skip notification
@@ -466,7 +466,7 @@ jobs:
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> $GITHUB_OUTPUT
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> "$GITHUB_OUTPUT"
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -490,7 +490,7 @@ jobs:
           CANDIDATE="${{ steps.resolve_neon.outputs.db_url }}"
           if [ -n "$CANDIDATE" ]; then
             echo "Using Neon DB URL from neon-db job outputs"
-            echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+            echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
           else
             echo "No Neon ephemeral DB URL available from neon-db job."
           fi
@@ -592,9 +592,9 @@ jobs:
           RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
           RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
           if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]]; then
-            echo "run_full_ci=true" >> $GITHUB_OUTPUT
+            echo "run_full_ci=true" >> "$GITHUB_OUTPUT"
           else
-            echo "run_full_ci=false" >> $GITHUB_OUTPUT
+            echo "run_full_ci=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Skip notification
@@ -796,9 +796,9 @@ jobs:
           RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
           RUN_DASHBOARD_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_dashboard_lighthouse }}"
           if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" || "$RUN_DASHBOARD_LIGHTHOUSE" == "true" ]]; then
-            echo "run_full_ci=true" >> $GITHUB_OUTPUT
+            echo "run_full_ci=true" >> "$GITHUB_OUTPUT"
           else
-            echo "run_full_ci=false" >> $GITHUB_OUTPUT
+            echo "run_full_ci=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Skip notification
@@ -839,7 +839,7 @@ jobs:
             echo "No Neon ephemeral DATABASE_URL available."
             exit 1
           fi
-          echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -955,7 +955,7 @@ jobs:
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> $GITHUB_OUTPUT
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> "$GITHUB_OUTPUT"
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -977,7 +977,7 @@ jobs:
           SUFFIX="${RUN_ID}-${RUN_ATTEMPT}"
           FINAL="${BASE}-${SUFFIX}"
           echo "Using sanitized branch name: $FINAL"
-          echo "name=$FINAL" >> $GITHUB_OUTPUT
+          echo "name=$FINAL" >> "$GITHUB_OUTPUT"
 
       - name: Create or reuse Neon branch (with retry)
         id: create-branch
@@ -997,7 +997,7 @@ jobs:
             echo "No Neon ephemeral DATABASE_URL available."
             exit 1
           fi
-          echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1230,10 +1230,10 @@ jobs:
         id: check-creds
         run: |
           if [ -z "${{ secrets.E2E_PROD_USER_EMAIL }}" ] && [ -z "${{ secrets.E2E_CLERK_USER_USERNAME }}" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "No production auth credentials configured — skipping"
           else
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: ./.github/actions/setup-node-pnpm
@@ -1302,16 +1302,16 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "TURBO_SCM_BASE=origin/${{ github.base_ref }}" >> $GITHUB_ENV
+            echo "TURBO_SCM_BASE=origin/${{ github.base_ref }}" >> "$GITHUB_ENV"
           else
-            echo "TURBO_SCM_BASE=origin/main" >> $GITHUB_ENV
+            echo "TURBO_SCM_BASE=origin/main" >> "$GITHUB_ENV"
           fi
-          echo "TURBO_SCM_HEAD=HEAD" >> $GITHUB_ENV
+          echo "TURBO_SCM_HEAD=HEAD" >> "$GITHUB_ENV"
 
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_build }}" >> $GITHUB_OUTPUT
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_build }}" >> "$GITHUB_OUTPUT"
 
       # Skip remaining steps if no relevant changes
       - name: Skip notification
@@ -1437,7 +1437,7 @@ jobs:
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_test }}" >> $GITHUB_OUTPUT
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_test }}" >> "$GITHUB_OUTPUT"
 
       # Skip remaining steps if no relevant changes
       - name: Skip notification
@@ -1456,11 +1456,11 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "TURBO_SCM_BASE=origin/${{ github.base_ref }}" >> $GITHUB_ENV
+            echo "TURBO_SCM_BASE=origin/${{ github.base_ref }}" >> "$GITHUB_ENV"
           else
-            echo "TURBO_SCM_BASE=origin/main" >> $GITHUB_ENV
+            echo "TURBO_SCM_BASE=origin/main" >> "$GITHUB_ENV"
           fi
-          echo "TURBO_SCM_HEAD=HEAD" >> $GITHUB_ENV
+          echo "TURBO_SCM_HEAD=HEAD" >> "$GITHUB_ENV"
 
       - name: Load quarantined unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1475,13 +1475,13 @@ jobs:
             UNIT_EXCLUDES=$(jq -r '.unit // [] | map("--exclude=" + .) | join(" ")' "$FILE")
           fi
 
-          echo "unit_files=$UNIT_FILES" >> $GITHUB_OUTPUT
-          echo "unit_excludes=$UNIT_EXCLUDES" >> $GITHUB_OUTPUT
+          echo "unit_files=$UNIT_FILES" >> "$GITHUB_OUTPUT"
+          echo "unit_excludes=$UNIT_EXCLUDES" >> "$GITHUB_OUTPUT"
 
           if [ -n "$UNIT_FILES" ]; then
-            echo "has_unit=true" >> $GITHUB_OUTPUT
+            echo "has_unit=true" >> "$GITHUB_OUTPUT"
           else
-            echo "has_unit=false" >> $GITHUB_OUTPUT
+            echo "has_unit=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run unit tests
@@ -1576,9 +1576,9 @@ jobs:
           RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
           RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
           if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]]; then
-            echo "run_full_ci=true" >> $GITHUB_OUTPUT
+            echo "run_full_ci=true" >> "$GITHUB_OUTPUT"
           else
-            echo "run_full_ci=false" >> $GITHUB_OUTPUT
+            echo "run_full_ci=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Skip notification
@@ -1672,7 +1672,7 @@ jobs:
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e }}" >> $GITHUB_OUTPUT
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e }}" >> "$GITHUB_OUTPUT"
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -1767,7 +1767,7 @@ jobs:
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e }}" >> $GITHUB_OUTPUT
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e }}" >> "$GITHUB_OUTPUT"
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -1825,13 +1825,13 @@ jobs:
 
           for quarantined in "${QUARANTINED[@]}"; do
             if [[ "$quarantined" == "$ADMIN_SPEC" ]]; then
-              echo "run_admin_smoke=false" >> $GITHUB_OUTPUT
+              echo "run_admin_smoke=false" >> "$GITHUB_OUTPUT"
               echo "Admin smoke spec is quarantined: $ADMIN_SPEC"
               exit 0
             fi
           done
 
-          echo "run_admin_smoke=true" >> $GITHUB_OUTPUT
+          echo "run_admin_smoke=true" >> "$GITHUB_OUTPUT"
 
       - name: Run Admin Smoke Tests (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.run_admin_smoke == 'true'
@@ -1889,7 +1889,7 @@ jobs:
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e }}" >> $GITHUB_OUTPUT
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e }}" >> "$GITHUB_OUTPUT"
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -1917,7 +1917,7 @@ jobs:
         run: |
           CANDIDATE="${{ steps.resolve_neon.outputs.db_url }}"
           if [ -n "$CANDIDATE" ]; then
-            echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+            echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
           else
             echo "No Neon ephemeral DB URL available from neon-db job."
           fi
@@ -1958,8 +1958,8 @@ jobs:
 
       - name: Set shard env
         run: |
-          echo "SHARD_TOTAL=4" >> $GITHUB_ENV
-          echo "SHARD_INDEX=${{ matrix.shard }}" >> $GITHUB_ENV
+          echo "SHARD_TOTAL=4" >> "$GITHUB_ENV"
+          echo "SHARD_INDEX=${{ matrix.shard }}" >> "$GITHUB_ENV"
 
       # Continue with CI steps only if relevant changes detected or full-ci label present
       - name: Setup Node.js and pnpm
@@ -1980,13 +1980,13 @@ jobs:
           SRC=""
           if [ -n "$CANDIDATE" ]; then
             echo "Using Neon DB URL from neon-db job outputs"
-            echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+            echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
             SRC="neon-job-output"
           else
             echo "No Neon ephemeral DB URL available from neon-db job."
             SRC="unresolved"
           fi
-          echo "RESOLVED_DB_SOURCE=$SRC" >> $GITHUB_ENV
+          echo "RESOLVED_DB_SOURCE=$SRC" >> "$GITHUB_ENV"
 
       - name: Fail if Neon DB URL is missing (E2E)
         run: |
@@ -2038,13 +2038,13 @@ jobs:
             fi
           done
 
-          echo "allowed_specs=${ALLOWED_SPECS[*]}" >> $GITHUB_OUTPUT
-          echo "quarantined_specs=${QUARANTINED[*]}" >> $GITHUB_OUTPUT
+          echo "allowed_specs=${ALLOWED_SPECS[*]}" >> "$GITHUB_OUTPUT"
+          echo "quarantined_specs=${QUARANTINED[*]}" >> "$GITHUB_OUTPUT"
 
           if [ ${#QUARANTINED[@]} -gt 0 ]; then
-            echo "has_quarantine=true" >> $GITHUB_OUTPUT
+            echo "has_quarantine=true" >> "$GITHUB_OUTPUT"
           else
-            echo "has_quarantine=false" >> $GITHUB_OUTPUT
+            echo "has_quarantine=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: E2E Smoke (PR to Preview)
@@ -2167,7 +2167,7 @@ jobs:
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_test }}" >> $GITHUB_OUTPUT
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_test }}" >> "$GITHUB_OUTPUT"
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -2241,7 +2241,7 @@ jobs:
             --env GIT_BRANCH="${GIT_BRANCH}" \
             --token $VERCEL_TOKEN)
 
-          echo "deployment_url=$deployment_url" >> $GITHUB_OUTPUT
+          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
