@@ -952,7 +952,7 @@ export async function setRecordingPreviewResolutionByIsrc(
   }
 
   const nextMetadata = {
-    ...(recording.metadata ?? {}),
+    ...recording.metadata,
     previewResolution: {
       status: resolution.status,
       source: resolution.source,

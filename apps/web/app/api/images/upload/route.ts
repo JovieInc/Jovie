@@ -218,7 +218,7 @@ async function uploadAvatarPhoto(ctx: UploadContext): Promise<NextResponse> {
     })
     .where(eq(profilePhotos.id, ctx.photoRecordId));
 
-  const currentSettings = (ctx.settings ?? {}) as Record<string, unknown>;
+  const currentSettings = ctx.settings ?? {};
   await ctx.tx
     .update(creatorProfiles)
     .set({

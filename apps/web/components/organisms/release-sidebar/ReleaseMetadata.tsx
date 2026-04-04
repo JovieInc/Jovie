@@ -247,7 +247,7 @@ export function ReleaseMetadata({
                 monospace
                 normalizeValue={nextValue => {
                   const trimmed = nextValue.trim();
-                  return trimmed ? trimmed : null;
+                  return trimmed || null;
                 }}
                 onSave={
                   onSaveMetadata
@@ -288,7 +288,7 @@ export function ReleaseMetadata({
                 emptyLabel='Unknown'
                 normalizeValue={nextValue => {
                   const trimmed = nextValue.trim();
-                  return trimmed ? trimmed : null;
+                  return trimmed || null;
                 }}
                 onSave={
                   onSaveMetadata
