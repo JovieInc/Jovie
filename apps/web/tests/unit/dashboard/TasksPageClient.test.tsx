@@ -264,9 +264,16 @@ vi.mock('@/components/organisms/PageShell', async importOriginal => {
     await importOriginal<typeof import('@/components/organisms/PageShell')>();
   return {
     ...actual,
-    PageShell: ({ children }: { children: React.ReactNode }) => (
+    PageShell: ({
+      children,
+      toolbar,
+    }: {
+      children: React.ReactNode;
+      toolbar?: React.ReactNode;
+    }) => (
       <div data-testid='page-shell'>
         <div data-testid='dashboard-header' />
+        {toolbar}
         {children}
       </div>
     ),
@@ -286,12 +293,14 @@ vi.mock('@/components/organisms/table', () => ({
     ariaLabel,
     disabled,
     icon,
+    iconOnly,
   }: {
     label: React.ReactNode;
     onClick?: () => void;
     ariaLabel?: string;
     disabled?: boolean;
     icon?: React.ReactNode;
+    iconOnly?: boolean;
   }) => (
     <button
       type='button'
@@ -300,7 +309,7 @@ vi.mock('@/components/organisms/table', () => ({
       disabled={disabled}
     >
       {icon}
-      {label}
+      {iconOnly ? <span className='sr-only'>{label}</span> : label}
     </button>
   ),
   PageToolbar: ({

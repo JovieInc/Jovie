@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.113] - 2026-04-03
+
+### Changed
+
+- Dashboard header no longer shows a shadow line between the header and content area
+- Content shell spacing is now visually consistent on all edges
+- Tasks toolbar sits as a full-width subheader matching the dashboard header height
+- Task list rows have tighter left padding for better density
+- Priority indicators use signal bars that fill proportionally (urgent=4, high=3, medium=2, low=1) instead of uniform colored dots
+- Overdue badge is now hidden on cancelled tasks
+- Playback stats use plain language: "linked" instead of "canonical", "unconfirmed" instead of "fallback", "pending" instead of "unknown", and zero counts are hidden
+
 ## [26.4.112] - 2026-04-03
 
 > Added a deterministic releases dashboard QA loop that starts with chaos, locks fixture states, and only passes once functional, performance, Lighthouse, cross-browser, and visual checks are all green in the same run.

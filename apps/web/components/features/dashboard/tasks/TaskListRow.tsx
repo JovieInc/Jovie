@@ -39,6 +39,27 @@ function TaskStageGlyph({ task }: Readonly<{ task: TaskView }>) {
   );
 }
 
+export function PriorityBars({
+  bars,
+  accentColor,
+}: Readonly<{ bars: number; accentColor: string }>) {
+  return (
+    <span className='inline-flex items-end gap-px' aria-hidden='true'>
+      {[1, 2, 3, 4].map(i => (
+        <span
+          key={i}
+          className='w-[3px] rounded-[1px]'
+          style={{
+            height: `${6 + i * 2}px`,
+            backgroundColor: accentColor,
+            opacity: i <= bars ? 1 : 0.15,
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
 function TaskPriorityInline({
   task,
 }: Readonly<{
@@ -50,11 +71,7 @@ function TaskPriorityInline({
 
   return (
     <span className='inline-flex min-w-0 max-w-full items-center gap-1 text-tertiary-token'>
-      <span
-        className='h-1.5 w-1.5 rounded-full'
-        style={{ backgroundColor: accent.solid }}
-        aria-hidden='true'
-      />
+      <PriorityBars bars={meta.bars} accentColor={accent.solid} />
       <span className='truncate'>{meta.label}</span>
     </span>
   );
@@ -166,7 +183,7 @@ export function TaskListRow({
             <ReleaseDueBadge
               dueDate={task.dueAt}
               dueDaysOffset={null}
-              isCompleted={isDone}
+              isCompleted={isDone || isCancelled}
             />
           ) : null}
         </div>
