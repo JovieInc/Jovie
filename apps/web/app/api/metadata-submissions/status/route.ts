@@ -8,6 +8,33 @@ import {
   verifySubmissionProfileOwnership,
 } from '@/lib/submission-agent/service';
 
+function isMissingMetadataSubmissionStorage(
+  error: unknown
+): error is { code?: string; message?: string } {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const nestedCause = 'cause' in error ? error.cause : null;
+  if (nestedCause && isMissingMetadataSubmissionStorage(nestedCause)) {
+    return true;
+  }
+
+  const code =
+    'code' in error && typeof error.code === 'string' ? error.code : null;
+  const message =
+    'message' in error && typeof error.message === 'string'
+      ? error.message.toLowerCase()
+      : '';
+
+  return (
+    (code === '42P01' && message.includes('metadata_submission')) ||
+    (message.includes('relation') &&
+      message.includes('does not exist') &&
+      message.includes('metadata_submission'))
+  );
+}
+
 export async function GET(request: Request) {
   try {
     const { userId } = await getCachedAuth();
@@ -72,6 +99,16 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ success: true, requests: result });
   } catch (error) {
+    if (isMissingMetadataSubmissionStorage(error)) {
+      return NextResponse.json({
+        success: true,
+        requests: [],
+        storageAvailable: false,
+        error:
+          'Metadata submission storage is not available in this environment.',
+      });
+    }
+
     await captureError('Metadata submission status failed', error, {
       route: '/api/metadata-submissions/status',
     });

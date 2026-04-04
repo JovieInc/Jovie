@@ -76,11 +76,11 @@ jobs:
 
           if [[ -z "$LINEAR_ID" && -z "$LINEAR_ISSUE_ID" ]]; then
             echo "No Linear issue markers found in PR body. Skipping scope judge."
-            echo "has_intent=false" >> $GITHUB_OUTPUT
+            echo "has_intent=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "has_intent=true" >> $GITHUB_OUTPUT
+          echo "has_intent=true" >> "$GITHUB_OUTPUT"
 
           # Store PR context for the judge
           INTENT=$(cat <<INTENTEOF
@@ -95,7 +95,7 @@ jobs:
           INTENTEOF
           )
 
-          echo "intent=$(echo "$INTENT" | base64 -w0)" >> $GITHUB_OUTPUT
+          echo "intent=$(echo "$INTENT" | base64 -w0)" >> "$GITHUB_OUTPUT"
 
       - name: Get PR diff
         id: diff
@@ -110,11 +110,11 @@ jobs:
 
           if [[ -z "$DIFF" ]]; then
             echo "Could not get PR diff. Skipping."
-            echo "has_diff=false" >> $GITHUB_OUTPUT
+            echo "has_diff=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "has_diff=true" >> $GITHUB_OUTPUT
+          echo "has_diff=true" >> "$GITHUB_OUTPUT"
 
           # Get diff stats for context
           DIFF_STATS=$(gh pr diff $PR_NUMBER --name-only 2>/dev/null | wc -l | xargs -I{} echo "{} files changed" || echo "")
@@ -128,7 +128,7 @@ jobs:
           DIFFEOF
           )
 
-          echo "diff=$(echo "$FULL_DIFF" | base64 -w0)" >> $GITHUB_OUTPUT
+          echo "diff=$(echo "$FULL_DIFF" | base64 -w0)" >> "$GITHUB_OUTPUT"
 
       - name: Run scope alignment judge (OpenAI)
         id: judge
@@ -199,17 +199,17 @@ jobs:
 
           if [[ "$VERDICT" == "PASS" ]]; then
             echo "Scope judge: PASS"
-            echo "verdict=pass" >> $GITHUB_OUTPUT
-            echo "reason=$REASON" >> $GITHUB_OUTPUT
+            echo "verdict=pass" >> "$GITHUB_OUTPUT"
+            echo "reason=$REASON" >> "$GITHUB_OUTPUT"
           elif [[ "$VERDICT" == "FAIL" ]]; then
             echo "Scope judge: FAIL - $REASON"
-            echo "verdict=fail" >> $GITHUB_OUTPUT
-            echo "reason=$REASON" >> $GITHUB_OUTPUT
+            echo "verdict=fail" >> "$GITHUB_OUTPUT"
+            echo "reason=$REASON" >> "$GITHUB_OUTPUT"
           else
             # Fail open: treat unclear responses as needing human review
             echo "Scope judge: INCONCLUSIVE - flagging for human review"
-            echo "verdict=inconclusive" >> $GITHUB_OUTPUT
-            echo "reason=Judge response was inconclusive. Flagging for human review." >> $GITHUB_OUTPUT
+            echo "verdict=inconclusive" >> "$GITHUB_OUTPUT"
+            echo "reason=Judge response was inconclusive. Flagging for human review." >> "$GITHUB_OUTPUT"
           fi
 
       - name: Report scope judge status

@@ -73,7 +73,7 @@ jobs:
 
           if [[ -z "$CHANGED" ]]; then
             echo "No files changed vs main. Skipping PR."
-            echo "has_code_changes=false" >> $GITHUB_OUTPUT
+            echo "has_code_changes=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -86,11 +86,11 @@ jobs:
 
           if [[ -z "$CODE_CHANGES" ]]; then
             echo "All changes are audit/docs only. Skipping PR creation."
-            echo "has_code_changes=false" >> $GITHUB_OUTPUT
+            echo "has_code_changes=false" >> "$GITHUB_OUTPUT"
           else
             echo "Found code changes:"
             echo "$CODE_CHANGES"
-            echo "has_code_changes=true" >> $GITHUB_OUTPUT
+            echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check for existing PR and rate limit
@@ -110,7 +110,7 @@ jobs:
 
           if [[ "$EXISTING" -gt 0 ]]; then
             echo "PR already exists for $BRANCH. Skipping."
-            echo "should_create=false" >> $GITHUB_OUTPUT
+            echo "should_create=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -129,13 +129,13 @@ jobs:
 
             if [[ "$OPEN_AGENT_PRS" -lt "$MAX_OPEN_AGENT_PRS" ]]; then
               echo "Capacity available. Will create PR."
-              echo "should_create=true" >> $GITHUB_OUTPUT
+              echo "should_create=true" >> "$GITHUB_OUTPUT"
               break
             fi
 
             if [[ "$WAITED" -ge "$MAX_WAIT" ]]; then
               echo "::warning::Rate limit still hit after waiting ${MAX_WAIT}s ($OPEN_AGENT_PRS open agent PRs). Skipping PR for $BRANCH."
-              echo "should_create=false" >> $GITHUB_OUTPUT
+              echo "should_create=false" >> "$GITHUB_OUTPUT"
               break
             fi
 
@@ -154,7 +154,7 @@ jobs:
           # Extract Linear ticket ID (JOV-123) from anywhere in the branch name
           # Handles: codex/linear-mention-jov-854-desc, linear/JOV-42-desc, claude/jov-100-fix
           TICKET=$(echo "$BRANCH" | grep -oiP 'jov-\d+' | head -1 | tr '[:lower:]' '[:upper:]' || echo "")
-          echo "ticket=$TICKET" >> $GITHUB_OUTPUT
+          echo "ticket=$TICKET" >> "$GITHUB_OUTPUT"
 
           # Build PR title from branch name
           # Strip the agent prefix (codex/, claude/, etc.)
@@ -172,7 +172,7 @@ jobs:
           # Capitalize first letter of description
           TITLE=$(echo "$TITLE" | sed 's/\(: \)\(.\)/\1\U\2/;s/^\(.\)/\U\1/')
 
-          echo "title=$TITLE" >> $GITHUB_OUTPUT
+          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
           echo "PR title: $TITLE"
 
       - name: Fetch Linear ticket details
@@ -185,7 +185,7 @@ jobs:
 
           if [[ -z "$LINEAR_API_KEY" ]]; then
             echo "No LINEAR_API_KEY. Skipping ticket lookup."
-            echo "has_details=false" >> $GITHUB_OUTPUT
+            echo "has_details=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -205,19 +205,19 @@ jobs:
 
           if [[ -n "$ISSUE_ID" ]]; then
             echo "Found Linear issue: $ISSUE_TITLE"
-            echo "has_details=true" >> $GITHUB_OUTPUT
-            echo "issue_id=$ISSUE_ID" >> $GITHUB_OUTPUT
-            echo "issue_title=$ISSUE_TITLE" >> $GITHUB_OUTPUT
-            echo "issue_url=$ISSUE_URL" >> $GITHUB_OUTPUT
+            echo "has_details=true" >> "$GITHUB_OUTPUT"
+            echo "issue_id=$ISSUE_ID" >> "$GITHUB_OUTPUT"
+            echo "issue_title=$ISSUE_TITLE" >> "$GITHUB_OUTPUT"
+            echo "issue_url=$ISSUE_URL" >> "$GITHUB_OUTPUT"
 
             # Override PR title with actual ticket title
-            echo "title=${TICKET}: ${ISSUE_TITLE}" >> $GITHUB_OUTPUT
+            echo "title=${TICKET}: ${ISSUE_TITLE}" >> "$GITHUB_OUTPUT"
 
             # Base64 encode description for safe multiline handling
-            echo "issue_desc=$(echo "$ISSUE_DESC" | base64 -w0)" >> $GITHUB_OUTPUT
+            echo "issue_desc=$(echo "$ISSUE_DESC" | base64 -w0)" >> "$GITHUB_OUTPUT"
           else
             echo "Linear issue not found for $TICKET"
-            echo "has_details=false" >> $GITHUB_OUTPUT
+            echo "has_details=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create PR

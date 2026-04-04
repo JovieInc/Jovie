@@ -5,12 +5,14 @@ const {
   mockCanAccessTasksWorkspace,
   mockDbSelect,
   mockDbRows,
+  mockGetCurrentUserEntitlements,
   mockNotFound,
   mockRequireProfileId,
 } = vi.hoisted(() => ({
   mockCanAccessTasksWorkspace: vi.fn(),
   mockDbSelect: vi.fn(),
   mockDbRows: { rows: [] as Array<Record<string, unknown>> },
+  mockGetCurrentUserEntitlements: vi.fn(),
   mockNotFound: vi.fn(() => {
     throw new Error('NOT_FOUND');
   }),
@@ -39,6 +41,10 @@ vi.mock('@/lib/db/schema/content', () => ({
     releaseDate: 'discogReleases.releaseDate',
     creatorProfileId: 'discogReleases.creatorProfileId',
   },
+}));
+
+vi.mock('@/lib/entitlements/server', () => ({
+  getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
 }));
 
 vi.mock('@/lib/entitlements/tasks-gate', () => ({
@@ -104,6 +110,10 @@ describe('release tasks page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireProfileId.mockResolvedValue('profile_1');
+    mockGetCurrentUserEntitlements.mockResolvedValue({
+      isAdmin: false,
+      canAccessMetadataSubmissionAgent: false,
+    });
     setupReleaseQueryRows([
       {
         title: 'My Release',
