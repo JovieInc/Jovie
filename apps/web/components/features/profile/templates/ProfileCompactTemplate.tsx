@@ -439,6 +439,21 @@ export function ProfileCompactTemplate({
                     )}
                   </nav>
                 ) : null}
+
+                {/* Powered by */}
+                <a
+                  href={BASE_URL}
+                  className='flex items-center justify-center gap-1 pt-1 text-[10px] font-[450] text-white/20 transition-colors duration-150 hover:text-white/40'
+                >
+                  <BrandLogo
+                    size={10}
+                    tone='white'
+                    rounded={false}
+                    className='opacity-40'
+                    aria-hidden
+                  />
+                  jovie
+                </a>
               </div>
             </div>
           </main>
