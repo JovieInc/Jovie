@@ -230,6 +230,13 @@ export async function resolveSeededProfilePath(
   return replaceRouteToken(route.path, 'username', username);
 }
 
+export async function resolveSeededProfileModePath(
+  route: PerfRouteDefinition
+): Promise<string> {
+  const username = await resolveSeedProfileHandle(route.seedProfile);
+  return replaceRouteToken(route.path, 'username', username);
+}
+
 export async function resolveSeededPublicReleasePath(
   route: PerfRouteDefinition
 ): Promise<string> {

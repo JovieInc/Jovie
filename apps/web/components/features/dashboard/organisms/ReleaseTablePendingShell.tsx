@@ -23,18 +23,11 @@ export function ReleaseTablePendingShell({
     >
       {showHeader ? (
         <div className='flex items-center justify-between rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-4'>
-          <div className='space-y-1.5'>
-            <p className='text-[12px] font-medium text-secondary-token'>
-              Releases
-            </p>
-            <h2 className='text-[22px] font-[590] tracking-[-0.03em] text-primary-token'>
-              Loading your release catalog
-            </h2>
-            <p className='max-w-[28rem] text-[13px] leading-[20px] text-secondary-token'>
-              Preparing smart links, provider status, and release details.
-            </p>
+          <div className='space-y-2'>
+            <div className='skeleton h-5 w-40 rounded' />
+            <div className='skeleton h-4 w-64 rounded' />
           </div>
-          <LoadingSkeleton height='h-10' width='w-24' rounded='full' />
+          <div className='skeleton h-10 w-24 rounded-full' />
         </div>
       ) : null}
 
