@@ -215,7 +215,7 @@ export function ProfileCompactTemplate({
               {/* ─── Hero ─── */}
               <header
                 className='relative w-full'
-                style={{ aspectRatio: '3 / 4' }}
+                style={{ aspectRatio: '4 / 5' }}
               >
                 <div className='absolute inset-0'>
                   <ImageWithFallback
@@ -316,14 +316,14 @@ export function ProfileCompactTemplate({
 
               {/* ─── Unified card ─── */}
               <div
-                className={`relative z-10 mx-4 mb-[max(env(safe-area-inset-bottom),24px)] mt-3 overflow-hidden rounded-2xl border ${glass.border} ${glass.bg} ${glass.shadow} ${glass.blur}`}
+                className={`relative z-10 mx-3 mb-[max(env(safe-area-inset-bottom),12px)] mt-2 overflow-hidden rounded-xl border ${glass.border} ${glass.bg} ${glass.shadow} ${glass.blur}`}
               >
                 {/* Player row */}
                 {latestRelease || mergedDSPs.length > 0 ? (
                   <button
                     type='button'
                     onClick={handlePlayClick}
-                    className='group flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-white/[0.04] active:bg-white/[0.06]'
+                    className='group flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors duration-150 hover:bg-white/[0.04] active:bg-white/[0.06]'
                     aria-label={
                       latestRelease
                         ? `Play ${latestRelease.title}`
@@ -394,7 +394,7 @@ export function ProfileCompactTemplate({
                   <>
                     <div className='mx-3 h-px bg-white/[0.06]' />
                     <nav
-                      className='flex items-center justify-center gap-5 py-2.5'
+                      className='flex items-center justify-center gap-5 py-2'
                       aria-label='Social links'
                     >
                       {visibleSocialLinks.map(link => (
