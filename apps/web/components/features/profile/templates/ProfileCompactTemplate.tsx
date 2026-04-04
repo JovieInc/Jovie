@@ -314,16 +314,14 @@ export function ProfileCompactTemplate({
                 </div>
               </header>
 
-              {/* ─── Unified card ─── */}
-              <div
-                className={`relative z-10 mx-3 mb-[max(env(safe-area-inset-bottom),12px)] mt-2 overflow-hidden rounded-xl border ${glass.border} ${glass.bg} ${glass.shadow} ${glass.blur}`}
-              >
+              {/* ─── Content ─── */}
+              <div className='relative z-10 flex flex-col gap-3 px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3'>
                 {/* Player row */}
                 {latestRelease || mergedDSPs.length > 0 ? (
                   <button
                     type='button'
                     onClick={handlePlayClick}
-                    className='group flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors duration-150 hover:bg-white/[0.04] active:bg-white/[0.06]'
+                    className='group flex w-full items-center gap-2.5 text-left'
                     aria-label={
                       latestRelease
                         ? `Play ${latestRelease.title}`
@@ -331,7 +329,7 @@ export function ProfileCompactTemplate({
                     }
                   >
                     {latestRelease?.artworkUrl ? (
-                      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-lg'>
+                      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.3)]'>
                         <ImageWithFallback
                           src={latestRelease.artworkUrl}
                           alt={latestRelease.title}
@@ -342,7 +340,7 @@ export function ProfileCompactTemplate({
                         />
                       </div>
                     ) : (
-                      <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/[0.06]'>
+                      <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/[0.08]'>
                         <Play className='h-3.5 w-3.5 fill-current text-white/60' />
                       </div>
                     )}
@@ -362,12 +360,7 @@ export function ProfileCompactTemplate({
                   </button>
                 ) : null}
 
-                {/* Separator */}
-                {(latestRelease || mergedDSPs.length > 0) && (
-                  <div className='mx-3 h-px bg-white/[0.06]' />
-                )}
-
-                {/* Subscribe row */}
+                {/* Subscribe */}
                 <section
                   ref={subscribeSectionRef}
                   data-testid='compact-subscribe'
@@ -389,24 +382,21 @@ export function ProfileCompactTemplate({
                   )}
                 </section>
 
-                {/* Separator + Social icons */}
+                {/* Social icons */}
                 {visibleSocialLinks.length > 0 ? (
-                  <>
-                    <div className='mx-3 h-px bg-white/[0.06]' />
-                    <nav
-                      className='flex items-center justify-center gap-5 py-2'
-                      aria-label='Social links'
-                    >
-                      {visibleSocialLinks.map(link => (
-                        <SocialLink
-                          key={link.id}
-                          link={link}
-                          handle={artist.handle}
-                          artistName={artist.name}
-                        />
-                      ))}
-                    </nav>
-                  </>
+                  <nav
+                    className='flex items-center justify-center gap-5'
+                    aria-label='Social links'
+                  >
+                    {visibleSocialLinks.map(link => (
+                      <SocialLink
+                        key={link.id}
+                        link={link}
+                        handle={artist.handle}
+                        artistName={artist.name}
+                      />
+                    ))}
+                  </nav>
                 ) : null}
               </div>
             </div>
