@@ -142,8 +142,12 @@ export function ProfileCompactTemplate({
     return getHeaderSocialLinks(socialLinks, viewerCountryCode, 2);
   }, [socialLinks, viewerCountryCode]);
 
-  const dspCountLabel =
-    mergedDSPs.length > 0 ? ` · ${mergedDSPs.length} platforms` : '';
+  const nextTourDate = useMemo(() => {
+    const now = Date.now();
+    return (
+      tourDates.find(td => new Date(td.startDate).getTime() >= now) ?? null
+    );
+  }, [tourDates]);
 
   const handlePlayClick = useCallback(() => {
     if (mergedDSPs.length === 0) {
@@ -257,75 +261,89 @@ export function ProfileCompactTemplate({
                     aria-hidden={false}
                   />
 
-                  {/* ─── Dropdown ─── */}
-                  <div ref={menuRef} className='relative'>
-                    <button
-                      type='button'
-                      onClick={() => setMenuOpen(prev => !prev)}
-                      className={`flex h-8 w-8 items-center justify-center rounded-full ${glass.border} bg-black/25 text-white/70 ${glass.blur} transition-colors duration-150 hover:bg-black/40`}
-                      aria-label='More options'
-                      aria-expanded={menuOpen}
-                      aria-haspopup='menu'
-                    >
-                      <MoreHorizontal className='h-[15px] w-[15px]' />
-                    </button>
-
-                    {menuOpen ? (
-                      <div
-                        className={`absolute right-0 top-full z-50 mt-1.5 min-w-[188px] overflow-hidden rounded-[14px] border ${glass.border} bg-black/75 p-1 shadow-[0_12px_40px_rgba(0,0,0,0.5)] ${glass.blur}`}
-                        role='menu'
+                  <div className='flex items-center gap-2'>
+                    {/* Play button in header */}
+                    {mergedDSPs.length > 0 ? (
+                      <button
+                        type='button'
+                        onClick={handlePlayClick}
+                        className={`flex h-8 w-8 items-center justify-center rounded-full ${glass.border} bg-black/25 text-white/70 ${glass.blur} transition-colors duration-150 hover:bg-black/40`}
+                        aria-label={`Play ${artist.name}`}
                       >
-                        <button
-                          type='button'
-                          role='menuitem'
-                          className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
-                          onClick={handleShare}
+                        <Play className='ml-px h-[14px] w-[14px] fill-current' />
+                      </button>
+                    ) : null}
+
+                    {/* ─── Dropdown ─── */}
+                    <div ref={menuRef} className='relative'>
+                      <button
+                        type='button'
+                        onClick={() => setMenuOpen(prev => !prev)}
+                        className={`flex h-8 w-8 items-center justify-center rounded-full ${glass.border} bg-black/25 text-white/70 ${glass.blur} transition-colors duration-150 hover:bg-black/40`}
+                        aria-label='More options'
+                        aria-expanded={menuOpen}
+                        aria-haspopup='menu'
+                      >
+                        <MoreHorizontal className='h-[15px] w-[15px]' />
+                      </button>
+
+                      {menuOpen ? (
+                        <div
+                          className={`absolute right-0 top-full z-50 mt-1.5 min-w-[188px] overflow-hidden rounded-[14px] border ${glass.border} bg-black/75 p-1 shadow-[0_12px_40px_rgba(0,0,0,0.5)] ${glass.blur}`}
+                          role='menu'
                         >
-                          <Share2 className='h-[14px] w-[14px] text-white/50' />
-                          Share Profile
-                        </button>
-                        <button
-                          type='button'
-                          role='menuitem'
-                          className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
-                          onClick={() => {
-                            setMenuOpen(false);
-                            subscribeSectionRef.current?.scrollIntoView({
-                              behavior: 'smooth',
-                              block: 'start',
-                            });
-                          }}
-                        >
-                          <Bell className='h-[14px] w-[14px] text-white/50' />
-                          Get Notified
-                        </button>
-                        {tourDates.length > 0 ? (
-                          <Link
-                            href={`/${artist.handle}?mode=tour`}
+                          <button
+                            type='button'
                             role='menuitem'
                             className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
-                            onClick={() => setMenuOpen(false)}
+                            onClick={handleShare}
                           >
-                            <CalendarDays className='h-[14px] w-[14px] text-white/50' />
-                            Tour Dates
-                          </Link>
-                        ) : null}
-                        {hasContacts ? (
+                            <Share2 className='h-[14px] w-[14px] text-white/50' />
+                            Share Profile
+                          </button>
                           <button
                             type='button'
                             role='menuitem'
                             className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
                             onClick={() => {
                               setMenuOpen(false);
-                              setContactOpen(true);
+                              subscribeSectionRef.current?.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'start',
+                              });
                             }}
                           >
-                            <Mail className='h-[14px] w-[14px] text-white/50' />
-                            Contact
+                            <Bell className='h-[14px] w-[14px] text-white/50' />
+                            Turn On Notifications
                           </button>
-                        ) : null}
-                      </div>
-                    ) : null}
+                          {tourDates.length > 0 ? (
+                            <Link
+                              href={`/${artist.handle}?mode=tour`}
+                              role='menuitem'
+                              className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
+                              onClick={() => setMenuOpen(false)}
+                            >
+                              <CalendarDays className='h-[14px] w-[14px] text-white/50' />
+                              Tour Dates
+                            </Link>
+                          ) : null}
+                          {hasContacts ? (
+                            <button
+                              type='button'
+                              role='menuitem'
+                              className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
+                              onClick={() => {
+                                setMenuOpen(false);
+                                setContactOpen(true);
+                              }}
+                            >
+                              <Mail className='h-[14px] w-[14px] text-white/50' />
+                              Contact
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
@@ -348,19 +366,15 @@ export function ProfileCompactTemplate({
 
               {/* ─── Content ─── */}
               <div className='relative z-10 flex flex-col gap-3 px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3'>
-                {/* Player card */}
-                {latestRelease || mergedDSPs.length > 0 ? (
+                {/* Featured card: release or tour date */}
+                {latestRelease ? (
                   <button
                     type='button'
                     onClick={handlePlayClick}
                     className={`group flex w-full items-center gap-2.5 rounded-[14px] border ${glass.border} ${glass.bg} px-2.5 py-2 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
-                    aria-label={
-                      latestRelease
-                        ? `Play ${latestRelease.title}`
-                        : `Listen to ${artist.name}`
-                    }
+                    aria-label={`Listen to ${latestRelease.title}`}
                   >
-                    {latestRelease?.artworkUrl ? (
+                    {latestRelease.artworkUrl ? (
                       <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
                         <ImageWithFallback
                           src={latestRelease.artworkUrl}
@@ -371,24 +385,58 @@ export function ProfileCompactTemplate({
                           fallbackVariant='release'
                         />
                       </div>
-                    ) : (
-                      <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white/[0.06]'>
-                        <Play className='h-3.5 w-3.5 fill-current text-white/60' />
-                      </div>
-                    )}
-                    <div className='min-w-0 flex-1'>
-                      <p className='truncate text-[13px] font-[510] leading-[1.15] text-white/88'>
-                        {latestRelease?.title ?? 'Listen'}
-                      </p>
-                      <p className='mt-px truncate text-[11px] font-[400] leading-[1.2] text-white/40'>
-                        {latestRelease
-                          ? `${artist.name}${dspCountLabel}`
-                          : `${mergedDSPs.length} platforms`}
-                      </p>
+                    ) : null}
+                    <p className='min-w-0 flex-1 truncate text-[13px] font-[510] leading-[1.15] text-white/88'>
+                      {latestRelease.title}
+                    </p>
+                    <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
+                      Listen
+                    </span>
+                  </button>
+                ) : nextTourDate ? (
+                  <a
+                    href={
+                      nextTourDate.ticketUrl ?? `/${artist.handle}?mode=tour`
+                    }
+                    target={nextTourDate.ticketUrl ? '_blank' : undefined}
+                    rel={
+                      nextTourDate.ticketUrl ? 'noopener noreferrer' : undefined
+                    }
+                    className={`group flex w-full items-center gap-2.5 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-2.5 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                  >
+                    <div className='flex shrink-0 flex-col items-center leading-none'>
+                      <span className='text-[10px] font-[590] uppercase tracking-[0.1em] text-white/45'>
+                        {new Intl.DateTimeFormat('en-US', {
+                          month: 'short',
+                        }).format(new Date(nextTourDate.startDate))}
+                      </span>
+                      <span className='text-[18px] font-[680] tracking-[-0.04em] text-white/90'>
+                        {new Intl.DateTimeFormat('en-US', {
+                          day: 'numeric',
+                        }).format(new Date(nextTourDate.startDate))}
+                      </span>
                     </div>
-                    <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_0_0_0.5px_rgba(0,0,0,0.04)] transition-transform duration-150 group-hover:scale-[1.06]'>
-                      <Play className='ml-px h-2.5 w-2.5 fill-current text-black/80' />
-                    </div>
+                    <p className='min-w-0 flex-1 truncate text-[13px] font-[510] text-white/80'>
+                      {nextTourDate.venueName ?? nextTourDate.city ?? 'Live'}
+                    </p>
+                    <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
+                      {nextTourDate.ticketUrl ? 'Tickets' : 'Details'}
+                    </span>
+                  </a>
+                ) : mergedDSPs.length > 0 ? (
+                  <button
+                    type='button'
+                    onClick={handlePlayClick}
+                    className={`group flex w-full items-center gap-2.5 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-2.5 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                    aria-label={`Listen to ${artist.name}`}
+                  >
+                    <Play className='h-4 w-4 shrink-0 fill-current text-white/60' />
+                    <p className='min-w-0 flex-1 text-[13px] font-[510] text-white/80'>
+                      Listen to {artist.name}
+                    </p>
+                    <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
+                      Listen
+                    </span>
                   </button>
                 ) : null}
 
