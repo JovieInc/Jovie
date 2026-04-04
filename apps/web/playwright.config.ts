@@ -18,6 +18,8 @@ if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
 const isCI = !!process.env.CI;
 const isFullMatrix = process.env.E2E_FULL_MATRIX === '1';
+const includeMobileMatrix =
+  process.env.E2E_MOBILE_MATRIX === '1' || isFullMatrix;
 const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
 const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 const baseURL = process.env.BASE_URL || 'http://localhost:3100';
@@ -132,6 +134,15 @@ export default defineConfig({
       dependencies: ['auth-setup'],
       use: { ...devices['Desktop Chrome'] },
     },
+    ...(includeMobileMatrix
+      ? [
+          {
+            name: 'mobile-chrome',
+            dependencies: ['auth-setup'],
+            use: { ...devices['Pixel 5'] },
+          },
+        ]
+      : []),
     // Firefox and WebKit run in nightly full-matrix workflow only
     ...(isFullMatrix
       ? [

@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.113] - 2026-04-03
+
+### Changed
+
+- Dashboard header no longer shows a shadow line between the header and content area
+- Content shell spacing is now visually consistent on all edges
+- Tasks toolbar sits as a full-width subheader matching the dashboard header height
+- Task list rows have tighter left padding for better density
+- Priority indicators use signal bars that fill proportionally (urgent=4, high=3, medium=2, low=1) instead of uniform colored dots
+- Overdue badge is now hidden on cancelled tasks
+- Playback stats use plain language: "linked" instead of "canonical", "unconfirmed" instead of "fallback", "pending" instead of "unknown", and zero counts are hidden
+
+## [26.4.112] - 2026-04-03
+
+> Added a deterministic releases dashboard QA loop that starts with chaos, locks fixture states, and only passes once functional, performance, Lighthouse, cross-browser, and visual checks are all green in the same run.
+
+### Added
+
+- Added `qa:releases:loop`, source-controlled QA artifacts, and dedicated releases dashboard chaos plus health Playwright coverage
+- Added deterministic `/demo/showcase/releases?state=...` fixtures for populated, disconnected, connected-empty, importing, failed, and partial release states
+- Added unit coverage for shell route matching used by the releases loading path
+
+### Changed
+
+- Releases dashboard functional coverage now treats missing creator releases or disconnected provider states as failures in blocking mode instead of skipping
+- Dashboard Lighthouse auth setup now preserves warmed authenticated state and runs repeatable releases audits for stable perf gating
+- Dashboard shell and releases loading surfaces now render visible loading copy sooner so perf and Lighthouse checks measure deterministic content
+
+### Fixed
+
+- [internal] Reused the standalone production server path for the releases QA loop instead of a less stable local start path
+- [internal] Disabled demo-mode releases polling so importing showcase fixtures do not hit live background polling behavior
+- [internal] Refreshed releases product screenshots to match the shipped drawer tabs and demo fixtures
+
 ## [26.4.111] - 2026-04-02
 
 > Moved tips into Artist Profile so payout setup, tip links, and QR sharing live next to the public profile editor, while legacy earnings routes now land on the new surface and tip traffic stays aligned with analytics.

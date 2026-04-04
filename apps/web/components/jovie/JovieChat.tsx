@@ -267,11 +267,14 @@ export function JovieChat({
   } as const;
 
   const greetingName = displayName?.trim() || username?.trim() || null;
-  const emptyStateHeading = isFirstSession
-    ? 'Welcome to Jovie'
-    : greetingName
-      ? `Welcome Back ${greetingName}`
-      : 'Welcome Back';
+  let emptyStateHeading: string;
+  if (isFirstSession) {
+    emptyStateHeading = 'Welcome to Jovie';
+  } else if (greetingName) {
+    emptyStateHeading = `Welcome Back ${greetingName}`;
+  } else {
+    emptyStateHeading = 'Welcome Back';
+  }
 
   return (
     <div
@@ -308,78 +311,44 @@ export function JovieChat({
         )}
       </AnimatePresence>
 
-      <AnimatePresence mode='wait' initial={false}>
-        {hasMessages ? (
-          <motion.div
-            key='chat-view'
-            className='flex flex-1 flex-col overflow-hidden'
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.15 }}
+      {hasMessages ? (
+        <div className='flex flex-1 flex-col overflow-hidden'>
+          {/* Messages area */}
+          <div
+            ref={scrollContainerRef}
+            className='relative flex flex-1 flex-col overflow-y-auto px-4 py-5 sm:px-5'
+            onScroll={onScroll}
           >
-            {/* Messages area */}
-            <div
-              ref={scrollContainerRef}
-              className='relative flex flex-1 flex-col overflow-y-auto px-4 py-5 sm:px-5'
-              onScroll={onScroll}
-            >
-              {shouldVirtualizeMessages ? (
-                <div
-                  ref={totalSizeRef}
-                  className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
-                  style={{
-                    position: 'relative',
-                    height: Math.max(
-                      virtualizer.getTotalSize(),
-                      scrollContainerRef.current?.clientHeight ?? 0
-                    ),
-                  }}
-                >
-                  {virtualizer.getVirtualItems().map(virtualItem => {
-                    const message = displayMessages[virtualItem.index];
-                    const index = virtualItem.index;
-                    const isThinking = message.id === THINKING_PLACEHOLDER_ID;
-                    return (
-                      <div
-                        key={message.id}
-                        data-index={virtualItem.index}
-                        ref={virtualizer.measureElement}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          transform: `translateY(${virtualItem.start}px)`,
-                        }}
-                      >
-                        <div className='pb-4'>
-                          <ChatMessage
-                            id={message.id}
-                            role={message.role}
-                            parts={message.parts}
-                            isStreaming={
-                              isStreaming && index === lastAssistantIndex
-                            }
-                            isThinking={isThinking}
-                            avatarUrl={
-                              message.role === 'user' ? avatarUrl : undefined
-                            }
-                            profileId={profileId}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div
-                  ref={totalSizeRef}
-                  className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col justify-center'
-                >
-                  {displayMessages.map((message, index) => {
-                    const isThinking = message.id === THINKING_PLACEHOLDER_ID;
-                    return (
-                      <div key={message.id} className='pb-4'>
+            {shouldVirtualizeMessages ? (
+              <div
+                ref={totalSizeRef}
+                className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+                style={{
+                  position: 'relative',
+                  height: Math.max(
+                    virtualizer.getTotalSize(),
+                    scrollContainerRef.current?.clientHeight ?? 0
+                  ),
+                }}
+              >
+                {virtualizer.getVirtualItems().map(virtualItem => {
+                  const message = displayMessages[virtualItem.index];
+                  const index = virtualItem.index;
+                  const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+                  return (
+                    <div
+                      key={message.id}
+                      data-index={virtualItem.index}
+                      ref={virtualizer.measureElement}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualItem.start}px)`,
+                      }}
+                    >
+                      <div className='pb-4'>
                         <ChatMessage
                           id={message.id}
                           role={message.role}
@@ -394,109 +363,128 @@ export function JovieChat({
                           profileId={profileId}
                         />
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div
+                ref={totalSizeRef}
+                className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col justify-center'
+              >
+                {displayMessages.map((message, index) => {
+                  const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+                  return (
+                    <div key={message.id} className='pb-4'>
+                      <ChatMessage
+                        id={message.id}
+                        role={message.role}
+                        parts={message.parts}
+                        isStreaming={
+                          isStreaming && index === lastAssistantIndex
+                        }
+                        isThinking={isThinking}
+                        avatarUrl={
+                          message.role === 'user' ? avatarUrl : undefined
+                        }
+                        profileId={profileId}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-              {/* Scroll to bottom button */}
-              <ScrollToBottom
-                visible={!isStuckToBottom}
-                onClick={scrollToBottom}
-              />
+            {/* Scroll to bottom button */}
+            <ScrollToBottom
+              visible={!isStuckToBottom}
+              onClick={scrollToBottom}
+            />
+          </div>
+
+          <div className='px-4 pt-3'>
+            <div className='mx-auto max-w-2xl'>
+              <ChatUsageAlert />
             </div>
+          </div>
 
-            <div className='px-4 pt-3'>
+          {/* Error display */}
+          {chatError && (
+            <div className='px-4 pb-3'>
               <div className='mx-auto max-w-2xl'>
-                <ChatUsageAlert />
+                <ErrorDisplay
+                  chatError={chatError}
+                  onRetry={handleRetry}
+                  isLoading={isLoading}
+                  isSubmitting={isSubmitting}
+                />
               </div>
             </div>
+          )}
 
-            {/* Error display */}
-            {chatError && (
-              <div className='px-4 pb-3'>
-                <div className='mx-auto max-w-2xl'>
+          {/* Input at bottom */}
+          <div className='bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
+            <div className='mx-auto max-w-2xl space-y-2'>
+              {isRateLimited && (
+                <p className='text-xs text-tertiary-token' aria-live='polite'>
+                  Sending too fast. Please wait a second before your next
+                  message.
+                </p>
+              )}
+              <ChatInput
+                {...chatInputProps}
+                placeholder='Ask a follow-up...'
+                variant='compact'
+                quickActions={followUpQuickActions}
+                onQuickActionSelect={handleSuggestedPrompt}
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className='flex flex-1 flex-col overflow-y-auto'>
+          <div className='flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-6 sm:py-8'>
+            <div className='mx-auto flex w-full max-w-[34rem] flex-1 flex-col items-center justify-center gap-5'>
+              <div className='flex flex-col items-center gap-1 text-center'>
+                <h1 className='text-[1.2rem] font-[560] tracking-[-0.03em] text-primary-token sm:text-[1.35rem]'>
+                  {emptyStateHeading}
+                </h1>
+              </div>
+
+              <div className='flex w-full flex-col items-center space-y-2.5'>
+                {isRateLimited && (
+                  <p
+                    className='text-center text-xs text-tertiary-token'
+                    aria-live='polite'
+                  >
+                    Sending too fast. Please wait a second before your next
+                    message.
+                  </p>
+                )}
+                <ChatUsageAlert />
+                <div className='w-full max-w-[35rem] space-y-2'>
+                  <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
+                  <SuggestedPrompts
+                    onSelect={handleSuggestedPrompt}
+                    isFirstSession={isFirstSession}
+                    latestReleaseTitle={latestReleaseTitle}
+                    layout='flat'
+                  />
+                </div>
+
+                {chatError && (
                   <ErrorDisplay
                     chatError={chatError}
                     onRetry={handleRetry}
                     isLoading={isLoading}
                     isSubmitting={isSubmitting}
                   />
-                </div>
-              </div>
-            )}
-
-            {/* Input at bottom */}
-            <div className='bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
-              <div className='mx-auto max-w-2xl space-y-2'>
-                {isRateLimited && (
-                  <p className='text-xs text-tertiary-token' aria-live='polite'>
-                    Sending too fast. Please wait a second before your next
-                    message.
-                  </p>
                 )}
-                <ChatInput
-                  {...chatInputProps}
-                  placeholder='Ask a follow-up...'
-                  variant='compact'
-                  quickActions={followUpQuickActions}
-                  onQuickActionSelect={handleSuggestedPrompt}
-                />
               </div>
             </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key='empty-state'
-            className='flex flex-1 flex-col overflow-y-auto'
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.15 }}
-          >
-            <div className='flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-6 sm:py-8'>
-              <div className='mx-auto flex w-full max-w-[34rem] flex-1 flex-col items-center justify-center gap-5'>
-                <div className='flex flex-col items-center gap-1 text-center'>
-                  <h1 className='text-[1.2rem] font-[560] tracking-[-0.03em] text-primary-token sm:text-[1.35rem]'>
-                    {emptyStateHeading}
-                  </h1>
-                </div>
-
-                <div className='flex w-full flex-col items-center space-y-2.5'>
-                  {isRateLimited && (
-                    <p
-                      className='text-center text-xs text-tertiary-token'
-                      aria-live='polite'
-                    >
-                      Sending too fast. Please wait a second before your next
-                      message.
-                    </p>
-                  )}
-                  <ChatUsageAlert />
-                  <div className='w-full max-w-[35rem] space-y-2'>
-                    <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
-                    <SuggestedPrompts
-                      onSelect={handleSuggestedPrompt}
-                      isFirstSession={isFirstSession}
-                      latestReleaseTitle={latestReleaseTitle}
-                      layout='flat'
-                    />
-                  </div>
-
-                  {chatError && (
-                    <ErrorDisplay
-                      chatError={chatError}
-                      onRetry={handleRetry}
-                      isLoading={isLoading}
-                      isSubmitting={isSubmitting}
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

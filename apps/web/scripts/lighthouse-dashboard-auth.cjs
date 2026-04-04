@@ -24,6 +24,18 @@ function resolveBaseUrl() {
   return process.env.BASE_URL || defaultBaseUrl;
 }
 
+function resolveCollectUrls(baseUrl) {
+  const configured = process.env.LIGHTHOUSE_DASHBOARD_URLS?.trim();
+  const paths = configured
+    ? configured
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean)
+    : ['/app', '/app/chat', '/app/dashboard/releases'];
+
+  return paths.map(path => new URL(path, `${baseUrl}/`).toString());
+}
+
 function resolveAuthStatePath() {
   const explicitPath = process.env.LIGHTHOUSE_AUTH_STATE_PATH?.trim();
   if (explicitPath) {
@@ -225,6 +237,7 @@ async function warmDashboardRoutes(baseUrl) {
 
 async function seedDashboardAuth(browser, { url }) {
   const origin = new URL(url).origin;
+  const pathname = new URL(url).pathname;
   const page = await browser.newPage();
   const browserContext =
     typeof browser.defaultBrowserContext === 'function'
@@ -233,6 +246,57 @@ async function seedDashboardAuth(browser, { url }) {
         ? page.browserContext()
         : null;
   const testUserId = process.env.E2E_CLERK_USER_ID?.trim();
+  const warmRoute = async () => {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    if (pathname === '/app/dashboard/releases') {
+      await Promise.any([
+        page.waitForSelector('[data-testid="releases-matrix"]', {
+          timeout: 60_000,
+        }),
+        page.waitForSelector('[data-testid="release-table-shell"]', {
+          timeout: 60_000,
+        }),
+        page.waitForSelector('[data-testid="spotify-import-progress-banner"]', {
+          timeout: 60_000,
+        }),
+      ]).catch(() => undefined);
+    } else if (pathname.startsWith('/app')) {
+      await page
+        .waitForSelector('main', { timeout: 30_000 })
+        .catch(() => undefined);
+    }
+    await page
+      .waitForNetworkIdle({ idleTime: 500, timeout: 10_000 })
+      .catch(() => undefined);
+  };
+
+  const warmDashboardShell = async () => {
+    if (!pathname.startsWith('/app')) {
+      return;
+    }
+
+    await page.goto(new URL('/app', origin).toString(), {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+    await page
+      .waitForSelector('main', { timeout: 30_000 })
+      .catch(() => undefined);
+    await page
+      .waitForNetworkIdle({ idleTime: 500, timeout: 10_000 })
+      .catch(() => undefined);
+  };
+
+  const warmRouteCount = pathname === '/app/dashboard/releases' ? 3 : 1;
+  const warmRouteRepeatedly = async () => {
+    await warmDashboardShell();
+    for (let i = 0; i < warmRouteCount; i += 1) {
+      await warmRoute();
+    }
+    await new Promise(resolve => {
+      setTimeout(resolve, pathname === '/app/dashboard/releases' ? 750 : 250);
+    });
+  };
 
   if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1' && testUserId) {
     const authCookies = [
@@ -254,6 +318,7 @@ async function seedDashboardAuth(browser, { url }) {
     } else {
       await page.setCookie(...authCookies);
     }
+    await warmRouteRepeatedly();
     await page.close();
     return;
   }
@@ -286,6 +351,7 @@ async function seedDashboardAuth(browser, { url }) {
     } else {
       await page.setCookie(...cookies);
     }
+    await warmRouteRepeatedly();
   } finally {
     await page.close();
   }
@@ -293,6 +359,7 @@ async function seedDashboardAuth(browser, { url }) {
 
 async function main() {
   const baseUrl = resolveBaseUrl();
+  const collectUrls = resolveCollectUrls(baseUrl);
   assertCiUsesSyntheticBypass();
   const authStatePath = ensureAuthState(baseUrl);
   const chromePath = ensureChromiumPath();
@@ -323,11 +390,9 @@ async function main() {
       'lhci',
       'autorun',
       '--config=.lighthouserc.dashboard.pr.json',
-      `--collect.url=${baseUrl}/app`,
-      `--collect.url=${baseUrl}/app/chat`,
-      `--collect.url=${baseUrl}/app/dashboard/releases`,
       `--healthcheck.chromePath=${chromePath}`,
       `--collect.chromePath=${chromePath}`,
+      ...collectUrls.map(url => `--collect.url=${url}`),
     ],
     {
       cwd: webRoot,

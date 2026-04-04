@@ -2,6 +2,7 @@ export const DEMO_SHOWCASE_SURFACE_IDS = [
   'analytics',
   'earnings',
   'links',
+  'releases',
   'settings',
   'public-profile',
   'release-landing',

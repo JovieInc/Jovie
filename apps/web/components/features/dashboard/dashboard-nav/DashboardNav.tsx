@@ -72,6 +72,13 @@ function isItemActive(pathname: string, item: NavItem): boolean {
   return normalizedPathname.startsWith(`${item.href}/`);
 }
 
+function formatTaskBadge(
+  taskStats: { activeTodoCount: number } | undefined
+): string | number | undefined {
+  if (!taskStats || taskStats.activeTodoCount <= 0) return undefined;
+  return taskStats.activeTodoCount > 99 ? '99+' : taskStats.activeTodoCount;
+}
+
 export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const { showPendingShell } = usePendingShell();
@@ -116,12 +123,7 @@ export function DashboardNav(_: DashboardNavProps) {
           item.id === 'tasks'
             ? {
                 ...item,
-                badge:
-                  taskStats && taskStats.activeTodoCount > 0
-                    ? taskStats.activeTodoCount > 99
-                      ? '99+'
-                      : taskStats.activeTodoCount
-                    : undefined,
+                badge: formatTaskBadge(taskStats),
               }
             : item
         ),

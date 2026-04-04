@@ -248,21 +248,20 @@ function NeighbourRow({ neighbour }: Readonly<{ neighbour: ScoredNeighbour }>) {
   );
 }
 
-function SizeBadge({ size }: Readonly<{ size: NeighbourSize }>) {
-  const variant =
-    size === 'BIGGER'
-      ? 'success'
-      : size === 'SIMILAR'
-        ? 'warning'
-        : 'destructive';
+const SIZE_BADGE_MAP: Record<
+  NeighbourSize,
+  { variant: 'success' | 'warning' | 'destructive'; label: string }
+> = {
+  BIGGER: { variant: 'success', label: 'Bigger' },
+  SIMILAR: { variant: 'warning', label: 'Similar' },
+  SMALLER: { variant: 'destructive', label: 'Smaller' },
+};
 
+function SizeBadge({ size }: Readonly<{ size: NeighbourSize }>) {
+  const { variant, label } = SIZE_BADGE_MAP[size];
   return (
     <Badge variant={variant} size='sm'>
-      {size === 'BIGGER'
-        ? 'Bigger'
-        : size === 'SIMILAR'
-          ? 'Similar'
-          : 'Smaller'}
+      {label}
     </Badge>
   );
 }

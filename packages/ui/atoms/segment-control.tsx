@@ -148,6 +148,15 @@ export function SegmentControl<T extends string = string>({
           </Tabs.Trigger>
         ))}
       </Tabs.List>
+      {options.map(option => (
+        <Tabs.Content
+          key={`${option.value}-panel`}
+          value={option.value}
+          forceMount
+          className='hidden'
+          aria-hidden='true'
+        />
+      ))}
     </Tabs.Root>
   );
 }
