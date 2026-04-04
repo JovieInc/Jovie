@@ -59,7 +59,7 @@ export function DashboardShellSkeleton({
 } = {}) {
   return (
     <div
-      className='flex h-svh w-full overflow-hidden bg-(--linear-bg-page) pt-[env(safe-area-inset-top)]'
+      className='flex h-svh w-full overflow-hidden bg-(--linear-bg-page) max-lg:pt-[env(safe-area-inset-top)] lg:gap-[var(--linear-app-shell-gap)] lg:p-[var(--linear-app-shell-gap)]'
       aria-busy='true'
       aria-live='polite'
       data-testid='dashboard-shell-skeleton'

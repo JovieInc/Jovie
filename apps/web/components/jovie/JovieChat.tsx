@@ -322,7 +322,7 @@ export function JovieChat({
             {shouldVirtualizeMessages ? (
               <div
                 ref={totalSizeRef}
-                className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+                className='mx-auto flex min-h-full w-full flex-col'
                 style={{
                   position: 'relative',
                   height: Math.max(
@@ -370,7 +370,7 @@ export function JovieChat({
             ) : (
               <div
                 ref={totalSizeRef}
-                className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col justify-center'
+                className='mx-auto flex min-h-full w-full flex-col justify-center'
               >
                 {displayMessages.map((message, index) => {
                   const isThinking = message.id === THINKING_PLACEHOLDER_ID;
@@ -402,56 +402,50 @@ export function JovieChat({
             />
           </div>
 
-          <div className='px-4 pt-3'>
-            <div className='mx-auto max-w-2xl'>
-              <ChatUsageAlert />
-            </div>
+          <div className='px-4 pt-3 sm:px-5'>
+            <ChatUsageAlert />
           </div>
 
           {/* Error display */}
           {chatError && (
-            <div className='px-4 pb-3'>
-              <div className='mx-auto max-w-2xl'>
-                <ErrorDisplay
-                  chatError={chatError}
-                  onRetry={handleRetry}
-                  isLoading={isLoading}
-                  isSubmitting={isSubmitting}
-                />
-              </div>
+            <div className='px-4 pb-3 sm:px-5'>
+              <ErrorDisplay
+                chatError={chatError}
+                onRetry={handleRetry}
+                isLoading={isLoading}
+                isSubmitting={isSubmitting}
+              />
             </div>
           )}
 
           {/* Input at bottom */}
           <div className='bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
-            <div className='mx-auto max-w-2xl space-y-2'>
-              {isRateLimited && (
-                <p className='text-xs text-tertiary-token' aria-live='polite'>
-                  Sending too fast. Please wait a second before your next
-                  message.
-                </p>
-              )}
-              <ChatInput
-                {...chatInputProps}
-                placeholder='Ask a follow-up...'
-                variant='compact'
-                quickActions={followUpQuickActions}
-                onQuickActionSelect={handleSuggestedPrompt}
-              />
-            </div>
+            {isRateLimited && (
+              <p className='text-xs text-tertiary-token' aria-live='polite'>
+                Sending too fast. Please wait a second before your next message.
+              </p>
+            )}
+            <ChatInput
+              {...chatInputProps}
+              placeholder='Ask a follow-up...'
+              variant='compact'
+              quickActions={followUpQuickActions}
+              onQuickActionSelect={handleSuggestedPrompt}
+            />
           </div>
         </div>
       ) : (
-        <div className='flex flex-1 flex-col overflow-y-auto'>
-          <div className='flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-6 sm:py-8'>
-            <div className='mx-auto flex w-full max-w-[34rem] flex-1 flex-col items-center justify-center gap-5'>
-              <div className='flex flex-col items-center gap-1 text-center'>
-                <h1 className='text-[1.2rem] font-[560] tracking-[-0.03em] text-primary-token sm:text-[1.35rem]'>
-                  {emptyStateHeading}
-                </h1>
-              </div>
+        <div className='flex-1 overflow-y-auto px-4 sm:px-6'>
+          <div className='flex min-h-full flex-col'>
+            {/* Top spacer — pushes input to optical center */}
+            <div className='flex-1' />
 
-              <div className='flex w-full flex-col items-center space-y-2.5'>
+            {/* Centered anchor: heading + input */}
+            <div className='mx-auto flex w-full max-w-[34rem] flex-col items-center gap-5'>
+              <h1 className='text-[1.2rem] font-[560] tracking-[-0.03em] text-primary-token sm:text-[1.35rem]'>
+                {emptyStateHeading}
+              </h1>
+              <div className='w-full max-w-[35rem] space-y-2.5'>
                 {isRateLimited && (
                   <p
                     className='text-center text-xs text-tertiary-token'
@@ -462,25 +456,28 @@ export function JovieChat({
                   </p>
                 )}
                 <ChatUsageAlert />
-                <div className='w-full max-w-[35rem] space-y-2'>
-                  <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
-                  <SuggestedPrompts
-                    onSelect={handleSuggestedPrompt}
-                    isFirstSession={isFirstSession}
-                    latestReleaseTitle={latestReleaseTitle}
-                    layout='flat'
-                  />
-                </div>
+                <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
+              </div>
+            </div>
 
-                {chatError && (
+            {/* Bottom section — items flow below center, don't shift input */}
+            <div className='mx-auto flex w-full max-w-md flex-1 flex-col items-center pt-2'>
+              <SuggestedPrompts
+                onSelect={handleSuggestedPrompt}
+                isFirstSession={isFirstSession}
+                latestReleaseTitle={latestReleaseTitle}
+                layout='flat'
+              />
+              {chatError && (
+                <div className='mt-2.5 w-full'>
                   <ErrorDisplay
                     chatError={chatError}
                     onRetry={handleRetry}
                     isLoading={isLoading}
                     isSubmitting={isSubmitting}
                   />
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
