@@ -208,7 +208,7 @@ export function getHeaderSocialLinks(
       }
 
       // Exclude source platform if specified
-      if (excludePlatform && platform === excludePlatform.toLowerCase()) {
+      if (platform === excludePlatform?.toLowerCase()) {
         return false;
       }
 
