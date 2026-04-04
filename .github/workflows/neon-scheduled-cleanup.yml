@@ -37,8 +37,8 @@ jobs:
       - name: Report cleanup summary
         if: always()
         run: |
-          echo "## Neon Branch Cleanup Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Scheduled cleanup completed" >> $GITHUB_STEP_SUMMARY
-          echo "- Threshold: ${{ github.event.inputs.cleanup_threshold || '5' }} branches" >> $GITHUB_STEP_SUMMARY
-          echo "- Run at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "## Neon Branch Cleanup Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Scheduled cleanup completed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Threshold: ${{ github.event.inputs.cleanup_threshold || '5' }} branches" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Run at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_STEP_SUMMARY"

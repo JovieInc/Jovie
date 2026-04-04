@@ -7,8 +7,5 @@
     "dev": "tsc -p tsconfig.build.json --watch",
     "test": "vitest run --config vitest.config.mts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
-  },
-  "dependencies": {
-    "@jovie/extension-contracts": "workspace:*"
   }
 }

@@ -172,27 +172,31 @@ jobs:
 
       - name: Slack alert (main CI unhealthy)
         if: ${{ steps.evaluate.outputs.should_alert == 'true' && env.SLACK_WEBHOOK_URL != '' }}
-        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
-        with:
-          status: custom
-          channel: '#alerts-production'
-          author_name: 'CI Monitor'
-          custom_payload: |
-            {
-              "text": "🚨 Main CI health monitor detected an issue",
-              "attachments": [
-                {
-                  "color": "danger",
-                  "fields": [
-                    { "title": "Repository", "value": "${{ github.repository }}", "short": true },
-                    { "title": "Branch", "value": "main", "short": true },
-                    { "title": "Summary", "value": "${{ steps.evaluate.outputs.summary }}", "short": false },
-                    { "title": "Details", "value": "${{ steps.evaluate.outputs.details }}", "short": false },
-                    { "title": "Run", "value": "<${{ steps.evaluate.outputs.run_url }}|View failing or stale run>", "short": false }
-                  ]
-                }
-              ]
-            }
+        run: |
+          DETAILS_JSON=$(jq -Rn --arg text "${{ steps.evaluate.outputs.details }}" '$text')
+          SUMMARY_JSON=$(jq -Rn --arg text "${{ steps.evaluate.outputs.summary }}" '$text')
+          PAYLOAD=$(cat <<EOF
+          {
+            "text": "🚨 Main CI health monitor detected an issue",
+            "attachments": [
+              {
+                "color": "danger",
+                "fields": [
+                  { "title": "Repository", "value": "${{ github.repository }}", "short": true },
+                  { "title": "Branch", "value": "main", "short": true },
+                  { "title": "Summary", "value": ${SUMMARY_JSON}, "short": false },
+                  { "title": "Details", "value": ${DETAILS_JSON}, "short": false },
+                  { "title": "Run", "value": "<${{ steps.evaluate.outputs.run_url }}|View failing or stale run>", "short": false }
+                ]
+              }
+            ]
+          }
+          EOF
+          )
+          curl -sS -X POST \
+            -H 'Content-type: application/json' \
+            --data "$PAYLOAD" \
+            "$SLACK_WEBHOOK_URL"
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 

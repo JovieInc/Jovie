@@ -36,9 +36,9 @@ jobs:
           BRANCH="sentry-fix/${ISSUE_ID}"
           if git ls-remote --heads "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$BRANCH" | grep -q "$BRANCH"; then
             echo "Branch $BRANCH already exists — skipping"
-            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip=true" >> "$GITHUB_OUTPUT"
           else
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout main
@@ -147,11 +147,11 @@ jobs:
           # Check if there are changes to commit (tracked + untracked)
           if git diff --quiet && git diff --staged --quiet && [ -z "$(git status --porcelain)" ]; then
             echo "No changes were made — Claude could not fix the issue"
-            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
 
           # Configure git
           git config user.name "jovie-bot[bot]"
@@ -195,7 +195,7 @@ jobs:
           EOF
           )")
 
-          echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
+          echo "pr_url=${PR_URL}" >> "$GITHUB_OUTPUT"
 
       - name: Enable auto-merge
         if: steps.create-pr.outputs.has_changes == 'true'

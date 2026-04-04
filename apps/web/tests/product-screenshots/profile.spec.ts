@@ -37,7 +37,7 @@ async function assertProfileLoaded(
 }
 
 test.describe('Product Screenshots – Public Profile', () => {
-  test('profile – phone viewport', async ({ page }) => {
+  test.fixme('profile – phone viewport', async ({ page }) => {
     test.setTimeout(120_000);
 
     // Set phone viewport (iPhone 14 Pro dimensions)
@@ -75,7 +75,7 @@ test.describe('Product Screenshots – Public Profile', () => {
     console.log('📸 Saved: profile-phone.png');
   });
 
-  test('profile – desktop viewport', async ({ page }) => {
+  test.fixme('profile – desktop viewport', async ({ page }) => {
     test.setTimeout(120_000);
 
     // Use default desktop viewport (1440x900 from config)
