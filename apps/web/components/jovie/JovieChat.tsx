@@ -370,7 +370,7 @@ export function JovieChat({
             ) : (
               <div
                 ref={totalSizeRef}
-                className='mx-auto flex min-h-full w-full flex-col justify-center'
+                className='mx-auto flex min-h-full w-full flex-col'
               >
                 {displayMessages.map((message, index) => {
                   const isThinking = message.id === THINKING_PLACEHOLDER_ID;
@@ -445,7 +445,7 @@ export function JovieChat({
               <h1 className='text-[1.2rem] font-[560] tracking-[-0.03em] text-primary-token sm:text-[1.35rem]'>
                 {emptyStateHeading}
               </h1>
-              <div className='w-full max-w-[35rem] space-y-2.5'>
+              <div className='w-full space-y-2.5'>
                 {isRateLimited && (
                   <p
                     className='text-center text-xs text-tertiary-token'
