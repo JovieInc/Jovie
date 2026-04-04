@@ -1402,22 +1402,30 @@ jobs:
       matrix:
         shard:
           [
-            '1/16',
-            '2/16',
-            '3/16',
-            '4/16',
-            '5/16',
-            '6/16',
-            '7/16',
-            '8/16',
-            '9/16',
-            '10/16',
-            '11/16',
-            '12/16',
-            '13/16',
-            '14/16',
-            '15/16',
-            '16/16',
+            '1/24',
+            '2/24',
+            '3/24',
+            '4/24',
+            '5/24',
+            '6/24',
+            '7/24',
+            '8/24',
+            '9/24',
+            '10/24',
+            '11/24',
+            '12/24',
+            '13/24',
+            '14/24',
+            '15/24',
+            '16/24',
+            '17/24',
+            '18/24',
+            '19/24',
+            '20/24',
+            '21/24',
+            '22/24',
+            '23/24',
+            '24/24',
           ]
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
@@ -1524,7 +1532,7 @@ jobs:
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Run packages/ui unit tests
-        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '1/16'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '1/24'
         run: pnpm turbo test --filter=@jovie/ui
 
       - name: Upload coverage to Codecov
@@ -2864,17 +2872,23 @@ jobs:
           set -euo pipefail
 
           api_url="${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100"
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+
+          curl -sS \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$api_url" \
+            > "$response_file"
+
           job_url=$(
-            curl -sS \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              "$api_url" \
-              | JOB_NAME="${{ github.job }}" python - <<'PY'
+            JOB_NAME="${{ github.job }}" python - "$response_file" <<'PY'
           import json
           import os
           import sys
 
-          data = json.load(sys.stdin)
+          with open(sys.argv[1], encoding='utf-8') as handle:
+              data = json.load(handle)
           job_name = os.environ["JOB_NAME"]
           job = next((item for item in data.get("jobs", []) if item.get("name") == job_name), None)
           print(job.get("html_url", "") if job else "")
