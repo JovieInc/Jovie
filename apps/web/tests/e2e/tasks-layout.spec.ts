@@ -104,6 +104,25 @@ async function openFirstTask(page: Page): Promise<void> {
   await firstRow.click();
 }
 
+async function assertTaskSelectionStaysStable(
+  page: Page,
+  taskTitle: string
+): Promise<void> {
+  await expect(page.getByText(taskTitle).first()).toBeVisible({
+    timeout: 15_000,
+  });
+  const rows = page.locator(TASK_ROW_SELECTOR);
+  await expect
+    .poll(async () => rows.count(), { timeout: 15_000 })
+    .toBeGreaterThan(0);
+  const rowCount = await rows.count();
+
+  const firstRow = rows.first();
+  await firstRow.click();
+  await expect(firstRow).toHaveAttribute('data-selected', 'true');
+  expect(rowCount).toBeGreaterThan(0);
+}
+
 async function assertTasksLayout(
   page: Page,
   testInfo: TestInfo,
@@ -171,6 +190,35 @@ async function assertTasksLayout(
   });
 }
 
+async function assertTasksInteractions(page: Page): Promise<void> {
+  const taskTitle = await ensureTaskExists();
+  await page.goto(APP_ROUTES.DASHBOARD_TASKS, {
+    waitUntil: 'domcontentloaded',
+    timeout: 120_000,
+  });
+  await expect(page.getByTestId('tasks-workspace')).toBeVisible({
+    timeout: 30_000,
+  });
+
+  const listPane = page.getByTestId('task-list-pane');
+  const documentPane = page.getByTestId('task-document-pane');
+  await expect(listPane).toBeVisible();
+  await expect(documentPane).toBeVisible();
+
+  await assertTaskSelectionStaysStable(page, taskTitle);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('tasks-workspace')).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(listPane).toBeVisible();
+  await expect(documentPane).toBeVisible();
+
+  const fitsWithoutScroll = await listPane.evaluate(
+    node => node.scrollWidth <= node.clientWidth + 1
+  );
+  expect(fitsWithoutScroll).toBe(true);
+}
+
 test.describe('Tasks layout', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     if (
@@ -192,4 +240,10 @@ test.describe('Tasks layout', () => {
       await assertTasksLayout(page, testInfo, viewport);
     });
   }
+
+  test('keeps selection and split panes stable across refreshes', async ({
+    page,
+  }) => {
+    await assertTasksInteractions(page);
+  });
 });

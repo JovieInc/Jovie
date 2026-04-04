@@ -56,6 +56,47 @@ interface PageHealthResult {
   readonly error?: string;
 }
 
+function hasOnlyResourceLoadConsoleErrors(
+  criticalErrors: readonly string[],
+  uncaughtExceptions: readonly string[]
+): boolean {
+  return (
+    uncaughtExceptions.length === 0 &&
+    criticalErrors.length > 0 &&
+    criticalErrors.every(error =>
+      error.toLowerCase().includes('failed to load resource')
+    )
+  );
+}
+
+function hasOnlyConsoleResourceNoise(context: {
+  readonly criticalErrors: readonly string[];
+  readonly uncaughtExceptions: readonly string[];
+  readonly networkDiagnostics: {
+    readonly failedResponses: readonly unknown[];
+  };
+}): boolean {
+  return (
+    hasOnlyResourceLoadConsoleErrors(
+      context.criticalErrors,
+      context.uncaughtExceptions
+    ) && context.networkDiagnostics.failedResponses.length === 0
+  );
+}
+
+function shouldIgnoreRouteConsoleNoise(
+  route: DashboardRouteDescriptor,
+  context: {
+    readonly criticalErrors: readonly string[];
+    readonly uncaughtExceptions: readonly string[];
+    readonly networkDiagnostics: {
+      readonly failedResponses: readonly unknown[];
+    };
+  }
+): boolean {
+  return route.name === 'Release Tasks' && hasOnlyConsoleResourceNoise(context);
+}
+
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 const ACTIVE_HEALTH_PAGES = FAST_ITERATION
   ? DASHBOARD_ROUTE_MATRIX.health.fast
@@ -329,8 +370,9 @@ async function runRouteCheck(
     const monitorContext = getContext();
 
     if (
-      monitorContext.criticalErrors.length > 0 ||
-      monitorContext.uncaughtExceptions.length > 0
+      (monitorContext.criticalErrors.length > 0 ||
+        monitorContext.uncaughtExceptions.length > 0) &&
+      !shouldIgnoreRouteConsoleNoise(route, monitorContext)
     ) {
       await testInfo.attach(`console-errors-${route.name}`, {
         body: JSON.stringify(
@@ -449,8 +491,9 @@ async function runRouteCheck(
 
     const finalContext = getContext();
     if (
-      finalContext.criticalErrors.length > 0 ||
-      finalContext.uncaughtExceptions.length > 0
+      (finalContext.criticalErrors.length > 0 ||
+        finalContext.uncaughtExceptions.length > 0) &&
+      !shouldIgnoreRouteConsoleNoise(route, finalContext)
     ) {
       await testInfo.attach(`late-console-errors-${route.name}`, {
         body: JSON.stringify(

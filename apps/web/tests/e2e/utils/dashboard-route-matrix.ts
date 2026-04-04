@@ -138,6 +138,18 @@ const creatorRoutes = [
     performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
   },
   {
+    path: APP_ROUTES.DASHBOARD_TASKS,
+    name: 'Dashboard Tasks',
+    kind: 'render',
+    surface: 'creator',
+    authRole: 'user',
+    contentSelector:
+      '[data-testid="tasks-workspace"], [data-testid="task-list-pane"]',
+    contentFallbackSelector: ':text-matches("tasks|up next|no tasks yet", "i")',
+    requiresUserButton: true,
+    performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
+  },
+  {
     path: DASHBOARD_RELEASE_TASKS_ROUTE,
     name: 'Release Tasks',
     kind: 'dynamic',
@@ -352,6 +364,7 @@ const adminRoutes = [
 const fastHealthPaths = new Set([
   APP_ROUTES.DASHBOARD,
   APP_ROUTES.CHAT,
+  APP_ROUTES.DASHBOARD_TASKS,
   APP_ROUTES.DASHBOARD_AUDIENCE,
   APP_ROUTES.PRESENCE,
   APP_ROUTES.DASHBOARD_RELEASES,
