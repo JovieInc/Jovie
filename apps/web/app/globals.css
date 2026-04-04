@@ -64,32 +64,58 @@ body:has(.profile-viewport) {
   overscroll-behavior: auto;
 }
 
-/* Compact profile — override CTA component styles to fit the unified card */
+/* Compact profile — override CTA styles so button ↔ composer is zero-shift */
 .compact-subscribe-section {
+  /* Kill heading — not needed in compact */
+  & p[class*="text-balance"][class*="font-[640]"] {
+    display: none !important;
+  }
   /* Kill internal spacing */
   & .space-y-3 > * + * {
-    margin-top: 4px !important;
+    margin-top: 0 !important;
   }
-  /* Heading: de-emphasized label */
-  & p[class*="text-balance"][class*="font-[640]"] {
-    font-size: 12px !important;
+  & .space-y-4 > * + * {
+    margin-top: 0 !important;
+  }
+  /* Kill footer disclaimer */
+  & .relative.min-h-5 {
+    display: none !important;
+  }
+  /* Standalone primary button: match composer pill dimensions exactly */
+  & > div > .space-y-3 > button[class*="bg-[var(--profile-pearl-primary-bg)]"],
+  & > div > .space-y-4 > button[class*="bg-[var(--profile-pearl-primary-bg)]"],
+  & > .space-y-3 > button[class*="bg-[var(--profile-pearl-primary-bg)]"],
+  & > .space-y-4 > button[class*="bg-[var(--profile-pearl-primary-bg)]"],
+  & button[class*="h-12"][class*="w-full"] {
+    height: 44px !important;
+    font-size: 13px !important;
     font-weight: 510 !important;
-    text-align: left !important;
-    padding: 6px 12px 0;
-    letter-spacing: 0;
-    color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.06) !important;
+    color: rgba(255, 255, 255, 0.6) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    backdrop-filter: blur(20px);
   }
-  /* Pearl composer: near-invisible, flush with card */
+  & button[class*="h-12"][class*="w-full"]:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: rgba(255, 255, 255, 0.85) !important;
+  }
+  /* Pearl composer: same height pill, near-invisible chrome */
   & [data-testid="subscription-pearl-composer"] {
-    border-color: rgba(255, 255, 255, 0.05) !important;
-    background: rgba(255, 255, 255, 0.03) !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    background: rgba(255, 255, 255, 0.06) !important;
     box-shadow: none !important;
-    margin: 0 8px;
+    display: flex !important;
+    align-items: center !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
   }
-  /* Glass button */
-  & button[class*="bg-[var(--profile-pearl-primary-bg)]"],
-  & a[class*="bg-[var(--profile-pearl-primary-bg)]"] {
-    height: 32px !important;
+  /* Inner action button inside composer */
+  &
+    [data-testid="subscription-pearl-composer"]
+    button[class*="bg-[var(--profile-pearl-primary-bg)]"] {
+    height: 34px !important;
     font-size: 12px !important;
     font-weight: 510 !important;
     padding-left: 12px !important;
@@ -97,22 +123,13 @@ body:has(.profile-viewport) {
     background: rgba(255, 255, 255, 0.1) !important;
     color: rgba(255, 255, 255, 0.85) !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    backdrop-filter: blur(20px);
   }
-  & button[class*="bg-[var(--profile-pearl-primary-bg)]"]:hover {
-    background: rgba(255, 255, 255, 0.14) !important;
-  }
-  /* Input */
+  /* Input inside composer */
   & input[data-testid="subscription-input"] {
-    height: 32px !important;
+    height: 34px !important;
     font-size: 13px !important;
     font-weight: 450 !important;
   }
-  /* Kill footer disclaimer */
-  & .relative.min-h-5 {
-    display: none !important;
-  }
-  padding-bottom: 2px;
 }
 
 /* PWA standalone mode polish — native-feel when installed */
