@@ -24,6 +24,7 @@ describe('performance route manifest', () => {
     expect(END_USER_PERF_GROUP_ORDER).toEqual([
       'home',
       'public-profile-core',
+      'public-profile-mode-shell',
       'public-profile-detail',
       'creator-shell',
       'creator-alias',
@@ -35,14 +36,14 @@ describe('performance route manifest', () => {
 
   it('selects routes by group in deterministic order', () => {
     const selected = selectPerfRoutes({
-      groupIds: ['home', 'public-profile-core'],
+      groupIds: ['home', 'public-profile-mode-shell'],
     });
 
     expect(selected[0]?.id).toBe('home');
     expect(selected.every(route => route.group !== 'creator-shell')).toBe(true);
-    expect(selected.some(route => route.id === 'public-profile-main')).toBe(
-      true
-    );
+    expect(
+      selected.some(route => route.id === 'public-profile-mode-listen')
+    ).toBe(true);
   });
 
   it('selects explicit route ids without pulling in unrelated siblings', () => {

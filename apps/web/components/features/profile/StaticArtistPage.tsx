@@ -41,6 +41,8 @@ export function StaticArtistPage({
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   genres,
+  pressPhotos = [],
+  allowPhotoDownloads = false,
   photoDownloadSizes = [],
   tourDates = [],
   visitTrackingToken,
@@ -56,6 +58,8 @@ export function StaticArtistPage({
       enableDynamicEngagement={enableDynamicEngagement}
       subscribeTwoStep={subscribeTwoStep}
       genres={genres}
+      pressPhotos={pressPhotos}
+      allowPhotoDownloads={allowPhotoDownloads}
       photoDownloadSizes={photoDownloadSizes}
       tourDates={tourDates}
       visitTrackingToken={visitTrackingToken}

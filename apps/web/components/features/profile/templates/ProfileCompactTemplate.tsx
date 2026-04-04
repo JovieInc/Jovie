@@ -2,13 +2,15 @@
 
 import {
   BadgeCheck,
+  Bell,
   CalendarDays,
+  Info,
   Mail,
   MoreHorizontal,
   Play,
   Share2,
+  Ticket,
 } from 'lucide-react';
-import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -19,20 +21,23 @@ import {
   useProfileShell,
 } from '@/components/organisms/profile-shell';
 import { BASE_URL } from '@/constants/app';
-import { ContactDrawer } from '@/features/profile/artist-contacts-button/ContactDrawer';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
-import {
-  ArtistNotificationsCTA,
-  TwoStepNotificationsCTA,
-} from '@/features/profile/artist-notifications-cta';
 import type { ProfileMode } from '@/features/profile/contracts';
-import { ListenDrawer } from '@/features/profile/ListenDrawer';
+import {
+  type ProfileDrawerMode,
+  ProfileModeDrawer,
+} from '@/features/profile/ProfileModeDrawer';
+import {
+  getProfileMode,
+  getProfileModeHref,
+} from '@/features/profile/registry';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
+import type { PressPhoto } from '@/types/press-photos';
 
 /* ─── Design tokens (aligned with DESIGN.md System B dark) ─── */
 const glass = {
@@ -59,10 +64,38 @@ interface ProfileCompactTemplateProps {
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly genres?: string[] | null;
+  readonly pressPhotos?: PressPhoto[];
+  readonly allowPhotoDownloads?: boolean;
   readonly photoDownloadSizes?: AvatarSize[];
   readonly tourDates?: TourDateViewModel[];
   readonly visitTrackingToken?: string;
   readonly viewerCountryCode?: string | null;
+}
+
+function resolveDrawerMode(
+  mode: ProfileMode,
+  options: {
+    readonly hasContacts: boolean;
+    readonly hasDSPs: boolean;
+    readonly hasTip: boolean;
+  }
+): ProfileDrawerMode | null {
+  switch (mode) {
+    case 'about':
+    case 'subscribe':
+      return mode;
+    case 'contact':
+      return options.hasContacts ? mode : null;
+    case 'listen':
+      return options.hasDSPs ? mode : null;
+    case 'tip':
+      return options.hasTip ? mode : null;
+    case 'tour':
+      return mode;
+    case 'profile':
+    default:
+      return null;
+  }
 }
 
 function unwrapNextImageUrl(url: string | null | undefined): string | null {
@@ -84,17 +117,18 @@ export function ProfileCompactTemplate({
   latestRelease,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
+  genres,
+  pressPhotos = [],
+  allowPhotoDownloads = false,
   photoDownloadSizes = [],
   tourDates = [],
   visitTrackingToken,
   viewerCountryCode,
 }: ProfileCompactTemplateProps) {
-  const [listenOpen, setListenOpen] = useState(mode === 'listen');
-  const [contactOpen, setContactOpen] = useState(mode === 'contact');
-  const [subscribeActive, setSubscribeActive] = useState(mode === 'subscribe');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeDrawerMode, setActiveDrawerMode] =
+    useState<ProfileDrawerMode | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const subscribeSectionRef = useRef<HTMLDivElement | null>(null);
 
   const mergedDSPs = useMemo(
     () =>
@@ -142,6 +176,11 @@ export function ProfileCompactTemplate({
     return getHeaderSocialLinks(socialLinks, viewerCountryCode, 2);
   }, [socialLinks, viewerCountryCode]);
 
+  const hasTip = useMemo(
+    () => socialLinks.some(link => link.platform === 'venmo'),
+    [socialLinks]
+  );
+
   const nextTourDate = useMemo(() => {
     const now = Date.now();
     return (
@@ -149,15 +188,56 @@ export function ProfileCompactTemplate({
     );
   }, [tourDates]);
 
-  const handlePlayClick = useCallback(() => {
-    if (mergedDSPs.length === 0) {
-      subscribeSectionRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      });
+  const resolveActiveMode = useCallback(
+    (nextMode: ProfileMode) =>
+      resolveDrawerMode(nextMode, {
+        hasContacts,
+        hasDSPs: mergedDSPs.length > 0,
+        hasTip,
+      }),
+    [hasContacts, hasTip, mergedDSPs.length]
+  );
+
+  useEffect(() => {
+    setActiveDrawerMode(resolveActiveMode(mode));
+  }, [mode, resolveActiveMode]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const nextMode = getProfileMode(
+        new URLSearchParams(globalThis.location.search).get('mode')
+      );
+      setActiveDrawerMode(resolveActiveMode(nextMode));
+    };
+
+    globalThis.addEventListener('popstate', handlePopState);
+    return () => globalThis.removeEventListener('popstate', handlePopState);
+  }, [resolveActiveMode]);
+
+  useEffect(() => {
+    const href =
+      activeDrawerMode === null
+        ? getProfileModeHref(artist.handle, 'profile')
+        : getProfileModeHref(artist.handle, activeDrawerMode);
+    const currentHref = `${globalThis.location.pathname}${globalThis.location.search}`;
+    if (currentHref === href) {
       return;
     }
-    setListenOpen(true);
+
+    globalThis.history.pushState(globalThis.history.state, '', href);
+  }, [activeDrawerMode, artist.handle]);
+
+  const openDrawerMode = useCallback((nextMode: ProfileDrawerMode) => {
+    setActiveDrawerMode(nextMode);
+    setMenuOpen(false);
+  }, []);
+
+  const handlePlayClick = useCallback(() => {
+    if (mergedDSPs.length === 0) {
+      setActiveDrawerMode('subscribe');
+      return;
+    }
+    setActiveDrawerMode('listen');
   }, [mergedDSPs.length]);
 
   const handleShare = useCallback(async () => {
@@ -289,16 +369,36 @@ export function ProfileCompactTemplate({
                             <Share2 className='h-[14px] w-[14px] text-white/50' />
                             Share Profile
                           </button>
+                          <button
+                            type='button'
+                            role='menuitem'
+                            className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
+                            onClick={() => openDrawerMode('about')}
+                          >
+                            <Info className='h-[14px] w-[14px] text-white/50' />
+                            About
+                          </button>
                           {tourDates.length > 0 ? (
-                            <Link
-                              href={`/${artist.handle}?mode=tour`}
+                            <button
+                              type='button'
                               role='menuitem'
                               className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
-                              onClick={() => setMenuOpen(false)}
+                              onClick={() => openDrawerMode('tour')}
                             >
                               <CalendarDays className='h-[14px] w-[14px] text-white/50' />
                               Tour Dates
-                            </Link>
+                            </button>
+                          ) : null}
+                          {hasTip ? (
+                            <button
+                              type='button'
+                              role='menuitem'
+                              className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
+                              onClick={() => openDrawerMode('tip')}
+                            >
+                              <Ticket className='h-[14px] w-[14px] text-white/50' />
+                              Tip
+                            </button>
                           ) : null}
                           {hasContacts ? (
                             <button
@@ -306,14 +406,22 @@ export function ProfileCompactTemplate({
                               role='menuitem'
                               className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
                               onClick={() => {
-                                setMenuOpen(false);
-                                setContactOpen(true);
+                                openDrawerMode('contact');
                               }}
                             >
                               <Mail className='h-[14px] w-[14px] text-white/50' />
                               Contact
                             </button>
                           ) : null}
+                          <button
+                            type='button'
+                            role='menuitem'
+                            className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
+                            onClick={() => openDrawerMode('subscribe')}
+                          >
+                            <Bell className='h-[14px] w-[14px] text-white/50' />
+                            Get Notified
+                          </button>
                         </div>
                       ) : null}
                     </div>
@@ -349,12 +457,7 @@ export function ProfileCompactTemplate({
 
               {/* ─── Content ─── */}
               <div className='relative z-10 flex flex-col gap-3 px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3'>
-                {/* Featured card OR subscribe heading (mutually exclusive) */}
-                {subscribeActive ? (
-                  <p className='text-center text-[13px] font-[450] leading-relaxed text-white/50'>
-                    Never miss a release from {artist.name}.
-                  </p>
-                ) : latestRelease ? (
+                {latestRelease ? (
                   <button
                     type='button'
                     onClick={handlePlayClick}
@@ -427,29 +530,52 @@ export function ProfileCompactTemplate({
                   </button>
                 ) : null}
 
-                {/* Subscribe */}
                 <div
-                  ref={subscribeSectionRef}
-                  data-testid='compact-subscribe'
-                  className={`compact-subscribe-section${subscribeActive ? ' compact-subscribe-active' : ''}`}
-                  onClickCapture={() => {
-                    if (!subscribeActive) setSubscribeActive(true);
-                  }}
+                  className='grid grid-cols-2 gap-2'
+                  data-testid='profile-mode-shortcuts'
                 >
-                  {subscribeTwoStep ? (
-                    <TwoStepNotificationsCTA
-                      artist={artist}
-                      startExpanded={subscribeActive || mode === 'subscribe'}
-                    />
-                  ) : (
-                    <ArtistNotificationsCTA
-                      artist={artist}
-                      variant='button'
-                      autoOpen={subscribeActive || mode === 'subscribe'}
-                      forceExpanded
-                      hideListenFallback
-                    />
-                  )}
+                  <button
+                    type='button'
+                    onClick={() => openDrawerMode('subscribe')}
+                    className={`flex items-center justify-center gap-2 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-3 text-[12px] font-[560] text-white/84 ${glass.blur} transition-colors duration-150 ${glass.bgHover}`}
+                  >
+                    <Bell className='h-3.5 w-3.5 text-white/52' />
+                    Get Notified
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() => openDrawerMode('about')}
+                    className={`flex items-center justify-center gap-2 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-3 text-[12px] font-[560] text-white/84 ${glass.blur} transition-colors duration-150 ${glass.bgHover}`}
+                  >
+                    <Info className='h-3.5 w-3.5 text-white/52' />
+                    About
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() => openDrawerMode('tour')}
+                    className={`flex items-center justify-center gap-2 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-3 text-[12px] font-[560] text-white/84 ${glass.blur} transition-colors duration-150 ${glass.bgHover}`}
+                  >
+                    <CalendarDays className='h-3.5 w-3.5 text-white/52' />
+                    Tour
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() =>
+                      openDrawerMode(
+                        hasTip ? 'tip' : hasContacts ? 'contact' : 'listen'
+                      )
+                    }
+                    className={`flex items-center justify-center gap-2 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-3 text-[12px] font-[560] text-white/84 ${glass.blur} transition-colors duration-150 ${glass.bgHover}`}
+                  >
+                    {hasTip ? (
+                      <Ticket className='h-3.5 w-3.5 text-white/52' />
+                    ) : hasContacts ? (
+                      <Mail className='h-3.5 w-3.5 text-white/52' />
+                    ) : (
+                      <Play className='h-3.5 w-3.5 fill-current text-white/52' />
+                    )}
+                    {hasTip ? 'Tip' : hasContacts ? 'Contact' : 'Listen'}
+                  </button>
                 </div>
 
                 {/* Social icons — flat, no chrome */}
@@ -495,27 +621,26 @@ export function ProfileCompactTemplate({
           </main>
         </div>
 
-        {/* ─── Drawers ─── */}
-        {mergedDSPs.length > 0 ? (
-          <ListenDrawer
-            open={listenOpen}
-            onOpenChange={setListenOpen}
-            artist={artist}
-            dsps={mergedDSPs}
-            enableDynamicEngagement={enableDynamicEngagement}
-          />
-        ) : null}
-
-        {hasContacts ? (
-          <ContactDrawer
-            open={contactOpen}
-            onOpenChange={setContactOpen}
-            artistName={artist.name}
-            artistHandle={artist.handle}
-            contacts={availableContacts}
-            primaryChannel={primaryChannel}
-          />
-        ) : null}
+        <ProfileModeDrawer
+          activeMode={activeDrawerMode}
+          onOpenChange={open => {
+            if (!open) {
+              setActiveDrawerMode(null);
+            }
+          }}
+          artist={artist}
+          socialLinks={socialLinks}
+          contacts={availableContacts}
+          primaryChannel={primaryChannel}
+          dsps={mergedDSPs}
+          enableDynamicEngagement={enableDynamicEngagement}
+          subscribeTwoStep={subscribeTwoStep}
+          genres={genres}
+          pressPhotos={pressPhotos}
+          allowPhotoDownloads={allowPhotoDownloads}
+          photoDownloadSizes={photoDownloadSizes}
+          tourDates={tourDates}
+        />
       </div>
     </ProfileNotificationsContext.Provider>
   );

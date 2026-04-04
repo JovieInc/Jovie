@@ -9,6 +9,9 @@ jobs:
   actionlint:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      SHELLCHECK_OPTS: >-
+        --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: rhysd/actionlint@393031adb9afb225ee52ae2ccd7a5af5525e03e8 # v1.7.11

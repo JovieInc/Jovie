@@ -22,7 +22,6 @@ vi.mock('@/lib/env-server', () => ({
 
 describe('Statsig server initialization', () => {
   beforeEach(() => {
-    vi.resetModules();
     vi.restoreAllMocks();
   });
 

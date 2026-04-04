@@ -20,29 +20,7 @@ const SHELL_ROOT = path.resolve(__dirname, '../../../app/app/(shell)');
  * Intentionally deferred routes — loading skeleton exists but page is not
  * implemented yet. Each entry MUST have a reason.
  */
-const EXPECTED_SKELETON_ONLY: Record<string, string> = {
-  // Layout-level loading shells (no page.tsx by design — sub-routes handle content)
-  dashboard: 'layout loading shell, sub-routes have pages',
-  settings: 'layout loading shell, sub-routes have pages',
-
-  // No backend implemented yet
-  'settings/branding': 'no backend, deferred',
-  'settings/appearance': 'no backend, deferred',
-  'settings/notifications': 'no backend, deferred',
-  'settings/remove-branding': 'premium feature, no backend',
-
-  // Redundant with existing pages
-  'settings/profile': 'redundant with /settings/artist-profile',
-  'dashboard/overview': 'chat is the home page now',
-  'dashboard/profile': 'integrated into chat',
-  'dashboard/tipping': 'redirect to earnings, loading skeleton for transition',
-  'dashboard/contacts': 'managed via /settings/contacts',
-  'dashboard/tour-dates': 'managed via /settings/touring',
-  'dashboard/links':
-    'managed via chat page GroupedLinksManager; standalone page needs preview panel context refactor',
-  'settings/retargeting-ads':
-    'admin-only retargeting attribution dashboard, deferred',
-};
+const EXPECTED_SKELETON_ONLY: Record<string, string> = {};
 
 function findLoadingDirs(dir: string, base: string = ''): string[] {
   const results: string[] = [];
