@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { OnboardingV2Form } from './onboarding-v2/OnboardingV2Form';
 
 /** Max age (ms) for a pendingClaim entry to be considered valid (10 minutes). */
@@ -65,16 +65,21 @@ export function OnboardingFormWrapper({
   // reading it eagerly is safe and keeps the form key stable.
   const [resolvedHandle] = useState(() => {
     if (initialHandle) return initialHandle;
-    const pending = readPendingClaimHandle();
-    if (pending) {
+    return readPendingClaimHandle() || initialHandle;
+  });
+
+  // Clean up the consumed pendingClaim entry in an effect (not in the
+  // useState initializer) to avoid a side effect during render, which
+  // React StrictMode would execute twice.
+  useEffect(() => {
+    if (resolvedHandle && resolvedHandle !== initialHandle) {
       try {
         globalThis.sessionStorage?.removeItem('pendingClaim');
       } catch {
         // sessionStorage may be unavailable in restricted contexts
       }
     }
-    return pending || initialHandle;
-  });
+  }, [resolvedHandle, initialHandle]);
 
   // Stable key — never changes after mount, preventing full-form CLS.
   const formKey = resolvedHandle || '__empty__';

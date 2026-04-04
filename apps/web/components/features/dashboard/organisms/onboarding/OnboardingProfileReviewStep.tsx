@@ -342,7 +342,7 @@ export function OnboardingProfileReviewStep({
           <div className='flex flex-col items-center gap-6 py-12'>
             <div className='w-full max-w-xs'>
               <div className='h-1.5 w-full overflow-hidden rounded-full bg-surface-1'>
-                <div className='h-full rounded-full bg-(--linear-accent) animate-[onboarding-indeterminate_1.5s_ease-in-out_infinite]' />
+                <div className='h-full w-[40%] rounded-full bg-(--linear-accent) animate-[onboarding-indeterminate_1.5s_ease-in-out_infinite]' />
               </div>
             </div>
             <p className='text-[13px] text-secondary-token animate-pulse'>
