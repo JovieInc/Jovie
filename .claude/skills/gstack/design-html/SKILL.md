@@ -230,6 +230,11 @@ If `_CONTRIB` is `true`: you are in **contributor mode**. At the end of each maj
 **File only:** gstack tooling bugs where the input was reasonable but gstack failed. **Skip:** user app bugs, network errors, auth failures on user's site.
 
 **To file:** write `~/.gstack/contributor-logs/{slug}.md`:
+
+```bash
+mkdir -p ~/.gstack/contributor-logs
+```
+
 ```
 # {Title}
 **What I tried:** {action} | **What happened:** {result} | **Rating:** {0-10}
@@ -405,7 +410,12 @@ If `NEEDS_SETUP`:
 3. If `bun` is not installed:
    ```bash
    if ! command -v bun >/dev/null 2>&1; then
-     curl -fsSL https://bun.sh/install | BUN_VERSION=1.3.10 bash
+     BUN_VERSION=1.3.10
+     curl -fsSL -o /tmp/bun.zip "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/arm64/aarch64/').zip"
+     curl -fsSL -o /tmp/bun-shasums.txt "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/SHASUMS256.txt"
+     (cd /tmp && grep "$(basename bun.zip)" bun-shasums.txt | shasum -a 256 -c -)
+     unzip -o /tmp/bun.zip -d /tmp/bun-install && install -m 755 /tmp/bun-install/*/bun "$HOME/.bun/bin/bun"
+     rm -rf /tmp/bun.zip /tmp/bun-shasums.txt /tmp/bun-install
    fi
    ```
 

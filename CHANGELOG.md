@@ -13,7 +13,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Updated `MENU_ITEM_COMPACT` and `DROPDOWN_CONTENT_COMPACT_BASE` in `packages/ui/lib/dropdown-styles.ts` to use `--linear-*` radius, surface, border, and text tokens for consistency with the Linear token system
 - Updated compact dropdown tests to assert compact padding semantics directly in `packages/ui/lib/dropdown-styles.test.ts`
-- Regenerated gstack skill documentation updates in `.claude/skills/gstack/{checkpoint,design-html,health,learn}/SKILL.md`
+- [internal] Regenerated gstack skill documentation updates in `.claude/skills/gstack/{checkpoint,design-html,health,learn}/SKILL.md`
 
 ## [26.4.113] - 2026-04-03
 

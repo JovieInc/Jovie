@@ -111,7 +111,7 @@ describe('dropdown-styles', () => {
       expect(dropdownMenuContentCompactClasses).toContain(
         DROPDOWN_CONTENT_COMPACT_BASE
       );
-      // Compact uses tighter padding (p-0.5) than standard
+      // Both compact and standard use p-0.5 padding; retained for explicit contract coverage
       expect(DROPDOWN_CONTENT_COMPACT_BASE).toContain('p-0.5');
     });
 

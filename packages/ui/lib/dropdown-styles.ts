@@ -17,7 +17,7 @@
  * Design tokens used:
  * - Border radius: rounded-(--linear-app-radius-menu) / rounded-(--linear-app-radius-item)
  * - Background: bg-(--linear-bg-surface-0) (elevated)
- * - Border: border-(--linear-border-subtle) (uses design token for both modes)
+ * - Border: border-(--linear-border-default) (uses design token for both modes)
  * - Shadow: consistent across all variants
  * - Transition: duration-normal ease-interactive
  */
@@ -285,7 +285,7 @@ export const subMenuContentClasses = [
 // ============================================================================
 
 /**
- * Compact base — same surface/border/animation but tighter padding
+ * Compact base — currently equivalent to DROPDOWN_CONTENT_BASE; retained for future divergence
  */
 export const DROPDOWN_CONTENT_COMPACT_BASE =
   'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)';
