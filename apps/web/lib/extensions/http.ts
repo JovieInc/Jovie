@@ -6,7 +6,7 @@ export function createExtensionCorsHeaders(
 ): HeadersInit {
   const origin = request.headers.get('origin');
 
-  if (!origin || !origin.startsWith('chrome-extension://')) {
+  if (!origin?.startsWith('chrome-extension://')) {
     return NO_STORE_HEADERS;
   }
 

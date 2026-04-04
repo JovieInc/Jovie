@@ -194,8 +194,8 @@ function extractNumericValueBeforeTrackLabel(html: string): number | null {
 
 function extractUpc(html: string): string | null {
   const match =
-    html.match(/UPC[:\s]+([0-9A-Za-z-]+)/i) ??
-    html.match(/Barcode[:\s]+([0-9A-Za-z-]+)/i);
+    html.match(/UPC[:\s]+([0-9a-z-]+)/i) ??
+    html.match(/Barcode[:\s]+([0-9a-z-]+)/i);
   return match?.[1]?.trim() ?? null;
 }
 
