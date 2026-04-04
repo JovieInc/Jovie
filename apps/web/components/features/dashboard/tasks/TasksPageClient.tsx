@@ -39,7 +39,10 @@ import { DashboardHeaderActionButton } from '@/components/features/dashboard/ato
 import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
 import { TaskDescriptionHelper } from '@/components/features/dashboard/tasks/TaskDescriptionHelper';
-import { TaskListRow } from '@/components/features/dashboard/tasks/TaskListRow';
+import {
+  PriorityBars,
+  TaskListRow,
+} from '@/components/features/dashboard/tasks/TaskListRow';
 import {
   HIDDEN_DIV_STYLES,
   useTextareaAutosize,
@@ -237,11 +240,7 @@ function TaskPriorityInline({
       className='inline-flex items-center gap-1.5 text-secondary-token'
       title={`Priority ${visual.label}`}
     >
-      <span
-        className='h-1.5 w-1.5 rounded-full'
-        style={{ backgroundColor: accent.solid }}
-        aria-hidden='true'
-      />
+      <PriorityBars bars={visual.bars} accentColor={accent.solid} />
       <span className='font-[560] text-secondary-token'>{visual.label}</span>
       {withChevron ? (
         <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
@@ -314,10 +313,7 @@ function TaskPriorityLeadingVisual({
       className='inline-flex h-4 w-4 items-center justify-center'
       aria-hidden='true'
     >
-      <span
-        className='h-1.5 w-1.5 rounded-full'
-        style={{ backgroundColor: accent.solid }}
-      />
+      <PriorityBars bars={visual.bars} accentColor={accent.solid} />
     </span>
   );
 }
@@ -944,10 +940,9 @@ function MobileTaskListItem({
           <span className='truncate'>{stage.label}</span>
           <span className='text-tertiary-token'>J-{task.taskNumber}</span>
           <span className='inline-flex items-center gap-1'>
-            <span
-              className='h-1.5 w-1.5 rounded-full'
-              style={{ backgroundColor: priorityAccent.solid }}
-              aria-hidden='true'
+            <PriorityBars
+              bars={priority.bars}
+              accentColor={priorityAccent.solid}
             />
             <span>{priority.label}</span>
           </span>
@@ -966,7 +961,7 @@ function MobileTaskListItem({
           <ReleaseDueBadge
             dueDate={task.dueAt}
             dueDaysOffset={null}
-            isCompleted={task.status === 'done'}
+            isCompleted={task.status === 'done' || task.status === 'cancelled'}
           />
         ) : null}
         {task.releaseTitle ? (
@@ -1567,14 +1562,11 @@ export function TasksPageClient() {
   };
 
   return (
-    <PageShell className='overflow-hidden' data-testid='tasks-workspace'>
-      <section
-        className={cn(
-          'flex min-h-0 flex-1 flex-col gap-2 overflow-hidden rounded-[22px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)] px-6 pb-6 pt-3'
-        )}
-        data-testid='tasks-content-panel'
-      >
-        {isXlUp || headerMode !== 'default' ? (
+    <PageShell
+      className='overflow-hidden'
+      data-testid='tasks-workspace'
+      toolbar={
+        isXlUp || headerMode !== 'default' ? (
           <TaskWorkspaceHeaderBar
             mode={headerMode}
             search={search}
@@ -1603,8 +1595,15 @@ export function TasksPageClient() {
             onSelectPrevious={selectPreviousTask}
             onSelectNext={selectNextTask}
           />
-        ) : null}
-
+        ) : undefined
+      }
+    >
+      <section
+        className={cn(
+          'flex min-h-0 flex-1 flex-col gap-2 overflow-hidden pb-2'
+        )}
+        data-testid='tasks-content-panel'
+      >
         {isError ? (
           <div className='flex min-h-[240px] flex-1 flex-col items-center justify-center gap-3 px-6 text-center'>
             <div className='space-y-1'>
