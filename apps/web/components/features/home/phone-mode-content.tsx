@@ -6,7 +6,6 @@
  */
 
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
-import { HomepageLabelLogoMark } from './HomepageLabelLogoMark';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -115,25 +114,22 @@ export const MOCK_TOUR_DATES = [
 ] as const;
 
 function ListenContent() {
-  const labels = [
-    { partner: 'orchard', caption: 'Launch partner' },
-    { partner: 'awal', caption: 'Catalog sync' },
-    { partner: 'armada', caption: 'Audience push' },
+  const dsps = [
+    { name: 'Spotify', action: 'Play' },
+    { name: 'Apple Music', action: 'Listen' },
+    { name: 'YouTube Music', action: 'Watch' },
   ] as const;
   return (
     <div className='flex h-full flex-col justify-center gap-3'>
-      {labels.map(label => (
+      {dsps.map(dsp => (
         <div
-          key={label.partner}
+          key={dsp.name}
           className='flex items-center justify-between rounded-xl bg-surface-1 px-3 py-2.5'
         >
-          <HomepageLabelLogoMark
-            partner={label.partner}
-            className='text-primary-token'
-          />
-          <span className='text-[10px] text-tertiary-token'>
-            {label.caption}
+          <span className='text-[12px] font-medium text-primary-token'>
+            {dsp.name}
           </span>
+          <span className='text-[10px] text-tertiary-token'>{dsp.action}</span>
         </div>
       ))}
     </div>

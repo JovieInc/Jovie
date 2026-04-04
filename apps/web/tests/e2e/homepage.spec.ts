@@ -75,7 +75,7 @@ test.describe('Homepage', () => {
     ).toHaveCount(0);
     await expect(
       page.getByRole('heading', {
-        name: 'Context, monitoring, and tasks in one system.',
+        name: 'Your release operating system.',
       })
     ).toBeVisible();
 
@@ -92,10 +92,11 @@ test.describe('Homepage', () => {
 
   test('final CTA renders with current actions', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: 'Release day starts here.' })
+      page.getByRole('heading', {
+        name: 'You made the song. Now make it hit.',
+      })
     ).toBeVisible();
     await expect(page.getByRole('link', { name: 'Start Free' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Log In' })).toBeVisible();
   });
 
   test('is responsive on mobile', async ({ page }) => {

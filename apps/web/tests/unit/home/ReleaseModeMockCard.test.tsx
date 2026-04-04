@@ -19,7 +19,7 @@ describe('ReleaseModeMockCard', () => {
     );
 
     expect(screen.getByText('Countdown Presave')).toBeInTheDocument();
-    expect(screen.getAllByText('Afterlight').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('The Sound').length).toBeGreaterThan(0);
     expect(screen.getByText('Presave is open')).toBeInTheDocument();
     expect(screen.getAllByText('Presave').length).toBeGreaterThan(0);
     expect(screen.getByTestId('label-logo-orchard')).toBeInTheDocument();
