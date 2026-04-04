@@ -42,6 +42,7 @@ import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { captureError } from '@/lib/error-tracking';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
@@ -232,7 +233,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     ...experienceAdapter?.entitlements,
   };
   const isReleasePlanGateLoading =
-    planGate.isLoading && releasePlanEntitlementOverride === undefined;
+    (planGate.isLoading || planGate.isError) &&
+    releasePlanEntitlementOverride === undefined;
 
   /** Soft cap: show a "request higher limit" banner (not a hard lock) */
   const SMART_LINK_SOFT_CAP = 100;
@@ -434,7 +436,12 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       setIsPostCreatePlanModalOpen(false);
       setPostCreateRelease(null);
       router.push(releaseTasksPath);
-    } catch {
+    } catch (error) {
+      captureError('Failed to generate release plan', error, {
+        context: 'release-provider-matrix',
+        releaseId: postCreateRelease.id,
+        action: 'generate-release-plan',
+      });
       toast.error('Failed to generate the release plan. Try again.');
     } finally {
       setIsGeneratingReleasePlan(false);
