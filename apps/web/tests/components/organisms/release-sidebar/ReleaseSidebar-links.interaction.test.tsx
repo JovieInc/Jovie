@@ -2,6 +2,11 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockUsePlanGate = vi.fn(() => ({
+  canAccessTasksWorkspace: true,
+  isLoading: false,
+}));
+
 // ReleaseSidebar directly uses SegmentControl from @jovie/ui for tab navigation.
 // All other sub-components that use additional @jovie/ui parts are mocked below,
 // so only SegmentControl needs to be provided here.
@@ -224,6 +229,12 @@ vi.mock('@/components/atoms/Icon', () => ({
   Icon: () => <span data-testid='icon' />,
 }));
 
+vi.mock('@/components/molecules/UpgradeButton', () => ({
+  UpgradeButton: ({ children }: { children: React.ReactNode }) => (
+    <button type='button'>{children}</button>
+  ),
+}));
+
 vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
   AlbumArtworkContextMenu: ({ children }: { children: React.ReactNode }) => (
     <div data-testid='artwork-menu'>{children}</div>
@@ -281,8 +292,15 @@ vi.mock('@/components/features/dashboard/release-tasks', () => ({
   ReleaseTaskChecklist: () => <div data-testid='task-checklist'>Tasks</div>,
 }));
 
+vi.mock('@/lib/queries', () => ({
+  usePlanGate: () => mockUsePlanGate(),
+}));
+
 vi.mock('@/constants/routes', () => ({
-  APP_ROUTES: { DASHBOARD_RELEASES: '/dashboard/releases' },
+  APP_ROUTES: {
+    DASHBOARD_RELEASES: '/dashboard/releases',
+    DASHBOARD_RELEASE_TASKS: '/dashboard/releases/[releaseId]/tasks',
+  },
 }));
 
 vi.mock(
@@ -353,6 +371,10 @@ const defaultProps = {
 describe('ReleaseSidebar Links tab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUsePlanGate.mockReturnValue({
+      canAccessTasksWorkspace: true,
+      isLoading: false,
+    });
   });
 
   it('shows empty state when no release selected', () => {
@@ -405,6 +427,23 @@ describe('ReleaseSidebar Links tab', () => {
     // Switch to Tasks
     await user.click(screen.getByTestId('drawer-tab-tasks'));
     expect(screen.getByTestId('task-checklist')).toBeInTheDocument();
+  });
+
+  it('shows the compact upgrade card when task access is locked', async () => {
+    mockUsePlanGate.mockReturnValue({
+      canAccessTasksWorkspace: false,
+      isLoading: false,
+    });
+
+    const user = userEvent.setup();
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    await user.click(screen.getByTestId('drawer-tab-tasks'));
+
+    expect(
+      screen.getByTestId('compact-release-plan-upgrade-card')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('task-checklist')).not.toBeInTheDocument();
   });
 
   it('does not render the generic Releases title row above the entity card', () => {

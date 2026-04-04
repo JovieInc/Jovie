@@ -2,8 +2,10 @@ import { and, eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { ReleaseTaskPage } from '@/components/features/dashboard/release-tasks';
+import { ReleasePlanUpgradeInterstitial } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
+import { canAccessTasksWorkspace } from '@/lib/entitlements/tasks-gate';
 import { requireProfileId } from '../../../requireProfileId';
 
 interface TasksPageProps {
@@ -45,6 +47,10 @@ async function TasksContent({ releaseId }: Readonly<{ releaseId: string }>) {
 
   if (!release) {
     notFound();
+  }
+
+  if (!(await canAccessTasksWorkspace())) {
+    return <ReleasePlanUpgradeInterstitial releaseTitle={release.title} />;
   }
 
   return (

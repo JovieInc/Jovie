@@ -36,6 +36,7 @@ import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
+import { CompactReleasePlanUpgradeCard } from '@/features/dashboard/tasks/TasksUpgradeInterstitial';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
@@ -43,6 +44,7 @@ import {
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { ProviderKey } from '@/lib/discography/types';
+import { usePlanGate } from '@/lib/queries';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -357,6 +359,7 @@ export function ReleaseSidebar({
 
   // Sidebar tab state
   const [activeTab, setActiveTab] = useState<SidebarTab>('playback');
+  const { canAccessTasksWorkspace } = usePlanGate();
   const [platformRescanCooldownEnd, setPlatformRescanCooldownEnd] = useState(0);
   const [platformRescanRemainingMs, setPlatformRescanRemainingMs] = useState(0);
   const platformRescanTimerRef = useRef<ReturnType<typeof setInterval> | null>(
@@ -720,14 +723,24 @@ export function ReleaseSidebar({
 
               {activeTab === 'tasks' && (
                 <div className='min-h-0' data-testid='release-tasks-card'>
-                  <ReleaseTaskChecklist
-                    releaseId={release.id}
-                    variant='compact'
-                    releaseDate={release.releaseDate}
-                    onNavigateToFullPage={() => {
-                      globalThis.location.href = `${APP_ROUTES.DASHBOARD_RELEASES}/${release.id}/tasks`;
-                    }}
-                  />
+                  {canAccessTasksWorkspace ? (
+                    <ReleaseTaskChecklist
+                      releaseId={release.id}
+                      variant='compact'
+                      releaseDate={release.releaseDate}
+                      onNavigateToFullPage={() => {
+                        globalThis.location.href =
+                          APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
+                            '[releaseId]',
+                            release.id
+                          );
+                      }}
+                    />
+                  ) : (
+                    <CompactReleasePlanUpgradeCard
+                      onDismiss={() => setActiveTab('details')}
+                    />
+                  )}
                 </div>
               )}
 

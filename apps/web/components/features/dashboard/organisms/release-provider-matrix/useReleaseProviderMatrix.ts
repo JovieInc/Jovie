@@ -141,7 +141,12 @@ export function useReleaseProviderMatrix({
   );
 
   const handleReleaseCreated = useCallback(
-    (createdRelease: ReleaseViewModel) => {
+    (
+      createdRelease: ReleaseViewModel,
+      options?: { readonly openEditor?: boolean }
+    ) => {
+      const shouldOpenEditor = options?.openEditor ?? true;
+
       setRawRows(currentRows => {
         const existingIndex = currentRows.findIndex(
           release => release.id === createdRelease.id
@@ -155,8 +160,15 @@ export function useReleaseProviderMatrix({
           release.id === createdRelease.id ? createdRelease : release
         );
       });
-      setDrafts(buildDrafts(createdRelease));
-      setEditingRelease(createdRelease);
+
+      if (shouldOpenEditor) {
+        setDrafts(buildDrafts(createdRelease));
+        setEditingRelease(createdRelease);
+        return;
+      }
+
+      setDrafts({});
+      setEditingRelease(null);
     },
     []
   );

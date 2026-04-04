@@ -360,6 +360,12 @@ vi.mock('@/lib/utm', () => ({
   getUTMShareContextMenuItems: () => [],
   getUTMShareDropdownItems: () => [],
 }));
+vi.mock('@/lib/queries', () => ({
+  usePlanGate: () => ({
+    canAccessTasksWorkspace: true,
+    isLoading: false,
+  }),
+}));
 
 const { ReleaseSidebar } = await import(
   '@/components/organisms/release-sidebar/ReleaseSidebar'

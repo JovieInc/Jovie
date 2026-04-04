@@ -8,6 +8,10 @@ import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tasks } from '@/lib/db/schema/tasks';
 import {
+  requireReleasePlanGenerationAccess,
+  requireTasksWorkspaceAccess,
+} from '@/lib/entitlements/tasks-gate';
+import {
   DEFAULT_RELEASE_TASK_TEMPLATE,
   type DefaultTemplateItem,
 } from '@/lib/release-tasks/default-template';
@@ -86,6 +90,7 @@ function computeDueDate(releaseDate: Date, offsetDays: number): Date {
 }
 
 export async function instantiateReleaseTasks(releaseId: string) {
+  await requireReleasePlanGenerationAccess();
   const profileId = await requireProfileId();
   await requireReleaseAccess(releaseId, profileId);
 
@@ -180,6 +185,7 @@ export async function instantiateReleaseTasks(releaseId: string) {
 export async function getReleaseTasks(
   releaseId: string
 ): Promise<ReleaseTaskView[]> {
+  await requireTasksWorkspaceAccess();
   const profileId = await requireProfileId();
   await requireReleaseAccess(releaseId, profileId);
 
@@ -239,6 +245,7 @@ export async function updateReleaseTask(
     readonly dueDate?: Date | null;
   }
 ) {
+  await requireTasksWorkspaceAccess();
   await updateTask(taskId, {
     status: data.status,
     priority: data.priority,
@@ -267,6 +274,7 @@ export async function addReleaseTask(
     readonly dueDate?: Date;
   }
 ): Promise<ReleaseTaskView> {
+  await requireTasksWorkspaceAccess();
   const profileId = await requireProfileId();
   await requireReleaseAccess(releaseId, profileId);
 
@@ -284,6 +292,7 @@ export async function addReleaseTask(
 }
 
 export async function deleteReleaseTask(taskId: string) {
+  await requireTasksWorkspaceAccess();
   await deleteTask(taskId);
   return { success: true };
 }
@@ -291,6 +300,7 @@ export async function deleteReleaseTask(taskId: string) {
 export async function getReleaseTaskSummary(
   _profileId?: string
 ): Promise<Map<string, { total: number; done: number }>> {
+  await requireTasksWorkspaceAccess();
   const profileId = await requireProfileId();
 
   const rows = await db
@@ -330,6 +340,7 @@ export async function recomputeTaskDueDates(
   releaseId: string,
   newReleaseDate: Date
 ) {
+  await requireTasksWorkspaceAccess();
   await db.execute(drizzleSql`
     UPDATE tasks
     SET due_at = ${newReleaseDate}::timestamp + (((metadata ->> 'dueDaysOffset')::int) || ' days')::interval,

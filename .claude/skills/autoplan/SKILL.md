@@ -1,0 +1,1 @@
+/Users/timwhite/conductor/workspaces/jovie/khartoum/.claude/skills/gstack/autoplan/SKILL.md
