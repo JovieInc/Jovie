@@ -425,7 +425,10 @@ export function ProfileCompactTemplate({
                 <div className='pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-[linear-gradient(to_top,var(--profile-stage-bg)_0%,rgba(5,6,8,0.75)_45%,transparent_100%)]' />
 
                 {/* Top bar */}
-                <div className='relative z-10 flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),20px)]'>
+                <div
+                  className='relative z-10 flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),20px)]'
+                  data-testid='profile-header'
+                >
                   <BrandLogo
                     size={22}
                     tone='white'
