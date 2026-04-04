@@ -18,7 +18,6 @@ import {
 } from '@/features/profile/artist-notifications-cta';
 import type { ProfileMode } from '@/features/profile/contracts';
 import { ListenDrawer } from '@/features/profile/ListenDrawer';
-import { ProfileFeaturedCard } from '@/features/profile/ProfileFeaturedCard';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
@@ -42,7 +41,6 @@ interface ProfileCompactTemplateProps {
   readonly subscribeTwoStep?: boolean;
   readonly genres?: string[] | null;
   readonly photoDownloadSizes?: AvatarSize[];
-  readonly tourDates?: { readonly id: string }[];
   readonly visitTrackingToken?: string;
   readonly viewerCountryCode?: string | null;
 }
@@ -67,7 +65,6 @@ export function ProfileCompactTemplate({
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   photoDownloadSizes = [],
-  tourDates = [],
   visitTrackingToken,
   viewerCountryCode,
 }: ProfileCompactTemplateProps) {
@@ -122,6 +119,9 @@ export function ProfileCompactTemplate({
   const visibleSocialLinks = useMemo(() => {
     return getHeaderSocialLinks(socialLinks, viewerCountryCode, 4);
   }, [socialLinks, viewerCountryCode]);
+
+  const dspCountLabel =
+    mergedDSPs.length > 0 ? ` · ${mergedDSPs.length} platforms` : '';
 
   const handlePlayClick = useCallback(() => {
     if (mergedDSPs.length === 0) {
@@ -311,34 +311,46 @@ export function ProfileCompactTemplate({
 
               {/* Content: player + subscribe + socials */}
               <div className='relative z-10 flex flex-col gap-4 px-5 pb-[max(env(safe-area-inset-bottom),40px)] pt-5'>
-                {/* Latest release / player card */}
-                {latestRelease ? (
-                  <ProfileFeaturedCard
-                    artist={artist}
-                    latestRelease={latestRelease}
-                    tourDates={tourDates as never}
-                    dsps={mergedDSPs}
-                  />
-                ) : mergedDSPs.length > 0 ? (
+                {/* Mini player card — liquid glass */}
+                {latestRelease || mergedDSPs.length > 0 ? (
                   <button
                     type='button'
                     onClick={handlePlayClick}
-                    className='flex items-center gap-3 rounded-xl border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] px-3 py-2.5 shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl transition-colors hover:bg-[var(--profile-pearl-bg-hover)]'
-                    aria-label={`Listen to ${artist.name}`}
+                    className='group flex items-center gap-3 rounded-2xl border border-white/[0.12] bg-white/[0.06] px-3 py-2.5 shadow-[inset_0_0.5px_0_rgba(255,255,255,0.1),0_2px_12px_rgba(0,0,0,0.2)] backdrop-blur-2xl transition-all duration-200 hover:bg-white/[0.09] hover:shadow-[inset_0_0.5px_0_rgba(255,255,255,0.14),0_4px_20px_rgba(0,0,0,0.25)] active:scale-[0.985]'
+                    aria-label={
+                      latestRelease
+                        ? `Play ${latestRelease.title}`
+                        : `Listen to ${artist.name}`
+                    }
                   >
-                    <div className='flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[var(--profile-pearl-bg-active)]'>
-                      <Play className='h-5 w-5 fill-current text-primary-token' />
-                    </div>
-                    <div className='min-w-0 flex-1'>
-                      <p className='truncate text-[14px] font-[510] text-primary-token'>
-                        Listen
+                    {latestRelease?.artworkUrl ? (
+                      <div className='relative h-11 w-11 shrink-0 overflow-hidden rounded-[10px] border border-white/[0.08] shadow-[0_2px_8px_rgba(0,0,0,0.2)]'>
+                        <ImageWithFallback
+                          src={latestRelease.artworkUrl}
+                          alt={latestRelease.title}
+                          fill
+                          sizes='44px'
+                          className='object-cover'
+                          fallbackVariant='release'
+                        />
+                      </div>
+                    ) : (
+                      <div className='flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border border-white/[0.08] bg-white/[0.06]'>
+                        <Play className='h-4 w-4 fill-current text-white/70' />
+                      </div>
+                    )}
+                    <div className='min-w-0 flex-1 text-left'>
+                      <p className='truncate text-[13px] font-[510] leading-tight text-white/90'>
+                        {latestRelease?.title ?? 'Listen'}
                       </p>
-                      <p className='truncate text-[13px] text-secondary-token'>
-                        {mergedDSPs.length} platforms
+                      <p className='mt-0.5 truncate text-[12px] font-[400] leading-tight text-white/45'>
+                        {latestRelease
+                          ? `${artist.name}${dspCountLabel}`
+                          : `${mergedDSPs.length} platforms`}
                       </p>
                     </div>
-                    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--profile-pearl-primary-bg)]'>
-                      <Play className='h-3.5 w-3.5 fill-current text-[color:var(--profile-pearl-primary-fg)]' />
+                    <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/90 shadow-[0_1px_4px_rgba(0,0,0,0.15)] transition-transform duration-200 group-hover:scale-105'>
+                      <Play className='ml-0.5 h-3 w-3 fill-current text-black/85' />
                     </div>
                   </button>
                 ) : null}

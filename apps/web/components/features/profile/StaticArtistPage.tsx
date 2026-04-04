@@ -248,7 +248,6 @@ export function StaticArtistPage({
         subscribeTwoStep={subscribeTwoStep}
         genres={genres}
         photoDownloadSizes={photoDownloadSizes}
-        tourDates={tourDates}
         visitTrackingToken={visitTrackingToken}
         viewerCountryCode={viewerCountryCode}
       />
