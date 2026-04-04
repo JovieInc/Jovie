@@ -7,7 +7,7 @@ import {
 } from '../helpers/clerk-auth';
 import {
   DASHBOARD_ROUTE_MATRIX,
-  getRoutePaths,
+  type DashboardRouteDescriptor,
 } from './utils/dashboard-route-matrix';
 import {
   isTransientNavigationError,
@@ -383,6 +383,12 @@ async function navigateChaosRoute(
  * Throws if credentials are missing or sign-in fails — chaos tests must not silently skip.
  */
 async function setupChaosAuth(page: Page, useAdmin = false): Promise<void> {
+  if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
+    const credentials = useAdmin ? getAdminCredentials() : undefined;
+    await ensureSignedInUser(page, credentials);
+    return;
+  }
+
   if (!hasClerkCredentials()) {
     throw new Error(
       'Chaos tests require Clerk credentials. Ensure E2E_CLERK_USER_USERNAME, E2E_CLERK_USER_PASSWORD, and CLERK_TESTING_SETUP_SUCCESS are set. Run with: doppler run -- pnpm exec playwright test'
@@ -399,16 +405,32 @@ async function setupChaosAuth(page: Page, useAdmin = false): Promise<void> {
 // Page Groups
 // ============================================================================
 
-const DASHBOARD_PAGES = getRoutePaths(DASHBOARD_ROUTE_MATRIX.dashboard.full);
-const FAST_DASHBOARD_PAGES = getRoutePaths(
-  DASHBOARD_ROUTE_MATRIX.dashboard.fast
-);
+const DASHBOARD_PAGES = DASHBOARD_ROUTE_MATRIX.dashboard.full;
+const FAST_DASHBOARD_PAGES = DASHBOARD_ROUTE_MATRIX.dashboard.fast;
 
-const SETTINGS_PAGES = getRoutePaths(DASHBOARD_ROUTE_MATRIX.settings.full);
-const FAST_SETTINGS_PAGES = getRoutePaths(DASHBOARD_ROUTE_MATRIX.settings.fast);
+const SETTINGS_PAGES = DASHBOARD_ROUTE_MATRIX.settings.full;
+const FAST_SETTINGS_PAGES = DASHBOARD_ROUTE_MATRIX.settings.fast;
 
-const ADMIN_PAGES = getRoutePaths(DASHBOARD_ROUTE_MATRIX.admin.full);
-const FAST_ADMIN_PAGES = getRoutePaths(DASHBOARD_ROUTE_MATRIX.admin.fast);
+const ADMIN_PAGES = DASHBOARD_ROUTE_MATRIX.admin.full;
+const FAST_ADMIN_PAGES = DASHBOARD_ROUTE_MATRIX.admin.fast;
+
+async function resolveChaosUrls(
+  page: Page,
+  routes: readonly DashboardRouteDescriptor[]
+): Promise<string[]> {
+  const resolvedPaths: string[] = [];
+
+  for (const route of routes) {
+    if (route.resolver) {
+      resolvedPaths.push(await route.resolver(page));
+      continue;
+    }
+
+    resolvedPaths.push(route.path);
+  }
+
+  return resolvedPaths;
+}
 
 // ============================================================================
 // Tests
@@ -422,9 +444,10 @@ test.describe('Authenticated Chaos Testing @chaos', () => {
   });
 
   test('Dashboard pages chaos test', async ({ page }, testInfo) => {
-    const activePages = IS_FAST_ITERATION
+    const activeRoutes = IS_FAST_ITERATION
       ? FAST_DASHBOARD_PAGES
       : DASHBOARD_PAGES;
+    const activePages = await resolveChaosUrls(page, activeRoutes);
     if (!IS_FAST_ITERATION) {
       await warmupChaosRoutes(page, activePages);
     }
@@ -447,9 +470,10 @@ test.describe('Authenticated Chaos Testing @chaos', () => {
       IS_FAST_ITERATION,
       'Settings interaction chaos runs in the slower authenticated chaos lane'
     );
-    const activePages = IS_FAST_ITERATION
+    const activeRoutes = IS_FAST_ITERATION
       ? FAST_SETTINGS_PAGES
       : SETTINGS_PAGES;
+    const activePages = await resolveChaosUrls(page, activeRoutes);
     if (!IS_FAST_ITERATION) {
       await warmupChaosRoutes(page, activePages);
     }
@@ -480,7 +504,8 @@ test.describe('Admin Chaos Testing @chaos', () => {
       IS_FAST_ITERATION,
       'Admin interaction chaos runs in the slower authenticated chaos lane'
     );
-    const activePages = IS_FAST_ITERATION ? FAST_ADMIN_PAGES : ADMIN_PAGES;
+    const activeRoutes = IS_FAST_ITERATION ? FAST_ADMIN_PAGES : ADMIN_PAGES;
+    const activePages = await resolveChaosUrls(page, activeRoutes);
     // First check if user has admin access
     const response = await navigateChaosRoute(page, activePages[0]);
 
@@ -517,7 +542,10 @@ test.describe('Full Chaos Sweep @chaos-full', () => {
 
   test('All authenticated pages', async ({ page }, testInfo) => {
     await setupChaosAuth(page, true);
-    await warmupChaosRoutes(page, DASHBOARD_PAGES);
+    await warmupChaosRoutes(
+      page,
+      await resolveChaosUrls(page, DASHBOARD_PAGES)
+    );
 
     const allErrors: ChaosError[] = [];
     const allResults: ChaosResult[] = [];
