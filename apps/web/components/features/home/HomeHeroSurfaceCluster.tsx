@@ -86,35 +86,18 @@ function HeroTaskPanel() {
 
 function HeroProfilePanel() {
   return (
-    <div
-      data-testid='homepage-hero-profile-card'
-      className='relative overflow-hidden rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(18,19,26,0.98),rgba(12,13,19,0.98))] shadow-[0_32px_100px_rgba(0,0,0,0.42)]'
-    >
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_30%),radial-gradient(circle_at_left,rgba(99,102,241,0.12),transparent_48%)]'
+    <div data-testid='homepage-hero-profile-card'>
+      <MarketingSurfaceCard
+        src='/product-screenshots/profile-phone.png'
+        alt='Mobile artist profile showing Tim White identity and fan CTA'
+        aspectRatio='9 / 16'
+        objectPosition='center top'
+        variant='phone-inset'
+        chrome='framed'
+        glowTone='violet'
+        imageClassName='object-cover'
+        className='shadow-[0_34px_90px_rgba(0,0,0,0.5)]'
       />
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.42),transparent)]'
-      />
-      <div className='relative min-h-[14rem] w-full px-5 pb-4 pt-4'>
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-x-8 bottom-0 h-20 rounded-full bg-[radial-gradient(circle,rgba(0,0,0,0.46),transparent_70%)] blur-2xl'
-        />
-        <MarketingSurfaceCard
-          src='/product-screenshots/profile-phone.png'
-          alt='Mobile artist profile showing Tim White identity and fan CTA'
-          aspectRatio='390 / 844'
-          objectPosition='center top'
-          variant='phone-inset'
-          chrome='framed'
-          glowTone='violet'
-          imageClassName='object-contain scale-[1.02]'
-          className='relative mx-auto h-full w-full max-w-[10rem] bg-[linear-gradient(180deg,rgba(18,19,24,0.94),rgba(8,9,13,0.98))] shadow-[0_34px_90px_rgba(0,0,0,0.5)]'
-        />
-      </div>
     </div>
   );
 }
@@ -130,23 +113,19 @@ function HeroSmartLinkPanel() {
   return (
     <div
       data-testid='homepage-hero-release-card'
-      className='relative overflow-hidden rounded-[1.35rem] border border-white/10 bg-[linear-gradient(180deg,rgba(19,21,29,0.98),rgba(12,13,20,0.94))] shadow-[0_30px_90px_rgba(0,0,0,0.44)]'
+      className='relative overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(16,17,24,0.98),rgba(10,11,16,0.98))] shadow-[0_30px_90px_rgba(0,0,0,0.44)]'
     >
       <div
         aria-hidden='true'
-        className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(129,140,248,0.14),transparent_50%)]'
-      />
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)]'
+        className='pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent)]'
       />
 
       <div className='relative p-4'>
-        <div className='overflow-hidden rounded-xl bg-[linear-gradient(135deg,rgba(113,112,255,0.4),rgba(46,18,94,0.6))]'>
-          <div className='flex min-h-[5rem] flex-col justify-end p-3'>
-            <p className='text-[10px] text-white/60'>Single</p>
-            <p className='text-[14px] font-[580] text-white'>The Deep End</p>
-            <p className='text-[10px] text-white/50'>Tim White</p>
+        <div className='overflow-hidden rounded-xl bg-[linear-gradient(135deg,rgba(113,112,255,0.5),rgba(46,18,94,0.7))]'>
+          <div className='flex min-h-[6rem] flex-col justify-end p-3'>
+            <p className='text-[10px] text-white/50'>Single</p>
+            <p className='text-[15px] font-[600] text-white'>The Deep End</p>
+            <p className='mt-0.5 text-[10px] text-white/50'>Tim White</p>
           </div>
         </div>
 
@@ -154,15 +133,16 @@ function HeroSmartLinkPanel() {
           {HERO_DSPS.map(dsp => (
             <div
               key={dsp.name}
-              className='flex items-center justify-between rounded-lg bg-white/[0.04] px-3 py-2'
+              className='flex items-center justify-center rounded-full bg-white/[0.06] py-2 text-[10px] font-[530] text-white/70'
             >
-              <span className='text-[11px] font-[530] text-white/80'>
-                {dsp.name}
-              </span>
-              <span className='text-[10px] text-white/35'>{dsp.action}</span>
+              {dsp.name}
             </div>
           ))}
         </div>
+
+        <p className='mt-3 text-center text-[8px] tracking-[0.08em] uppercase text-white/20'>
+          Powered by Jovie
+        </p>
       </div>
     </div>
   );
