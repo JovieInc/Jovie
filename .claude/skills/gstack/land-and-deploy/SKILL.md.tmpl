@@ -6,14 +6,13 @@ description: |
   Land and deploy workflow. Merges the PR, waits for CI and deploy,
   verifies production health via canary checks. Takes over after /ship
   creates the PR. Use when: "merge", "land", "deploy", "merge and verify",
-  "land it", "ship it to production". (gstack)
+  "land it", "ship it to production".
 allowed-tools:
   - Bash
   - Read
   - Write
   - Glob
   - AskUserQuestion
-sensitive: true
 ---
 
 {{PREAMBLE}}
