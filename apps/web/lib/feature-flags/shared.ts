@@ -46,7 +46,7 @@ export interface FeatureFlagsBootstrap {
 export const FEATURE_FLAGS = {
   // ── Former Statsig gates ──────────────────────────────────────────
   /** Profile V2 layout (gate: feature_profile_v2) */
-  PROFILE_V2: false,
+  PROFILE_V2: true,
   /** Handle claiming flow (gate: feature_claim_handle) */
   CLAIM_HANDLE: false,
   /** Hero Spotify claim flow (gate: feature_hero_spotify_claim_flow) */
@@ -56,7 +56,7 @@ export const FEATURE_FLAGS = {
   /** Two-step subscribe flow (gate: feature_subscribe_two_step) */
   SUBSCRIBE_TWO_STEP: false,
   /** Latest release card on profile (gate: feature_latest_release_card) */
-  LATEST_RELEASE_CARD: false,
+  LATEST_RELEASE_CARD: true,
   /** Smartlink pre-save campaigns (gate: smartlink_pre_save_campaigns) */
   SMARTLINK_PRE_SAVE: false,
   /** iOS Apple Music priority in listen interface (gate: feature_ios_apple_music_priority) */
