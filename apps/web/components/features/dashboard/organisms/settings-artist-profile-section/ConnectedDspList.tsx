@@ -50,6 +50,9 @@ const PROVIDER_LABELS: Record<DspProviderId, string> = {
   deezer: 'Deezer',
   amazon_music: 'Amazon Music',
   musicbrainz: 'MusicBrainz',
+  genius: 'Genius',
+  discogs: 'Discogs',
+  allmusic: 'AllMusic',
 };
 
 interface ArtistSelection {

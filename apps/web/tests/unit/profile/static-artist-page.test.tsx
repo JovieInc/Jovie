@@ -53,7 +53,12 @@ vi.mock('@/features/profile/VenmoTipSelector', () => ({
 
 vi.mock('@/features/profile/templates/PublicProfileTemplateV2', () => ({
   PublicProfileTemplateV2: () =>
-    React.createElement('div', { 'data-testid': 'public-profile-template-v2' }),
+    React.createElement('div', { 'data-testid': 'profile-compact-template' }),
+}));
+
+vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
+  ProfileCompactTemplate: () =>
+    React.createElement('div', { 'data-testid': 'profile-compact-template' }),
 }));
 
 vi.mock('@/lib/dsp', () => ({
@@ -272,7 +277,7 @@ describe('StaticArtistPage', () => {
     );
 
     expect(
-      screen.queryByTestId('public-profile-template-v2')
+      screen.queryByTestId('profile-compact-template')
     ).not.toBeInTheDocument();
     expect(screen.getByTestId('artist-page-shell')).toBeDefined();
   });
@@ -297,7 +302,7 @@ describe('StaticArtistPage', () => {
       />
     );
 
-    expect(screen.getByTestId('public-profile-template-v2')).toBeDefined();
+    expect(screen.getByTestId('profile-compact-template')).toBeDefined();
   });
 
   it('renders latest release card when in profile mode with release', () => {
@@ -388,7 +393,7 @@ describe('StaticArtistPage', () => {
       />
     );
 
-    expect(screen.getByTestId('public-profile-template-v2')).toBeDefined();
+    expect(screen.getByTestId('profile-compact-template')).toBeDefined();
   });
 
   it.each([
@@ -412,7 +417,7 @@ describe('StaticArtistPage', () => {
       />
     );
 
-    expect(screen.getByTestId('public-profile-template-v2')).toBeDefined();
+    expect(screen.getByTestId('profile-compact-template')).toBeDefined();
   });
 
   it('routes contact mode through the V2 template when contacts exist', () => {
@@ -435,7 +440,7 @@ describe('StaticArtistPage', () => {
       />
     );
 
-    expect(screen.getByTestId('public-profile-template-v2')).toBeDefined();
+    expect(screen.getByTestId('profile-compact-template')).toBeDefined();
   });
 });
 

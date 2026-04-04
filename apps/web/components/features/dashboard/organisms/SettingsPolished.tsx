@@ -28,8 +28,7 @@ import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection'
 import { SettingsTouringSection } from '@/features/dashboard/organisms/SettingsTouringSection';
 import { SettingsArtistProfileSection } from '@/features/dashboard/organisms/settings-artist-profile-section';
 import { publicEnv } from '@/lib/env-public';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { useCodeFlag } from '@/lib/feature-flags/client';
 import { useBillingStatusQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
@@ -194,9 +193,7 @@ export function SettingsPolished({
   const { data: billingData } = useBillingStatusQuery();
   const isPro = billingData?.isPro ?? false;
   const isGrowth = billingData?.plan === 'growth';
-  const isStripeConnectEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.STRIPE_CONNECT_ENABLED
-  );
+  const isStripeConnectEnabled = useCodeFlag('STRIPE_CONNECT_ENABLED');
 
   const renderAccountSection = useCallback(
     () =>

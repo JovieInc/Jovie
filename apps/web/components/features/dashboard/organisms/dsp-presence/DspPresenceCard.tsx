@@ -82,7 +82,7 @@ export function DspPresenceCard({
 
         <div className='flex min-h-5 items-center gap-2.5 text-[12px] text-tertiary-token'>
           {isConfirmed && (
-            <ConfidenceBadge score={item.confidenceScore} size='sm' />
+            <ConfidenceBadge score={item.confidenceScore ?? 0} size='sm' />
           )}
           {item.matchingIsrcCount > 0 && (
             <span>{item.matchingIsrcCount} ISRC matches</span>

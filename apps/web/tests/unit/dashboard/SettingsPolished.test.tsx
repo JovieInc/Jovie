@@ -64,6 +64,7 @@ vi.mock('@/lib/env-public', () => ({
 
 vi.mock('@/lib/feature-flags/client', () => ({
   useFeatureGate: () => false,
+  useCodeFlag: () => false,
 }));
 
 vi.mock('@/lib/feature-flags/shared', () => ({

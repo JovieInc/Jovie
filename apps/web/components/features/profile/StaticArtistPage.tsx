@@ -16,8 +16,8 @@ import { ProfilePrimaryCTA } from '@/features/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
 import { TourModePanel } from '@/features/profile/TourModePanel';
+import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
 import { PublicProfileTemplate } from '@/features/profile/templates/PublicProfileTemplate';
-import { PublicProfileTemplateV2 } from '@/features/profile/templates/PublicProfileTemplateV2';
 import { extractVenmoUsername } from '@/features/profile/utils/venmo';
 import VenmoTipSelector from '@/features/profile/VenmoTipSelector';
 import { buildProfilePublicViewModel } from '@/features/profile/view-models';
@@ -238,7 +238,7 @@ export function StaticArtistPage({
 
   if (profileV2Enabled && supportsProfileV2Mode(mode, contacts.length > 0)) {
     return (
-      <PublicProfileTemplateV2
+      <ProfileCompactTemplate
         mode={mode}
         artist={artist}
         socialLinks={socialLinks}
@@ -247,8 +247,6 @@ export function StaticArtistPage({
         enableDynamicEngagement={enableDynamicEngagement}
         subscribeTwoStep={subscribeTwoStep}
         genres={genres}
-        pressPhotos={pressPhotos}
-        allowPhotoDownloads={allowPhotoDownloads}
         photoDownloadSizes={photoDownloadSizes}
         tourDates={tourDates}
         visitTrackingToken={visitTrackingToken}
