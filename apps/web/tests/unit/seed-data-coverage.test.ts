@@ -188,6 +188,11 @@ describe('seed-helpers', () => {
     it('handles empty arrays', () => {
       expect(chunk([], 5)).toEqual([]);
     });
+
+    it('throws on non-positive chunk size', () => {
+      expect(() => chunk([1, 2, 3], 0)).toThrow(RangeError);
+      expect(() => chunk([1, 2, 3], -1)).toThrow(RangeError);
+    });
   });
 });
 
@@ -215,5 +220,33 @@ describe('query contract: referrerHistory JSONB matches r->>url extraction', () 
         expect((entry as Record<string, unknown>)['source']).toBeUndefined();
       }
     }
+  });
+
+  it('coalesce(r->>url, r->>source) works with legacy source rows', () => {
+    // Simulate how getUserDashboardAnalytics extracts referrers:
+    // coalesce(r->>'url', r->>'source') as referrer
+    const coalesce = (entry: Record<string, unknown>) =>
+      (entry['url'] as string | undefined) ??
+      (entry['source'] as string | undefined) ??
+      null;
+
+    // New format (url key) — produced by generateReferrerHistory
+    const newEntry = {
+      url: 'https://instagram.com',
+      timestamp: new Date().toISOString(),
+    };
+    expect(coalesce(newEntry)).toBe('https://instagram.com');
+
+    // Legacy format (source key) — may exist in older DB rows
+    const legacyEntry = {
+      source: 'https://tiktok.com',
+      timestamp: new Date().toISOString(),
+    };
+    expect(coalesce(legacyEntry)).toBe('https://tiktok.com');
+
+    // Mixed payload — url takes priority via coalesce ordering
+    const mixedPayload = [newEntry, legacyEntry];
+    const extracted = mixedPayload.map(coalesce);
+    expect(extracted).toEqual(['https://instagram.com', 'https://tiktok.com']);
   });
 });

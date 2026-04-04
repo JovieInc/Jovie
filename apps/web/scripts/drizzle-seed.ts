@@ -1323,6 +1323,13 @@ async function seedUserSettings(userId: string) {
     .onConflictDoNothing();
 }
 
+function seedPhonePrefix(profileId: string): string {
+  return profileId
+    .replaceAll(/[^0-9]/g, '')
+    .slice(0, 3)
+    .padEnd(3, '0');
+}
+
 async function seedAudienceMembers(
   profileId: string,
   _displayName: string,
@@ -1408,7 +1415,7 @@ async function seedAudienceMembers(
           : null,
       phone:
         memberType === 'sms'
-          ? `+1555${profileId.slice(0, 4)}${String(i).padStart(4, '0')}`
+          ? `+1555${seedPhonePrefix(profileId)}${String(i).padStart(4, '0')}`
           : null,
       spotifyConnected: memberType === 'spotify',
       purchaseCount:
@@ -1452,6 +1459,9 @@ async function seedClickEvents(
     const country = pickCountry();
     const city = pickCity(country);
 
+    const osChoice = oses[Math.floor(Math.random() * oses.length)];
+    const browserChoice = browsers[Math.floor(Math.random() * browsers.length)];
+
     clickRows.push({
       creatorProfileId: profileId,
       linkId:
@@ -1460,13 +1470,13 @@ async function seedClickEvents(
           : null,
       linkType: pickWeightedLinkType(),
       ipAddress: `${SEED_TESTNET_IP_PREFIX}${Math.floor(Math.random() * 255)}`,
-      userAgent: `Mozilla/5.0 (${oses[Math.floor(Math.random() * oses.length)]}) ${browsers[Math.floor(Math.random() * browsers.length)]}`,
+      userAgent: `Mozilla/5.0 (${osChoice}) ${browserChoice}`,
       referrer: pickWeightedReferrer(),
       country,
       city,
       deviceType: pickDeviceType(),
-      os: oses[Math.floor(Math.random() * oses.length)],
-      browser: browsers[Math.floor(Math.random() * browsers.length)],
+      os: osChoice,
+      browser: browserChoice,
       isBot: Math.random() < 0.02,
       createdAt: clickDate,
     });
@@ -1492,8 +1502,13 @@ async function seedDailyProfileViews(profileId: string, scale = 0.5) {
   }
 
   for (let daysAgo = 0; daysAgo < dayCount; daysAgo++) {
-    const date = new Date(now);
-    date.setDate(date.getDate() - daysAgo);
+    const date = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() - daysAgo
+      )
+    );
     const dayOfWeek = date.getUTCDay();
 
     // Hockey-stick: grows from ~10 to ~(60*scale + 40)
@@ -1515,7 +1530,7 @@ async function seedDailyProfileViews(profileId: string, scale = 0.5) {
 
     rows.push({
       creatorProfileId: profileId,
-      viewDate: date.toISOString().split('T')[0],
+      viewDate: date.toISOString().slice(0, 10),
       viewCount,
     });
   }
@@ -1594,8 +1609,8 @@ async function seedNotificationSubscriptions(profileId: string, scale = 0.5) {
   );
   await db.delete(notificationSubscriptions).where(
     drizzleSql`creator_profile_id = ${profileId} AND (
-        phone LIKE ${`+1555${profileId.slice(0, 4)}%`}
-        OR phone LIKE ${`+1555%${profileId.slice(0, 4)}`}
+        phone LIKE ${`+1555${seedPhonePrefix(profileId)}%`}
+        OR phone LIKE ${`+1555%${seedPhonePrefix(profileId)}`}
       )`
   );
 
@@ -1626,7 +1641,7 @@ async function seedNotificationSubscriptions(profileId: string, scale = 0.5) {
     smsRows.push({
       creatorProfileId: profileId,
       channel: 'sms' as const,
-      phone: `+1555${profileId.slice(0, 4)}${String(i).padStart(4, '0')}`,
+      phone: `+1555${seedPhonePrefix(profileId)}${String(i).padStart(4, '0')}`,
       countryCode: country,
       city,
       ipAddress: `${SEED_TESTNET_IP_PREFIX}${Math.floor(Math.random() * 255)}`,

@@ -184,23 +184,29 @@ export function fanEmail(name: string): string {
 }
 
 /**
- * Generate 1-4 referrer history entries with correct `url` key format.
+ * Generate 0-3 referrer history entries with correct `url` key format.
+ * Entries are only added for non-null referrers; direct-traffic picks are skipped,
+ * so the result can be an empty array.
  * Matches the production format used by /api/audience/visit/route.ts:303.
  */
 export function generateReferrerHistory(
   baseDate: Date,
-  count?: number
+  count?: number,
+  endDate: Date = new Date()
 ): Array<{ url: string; timestamp: string }> {
   const entryCount = count ?? 1 + Math.floor(Math.random() * 3);
   const entries: Array<{ url: string; timestamp: string }> = [];
-  for (let r = 0; r < entryCount; r++) {
+  const spanMs = Math.max(endDate.getTime() - baseDate.getTime(), 0);
+  const offsets = Array.from(
+    { length: entryCount },
+    () => Math.random() * spanMs
+  ).sort((a, b) => a - b);
+  for (const offset of offsets) {
     const refUrl = pickWeightedReferrer();
     if (refUrl) {
       entries.push({
         url: refUrl,
-        timestamp: new Date(
-          baseDate.getTime() + r * 86_400_000 * Math.random() * 7
-        ).toISOString(),
+        timestamp: new Date(baseDate.getTime() + offset).toISOString(),
       });
     }
   }
@@ -234,6 +240,9 @@ export function pickDeviceType(): string {
 
 /** Split an array into chunks of a given size. */
 export function chunk<T>(arr: T[], size: number): T[][] {
+  if (size <= 0) {
+    throw new RangeError('chunk size must be greater than 0');
+  }
   const chunks: T[][] = [];
   for (let i = 0; i < arr.length; i += size) {
     chunks.push(arr.slice(i, i + size));

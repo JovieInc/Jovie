@@ -1403,14 +1403,17 @@ async function seedDemoAudience(profileId: string): Promise<string[]> {
           'https://google.com',
           'https://facebook.com',
         ];
-        const entryCount = 3 + Math.floor(Math.random() * 3);
-        return Array.from({ length: entryCount }, (_, r) => ({
+        const entryCount = Math.min(visits, 3 + Math.floor(Math.random() * 3));
+        const spanMs = Math.max(lastSeen.getTime() - firstSeen.getTime(), 0);
+        const offsets = Array.from(
+          { length: entryCount },
+          () => Math.random() * spanMs
+        ).sort((a, b) => a - b);
+        return offsets.map(offset => ({
           url: referrerSources[
             Math.floor(Math.random() * referrerSources.length)
           ],
-          timestamp: new Date(
-            firstSeen.getTime() + r * 86_400_000 * (1 + Math.random() * 7)
-          ).toISOString(),
+          timestamp: new Date(firstSeen.getTime() + offset).toISOString(),
         }));
       })(),
       latestActions: [
