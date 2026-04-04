@@ -372,8 +372,6 @@ export function TourModePanel({
         open
         onOpenChange={open => !open && router.replace(`/${artist.handle}`)}
         title='Tour Dates'
-        contentClassName='bg-[rgb(24,24,28)] border-white/8'
-        bodyClassName='bg-[rgb(24,24,28)] px-4 pt-2'
         dataTestId='tour-drawer'
       >
         {emptyContent}
