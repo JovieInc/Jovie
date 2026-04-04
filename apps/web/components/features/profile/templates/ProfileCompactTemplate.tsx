@@ -2,7 +2,6 @@
 
 import {
   BadgeCheck,
-  Bell,
   CalendarDays,
   Mail,
   MoreHorizontal,
@@ -289,21 +288,6 @@ export function ProfileCompactTemplate({
                           >
                             <Share2 className='h-[14px] w-[14px] text-white/50' />
                             Share Profile
-                          </button>
-                          <button
-                            type='button'
-                            role='menuitem'
-                            className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
-                            onClick={() => {
-                              setMenuOpen(false);
-                              subscribeSectionRef.current?.scrollIntoView({
-                                behavior: 'smooth',
-                                block: 'start',
-                              });
-                            }}
-                          >
-                            <Bell className='h-[14px] w-[14px] text-white/50' />
-                            Turn On Notifications
                           </button>
                           {tourDates.length > 0 ? (
                             <Link
