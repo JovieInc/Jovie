@@ -24,7 +24,7 @@ function resolveCheckoutPlan(params: {
   planParam: string | null;
   sourceParam: string | null;
   spotifyFollowers: number | null;
-  growthPlanEnabled?: boolean;
+  maxPlanEnabled?: boolean;
 }): { plan: PlanIntentTier; isDefaultUpsell: boolean } {
   // Step 1: Read plan intent from cookie
   let planIntent: PlanIntentTier | null = getPlanIntentFromCookies(
@@ -50,7 +50,7 @@ function resolveCheckoutPlan(params: {
   );
   if (isDefaultUpsell && !hadPaidIntentFromCookie) {
     let recommended = recommendPlan(params.spotifyFollowers);
-    if (recommended === 'growth' && params.growthPlanEnabled === false) {
+    if (recommended === 'max' && params.maxPlanEnabled === false) {
       recommended = DEFAULT_UPSELL_PLAN;
     }
     planIntent = recommended;
@@ -71,36 +71,36 @@ describe('onboarding checkout page plan resolution', () => {
     expect(result.isDefaultUpsell).toBe(true);
   });
 
-  it('organic user with 15K followers gets Growth', () => {
+  it('organic user with 15K followers gets Max', () => {
     const result = resolveCheckoutPlan({
       cookieHeader: '',
       planParam: 'pro',
       sourceParam: 'organic',
       spotifyFollowers: 15_000,
     });
-    expect(result.plan).toBe('growth');
+    expect(result.plan).toBe('max');
     expect(result.isDefaultUpsell).toBe(true);
   });
 
   it('explicit intent with cookie gets their chosen plan', () => {
     const result = resolveCheckoutPlan({
-      cookieHeader: 'jovie_plan_intent=growth',
+      cookieHeader: 'jovie_plan_intent=max',
       planParam: null,
       sourceParam: 'intent',
       spotifyFollowers: 500,
     });
-    expect(result.plan).toBe('growth');
+    expect(result.plan).toBe('max');
     expect(result.isDefaultUpsell).toBe(false);
   });
 
   it('explicit intent without cookie uses query param plan', () => {
     const result = resolveCheckoutPlan({
       cookieHeader: '',
-      planParam: 'founding',
+      planParam: 'pro',
       sourceParam: 'intent',
       spotifyFollowers: null,
     });
-    expect(result.plan).toBe('founding');
+    expect(result.plan).toBe('pro');
     expect(result.isDefaultUpsell).toBe(false);
   });
 
@@ -127,47 +127,47 @@ describe('onboarding checkout page plan resolution', () => {
     expect(result.isDefaultUpsell).toBe(true);
   });
 
-  it('organic user with exactly 10K followers gets Growth', () => {
+  it('organic user with exactly 10K followers gets Max', () => {
     const result = resolveCheckoutPlan({
       cookieHeader: '',
       planParam: 'pro',
       sourceParam: 'organic',
       spotifyFollowers: 10_000,
     });
-    expect(result.plan).toBe('growth');
+    expect(result.plan).toBe('max');
     expect(result.isDefaultUpsell).toBe(true);
   });
 
-  it('founding plan cookie is NOT overridden when source param is absent', () => {
+  it('pro plan cookie is NOT overridden when source param is absent', () => {
     const result = resolveCheckoutPlan({
-      cookieHeader: 'jovie_plan_intent=founding',
-      planParam: 'founding',
+      cookieHeader: 'jovie_plan_intent=pro',
+      planParam: 'pro',
       sourceParam: null,
       spotifyFollowers: 50_000,
     });
-    // Founding cookie = paid intent, so recommendPlan must NOT override it
-    expect(result.plan).toBe('founding');
+    // Pro cookie = paid intent, so recommendPlan must NOT override it
+    expect(result.plan).toBe('pro');
     expect(result.isDefaultUpsell).toBe(true);
   });
 
-  it('founding plan cookie preserved even with source=organic', () => {
+  it('pro plan cookie preserved even with source=organic', () => {
     const result = resolveCheckoutPlan({
-      cookieHeader: 'jovie_plan_intent=founding',
+      cookieHeader: 'jovie_plan_intent=pro',
       planParam: null,
       sourceParam: 'organic',
       spotifyFollowers: 15_000,
     });
-    expect(result.plan).toBe('founding');
+    expect(result.plan).toBe('pro');
     expect(result.isDefaultUpsell).toBe(true);
   });
 
-  it('falls back to pro when Growth plan is disabled', () => {
+  it('falls back to pro when Max plan is disabled', () => {
     const result = resolveCheckoutPlan({
       cookieHeader: '',
       planParam: null,
       sourceParam: 'organic',
       spotifyFollowers: 50_000,
-      growthPlanEnabled: false,
+      maxPlanEnabled: false,
     });
     expect(result.plan).toBe('pro');
     expect(result.isDefaultUpsell).toBe(true);

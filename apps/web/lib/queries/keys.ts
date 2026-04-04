@@ -44,11 +44,19 @@ export const queryKeys = {
         'analytics',
         ...(range === undefined ? [] : [range]),
       ] as const,
+    monetizationSummary: () =>
+      [...queryKeys.dashboard.all, 'monetization-summary'] as const,
     links: () => [...queryKeys.dashboard.all, 'links'] as const,
     socialLinks: (profileId?: string) =>
       [
         ...queryKeys.dashboard.all,
         'social-links',
+        ...(profileId === undefined ? [] : [profileId]),
+      ] as const,
+    pressPhotos: (profileId?: string) =>
+      [
+        ...queryKeys.dashboard.all,
+        'press-photos',
         ...(profileId === undefined ? [] : [profileId]),
       ] as const,
     activityFeed: (profileId?: string, range?: string) =>
@@ -72,6 +80,17 @@ export const queryKeys = {
     featured: () => [...queryKeys.creators.all, 'featured'] as const,
     socialLinks: (profileId: string) =>
       [...queryKeys.creators.all, 'social-links', profileId] as const,
+  },
+
+  // Admin releases
+  adminReleases: {
+    all: ['admin-releases'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.adminReleases.all,
+        'list',
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
   },
 
   // Admin users
@@ -177,8 +196,21 @@ export const queryKeys = {
     all: ['releases'] as const,
     recent: (profileId: string) =>
       [...queryKeys.releases.all, 'recent', profileId] as const,
+    /**
+     * Release matrix key. Filtering is client-side via filterReleases(),
+     * so filters are intentionally excluded from the key to avoid
+     * duplicate cache entries for identical server data.
+     */
     matrix: (profileId: string) =>
       [...queryKeys.releases.all, 'matrix', profileId] as const,
+    /** For future server-side filtering. Not used by useReleasesQuery yet. */
+    matrixFiltered: (profileId: string, filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.releases.all,
+        'matrix',
+        profileId,
+        ...(filters ? [filters] : []),
+      ] as const,
     tracks: (releaseId: string) =>
       [...queryKeys.releases.all, 'tracks', releaseId] as const,
     dspStatus: (releaseId: string) =>
@@ -289,6 +321,7 @@ export const queryKeys = {
   // Audience infinite scroll
   audience: {
     all: ['audience'] as const,
+    /** Includes sort, direction, segments, and view in the filters object for cache granularity. */
     members: (profileId: string, filters?: Record<string, unknown>) =>
       [
         ...queryKeys.audience.all,
@@ -312,6 +345,30 @@ export const queryKeys = {
       [...queryKeys.releaseTasks.all, 'release', releaseId] as const,
     summary: (profileId: string) =>
       [...queryKeys.releaseTasks.all, 'summary', profileId] as const,
+  },
+
+  tasks: {
+    all: ['tasks'] as const,
+    list: (profileId?: string, filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.tasks.all,
+        'list',
+        ...(profileId === undefined ? [] : [profileId]),
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
+    detail: (taskId: string, profileId?: string) =>
+      [
+        ...queryKeys.tasks.all,
+        'detail',
+        taskId,
+        ...(profileId === undefined ? [] : [profileId]),
+      ] as const,
+    stats: (profileId?: string) =>
+      [
+        ...queryKeys.tasks.all,
+        'stats',
+        ...(profileId === undefined ? [] : [profileId]),
+      ] as const,
   },
 
   // Ad pixel settings

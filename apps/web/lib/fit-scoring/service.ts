@@ -67,7 +67,8 @@ interface RecalculateProfileRow {
   latestReleaseDate: Date | null;
   hasContactEmail: boolean | null;
   paidVerificationPlatforms: string[] | null;
-  hasTrackingPixels: boolean | null;
+  hasSoundCloudPro: boolean | null;
+  discoveredPixels: unknown;
 }
 
 /**
@@ -187,6 +188,21 @@ export async function calculateAndStoreFitScore(
     .filter(a => PAID_VERIFICATION_PLATFORMS.has(a.platform.toLowerCase()))
     .map(a => a.platform.toLowerCase());
 
+  // Check SoundCloud Pro subscription (separate from social paid verification)
+  const [soundcloudProAccount] = await db
+    .select({
+      paidFlag: socialAccounts.paidFlag,
+    })
+    .from(socialAccounts)
+    .where(
+      and(
+        eq(socialAccounts.creatorProfileId, creatorProfileId),
+        eq(socialAccounts.platform, 'soundcloud'),
+        eq(socialAccounts.paidFlag, true)
+      )
+    )
+    .limit(1);
+
   // Fetch latest release date
   const [latestRelease] = await db
     .select({
@@ -226,6 +242,7 @@ export async function calculateAndStoreFitScore(
     hasSoundCloudId: !!profile.soundcloudId,
     dspPlatformCount,
     paidVerificationPlatforms,
+    hasSoundCloudPro: !!soundcloudProAccount,
     hasTrackingPixels: hasCreatorOwnedPixels(
       profile.discoveredPixels as DiscoveredPixels | null
     ),
@@ -266,7 +283,7 @@ export async function calculateMissingFitScores(
       spotifyPopularity: creatorProfiles.spotifyPopularity,
       genres: creatorProfiles.genres,
       ingestionSourcePlatform: creatorProfiles.ingestionSourcePlatform,
-      hasTrackingPixels: drizzleSql<boolean>`${creatorProfiles.discoveredPixels} IS NOT NULL`,
+      discoveredPixels: creatorProfiles.discoveredPixels,
       socialLinkPlatforms: drizzleSql<string[]>`
         coalesce(
           array_agg(distinct ${socialLinks.platform})
@@ -284,6 +301,13 @@ export async function calculateMissingFitScores(
               and lower(sa.platform) in ('twitter', 'x', 'instagram', 'facebook', 'threads')),
           '{}'
         ) FROM social_accounts sa WHERE sa.creator_profile_id = ${creatorProfiles.id})
+      `,
+      hasSoundCloudPro: drizzleSql<boolean>`
+        (SELECT coalesce(bool_or(sa.paid_flag), false)
+        FROM social_accounts sa
+        WHERE sa.creator_profile_id = ${creatorProfiles.id}
+          AND lower(sa.platform) = 'soundcloud'
+          AND sa.paid_flag = true)
       `,
     })
     .from(creatorProfiles)
@@ -327,7 +351,10 @@ export async function calculateMissingFitScores(
       paidVerificationPlatforms: (
         profile.paidVerificationPlatforms ?? []
       ).filter((p): p is string => !!p),
-      hasTrackingPixels: !!profile.hasTrackingPixels,
+      hasSoundCloudPro: !!profile.hasSoundCloudPro,
+      hasTrackingPixels: hasCreatorOwnedPixels(
+        profile.discoveredPixels as DiscoveredPixels | null
+      ),
     };
 
     const { score, breakdown } = calculateFitScore(input);
@@ -407,7 +434,14 @@ export async function recalculateAllFitScores(
             '{}'
           ) FROM social_accounts sa WHERE sa.creator_profile_id = ${creatorProfiles.id})
         `,
-        hasTrackingPixels: drizzleSql<boolean>`${creatorProfiles.discoveredPixels} IS NOT NULL`,
+        hasSoundCloudPro: drizzleSql<boolean>`
+          (SELECT coalesce(bool_or(sa.paid_flag), false)
+          FROM social_accounts sa
+          WHERE sa.creator_profile_id = ${creatorProfiles.id}
+            AND lower(sa.platform) = 'soundcloud'
+            AND sa.paid_flag = true)
+        `,
+        discoveredPixels: creatorProfiles.discoveredPixels,
       })
       .from(creatorProfiles)
       .leftJoin(
@@ -460,7 +494,10 @@ export async function recalculateAllFitScores(
         paidVerificationPlatforms: (
           profile.paidVerificationPlatforms ?? []
         ).filter((p): p is string => !!p),
-        hasTrackingPixels: !!profile.hasTrackingPixels,
+        hasSoundCloudPro: !!profile.hasSoundCloudPro,
+        hasTrackingPixels: hasCreatorOwnedPixels(
+          profile.discoveredPixels as DiscoveredPixels | null
+        ),
       };
 
       const { score, breakdown } = calculateFitScore(input);

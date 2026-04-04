@@ -27,7 +27,7 @@ const CHIP_BG_ALPHA = 0x15 / 255;
 function getChipSafeIconColor(brandHex: string, isDark: boolean): string {
   if (isDark && isBrandDark(brandHex)) return '#ffffff';
 
-  const surfaceHex = isDark ? '#101012' : '#fcfcfc';
+  const surfaceHex = isDark ? '#17171a' : '#fcfcfc';
   const brand = hexToRgb(brandHex);
   const surface = hexToRgb(surfaceHex);
   const r = Math.round(
@@ -319,7 +319,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
             {socialLinks.map((link, index) => (
               <div
                 key={link.id || `new-${index}`}
-                className='flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-0/50'
+                className='flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-1'
               >
                 <CommonDropdown
                   variant='dropdown'

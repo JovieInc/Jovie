@@ -18,9 +18,9 @@ export const typography = {
 export const alignment = {
   checkboxCell: 'flex items-center justify-center', // Center checkbox
   numberCell: 'flex items-center justify-end tabular-nums', // Right-align numbers
-  rowHeight: 'h-[36px]', // Fixed height for consistent alignment (denser authenticated baseline)
-  cellPadding: 'px-3 py-0', // Dense padding for cells (Linear-density)
-  headerPadding: 'px-3 py-1', // Dense padding for headers (Linear-density)
+  rowHeight: 'h-[40px]', // Comfortable density with room for two-line cells
+  cellPadding: 'px-3 py-1', // Balanced padding for cells
+  headerPadding: 'px-3 py-1.5', // Slightly more header breathing room
   checkboxSize: 'h-3.5 w-3.5', // 14px checkbox
 } as const;
 
@@ -69,12 +69,12 @@ export const columnWidths = {
 
 // Layout Stability - Fixed Heights to Prevent Layout Shift
 export const layoutStability = {
-  rowHeight: '36px',
-  headerHeight: '30px', // Dense header (Linear-density)
+  rowHeight: '40px',
+  headerHeight: '32px',
   toolbarHeight: '56px',
   footerHeight: '52px',
   emptyStateMinHeight: '400px',
-  skeletonRowHeight: '36px', // Must match rowHeight
+  skeletonRowHeight: '40px', // Must match rowHeight
 } as const;
 
 // Border Styles
@@ -122,8 +122,8 @@ export const presets = {
   stickyHeader: cn(
     'sticky top-0',
     zIndex.tableHeader,
-    'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] backdrop-blur-[12px]',
-    'shadow-[inset_0_-1px_0_var(--linear-app-frame-seam)]',
+    'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,transparent)] backdrop-blur-[14px]',
+    'shadow-[inset_0_-1px_0_color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]',
     'align-middle'
   ),
   stickyGroupHeader: cn(
@@ -134,7 +134,7 @@ export const presets = {
   ),
   tableRow: cn(
     alignment.rowHeight,
-    'border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_84%,transparent)]',
+    'border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_60%,transparent)]',
     selection.unchecked,
     'last:border-b-0',
     'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]'

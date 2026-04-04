@@ -10,15 +10,16 @@
  * Authentication: Required (creator must own the profile)
  */
 
-import { auth } from '@clerk/nextjs/server';
 import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { isActiveDiscoveryJob } from '@/lib/discovery/is-active-discovery-job';
 import { captureError } from '@/lib/error-tracking';
 import type { EnrichmentPhase, ProviderEnrichmentStatus } from '@/lib/queries';
 import { toISOStringOrFallback, toISOStringOrNull } from '@/lib/utils/date';
@@ -96,7 +97,7 @@ function isTerminalJobStatus(status: string | null | undefined): boolean {
 export async function GET(request: Request) {
   try {
     // Authenticate user
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -180,10 +181,6 @@ export async function GET(request: Request) {
       );
     }
 
-    const hasPendingDiscoveryJob =
-      discoveryJob?.status === 'pending' ||
-      discoveryJob?.status === 'processing';
-
     // Fetch all matches for this profile
     const matches = await db
       .select({
@@ -228,6 +225,28 @@ export async function GET(request: Request) {
         lastUpdatedAt: toISOStringOrFallback(match?.updatedAt),
       };
     });
+
+    const latestMatchUpdatedAt =
+      matches.length > 0
+        ? matches.reduce<Date | null>(
+            (latest, match) =>
+              !match.updatedAt || (latest && latest >= match.updatedAt)
+                ? latest
+                : match.updatedAt,
+            null
+          )
+        : null;
+    const hasOnlyTerminalProviderStates =
+      providerStatuses.length > 0 &&
+      providerStatuses.every(
+        status => status.phase === 'complete' || status.phase === 'failed'
+      );
+
+    const hasPendingDiscoveryJob = isActiveDiscoveryJob(
+      discoveryJob,
+      latestMatchUpdatedAt,
+      hasOnlyTerminalProviderStates
+    );
 
     // Calculate overall status
     const overallPhase = determineOverallPhase(

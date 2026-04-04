@@ -14,6 +14,8 @@ const { previewPanelProviderMock, useAuthRouteConfigMock } = vi.hoisted(() => ({
     breadcrumbs: [],
     showMobileTabs: false,
     isTableRoute: false,
+    isDemoRoute: false,
+    showChatUsageIndicator: false,
   })),
 }));
 // AuthShellWrapper pulls in context providers, @jovie/ui Sheet components,
@@ -47,8 +49,8 @@ vi.mock('@/components/providers/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: { children: ReactNode }) => children,
 }));
 
-vi.mock('@/hooks/useSequentialShortcuts', () => ({
-  useSequentialShortcuts: vi.fn(),
+vi.mock('@/hooks/useDashboardShortcuts', () => ({
+  useDashboardShortcuts: vi.fn(),
 }));
 
 vi.mock('@/components/organisms/keyboard-shortcuts-sheet', () => ({
@@ -103,6 +105,8 @@ describe('AuthShellWrapper', () => {
       breadcrumbs: [],
       showMobileTabs: false,
       isTableRoute: false,
+      isDemoRoute: false,
+      showChatUsageIndicator: false,
     });
   });
 
@@ -137,6 +141,8 @@ describe('AuthShellWrapper', () => {
       breadcrumbs: [],
       showMobileTabs: false,
       isTableRoute: false,
+      isDemoRoute: false,
+      showChatUsageIndicator: false,
     });
 
     render(

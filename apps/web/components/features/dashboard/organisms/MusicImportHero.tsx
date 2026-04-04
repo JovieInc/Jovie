@@ -76,7 +76,7 @@ export const MusicImportHero = memo(function MusicImportHero({
   // Failed state
   if (isFailed && !hasReleases) {
     return (
-      <div className='rounded-xl border border-subtle bg-surface-1 p-4'>
+      <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'>
         <div className='flex items-center gap-2 text-secondary-token'>
           <AlertCircle className='h-4 w-4 shrink-0' />
           <p className='text-sm'>
@@ -94,9 +94,11 @@ export const MusicImportHero = memo(function MusicImportHero({
     );
   }
 
-  const headline = isImporting
-    ? "We're importing your music"
-    : `${releases.length} release${releases.length === 1 ? '' : 's'} ready`;
+  const headline = (() => {
+    if (isImporting) return "We're importing your music";
+    const plural = releases.length === 1 ? '' : 's';
+    return `${releases.length} release${plural} ready`;
+  })();
 
   return (
     <div className='space-y-3'>
@@ -127,7 +129,12 @@ export const MusicImportHero = memo(function MusicImportHero({
 
       {/* CTA */}
       {(hasReleases || isImporting) && (
-        <Button variant='secondary' size='sm' asChild>
+        <Button
+          variant='secondary'
+          size='sm'
+          asChild
+          className='rounded-[10px] text-[11px] font-[510] tracking-[-0.01em]'
+        >
           <Link href={APP_ROUTES.DASHBOARD_RELEASES}>
             {isImporting ? 'View All Releases' : 'Explore Your Releases'}
           </Link>

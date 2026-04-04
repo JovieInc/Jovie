@@ -6,8 +6,8 @@ import type { ChangeEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import {
   DEFAULT_THROTTLING,
   type ThrottlingConfig,
@@ -67,20 +67,30 @@ export function CampaignSettingsPanel() {
 
   if (loading) {
     return (
-      <ContentSurfaceCard className='flex items-center gap-2 px-4 py-3.5 text-[13px] text-secondary-token'>
-        <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
-        Loading campaign settings...
-      </ContentSurfaceCard>
+      <SettingsPanel
+        title='Campaign targeting'
+        description='Control who receives invites and pacing for anti-spam compliance.'
+      >
+        <div className='flex items-center gap-2 px-4 py-4 text-[13px] text-secondary-token sm:px-5'>
+          <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
+          Loading campaign settings...
+        </div>
+      </SettingsPanel>
     );
   }
 
   if (isError) {
     return (
-      <ContentSurfaceCard className='border-destructive/25 bg-destructive/5 px-4 py-3.5 text-[13px] text-destructive'>
-        {error instanceof Error
-          ? error.message
-          : 'Unable to load campaign settings. Please refresh and try again.'}
-      </ContentSurfaceCard>
+      <SettingsPanel
+        title='Campaign targeting'
+        description='Control who receives invites and pacing for anti-spam compliance.'
+      >
+        <div className='px-4 py-4 text-[13px] text-destructive sm:px-5'>
+          {error instanceof Error
+            ? error.message
+            : 'Unable to load campaign settings. Please refresh and try again.'}
+        </div>
+      </SettingsPanel>
     );
   }
 
@@ -90,46 +100,42 @@ export function CampaignSettingsPanel() {
   const effectiveRatePerHour = Math.round(3600 / avgDelaySeconds);
 
   return (
-    <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
-      <ContentSectionHeader
-        title='Campaign targeting & throttling'
-        subtitle='Control who receives invites and pacing for anti-spam compliance.'
-        className='min-h-0 px-4 py-3'
-        actions={
-          <div className='flex flex-wrap items-center gap-3'>
-            <Button
-              variant='secondary'
-              size='sm'
-              onClick={handleSave}
-              disabled={saveCampaignSettings.isPending}
+    <SettingsPanel
+      title='Campaign targeting'
+      description='Control who receives invites and pacing for anti-spam compliance.'
+      actions={
+        <div className='flex flex-wrap items-center gap-3'>
+          <Button
+            variant='secondary'
+            size='sm'
+            onClick={handleSave}
+            disabled={saveCampaignSettings.isPending}
+          >
+            {saveCampaignSettings.isPending ? (
+              <>
+                <Icon
+                  name='Loader2'
+                  className='mr-2 h-3.5 w-3.5 animate-spin'
+                />
+                Saving...
+              </>
+            ) : (
+              'Save'
+            )}
+          </Button>
+          {settingsSaved ? (
+            <output
+              className='flex items-center gap-1 text-xs text-success'
+              aria-live='polite'
             >
-              {saveCampaignSettings.isPending ? (
-                <>
-                  <Icon
-                    name='Loader2'
-                    className='mr-2 h-3.5 w-3.5 animate-spin'
-                  />
-                  Saving...
-                </>
-              ) : (
-                'Save'
-              )}
-            </Button>
-            {settingsSaved ? (
-              <output
-                className='flex items-center gap-1 text-xs text-success'
-                aria-live='polite'
-              >
-                <Icon name='CheckCircle' className='h-3.5 w-3.5' />
-                Saved
-              </output>
-            ) : null}
-          </div>
-        }
-        actionsClassName='w-auto shrink-0'
-      />
-
-      <div className='space-y-4 px-4 py-3'>
+              <Icon name='CheckCircle' className='h-3.5 w-3.5' />
+              Saved
+            </output>
+          ) : null}
+        </div>
+      }
+    >
+      <div className='space-y-4 px-4 py-4 sm:px-5'>
         {/* Targeting */}
         <div className='grid gap-4 md:grid-cols-2'>
           <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
@@ -273,6 +279,6 @@ export function CampaignSettingsPanel() {
           </p>
         )}
       </div>
-    </ContentSurfaceCard>
+    </SettingsPanel>
   );
 }

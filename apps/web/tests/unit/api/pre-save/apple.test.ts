@@ -95,7 +95,7 @@ describe('POST /api/pre-save/apple', () => {
   it('returns 504 when apple request times out', async () => {
     const { ServerFetchTimeoutError } = await import('@/lib/http/server-fetch');
     mockServerFetch.mockRejectedValueOnce(
-      new ServerFetchTimeoutError('timed out', 10_000)
+      new ServerFetchTimeoutError('timed out', 10_000, 'Apple pre-save')
     );
 
     const { POST } = await import('@/app/api/pre-save/apple/route');

@@ -1,8 +1,12 @@
-'use client';
-
+import type { Metadata } from 'next';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
+
+export const metadata: Metadata = {
+  robots: NOINDEX_ROBOTS,
+};
 
 export default function SpinnerTestPage() {
   return (
@@ -16,19 +20,15 @@ export default function SpinnerTestPage() {
 
         <div className='space-y-5 px-5 py-5 text-center sm:px-6'>
           <div className='flex justify-center'>
-            <div className='rounded-[14px] border border-(--linear-app-frame-seam) bg-surface-0 p-6'>
+            <div className='rounded-[14px] border border-subtle bg-surface-0 p-6'>
               <svg
                 width='64'
                 height='64'
                 viewBox='0 0 44 44'
                 xmlns='http://www.w3.org/2000/svg'
                 aria-hidden='true'
+                className='text-primary-token'
               >
-                <style>
-                  {
-                    '.spinner{transform-origin:50% 50%;animation:spin 1s linear infinite;}@keyframes spin{to{transform:rotate(360deg);}}'
-                  }
-                </style>
                 <defs>
                   <linearGradient
                     id='spinnerTail'
@@ -39,12 +39,24 @@ export default function SpinnerTestPage() {
                     gradientUnits='userSpaceOnUse'
                     gradientTransform='rotate(-40 22 22)'
                   >
-                    <stop offset='0%' stopColor='white' stopOpacity='1' />
-                    <stop offset='70%' stopColor='white' stopOpacity='1' />
-                    <stop offset='100%' stopColor='white' stopOpacity='0' />
+                    <stop
+                      offset='0%'
+                      stopColor='currentColor'
+                      stopOpacity='1'
+                    />
+                    <stop
+                      offset='70%'
+                      stopColor='currentColor'
+                      stopOpacity='1'
+                    />
+                    <stop
+                      offset='100%'
+                      stopColor='currentColor'
+                      stopOpacity='0'
+                    />
                   </linearGradient>
                 </defs>
-                <g className='spinner'>
+                <g className='origin-center animate-spin'>
                   <circle
                     cx='22'
                     cy='22'

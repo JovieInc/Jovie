@@ -1,0 +1,37 @@
+'use client';
+
+import {
+  ArtistNotificationsCTA,
+  TwoStepNotificationsCTA,
+} from '@/features/profile/artist-notifications-cta';
+import type { Artist } from '@/types/db';
+import { ProfileDrawerShell } from './ProfileDrawerShell';
+
+interface SubscribeDrawerProps {
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly artist: Artist;
+  readonly subscribeTwoStep?: boolean;
+}
+
+export function SubscribeDrawer({
+  open,
+  onOpenChange,
+  artist,
+  subscribeTwoStep = false,
+}: SubscribeDrawerProps) {
+  return (
+    <ProfileDrawerShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title='Get notified'
+      subtitle={`Stay close to ${artist.name} without checking back manually.`}
+    >
+      {subscribeTwoStep ? (
+        <TwoStepNotificationsCTA artist={artist} />
+      ) : (
+        <ArtistNotificationsCTA artist={artist} variant='button' autoOpen />
+      )}
+    </ProfileDrawerShell>
+  );
+}

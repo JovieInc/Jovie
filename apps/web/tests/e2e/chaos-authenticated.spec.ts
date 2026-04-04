@@ -1,7 +1,14 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, Page, test } from '@playwright/test';
-import { APP_ROUTES } from '@/constants/routes';
-import { ensureSignedInUser, isClerkTestEmail } from '../helpers/clerk-auth';
+import {
+  ensureSignedInUser,
+  getAdminCredentials,
+  hasClerkCredentials,
+} from '../helpers/clerk-auth';
+import {
+  DASHBOARD_ROUTE_MATRIX,
+  getRoutePaths,
+} from './utils/dashboard-route-matrix';
 import {
   isTransientNavigationError,
   setupPageMonitoring,
@@ -66,41 +73,6 @@ const CHAOS_POST_CLICK_TIMEOUT = IS_FAST_ITERATION ? 1_500 : 5_000;
 function isReactError(text: string): boolean {
   const lower = text.toLowerCase();
   return REACT_ERROR_PATTERNS.some(p => lower.includes(p));
-}
-
-/**
- * Check if Clerk credentials are available for authenticated tests
- */
-function hasClerkCredentials(): boolean {
-  const username = process.env.E2E_CLERK_USER_USERNAME ?? '';
-  const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
-  const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
-
-  return (
-    username.length > 0 &&
-    (password.length > 0 || isClerkTestEmail(username)) &&
-    clerkSetupSuccess
-  );
-}
-
-/**
- * Get admin credentials (admin-specific or fallback to regular)
- */
-function getAdminCredentials(): { username: string; password: string } {
-  const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
-  const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
-
-  if (
-    adminUsername.length > 0 &&
-    (adminPassword.length > 0 || isClerkTestEmail(adminUsername))
-  ) {
-    return { username: adminUsername, password: adminPassword };
-  }
-
-  return {
-    username: process.env.E2E_CLERK_USER_USERNAME ?? '',
-    password: process.env.E2E_CLERK_USER_PASSWORD ?? '',
-  };
 }
 
 /**
@@ -427,31 +399,16 @@ async function setupChaosAuth(page: Page, useAdmin = false): Promise<void> {
 // Page Groups
 // ============================================================================
 
-const DASHBOARD_PAGES = [
-  APP_ROUTES.AUDIENCE,
-  APP_ROUTES.CHAT,
-  APP_ROUTES.CONTACTS,
-  APP_ROUTES.EARNINGS,
-  APP_ROUTES.RELEASES,
-];
-const FAST_DASHBOARD_PAGES = [APP_ROUTES.AUDIENCE];
+const DASHBOARD_PAGES = getRoutePaths(DASHBOARD_ROUTE_MATRIX.dashboard.full);
+const FAST_DASHBOARD_PAGES = getRoutePaths(
+  DASHBOARD_ROUTE_MATRIX.dashboard.fast
+);
 
-const SETTINGS_PAGES = [
-  '/app/settings',
-  '/app/settings/billing',
-  '/app/settings/branding',
-  '/app/settings/ad-pixels',
-];
-const FAST_SETTINGS_PAGES = ['/app/settings'];
+const SETTINGS_PAGES = getRoutePaths(DASHBOARD_ROUTE_MATRIX.settings.full);
+const FAST_SETTINGS_PAGES = getRoutePaths(DASHBOARD_ROUTE_MATRIX.settings.fast);
 
-const ADMIN_PAGES = [
-  '/app/admin',
-  '/app/admin/activity',
-  '/app/admin/campaigns',
-  '/app/admin/creators',
-  '/app/admin/users',
-];
-const FAST_ADMIN_PAGES = ['/app/admin'];
+const ADMIN_PAGES = getRoutePaths(DASHBOARD_ROUTE_MATRIX.admin.full);
+const FAST_ADMIN_PAGES = getRoutePaths(DASHBOARD_ROUTE_MATRIX.admin.fast);
 
 // ============================================================================
 // Tests

@@ -80,12 +80,14 @@ export function ConfettiStyles() {
 interface ConfettiOverlayProps {
   readonly count?: number;
   readonly colors?: string[];
+  readonly viewport?: boolean;
 }
 
 /** Drop-in confetti overlay — renders particles + keyframe styles */
 export function ConfettiOverlay({
   count = DEFAULT_COUNT,
   colors = DEFAULT_COLORS,
+  viewport = false,
 }: ConfettiOverlayProps = {}) {
   const particles = useMemo(
     () => generateParticles(count, colors),
@@ -95,7 +97,11 @@ export function ConfettiOverlay({
   return (
     <>
       <div
-        className='pointer-events-none absolute inset-0 overflow-hidden'
+        className={
+          viewport
+            ? 'pointer-events-none fixed inset-0 overflow-hidden'
+            : 'pointer-events-none absolute inset-0 overflow-hidden'
+        }
         aria-hidden='true'
       >
         {particles.map(p => (

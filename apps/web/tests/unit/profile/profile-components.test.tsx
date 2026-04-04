@@ -161,6 +161,11 @@ describe('ProfileViewTracker', () => {
     vi.clearAllMocks();
     mockFetch.mockResolvedValue(new Response('ok'));
     vi.stubGlobal('fetch', mockFetch);
+    // requestIdleCallback runs synchronously in tests so tracking assertions work
+    vi.stubGlobal('requestIdleCallback', (cb: () => void) => {
+      cb();
+      return 0;
+    });
     Object.defineProperty(navigator, 'sendBeacon', {
       value: mockSendBeacon,
       writable: true,

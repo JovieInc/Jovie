@@ -2,7 +2,6 @@
 
 import { Play } from 'lucide-react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
-import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialLink } from '@/components/molecules/SocialLink';
 import type { SwipeableProfileMode } from '@/features/profile/contracts';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
@@ -10,7 +9,6 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 
 const MODE_LABELS: Record<SwipeableProfileMode, string> = {
   profile: 'Home',
-  listen: 'Listen',
   tour: 'Tour',
   about: 'About',
   tip: 'Tip',
@@ -38,7 +36,7 @@ export function ProfileHeaderV2({
   const isMobile = useBreakpointDown('md');
 
   return (
-    <header className='sticky top-0 z-30 border-b border-subtle/50 bg-base/80 px-3 py-3 backdrop-blur-xl'>
+    <header className='sticky top-0 z-30 border-b border-subtle/30 bg-base/80 px-3 py-3 backdrop-blur-xl'>
       <div className='flex items-center gap-3'>
         <CircleIconButton
           ariaLabel={`Listen to ${artist.name}`}
@@ -51,23 +49,13 @@ export function ProfileHeaderV2({
         </CircleIconButton>
 
         <div className='flex min-w-0 flex-1 items-center gap-3'>
-          <div className='relative h-11 w-11 shrink-0 overflow-hidden rounded-full border border-subtle/60 bg-surface-1'>
-            <ImageWithFallback
-              src={artist.image_url}
-              alt={artist.name}
-              fill
-              sizes='44px'
-              className='object-cover'
-              fallbackVariant='avatar'
-            />
-          </div>
           <div className='min-w-0'>
             <p className='truncate text-sm font-semibold text-primary-token'>
               {artist.name}
             </p>
             {!isMobile && (
               <div
-                className='mt-2 flex items-center gap-1'
+                className='mt-1.5 flex items-center gap-1'
                 role='tablist'
                 aria-label='Profile sections'
               >

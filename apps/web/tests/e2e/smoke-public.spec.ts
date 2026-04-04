@@ -60,15 +60,20 @@ test('homepage: hero heading, CTA, final claim CTA', async ({ page }) => {
     .first();
   await expect(cta).toBeVisible({ timeout: 20_000 });
 
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  const finalCtaHeadline = page.getByTestId('final-cta-headline');
+  await page
+    .getByRole('link', { name: 'Start Free' })
+    .last()
+    .scrollIntoViewIfNeeded();
+  const finalCtaHeadline = page.getByRole('heading', {
+    name: /Release day starts here\.|Own the release stack\./,
+  });
   await expect(
     finalCtaHeadline,
     'Homepage did not render the final claim CTA section'
   ).toBeVisible({ timeout: 20_000 });
   await expect(
-    page.getByTestId('final-cta-dock'),
-    'Homepage did not render the final claim handle form'
+    page.getByRole('link', { name: 'Start Free' }).last(),
+    'Homepage did not render the final CTA action'
   ).toBeVisible({ timeout: 20_000 });
 
   const bodyText =
@@ -117,7 +122,9 @@ test.describe('Public Profile - dualipa', () => {
       return;
     }
 
-    await expect(page.locator('h1').first()).toContainText(/dua lipa/i, {
+    await expect(
+      page.getByText('Dua Lipa', { exact: true }).first()
+    ).toBeVisible({
       timeout: 60_000,
     });
 
@@ -248,16 +255,13 @@ test.describe('Public Profile - dualipa', () => {
       return;
     }
 
-    const openSubscribe = page.getByRole('button', {
-      name: /turn on notifications/i,
-    });
+    const notificationsUi = page
+      .getByRole('button', { name: /turn on notifications/i })
+      .or(page.getByRole('button', { name: /get notified/i }))
+      .or(page.locator('input[type="email"], input[type="tel"]').first());
     await expect(
-      openSubscribe,
-      'Subscribe mode did not render the notification entry action'
-    ).toBeVisible({ timeout: 30_000 });
-    await expect(
-      page.getByText(/get notified/i),
-      'Subscribe mode did not render the get-notified state'
+      notificationsUi.first(),
+      'Subscribe mode did not render a subscription CTA'
     ).toBeVisible({ timeout: 30_000 });
   });
 });

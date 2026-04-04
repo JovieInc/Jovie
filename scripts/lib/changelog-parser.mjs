@@ -5,9 +5,11 @@
  * Used by: send-changelog-email.mjs and the /changelog page (server component).
  */
 
+import { isInternalEntry } from './changelog-filter-rules.mjs';
+
 const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
 const SECTION_HEADING_RE = /^### (Added|Changed|Fixed|Removed)$/;
-const INTERNAL_PREFIX = '[internal]';
+const INTERNAL_MARKER_RE = /\[\s*internal\s*\]/i;
 
 /**
  * Parse a full CHANGELOG.md into structured data.
@@ -32,6 +34,7 @@ export function parseChangelog(markdown) {
   };
   let currentBlock = null; // null | 'unreleased' | index into releases
   let currentSection = null;
+  let summaryConsumed = false;
 
   for (const line of lines) {
     const versionMatch = line.match(VERSION_HEADING_RE);
@@ -39,6 +42,7 @@ export function parseChangelog(markdown) {
     if (versionMatch) {
       const [, version, date] = versionMatch;
       currentSection = null;
+      summaryConsumed = false;
 
       if (version.toLowerCase() === 'unreleased') {
         currentBlock = 'unreleased';
@@ -62,8 +66,12 @@ export function parseChangelog(markdown) {
       currentBlock === 'unreleased' ? unreleased : releases[currentBlock];
 
     // Capture summary blockquote (first `> ` line before any section heading)
-    if (!currentSection && line.startsWith('> ') && !target.summary) {
-      target.summary = line.slice(2).trim();
+    if (!currentSection && line.startsWith('> ') && !summaryConsumed) {
+      summaryConsumed = true;
+      const summary = line.slice(2).trim();
+      if (!INTERNAL_MARKER_RE.test(summary) && !isInternalEntry(summary)) {
+        target.summary = summary;
+      }
       target.raw += line + '\n';
       continue;
     }
@@ -87,10 +95,11 @@ export function parseChangelog(markdown) {
     const trimmed = line.trim();
     if (trimmed.startsWith('- ') && currentSection) {
       const entry = trimmed.slice(2);
-      if (entry.startsWith(INTERNAL_PREFIX)) {
-        target.internalSections[currentSection].push(
-          entry.slice(INTERNAL_PREFIX.length).trim()
-        );
+      if (INTERNAL_MARKER_RE.test(entry)) {
+        target.internalSections[currentSection].push(entry);
+      } else if (isInternalEntry(entry)) {
+        // Auto-filtered: vendor names, dev tooling, infrastructure patterns
+        target.internalSections[currentSection].push(entry);
       } else {
         target.sections[currentSection].push(entry);
       }

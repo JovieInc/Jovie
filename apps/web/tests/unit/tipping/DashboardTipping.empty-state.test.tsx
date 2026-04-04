@@ -60,11 +60,13 @@ describe('DashboardTipping empty state behavior', () => {
       screen.getByRole('button', { name: 'Connect Venmo' })
     ).toBeInTheDocument();
 
-    expect(screen.queryByText('Activity')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Earnings Dashboard' })
+    ).toBeInTheDocument();
     expect(screen.queryByTestId('earnings-tab')).not.toBeInTheDocument();
   });
 
-  it('shows activity sections and earnings content when Venmo is connected', () => {
+  it('shows earnings workspace and earnings content when Venmo is connected', () => {
     mockUseDashboardData.mockReturnValue({
       tippingStats: {
         tipClicks: 42,
@@ -89,7 +91,9 @@ describe('DashboardTipping empty state behavior', () => {
 
     render(<DashboardTipping />);
 
-    expect(screen.getByText('Activity')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Earnings Dashboard' })
+    ).toBeInTheDocument();
     expect(screen.getByTestId('earnings-tab')).toBeInTheDocument();
   });
 });

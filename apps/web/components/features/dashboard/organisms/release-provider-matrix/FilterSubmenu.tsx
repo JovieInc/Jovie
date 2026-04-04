@@ -4,145 +4,16 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-  MENU_ITEM_BASE,
 } from '@jovie/ui';
-import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { DropdownEmptyState } from '@/components/molecules/DropdownEmptyState';
-import { DrawerInlineIconButton } from '@/components/molecules/drawer';
+import {
+  FilterCheckboxItem,
+  FilterSearchInput,
+} from '@/components/molecules/filters';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
-
-/**
- * Search input component for filtering options within a submenu
- */
-interface SearchInputProps {
-  readonly value: string;
-  readonly onChange: (value: string) => void;
-  readonly onClear: () => void;
-  readonly placeholder?: string;
-  readonly inputRef?: React.RefObject<HTMLInputElement | null>;
-  readonly onEscape?: () => void;
-}
-
-function SearchInput({
-  value,
-  onChange,
-  onClear,
-  placeholder = 'Search...',
-  inputRef,
-  onEscape,
-}: SearchInputProps) {
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Escape') {
-        if (value) {
-          e.preventDefault();
-          e.stopPropagation();
-          onClear();
-        } else if (onEscape) {
-          onEscape();
-        }
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const container = (e.target as HTMLElement).closest(
-          '[data-radix-menu-content]'
-        );
-        const firstItem = container?.querySelector(
-          'button[data-filter-item]'
-        ) as HTMLElement;
-        firstItem?.focus();
-      }
-    },
-    [value, onClear, onEscape]
-  );
-
-  return (
-    <div className='sticky top-0 z-10 border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-2 py-2'>
-      <div className='relative'>
-        <Icon
-          name='Search'
-          className='pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token'
-        />
-        <input
-          ref={inputRef}
-          type='text'
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          className='w-full rounded-[8px] border border-transparent bg-surface-0 py-1.5 pl-7 pr-6 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
-        />
-        {value && (
-          <DrawerInlineIconButton
-            onClick={onClear}
-            className='absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-tertiary-token'
-          >
-            <Icon name='X' className='h-3 w-3' />
-          </DrawerInlineIconButton>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Checkbox item within a filter submenu
- */
-interface SubmenuCheckboxItemProps {
-  readonly label: string;
-  readonly icon?: ReactNode;
-  readonly count?: number;
-  readonly checked: boolean;
-  readonly onCheckedChange: () => void;
-  readonly searchInputRef?: React.RefObject<HTMLInputElement | null>;
-}
-
-function SubmenuCheckboxItem({
-  label,
-  icon,
-  count = 0,
-  checked,
-  onCheckedChange,
-  searchInputRef,
-}: SubmenuCheckboxItemProps) {
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        searchInputRef?.current?.focus();
-      }
-    },
-    [searchInputRef]
-  );
-
-  return (
-    <button
-      type='button'
-      data-filter-item
-      onClick={onCheckedChange}
-      onKeyDown={handleKeyDown}
-      className={cn(
-        MENU_ITEM_BASE,
-        'w-full justify-between rounded-[8px] border border-transparent',
-        checked &&
-          'border-(--linear-app-frame-seam) bg-surface-1 text-primary-token'
-      )}
-    >
-      <div className='flex items-center gap-2'>
-        {icon && <span className='text-tertiary-token'>{icon}</span>}
-        <span className='text-[13px]'>{label}</span>
-      </div>
-      <div className='flex items-center gap-2'>
-        {count > 0 && (
-          <span className='text-[10px] text-tertiary-token'>{count}</span>
-        )}
-        {checked && (
-          <Icon name='Check' className='h-3.5 w-3.5 text-(--linear-accent)' />
-        )}
-      </div>
-    </button>
-  );
-}
 
 /**
  * Configuration for a filter category option
@@ -232,7 +103,7 @@ export function FilterSubmenu<T extends string = string>({
 
   return (
     <DropdownMenuSub onOpenChange={handleOpenChange}>
-      <DropdownMenuSubTrigger className='justify-between rounded-[8px]'>
+      <DropdownMenuSubTrigger className='justify-between rounded-full'>
         <div className='flex items-center gap-2'>
           <Icon
             name={iconName as 'Disc3'}
@@ -256,7 +127,7 @@ export function FilterSubmenu<T extends string = string>({
           'flex max-h-[260px] min-w-[196px] max-w-[calc(100vw-16px)] flex-col overflow-hidden'
         )}
       >
-        <SearchInput
+        <FilterSearchInput
           value={search}
           onChange={setSearch}
           onClear={() => {
@@ -272,7 +143,7 @@ export function FilterSubmenu<T extends string = string>({
             <DropdownEmptyState message='No options found' />
           ) : (
             filteredOptions.map(opt => (
-              <SubmenuCheckboxItem
+              <FilterCheckboxItem
                 key={opt.id}
                 label={opt.label}
                 icon={

@@ -1,22 +1,7 @@
-import { BASE_URL, APP_URL as DOMAINS_APP_URL } from './domains';
+export { APP_URL, APP_URL as DASHBOARD_URL, BASE_URL } from './domains';
 
 export const APP_NAME = 'Jovie';
 export const LEGAL_ENTITY_NAME = 'Jovie Technology Inc.';
-
-/**
- * APP_URL - The app/dashboard domain (jov.ie)
- * Use this for:
- * - Dashboard/app routes
- * - Marketing pages
- * - Auth-related URLs
- * - Email links to app features
- *
- * For profile URLs (jov.ie), use BASE_URL instead.
- */
-export const APP_URL = DOMAINS_APP_URL;
-
-// Re-export domain URLs for convenience
-export { BASE_URL, DOMAINS_APP_URL as DASHBOARD_URL };
 export const MAX_SOCIAL_LINKS = 6;
 export const LISTEN_COOKIE = 'jovie_dsp';
 export const COUNTRY_CODE_COOKIE = 'jv_country';

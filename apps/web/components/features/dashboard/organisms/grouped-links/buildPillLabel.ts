@@ -9,8 +9,15 @@ export function buildPillLabel(link: DetectedLink): string {
   ).trim();
   const suggested = (link.suggestedTitle || '').trim();
 
+  // Strip auto-generated title patterns:
+  //   "@timwhite on YouTube" → "@timwhite"
+  //   "TikTok (@username)"  → "@username"
   const cleanSuggested = (() => {
     if (!suggested) return '';
+    // "Platform (@handle)" pattern (TikTok, etc.)
+    const parenMatch = /\(@([^)]+)\)/.exec(suggested);
+    if (parenMatch) return `@${parenMatch[1]}`;
+    // "Handle on Platform" pattern
     const onIdx = suggested.toLowerCase().indexOf(' on ');
     if (onIdx !== -1) {
       return suggested.slice(0, onIdx).trim();
@@ -18,36 +25,26 @@ export function buildPillLabel(link: DetectedLink): string {
     return suggested;
   })();
 
-  const pickShortest = (candidates: string[]): string => {
-    const filtered = candidates
-      .map(s => s.trim())
-      .filter(Boolean)
-      .filter(s => s.length <= 28);
-    if (filtered.length === 0) return platform;
-    return filtered.reduce(
-      (best, next) => (next.length < best.length ? next : best),
-      filtered[0]
-    );
-  };
+  // Fallback chain: displayText → handle → platform name
+  // displayText is embedded in suggestedTitle by link-transformers.ts:57
 
-  // Prefer @handles when present.
+  // 1. If suggestedTitle carries a user-set displayText (differs from platform name), use it.
+  if (cleanSuggested && cleanSuggested !== platform) {
+    return cleanSuggested.length <= 40
+      ? cleanSuggested
+      : cleanSuggested.slice(0, 37) + '...';
+  }
+
+  // 2. If @handle extractable from URL, use it.
   if (identity.startsWith('@')) {
-    return pickShortest([identity]);
+    return identity;
   }
 
-  // Website-style labels should just be the host.
+  // 3. Website-style labels: show the host.
   if (link.platform.id === 'website' && identity) {
-    return pickShortest([identity, platform]);
+    return identity.length <= 40 ? identity : platform;
   }
 
-  // For DSPs, the URL identity is usually just the host; prefer platform name / suggested.
-  if (link.platform.category === 'dsp') {
-    return pickShortest([cleanSuggested, platform]);
-  }
-
-  if (!identity) {
-    return pickShortest([cleanSuggested, platform]);
-  }
-
-  return pickShortest([cleanSuggested, `${platform} • ${identity}`, platform]);
+  // 4. Fall back to platform name.
+  return platform;
 }

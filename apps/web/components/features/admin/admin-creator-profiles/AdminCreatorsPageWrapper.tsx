@@ -20,6 +20,7 @@ import { BatchIngestModal } from '@/features/admin/BatchIngestModal';
 import { IngestProfileDropdown } from '@/features/admin/ingest-profile-dropdown';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { cn } from '@/lib/utils';
+import { mergeHrefSearchParams } from '@/lib/utils/merge-href-search-params';
 import { AdminCreatorProfilesUnified } from './AdminCreatorProfilesUnified';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 
@@ -69,18 +70,15 @@ export function AdminCreatorsPageWrapper(
   const handleSearchSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      const params = new URLSearchParams();
-      params.set('sort', props.sort);
-      params.set('pageSize', String(props.pageSize));
-      params.set('page', '1');
-
       const query = searchQuery.trim();
-      if (query.length > 0) {
-        params.set('q', query);
-      }
-
-      const queryString = params.toString();
-      router.push(queryString ? `${basePath}?${queryString}` : basePath);
+      router.push(
+        mergeHrefSearchParams(basePath, {
+          page: 1,
+          pageSize: props.pageSize,
+          q: query.length > 0 ? query : null,
+          sort: props.sort,
+        })
+      );
     },
     [basePath, props.pageSize, props.sort, router, searchQuery]
   );
@@ -122,7 +120,7 @@ export function AdminCreatorsPageWrapper(
                   handleSearchClose();
                 }
               }}
-              className='h-7 w-[210px] rounded-full border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] px-3 text-[12px]'
+              className='h-7 w-[210px] rounded-full border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 text-[12px]'
               aria-label='Search creators by handle'
             />
             <AppIconButton

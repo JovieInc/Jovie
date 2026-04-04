@@ -9,14 +9,14 @@ import {
   SimpleTooltip,
 } from '@jovie/ui';
 import { Check, ChevronDown, Info } from 'lucide-react';
-import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
-
+import { useEffect, useRef } from 'react';
 import {
   DrawerButton,
+  DrawerEditableTextField,
   DrawerPropertyRow,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
+import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
@@ -44,21 +44,30 @@ const CANVAS_STATUS_CONFIG: Record<
 
 const CANVAS_STATUS_OPTIONS: CanvasStatus[] = ['uploaded', 'not_set'];
 const METADATA_ROW_PROPS = {
-  labelWidth: 72,
+  labelWidth: 74,
   size: 'sm' as const,
 };
 const METADATA_TEXT_CLASSNAME =
-  'text-[11px] leading-[14px] text-secondary-token';
+  'text-[12px] font-[460] leading-[16px] text-secondary-token';
 const METADATA_MUTED_TEXT_CLASSNAME =
-  'text-[10.5px] leading-[14px] text-tertiary-token';
-const METADATA_BADGE_CLASSNAME = 'text-[9.5px] font-[510]';
-const METADATA_ROW_CLASSNAME =
-  'rounded-none px-2 py-1.5 first:pt-0.5 last:pb-0.5';
+  'text-[11px] leading-[15px] text-tertiary-token';
+const METADATA_LABEL_CLASSNAME =
+  'text-[10px] font-[500] leading-[13px] tracking-[0.01em] text-quaternary-token';
+const METADATA_VALUE_CLASSNAME =
+  'text-[12px] leading-[16px] text-secondary-token';
+const METADATA_BADGE_CLASSNAME =
+  'h-5 rounded-full border border-subtle bg-surface-0 px-2 text-[9.5px] font-[510] tracking-[-0.01em] shadow-none';
+const METADATA_ROW_CLASSNAME = 'rounded-none px-0 py-1 first:pt-0 last:pb-0';
+const METADATA_STACK_CLASSNAME = 'space-y-0.5';
+const METADATA_DISPLAY_VALUE_CLASSNAME =
+  'text-[11.5px] font-[460] leading-[16px] text-primary-token';
+const METADATA_INPUT_CLASSNAME =
+  'h-7 rounded-[8px] border-subtle bg-surface-0 px-2.5 text-[11px] font-[460] text-primary-token shadow-none';
 
 function PopularityScore({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <span className='text-[11px] tabular-nums text-secondary-token'>
+    <span className='text-[11.5px] font-[460] tabular-nums text-primary-token'>
       {clamped} / 100
     </span>
   );
@@ -70,14 +79,14 @@ function ReleaseTypeBadges({ release }: { readonly release: Release }) {
     <div className='flex flex-wrap items-center gap-1.5'>
       <Badge
         size='sm'
-        className={`h-5 rounded-md px-1.5 text-[9.5px] font-[510] ${typeStyle.bg} ${typeStyle.text}`}
+        className={`${METADATA_BADGE_CLASSNAME} ${typeStyle.bg} ${typeStyle.text}`}
       >
         {typeStyle.label}
       </Badge>
       {release.isExplicit && (
         <Badge
           size='sm'
-          className='h-5 rounded-md bg-red-500/10 px-1.5 text-[9.5px] font-[510] text-red-600 dark:text-red-300'
+          className='h-5 rounded-full border border-transparent bg-red-500/10 px-2 text-[9.5px] font-[510] tracking-[-0.01em] text-red-600 shadow-none dark:text-red-300'
         >
           E
         </Badge>
@@ -88,7 +97,17 @@ function ReleaseTypeBadges({ release }: { readonly release: Release }) {
 
 interface ReleaseMetadataProps {
   readonly release: Release;
+  readonly isEditable?: boolean;
+  readonly onSaveMetadata?: (
+    releaseId: string,
+    values: { upc: string | null; label: string | null }
+  ) => Promise<void>;
+  readonly onSavePrimaryIsrc?: (
+    releaseId: string,
+    isrc: string | null
+  ) => Promise<void>;
   readonly onCanvasStatusChange?: (status: CanvasStatus) => void;
+  readonly variant?: 'card' | 'flat';
 }
 
 function formatCopyrightLine(line: string, symbol: '℗' | '©'): string {
@@ -126,7 +145,11 @@ function MetadataFallbackValue({ children }: { readonly children: string }) {
 
 export function ReleaseMetadata({
   release,
+  isEditable = false,
+  onSaveMetadata,
+  onSavePrimaryIsrc,
   onCanvasStatusChange,
+  variant = 'card',
 }: ReleaseMetadataProps) {
   const canvasStatus: CanvasStatus = release.canvasStatus ?? 'not_set';
   const selectionStatus: CanvasStatus =
@@ -135,21 +158,40 @@ export function ReleaseMetadata({
     CANVAS_STATUS_CONFIG[canvasStatus] ?? CANVAS_STATUS_CONFIG.not_set;
   const canvasStatusDisplayLabel =
     canvasStatusConfig.displayLabel ?? canvasStatusConfig.label;
+  const canEditMetadata = isEditable && Boolean(onSaveMetadata);
+  const canEditPrimaryIsrc = isEditable && Boolean(onSavePrimaryIsrc);
+  const metadataDraftRef = useRef({
+    upc: release.upc ?? null,
+    label: release.label ?? null,
+  });
+
+  useEffect(() => {
+    metadataDraftRef.current = {
+      upc: release.upc ?? null,
+      label: release.label ?? null,
+    };
+  }, [release.label, release.upc]);
 
   return (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
+      variant={variant}
+      className={cn(
+        variant === 'card' && LINEAR_SURFACE.drawerCardSm,
+        'overflow-hidden'
+      )}
+      testId='release-metadata-card'
     >
-      <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-        <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-          Metadata
-        </p>
-      </div>
-      <div className='p-1.5'>
-        <div className='divide-y divide-(--linear-app-frame-seam)'>
+      <div className='p-3'>
+        <div
+          className={METADATA_STACK_CLASSNAME}
+          data-testid='release-metadata-grid'
+          data-dividers='false'
+        >
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
+            labelClassName={METADATA_LABEL_CLASSNAME}
+            valueClassName={METADATA_VALUE_CLASSNAME}
             label='Type'
             value={<ReleaseTypeBadges release={release} />}
             align='start'
@@ -158,13 +200,34 @@ export function ReleaseMetadata({
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
+            labelClassName={METADATA_LABEL_CLASSNAME}
             label='ISRC'
             value={
-              <CopyableMonospaceCell
-                value={release.primaryIsrc}
+              <DrawerEditableTextField
                 label='ISRC'
-                size='sm'
-                maxWidth={140}
+                value={release.primaryIsrc}
+                editable={canEditPrimaryIsrc}
+                placeholder='Add ISRC'
+                emptyLabel='—'
+                monospace
+                normalizeValue={nextValue => {
+                  const trimmed = nextValue.trim();
+                  return trimmed
+                    ? trimmed.replaceAll(/[^a-zA-Z0-9]/g, '').toUpperCase()
+                    : null;
+                }}
+                onSave={
+                  onSavePrimaryIsrc
+                    ? nextValue => onSavePrimaryIsrc(release.id, nextValue)
+                    : undefined
+                }
+                copyValue={release.primaryIsrc ?? null}
+                displayClassName={METADATA_DISPLAY_VALUE_CLASSNAME}
+                emptyClassName={METADATA_MUTED_TEXT_CLASSNAME}
+                inputClassName={cn(
+                  METADATA_INPUT_CLASSNAME,
+                  'font-mono tracking-[0.02em]'
+                )}
               />
             }
           />
@@ -172,13 +235,41 @@ export function ReleaseMetadata({
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
+            labelClassName={METADATA_LABEL_CLASSNAME}
             label='UPC'
             value={
-              <CopyableMonospaceCell
-                value={release.upc}
+              <DrawerEditableTextField
                 label='UPC'
-                size='sm'
-                maxWidth={140}
+                value={release.upc}
+                editable={canEditMetadata}
+                placeholder='Add UPC'
+                emptyLabel='—'
+                monospace
+                normalizeValue={nextValue => {
+                  const trimmed = nextValue.trim();
+                  return trimmed ? trimmed : null;
+                }}
+                onSave={
+                  onSaveMetadata
+                    ? async upc => {
+                        metadataDraftRef.current = {
+                          ...metadataDraftRef.current,
+                          upc,
+                        };
+                        await onSaveMetadata(
+                          release.id,
+                          metadataDraftRef.current
+                        );
+                      }
+                    : undefined
+                }
+                copyValue={release.upc ?? null}
+                displayClassName={METADATA_DISPLAY_VALUE_CLASSNAME}
+                emptyClassName={METADATA_MUTED_TEXT_CLASSNAME}
+                inputClassName={cn(
+                  METADATA_INPUT_CLASSNAME,
+                  'font-mono tracking-[0.02em]'
+                )}
               />
             }
           />
@@ -186,25 +277,46 @@ export function ReleaseMetadata({
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
+            labelClassName={METADATA_LABEL_CLASSNAME}
             label='Label'
             value={
-              release.label ? (
-                <CopyableMonospaceCell
-                  value={release.label}
-                  label='Label'
-                  size='sm'
-                  maxWidth={140}
-                  className='font-sans'
-                />
-              ) : (
-                <MetadataFallbackValue>Unknown</MetadataFallbackValue>
-              )
+              <DrawerEditableTextField
+                label='Label'
+                value={release.label}
+                editable={canEditMetadata}
+                placeholder='Add Label'
+                emptyLabel='Unknown'
+                normalizeValue={nextValue => {
+                  const trimmed = nextValue.trim();
+                  return trimmed ? trimmed : null;
+                }}
+                onSave={
+                  onSaveMetadata
+                    ? async label => {
+                        metadataDraftRef.current = {
+                          ...metadataDraftRef.current,
+                          label,
+                        };
+                        await onSaveMetadata(
+                          release.id,
+                          metadataDraftRef.current
+                        );
+                      }
+                    : undefined
+                }
+                copyValue={release.label ?? null}
+                displayClassName={METADATA_DISPLAY_VALUE_CLASSNAME}
+                emptyClassName={METADATA_MUTED_TEXT_CLASSNAME}
+                inputClassName={METADATA_INPUT_CLASSNAME}
+              />
             }
           />
           {release.copyrightLine && (
             <DrawerPropertyRow
               {...METADATA_ROW_PROPS}
               className={METADATA_ROW_CLASSNAME}
+              labelClassName={METADATA_LABEL_CLASSNAME}
+              valueClassName={METADATA_VALUE_CLASSNAME}
               label={
                 <CopyrightLabel
                   symbol='℗'
@@ -223,9 +335,10 @@ export function ReleaseMetadata({
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
+            labelClassName={METADATA_LABEL_CLASSNAME}
             label='Tracks'
             value={
-              <span className='text-[11px] tabular-nums text-secondary-token'>
+              <span className='text-[11.5px] font-[460] tabular-nums text-primary-token'>
                 {release.totalTracks}{' '}
                 {release.totalTracks === 1 ? 'track' : 'tracks'}
               </span>
@@ -235,6 +348,8 @@ export function ReleaseMetadata({
             <DrawerPropertyRow
               {...METADATA_ROW_PROPS}
               className={METADATA_ROW_CLASSNAME}
+              labelClassName={METADATA_LABEL_CLASSNAME}
+              valueClassName={METADATA_VALUE_CLASSNAME}
               label={
                 <CopyrightLabel
                   symbol='©'
@@ -253,15 +368,16 @@ export function ReleaseMetadata({
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
+            labelClassName={METADATA_LABEL_CLASSNAME}
             label='Canvas'
             value={
               onCanvasStatusChange ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <DrawerButton
-                      tone='ghost'
+                      tone='secondary'
                       size='sm'
-                      className='-mx-1 h-6 gap-1 rounded-md border-transparent px-1 py-0.5 text-[11px] font-[400] leading-[14px] text-secondary-token'
+                      className='-mx-0.5 h-5.5 gap-1 rounded-full border-subtle bg-surface-0 px-2 text-[10.5px] font-[510] leading-none text-secondary-token shadow-none hover:bg-surface-0'
                     >
                       <span>{canvasStatusDisplayLabel}</span>
                       <ChevronDown
@@ -316,6 +432,7 @@ export function ReleaseMetadata({
             <DrawerPropertyRow
               {...METADATA_ROW_PROPS}
               className={METADATA_ROW_CLASSNAME}
+              labelClassName={METADATA_LABEL_CLASSNAME}
               label='Popularity'
               value={<PopularityScore value={release.spotifyPopularity} />}
             />
@@ -324,9 +441,10 @@ export function ReleaseMetadata({
             <DrawerPropertyRow
               {...METADATA_ROW_PROPS}
               className={METADATA_ROW_CLASSNAME}
+              labelClassName={METADATA_LABEL_CLASSNAME}
               label='Duration'
               value={
-                <span className='text-[11px] tabular-nums text-secondary-token'>
+                <span className='text-[11.5px] font-[460] tabular-nums text-primary-token'>
                   {formatDuration(release.totalDurationMs)}
                 </span>
               }
@@ -336,6 +454,8 @@ export function ReleaseMetadata({
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
+            labelClassName={METADATA_LABEL_CLASSNAME}
+            valueClassName={METADATA_VALUE_CLASSNAME}
             label='Released'
             value={
               release.releaseDate ? (
@@ -355,6 +475,7 @@ export function ReleaseMetadata({
             <DrawerPropertyRow
               {...METADATA_ROW_PROPS}
               className={METADATA_ROW_CLASSNAME}
+              labelClassName={METADATA_LABEL_CLASSNAME}
               label='Genres'
               value={
                 <div className='flex flex-wrap gap-1'>
@@ -362,7 +483,7 @@ export function ReleaseMetadata({
                     <Badge
                       key={genre}
                       variant='secondary'
-                      className='rounded-md bg-surface-1 px-1.5 py-0 text-[9.5px] font-[510] text-secondary-token'
+                      className='rounded-full border border-subtle bg-surface-0 px-2 py-0 text-[9.5px] font-[510] tracking-[-0.01em] text-secondary-token shadow-none'
                     >
                       {genre}
                     </Badge>

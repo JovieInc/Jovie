@@ -26,9 +26,9 @@ export default async function NotificationsPage({ params }: Props) {
   const { username } = await params;
 
   const result = await getProfileWithLinks(username);
-  if (!result || !result.isPublic) notFound();
+  if (!result?.isPublic) notFound();
 
-  // Map camelCase ProfileWithLinks → snake_case CreatorProfile for convertCreatorProfileToArtist
+  // Adapt the public profile query shape into the legacy artist mapper contract.
   const profile: CreatorProfile = {
     id: result.id,
     user_id: result.userId,

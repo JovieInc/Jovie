@@ -19,6 +19,10 @@ import { db } from '@/lib/db';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
+  derivePreviewState,
+  getProviderConfidence,
+} from '@/lib/discography/audio-qa';
+import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
@@ -230,6 +234,7 @@ export default async function ReleaseSmartLinkPage({
       label: PROVIDER_CONFIG[key].label,
       accent: PROVIDER_CONFIG[key].accent,
       url: link?.url ?? null,
+      confidence: link ? getProviderConfidence(link) : 'unknown',
     };
   }).filter(p => p.url); // Only show providers with URLs
 
@@ -243,11 +248,18 @@ export default async function ReleaseSmartLinkPage({
         label: PROVIDER_CONFIG[key].label,
         accent: PROVIDER_CONFIG[key].accent,
         url: link?.url ?? null,
+        confidence: link ? getProviderConfidence(link) : 'unknown',
       };
     })
     .filter(p => p.url);
 
   const allProviders = [...providers, ...secondaryProviders];
+  const previewState = derivePreviewState({
+    audioUrl: null,
+    previewUrl: null,
+    metadata: null,
+    providerLinks: links,
+  });
 
   return (
     <ReleaseLandingPage
@@ -255,6 +267,8 @@ export default async function ReleaseSmartLinkPage({
         title: release.title,
         artworkUrl: release.artworkUrl ?? null,
         releaseDate: release.releaseDate?.toISOString() ?? null,
+        previewVerification: previewState.previewVerification,
+        previewSource: previewState.previewSource,
       }}
       artist={{
         name: creator.displayName ?? creator.username,

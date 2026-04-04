@@ -1,8 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { PageHeader } from '@/components/organisms/PageShell';
 import { cn } from '@/lib/utils';
 
 export interface SettingsSectionProps {
@@ -11,9 +10,9 @@ export interface SettingsSectionProps {
   readonly description?: string;
   readonly children: React.ReactNode;
   readonly className?: string;
-  readonly headerClassName?: string;
   readonly titleClassName?: string;
   readonly descriptionClassName?: string;
+  readonly headerAction?: React.ReactNode;
 }
 
 export function SettingsSection({
@@ -22,42 +21,41 @@ export function SettingsSection({
   description,
   children,
   className,
-  headerClassName,
   titleClassName,
   descriptionClassName,
+  headerAction,
 }: SettingsSectionProps) {
   const headingId = `${id}-heading`;
   const descriptionId = description ? `${id}-description` : undefined;
 
   return (
-    <ContentSurfaceCard
-      as='section'
-      surface='details'
+    <section
       id={id}
       aria-labelledby={headingId}
       aria-describedby={descriptionId}
-      className={cn('scroll-mt-4 overflow-hidden', className)}
+      className={cn('scroll-mt-6', className)}
     >
-      <ContentSectionHeader
-        density='compact'
-        className={cn('min-h-0', headerClassName)}
-        bodyClassName='space-y-0.5'
-        title={<span id={headingId}>{title}</span>}
-        subtitle={
-          description ? (
-            <span id={descriptionId}>{description}</span>
-          ) : undefined
-        }
-        titleClassName={cn(
-          'dashboard-heading text-[15px] font-[590] text-primary-token tracking-[-0.02em]',
+      <div
+        className={cn(
+          'flex items-center justify-between border-b border-subtle/80',
           titleClassName
         )}
-        subtitleClassName={cn(
-          'dashboard-body text-[12px] text-secondary-token',
+      >
+        <PageHeader
+          title={title}
+          description={description}
+          className='border-b-0'
+        />
+        {headerAction}
+      </div>
+      <div
+        className={cn(
+          'space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)',
           descriptionClassName
         )}
-      />
-      <div className='space-y-3 px-4 py-3'>{children}</div>
-    </ContentSurfaceCard>
+      >
+        {children}
+      </div>
+    </section>
   );
 }

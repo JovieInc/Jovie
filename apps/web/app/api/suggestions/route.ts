@@ -16,10 +16,20 @@
  * Authentication: Required (creator must own the profile)
  */
 
-import { auth } from '@clerk/nextjs/server';
-import { and, count, desc, eq, isNotNull, or } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  sql as drizzleSql,
+  eq,
+  gte,
+  isNotNull,
+  isNull,
+  or,
+} from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { chatConversations } from '@/lib/db/schema/chat';
@@ -63,8 +73,11 @@ export interface SuggestionsStarterContext {
 // ============================================================================
 
 export async function GET(request: Request) {
+  const oneYearAgo = new Date();
+  oneYearAgo.setDate(oneYearAgo.getDate() - 365);
+
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -171,20 +184,33 @@ export async function GET(request: Request) {
             .limit(10),
 
       // Latest release for contextual starter prompts
+      // Use only recent releases so we don't suggest stale catalog items.
+      // Use releaseDate when available, with createdAt as fallback so manually
+      // entered releases without release dates still count as newest.
       db
-        .select({ title: discogReleases.title })
+        .select({
+          title: discogReleases.title,
+        })
         .from(discogReleases)
         .where(
           and(
             eq(discogReleases.creatorProfileId, profileId),
             or(
-              isNotNull(discogReleases.releaseDate),
-              isNotNull(discogReleases.createdAt)
+              and(
+                isNotNull(discogReleases.releaseDate),
+                gte(discogReleases.releaseDate, oneYearAgo)
+              ),
+              and(
+                isNull(discogReleases.releaseDate),
+                gte(discogReleases.createdAt, oneYearAgo)
+              )
             )
           )
         )
         .orderBy(
-          desc(discogReleases.releaseDate),
+          desc(
+            drizzleSql`COALESCE(${discogReleases.releaseDate}, ${discogReleases.createdAt})`
+          ),
           desc(discogReleases.createdAt)
         )
         .limit(1),

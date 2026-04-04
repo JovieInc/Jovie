@@ -35,20 +35,20 @@ SidebarMenuItem.displayName = 'SidebarMenuItem';
 
 const sidebarMenuButtonVariants = cva(
   [
-    // Base layout — 13px / weight 500 / pill radius / -0.01em tracking matching Linear
-    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-full border border-transparent px-2.5 text-left text-[12px] leading-tight tracking-[-0.012em] outline-none',
+    // Base layout — tighter and calmer so the rail reads as one system.
+    'peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-[10px] border border-transparent px-2.5 text-left text-[12.5px] leading-[1.15] tracking-normal outline-none',
     // Font weight 500 — Linear's --font-weight-medium for sidebar nav
     '[font-weight:var(--font-weight-nav)]',
     // Transitions — Linear: instant for background, colors
-    'transition-[background-color,color] duration-0 ease-interactive',
-    // Default text color — keep non-active rows quiet
-    'text-sidebar-item-icon/80',
+    'transition-[background-color,border-color,color,box-shadow] duration-fast ease-interactive',
+    // Default text color — token-driven contrast, no extra opacity dampening
+    'text-sidebar-item-foreground',
     // Hover state — Linear: rgba(255,255,255,0.02) bg
-    'hover:border-transparent hover:bg-sidebar-accent/78 hover:text-sidebar-item-foreground',
+    'hover:border-[color-mix(in_oklab,var(--linear-app-frame-seam)_58%,transparent)] hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] hover:text-sidebar-item-foreground',
     // Active state — soft emphasis while keeping shell understated
-    'data-[active=true]:bg-sidebar-accent/92 data-[active=true]:text-sidebar-item-foreground data-[active=true]:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_82%,transparent)]',
+    'data-[active=true]:border-[color-mix(in_oklab,var(--linear-app-frame-seam)_80%,transparent)] data-[active=true]:bg-[color-mix(in_oklab,var(--color-sidebar-accent-active)_88%,var(--linear-app-content-surface))] data-[active=true]:text-sidebar-item-foreground data-[active=true]:shadow-[inset_0_1px_0_rgba(255,255,255,0.03),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_62%,transparent)]',
     // Focus state - subtle bg like Linear (no rings)
-    'focus-visible:bg-sidebar-accent focus-visible:outline-none',
+    'focus-visible:border-[color-mix(in_oklab,var(--linear-border-focus)_62%,transparent)] focus-visible:bg-sidebar-accent focus-visible:outline-none',
     // Disabled state
     'disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
     // Menu action spacing
@@ -60,10 +60,10 @@ const sidebarMenuButtonVariants = cva(
     'group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden',
     // Icon styling — 14px to match Linear's nav icon size
     '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-3.5 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
-    '[&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon/65 [&>svg]:transition-colors [&>svg]:duration-0 [&>svg]:ease-interactive',
-    '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon/65 [&_[data-sidebar-icon]_svg]:transition-colors [&_[data-sidebar-icon]_svg]:duration-0 [&_[data-sidebar-icon]_svg]:ease-interactive',
-    'hover:[&>svg]:text-sidebar-item-foreground/85',
-    'hover:[&_[data-sidebar-icon]_svg]:text-sidebar-item-foreground/85',
+    '[&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors [&>svg]:duration-0 [&>svg]:ease-interactive',
+    '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon [&_[data-sidebar-icon]_svg]:transition-colors [&_[data-sidebar-icon]_svg]:duration-0 [&_[data-sidebar-icon]_svg]:ease-interactive',
+    'hover:[&>svg]:text-sidebar-item-foreground',
+    'hover:[&_[data-sidebar-icon]_svg]:text-sidebar-item-foreground',
     'data-[active=true]:[&>svg]:text-sidebar-item-foreground',
     'data-[active=true]:[&_[data-sidebar-icon]_svg]:text-sidebar-item-foreground',
   ].join(' '),
@@ -75,7 +75,7 @@ const sidebarMenuButtonVariants = cva(
           'bg-sidebar-background border border-sidebar-border hover:border-sidebar-accent',
       },
       size: {
-        default: 'h-7',
+        default: 'h-6.5',
         sm: 'h-6 text-xs',
         lg: 'h-8 group-data-[collapsible=icon]:!size-8',
       },
@@ -219,7 +219,7 @@ export const SidebarMenuBadge = React.forwardRef<
     ref={ref}
     data-sidebar='menu-badge'
     className={cn(
-      'absolute right-2 top-1/2 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full border border-transparent bg-sidebar-accent/45 px-1.5 text-[11px] font-medium tabular-nums text-sidebar-item-icon/70 select-none pointer-events-none',
+      'absolute right-2 top-1/2 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full border border-transparent bg-sidebar-accent/45 px-1.5 text-[11px] font-medium tabular-nums text-sidebar-item-icon select-none pointer-events-none',
       'peer-hover/menu-button:text-sidebar-item-foreground peer-data-[active=true]/menu-button:text-sidebar-item-foreground',
       'peer-data-[size=sm]/menu-button:text-[10px]',
       'peer-data-[size=default]/menu-button:text-[11px]',
@@ -314,15 +314,15 @@ export const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        'flex min-h-6 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-full px-1.5 text-app text-sidebar-item-foreground outline-none transition-[background-color,color] duration-normal ease-interactive',
-        'hover:bg-sidebar-accent hover:text-sidebar-foreground',
+        'flex min-h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-full px-2.5 text-[13px] leading-[1.15] text-sidebar-item-foreground outline-none transition-[background-color,color,box-shadow] duration-normal ease-interactive [font-weight:var(--font-weight-nav)]',
+        'hover:bg-sidebar-accent hover:text-sidebar-item-foreground',
         'focus-visible:bg-sidebar-accent focus-visible:outline-none',
-        'active:bg-sidebar-accent active:text-sidebar-foreground',
+        'active:bg-sidebar-accent active:text-sidebar-item-foreground',
         'disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
-        '[&>span:last-child]:truncate [&>svg]:size-3 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors',
-        'data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-foreground data-[active=true]:font-medium',
+        '[&>span:last-child]:truncate [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors',
+        'data-[active=true]:bg-sidebar-accent-active data-[active=true]:text-sidebar-item-foreground data-[active=true]:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_82%,transparent)]',
         'data-[active=true]:[&>svg]:text-sidebar-item-foreground hover:[&>svg]:text-sidebar-item-foreground',
-        size === 'sm' && 'text-xs min-h-5',
+        size === 'sm' && 'min-h-6 text-[12px]',
         'group-data-[collapsible=icon]:hidden',
         className
       )}

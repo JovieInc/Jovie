@@ -1,6 +1,7 @@
 'use client';
 
 import { SimpleTooltip } from '@jovie/ui';
+import * as Sentry from '@sentry/nextjs';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
 import type {
@@ -32,6 +33,7 @@ export interface ProfileLinkListProps {
   readonly onRemoveLink?: (linkId: string) => void;
   readonly dspConnections?: PreviewDspConnections;
   readonly onDisconnectDsp?: (provider: 'spotify' | 'apple_music') => void;
+  readonly surface?: 'card' | 'plain';
 }
 
 function mapPreviewCategoryToSection(
@@ -49,13 +51,21 @@ function getLinkSection(link: PreviewPanelLink): LinkSection {
   if (fromCategory) return fromCategory;
 
   if (link.platformType) {
-    return link.platformType === 'websites'
-      ? 'custom'
-      : (link.platformType as LinkSection);
+    if (link.platformType === 'websites') return 'custom';
+    if (VALID_SECTIONS.has(link.platformType))
+      return link.platformType as LinkSection;
+    Sentry.addBreadcrumb({
+      category: 'links',
+      message: `Unknown platformType: ${link.platformType}`,
+      level: 'warning',
+    });
+    return 'custom';
   }
 
   const category = getPlatformCategory(link.platform);
-  return category === 'websites' ? 'custom' : (category as LinkSection);
+  if (category === 'websites') return 'custom';
+  if (VALID_SECTIONS.has(category)) return category as LinkSection;
+  return 'custom';
 }
 
 /**
@@ -71,6 +81,9 @@ function formatDisplayHost(url: string): string {
 }
 
 const SECTION_ORDER: LinkSection[] = ['social', 'dsp', 'earnings', 'custom'];
+
+/** Valid LinkSection values for runtime validation of free-text DB platformType */
+const VALID_SECTIONS: ReadonlySet<string> = new Set(SECTION_ORDER);
 
 const SECTION_LABELS: Record<LinkSection, string> = {
   social: 'Social',
@@ -142,7 +155,7 @@ function ConnectedDspRows({
   if (connectedProviders.length === 0) {
     return (
       <p className='text-[13px] text-secondary-token'>
-        No Spotify or Apple Music connected yet
+        No artist profiles connected yet
       </p>
     );
   }
@@ -179,6 +192,7 @@ export function ProfileLinkList({
   onRemoveLink,
   dspConnections,
   onDisconnectDsp,
+  surface = 'card',
 }: ProfileLinkListProps) {
   // Group links by category
   const groupedLinks = useMemo(() => {
@@ -208,6 +222,9 @@ export function ProfileLinkList({
   // When viewing a specific category, render links directly (no section header —
   // the tab already labels the category, and the + button is inline with tabs)
   if (selectedCategory !== 'all') {
+    const sectionSurfaceClassName =
+      surface === 'card' ? LINEAR_SURFACE.drawerCard : '';
+
     if (selectedCategory === 'dsp' && dspConnections) {
       const hasDspContent =
         filteredLinks.length > 0 ||
@@ -216,7 +233,7 @@ export function ProfileLinkList({
 
       if (!hasDspContent) {
         return (
-          <div className={cn(LINEAR_SURFACE.drawerCard, 'px-3 py-3')}>
+          <div className={cn(sectionSurfaceClassName, 'px-3 py-3')}>
             <p className='py-1 text-xs text-tertiary-token'>
               No music links yet. Click + to add one.
             </p>
@@ -225,7 +242,7 @@ export function ProfileLinkList({
       }
 
       return (
-        <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-1 p-2')}>
+        <div className={cn(sectionSurfaceClassName, 'space-y-1 p-2')}>
           <ConnectedDspRows
             dspConnections={dspConnections}
             onDisconnect={onDisconnectDsp}
@@ -239,7 +256,7 @@ export function ProfileLinkList({
 
     if (filteredLinks.length === 0) {
       return (
-        <div className={cn(LINEAR_SURFACE.drawerCard, 'px-3 py-3')}>
+        <div className={cn(sectionSurfaceClassName, 'px-3 py-3')}>
           <p className='py-1 text-xs text-tertiary-token'>
             No {SECTION_LABELS[selectedCategory].toLowerCase()} links yet. Click
             + to add one.
@@ -249,7 +266,7 @@ export function ProfileLinkList({
     }
 
     return (
-      <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-1 p-2')}>
+      <div className={cn(sectionSurfaceClassName, 'space-y-1 p-2')}>
         {filteredLinks.map(link => (
           <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
         ))}

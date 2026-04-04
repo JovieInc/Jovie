@@ -1,0 +1,154 @@
+# Auto-generate product screenshots when UI code changes on main.
+# Captures demo-route screenshots (no database needed), checks if they
+# differ from the committed versions, and opens/updates a single PR.
+name: Product Screenshots
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/app/(marketing)/**'
+      - 'apps/web/app/demo/**'
+      - 'apps/web/components/**'
+      - 'apps/web/features/**'
+      - 'apps/web/lib/screenshots/**'
+      - 'apps/web/tests/product-screenshots/**'
+      - 'apps/web/tailwind.config.*'
+      - 'apps/web/app/**/layout.tsx'
+      - 'apps/web/app/globals.css'
+      - 'packages/ui/**'
+      - '!apps/web/public/product-screenshots/**'
+      - '!apps/web/screenshot-catalog/current/**'
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: screenshots
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    name: Generate Screenshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      DATABASE_URL: postgresql://localhost/noop
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_mock
+      CLERK_SECRET_KEY: sk_test_mock
+      NEXT_DISABLE_TOOLBAR: '1'
+      NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build production app
+        run: pnpm run build
+
+      - name: Start production server
+        run: |
+          pnpm run start &
+          npx wait-on http://localhost:3000 --timeout 60000
+
+      - name: Capture screenshot catalog
+        run: |
+          pnpm exec playwright test \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots
+        env:
+          BASE_URL: http://localhost:3000
+
+      - name: Check for changes
+        id: diff
+        working-directory: .
+        run: |
+          if [ -z "$(git status --porcelain apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No screenshot changes detected"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Screenshots changed:"
+            git status --short apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
+          fi
+
+      - name: Create or update screenshot PR
+        if: steps.diff.outputs.changed == 'true'
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          BRANCH="screenshots/auto-update"
+
+          # Check for existing open PR before pushing
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number \
+            -q '.[0].number' 2>/dev/null || true)
+
+          git checkout -b "$BRANCH"
+          git add apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
+          git commit -m "chore: update product screenshots [auto]
+
+          Triggered by ${GITHUB_SHA::8} (run ${GITHUB_RUN_ID})"
+          # Dedicated bot branch: always force-push latest generated screenshots.
+          # `--force-with-lease` can fail with stale lease info when concurrent
+          # screenshot runs update this branch between list + push.
+          # Retry transient GitHub 500s, but gracefully skip when the branch is
+          # merge-queue locked (GH006) so this workflow doesn't fail.
+          PUSHED=false
+          for ATTEMPT in 1 2 3; do
+            set +e
+            PUSH_OUTPUT=$(git push --force origin "$BRANCH" 2>&1)
+            PUSH_EXIT=$?
+            set -e
+
+            if [ "$PUSH_EXIT" -eq 0 ]; then
+              PUSHED=true
+              break
+            fi
+
+            if [[ "$PUSH_OUTPUT" == *"A pull request for this branch has been added to a merge queue"* ]] || [[ "$PUSH_OUTPUT" == *"cannot be updated"* ]]; then
+              echo "$PUSH_OUTPUT"
+              echo "Screenshot branch is queued for merge; skipping update for this run."
+              exit 0
+            fi
+
+            if [[ "$PUSH_OUTPUT" == *"The requested URL returned error: 500"* ]] && [ "$ATTEMPT" -lt 3 ]; then
+              echo "$PUSH_OUTPUT"
+              echo "Transient GitHub 500 during push; retrying..."
+              sleep $((ATTEMPT * 4))
+              continue
+            fi
+
+            echo "$PUSH_OUTPUT"
+            exit "$PUSH_EXIT"
+          done
+
+          if [ "$PUSHED" != "true" ]; then
+            echo "Failed to push screenshot update branch after retries."
+            exit 1
+          fi
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "Updated existing PR #$EXISTING_PR via force-push"
+            # Re-enable auto-merge (GitHub disables it on force-push)
+            gh pr merge --auto --squash "$EXISTING_PR" 2>/dev/null || true
+          else
+            PR_URL=$(gh pr create \
+              --title "chore: update product screenshots" \
+              --body "Auto-generated screenshot update triggered by ${GITHUB_SHA::8}.")
+            gh pr merge --auto --squash "$PR_URL" || true
+          fi

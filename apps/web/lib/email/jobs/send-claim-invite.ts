@@ -16,6 +16,10 @@ import {
   getClaimInviteEmail,
 } from '@/lib/email/templates/claim-invite';
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import {
+  formatFounderSender,
+  getSenderPolicy,
+} from '@/lib/notifications/sender-policy';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { logger } from '@/lib/utils/logger';
@@ -228,11 +232,14 @@ export async function processSendClaimInviteJob(
   };
 
   const emailContent = getClaimInviteEmail(templateData);
+  const founderSender = getSenderPolicy('founder');
 
   // Send via Resend (using singleton provider)
   const emailProvider = getEmailProvider();
   const result = await emailProvider.sendEmail({
     to: invite.email,
+    from: formatFounderSender(),
+    replyTo: founderSender.replyToEmail,
     subject: emailContent.subject,
     text: emailContent.text,
     html: emailContent.html,

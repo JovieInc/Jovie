@@ -14,12 +14,20 @@ import { Redis } from '@upstash/redis';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
+import {
+  DEFAULT_TEST_AVATAR_URL,
+  ensureCreatorProfileRecord as ensureCreatorProfile,
+  ensureSocialLinkRecord as ensureSocialLink,
+  ensureUserRecord as ensureUser,
+  isAllowlistedPrivilegedTestAccountEmail,
+  resolveClerkTestUserId as resolveSeedUserClerkId,
+  setActiveProfileForUser as setActiveProfile,
+} from '@/lib/testing/test-user-provision.server';
+import { normalizeEmail } from '@/lib/utils/email';
 
 // Use the same HTTP driver as the app for consistency
 const {
-  users,
-  creatorProfiles,
-  socialLinks,
+  creatorContacts,
   discogReleases,
   discogTracks,
   providerLinks,
@@ -38,9 +46,43 @@ interface SeedTestDataOptions {
   readonly publicProfilesOnly?: boolean;
 }
 
+async function withSeedOperationTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  label: string
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([operation, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
 function isMissingActiveProfileIdColumn(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes('active_profile_id');
+  const message = (
+    error instanceof Error ? error.message : String(error)
+  ).toLowerCase();
+  const code =
+    typeof error === 'object' && error !== null
+      ? ((error as { code?: string; cause?: { code?: string } }).code ??
+        (error as { cause?: { code?: string } }).cause?.code)
+      : undefined;
+
+  return (
+    (code === '42703' || message.includes('does not exist')) &&
+    message.includes('active_profile_id') &&
+    message.includes('column')
+  );
 }
 
 const TEST_PROFILES: TestProfile[] = [
@@ -70,46 +112,6 @@ const TEST_PROFILES: TestProfile[] = [
   },
 ];
 
-type SeededUserValues = Pick<
-  typeof users.$inferInsert,
-  'clerkId' | 'email' | 'name' | 'userStatus' | 'isAdmin'
->;
-
-type SeededCreatorProfileValues = Pick<
-  typeof creatorProfiles.$inferInsert,
-  | 'userId'
-  | 'creatorType'
-  | 'username'
-  | 'usernameNormalized'
-  | 'displayName'
-  | 'bio'
-  | 'avatarUrl'
-  | 'spotifyUrl'
-  | 'appleMusicUrl'
-  | 'appleMusicId'
-  | 'youtubeMusicId'
-  | 'deezerId'
-  | 'tidalId'
-  | 'soundcloudId'
-  | 'isPublic'
-  | 'isVerified'
-  | 'isClaimed'
-  | 'ingestionStatus'
-  | 'onboardingCompletedAt'
->;
-
-type SeededSocialLinkValues = Pick<
-  typeof socialLinks.$inferInsert,
-  | 'creatorProfileId'
-  | 'platform'
-  | 'platformType'
-  | 'url'
-  | 'displayText'
-  | 'isActive'
-  | 'sortOrder'
-  | 'state'
->;
-
 type SeededReleaseValues = Pick<
   typeof discogReleases.$inferInsert,
   | 'creatorProfileId'
@@ -129,118 +131,23 @@ function isDuplicateKeyError(error: unknown): boolean {
   return message.includes('duplicate key value');
 }
 
-async function ensureUser(
-  db: ReturnType<typeof drizzle>,
-  values: SeededUserValues
-) {
-  const [existingUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.clerkId, values.clerkId))
-    .limit(1);
-
-  if (existingUser) {
-    await db
-      .update(users)
-      .set({ ...values, updatedAt: new Date() })
-      .where(eq(users.id, existingUser.id));
-    return existingUser.id;
-  }
-
-  try {
-    const [createdUser] = await db
-      .insert(users)
-      .values(values)
-      .returning({ id: users.id });
-    return createdUser.id;
-  } catch (error) {
-    if (!isDuplicateKeyError(error)) throw error;
-
-    const [racedUser] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, values.clerkId))
-      .limit(1);
-
-    if (!racedUser) throw error;
-
-    await db
-      .update(users)
-      .set({ ...values, updatedAt: new Date() })
-      .where(eq(users.id, racedUser.id));
-
-    return racedUser.id;
-  }
+function getSeedEnv() {
+  // This file is imported by Playwright global setup, so it must not depend on
+  // Next's server-only env modules.
+  return {
+    CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
+    DATABASE_URL: process.env.DATABASE_URL,
+    E2E_CLERK_USER_ID: process.env.E2E_CLERK_USER_ID,
+    E2E_CLERK_USER_USERNAME: process.env.E2E_CLERK_USER_USERNAME,
+    UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
+    UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
+  } as const;
 }
 
-async function ensureCreatorProfile(
-  db: ReturnType<typeof drizzle>,
-  values: SeededCreatorProfileValues
-) {
-  const [existingProfile] = await db
-    .select({ id: creatorProfiles.id })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
-    .limit(1);
-
-  if (existingProfile) {
-    await db
-      .update(creatorProfiles)
-      .set({ ...values, updatedAt: new Date() })
-      .where(eq(creatorProfiles.id, existingProfile.id));
-    return existingProfile.id;
-  }
-
-  try {
-    const [createdProfile] = await db
-      .insert(creatorProfiles)
-      .values(values)
-      .returning({ id: creatorProfiles.id });
-    return createdProfile.id;
-  } catch (error) {
-    if (!isDuplicateKeyError(error)) throw error;
-
-    const [racedProfile] = await db
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
-      .limit(1);
-
-    if (!racedProfile) throw error;
-
-    await db
-      .update(creatorProfiles)
-      .set({ ...values, updatedAt: new Date() })
-      .where(eq(creatorProfiles.id, racedProfile.id));
-
-    return racedProfile.id;
-  }
-}
-
-async function ensureSocialLink(
-  db: ReturnType<typeof drizzle>,
-  values: SeededSocialLinkValues
-) {
-  const [existingLink] = await db
-    .select({ id: socialLinks.id })
-    .from(socialLinks)
-    .where(
-      and(
-        eq(socialLinks.creatorProfileId, values.creatorProfileId),
-        eq(socialLinks.platform, values.platform)
-      )
-    )
-    .limit(1);
-
-  if (existingLink) {
-    await db
-      .update(socialLinks)
-      .set({ ...values, updatedAt: new Date() })
-      .where(eq(socialLinks.id, existingLink.id));
-    return;
-  }
-
-  await db.insert(socialLinks).values(values);
+function isAllowlistedE2ESeedEmail(
+  email: string | null | undefined
+): email is string {
+  return isAllowlistedPrivilegedTestAccountEmail(email);
 }
 
 /** Track template for seeding */
@@ -604,30 +511,62 @@ async function seedTourDatesForProfile(
 ) {
   console.log('    Seeding tour dates...');
 
-  for (const td of TEST_TOUR_DATES) {
-    await db
-      .insert(tourDates)
-      .values({
-        profileId,
-        externalId: td.externalId,
-        title: td.title,
-        venueName: td.venueName,
-        city: td.city,
-        region: td.region,
-        country: td.country,
-        provider: td.provider,
-        ticketStatus: td.ticketStatus,
-        ticketUrl: td.ticketUrl,
-        latitude: td.latitude,
-        longitude: td.longitude,
-        timezone: td.timezone,
-        startDate: dateMonthsFromNow(td.monthsFromNow),
-        startTime: td.startTime,
-      })
-      .onConflictDoNothing();
+  const values = TEST_TOUR_DATES.map(td => ({
+    profileId,
+    externalId: td.externalId,
+    title: td.title,
+    venueName: td.venueName,
+    city: td.city,
+    region: td.region,
+    country: td.country,
+    provider: td.provider,
+    ticketStatus: td.ticketStatus,
+    ticketUrl: td.ticketUrl,
+    latitude: td.latitude,
+    longitude: td.longitude,
+    timezone: td.timezone,
+    startDate: dateMonthsFromNow(td.monthsFromNow),
+    startTime: td.startTime,
+  }));
+
+  try {
+    await withSeedOperationTimeout(
+      db.insert(tourDates).values(values).onConflictDoNothing(),
+      15_000,
+      'Tour date seed'
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`    ⚠ Failed to seed tour dates: ${message}`);
+    return;
   }
 
   console.log(`    ✓ Ensured ${TEST_TOUR_DATES.length} tour dates`);
+}
+
+async function seedPublicContactsForProfile(
+  db: ReturnType<typeof drizzle>,
+  profileId: string
+) {
+  await db
+    .delete(creatorContacts)
+    .where(eq(creatorContacts.creatorProfileId, profileId));
+
+  await db.insert(creatorContacts).values([
+    {
+      creatorProfileId: profileId,
+      role: 'bookings',
+      personName: 'Maya Reed',
+      companyName: 'North Star Touring',
+      territories: ['North America'],
+      email: 'booking@dualipa.example.com',
+      preferredChannel: 'email',
+      isActive: true,
+      sortOrder: 0,
+    },
+  ]);
+
+  console.log('    ✓ Ensured public contact coverage');
 }
 
 // Sample release data for E2E tests — covers various edge cases
@@ -885,7 +824,7 @@ async function seedTracksForRelease(
 export async function seedTestData(options: SeedTestDataOptions = {}) {
   console.log('🌱 Seeding test data for E2E smoke tests...');
 
-  const databaseUrl = process.env.DATABASE_URL;
+  const { DATABASE_URL: databaseUrl } = getSeedEnv();
   if (!databaseUrl) {
     console.warn('⚠ DATABASE_URL not set, skipping seed');
     return { success: false, reason: 'no_database_url' };
@@ -900,11 +839,28 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
     if (!options.publicProfilesOnly) {
       // Create E2E test user (for authenticated dashboard tests)
       // These values come from the setup script: scripts/setup-e2e-users.ts
-      const E2E_CLERK_USER_ID = process.env.E2E_CLERK_USER_ID;
-      const E2E_EMAIL = process.env.E2E_CLERK_USER_USERNAME || 'e2e@jov.ie';
+      const {
+        E2E_CLERK_USER_ID: configuredE2EClerkUserId,
+        E2E_CLERK_USER_USERNAME,
+      } = getSeedEnv();
+      const E2E_EMAIL = normalizeEmail(E2E_CLERK_USER_USERNAME || 'e2e@jov.ie');
+      const isAllowlistedE2EEmail = isAllowlistedE2ESeedEmail(E2E_EMAIL);
       const E2E_USERNAME = 'e2e-test-user';
+      const E2E_CLERK_USER_ID = isAllowlistedE2EEmail
+        ? await resolveSeedUserClerkId(E2E_EMAIL, configuredE2EClerkUserId)
+        : null;
 
-      if (!E2E_CLERK_USER_ID) {
+      if (E2E_CLERK_USER_ID) {
+        // Keep the Playwright auth-bypass path aligned with the Clerk user ID
+        // actually seeded into the database for this run.
+        process.env.E2E_CLERK_USER_ID = E2E_CLERK_USER_ID;
+      }
+
+      if (!isAllowlistedE2EEmail) {
+        console.warn(
+          `  ⚠ Refusing to seed privileged E2E user for non-allowlisted email ${E2E_EMAIL}`
+        );
+      } else if (!E2E_CLERK_USER_ID) {
         console.log(
           '  ⚠ E2E_CLERK_USER_ID not set, skipping E2E user creation'
         );
@@ -914,7 +870,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
       } else {
         console.log('  Creating E2E test user...');
         try {
-          const userId = await ensureUser(db, {
+          const { id: userId, previousClerkId } = await ensureUser(db, {
             clerkId: E2E_CLERK_USER_ID,
             email: E2E_EMAIL,
             name: 'E2E Test',
@@ -924,6 +880,11 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           console.log(
             `    ✓ Ensured E2E user with admin privileges (ID: ${userId})`
           );
+          if (previousClerkId) {
+            console.log(
+              `    ✓ Adopted existing E2E user from stale Clerk ID ${previousClerkId} to ${E2E_CLERK_USER_ID}`
+            );
+          }
 
           const profileId = await ensureCreatorProfile(db, {
             userId,
@@ -931,7 +892,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
             usernameNormalized: E2E_USERNAME.toLowerCase(),
             displayName: 'E2E Test User',
             bio: 'Automated test user',
-            avatarUrl: null,
+            avatarUrl: DEFAULT_TEST_AVATAR_URL,
             spotifyUrl: null,
             appleMusicUrl: null,
             appleMusicId: null,
@@ -947,12 +908,47 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
             onboardingCompletedAt: new Date(),
           });
 
+          await setActiveProfile(db, userId, profileId);
+
           console.log(
             `    ✓ Ensured E2E profile ${E2E_USERNAME} (ID: ${profileId})`
           );
+          console.log(`    ✓ Set active profile for E2E user`);
 
           await seedReleasesForProfile(db, profileId);
           await seedTourDatesForProfile(db, profileId);
+
+          const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } =
+            getSeedEnv();
+          if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
+            try {
+              const redis = new Redis({
+                url: UPSTASH_REDIS_REST_URL,
+                token: UPSTASH_REDIS_REST_TOKEN,
+              });
+              const clerkIdsToInvalidate = [
+                previousClerkId,
+                E2E_CLERK_USER_ID,
+              ].filter((clerkId): clerkId is string => Boolean(clerkId));
+
+              let deletedCount = 0;
+              for (const clerkId of clerkIdsToInvalidate) {
+                const proxyStateCacheKey = `proxy:user-state:${clerkId}`;
+                const adminRoleCacheKey = `admin:role:${clerkId}`;
+                deletedCount += await redis.del(proxyStateCacheKey);
+                deletedCount += await redis.del(adminRoleCacheKey);
+              }
+
+              console.log(
+                `    ✓ Invalidated proxy/admin caches for E2E user (${deletedCount} key(s) across ${clerkIdsToInvalidate.length} Clerk ID(s))`
+              );
+            } catch (error) {
+              console.warn(
+                '    ⚠ Failed to invalidate proxy state cache for E2E user:',
+                error
+              );
+            }
+          }
         } catch (error) {
           if (!isMissingActiveProfileIdColumn(error)) {
             throw error;
@@ -1078,6 +1074,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
       // Add tour dates for dualipa to test public touring display
       if (profile.username === 'dualipa') {
         await seedTourDatesForProfile(db, createdProfileId);
+        await seedPublicContactsForProfile(db, createdProfileId);
       }
 
       // Add Venmo payment link for tipping tests
@@ -1097,14 +1094,12 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
 
       // Invalidate Redis cache for this profile to ensure fresh data
       // Only attempt if Redis credentials are available
-      if (
-        process.env.UPSTASH_REDIS_REST_URL &&
-        process.env.UPSTASH_REDIS_REST_TOKEN
-      ) {
+      const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } = getSeedEnv();
+      if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
         try {
           const redis = new Redis({
-            url: process.env.UPSTASH_REDIS_REST_URL,
-            token: process.env.UPSTASH_REDIS_REST_TOKEN,
+            url: UPSTASH_REDIS_REST_URL,
+            token: UPSTASH_REDIS_REST_TOKEN,
           });
           const cacheKey = `profile:data:${profile.username.toLowerCase()}`;
 

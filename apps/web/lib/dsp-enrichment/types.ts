@@ -39,7 +39,10 @@ export type DspProviderId =
   | 'tidal'
   | 'soundcloud'
   | 'amazon_music'
-  | 'musicbrainz';
+  | 'musicbrainz'
+  | 'genius'
+  | 'discogs'
+  | 'allmusic';
 
 /**
  * Match status for DSP artist matches
@@ -142,6 +145,9 @@ export interface AppleMusicTrack {
     isrc?: string;
     durationInMillis?: number;
     url: string;
+    previews?: Array<{
+      url: string;
+    }>;
     artwork?: {
       url: string;
       width: number;
@@ -209,6 +215,7 @@ export interface MusicBrainzArtist {
   disambiguation?: string;
   type?: 'Person' | 'Group' | 'Orchestra' | 'Choir' | 'Character' | 'Other';
   'type-id'?: string;
+  gender?: string;
   country?: string;
   area?: {
     id: string;
@@ -237,6 +244,12 @@ export interface MusicBrainzArtist {
   tags?: Array<{
     name: string;
     count: number;
+  }>;
+  genres?: Array<{
+    id?: string;
+    name: string;
+    count?: number;
+    disambiguation?: string;
   }>;
   relations?: MusicBrainzRelation[];
   isnis?: string[];
@@ -593,6 +606,8 @@ export const MUSICBRAINZ_URL_TYPE_MAP: Record<string, SocialPlatform> = {
   twitch: 'twitch',
   discord: 'discord',
   bandcamp: 'bandcamp',
+  bandsintown: 'website',
+  wikidata: 'website',
 } as const;
 
 // ============================================================================

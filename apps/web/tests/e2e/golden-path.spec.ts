@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { isClerkHandshakeUrl } from '../helpers/clerk-auth';
 
 import {
   buildValidOnboardingHandle,
@@ -112,6 +113,10 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       waitUntil: 'commit',
       timeout: 30_000,
     });
+    if (isClerkHandshakeUrl(page.url())) {
+      test.skip(true, 'Clerk handshake redirect in CI preview');
+      return;
+    }
     await expect(page).toHaveURL(/\/signup/, { timeout: 30_000 });
 
     // ──────────────────────────────────────────────────────────────────
@@ -449,24 +454,23 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
 
     const allOptions = pricingJson.pricingOptions ?? pricingJson.options ?? [];
 
-    // Find the Founding Member plan specifically
-    const foundingOption = allOptions.find(
-      o => o.description === 'Founding Member' && o.priceId
+    // Find the Pro plan specifically
+    const proOption = allOptions.find(
+      o => o.description === 'Pro' && o.priceId
     );
     expect(
-      foundingOption,
-      'Founding Member pricing option not returned — billing misconfigured'
+      proOption,
+      'Pro pricing option not returned — billing misconfigured'
     ).toBeTruthy();
 
-    const foundingPriceId = foundingOption!.priceId!;
-    expect(
-      foundingOption!.amount,
-      'Founding Member price should be $12/mo (1200 cents)'
-    ).toBe(1200);
+    const proPriceId = proOption!.priceId!;
+    expect(proOption!.amount, 'Pro price should be $20/mo (2000 cents)').toBe(
+      2000
+    );
 
-    // Create checkout session with Founding Member price
+    // Create checkout session with Pro price
     const checkoutResponse = await page.request.post('/api/stripe/checkout', {
-      data: { priceId: foundingPriceId },
+      data: { priceId: proPriceId },
     });
     if (!checkoutResponse.ok()) {
       const errBody = await checkoutResponse.text().catch(() => '<unreadable>');

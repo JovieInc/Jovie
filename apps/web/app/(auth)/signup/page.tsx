@@ -2,12 +2,13 @@
 
 import { SignUp } from '@clerk/nextjs';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
+import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout } from '@/features/auth';
+import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
 import { track } from '@/lib/analytics';
-import { sanitizeRedirectUrl } from '@/lib/auth/constants';
+import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { setPlanIntent, validatePlan } from '@/lib/auth/plan-intent';
 import {
   clearSignupClaimValue,
@@ -16,16 +17,6 @@ import {
   SIGNUP_SPOTIFY_EXPECTED_KEY,
   SIGNUP_SPOTIFY_URL_KEY,
 } from '@/lib/auth/signup-claim-storage';
-
-function AuthRoutePrefetch({ href }: { href: string }) {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.prefetch(href);
-  }, [href, router]);
-
-  return null;
-}
 
 /**
  * Persist pre-signup claim data from the homepage hero into sessionStorage,
@@ -109,7 +100,10 @@ function SignUpClaimDataPersistence() {
   if (!handle || !availability) return null;
 
   return (
-    <div className='mb-4 rounded-(--linear-radius-sm) border border-subtle bg-surface-1 px-4 py-3 text-center'>
+    <output
+      className='mb-4 block rounded-(--linear-radius-sm) border border-subtle bg-surface-1 px-4 py-3 text-center'
+      aria-live='polite'
+    >
       {availability === 'checking' && (
         <p className='text-[13px] font-[450] text-secondary-token'>
           Checking if @{normalizedHandle} is available...
@@ -132,19 +126,8 @@ function SignUpClaimDataPersistence() {
           sign up and choose a handle.
         </p>
       )}
-    </div>
+    </output>
   );
-}
-
-function buildSignInUrl(searchParams: { get: (key: string) => string | null }) {
-  const signInUrl = new URL(APP_ROUTES.SIGNIN, globalThis.location.origin);
-  const redirectUrl = sanitizeRedirectUrl(searchParams.get('redirect_url'));
-
-  if (redirectUrl) {
-    signInUrl.searchParams.set('redirect_url', redirectUrl);
-  }
-
-  return signInUrl.pathname + signInUrl.search;
 }
 
 function SignUpOauthErrorBanner() {
@@ -184,7 +167,7 @@ function SignUpOauthErrorBanner() {
       {isAccountExists ? (
         <p className='mt-2 text-sm text-secondary-token'>
           <Link
-            href={buildSignInUrl(searchParams)}
+            href={buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams)}
             className='text-primary-token underline focus-ring-themed rounded-md'
           >
             Sign in instead
@@ -196,6 +179,18 @@ function SignUpOauthErrorBanner() {
 }
 
 function SignUpPageContent() {
+  const [isMounted, setIsMounted] = useState(false);
+  const searchParams = useSearchParams();
+  const signInUrl = buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return <AuthFormSkeleton />;
+  }
+
   return (
     <>
       <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
@@ -204,21 +199,21 @@ function SignUpPageContent() {
       <SignUp
         routing='hash'
         oauthFlow='redirect'
-        signInUrl={APP_ROUTES.SIGNIN}
+        signInUrl={signInUrl}
         fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
       />
       <p className='mt-4 text-center text-[11px] leading-relaxed text-tertiary-token'>
         By signing up, you agree to our{' '}
         <Link
           href={APP_ROUTES.LEGAL_TERMS}
-          className='focus-ring-themed rounded-md text-secondary-token underline transition-colors hover:text-primary-token'
+          className='focus-ring-themed rounded-md py-1 text-secondary-token underline underline-offset-2 transition-colors hover:text-primary-token'
         >
           Terms of Service
         </Link>{' '}
         and{' '}
         <Link
           href={APP_ROUTES.LEGAL_PRIVACY}
-          className='focus-ring-themed rounded-md text-secondary-token underline transition-colors hover:text-primary-token'
+          className='focus-ring-themed rounded-md py-1 text-secondary-token underline underline-offset-2 transition-colors hover:text-primary-token'
         >
           Privacy Policy
         </Link>
@@ -238,7 +233,7 @@ export default function SignUpPage() {
       showFormTitle={false}
       showFooterPrompt={false}
     >
-      <Suspense fallback={null}>
+      <Suspense fallback={<AuthFormSkeleton />}>
         <SignUpPageContent />
       </Suspense>
     </AuthLayout>

@@ -5,11 +5,11 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 export const APP_CONTROL_BUTTON_CLASS =
-  'inline-flex h-(--linear-app-control-height-sm) items-center justify-center gap-1.5 rounded-(--linear-app-control-radius) border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] px-(--linear-app-control-padding-x) text-[12px] font-[510] tracking-[-0.012em] text-secondary-token transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/16 active:border-default active:bg-surface-1 disabled:pointer-events-none disabled:opacity-50';
+  'inline-flex h-app-control-sm items-center justify-center gap-1.5 rounded-pill border border-subtle bg-surface-1 px-app-control-x text-[12px] font-[510] tracking-[-0.012em] text-secondary-token shadow-none transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token hover:shadow-none focus-visible:border-focus focus-visible:bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 active:border-default active:bg-surface-1 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none';
 
 export const APP_ICON_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'w-(--linear-app-control-height-sm) shrink-0 rounded-full px-0 [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'w-app-control-sm shrink-0 rounded-full px-0 [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 type AppIconButtonLabelProps =

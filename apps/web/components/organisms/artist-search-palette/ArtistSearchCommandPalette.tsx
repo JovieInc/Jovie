@@ -231,7 +231,7 @@ export function ArtistSearchCommandPalette({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className='overflow-hidden rounded-[18px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] p-0 shadow-[0_20px_48px_rgba(0,0,0,0.12)] sm:max-w-[500px]'
+        className='overflow-hidden rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover sm:max-w-[500px]'
         hideClose
       >
         <DialogPrimitive.Title className='sr-only'>
@@ -252,7 +252,7 @@ export function ArtistSearchCommandPalette({
               style={{ boxShadow: '0 1px 0 rgba(0,0,0,0.03)' }}
             >
               <div
-                className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]'
+                className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full'
                 style={{
                   backgroundColor: `${config.accent}12`,
                   color: config.accent,
@@ -390,14 +390,14 @@ export function ArtistSearchCommandPalette({
                 }}
                 placeholder={config.manualPlaceholder}
                 data-testid='artist-search-manual-input'
-                className='flex-1 rounded-[8px] border border-subtle bg-surface-1 px-3 py-1.5 text-xs text-primary-token outline-none placeholder:text-tertiary-token transition-colors focus:border-primary/30'
+                className='flex-1 rounded-full border border-subtle bg-surface-1 px-3 py-1.5 text-xs text-primary-token outline-none placeholder:text-tertiary-token transition-colors focus:border-primary/30'
               />
               <button
                 type='button'
                 onClick={handleManualSubmit}
                 disabled={!manualUrl.trim()}
                 data-testid='artist-search-manual-submit'
-                className='rounded-[8px] px-3 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50'
+                className='rounded-full px-3 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50'
                 style={{ backgroundColor: config.accent }}
               >
                 Connect

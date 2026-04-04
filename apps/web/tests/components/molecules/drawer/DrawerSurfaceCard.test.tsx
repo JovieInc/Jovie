@@ -1,6 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
+import {
+  LINEAR_SURFACE,
+  LINEAR_SURFACE_TIER,
+} from '@/features/dashboard/tokens';
 
 describe('DrawerSurfaceCard', () => {
   it('defaults to the flat variant', () => {
@@ -30,7 +34,45 @@ describe('DrawerSurfaceCard', () => {
     const className =
       screen.getByTestId('surface-card').getAttribute('class') ?? '';
 
-    expect(className).toContain('rounded-[14px]');
-    expect(className).toContain('bg-[color-mix');
+    expect(className).toContain('rounded-xl');
+    expect(className).toContain('border-(--linear-app-shell-border)');
+    expect(className).toContain('bg-surface-1');
+    expect(className).toContain('shadow-[');
+  });
+
+  it('uses the quieter drawer treatment without adding floating shadows', () => {
+    render(
+      <DrawerSurfaceCard testId='surface-card' variant='quiet'>
+        Quiet
+      </DrawerSurfaceCard>
+    );
+
+    expect(screen.getByTestId('surface-card')).toHaveAttribute(
+      'data-surface-variant',
+      'quiet'
+    );
+  });
+
+  it('keeps elevated shadows scoped to floating sidebar and drawer surfaces', () => {
+    expect(LINEAR_SURFACE.drawerCard).toContain('shadow-[');
+    expect(LINEAR_SURFACE.drawerCardSm).toContain('shadow-[');
+    expect(LINEAR_SURFACE.sidebarCard).toContain('shadow-[');
+
+    expect(LINEAR_SURFACE.contentContainer).toContain('shadow-none');
+    expect(LINEAR_SURFACE.bannerCard).toContain('shadow-none');
+    expect(LINEAR_SURFACE.dialogCard).toContain('shadow-none');
+    expect(LINEAR_SURFACE.popover).toContain('shadow-[var(--shadow-popover)]');
+  });
+
+  it('keeps drawer and sidebar cards on a higher elevation tier than main content containers', () => {
+    expect(LINEAR_SURFACE_TIER.drawerCard).toBeGreaterThan(
+      LINEAR_SURFACE_TIER.contentContainer
+    );
+    expect(LINEAR_SURFACE_TIER.drawerCardSm).toBeGreaterThan(
+      LINEAR_SURFACE_TIER.contentContainer
+    );
+    expect(LINEAR_SURFACE_TIER.sidebarCard).toBeGreaterThan(
+      LINEAR_SURFACE_TIER.contentContainer
+    );
   });
 });

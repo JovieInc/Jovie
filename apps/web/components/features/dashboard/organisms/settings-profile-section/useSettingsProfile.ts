@@ -56,7 +56,8 @@ interface ProfileUpdateData {
   username: string;
   location: string;
   hometown: string;
-  pitchContext: string;
+  careerHighlights: string;
+  targetPlaylists: string;
 }
 
 function normalizePlace(value: string): string | null {
@@ -91,7 +92,8 @@ export function useSettingsProfile({
     displayName: identityFields.displayName,
     location: identityFields.location,
     hometown: identityFields.hometown,
-    pitchContext: identityFields.pitchContext,
+    careerHighlights: identityFields.careerHighlights,
+    targetPlaylists: identityFields.targetPlaylists,
   });
 
   const [profileSaveStatus, setProfileSaveStatus] = useState<ProfileSaveStatus>(
@@ -104,7 +106,8 @@ export function useSettingsProfile({
     username: identityFields.username,
     location: identityFields.location,
     hometown: identityFields.hometown,
-    pitchContext: identityFields.pitchContext,
+    careerHighlights: identityFields.careerHighlights,
+    targetPlaylists: identityFields.targetPlaylists,
   });
 
   // Store artist ref for async operations
@@ -144,7 +147,8 @@ export function useSettingsProfile({
       const username = data.username?.trim() ?? '';
       const location = normalizePlace(data.location);
       const hometown = normalizePlace(data.hometown);
-      const pitchContext = data.pitchContext?.trim() ?? '';
+      const careerHighlights = data.careerHighlights?.trim() ?? '';
+      const targetPlaylists = data.targetPlaylists?.trim() ?? '';
 
       if (!displayName || !username) {
         return;
@@ -169,7 +173,8 @@ export function useSettingsProfile({
         lastSaved?.username === username &&
         lastSaved?.location === (location ?? '') &&
         lastSaved?.hometown === (hometown ?? '') &&
-        lastSaved?.pitchContext === pitchContext
+        lastSaved?.careerHighlights === careerHighlights &&
+        lastSaved?.targetPlaylists === targetPlaylists
       ) {
         return;
       }
@@ -185,7 +190,13 @@ export function useSettingsProfile({
             displayName,
             location,
             hometown,
-            pitchContext: pitchContext || undefined,
+            careerHighlights,
+            targetPlaylists: targetPlaylists
+              ? targetPlaylists
+                  .split(',')
+                  .map(s => s.trim())
+                  .filter(Boolean)
+              : [],
           },
         });
       } catch (error) {
@@ -202,7 +213,8 @@ export function useSettingsProfile({
         username,
         location: location ?? '',
         hometown: hometown ?? '',
-        pitchContext,
+        careerHighlights,
+        targetPlaylists,
       };
 
       const nextSettings = {
@@ -335,14 +347,16 @@ export function useSettingsProfile({
       username: identityFields.username,
       location: identityFields.location,
       hometown: identityFields.hometown,
-      pitchContext: identityFields.pitchContext,
+      careerHighlights: identityFields.careerHighlights,
+      targetPlaylists: identityFields.targetPlaylists,
     };
     setFormData({
       displayName: identityFields.displayName,
       username: identityFields.username,
       location: identityFields.location,
       hometown: identityFields.hometown,
-      pitchContext: identityFields.pitchContext,
+      careerHighlights: identityFields.careerHighlights,
+      targetPlaylists: identityFields.targetPlaylists,
     });
     setProfileSaveStatus(buildProfileSaveState());
   }, [
@@ -350,7 +364,8 @@ export function useSettingsProfile({
     identityFields.hometown,
     identityFields.location,
     identityFields.username,
-    identityFields.pitchContext,
+    identityFields.careerHighlights,
+    identityFields.targetPlaylists,
   ]);
 
   // Clear success status after delay

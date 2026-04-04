@@ -9,7 +9,7 @@
  * - Retry logic for flaky operations
  */
 
-import { expect, Page } from '@playwright/test';
+import { type ConsoleMessage, expect, Page } from '@playwright/test';
 
 // ============================================================================
 // Constants
@@ -48,88 +48,85 @@ export const RETRY_CONFIG = {
 
 /**
  * Patterns for console errors that are expected in test environments
- * and should not fail tests
+ * and should not fail tests.
  *
- * These patterns cover:
- * - Authentication/auth provider issues (expected without real config)
- * - Network/resource loading (non-critical)
- * - Security headers (normal in test)
- * - Framework development warnings
- * - Third-party service errors (analytics, etc.)
+ * REVIEW CRITERIA — to add a new pattern:
+ *   1. Must be vendor-specific or framework noise, NOT app code
+ *   2. Use the exact error text, not a broad substring
+ *   3. Add a comment explaining why it's expected
+ *
+ * If you're tempted to add a broad word like 'clerk' or '404', stop —
+ * that swallows real errors. Be specific.
  */
 export const EXPECTED_ERROR_PATTERNS = [
-  // Auth/Clerk related
-  'clerk',
-  'handshake',
-  'authentication',
-  'test-pass-',
-  'publishable key',
-  'unauthorized',
-  // Network/resource loading (non-critical)
-  'failed to load resource',
-  'net::err_',
-  'net::err_failed',
-  'net::err_connection_refused',
-  'net::err_name_not_resolved',
-  'fetch failed',
-  '404',
-  // Chunk loading errors (Turbopack dev environment)
-  'chunkloaderror',
-  'failed to load chunk',
-  'web vitals',
-  // CSP and security headers (expected in test)
-  'content security policy',
-  'csp',
-  'blocked by cors',
-  'cross-origin',
-  // React/Next.js development warnings
-  'warning:',
-  'hydration',
-  'text content does not match',
-  'server rendered html',
-  'did not match',
-  'extra attributes from the server',
-  // Nonce mismatches in test environment
-  'nonce',
-  // Test environment indicators
-  'test environment',
-  'mock data',
-  'dummy',
-  'placeholder',
-  // Analytics (not critical for smoke)
-  'analytics',
-  'tracking',
-  'posthog',
-  'mixpanel',
-  'segment',
-  // Vercel-specific
-  'vercel',
-  '__vercel',
-  // Image/media loading errors
-  'i.scdn.co', // Spotify CDN
-  'image',
-  'loading image',
-  // Sentry/monitoring
-  'sentry',
-  'dsn',
-  // Database/API errors in CI (expected without DB)
-  'database',
-  'connection',
-  'prisma',
-  'drizzle',
-  // WebSocket/realtime
-  'websocket',
-  'socket',
-  // Third-party scripts
-  'google',
-  'facebook',
-  'twitter',
-  'stripe',
-  // Browser-specific
-  'deprecated',
-  'passive event listener',
+  // Clerk dev-mode specific messages (safe to ignore in test)
+  'clerk: clerk has been loaded with development keys', // dev publishable key warning
+  'clerk: the request to /v1/client/handshake', // handshake 400 in dev-browser-missing mode
+  'test-pass-', // Clerk test-mode password prefix
+
+  // Network errors from browser-level failures (not app bugs)
+  'net::err_', // Chrome network-level failures (ERR_FAILED, ERR_CONNECTION_REFUSED, etc.)
+
+  // Chunk loading (Turbopack/webpack dev environment hot reload)
+  'chunkloaderror', // dynamic import fails during hot reload
+  'failed to load chunk', // same, different phrasing
+
+  // Third-party CDN resource failures (not app bugs)
+  'i.scdn.co', // Spotify CDN image 403/404s
+
+  // CSP and security headers (expected in test/dev)
+  'content security policy', // CSP violations from dev tooling
+
+  // NOTE: console.warn is NOT captured by the error listener (msg.type() === 'error' only).
+  // This pattern catches the rare case where something calls console.error("Warning: ...")
+  'warning:', // defensive: suppress console.error starting with "Warning:" (e.g. React internals)
+
+  // WebSocket/HMR noise in dev environment (scoped to dev server, not product WebSockets)
+  'ws://localhost', // Turbopack/webpack HMR WebSocket connection failures in dev
+  'webpack-hmr', // Webpack HMR WebSocket protocol errors
+
+  // Nonce mismatches (Next.js CSP nonce in dev)
+  'nonce', // script nonce mismatch between server/client in dev
+
+  // Analytics SDK noise (not critical for smoke tests)
+  'posthog', // PostHog SDK init/config messages
+
+  // Vercel dev/preview environment
+  '__vercel', // Vercel toolbar/analytics dev scripts
+
+  // Sentry SDK noise
+  'sentry', // Sentry SDK init warnings, DSN config messages
+
+  // Spotify CDN image loading (external CDN, flaky in CI)
+  'i.scdn.co', // Spotify image CDN 403/404s
+
+  // Browser-specific noise
+  'passive event listener', // Chrome passive event listener warnings
+
   // Next.js internals — redirect() causes negative performance marks
   'negative time stamp',
+
+  // React dev warning for script tags rendered inside components.
+  // This is framework noise in local E2E and not a dashboard route regression.
+  'encountered a script tag while rendering react component',
+
+  // Next.js dev + CSP on bypass-auth local runs can emit this React dev-only eval warning.
+  'eval() is not supported in this environment',
+] as const;
+
+const EXPECTED_WARNING_PATTERNS = [
+  'clerk: clerk has been loaded with development keys',
+  'clerk: the request to /v1/client/handshake',
+  'refreshing the session token resulted in an infinite redirect loop',
+  'dev-browser-missing',
+  'react hook',
+  'usecontext',
+  'invalid hook call',
+] as const;
+
+const EXPECTED_WARNING_REGEXES = [
+  /the resource https:\/\/.*\/npm\/@clerk\/ui@1(?:\.\d+\.\d+)?\/dist\/ui\.browser\.js was preloaded .* but not used/i,
+  /the resource https:\/\/.*\/npm\/@clerk\/clerk-js@6(?:\.\d+\.\d+)?\/dist\/clerk\.browser\.js was preloaded .* but not used/i,
 ] as const;
 
 // ============================================================================
@@ -167,7 +164,27 @@ export interface SmokeTestContext {
  */
 export function isExpectedError(errorText: string): boolean {
   const lowerText = errorText.toLowerCase();
+  if (
+    lowerText.includes('clerk.accounts.dev/npm/@clerk/') &&
+    lowerText.includes('redirect is not allowed for a preflight request')
+  ) {
+    return true;
+  }
   return EXPECTED_ERROR_PATTERNS.some(pattern => lowerText.includes(pattern));
+}
+
+/**
+ * Check if a console warning is expected in smoke tests.
+ * Keep this list tighter than error filtering so we only suppress
+ * reproducible vendor noise from the Clerk local-dev path.
+ */
+export function isExpectedWarning(warningText: string): boolean {
+  const lowerText = warningText.toLowerCase();
+
+  return (
+    EXPECTED_WARNING_PATTERNS.some(pattern => lowerText.includes(pattern)) ||
+    EXPECTED_WARNING_REGEXES.some(pattern => pattern.test(warningText))
+  );
 }
 
 /**
@@ -226,9 +243,17 @@ export function setupPageMonitoring(page: Page): {
   const failedResponses: NetworkDiagnostics['failedResponses'] = [];
   const failedRequests: NetworkDiagnostics['failedRequests'] = [];
 
-  const handleConsole = (msg: { type: () => string; text: () => string }) => {
+  const handleConsole = (msg: ConsoleMessage) => {
     if (msg.type() === 'error') {
       const text = msg.text();
+      const textLower = text.toLowerCase();
+      const locationUrl = msg.location().url.toLowerCase();
+      if (
+        text.includes('Failed to load resource') &&
+        (locationUrl.includes('i.scdn.co/') || textLower.includes('i.scdn.co/'))
+      ) {
+        return;
+      }
       consoleErrors.push(text);
       if (text.includes('Failed to load resource')) {
         consoleNetworkErrors.push(text);

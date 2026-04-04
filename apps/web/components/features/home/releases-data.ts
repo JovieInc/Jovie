@@ -50,5 +50,5 @@ export const DSP_LABELS: Record<string, string> = {
 };
 
 export function getDspConfig(key: string) {
-  return DSP_LOGO_CONFIG[key as keyof typeof DSP_LOGO_CONFIG];
+  return DSP_LOGO_CONFIG[key];
 }

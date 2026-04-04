@@ -1,11 +1,239 @@
 import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  TEST_AUTH_BYPASS_MODE,
+  TEST_MODE_COOKIE,
+  TEST_PERSONA_COOKIE,
+  TEST_USER_ID_COOKIE,
+} from '@/lib/auth/test-mode';
 import { smokeNavigateWithRetry } from '../e2e/utils/smoke-test-utils';
 import { primeVercelBypassCookie } from './vercel-preview';
 
 const AUTH_READY_ROUTE = APP_ROUTES.DASHBOARD;
 
+function isTestAuthBypassEnabled(): boolean {
+  return process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+}
+
+function getTestAuthBypassUserId(): string | null {
+  const userId = process.env.E2E_CLERK_USER_ID?.trim();
+  return userId && userId.length > 0 ? userId : null;
+}
+
+function getRequestedBypassPersona(): 'creator' | 'admin' | null {
+  const persona = process.env.E2E_TEST_AUTH_PERSONA?.trim();
+  if (persona === 'creator' || persona === 'admin') {
+    return persona;
+  }
+  return null;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolveSleep => {
+    setTimeout(resolveSleep, ms);
+  });
+}
+
+async function resolveBypassUserId(
+  baseUrl: string,
+  fallbackUserId: string,
+  persona: 'creator' | 'admin' | null
+): Promise<string> {
+  if (!persona) {
+    return fallbackUserId;
+  }
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(
+        new URL('/api/dev/test-auth/session', baseUrl),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persona }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new ClerkTestError(
+          `Failed to resolve ${persona} test auth persona.`,
+          'CLERK_SETUP_FAILED'
+        );
+      }
+
+      const payload = (await response.json()) as { userId?: string | null };
+      return payload.userId?.trim() || fallbackUserId;
+    } catch (error) {
+      if (error instanceof ClerkTestError || attempt === 3) {
+        throw error;
+      }
+
+      await sleep(500 * attempt);
+    }
+  }
+
+  return fallbackUserId;
+}
+
+async function enableTestAuthBypass(page: Page): Promise<void> {
+  const existingCookies = await page.context().cookies();
+  const existingMode = existingCookies.find(
+    cookie => cookie.name === TEST_MODE_COOKIE
+  )?.value;
+  const existingUserId = existingCookies.find(
+    cookie => cookie.name === TEST_USER_ID_COOKIE
+  )?.value;
+  const existingPersona = existingCookies.find(
+    cookie => cookie.name === TEST_PERSONA_COOKIE
+  )?.value;
+
+  const defaultUserId = getTestAuthBypassUserId();
+  const requestedPersona = getRequestedBypassPersona();
+  const userId = existingUserId?.trim() || defaultUserId;
+  const persona =
+    (existingPersona === 'creator' || existingPersona === 'admin'
+      ? existingPersona
+      : null) ?? requestedPersona;
+
+  if (!userId) {
+    throw new ClerkTestError(
+      'E2E_CLERK_USER_ID is required when test auth bypass is enabled.',
+      'MISSING_CREDENTIALS'
+    );
+  }
+
+  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  const resolvedUserId =
+    existingMode === TEST_AUTH_BYPASS_MODE && existingUserId?.trim()
+      ? existingUserId.trim()
+      : await resolveBypassUserId(baseUrl, userId, persona);
+  await page.context().addCookies([
+    {
+      name: TEST_MODE_COOKIE,
+      value: TEST_AUTH_BYPASS_MODE,
+      url: baseUrl,
+      sameSite: 'Lax',
+    },
+    {
+      name: TEST_USER_ID_COOKIE,
+      value: resolvedUserId,
+      url: baseUrl,
+      sameSite: 'Lax',
+    },
+    ...(persona
+      ? [
+          {
+            name: TEST_PERSONA_COOKIE,
+            value: persona,
+            url: baseUrl,
+            sameSite: 'Lax' as const,
+          },
+        ]
+      : []),
+  ]);
+}
+
+export async function setTestAuthBypassSession(
+  page: Page,
+  persona: 'creator' | 'admin' | null,
+  overrideUserId?: string | null
+): Promise<void> {
+  const userId = overrideUserId?.trim() || getTestAuthBypassUserId();
+  if (!userId) {
+    throw new ClerkTestError(
+      'E2E_CLERK_USER_ID is required when test auth bypass is enabled.',
+      'MISSING_CREDENTIALS'
+    );
+  }
+
+  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  const resolvedUserId = await resolveBypassUserId(baseUrl, userId, persona);
+  await page.context().addCookies([
+    {
+      name: TEST_MODE_COOKIE,
+      value: TEST_AUTH_BYPASS_MODE,
+      url: baseUrl,
+      sameSite: 'Lax',
+    },
+    {
+      name: TEST_USER_ID_COOKIE,
+      value: resolvedUserId,
+      url: baseUrl,
+      sameSite: 'Lax',
+    },
+    ...(persona
+      ? [
+          {
+            name: TEST_PERSONA_COOKIE,
+            value: persona,
+            url: baseUrl,
+            sameSite: 'Lax' as const,
+          },
+        ]
+      : []),
+  ]);
+
+  if (!persona) {
+    await page.context().clearCookies({ name: TEST_PERSONA_COOKIE });
+  }
+}
+
+async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
+  await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
+    timeout: 120_000,
+    retries: 2,
+  });
+
+  if (isClerkHandshakeUrl(page.url())) {
+    throw new ClerkTestError(
+      'Clerk redirected to a handshake flow after sign-in on the current preview target.',
+      'CLERK_SETUP_FAILED'
+    );
+  }
+
+  let hasReloaded = false;
+  await expect(async () => {
+    const overlay = page.locator(
+      '[data-nextjs-dialog-overlay], [data-nextjs-toast]'
+    );
+    if (await overlay.isVisible({ timeout: 500 }).catch(() => false)) {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(500);
+    }
+
+    const tryAgain = page.locator('button:has-text("Try again")');
+    if (await tryAgain.isVisible({ timeout: 500 }).catch(() => false)) {
+      await tryAgain.click();
+      await page.waitForTimeout(1000);
+    }
+
+    const dashNav = page.locator('nav[aria-label="Dashboard navigation"]');
+    const userButton = page.locator('[data-clerk-element="userButton"]');
+    const chatComposer = page
+      .locator(
+        'textarea, [contenteditable="true"], button:has-text("New thread")'
+      )
+      .first();
+    const main = page.locator('main').first();
+    const isShellReady = async () =>
+      (page.url().includes('/app') &&
+        !page.url().includes('/signin') &&
+        !page.url().includes('/sign-in') &&
+        !page.url().includes('/onboarding') &&
+        (await main.isVisible().catch(() => false))) ||
+      (await dashNav.isVisible().catch(() => false)) ||
+      (await userButton.isVisible().catch(() => false)) ||
+      (await chatComposer.isVisible().catch(() => false));
+
+    if (!(await isShellReady()) && !hasReloaded) {
+      hasReloaded = true;
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+    }
+
+    await expect.poll(isShellReady, { timeout: 5000 }).toBe(true);
+  }).toPass({ timeout: 120_000, intervals: [3000, 5000, 10000, 15000] });
+}
 /**
  * Check if the test target is a production deployment (jov.ie).
  * Used to gate heavy test suites that should only run against testing environments.
@@ -26,6 +254,73 @@ export function isTestingEnvironment(): boolean {
 }
 
 /**
+ * Check if Clerk credentials are available for authenticated tests.
+ * Supports passwordless Clerk test emails (containing +clerk_test).
+ */
+export function hasClerkCredentials(
+  credentials: { username?: string; password?: string } = {}
+): boolean {
+  if (isTestAuthBypassEnabled()) {
+    return getTestAuthBypassUserId() !== null;
+  }
+
+  const username =
+    credentials.username ?? process.env.E2E_CLERK_USER_USERNAME ?? '';
+  const password =
+    credentials.password ?? process.env.E2E_CLERK_USER_PASSWORD ?? '';
+  const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
+
+  return (
+    username.length > 0 &&
+    (password.length > 0 || isClerkTestEmail(username)) &&
+    clerkSetupSuccess
+  );
+}
+
+/**
+ * Check if admin Clerk credentials are available.
+ * Falls back to the regular test user when admin-specific credentials are absent.
+ */
+export function hasAdminCredentials(): boolean {
+  const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
+  const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
+
+  if (adminUsername.length > 0) {
+    return hasClerkCredentials({
+      username: adminUsername,
+      password: adminPassword,
+    });
+  }
+
+  return hasClerkCredentials();
+}
+
+/**
+ * Resolve the credential pair for admin test flows.
+ * Uses admin-specific credentials when configured, otherwise falls back to the
+ * regular creator test user.
+ */
+export function getAdminCredentials(): {
+  username: string;
+  password: string;
+} {
+  const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
+  const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
+
+  if (
+    adminUsername.length > 0 &&
+    (adminPassword.length > 0 || isClerkTestEmail(adminUsername))
+  ) {
+    return { username: adminUsername, password: adminPassword };
+  }
+
+  return {
+    username: process.env.E2E_CLERK_USER_USERNAME ?? '',
+    password: process.env.E2E_CLERK_USER_PASSWORD ?? '',
+  };
+}
+
+/**
  * Custom error types for better test debugging
  */
 export class ClerkTestError extends Error {
@@ -43,6 +338,32 @@ export class ClerkTestError extends Error {
  */
 export function isClerkTestEmail(email: string): boolean {
   return email.includes('+clerk_test');
+}
+
+export function isClerkHandshakeUrl(url: string): boolean {
+  return (
+    url.includes('clerk') &&
+    (url.includes('handshake') || url.includes('dev-browser'))
+  );
+}
+
+const CLERK_ORIGIN_MISMATCH_PATTERNS = [
+  /production keys are only allowed for domain/i,
+  /request http origin header must be equal to or a subdomain of the requesting url/i,
+];
+
+export function isClerkOriginMismatchMessage(message: string): boolean {
+  return CLERK_ORIGIN_MISMATCH_PATTERNS.some(pattern => pattern.test(message));
+}
+
+export function hasClerkOriginMismatchSignal(
+  errorMessage: string,
+  consoleMessages: readonly string[] = []
+): boolean {
+  return (
+    isClerkOriginMismatchMessage(errorMessage) ||
+    consoleMessages.some(isClerkOriginMismatchMessage)
+  );
 }
 
 /**
@@ -117,6 +438,12 @@ export async function signInUser(
     password = process.env.E2E_CLERK_USER_PASSWORD,
   }: { username?: string; password?: string } = {}
 ) {
+  if (isTestAuthBypassEnabled()) {
+    await enableTestAuthBypass(page);
+    await waitForShellReadyAfterAuth(page);
+    return page;
+  }
+
   if (!username) {
     throw new ClerkTestError(
       'E2E test user credentials not configured. Set E2E_CLERK_USER_USERNAME.',
@@ -151,6 +478,17 @@ export async function signInUser(
   // This is required for the testing token to be included in Clerk's FAPI requests
   await setupClerkTestingToken({ page });
 
+  const clerkConsoleMessages: string[] = [];
+  const handleConsoleMessage = (message: {
+    type(): string;
+    text(): string;
+  }) => {
+    if (message.type() === 'error' || message.type() === 'warning') {
+      clerkConsoleMessages.push(message.text());
+    }
+  };
+  page.on('console', handleConsoleMessage);
+
   await primeVercelBypassCookie(
     page,
     process.env.BASE_URL,
@@ -167,6 +505,13 @@ export async function signInUser(
     timeout: 120_000,
     retries: 2,
   });
+
+  if (isClerkHandshakeUrl(page.url())) {
+    throw new ClerkTestError(
+      'Clerk redirected to a handshake flow on the current preview target.',
+      'CLERK_SETUP_FAILED'
+    );
+  }
 
   // Wait for Clerk JS to load from CDN before calling clerk.signIn()
   // The @clerk/testing library has a hard 30s timeout for window.Clerk.loaded.
@@ -225,11 +570,20 @@ export async function signInUser(
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
+    const sawOriginMismatch = hasClerkOriginMismatchSignal(
+      msg,
+      clerkConsoleMessages
+    );
 
     // Handle "already signed in" — testing token may auto-authenticate
     if (msg.includes('already signed in')) {
       console.log('  Already signed in via testing token, continuing...');
       // Continue to verification below
+    } else if (sawOriginMismatch) {
+      throw new ClerkTestError(
+        'Clerk rejected the current preview/local origin for the configured keys.',
+        'CLERK_SETUP_FAILED'
+      );
     } else {
       // Check if Clerk JS even loaded
       const clerkLoaded = await page
@@ -256,57 +610,11 @@ export async function signInUser(
       // Re-throw the original error if Clerk was loaded but signIn failed
       throw error;
     }
+  } finally {
+    page.off('console', handleConsoleMessage);
   }
 
-  // After sign-in, navigate to a stable authenticated shell route to verify auth.
-  // Profile data can 404 transiently in local dev and should not be the auth probe.
-  await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
-    timeout: 120_000,
-    retries: 2,
-  });
-
-  // Dismiss Next.js dev error overlay and wait for page to stabilize
-  // Handles React hydration mismatches (nonce attr) and transient hooks errors
-  let hasReloaded = false;
-  await expect(async () => {
-    // Dismiss error overlay if present
-    const overlay = page.locator(
-      '[data-nextjs-dialog-overlay], [data-nextjs-toast]'
-    );
-    if (await overlay.isVisible({ timeout: 500 }).catch(() => false)) {
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(500);
-    }
-    // Click "Try again" on error boundary if present
-    const tryAgain = page.locator('button:has-text("Try again")');
-    if (await tryAgain.isVisible({ timeout: 500 }).catch(() => false)) {
-      await tryAgain.click();
-      await page.waitForTimeout(1000);
-    }
-    // Verify dashboard element is visible
-    const dashNav = page.locator('nav[aria-label="Dashboard navigation"]');
-    const userButton = page.locator('[data-clerk-element="userButton"]');
-    const chatComposer = page
-      .locator(
-        'textarea, [contenteditable="true"], button:has-text("New thread")'
-      )
-      .first();
-    const main = page.locator('main').first();
-    const isShellReady = async () =>
-      (page.url().includes('/app') &&
-        !page.url().includes('/signin') &&
-        !page.url().includes('/sign-in') &&
-        !page.url().includes('/onboarding') &&
-        (await main.isVisible().catch(() => false))) ||
-      (await dashNav.isVisible().catch(() => false)) ||
-      (await userButton.isVisible().catch(() => false)) ||
-      (await chatComposer.isVisible().catch(() => false));
-    if (!(await isShellReady()) && !hasReloaded) {
-      hasReloaded = true;
-      await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
-    }
-    await expect.poll(isShellReady, { timeout: 5000 }).toBe(true);
-  }).toPass({ timeout: 120_000, intervals: [3000, 5000, 10000, 15000] });
+  await waitForShellReadyAfterAuth(page);
 
   return page;
 }

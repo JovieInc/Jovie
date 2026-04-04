@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LinkActions } from '@/features/dashboard/atoms/link-actions';
@@ -134,7 +134,10 @@ describe('LinkActions Keyboard Accessibility', () => {
     ).toBeInTheDocument();
 
     // Close menu and rerender with isVisible=false
-    await user.click(menuButton);
+    await user.keyboard('{Escape}');
+    await waitFor(() => {
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    });
     rerender(
       <LinkActions
         onToggle={mockOnToggle}

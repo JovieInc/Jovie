@@ -18,9 +18,19 @@ if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
 const isCI = !!process.env.CI;
 const isFullMatrix = process.env.E2E_FULL_MATRIX === '1';
+const includeMobileMatrix =
+  process.env.E2E_MOBILE_MATRIX === '1' || isFullMatrix;
 const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
+const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+const baseURL = process.env.BASE_URL || 'http://localhost:3100';
+const managedWebServerUrl = new URL(baseURL);
+if (!managedWebServerUrl.port) {
+  managedWebServerUrl.port = '3100';
+}
+const managedWebServerPort = managedWebServerUrl.port;
 const sentryE2eEnabled =
   process.env.SENTRY_E2E_REPORTING === '1' && Boolean(process.env.SENTRY_DSN);
+const shouldSerializeLocalBypassRuns = !isCI && useTestAuthBypass;
 
 const videoMode: 'off' | 'retain-on-failure' =
   isCI && isSmokeOnly ? 'off' : 'retain-on-failure';
@@ -37,6 +47,18 @@ function getRetries(): number {
 }
 
 function getWorkers(): number | undefined {
+  const explicitWorkers = process.env.PLAYWRIGHT_WORKERS;
+  if (explicitWorkers) {
+    const parsedWorkers = Number.parseInt(explicitWorkers, 10);
+    if (Number.isFinite(parsedWorkers) && parsedWorkers > 0) {
+      return parsedWorkers;
+    }
+  }
+
+  if (shouldSerializeLocalBypassRuns) {
+    return 1;
+  }
+
   if (!isCI) return undefined;
   return isSmokeOnly ? 8 : 4;
 }
@@ -55,7 +77,7 @@ export default defineConfig({
   testDir: './tests/e2e',
   // Exclude nightly tests - they run via playwright.config.nightly.ts on schedule
   testIgnore: ['**/nightly/**'],
-  fullyParallel: true,
+  fullyParallel: !shouldSerializeLocalBypassRuns,
   forbidOnly: isCI,
   // Smoke tests: fewer retries for faster feedback; full suite: more resilience
   retries: getRetries(),
@@ -86,7 +108,7 @@ export default defineConfig({
   snapshotPathTemplate: '{snapshotDir}/{testFilePath}/{arg}{ext}',
 
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:3100',
+    baseURL,
     trace: 'on-first-retry',
     video: videoMode,
     // Turbopack compilation needs longer timeouts even for smoke tests
@@ -112,6 +134,15 @@ export default defineConfig({
       dependencies: ['auth-setup'],
       use: { ...devices['Desktop Chrome'] },
     },
+    ...(includeMobileMatrix
+      ? [
+          {
+            name: 'mobile-chrome',
+            dependencies: ['auth-setup'],
+            use: { ...devices['Pixel 5'] },
+          },
+        ]
+      : []),
     // Firefox and WebKit run in nightly full-matrix workflow only
     ...(isFullMatrix
       ? [
@@ -140,15 +171,22 @@ export default defineConfig({
           env: {
             ...process.env,
             NODE_ENV: 'test',
-            PORT: '3100',
+            PORT: managedWebServerPort,
             NEXT_PUBLIC_E2E_MODE: '1',
+            E2E_USE_TEST_AUTH_BYPASS: useTestAuthBypass ? '1' : '0',
             NEXT_DISABLE_TOOLBAR: '1',
             E2E_FAST_ONBOARDING: '1',
             E2E_ALLOW_DEV_CSP: '1',
+            ...(useTestAuthBypass
+              ? {
+                  NEXT_PUBLIC_CLERK_MOCK: '1',
+                  NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
+                }
+              : {}),
             NODE_OPTIONS:
               `${process.env.NODE_OPTIONS || ''} --max-old-space-size=8192`.trim(),
           },
-          url: 'http://localhost:3100',
+          url: managedWebServerUrl.origin,
           reuseExistingServer: !isCI,
           timeout: 300000, // Increased to 300s (5min) for Turbopack cold start
           stdout: 'pipe',

@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
+import { after } from 'next/server';
 import { db } from '@/lib/db';
 import {
   discogRecordings,
@@ -24,8 +25,8 @@ import {
   sanitizeName,
   sanitizeText,
 } from '@/lib/spotify/sanitize';
+import { mapConcurrent } from '@/lib/utils/map-concurrent';
 import { spotifyArtistIdSchema } from '@/lib/validation/schemas/spotify';
-
 import {
   parseArtistCredits,
   parseMainArtists,
@@ -102,8 +103,8 @@ export interface SpotifyImportOptions {
   includeTracks?: boolean;
   /** Market for availability. Defaults to 'US' */
   market?: string;
-  /** Discover cross-platform links after import. Defaults to true */
-  discoverLinks?: boolean;
+  /** Discover cross-platform links after import. Defaults to 'background' */
+  discoverLinks?: boolean | 'sync' | 'background';
 }
 
 /**
@@ -115,7 +116,7 @@ async function discoverLinksForReleases(
 ): Promise<void> {
   const importedReleases = await getReleasesForProfile(creatorProfileId);
 
-  for (const release of importedReleases) {
+  await mapConcurrent(importedReleases, 5, async release => {
     try {
       // Only count canonical/manual links as existing — search fallback URLs
       // should be upgraded to canonical links via ISRC/UPC discovery.
@@ -138,6 +139,24 @@ async function discoverLinksForReleases(
         data: { releaseId: release.id, error },
       });
     }
+  });
+}
+
+function scheduleBackgroundDiscovery(task: () => Promise<void>): void {
+  try {
+    after(task);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes('outside a request scope')
+    ) {
+      queueMicrotask(() => {
+        void task();
+      });
+      return;
+    }
+
+    throw error;
   }
 }
 
@@ -188,6 +207,7 @@ function mergeFullTrackMetadata(
         return {
           ...track,
           external_ids: fullTrack.external_ids,
+          preview_url: track.preview_url ?? fullTrack.preview_url,
         };
       }),
     },
@@ -241,9 +261,22 @@ export async function importReleasesFromSpotify(
   const {
     includeGroups = ['album', 'single', 'compilation'],
     includeTracks = true, // Default to true for ISRC discovery
-    discoverLinks = true,
+    discoverLinks: discoverLinksOpt,
     market = 'US',
   } = options;
+
+  // Normalize legacy boolean values to the new string union.
+  // `true` preserves original sync behavior; only omitted defaults to background.
+  let discoverLinksMode: false | 'sync' | 'background';
+  if (discoverLinksOpt === undefined) {
+    discoverLinksMode = 'background';
+  } else if (discoverLinksOpt === true) {
+    discoverLinksMode = 'sync';
+  } else if (discoverLinksOpt === false) {
+    discoverLinksMode = false;
+  } else {
+    discoverLinksMode = discoverLinksOpt;
+  }
 
   const result: SpotifyImportResult = {
     success: false,
@@ -376,8 +409,23 @@ export async function importReleasesFromSpotify(
         }
 
         // 5. Discover cross-platform links
-        if (discoverLinks && includeTracks) {
-          await discoverLinksForReleases(creatorProfileId, market);
+        if (discoverLinksMode && includeTracks) {
+          if (discoverLinksMode === 'sync') {
+            await discoverLinksForReleases(creatorProfileId, market);
+          } else {
+            // Use after() in request scope, but fall back for tests and other
+            // non-request call sites that still need fire-and-forget behavior.
+            scheduleBackgroundDiscovery(() =>
+              discoverLinksForReleases(creatorProfileId, market).catch(
+                error => {
+                  captureWarning('Background link discovery failed', error, {
+                    source: 'spotify_import',
+                    creatorProfileId,
+                  });
+                }
+              )
+            );
+          }
         }
 
         // 6. Fetch the final state

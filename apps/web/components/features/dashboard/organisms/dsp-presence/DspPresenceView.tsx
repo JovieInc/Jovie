@@ -1,11 +1,26 @@
 'use client';
 
-import { useState } from 'react';
-import type { DspPresenceData } from '@/app/app/(shell)/dashboard/presence/actions';
-import { DspPresenceCard } from './DspPresenceCard';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import type {
+  DspPresenceData,
+  DspPresenceItem,
+} from '@/app/app/(shell)/dashboard/presence/actions';
+import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
+import { PageShell } from '@/components/organisms/PageShell';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
+import { useDspEnrichmentStatusQuery } from '@/lib/queries/useDspEnrichmentStatusQuery';
+import { AddPlatformDialog } from './AddPlatformDialog';
 import { DspPresenceEmptyState } from './DspPresenceEmptyState';
 import { DspPresenceSidebar } from './DspPresenceSidebar';
 import { DspPresenceSummary } from './DspPresenceSummary';
+import { DspPresenceTable } from './DspPresenceTable';
+
+// ============================================================================
+// View component
+// ============================================================================
 
 interface DspPresenceViewProps {
   readonly data: DspPresenceData;
@@ -13,46 +28,144 @@ interface DspPresenceViewProps {
 
 export function DspPresenceView({ data }: DspPresenceViewProps) {
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [isAddPlatformDialogOpen, setIsAddPlatformDialogOpen] = useState(false);
+  const dashboardData = useDashboardData();
+  const router = useRouter();
+
+  const profileId = dashboardData.selectedProfile?.id ?? '';
+  const isAdmin = dashboardData.isAdmin;
+  const spotifyId = dashboardData.selectedProfile?.spotifyId ?? null;
+
+  // Poll enrichment status and auto-refresh when discovery completes
+  const onDiscoveryComplete = useCallback(() => {
+    router.refresh();
+  }, [router]);
+
+  const { data: enrichmentStatus } = useDspEnrichmentStatusQuery({
+    profileId,
+    onComplete: onDiscoveryComplete,
+  });
+
+  const existingProviderIds = useMemo(
+    () => data.items.map(i => i.providerId),
+    [data.items]
+  );
 
   const selectedItem =
     data.items.find(i => i.matchId === selectedMatchId) ?? null;
+  const isSidebarOpen = selectedItem !== null;
 
-  if (data.items.length === 0) {
-    return <DspPresenceEmptyState />;
-  }
+  const openAddPlatformDialog = useCallback(() => {
+    // Delay opening so the initiating click is not treated as an outside
+    // interaction by the controlled Radix dialog on the same event loop turn.
+    globalThis.setTimeout(() => {
+      setIsAddPlatformDialogOpen(true);
+    }, 0);
+  }, []);
 
-  return (
-    <div className='flex h-full min-h-0 flex-row bg-[color-mix(in_oklab,var(--linear-bg-page)_72%,var(--linear-bg-surface-1))]'>
-      {/* Main content */}
-      <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>
-        <DspPresenceSummary
-          confirmedCount={data.confirmedCount}
-          suggestedCount={data.suggestedCount}
-        />
+  // Clear stale selection when item disappears from data (e.g. after reject)
+  useEffect(() => {
+    if (selectedMatchId && !selectedItem) {
+      setSelectedMatchId(null);
+    }
+  }, [selectedMatchId, selectedItem]);
 
-        <div className='flex-1 min-h-0 overflow-y-auto px-3.5 pb-3.5 pt-2.5 lg:px-4 lg:pb-4 lg:pt-3'>
-          <div className='grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3'>
-            {data.items.map(item => (
-              <DspPresenceCard
-                key={item.matchId}
-                item={item}
-                isSelected={item.matchId === selectedMatchId}
-                onSelect={() =>
-                  setSelectedMatchId(
-                    item.matchId === selectedMatchId ? null : item.matchId
-                  )
-                }
-              />
-            ))}
-          </div>
-        </div>
-      </div>
+  // Shell integration: drawer toggle + right panel width
+  const { setTableMeta } = useTableMeta();
+  const itemsRef = useRef(data.items);
+  itemsRef.current = data.items;
 
-      {/* Detail sidebar */}
+  useEffect(() => {
+    const toggle = () => {
+      if (isSidebarOpen) {
+        setSelectedMatchId(null);
+      } else if (itemsRef.current.length > 0) {
+        setSelectedMatchId(itemsRef.current[0].matchId);
+      }
+    };
+
+    setTableMeta({
+      rowCount: data.items.length,
+      toggle: data.items.length > 0 ? toggle : null,
+      rightPanelWidth: isSidebarOpen ? SIDEBAR_WIDTH : 0,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
+  }, [selectedMatchId, data.items.length, isSidebarOpen]);
+
+  // Row click: toggle sidebar
+  const handleRowSelect = useCallback(
+    (item: DspPresenceItem) => {
+      setSelectedMatchId(
+        item.matchId === selectedMatchId ? null : item.matchId
+      );
+    },
+    [selectedMatchId]
+  );
+
+  const sidebarPanel = useMemo(() => {
+    if (!selectedItem) {
+      return null;
+    }
+
+    return (
       <DspPresenceSidebar
         item={selectedItem}
         onClose={() => setSelectedMatchId(null)}
       />
-    </div>
+    );
+  }, [selectedItem]);
+
+  useRegisterRightPanel(sidebarPanel);
+
+  const toolbar = (
+    <DspPresenceSummary
+      confirmedCount={data.confirmedCount}
+      suggestedCount={data.suggestedCount}
+      profileId={profileId}
+      isAdmin={isAdmin}
+      spotifyId={spotifyId}
+      enrichmentStatus={enrichmentStatus}
+      onAddPlatform={openAddPlatformDialog}
+    />
+  );
+
+  if (data.items.length === 0) {
+    return (
+      <PageShell toolbar={toolbar} data-testid='dsp-presence-workspace'>
+        <div
+          className='flex h-full min-h-0 flex-1 items-center justify-center'
+          data-testid='dsp-presence-content-panel'
+        >
+          <DspPresenceEmptyState onAddPlatform={openAddPlatformDialog} />
+        </div>
+        <AddPlatformDialog
+          open={isAddPlatformDialogOpen}
+          onClose={() => setIsAddPlatformDialogOpen(false)}
+          existingProviderIds={existingProviderIds}
+        />
+      </PageShell>
+    );
+  }
+
+  return (
+    <PageShell toolbar={toolbar} data-testid='dsp-presence-workspace'>
+      <div
+        className='flex min-h-0 flex-1 overflow-hidden'
+        data-testid='dsp-presence-content-panel'
+      >
+        <div className='flex-1 min-h-0 overflow-auto'>
+          <DspPresenceTable
+            items={data.items}
+            selectedMatchId={selectedMatchId}
+            onRowSelect={handleRowSelect}
+          />
+        </div>
+      </div>
+      <AddPlatformDialog
+        open={isAddPlatformDialogOpen}
+        onClose={() => setIsAddPlatformDialogOpen(false)}
+        existingProviderIds={existingProviderIds}
+      />
+    </PageShell>
   );
 }

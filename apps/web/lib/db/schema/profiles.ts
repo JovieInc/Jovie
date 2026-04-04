@@ -83,6 +83,8 @@ export interface FitScoreBreakdown {
   hasContactEmail?: number;
   /** Has paid verification on social platforms (Twitter/X, Instagram, Facebook, Threads) - max 10 points */
   paidVerification?: number;
+  /** SoundCloud Pro/Pro Unlimited/Next Pro subscription (music-specific paid, stronger signal) - max 10 points */
+  soundcloudPro?: number;
   /** Has tracking pixels on link-in-bio (Facebook, TikTok, Google) - max 5 points */
   hasTrackingPixels?: number;
   /** Metadata about the scoring */
@@ -95,6 +97,7 @@ export interface FitScoreBreakdown {
     alternativeDspPlatforms?: string[];
     dspPlatformCount?: number;
     paidVerificationPlatforms?: string[];
+    soundcloudProTier?: string;
   };
 }
 
@@ -120,7 +123,8 @@ export const creatorProfiles = pgTable(
     usernameNormalized: text('username_normalized').notNull(),
     displayName: text('display_name'),
     bio: text('bio'),
-    pitchContext: text('pitch_context'),
+    careerHighlights: text('career_highlights'),
+    targetPlaylists: text('target_playlists').array(),
     venmoHandle: text('venmo_handle'),
     avatarUrl: text('avatar_url'),
     spotifyUrl: text('spotify_url'),
@@ -200,6 +204,7 @@ export const creatorProfiles = pgTable(
     stripePayoutsEnabled: boolean('stripe_payouts_enabled')
       .default(false)
       .notNull(),
+    nextTaskNumber: integer('next_task_number').default(1).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -357,6 +362,8 @@ export const profilePhotos = pgTable(
     height: integer('height'),
     processedAt: timestamp('processed_at'),
     errorMessage: text('error_message'),
+    photoType: text('photo_type').notNull().default('avatar'),
+    sortOrder: integer('sort_order').notNull().default(0),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -367,6 +374,11 @@ export const profilePhotos = pgTable(
     ),
     ingestionOwnerIdx: index('idx_profile_photos_ingestion_owner').on(
       table.ingestionOwnerUserId
+    ),
+    typeStatusIdx: index('idx_profile_photos_type').on(
+      table.creatorProfileId,
+      table.photoType,
+      table.status
     ),
   })
 );

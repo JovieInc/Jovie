@@ -1,116 +1,316 @@
-/**
- * Authenticates a Clerk test user via email + OTP and exports session cookies for /browse.
- *
- * Usage:
- *   doppler run -c dev -- bun run scripts/browse-auth.ts [email]
- *
- * Default email: browse+clerk_test@jov.ie (uses magic OTP code 424242)
- * Outputs cookies to /tmp/browse-clerk-cookies.json
- * Then import: $B cookie-import /tmp/browse-clerk-cookies.json
- */
-import { writeFileSync } from 'fs';
-import { type BrowserContext, chromium, type Page } from 'playwright';
+#!/usr/bin/env tsx
 
-const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY!;
-const CLERK_PK = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!;
-const SITE_URL = process.env.SITE_URL || 'http://localhost:3000';
-const TEST_EMAIL = process.argv[2] || 'browse+clerk_test@jov.ie';
+import { writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+import { type BrowserContext, chromium } from 'playwright';
+
+const DEFAULT_BASE_URL = 'http://localhost:3000';
+const DEFAULT_OUTPUT_PATH = '/tmp/browse-clerk-cookies.json';
+const DEFAULT_CREATOR_EMAIL = 'browse+clerk_test@jov.ie';
+const DEFAULT_ADMIN_EMAIL = 'browse-admin+clerk_test@jov.ie';
 const MAGIC_CODE = '424242';
 const TESTING_TOKEN_PARAM = '__clerk_testing_token';
+const PRIVATE_IPV4_BLOCKS = [
+  /^10\./,
+  /^127\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2\d|3[0-1])\./,
+] as const;
 
-if (!CLERK_SECRET_KEY) {
-  console.error(
-    'Missing CLERK_SECRET_KEY. Run with: doppler run -c dev -- bun run scripts/browse-auth.ts'
-  );
-  process.exit(1);
+type BrowseAuthPersona = 'creator' | 'admin';
+type SameSitePolicy = 'Lax' | 'Strict' | 'None';
+
+interface BrowseAuthArgs {
+  readonly baseUrl: string;
+  readonly output: string;
+  readonly persona: BrowseAuthPersona;
 }
 
-if (!CLERK_PK) {
-  console.error(
-    'Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY. Run with: doppler run -c dev -- bun run scripts/browse-auth.ts'
-  );
-  process.exit(1);
+interface ExportedCookie {
+  readonly name: string;
+  readonly value: string;
+  readonly domain: string;
+  readonly path: string;
+  readonly expires: number;
+  readonly httpOnly: boolean;
+  readonly secure: boolean;
+  readonly sameSite: SameSitePolicy;
 }
 
-/** Parse Clerk Frontend API hostname from publishable key */
+function isPrivateOrLoopbackHost(hostname: string): boolean {
+  const normalizedHostname = hostname.trim().toLowerCase();
+
+  return (
+    normalizedHostname === 'localhost' ||
+    normalizedHostname === '::1' ||
+    normalizedHostname === '[::1]' ||
+    normalizedHostname.endsWith('.localhost') ||
+    normalizedHostname.endsWith('.local') ||
+    PRIVATE_IPV4_BLOCKS.some(pattern => pattern.test(normalizedHostname))
+  );
+}
+
+export function parseBrowseAuthArgs(argv: readonly string[]): BrowseAuthArgs {
+  let baseUrl = DEFAULT_BASE_URL;
+  let output = DEFAULT_OUTPUT_PATH;
+  let persona: BrowseAuthPersona = 'creator';
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    const nextValue = argv[index + 1];
+
+    if (arg === '--base-url' && nextValue) {
+      baseUrl = nextValue;
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--output' && nextValue) {
+      output = nextValue;
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--persona' && nextValue) {
+      if (nextValue === 'creator' || nextValue === 'admin') {
+        persona = nextValue;
+        index += 1;
+        continue;
+      }
+
+      throw new Error(`Invalid persona "${nextValue}"`);
+    }
+  }
+
+  return {
+    baseUrl,
+    output,
+    persona,
+  };
+}
+
 function parseFrontendApi(pk: string): string {
-  // pk_test_<base64> or pk_live_<base64> — the base64 decodes to the FAPI URL
   const match = pk.match(/^pk_(test|live)_(.+)$/);
-  if (!match)
+  if (!match) {
     throw new Error(
       `Invalid publishable key format: ${pk.substring(0, 15)}...`
     );
+  }
+
   const decoded = Buffer.from(match[2], 'base64').toString('utf-8');
-  // decoded is like "distinct-giraffe-5.clerk.accounts.dev$"
   return decoded.replace(/\$$/, '');
 }
 
-async function getTestingToken(): Promise<string> {
-  const res = await fetch('https://api.clerk.com/v1/testing_tokens', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${CLERK_SECRET_KEY}` },
+export function getPersonaEmail(persona: BrowseAuthPersona): string {
+  if (persona === 'admin') {
+    return process.env.E2E_CLERK_ADMIN_USERNAME ?? DEFAULT_ADMIN_EMAIL;
+  }
+
+  return DEFAULT_CREATOR_EMAIL;
+}
+
+function getSetCookieHeaders(headers: Headers): string[] {
+  const headerBag = headers as Headers & {
+    getSetCookie?: () => string[];
+  };
+
+  if (typeof headerBag.getSetCookie === 'function') {
+    return headerBag.getSetCookie();
+  }
+
+  const singleHeader = headers.get('set-cookie');
+  return singleHeader ? [singleHeader] : [];
+}
+
+export function parseSetCookieHeaders(
+  setCookieHeaders: readonly string[],
+  baseUrl: URL
+): ExportedCookie[] {
+  return setCookieHeaders.map(headerValue => {
+    const parts = headerValue.split(';').map(part => part.trim());
+    const [nameValue, ...attributeParts] = parts;
+    const [name = '', ...valueParts] = nameValue.split('=');
+    const attributes = new Map<string, string>();
+
+    for (const attributePart of attributeParts) {
+      const [attributeName, ...attributeValueParts] = attributePart.split('=');
+      attributes.set(
+        attributeName.toLowerCase(),
+        attributeValueParts.join('=').trim()
+      );
+    }
+
+    const sameSiteValue = attributes.get('samesite');
+    const normalizedSameSite =
+      sameSiteValue === 'None' || sameSiteValue === 'Strict'
+        ? sameSiteValue
+        : 'Lax';
+    const expiresValue = attributes.get('expires');
+    const maxAgeValue = attributes.get('max-age');
+
+    let expires = -1;
+    if (maxAgeValue) {
+      const maxAgeSeconds = Number(maxAgeValue);
+      if (Number.isFinite(maxAgeSeconds)) {
+        expires = Math.floor(Date.now() / 1000) + maxAgeSeconds;
+      }
+    } else if (expiresValue) {
+      const parsedExpiry = Date.parse(expiresValue);
+      if (!Number.isNaN(parsedExpiry)) {
+        expires = Math.floor(parsedExpiry / 1000);
+      }
+    }
+
+    return {
+      name,
+      value: valueParts.join('='),
+      domain: attributes.get('domain') || baseUrl.hostname,
+      path: attributes.get('path') || '/',
+      expires,
+      httpOnly: attributes.has('httponly'),
+      secure: attributes.has('secure'),
+      sameSite: normalizedSameSite,
+    };
   });
-  if (!res.ok) {
+}
+
+function writeCookieExport(
+  outputPath: string,
+  cookies: readonly ExportedCookie[]
+) {
+  writeFileSync(outputPath, JSON.stringify(cookies, null, 2));
+  console.log(`Cookies exported: ${outputPath}`);
+}
+
+async function runLocalBypassFlow(args: BrowseAuthArgs) {
+  const baseUrl = new URL(args.baseUrl);
+  const response = await fetch(new URL('/api/dev/test-auth/session', baseUrl), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ persona: args.persona }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new LocalBypassError(response.status, errorText);
+  }
+
+  const payload = (await response.json()) as {
+    success: boolean;
+    persona: BrowseAuthPersona;
+    userId: string;
+    email: string;
+    profilePath: string | null;
+  };
+
+  const cookies = parseSetCookieHeaders(
+    getSetCookieHeaders(response.headers),
+    baseUrl
+  );
+
+  writeCookieExport(args.output, cookies);
+
+  console.log(
+    `Local mode: authenticated ${payload.email} (${payload.persona})`
+  );
+  console.log(
+    `Browse entrypoint: ${new URL(
+      `/api/dev/test-auth/enter?persona=${payload.persona}&redirect=/app/dashboard/earnings`,
+      baseUrl
+    ).toString()}`
+  );
+}
+
+class LocalBypassError extends Error {
+  constructor(
+    readonly status: number,
+    readonly body: string
+  ) {
+    super(`Local browse auth failed: ${status} ${body}`);
+    this.name = 'LocalBypassError';
+  }
+}
+
+function shouldFallbackToClerk(error: unknown): boolean {
+  if (error instanceof LocalBypassError) {
+    return error.status === 403 || error.status === 404;
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes('E2E_USE_TEST_AUTH_BYPASS is not enabled') ||
+    error.message.includes('Only available on loopback and private dev hosts')
+  );
+}
+
+async function getTestingToken(secretKey: string): Promise<string> {
+  const response = await fetch('https://api.clerk.com/v1/testing_tokens', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${secretKey}` },
+  });
+
+  if (!response.ok) {
     throw new Error(
-      `Failed to get testing token: ${res.status} ${res.statusText}`
+      `Failed to get testing token: ${response.status} ${response.statusText}`
     );
   }
-  const data = await res.json();
+
+  const data = (await response.json()) as { token?: string };
   if (!data.token) {
-    throw new Error(
-      `Testing token response missing token field: ${JSON.stringify(data)}`
-    );
+    throw new Error('Testing token response missing token field');
   }
+
   return data.token;
 }
 
-async function ensureTestUser(email: string): Promise<void> {
-  const searchRes = await fetch(
+async function ensureFallbackTestUser(
+  secretKey: string,
+  email: string
+): Promise<void> {
+  const searchResponse = await fetch(
     `https://api.clerk.com/v1/users?email_address=${encodeURIComponent(email)}&limit=1`,
-    { headers: { Authorization: `Bearer ${CLERK_SECRET_KEY}` } }
+    {
+      headers: { Authorization: `Bearer ${secretKey}` },
+    }
   );
-  if (!searchRes.ok) {
+
+  if (!searchResponse.ok) {
     throw new Error(
-      `Clerk user search failed: ${searchRes.status} ${searchRes.statusText}`
+      `Clerk user search failed: ${searchResponse.status} ${searchResponse.statusText}`
     );
   }
-  const users = await searchRes.json();
-  if (Array.isArray(users) && users.length > 0) {
-    console.log(`Test user exists: ${users[0].id}`);
+
+  const users = (await searchResponse.json()) as Array<{ id: string }>;
+  if (users.length > 0) {
     return;
   }
 
-  console.log(`Creating test user: ${email}`);
-  const createRes = await fetch('https://api.clerk.com/v1/users', {
+  const createResponse = await fetch('https://api.clerk.com/v1/users', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${CLERK_SECRET_KEY}`,
+      Authorization: `Bearer ${secretKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       email_address: [email],
       first_name: 'Browse',
       last_name: 'Bot',
+      skip_password_requirement: true,
     }),
   });
-  if (!createRes.ok) {
+
+  if (!createResponse.ok) {
     throw new Error(
-      `Clerk user create failed: ${createRes.status} ${await createRes.text()}`
+      `Clerk user create failed: ${createResponse.status} ${await createResponse.text()}`
     );
   }
-  const created = await createRes.json();
-  if (created.errors) {
-    throw new Error(`Failed to create user: ${JSON.stringify(created.errors)}`);
-  }
-  console.log(`Created test user: ${created.id}`);
 }
 
-/**
- * Replicates @clerk/testing/playwright's setupClerkTestingToken behavior:
- * - Uses context.route() (persists across navigations, unlike page.route)
- * - Only matches Clerk Frontend API /v1/* URLs
- * - Patches captcha_bypass in responses
- */
 async function setupClerkTestingToken(
   context: BrowserContext,
   fapiHost: string,
@@ -126,7 +326,6 @@ async function setupClerkTestingToken(
     try {
       const response = await route.fetch({ url: url.toString() });
       const json = await response.json();
-      // Patch captcha bypass flags (like the official library does)
       if (json?.response?.captcha_bypass === false) {
         json.response.captcha_bypass = true;
       }
@@ -135,128 +334,127 @@ async function setupClerkTestingToken(
       }
       await route.fulfill({ response, json });
     } catch {
-      await route.continue({ url: url.toString() }).catch(console.error);
+      await route.continue({ url: url.toString() });
     }
   });
 }
 
-async function enterOtp(page: Page): Promise<void> {
-  await page.waitForTimeout(2000);
+async function runClerkFallbackFlow(args: BrowseAuthArgs) {
+  const secretKey = process.env.CLERK_SECRET_KEY;
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-  const codeInput = page.locator('input[autocomplete="one-time-code"]').first();
-  if (await codeInput.isVisible({ timeout: 5000 })) {
-    console.log(`Entering magic code: ${MAGIC_CODE}`);
-    await codeInput.fill(MAGIC_CODE);
-    return;
-  }
-
-  // Fallback: individual digit inputs
-  const digitInputs = page.locator('input[inputmode="numeric"]');
-  const count = await digitInputs.count();
-  if (count > 0) {
-    console.log(`Found ${count} digit inputs, entering code...`);
-    for (let i = 0; i < Math.min(count, MAGIC_CODE.length); i++) {
-      await digitInputs.nth(i).fill(MAGIC_CODE[i]);
-    }
-    // Trigger submission after filling all digits
-    await digitInputs
-      .nth(Math.min(count, MAGIC_CODE.length) - 1)
-      .press('Enter');
-    return;
-  }
-
-  await page.screenshot({ path: '/tmp/browse-auth-otp-debug.png' });
-  console.log(
-    'Could not find OTP input. Debug screenshot: /tmp/browse-auth-otp-debug.png'
-  );
-}
-
-async function main() {
-  console.log(`Site: ${SITE_URL}`);
-  console.log(`Email: ${TEST_EMAIL}`);
-
-  await ensureTestUser(TEST_EMAIL);
-
-  const fapiHost = parseFrontendApi(CLERK_PK);
-  const testingToken = await getTestingToken();
-  console.log(`FAPI: ${fapiHost}`);
-  console.log('Got testing token');
-
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
-
-  // Set up testing token interception at context level (persists across navigations)
-  await setupClerkTestingToken(context, fapiHost, testingToken);
-
-  const page = await context.newPage();
-
-  // Navigate to sign-in
-  console.log('Navigating to sign-in...');
-  await page.goto(`${SITE_URL}/signin`, { waitUntil: 'networkidle' });
-
-  // Click "Continue with email"
-  console.log('Clicking "Continue with email"...');
-  await page.getByRole('button', { name: 'Continue with email' }).click();
-  await page
-    .getByLabel('Email Address')
-    .waitFor({ state: 'visible', timeout: 5000 });
-
-  // Fill email and submit
-  console.log(`Entering email: ${TEST_EMAIL}`);
-  await page.getByLabel('Email Address').fill(TEST_EMAIL);
-  await page.getByRole('button', { name: 'Continue with email' }).click();
-
-  // Enter OTP
-  console.log('Waiting for OTP input...');
-  try {
-    await enterOtp(page);
-  } catch (err) {
-    await page.screenshot({ path: '/tmp/browse-auth-otp-debug.png' });
-    console.log(
-      `OTP step error: ${err}. Debug screenshot: /tmp/browse-auth-otp-debug.png`
+  if (!secretKey) {
+    throw new Error(
+      'Missing CLERK_SECRET_KEY. Run with: doppler run -- pnpm tsx scripts/browse-auth.ts'
     );
   }
 
-  // Wait for auth redirect
-  console.log('Waiting for auth redirect...');
-  try {
-    await page.waitForURL(url => !url.toString().includes('/signin'), {
-      timeout: 15000,
-    });
-    console.log(`Redirected to: ${page.url()}`);
-  } catch {
-    console.log(`Still on: ${page.url()}`);
-    await page.screenshot({ path: '/tmp/browse-auth-debug.png' });
-    console.log('Debug screenshot: /tmp/browse-auth-debug.png');
+  if (!publishableKey) {
+    throw new Error(
+      'Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY. Run with: doppler run -- pnpm tsx scripts/browse-auth.ts'
+    );
   }
 
-  // Export cookies
-  const cookies = await context.cookies();
-  writeFileSync(
-    '/tmp/browse-clerk-cookies.json',
-    JSON.stringify(cookies, null, 2)
-  );
-  console.log(
-    `Exported ${cookies.length} cookies to /tmp/browse-clerk-cookies.json`
+  const email = getPersonaEmail(args.persona);
+  await ensureFallbackTestUser(secretKey, email);
+
+  const fapiHost = parseFrontendApi(publishableKey);
+  const testingToken = await getTestingToken(secretKey);
+
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext();
+  await setupClerkTestingToken(context, fapiHost, testingToken);
+
+  const page = await context.newPage();
+  await page.goto(`${args.baseUrl}/signin`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60_000,
+  });
+  await page.waitForFunction(
+    () => Boolean((window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded),
+    {
+      timeout: 30_000,
+    }
   );
 
-  const sessionCookie = cookies.find(c => c.name === '__session');
-  if (sessionCookie) {
-    console.log('Session cookie found — authentication successful');
-    await page.screenshot({ path: '/tmp/browse-auth-success.png' });
-    console.log('Success screenshot: /tmp/browse-auth-success.png');
-  } else {
-    console.error('No session cookie — authentication failed');
-    await page.screenshot({ path: '/tmp/browse-auth-debug.png' });
-    console.log('Debug screenshot: /tmp/browse-auth-debug.png');
-    await browser.close();
-    process.exit(1);
+  const signInResult = await page.evaluate(
+    async ({ email, code }) => {
+      const clerk = (window as { Clerk?: any }).Clerk;
+      if (!clerk) {
+        return { error: 'Clerk not loaded' };
+      }
+
+      try {
+        const signIn = await clerk.client.signIn.create({
+          identifier: email,
+          strategy: 'email_code',
+        });
+
+        const result = await signIn.attemptFirstFactor({
+          strategy: 'email_code',
+          code,
+        });
+
+        if (result.status === 'complete') {
+          await clerk.setActive({ session: result.createdSessionId });
+          return { success: true };
+        }
+
+        return { error: `Sign-in status: ${result.status}` };
+      } catch (error: unknown) {
+        return {
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+    { email, code: MAGIC_CODE }
+  );
+
+  if ('error' in signInResult && signInResult.error) {
+    throw new Error(`Fallback sign-in failed: ${signInResult.error}`);
   }
 
+  await page.goto(`${args.baseUrl}/app/dashboard/earnings`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60_000,
+  });
+
+  writeCookieExport(args.output, await context.cookies());
   await browser.close();
 }
 
-main().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
+async function main() {
+  const args = parseBrowseAuthArgs(process.argv.slice(2));
+  const baseUrl = new URL(args.baseUrl);
+
+  console.log(`Base URL: ${baseUrl.toString()}`);
+  console.log(`Persona: ${args.persona}`);
+
+  if (isPrivateOrLoopbackHost(baseUrl.hostname)) {
+    try {
+      await runLocalBypassFlow(args);
+      return;
+    } catch (error) {
+      if (!shouldFallbackToClerk(error)) {
+        throw error;
+      }
+
+      console.log(
+        'Local bypass unavailable, falling back to Clerk testing token auth'
+      );
+    }
+  }
+
+  console.log('Mode: Clerk fallback');
+  await runClerkFallbackFlow(args);
+}
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  main().catch(error => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  });
+}

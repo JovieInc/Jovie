@@ -1,7 +1,13 @@
 import { and, eq } from 'drizzle-orm';
+import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { investorLinks, investorSettings } from '@/lib/db/schema/investors';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
+
+export const metadata: Metadata = {
+  robots: NOINDEX_ROBOTS,
+};
 
 interface RespondPageProps {
   readonly searchParams: Promise<{ t?: string; action?: string }>;
@@ -67,8 +73,11 @@ export default async function InvestorRespondPage({
 
     // Fallback if no calendar URL configured
     return (
-      <div className='flex min-h-screen items-center justify-center bg-[var(--color-bg-base)]'>
+      <div className='dark flex min-h-screen items-center justify-center bg-[var(--color-bg-base)]'>
         <div className='text-center'>
+          <span className='mb-6 block text-[length:var(--text-lg)] font-[680] tracking-tight text-[var(--color-text-primary-token)]'>
+            Jovie
+          </span>
           <h1 className='text-[length:var(--text-2xl)] font-[var(--font-weight-bold)] text-[var(--color-text-primary-token)]'>
             Thanks for your interest!
           </h1>
@@ -87,8 +96,11 @@ export default async function InvestorRespondPage({
     .where(eq(investorLinks.id, link.id));
 
   return (
-    <div className='flex min-h-screen items-center justify-center bg-[var(--color-bg-base)]'>
+    <div className='dark flex min-h-screen items-center justify-center bg-[var(--color-bg-base)]'>
       <div className='max-w-md text-center'>
+        <span className='mb-6 block text-[length:var(--text-lg)] font-[680] tracking-tight text-[var(--color-text-primary-token)]'>
+          Jovie
+        </span>
         <h1 className='text-[length:var(--text-2xl)] font-[var(--font-weight-bold)] text-[var(--color-text-primary-token)]'>
           Thanks for letting us know
         </h1>

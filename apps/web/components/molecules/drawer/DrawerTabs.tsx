@@ -1,41 +1,42 @@
 'use client';
 
 import type { SegmentControlOption } from '@jovie/ui';
-import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
-import { cn } from '@/lib/utils';
+import type { ReactNode } from 'react';
+import { TabBar } from '@/components/molecules/tab-bar/TabBar';
+
+/**
+ * Re-export classname constants for backward compatibility.
+ * Used by AudienceHeaderBadge and tests.
+ */
+export {
+  TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME as DRAWER_TABS_TRIGGER_ACTIVE_CLASSNAME,
+  TAB_BAR_DRAWER_TRIGGER_CLASSNAME as DRAWER_TABS_TRIGGER_CLASSNAME,
+  TAB_BAR_RAIL_CLASSNAME as DRAWER_TABS_RAIL_CLASSNAME,
+} from '@/components/molecules/tab-bar/TabBar';
 
 export interface DrawerTabsProps<T extends string> {
   readonly value: T;
   readonly onValueChange: (value: T) => void;
   readonly options: readonly SegmentControlOption<T>[];
   readonly ariaLabel: string;
+  readonly actions?: ReactNode;
   readonly className?: string;
+  readonly actionsClassName?: string;
   readonly triggerClassName?: string;
+  readonly overflowMode?: 'collapse' | 'wrap' | 'scroll';
+  readonly distribution?: 'intrinsic' | 'fill';
 }
 
+/**
+ * DrawerTabs — tabbed navigation for sidebar drawers.
+ *
+ * Thin wrapper around TabBar with drawer variant styling.
+ * Default overflow mode is 'collapse' (tabs that don't fit go into a "More" dropdown).
+ * Pass overflowMode='scroll' for the legacy hidden-scrollbar behavior.
+ */
 export function DrawerTabs<T extends string>({
-  value,
-  onValueChange,
-  options,
-  ariaLabel,
-  className,
-  triggerClassName,
+  overflowMode = 'collapse',
+  ...props
 }: DrawerTabsProps<T>) {
-  return (
-    <AppSegmentControl
-      value={value}
-      onValueChange={onValueChange}
-      options={options}
-      surface='ghost'
-      aria-label={ariaLabel}
-      className={cn(
-        'w-full rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
-        className
-      )}
-      triggerClassName={cn(
-        'h-[27px] rounded-full px-3 text-[11px] font-[510] tracking-[-0.008em] text-tertiary-token data-[state=active]:bg-surface-0 data-[state=active]:text-primary-token',
-        triggerClassName
-      )}
-    />
-  );
+  return <TabBar {...props} overflowMode={overflowMode} variant='drawer' />;
 }

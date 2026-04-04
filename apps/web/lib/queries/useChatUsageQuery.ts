@@ -6,7 +6,7 @@ import { createQueryFn, FetchError } from './fetch';
 import { queryKeys } from './keys';
 
 export interface ChatUsageData {
-  plan: 'free' | 'pro' | 'growth';
+  plan: 'free' | 'pro' | 'max';
   dailyLimit: number;
   used: number;
   remaining: number;

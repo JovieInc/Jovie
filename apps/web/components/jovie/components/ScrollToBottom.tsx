@@ -40,7 +40,7 @@ export function ScrollToBottom({ visible, onClick }: ScrollToBottomProps) {
         >
           <span className='flex h-5 w-5 items-center justify-center rounded-full bg-surface-2 text-primary-token'>
             <ArrowDown className='h-3 w-3' />
-          </span>
+          </span>{' '}
           Latest
         </motion.button>
       )}

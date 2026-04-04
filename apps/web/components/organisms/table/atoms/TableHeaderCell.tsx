@@ -53,7 +53,7 @@ export function TableHeaderCell({
     <th
       className={cn(
         // Base styles
-        'border-b border-subtle px-3 py-1 align-middle text-[11px] text-tertiary-token',
+        'border-b border-subtle px-3 py-1 align-middle text-[11px] font-[510] text-secondary-token',
         // Sticky positioning
         sticky && 'sticky z-20 bg-(--linear-app-content-surface)',
         // Alignment
@@ -61,7 +61,7 @@ export function TableHeaderCell({
         // Width
         width,
         // Responsive hiding
-        hideOnMobile && 'hidden md:table-cell',
+        hideOnMobile && 'max-md:hidden md:table-cell',
         // Custom classes
         className
       )}

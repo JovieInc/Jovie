@@ -8,12 +8,12 @@ import {
   lte,
 } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { discogReleases } from '@/lib/db/schema/content';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
 import { getBatchCreatorEntitlements } from '@/lib/entitlements/creator-plan';
-import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
@@ -21,20 +21,22 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const SCHEDULING_LOOKBACK_MS = 15 * 60 * 1000;
+const SCHEDULING_LOOKAHEAD_MS = 15 * 60 * 1000;
 
 /**
- * Cron job to schedule release day notifications for upcoming releases.
+ * Cron job to schedule release day notifications around the current window.
  *
  * This job:
- * 1. Finds releases dropping in the next 24 hours
+ * 1. Finds releases that just dropped or will drop in the next 15 minutes
  * 2. For each subscriber with releaseDay preference enabled
  * 3. Creates a fanReleaseNotifications entry scheduled for release time
  *
- * Schedule: Daily at 00:00 UTC (configured in vercel.json)
+ * Schedule: Every 15 minutes via /api/cron/frequent
  */
 /**
  * Core logic for scheduling release notifications.
- * Exported for use by the consolidated /api/cron/daily-maintenance handler.
+ * Exported for use by the consolidated /api/cron/frequent handler.
  */
 type SubscriberRow = {
   id: string;
@@ -59,7 +61,7 @@ type NotificationInsertValue = {
 /** Fetch eligible creator IDs based on plan entitlements. */
 async function getEligibleCreatorIds(
   creatorProfileIds: string[]
-): Promise<Set<string>> {
+): Promise<Set<string> | null> {
   const eligible = new Set<string>();
   try {
     const entitlementsMap =
@@ -69,10 +71,15 @@ async function getEligibleCreatorIds(
         eligible.add(profileId);
       }
     }
-  } catch {
+  } catch (error) {
     logger.warn(
-      '[schedule-release-notifications] Batch entitlements lookup failed, skipping all creators'
+      '[schedule-release-notifications] Batch entitlements lookup failed, preserving releases for retry',
+      {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        creatorCount: creatorProfileIds.length,
+      }
     );
+    return null;
   }
   return eligible;
 }
@@ -192,7 +199,9 @@ async function scheduleNotificationsForRelease(
     }
 
     if (page.length < SUBSCRIBER_PAGE_SIZE) break;
-    lastId = page.at(-1)!.id;
+    const lastPageRow = page.at(-1);
+    if (!lastPageRow) break;
+    lastId = lastPageRow.id;
 
     // Drain completed inserts when concurrency ceiling is reached
     if (pendingInserts.length >= INSERT_CONCURRENCY) {
@@ -213,7 +222,8 @@ export async function scheduleReleaseNotifications(): Promise<{
   releasesFound: number;
 }> {
   const now = new Date();
-  const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const windowStart = new Date(now.getTime() - SCHEDULING_LOOKBACK_MS);
+  const windowEnd = new Date(now.getTime() + SCHEDULING_LOOKAHEAD_MS);
 
   const upcomingReleases = await db
     .select({
@@ -225,8 +235,8 @@ export async function scheduleReleaseNotifications(): Promise<{
     .from(discogReleases)
     .where(
       and(
-        gte(discogReleases.releaseDate, now),
-        lte(discogReleases.releaseDate, in24Hours)
+        gte(discogReleases.releaseDate, windowStart),
+        lte(discogReleases.releaseDate, windowEnd)
       )
     );
 
@@ -240,6 +250,11 @@ export async function scheduleReleaseNotifications(): Promise<{
   ];
 
   const eligibleCreatorIds = await getEligibleCreatorIds(creatorProfileIds);
+  if (!eligibleCreatorIds) {
+    throw new Error(
+      'Creator entitlements lookup failed while scheduling release notifications'
+    );
+  }
 
   // Filter to only eligible releases
   const eligibleReleases = upcomingReleases.filter(r =>
@@ -289,16 +304,13 @@ export async function scheduleReleaseNotifications(): Promise<{
 /**
  * Cron job to schedule release day notifications for upcoming releases.
  *
- * Schedule: Daily at 00:00 UTC (configured in vercel.json)
+ * Schedule: On demand or via the consolidated /api/cron/frequent handler
  */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/schedule-release-notifications',
+  });
+  if (authError) return authError;
 
   try {
     const result = await scheduleReleaseNotifications();
@@ -308,7 +320,7 @@ export async function GET(request: Request) {
         success: true,
         message:
           result.releasesFound === 0
-            ? 'No upcoming releases in the next 24 hours'
+            ? 'No release notifications to schedule in the current window'
             : `Processed ${result.scheduled} notifications`,
         scheduled: result.scheduled,
         releasesFound: result.releasesFound,

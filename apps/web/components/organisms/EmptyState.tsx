@@ -65,7 +65,7 @@ const variantStyles: Record<
   default: {
     iconWrapper: 'text-tertiary-token',
     heading: 'text-secondary-token',
-    description: 'text-tertiary-token',
+    description: 'text-secondary-token',
   },
   search: {
     iconWrapper: 'text-sky-600 dark:text-sky-300',
@@ -191,7 +191,8 @@ export function EmptyState({
   };
 
   return (
-    <output
+    <div
+      role='status'
       aria-labelledby={headingId}
       aria-describedby={description ? descriptionId : undefined}
       data-testid={testId}
@@ -203,7 +204,7 @@ export function EmptyState({
       {icon && (
         <div
           className={cn(
-            'mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-surface-1/30',
+            'mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-surface-0',
             styles.iconWrapper
           )}
           aria-hidden='true'
@@ -237,6 +238,6 @@ export function EmptyState({
           {renderSecondaryAction()}
         </div>
       )}
-    </output>
+    </div>
   );
 }

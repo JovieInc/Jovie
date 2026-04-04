@@ -8,8 +8,11 @@ import {
   rescanIsrcLinks,
   resetProviderOverride,
   saveCanvasStatus,
+  savePrimaryIsrc,
   saveProviderOverride,
   saveReleaseLyrics,
+  saveReleaseMetadata,
+  saveReleaseTargetPlaylists,
   syncFromSpotify,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -294,11 +297,15 @@ export function useDeleteReleaseMutation(profileId: string) {
   });
 }
 
-export function useSaveReleaseLyricsMutation(profileId: string) {
+/** Factory for release mutations that optimistically update the matrix cache. */
+function useReleaseMutation<T>(
+  profileId: string,
+  mutationFn: (params: T) => Promise<ReleaseViewModel>
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: saveReleaseLyrics,
+    mutationFn,
     onSuccess: async updated => {
       const current = queryClient.getQueryData<ReleaseViewModel[]>(
         queryKeys.releases.matrix(profileId)
@@ -313,23 +320,24 @@ export function useSaveReleaseLyricsMutation(profileId: string) {
   });
 }
 
-export function useSaveCanvasStatusMutation(profileId: string) {
-  const queryClient = useQueryClient();
+export function useSaveReleaseLyricsMutation(profileId: string) {
+  return useReleaseMutation(profileId, saveReleaseLyrics);
+}
 
-  return useMutation({
-    mutationFn: saveCanvasStatus,
-    onSuccess: async updated => {
-      const current = queryClient.getQueryData<ReleaseViewModel[]>(
-        queryKeys.releases.matrix(profileId)
-      );
-      if (current) {
-        queryClient.setQueryData(
-          queryKeys.releases.matrix(profileId),
-          current.map(r => (r.id === updated.id ? updated : r))
-        );
-      }
-    },
-  });
+export function useSaveReleaseTargetPlaylistsMutation(profileId: string) {
+  return useReleaseMutation(profileId, saveReleaseTargetPlaylists);
+}
+
+export function useSaveCanvasStatusMutation(profileId: string) {
+  return useReleaseMutation(profileId, saveCanvasStatus);
+}
+
+export function useSaveReleaseMetadataMutation(profileId: string) {
+  return useReleaseMutation(profileId, saveReleaseMetadata);
+}
+
+export function useSavePrimaryIsrcMutation(profileId: string) {
+  return useReleaseMutation(profileId, savePrimaryIsrc);
 }
 
 export function useFormatReleaseLyricsMutation(profileId: string) {

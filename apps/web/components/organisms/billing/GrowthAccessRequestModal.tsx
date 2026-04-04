@@ -92,7 +92,7 @@ export function GrowthAccessRequestModal({
           </DialogDescription>
 
           <DialogBody>
-            <ContentSurfaceCard className='space-y-2 bg-surface-0 p-2.5'>
+            <ContentSurfaceCard className='space-y-2 p-2.5'>
               <Label htmlFor='growth-reason'>
                 What feature are you most excited about?
               </Label>

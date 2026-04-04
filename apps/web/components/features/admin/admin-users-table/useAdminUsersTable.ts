@@ -9,7 +9,7 @@ import {
   type UserSortableColumnKey,
 } from '@/features/admin/users-sort-config';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import type { AdminUserRow, AdminUsersSort } from '@/lib/admin/users';
+import type { AdminUserRow, AdminUsersSort } from '@/lib/admin/types';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { AdminUsersTableProps } from './types';
 
@@ -37,6 +37,7 @@ export function useAdminUsersTable({
   total,
   search,
   sort,
+  basePath = APP_ROUTES.ADMIN_USERS,
 }: AdminUsersTableProps): UseAdminUsersTableReturn {
   const router = useRouter();
   const notifications = useNotifications();
@@ -44,7 +45,7 @@ export function useAdminUsersTable({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const pagination = useAdminTablePaginationLinks<AdminUsersSort>({
-    basePath: APP_ROUTES.ADMIN_USERS,
+    basePath,
     page,
     pageSize,
     search,

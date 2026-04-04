@@ -1,16 +1,15 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { APP_URL } from '@/constants/app';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const metadata: Metadata = {
-  title: 'Jovie Founder AI Workflow',
-  description:
-    'The 7-method AI operating system used to run Jovie as a solo founder with team-level output.',
-  alternates: {
-    canonical: `${APP_URL}/ai`,
-  },
+  robots: NOINDEX_ROBOTS,
 };
 
+/**
+ * /ai redirects to the investor portal — the 7-Method AI Operating System
+ * content belongs in the investor section, not as a public marketing page.
+ */
 export default function AiPage() {
-  redirect('/ai/index.html');
+  redirect('/investor-portal');
 }

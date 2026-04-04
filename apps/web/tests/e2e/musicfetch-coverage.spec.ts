@@ -25,7 +25,7 @@
 import { neon } from '@neondatabase/serverless';
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { ensureSignedInUser } from '../helpers/clerk-auth';
+import { ensureSignedInUser, hasClerkCredentials } from '../helpers/clerk-auth';
 import {
   setupPageMonitoring,
   smokeNavigateWithRetry,
@@ -36,16 +36,6 @@ const IS_FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 const ONBOARDING_FULL = process.env.E2E_ONBOARDING_FULL === '1';
 
 const TEST_PROFILE_HANDLE = 'dualipa';
-
-function hasClerkCredentials(): boolean {
-  const username = process.env.E2E_CLERK_USER_USERNAME ?? '';
-  const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
-  return (
-    username.length > 0 &&
-    (password.length > 0 || username.includes('+clerk_test')) &&
-    process.env.CLERK_TESTING_SETUP_SUCCESS === 'true'
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DSP enrichment status API

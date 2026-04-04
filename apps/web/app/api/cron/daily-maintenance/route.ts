@@ -5,7 +5,6 @@
  * in a single function with one cold start and one DB connection.
  *
  * Sub-jobs:
- * - Schedule release notifications: every day (time-sensitive, runs first)
  * - Cleanup orphaned photos: every day
  * - Cleanup expired idempotency keys: every day
  * - Billing reconciliation: every day (safety net for webhooks)
@@ -19,13 +18,12 @@
 
 import { NextResponse } from 'next/server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
-import { env } from '@/lib/env-server';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { runReconciliation } from '../billing-reconciliation/route';
 import { cleanupExpiredKeys } from '../cleanup-idempotency-keys/route';
 import { cleanupOrphanedPhotos } from '../cleanup-photos/route';
-import { scheduleReleaseNotifications } from '../schedule-release-notifications/route';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for all sub-jobs
@@ -60,34 +58,25 @@ async function runSubJob(
 export async function GET(request: Request) {
   const startTime = Date.now();
 
-  const authHeader = request.headers.get('authorization');
-  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/daily-maintenance',
+  });
+  if (authError) return authError;
 
   const results: Record<string, SubJobResult> = {};
 
-  // 1. Schedule release notifications — runs first (time-sensitive)
-  results.scheduleNotifications = await runSubJob(
-    'scheduleNotifications',
-    scheduleReleaseNotifications
-  );
-
-  // 2. Cleanup orphaned photos
+  // 1. Cleanup orphaned photos
   results.cleanupPhotos = await runSubJob(
     'cleanupPhotos',
     cleanupOrphanedPhotos
   );
 
-  // 3. Cleanup expired idempotency keys
+  // 2. Cleanup expired idempotency keys
   results.cleanupKeys = await runSubJob('cleanupKeys', async () => ({
     deleted: await cleanupExpiredKeys(),
   }));
 
-  // 4. Billing reconciliation (daily safety net for webhooks)
+  // 3. Billing reconciliation (daily safety net for webhooks)
   results.billingReconciliation = await runSubJob(
     'billingReconciliation',
     async () => {
@@ -101,7 +90,7 @@ export async function GET(request: Request) {
     }
   );
 
-  // 5. Data retention — Sundays only (heavy operation)
+  // 4. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
   results.dataRetention = isSunday
     ? await runSubJob('dataRetention', runDataRetentionCleanup)

@@ -32,6 +32,16 @@ vi.mock('@/lib/dsp-enrichment/providers/apple-music', () => ({
   MAX_ISRC_BATCH_SIZE: 25,
 }));
 
+// Deezer provider
+const mockIsDeezerAvailable = vi.fn(() => true);
+const mockBulkLookupDeezerByIsrc = vi.fn();
+
+vi.mock('@/lib/dsp-enrichment/providers/deezer', () => ({
+  isDeezerAvailable: () => mockIsDeezerAvailable(),
+  bulkLookupDeezerByIsrc: (...args: unknown[]) =>
+    mockBulkLookupDeezerByIsrc(...args),
+}));
+
 // DB mock — avoid referencing variables in vi.mock factory (hoisted)
 vi.mock('@/lib/db', () => ({
   db: { __isMockDb: true },
@@ -275,7 +285,101 @@ describe('release-enrichment', () => {
       );
 
       expect(mockLookupByUpc).toHaveBeenCalledWith('00602445790128');
-      expect(result.releasesEnriched).toBeGreaterThanOrEqual(0);
+      expect(result.releasesEnriched).toBe(1);
+    });
+  });
+
+  describe('Deezer enrichment', () => {
+    it('returns error when Deezer is unavailable', async () => {
+      mockIsDeezerAvailable.mockReturnValue(false);
+      const mockConn = createMockDbConn({ releases: [] });
+
+      const { processReleaseEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/release-enrichment'
+      );
+
+      const result = await processReleaseEnrichmentJob(
+        mockConn as unknown as Parameters<
+          typeof processReleaseEnrichmentJob
+        >[0],
+        {
+          creatorProfileId: '550e8400-e29b-41d4-a716-446655440000',
+          matchId: 'match-123',
+          providerId: 'deezer',
+          externalArtistId: '12345',
+        }
+      );
+
+      expect(result.errors).toContain('Deezer provider not available');
+      expect(result.releasesEnriched).toBe(0);
+      mockIsDeezerAvailable.mockReturnValue(true);
+    });
+
+    it('returns 0 enriched when no unlinked releases exist', async () => {
+      const mockConn = createMockDbConn({ releases: [] });
+
+      const { processReleaseEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/release-enrichment'
+      );
+
+      const result = await processReleaseEnrichmentJob(
+        mockConn as unknown as Parameters<
+          typeof processReleaseEnrichmentJob
+        >[0],
+        {
+          creatorProfileId: '550e8400-e29b-41d4-a716-446655440000',
+          matchId: 'match-123',
+          providerId: 'deezer',
+          externalArtistId: '12345',
+        }
+      );
+
+      expect(result.releasesEnriched).toBe(0);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('enriches releases via Deezer ISRC lookup', async () => {
+      const mockConn = createMockDbConn({
+        releases: [{ id: 'release-1', upc: '00602445790128' }],
+        tracks: [{ releaseId: 'release-1', isrc: 'USRC12345678' }],
+      });
+
+      mockBulkLookupDeezerByIsrc.mockResolvedValue(
+        new Map([
+          [
+            'USRC12345678',
+            {
+              id: 999,
+              link: 'https://www.deezer.com/track/999',
+              album: {
+                id: 100,
+                title: 'Test Album',
+                link: 'https://www.deezer.com/album/100',
+                cover: 'https://example.com/cover.jpg',
+              },
+            },
+          ],
+        ])
+      );
+
+      const { processReleaseEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/release-enrichment'
+      );
+
+      const result = await processReleaseEnrichmentJob(
+        mockConn as unknown as Parameters<
+          typeof processReleaseEnrichmentJob
+        >[0],
+        {
+          creatorProfileId: '550e8400-e29b-41d4-a716-446655440000',
+          matchId: 'match-123',
+          providerId: 'deezer',
+          externalArtistId: '12345',
+        }
+      );
+
+      expect(mockBulkLookupDeezerByIsrc).toHaveBeenCalledWith(['USRC12345678']);
+      expect(result.releasesEnriched).toBe(1);
     });
   });
 

@@ -22,6 +22,7 @@ import {
   getIncompleteTaskLabelClass,
 } from '@/features/dashboard/organisms/dashboard-overview-helpers';
 import { GetStartedChecklistCard } from '@/features/dashboard/organisms/GetStartedChecklistCard';
+import { LinkClicksCard } from '@/features/dashboard/organisms/LinkClicksCard';
 import { StarterEmptyState } from '@/features/feedback/StarterEmptyState';
 import { GLYPH_ARROW_RIGHT } from '@/lib/keyboard-shortcuts';
 import {
@@ -49,6 +50,8 @@ interface DashboardOverviewProps {
   readonly artist: Artist | null;
   readonly hasSocialLinks: boolean;
   readonly hasMusicLinks?: boolean;
+  readonly linkClickStats?: { platform: string; clicks: number }[];
+  readonly linkClickTotal?: number;
 }
 
 interface SetupTaskItemProps {
@@ -88,7 +91,7 @@ function SetupTaskItem({
       {!isComplete && (
         <Link
           href={actionHref}
-          className='text-[12.5px] font-[510] text-secondary-token transition-colors hover:text-primary-token'
+          className='rounded-full border border-transparent px-2.5 py-1 text-[12px] font-[510] text-secondary-token transition-[background-color,border-color,color] hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
         >
           {actionLabel} {GLYPH_ARROW_RIGHT}
         </Link>
@@ -101,6 +104,8 @@ export function DashboardOverview({
   artist,
   hasSocialLinks,
   hasMusicLinks = false,
+  linkClickStats = [],
+  linkClickTotal = 0,
 }: DashboardOverviewProps) {
   if (!artist) {
     return (
@@ -251,6 +256,8 @@ export function DashboardOverview({
           profileUrl={profileUrl}
           showActivity
         />
+
+        <LinkClicksCard stats={linkClickStats} total={linkClickTotal} />
       </div>
     </DashboardOverviewControlsProvider>
   );

@@ -1,11 +1,14 @@
 'use client';
 
+import { TooltipProvider } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
 } from 'react';
@@ -22,8 +25,9 @@ import {
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
 import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileProgress';
+import { ReleaseTablePendingShell } from '@/features/dashboard/organisms/ReleaseTablePendingShell';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
-import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
+import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { AuthShell } from './AuthShell';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
 
@@ -41,12 +45,34 @@ type TableMetaContextValue = {
 
 const TableMetaContext = createContext<TableMetaContextValue | null>(null);
 
+type PendingShellRoute = 'releases' | null;
+
+interface PendingShellContextValue {
+  readonly clearPendingShell: (route?: PendingShellRoute) => void;
+  readonly pendingShellRoute: PendingShellRoute;
+  readonly showPendingShell: (route: Exclude<PendingShellRoute, null>) => void;
+}
+
+const noopPendingShellContext: PendingShellContextValue = {
+  clearPendingShell: () => {},
+  pendingShellRoute: null,
+  showPendingShell: () => {},
+};
+
+const PendingShellContext = createContext<PendingShellContextValue>(
+  noopPendingShellContext
+);
+
 export function useTableMeta(): TableMetaContextValue {
   const ctx = useContext(TableMetaContext);
   if (!ctx) {
     throw new TypeError('useTableMeta must be used within AuthShellWrapper');
   }
   return ctx;
+}
+
+export function usePendingShell() {
+  return useContext(PendingShellContext);
 }
 
 /**
@@ -84,7 +110,7 @@ export interface AuthShellWrapperProps {
  */
 function KeyboardShortcutsHandler() {
   const { open } = useKeyboardShortcuts();
-  useSequentialShortcuts({ onOpenShortcutsModal: open });
+  useDashboardShortcuts({ onOpenShortcutsModal: open });
   return <KeyboardShortcutsSheet />;
 }
 
@@ -105,6 +131,11 @@ function AuthShellWrapperInner({
   const config = useAuthRouteConfig();
   const headerActionsContext = useOptionalHeaderActions();
   const [, startTransition] = useTransition();
+  const [pendingShellRoute, setPendingShellRoute] =
+    useState<PendingShellRoute>(null);
+  const pendingShellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   // TableMeta state for audience/creators tables
   const [tableMeta, setTableMeta] = useState<TableMeta>({
@@ -123,11 +154,13 @@ function AuthShellWrapperInner({
   const defaultHeaderAction = useMemo(
     () => (
       <>
-        <HeaderChatUsageIndicator />
+        {config.showChatUsageIndicator && !config.isDemoRoute ? (
+          <HeaderChatUsageIndicator />
+        ) : null}
         <HeaderProfileProgress />
       </>
     ),
-    []
+    [config.isDemoRoute, config.showChatUsageIndicator]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
@@ -157,6 +190,42 @@ function AuthShellWrapperInner({
     [persistSidebarCollapsed, startTransition]
   );
 
+  const clearPendingShell = useCallback((route?: PendingShellRoute) => {
+    setPendingShellRoute(current =>
+      route && current !== route ? current : null
+    );
+    if (pendingShellTimerRef.current) {
+      clearTimeout(pendingShellTimerRef.current);
+      pendingShellTimerRef.current = null;
+    }
+  }, []);
+
+  const showPendingShell = useCallback(
+    (route: Exclude<PendingShellRoute, null>) => {
+      setPendingShellRoute(route);
+      if (pendingShellTimerRef.current) {
+        clearTimeout(pendingShellTimerRef.current);
+      }
+
+      pendingShellTimerRef.current = setTimeout(() => {
+        setPendingShellRoute(activeRoute =>
+          activeRoute === route ? null : activeRoute
+        );
+        pendingShellTimerRef.current = null;
+      }, 10_000);
+    },
+    []
+  );
+
+  useEffect(
+    () => () => {
+      if (pendingShellTimerRef.current) {
+        clearTimeout(pendingShellTimerRef.current);
+      }
+    },
+    []
+  );
+
   // Memoize context value to prevent unnecessary re-renders
   // setTableMeta is a stable useState setter, so we exclude it from deps
   const tableMetaContextValue = useMemo(
@@ -164,31 +233,54 @@ function AuthShellWrapperInner({
 
     [tableMeta]
   );
+  const pendingShellContextValue = useMemo(
+    () => ({
+      clearPendingShell,
+      pendingShellRoute,
+      showPendingShell,
+    }),
+    [clearPendingShell, pendingShellRoute, showPendingShell]
+  );
+  const shellChildren =
+    pendingShellRoute === 'releases' ? (
+      <div className='relative min-h-full'>
+        <div aria-hidden='true' className='pointer-events-none opacity-0'>
+          {children}
+        </div>
+        <div className='absolute inset-0 z-10'>
+          <ReleaseTablePendingShell />
+        </div>
+      </div>
+    ) : (
+      children
+    );
 
   return (
     <TableMetaContext.Provider value={tableMetaContextValue}>
-      <RightPanelProvider>
-        <PreviewPanelProvider
-          key={config.section}
-          defaultOpen={shouldDefaultOpenPreviewPanel}
-          enabled={previewEnabled}
-        >
-          <AuthShell
-            section={config.section}
-            breadcrumbs={config.breadcrumbs}
-            headerBadge={headerBadge}
-            headerAction={headerAction}
-            showMobileTabs={config.showMobileTabs}
-            isTableRoute={config.isTableRoute}
-            onSidebarOpenChange={
-              persistSidebarCollapsed ? handleSidebarOpenChange : undefined
-            }
-            sidebarDefaultOpen={sidebarDefaultOpen}
+      <PendingShellContext.Provider value={pendingShellContextValue}>
+        <RightPanelProvider>
+          <PreviewPanelProvider
+            key={config.section}
+            defaultOpen={shouldDefaultOpenPreviewPanel}
+            enabled={previewEnabled}
           >
-            {children}
-          </AuthShell>
-        </PreviewPanelProvider>
-      </RightPanelProvider>
+            <AuthShell
+              section={config.section}
+              breadcrumbs={config.breadcrumbs}
+              headerBadge={headerBadge}
+              headerAction={headerAction}
+              showMobileTabs={config.showMobileTabs}
+              isTableRoute={config.isTableRoute}
+              onSidebarOpenChange={
+                persistSidebarCollapsed ? handleSidebarOpenChange : undefined
+              }
+              sidebarDefaultOpen={sidebarDefaultOpen}
+            >
+              {shellChildren}
+            </AuthShell>
+          </PreviewPanelProvider>
+        </RightPanelProvider>
+      </PendingShellContext.Provider>
     </TableMetaContext.Provider>
   );
 }
@@ -212,17 +304,19 @@ export function AuthShellWrapper({
   children,
 }: Readonly<AuthShellWrapperProps>) {
   return (
-    <KeyboardShortcutsProvider>
-      <HeaderActionsProvider>
-        <AuthShellWrapperInner
-          persistSidebarCollapsed={persistSidebarCollapsed}
-          sidebarDefaultOpen={sidebarDefaultOpen}
-          previewPanelDefaultOpen={previewPanelDefaultOpen}
-        >
-          {children}
-        </AuthShellWrapperInner>
-        <KeyboardShortcutsHandler />
-      </HeaderActionsProvider>
-    </KeyboardShortcutsProvider>
+    <TooltipProvider delayDuration={1200}>
+      <KeyboardShortcutsProvider>
+        <HeaderActionsProvider>
+          <AuthShellWrapperInner
+            persistSidebarCollapsed={persistSidebarCollapsed}
+            sidebarDefaultOpen={sidebarDefaultOpen}
+            previewPanelDefaultOpen={previewPanelDefaultOpen}
+          >
+            {children}
+          </AuthShellWrapperInner>
+          <KeyboardShortcutsHandler />
+        </HeaderActionsProvider>
+      </KeyboardShortcutsProvider>
+    </TooltipProvider>
   );
 }

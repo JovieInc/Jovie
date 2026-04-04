@@ -3,8 +3,8 @@
  * Returns the current user's billing information
  */
 
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { getRedis } from '@/lib/redis';
@@ -126,7 +126,7 @@ function buildStaleBillingStatusPayload(
 export async function GET() {
   try {
     // Check authentication
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

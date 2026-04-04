@@ -44,10 +44,13 @@ export {
   type AdminCreatorProfileRow,
   type AdminCreatorProfilesSort,
   type AdminLeadsSortBy,
+  type AdminReleaseRow,
+  type AdminReleasesSort,
   type AdminUserRow,
   type AdminUserStatus,
   type AdminUsersSort,
   useAdminCreatorsInfiniteQuery,
+  useAdminReleasesInfiniteQuery,
   useAdminUsersInfiniteQuery,
   useAdminWaitlistInfiniteQuery,
   useLeadsInfiniteQuery,
@@ -57,12 +60,15 @@ export {
 export { useAudienceInfiniteQuery } from './audience-infinite';
 // Cache strategy presets
 export {
+  FREQUENT_BACKGROUND_CACHE,
   FREQUENT_CACHE,
   PAGINATED_CACHE,
   REALTIME_CACHE,
+  RETRY_BACKOFF,
   SEARCH_CACHE,
   STABLE_CACHE,
   STANDARD_CACHE,
+  STANDARD_NO_REMOUNT_CACHE,
   STATIC_CACHE,
 } from './cache-strategies';
 // Fetch utilities (Edge-compatible)
@@ -407,10 +413,16 @@ export { type PlanGateEntitlements, usePlanGate } from './usePlanGate';
 // Pre-save mutation
 export { useApplePreSaveMutation } from './usePreSaveMutation';
 export {
+  useDeletePressPhotoMutation,
+  usePressPhotosQuery,
+  usePressPhotoUploadMutation,
+} from './usePressPhotoMutation';
+export {
   type PricingOption,
   type PricingOptionsResponse,
   usePricingOptionsQuery,
 } from './usePricingOptionsQuery';
+export { useProfileMonetizationSummary } from './useProfileMonetizationSummary';
 // Profile editor mutations (TanStack Query + Pacer integration)
 export {
   type ProfileData,
@@ -441,8 +453,11 @@ export {
   useRescanIsrcLinksMutation,
   useResetProviderOverrideMutation,
   useSaveCanvasStatusMutation,
+  useSavePrimaryIsrcMutation,
   useSaveProviderOverrideMutation,
   useSaveReleaseLyricsMutation,
+  useSaveReleaseMetadataMutation,
+  useSaveReleaseTargetPlaylistsMutation,
   useSyncReleasesFromSpotifyMutation,
 } from './useReleaseMutations';
 // Release queries and mutations

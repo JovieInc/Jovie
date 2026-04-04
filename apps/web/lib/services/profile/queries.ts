@@ -8,6 +8,7 @@
 import { and, eq, inArray, ne, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
+import { getPressPhotosByProfileId } from '@/lib/db/queries/press-photos';
 import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import {
@@ -413,73 +414,77 @@ async function fetchProfileFromDatabase(
 
   if (!profile) return null;
 
-  // Step 2: Fetch related data using profile ID (3 parallel queries, no redundant JOINs)
-  const [linksResult, contactsResult, latestRelease] = await Promise.all([
-    // Social links - use profile ID directly (no JOIN to creatorProfiles needed)
-    db
-      .select({
-        id: socialLinks.id,
-        creatorProfileId: socialLinks.creatorProfileId,
-        platform: socialLinks.platform,
-        platformType: socialLinks.platformType,
-        url: socialLinks.url,
-        displayText: socialLinks.displayText,
-        clicks: socialLinks.clicks,
-        isActive: socialLinks.isActive,
-        sortOrder: socialLinks.sortOrder,
-        createdAt: socialLinks.createdAt,
-        updatedAt: socialLinks.updatedAt,
-      })
-      .from(socialLinks)
-      .where(
-        and(
-          eq(socialLinks.creatorProfileId, profile.id),
-          eq(socialLinks.isActive, true),
-          ne(socialLinks.state, 'rejected')
+  // Step 2: Fetch related data using profile ID (4 parallel queries, no redundant JOINs)
+  const [linksResult, contactsResult, latestRelease, pressPhotos] =
+    await Promise.all([
+      // Social links - use profile ID directly (no JOIN to creatorProfiles needed)
+      db
+        .select({
+          id: socialLinks.id,
+          creatorProfileId: socialLinks.creatorProfileId,
+          platform: socialLinks.platform,
+          platformType: socialLinks.platformType,
+          url: socialLinks.url,
+          displayText: socialLinks.displayText,
+          clicks: socialLinks.clicks,
+          isActive: socialLinks.isActive,
+          sortOrder: socialLinks.sortOrder,
+          createdAt: socialLinks.createdAt,
+          updatedAt: socialLinks.updatedAt,
+        })
+        .from(socialLinks)
+        .where(
+          and(
+            eq(socialLinks.creatorProfileId, profile.id),
+            eq(socialLinks.isActive, true),
+            ne(socialLinks.state, 'rejected')
+          )
         )
-      )
-      .orderBy(socialLinks.sortOrder)
-      .limit(MAX_SOCIAL_LINKS),
+        .orderBy(socialLinks.sortOrder)
+        .limit(MAX_SOCIAL_LINKS),
 
-    // Contacts - use profile ID directly (no JOIN to creatorProfiles needed)
-    db
-      .select({
-        id: creatorContacts.id,
-        creatorProfileId: creatorContacts.creatorProfileId,
-        role: creatorContacts.role,
-        customLabel: creatorContacts.customLabel,
-        personName: creatorContacts.personName,
-        companyName: creatorContacts.companyName,
-        territories: creatorContacts.territories,
-        email: creatorContacts.email,
-        phone: creatorContacts.phone,
-        preferredChannel: creatorContacts.preferredChannel,
-        forwardInboxEmails: creatorContacts.forwardInboxEmails,
-        autoMarkRead: creatorContacts.autoMarkRead,
-        isActive: creatorContacts.isActive,
-        sortOrder: creatorContacts.sortOrder,
-        createdAt: creatorContacts.createdAt,
-        updatedAt: creatorContacts.updatedAt,
-      })
-      .from(creatorContacts)
-      .where(
-        and(
-          eq(creatorContacts.creatorProfileId, profile.id),
-          eq(creatorContacts.isActive, true)
+      // Contacts - use profile ID directly (no JOIN to creatorProfiles needed)
+      db
+        .select({
+          id: creatorContacts.id,
+          creatorProfileId: creatorContacts.creatorProfileId,
+          role: creatorContacts.role,
+          customLabel: creatorContacts.customLabel,
+          personName: creatorContacts.personName,
+          companyName: creatorContacts.companyName,
+          territories: creatorContacts.territories,
+          email: creatorContacts.email,
+          phone: creatorContacts.phone,
+          preferredChannel: creatorContacts.preferredChannel,
+          forwardInboxEmails: creatorContacts.forwardInboxEmails,
+          autoMarkRead: creatorContacts.autoMarkRead,
+          isActive: creatorContacts.isActive,
+          sortOrder: creatorContacts.sortOrder,
+          createdAt: creatorContacts.createdAt,
+          updatedAt: creatorContacts.updatedAt,
+        })
+        .from(creatorContacts)
+        .where(
+          and(
+            eq(creatorContacts.creatorProfileId, profile.id),
+            eq(creatorContacts.isActive, true)
+          )
         )
-      )
-      .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt)
-      .limit(MAX_CONTACTS),
+        .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt)
+        .limit(MAX_CONTACTS),
 
-    // Latest release - still uses username (existing function)
-    getLatestReleaseByUsername(normalizedUsername),
-  ]);
+      // Latest release - still uses username (existing function)
+      getLatestReleaseByUsername(normalizedUsername),
+
+      getPressPhotosByProfileId(profile.id),
+    ]);
 
   return {
     ...profile,
     socialLinks: linksResult,
     contacts: contactsResult,
     latestRelease,
+    pressPhotos,
   };
 }
 

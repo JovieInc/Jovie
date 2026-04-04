@@ -35,9 +35,10 @@ export const AppShellFrame = memo(function AppShellFrame({
   return (
     <div
       className={cn(
-        'flex h-svh w-full overflow-hidden bg-(--linear-bg-page)',
+        'flex h-full w-full overflow-hidden bg-(--linear-bg-page)',
         /* PWA safe area: pad top for notch/Dynamic Island in standalone mode */
         'pt-[env(safe-area-inset-top)]',
+        'lg:gap-[var(--linear-app-shell-gap)] lg:p-[var(--linear-app-shell-gap)]',
         containerClassName
       )}
     >
@@ -45,22 +46,20 @@ export const AppShellFrame = memo(function AppShellFrame({
 
       <main
         id='main-content'
-        className='flex flex-1 min-h-0 overflow-hidden bg-surface-0 lg:m-[5px] lg:ml-px lg:rounded-[15px] lg:border lg:border-(--linear-app-shell-border) lg:border-l-(--linear-app-shell-sidebar-seam) lg:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] lg:shadow-[var(--linear-app-shell-shadow)] lg:peer-data-[state=open]:ml-[3px] lg:peer-data-[state=open]:rounded-l-[13px] lg:peer-data-[state=open]:border-l-0 lg:peer-data-[state=open]:shadow-[-1px_0_0_0_var(--linear-app-frame-seam)_inset,var(--linear-app-shell-shadow)] lg:peer-data-[state=closed]:rounded-l-[15px]'
+        className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)] lg:pt-px'
       >
-        <div className='flex flex-1 min-h-0 overflow-hidden'>
-          <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>
-            {header}
-            <div
-              className={cn(
-                'flex-1 min-h-0 min-w-0',
-                isTableRoute
-                  ? 'overflow-hidden overflow-x-auto overscroll-contain'
-                  : 'overflow-y-auto overflow-x-hidden overscroll-contain p-1 sm:p-1.5 lg:p-1.5',
-                contentClassName
-              )}
-            >
-              {main}
-            </div>
+        {header}
+        <div className='flex flex-1 min-h-0 min-w-0 overflow-hidden lg:gap-[var(--linear-app-shell-gap)]'>
+          <div
+            className={cn(
+              'flex-1 min-h-0 min-w-0 pb-[var(--dev-toolbar-height,0px)]',
+              isTableRoute
+                ? 'overflow-hidden overflow-x-auto overscroll-contain'
+                : 'overflow-y-auto overflow-x-hidden overscroll-contain',
+              contentClassName
+            )}
+          >
+            {main}
           </div>
           {rightPanel}
         </div>

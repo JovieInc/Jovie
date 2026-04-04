@@ -55,13 +55,28 @@ describe('getCurrentUserEntitlements', () => {
       canBeVerified: false,
       aiCanUseTools: true,
       canCreateManualReleases: true,
+      canAccessTasksWorkspace: false,
+      canGenerateReleasePlans: false,
+      canAccessMetadataSubmissionAgent: false,
       canAccessFutureReleases: false,
       canSendNotifications: false,
       canEditSmartLinks: true,
       analyticsRetentionDays: 30,
       contactsLimit: 100,
       smartLinksLimit: null,
-      aiDailyMessageLimit: 25,
+      aiDailyMessageLimit: 10,
+      canAccessPreSave: false,
+      canAccessTipping: false,
+      canAccessUrlEncryption: false,
+      canAccessStripeConnect: false,
+      canAccessFanSubscriptions: false,
+      canAccessEmailCampaigns: false,
+      canAccessApiKeys: false,
+      canAccessTeamManagement: false,
+      canAccessWebhooks: false,
+      canAccessWhiteLabel: false,
+      canAccessAbTesting: false,
+      aiPitchGenPerRelease: 1,
     });
   });
 
@@ -182,13 +197,28 @@ describe('getCurrentUserEntitlements', () => {
       canBeVerified: false,
       aiCanUseTools: true,
       canCreateManualReleases: true,
+      canAccessTasksWorkspace: false,
+      canGenerateReleasePlans: false,
+      canAccessMetadataSubmissionAgent: false,
       canAccessFutureReleases: false,
       canSendNotifications: false,
       canEditSmartLinks: true,
       analyticsRetentionDays: 30,
       contactsLimit: 100,
       smartLinksLimit: null,
-      aiDailyMessageLimit: 25,
+      aiDailyMessageLimit: 10,
+      canAccessPreSave: false,
+      canAccessTipping: false,
+      canAccessUrlEncryption: false,
+      canAccessStripeConnect: false,
+      canAccessFanSubscriptions: false,
+      canAccessEmailCampaigns: false,
+      canAccessApiKeys: false,
+      canAccessTeamManagement: false,
+      canAccessWebhooks: false,
+      canAccessWhiteLabel: false,
+      canAccessAbTesting: false,
+      aiPitchGenPerRelease: 1,
     });
   });
 
@@ -230,17 +260,32 @@ describe('getCurrentUserEntitlements', () => {
       canBeVerified: true,
       aiCanUseTools: true,
       canCreateManualReleases: true,
+      canAccessTasksWorkspace: true,
+      canGenerateReleasePlans: true,
+      canAccessMetadataSubmissionAgent: true,
       canAccessFutureReleases: true,
       canSendNotifications: true,
       canEditSmartLinks: true,
-      analyticsRetentionDays: 90,
-      contactsLimit: null,
+      canAccessPreSave: true,
+      canAccessTipping: true,
+      canAccessUrlEncryption: true,
+      canAccessStripeConnect: false,
+      canAccessFanSubscriptions: false,
+      canAccessEmailCampaigns: false,
+      canAccessApiKeys: false,
+      canAccessTeamManagement: false,
+      canAccessWebhooks: false,
+      canAccessWhiteLabel: false,
+      canAccessAbTesting: false,
+      analyticsRetentionDays: 180,
+      contactsLimit: 5000,
       smartLinksLimit: null,
       aiDailyMessageLimit: 100,
+      aiPitchGenPerRelease: null,
     });
   });
 
-  it('maps billing data for a growth user', async () => {
+  it('maps billing data for a max user (backward compat: DB may store growth)', async () => {
     mockCachedAuth.mockResolvedValue({ userId: 'user_growth' });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'growth@example.com' },
@@ -278,13 +323,28 @@ describe('getCurrentUserEntitlements', () => {
       canBeVerified: true,
       aiCanUseTools: true,
       canCreateManualReleases: true,
+      canAccessTasksWorkspace: true,
+      canGenerateReleasePlans: true,
+      canAccessMetadataSubmissionAgent: true,
       canAccessFutureReleases: true,
       canSendNotifications: true,
       canEditSmartLinks: true,
-      analyticsRetentionDays: 365,
+      canAccessPreSave: true,
+      canAccessTipping: true,
+      canAccessUrlEncryption: true,
+      canAccessStripeConnect: true,
+      canAccessFanSubscriptions: true,
+      canAccessEmailCampaigns: true,
+      canAccessApiKeys: true,
+      canAccessTeamManagement: true,
+      canAccessWebhooks: true,
+      canAccessWhiteLabel: true,
+      canAccessAbTesting: true,
+      analyticsRetentionDays: null,
       contactsLimit: null,
       smartLinksLimit: null,
       aiDailyMessageLimit: 500,
+      aiPitchGenPerRelease: null,
     });
   });
 
@@ -337,8 +397,8 @@ describe('getCurrentUserEntitlements', () => {
     expect(entitlements.plan).toBe('pro');
     expect(entitlements.isPro).toBe(true);
     expect(entitlements.canRemoveBranding).toBe(true);
-    expect(entitlements.analyticsRetentionDays).toBe(90);
-    expect(entitlements.contactsLimit).toBeNull();
+    expect(entitlements.analyticsRetentionDays).toBe(180);
+    expect(entitlements.contactsLimit).toBe(5000);
   });
 
   it('defaults to pro plan when isPro=true but dbPlan is empty string', async () => {

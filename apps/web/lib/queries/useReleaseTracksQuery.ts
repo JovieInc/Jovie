@@ -10,6 +10,7 @@ export type ReleaseTrack = Pick<
   TrackViewModel,
   | 'id'
   | 'releaseId'
+  | 'releaseSlug'
   | 'title'
   | 'slug'
   | 'smartLinkPath'
@@ -21,6 +22,9 @@ export type ReleaseTrack = Pick<
   | 'previewUrl'
   | 'audioUrl'
   | 'audioFormat'
+  | 'previewSource'
+  | 'previewVerification'
+  | 'providerConfidenceSummary'
   | 'providers'
 >;
 

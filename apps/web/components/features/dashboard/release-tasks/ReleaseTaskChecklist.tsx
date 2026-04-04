@@ -7,15 +7,21 @@ import {
 } from '@/lib/queries/useReleaseTaskMutations';
 import { useReleaseTasksQuery } from '@/lib/queries/useReleaseTasksQuery';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
+import { cn } from '@/lib/utils';
+import { toDateOnlySafe } from '@/lib/utils/date';
 import { ReleaseTaskCategoryGroup } from './ReleaseTaskCategoryGroup';
 import { ReleaseTaskCompactRow } from './ReleaseTaskCompactRow';
 import { ReleaseTaskEmptyState } from './ReleaseTaskEmptyState';
+import { ReleaseTaskPastReleaseState } from './ReleaseTaskPastReleaseState';
 import { ReleaseTaskProgressBar } from './ReleaseTaskProgressBar';
 import { ReleaseTaskRow } from './ReleaseTaskRow';
+
+const DAY_MS = 1000 * 60 * 60 * 24;
 
 interface ReleaseTaskChecklistProps {
   readonly releaseId: string;
   readonly variant: 'compact' | 'full';
+  readonly releaseDate?: Date | string | null;
   readonly onNavigateToTask?: (taskId: string) => void;
   readonly onNavigateToFullPage?: () => void;
 }
@@ -38,12 +44,29 @@ function groupByCategory(tasks: ReleaseTaskView[]) {
   return groups;
 }
 
+function parseCalendarDate(value: Date | string): Date {
+  const [year, month, day] = toDateOnlySafe(value).split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function getRelativeDueDays(dueDate: Date | string): number {
+  const due = parseCalendarDate(dueDate);
+  return Math.ceil((due.getTime() - Date.now()) / DAY_MS);
+}
+
+function isPastRelease(releaseDate?: Date | string | null): boolean {
+  if (!releaseDate) return false;
+  return getRelativeDueDays(releaseDate) < 0;
+}
+
 export function ReleaseTaskChecklist({
   releaseId,
   variant,
+  releaseDate,
   onNavigateToTask,
   onNavigateToFullPage,
 }: ReleaseTaskChecklistProps) {
+  const isCompact = variant === 'compact';
   const { data: tasks, isLoading } = useReleaseTasksQuery(releaseId);
   const instantiate = useInstantiateTasksMutation(releaseId);
   const toggle = useTaskToggleMutation(releaseId);
@@ -55,6 +78,16 @@ export function ReleaseTaskChecklist({
 
   const totalDone = tasks?.filter(t => t.status === 'done').length ?? 0;
   const totalTasks = tasks?.length ?? 0;
+  const overdueCount = useMemo(() => {
+    if (!tasks) return 0;
+    return tasks.filter(
+      t =>
+        t.status !== 'done' &&
+        t.status !== 'cancelled' &&
+        t.dueDate &&
+        getRelativeDueDays(t.dueDate) < 0
+    ).length;
+  }, [tasks]);
 
   const handleToggle = (taskId: string, done: boolean) => {
     toggle.mutate({ taskId, done });
@@ -78,22 +111,43 @@ export function ReleaseTaskChecklist({
   // Empty state
   if (!tasks || tasks.length === 0) {
     return (
-      <div className={variant === 'compact' ? 'px-2 py-2' : ''}>
-        <ReleaseTaskEmptyState
-          onSetUp={() => instantiate.mutate()}
-          isLoading={instantiate.isPending}
-        />
+      <div
+        className={variant === 'compact' ? 'px-2 py-2' : ''}
+        data-testid={
+          variant === 'compact'
+            ? 'release-task-empty-state-compact'
+            : 'release-task-empty-state'
+        }
+      >
+        {isPastRelease(releaseDate) ? (
+          <ReleaseTaskPastReleaseState
+            onSetUpAnyway={() => instantiate.mutate()}
+            isLoading={instantiate.isPending}
+          />
+        ) : (
+          <ReleaseTaskEmptyState
+            onSetUp={() => instantiate.mutate()}
+            isLoading={instantiate.isPending}
+          />
+        )}
       </div>
     );
   }
 
   return (
-    <div className='space-y-1'>
+    <div
+      className={cn(
+        'space-y-1',
+        isCompact && 'flex h-full min-h-0 flex-col space-y-0'
+      )}
+      data-testid={isCompact ? undefined : 'release-task-checklist'}
+    >
       {/* Progress bar + optional link to full page */}
-      <div className='flex items-center gap-2 px-4 py-2'>
+      <div className='flex shrink-0 items-center gap-2 px-4 py-2'>
         <ReleaseTaskProgressBar
           done={totalDone}
           total={totalTasks}
+          overdueCount={overdueCount}
           className='flex-1'
         />
         {variant === 'compact' && onNavigateToFullPage && (
@@ -108,13 +162,20 @@ export function ReleaseTaskChecklist({
       </div>
 
       {/* Category groups */}
-      <div className='space-y-3'>
+      <div
+        className={cn('space-y-3', isCompact && 'min-h-0 overflow-y-auto')}
+        data-testid={
+          isCompact ? 'release-task-checklist-scroll-region' : undefined
+        }
+        data-scroll-mode={isCompact ? 'internal' : undefined}
+      >
         {Array.from(groups.entries()).map(([category, group]) => (
           <ReleaseTaskCategoryGroup
             key={category}
             category={category}
             done={group.done}
             total={group.total}
+            allDone={group.done === group.total}
           >
             {group.tasks.map((task: ReleaseTaskView) =>
               variant === 'compact' ? (

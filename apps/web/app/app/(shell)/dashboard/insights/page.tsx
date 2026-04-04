@@ -4,12 +4,10 @@ import { APP_ROUTES } from '@/constants/routes';
 import { InsightsPanel } from '@/features/dashboard/insights/InsightsPanel';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { logger } from '@/lib/utils/logger';
+import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
-import { getDashboardData } from '../actions';
+import { getDashboardDataEssential } from '../actions';
 
-// User-specific page - always render fresh
-export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 /* -------------------------------------------------------------------------- */
@@ -20,16 +18,16 @@ export const runtime = 'nodejs';
 /**
  * Lightweight onboarding guard that streams independently.
  *
- * getDashboardData() is request-deduped via React cache() and already
+ * getDashboardDataEssential() is request-deduped via React cache() and already
  * pre-fetched by the shell layout, so this resolves near-instantly.
  * Separated into its own boundary so the redirect fires without
  * blocking the content skeleton from being displayed.
  */
 async function InsightsOnboardingGuard() {
   try {
-    const dashboardData = await getDashboardData();
+    const dashboardData = await getDashboardDataEssential();
     if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-      redirect('/onboarding');
+      redirect(APP_ROUTES.ONBOARDING);
     }
   } catch (error) {
     throwIfRedirect(error);
@@ -47,12 +45,26 @@ async function InsightsOnboardingGuard() {
  */
 async function InsightsContentSection() {
   try {
-    const dashboardData = await getDashboardData();
+    const dashboardData = await getDashboardDataEssential();
+
+    if (dashboardData.dashboardLoadError) {
+      void captureError(
+        'Dashboard data load failed on insights page',
+        dashboardData.dashboardLoadError,
+        { route: APP_ROUTES.INSIGHTS }
+      );
+      return (
+        <PageErrorState message='Failed to load insights. Please refresh the page.' />
+      );
+    }
+
     if (dashboardData.needsOnboarding) return null;
     return <InsightsPanel />;
   } catch (error) {
     throwIfRedirect(error);
-    logger.error('[InsightsPage] Failed to load insights', { error });
+    void captureError('Insights page failed', error, {
+      route: APP_ROUTES.INSIGHTS,
+    });
     return (
       <PageErrorState message='Failed to load insights. Please refresh the page.' />
     );
@@ -112,7 +124,7 @@ export default async function InsightsPage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/insights`);
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.INSIGHTS}`);
   }
 
   return (
@@ -127,7 +139,7 @@ export default async function InsightsPage() {
           remains stable while streaming. */}
       <Suspense
         fallback={
-          <div className='max-w-3xl space-y-6'>
+          <div className='space-y-6'>
             <InsightsHeaderSkeleton />
             <InsightsFiltersSkeleton />
             <InsightsCardsSkeleton />

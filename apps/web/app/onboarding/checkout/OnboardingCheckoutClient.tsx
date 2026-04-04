@@ -2,14 +2,16 @@
 
 import { Button } from '@jovie/ui';
 import { BadgeCheck, BarChart3, Eye, Sparkles } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Avatar } from '@/components/molecules/Avatar/Avatar';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
-import { FORM_LAYOUT } from '@/lib/auth/constants';
+import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
-import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
+import { getEntitlements } from '@/lib/entitlements/registry';
+import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
+import { cn } from '@/lib/utils';
 
 interface OnboardingCheckoutClientProps {
   readonly plan: PlanIntentTier;
@@ -96,7 +98,10 @@ function ProfilePreviewCard({
               type='button'
               aria-pressed={!showBranding}
               onClick={onToggleBranding}
-              className='group flex w-full items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors hover:bg-surface-1'
+              className={cn(
+                AUTH_SURFACE.fieldShell,
+                'justify-between px-3.5 py-2.5'
+              )}
             >
               <span className='text-[13px] text-secondary-token'>
                 Jovie branding
@@ -128,7 +133,7 @@ function ProfilePreviewCard({
       </ContentSurfaceCard>
 
       {spotifyFollowers && spotifyFollowers > 0 ? (
-        <div className='mb-4 flex items-start gap-2.5 rounded-lg border border-subtle bg-surface-1 px-4 py-3'>
+        <ContentSurfaceCard className='mb-4 px-4 py-3'>
           <Sparkles className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)' />
           <p className='text-[13px] text-secondary-token'>
             You have{' '}
@@ -138,7 +143,7 @@ function ProfilePreviewCard({
             . {planDisplayName} analytics shows exactly where they&apos;re
             listening from.
           </p>
-        </div>
+        </ContentSurfaceCard>
       ) : null}
     </>
   );
@@ -160,11 +165,11 @@ function BillingIntervalSelector({
       <legend className='sr-only'>Billing interval</legend>
       <div className='flex items-center justify-center gap-3'>
         <label
-          className={`cursor-pointer rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${
-            isAnnual
-              ? 'text-tertiary-token hover:text-secondary-token'
-              : 'bg-surface-1 text-primary-token'
-          }`}
+          className={cn(
+            AUTH_SURFACE.pillOption,
+            !isAnnual && AUTH_SURFACE.pillOptionActive,
+            'cursor-pointer'
+          )}
         >
           <input
             type='radio'
@@ -176,11 +181,11 @@ function BillingIntervalSelector({
           Monthly
         </label>
         <label
-          className={`cursor-pointer rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${
-            isAnnual
-              ? 'bg-surface-1 text-primary-token'
-              : 'text-tertiary-token hover:text-secondary-token'
-          }`}
+          className={cn(
+            AUTH_SURFACE.pillOption,
+            isAnnual && AUTH_SURFACE.pillOptionActive,
+            'cursor-pointer'
+          )}
         >
           <input
             type='radio'
@@ -211,6 +216,7 @@ export function OnboardingCheckoutClient({
   spotifyFollowers,
   isDefaultUpsell,
 }: OnboardingCheckoutClientProps) {
+  const searchParams = useSearchParams();
   // Pre-compute savings to determine annual default
   const hasAnnualOption = annualPriceId !== null && annualAmount !== null;
   const annualSavingsPercent = hasAnnualOption
@@ -221,15 +227,14 @@ export function OnboardingCheckoutClient({
   const [error, setError] = useState<string | null>(null);
   const [showBranding, setShowBranding] = useState(true);
 
-  const planMarketing =
-    ENTITLEMENT_REGISTRY[plan]?.marketing ??
-    ENTITLEMENT_REGISTRY.founding.marketing;
+  const planMarketing = getEntitlements(plan).marketing;
 
   const currentPriceId =
     isAnnual && annualPriceId !== null ? annualPriceId : monthlyPriceId;
   const currentAmount =
     isAnnual && annualAmount !== null ? annualAmount : monthlyAmount;
   const interval = isAnnual ? 'year' : 'month';
+  const returnTo = normalizeOnboardingReturnTo(searchParams.get('returnTo'));
   const handleToggleBranding = useCallback(() => {
     setShowBranding(current => !current);
   }, []);
@@ -258,7 +263,11 @@ export function OnboardingCheckoutClient({
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId: currentPriceId, source: 'onboarding' }),
+        body: JSON.stringify({
+          priceId: currentPriceId,
+          returnTo,
+          source: 'onboarding',
+        }),
       });
 
       if (!response.ok) {
@@ -280,7 +289,7 @@ export function OnboardingCheckoutClient({
       );
       setIsLoading(false);
     }
-  }, [plan, currentPriceId, interval, isDefaultUpsell]);
+  }, [plan, currentPriceId, interval, isDefaultUpsell, returnTo]);
 
   const handleSkip = useCallback(() => {
     track('onboarding_checkout_skipped', {
@@ -288,14 +297,8 @@ export function OnboardingCheckoutClient({
       intent_source: isDefaultUpsell ? 'upsell_intercept' : 'paid_intent',
     });
     clearPlanIntent();
-    // Preserve the dashboard handoff query so ChatPageClient auto-submits
-    // the onboarding prompt (mirrors AppleStyleOnboardingForm behavior)
-    const initialQuery =
-      spotifyFollowers == null
-        ? 'Connect my Spotify'
-        : 'Show me my latest releases';
-    globalThis.location.href = `${APP_ROUTES.DASHBOARD}?q=${encodeURIComponent(initialQuery)}`;
-  }, [plan, isDefaultUpsell, spotifyFollowers]);
+    globalThis.location.href = returnTo;
+  }, [isDefaultUpsell, plan, returnTo]);
 
   return (
     <div className='flex flex-col items-center justify-center'>
@@ -321,35 +324,26 @@ export function OnboardingCheckoutClient({
           onToggleBranding={handleToggleBranding}
         />
 
-        {/* Founding urgency callout */}
-        {plan === 'founding' ? (
-          <ContentSurfaceCard className='mb-4 border-[var(--linear-accent)]/30 px-4 py-3'>
-            <div className='flex items-center gap-2.5'>
-              <Sparkles className='h-4 w-4 shrink-0 text-(--linear-accent)' />
-              <p className='text-[13px] font-medium text-primary-token'>
-                Lock in founding member pricing — {formatPrice(monthlyAmount)}
-                /mo forever
-              </p>
-            </div>
-          </ContentSurfaceCard>
-        ) : null}
-
         {/* Pro highlights */}
-        <div className='mb-6 space-y-2.5'>
-          {PRO_HIGHLIGHTS.map(item => (
-            <div key={item.label} className='flex items-start gap-3'>
-              <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-1'>
-                <item.icon className='h-4 w-4 text-(--linear-accent)' />
+        <ContentSurfaceCard className='mb-6 p-4'>
+          <div className='space-y-2.5'>
+            {PRO_HIGHLIGHTS.map(item => (
+              <div key={item.label} className='flex items-start gap-3'>
+                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-1'>
+                  <item.icon className='h-4 w-4 text-(--linear-accent)' />
+                </div>
+                <div>
+                  <p className='text-[13px] font-medium text-primary-token'>
+                    {item.label}
+                  </p>
+                  <p className='text-[12px] text-tertiary-token'>
+                    {item.detail}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className='text-[13px] font-medium text-primary-token'>
-                  {item.label}
-                </p>
-                <p className='text-[12px] text-tertiary-token'>{item.detail}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </ContentSurfaceCard>
 
         {/* Annual toggle */}
         {hasAnnualOption ? (
@@ -372,12 +366,12 @@ export function OnboardingCheckoutClient({
 
         {/* Error message */}
         {error ? (
-          <div
-            className='mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-[13px] text-destructive'
+          <ContentSurfaceCard
+            className='mb-4 border-destructive/30 bg-destructive/5 px-4 py-3 text-[13px] text-destructive'
             role='alert'
           >
             {error}
-          </div>
+          </ContentSurfaceCard>
         ) : null}
 
         {/* CTA */}

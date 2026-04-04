@@ -2,6 +2,7 @@
 
 import { BarChart3 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
+import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 import { UnifiedTable } from '@/components/organisms/table';
 import {
   AudienceTableStableProvider,
@@ -37,6 +38,11 @@ export default function DemoAudienceSection() {
       onViewProfile: noopMember,
       onSendNotification: noopMember,
       getTouringCity,
+      hiddenMetadataColumns: {
+        location: false,
+        engagement: false,
+        lastSeen: false,
+      },
     }),
     [toggleSelect, noop, noopMember, getContextMenuItems, getTouringCity]
   );
@@ -51,11 +57,18 @@ export default function DemoAudienceSection() {
   return (
     <AudienceTableStableProvider value={stableContextValue}>
       <AudienceTableVolatileProvider value={volatileContextValue}>
-        <div className='flex h-full min-h-0 flex-col bg-surface-0'>
+        <AppShellContentPanel
+          maxWidth='full'
+          frame='none'
+          contentPadding='none'
+          scroll='panel'
+          className='overflow-hidden'
+          data-testid='demo-audience-shell'
+        >
           {/* Summary bar */}
-          <div className='flex items-center justify-between border-b border-subtle px-5 py-2.5'>
-            <div className='flex items-center gap-4 text-[13px]'>
-              <span className='font-medium text-primary-token'>
+          <div className='flex items-center justify-between border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-4 py-2'>
+            <div className='flex items-center gap-4 text-[12.5px]'>
+              <span className='font-[510] text-primary-token'>
                 {DEMO_AUDIENCE_MEMBERS.length} visitors
               </span>
               <span className='text-tertiary-token'>
@@ -73,15 +86,15 @@ export default function DemoAudienceSection() {
               type='button'
               onClick={() => setAnalyticsOpen(prev => !prev)}
               className={cn(
-                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors',
+                'flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1.5 text-[12px] font-[510] transition-[background-color,border-color,color,box-shadow]',
                 analyticsOpen
-                  ? 'bg-surface-2 text-primary-token'
-                  : 'text-tertiary-token hover:text-secondary-token hover:bg-(--linear-bg-hover)'
+                  ? 'border-[color-mix(in_oklab,var(--linear-app-shell-border)_90%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,white_4%)] text-primary-token shadow-[0_1px_1px_rgba(0,0,0,0.04),0_6px_12px_-10px_rgba(0,0,0,0.14)]'
+                  : 'text-tertiary-token hover:border-subtle hover:bg-(--linear-bg-hover) hover:text-secondary-token'
               )}
               aria-label='Toggle analytics panel'
             >
               <BarChart3 className='h-3.5 w-3.5' aria-hidden='true' />
-              <span className='hidden sm:inline'>Analytics</span>
+              <span className='max-sm:hidden sm:inline'>Analytics</span>
             </button>
           </div>
 
@@ -104,7 +117,7 @@ export default function DemoAudienceSection() {
               onClose={() => setAnalyticsOpen(false)}
             />
           </div>
-        </div>
+        </AppShellContentPanel>
       </AudienceTableVolatileProvider>
     </AudienceTableStableProvider>
   );

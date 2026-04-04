@@ -2,7 +2,7 @@ import { Check } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { publicEnv } from '@/lib/env-public';
@@ -20,20 +20,20 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title,
       description,
-      url: `${APP_URL}/launch/pricing`,
+      url: `${BASE_URL}/launch/pricing`,
       siteName: APP_NAME,
       type: 'website',
     },
     twitter: { card: 'summary_large_image', title, description },
-    alternates: { canonical: `${APP_URL}/launch/pricing` },
+    alternates: { canonical: `${BASE_URL}/launch/pricing` },
   };
 }
 
-const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+const maxPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
 
 const free = ENTITLEMENT_REGISTRY.free;
 const pro = ENTITLEMENT_REGISTRY.pro;
-const growth = ENTITLEMENT_REGISTRY.growth;
+const max = ENTITLEMENT_REGISTRY.max;
 
 interface FeatureListProps {
   readonly features: readonly string[];
@@ -59,15 +59,15 @@ export default function PricingPage() {
   return (
     <div>
       <MarketingHero variant='centered'>
-        <h2 id='pricing-heading' className='marketing-h2-linear max-w-[680px]'>
+        <h1 id='pricing-heading' className='marketing-h2-linear max-w-[680px]'>
           Simple pricing.{' '}
           <span className='text-secondary-token'>No surprises.</span>
-        </h2>
+        </h1>
       </MarketingHero>
 
       <MarketingContainer width='page'>
         <div
-          className={`grid grid-cols-1 ${growthPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} border-t border-subtle`}
+          className={`grid grid-cols-1 ${maxPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} border-t border-subtle`}
         >
           {/* Free */}
           <div className='py-12 md:pr-8 md:border-r md:border-subtle'>
@@ -122,28 +122,28 @@ export default function PricingPage() {
             </Link>
           </div>
 
-          {growthPlanEnabled && (
+          {maxPlanEnabled && (
             <div className='py-12 md:pl-8'>
               <div className='uppercase tracking-widest font-medium mb-3 text-xs text-tertiary-token'>
-                {growth.marketing.displayName}
+                {max.marketing.displayName}
               </div>
               <div className='font-medium text-[2.5rem] tracking-tight leading-none'>
-                ${growth.marketing.price!.monthly}{' '}
+                ${max.marketing.price!.monthly}{' '}
                 <span className='text-base font-normal text-tertiary-token'>
                   /mo
                 </span>
               </div>
               <div className='mt-3 text-sm text-secondary-token leading-normal min-h-[2.5em]'>
-                {growth.marketing.tagline}
+                {max.marketing.tagline}
               </div>
               <div className='mt-6 pt-5 border-t border-subtle'>
                 <div className='uppercase tracking-widest mb-3 text-[0.7rem] text-tertiary-token'>
                   Everything in Pro, plus
                 </div>
-                <FeatureList features={growth.marketing.features} />
+                <FeatureList features={max.marketing.features} />
               </div>
               <Link
-                href={`${APP_ROUTES.SIGNUP}?plan=growth`}
+                href={`${APP_ROUTES.SIGNUP}?plan=max`}
                 className='focus-ring inline-block mt-7 px-5 py-2.5 rounded-md font-medium text-sm transition-colors border border-subtle hover:bg-white/[0.04]'
               >
                 Get started

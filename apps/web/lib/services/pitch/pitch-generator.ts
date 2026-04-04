@@ -53,13 +53,14 @@ export function truncateToLimit(text: string, limit: number): string {
  * Generates playlist pitches for a release across multiple platforms.
  */
 export async function generatePitches(
-  input: PitchInput
+  input: PitchInput,
+  instructions?: string
 ): Promise<PitchGenerationResult> {
   const { object, usage } = await generateObject({
     model: gateway(PITCH_MODEL),
     schema: pitchResponseSchema,
     system: buildSystemPrompt(),
-    prompt: buildUserPrompt(input),
+    prompt: buildUserPrompt(input, instructions),
     temperature: 0.4,
     maxOutputTokens: 2048,
     experimental_telemetry: {

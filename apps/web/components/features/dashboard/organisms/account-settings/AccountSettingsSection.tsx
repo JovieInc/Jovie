@@ -6,12 +6,11 @@
  * Main container for account settings, composing email, session management,
  * appearance, and notification preference cards.
  */
-
-import { useSession, useUser } from '@clerk/nextjs';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
-import { SettingsGroupHeading } from '@/features/dashboard/molecules/SettingsGroupHeading';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsAppearanceSection } from '@/features/dashboard/organisms/SettingsAppearanceSection';
 import { SettingsNotificationsSection } from '@/features/dashboard/organisms/SettingsNotificationsSection';
+import { useSessionSafe, useUserSafe } from '@/hooks/useClerkSafe';
 
 import { ConnectedAccountsCard } from './ConnectedAccountsCard';
 import { EmailManagementCard } from './EmailManagementCard';
@@ -19,8 +18,8 @@ import { SessionManagementCard } from './SessionManagementCard';
 import type { ClerkUserResource } from './types';
 
 function ClerkAccountSections() {
-  const { user, isLoaded } = useUser();
-  const { session: activeSession } = useSession();
+  const { user, isLoaded } = useUserSafe();
+  const { session: activeSession } = useSessionSafe();
 
   const typedUser = user as unknown as ClerkUserResource | null;
 
@@ -46,27 +45,27 @@ function ClerkAccountSections() {
 
   return (
     <>
-      <div>
-        <SettingsGroupHeading className='pb-3 pt-6 first:pt-0'>
-          Email
-        </SettingsGroupHeading>
+      <SettingsPanel
+        title='Email'
+        cardClassName='border-0 bg-transparent shadow-none p-0'
+      >
         <EmailManagementCard user={typedUser} />
-      </div>
-      <div>
-        <SettingsGroupHeading className='pb-3 pt-6'>
-          Connected accounts
-        </SettingsGroupHeading>
+      </SettingsPanel>
+      <SettingsPanel
+        title='Connected accounts'
+        cardClassName='border-0 bg-transparent shadow-none p-0'
+      >
         <ConnectedAccountsCard user={typedUser} />
-      </div>
-      <div>
-        <SettingsGroupHeading className='pb-3 pt-6'>
-          Sessions
-        </SettingsGroupHeading>
+      </SettingsPanel>
+      <SettingsPanel
+        title='Sessions'
+        cardClassName='border-0 bg-transparent shadow-none p-0'
+      >
         <SessionManagementCard
           user={typedUser}
           activeSessionId={activeSession?.id}
         />
-      </div>
+      </SettingsPanel>
     </>
   );
 }
@@ -79,20 +78,10 @@ export function AccountSettingsSection({
   isGrowth = false,
 }: AccountSettingsSectionProps) {
   return (
-    <div className='space-y-0' data-testid='account-settings-section'>
+    <div className='space-y-6' data-testid='account-settings-section'>
       <ClerkAccountSections />
-      <div>
-        <SettingsGroupHeading className='pb-3 pt-6'>
-          Appearance
-        </SettingsGroupHeading>
-        <SettingsAppearanceSection />
-      </div>
-      <div>
-        <SettingsGroupHeading className='pb-3 pt-6'>
-          Notifications
-        </SettingsGroupHeading>
-        <SettingsNotificationsSection isGrowth={isGrowth} />
-      </div>
+      <SettingsAppearanceSection />
+      <SettingsNotificationsSection isGrowth={isGrowth} />
     </div>
   );
 }

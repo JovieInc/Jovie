@@ -10,21 +10,27 @@
  * - DashboardDataProvider is fed with mock data (DEMO_DASHBOARD_DATA)
  * - AuthShellWrapper provides the real shell providers (TableMeta, RightPanel,
  *   PreviewPanel, HeaderActions, KeyboardShortcuts)
- * - ClientProviders wraps everything with ClerkProvider so that sidebar
- *   components (UserButton, SidebarUpgradeBanner) that use Clerk/billing
- *   hooks degrade gracefully instead of crashing
+ * - NuqsProvider mirrors the app-level URL state adapter used by /app
+ *   so release and audience tables can safely read query param state on /demo
+ * - TooltipProvider mirrors the app-level CoreProviders boundary used by /app
+ *   so the dashboard shell can render tooltip-bearing chrome on /demo routes
+ * - ClerkSafeDefaultsProvider supplies no-auth Clerk values without mounting
+ *   ClerkProvider, which keeps /demo fully local and avoids proxy noise
  * - Releases query is pre-seeded in the QueryClient cache so DashboardNav
  *   badge renders correctly
  */
 
+import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
-import { ClientProviders } from '@/components/providers/ClientProviders';
-import { publicEnv } from '@/lib/env-public';
+import { NuqsProvider } from '@/components/providers/NuqsProvider';
+import { ClerkSafeDefaultsProvider } from '@/hooks/useClerkSafe';
 import { queryKeys } from '@/lib/queries';
+import type { BillingStatusData } from '@/lib/queries/useBillingStatusQuery';
+import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 import { DEMO_DASHBOARD_DATA } from './mock-dashboard-data';
 import { DEMO_RELEASE_VIEW_MODELS } from './mock-release-data';
 
@@ -51,6 +57,23 @@ function createDemoQueryClient(profileId: string): QueryClient {
     queryKeys.releases.matrix(profileId),
     DEMO_RELEASE_VIEW_MODELS
   );
+  client.setQueryData<BillingStatusData>(queryKeys.billing.status(), {
+    isPro: true,
+    plan: 'max',
+    hasStripeCustomer: true,
+    stripeSubscriptionId: 'demo-subscription',
+    stale: false,
+    staleReason: null,
+  });
+  client.setQueryData<ChatUsageData>(queryKeys.chat.usage(), {
+    plan: 'max',
+    dailyLimit: 1000,
+    used: 128,
+    remaining: 872,
+    isExhausted: false,
+    warningThreshold: 5,
+    isNearLimit: false,
+  });
 
   return client;
 }
@@ -75,20 +98,21 @@ export function DemoAuthShell({ children, dashboardData }: DemoAuthShellProps) {
   );
 
   return (
-    <ClientProviders
-      publishableKey={publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-      skipCoreProviders
-    >
+    <ClerkSafeDefaultsProvider>
       <QueryClientProvider client={demoQueryClient}>
-        <DashboardDataProvider value={data}>
-          <AuthShellWrapper
-            persistSidebarCollapsed={noopPersist}
-            sidebarDefaultOpen
-          >
-            {children}
-          </AuthShellWrapper>
-        </DashboardDataProvider>
+        <NuqsProvider>
+          <TooltipProvider delayDuration={1200}>
+            <DashboardDataProvider value={data}>
+              <AuthShellWrapper
+                persistSidebarCollapsed={noopPersist}
+                sidebarDefaultOpen
+              >
+                {children}
+              </AuthShellWrapper>
+            </DashboardDataProvider>
+          </TooltipProvider>
+        </NuqsProvider>
       </QueryClientProvider>
-    </ClientProviders>
+    </ClerkSafeDefaultsProvider>
   );
 }

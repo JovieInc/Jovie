@@ -4,7 +4,7 @@ import { Badge, Button } from '@jovie/ui';
 import { Mail } from 'lucide-react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DateCell } from '@/components/organisms/table';
-import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { cn } from '@/lib/utils';
 import {
   PLATFORM_LABELS,

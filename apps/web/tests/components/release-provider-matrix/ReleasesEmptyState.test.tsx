@@ -18,10 +18,10 @@ vi.mock('@/components/molecules/drawer', () => ({
   ),
   DrawerSurfaceCard: ({
     children,
-    'data-testid': testId,
+    testId,
   }: {
     children: ReactNode;
-    'data-testid'?: string;
+    testId?: string;
   }) => <div data-testid={testId}>{children}</div>,
 }));
 

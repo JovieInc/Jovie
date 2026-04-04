@@ -28,20 +28,22 @@ test.describe('Homepage', () => {
     await waitForHydration(page);
   });
 
-  test('hero renders with current headline, lead, and claim form', async ({
+  test('hero renders with current headline, lead, CTA, and premium cards', async ({
     page,
   }) => {
     await expect(page.locator('h1')).toContainText(
-      'The link your music deserves.'
+      'Drop more music. Crush every release.'
     );
     await expect(
-      page.getByText(
-        'Smart links, release automation, and fan intelligence in one system that helps you launch faster and keep more fans moving.'
-      )
+      page.getByText('One system to make every release count, every time.')
     ).toBeVisible();
+    await expect(page.getByRole('link', { name: /start free/i })).toBeVisible();
 
-    const heroSection = page.locator('main section').first();
-    await expect(heroSection.locator('input').first()).toBeVisible();
+    await expect(page.getByTestId('homepage-hero-profile-card')).toBeVisible();
+    await expect(page.getByTestId('homepage-hero-release-card')).toBeVisible();
+    await expect(page.getByTestId('homepage-hero-task-card-1')).toBeVisible();
+    await expect(page.getByTestId('homepage-hero-task-card-2')).toBeVisible();
+    await expect(page.getByTestId('homepage-hero-task-card-3')).toBeVisible();
   });
 
   test('header shows auth actions without marketing nav links', async ({
@@ -57,57 +59,61 @@ test.describe('Homepage', () => {
     await expect(page.locator('a[href="/pricing"]')).toHaveCount(0);
   });
 
-  test('core homepage sections render in order', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', { name: 'Built for releases, not just links.' })
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Release day, automated.' })
-    ).toBeVisible();
+  test('core homepage sections render in order with updated surfaces', async ({
+    page,
+  }) => {
     await expect(
       page.getByRole('heading', { name: 'Profiles that convert.' })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'AI that knows every song.' })
+      page.getByRole('heading', {
+        name: 'Every release gets a clean destination.',
+      })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Know every fan by name.' })
+      page.getByRole('heading', { name: 'AI that knows the context.' })
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('heading', {
+        name: 'Your release operating system.',
+      })
+    ).toBeVisible();
+
+    await expect(
+      page.getByTestId('homepage-release-destination-presave').first()
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Simple pricing.' })
+      page.getByTestId('homepage-release-destination-live').first()
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('homepage-release-operating-system-surface')
     ).toBeVisible();
   });
 
-  test('final CTA renders with preserved ids and claim form', async ({
-    page,
-  }) => {
-    const finalHeadline = page.getByTestId('final-cta-headline');
-    await expect(finalHeadline).toHaveText('Available today.');
-
-    const finalDock = page.getByTestId('final-cta-dock');
-    await expect(finalDock).toBeVisible();
-    await expect(finalDock.locator('input').first()).toBeVisible();
+  test('final CTA renders with current actions', async ({ page }) => {
+    await expect(
+      page.getByRole('heading', {
+        name: 'You made the song. Now make it hit.',
+      })
+    ).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Start Free' })).toBeVisible();
   });
 
   test('is responsive on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
 
-    await expect(page.locator('h1')).toContainText(
-      'The link your music deserves.',
-      {
-        timeout: SMOKE_TIMEOUTS.VISIBILITY,
-      }
-    );
-
-    await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    await expect(page.getByRole('link', { name: 'Sign up' })).toBeVisible({
+    await expect(page.locator('h1')).toContainText('Drop more music.', {
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
 
-    const heroSection = page.locator('main section').first();
-    await expect(heroSection.locator('input').first()).toBeVisible({
+    await expect(page.getByTestId('homepage-hero-release-card')).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+    await expect(page.getByTestId('homepage-hero-profile-card')).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+
+    await expect(page.getByRole('link', { name: /start free/i })).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   });

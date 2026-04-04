@@ -25,8 +25,8 @@ export function HeroScrollSection() {
               </h1>
 
               <p className='marketing-lead-linear mx-auto mt-4 max-w-[31rem] text-secondary-token md:mt-5 lg:mx-0'>
-                Smart links, release automation, and fan intelligence in one
-                system that helps you launch faster and keep more fans moving.
+                Smart links, release automation, and fan insight that keep every
+                launch moving.
               </p>
 
               <div className='mx-auto mt-6 w-full max-w-[27rem] md:mt-7 lg:mx-0'>
@@ -34,20 +34,21 @@ export function HeroScrollSection() {
               </div>
 
               <p className='mt-3.5 text-[11px] tracking-[0.01em] text-quaternary-token md:mt-4 lg:text-left'>
-                Start free with your artist link, profile, and next release
-                workflow.
+                Start free with your artist page and next release ready to go.
               </p>
             </div>
 
             <div className='relative mt-10 w-full md:mt-13 lg:mt-15'>
               <div className='homepage-surface-card relative overflow-hidden rounded-[1rem] md:rounded-[1.1rem]'>
                 <ProductScreenshot
-                  src='/product-screenshots/releases-dashboard-sidebar.png'
-                  alt='Jovie release dashboard showing releases table with sidebar open'
+                  src='/product-screenshots/releases-dashboard-full.png'
+                  alt='Jovie release dashboard showing releases table with smart link details'
                   width={2880}
                   height={1800}
                   title='Jovie'
                   priority
+                  skipCheck
+                  testId='hero-dashboard-screenshot'
                 />
                 {/* Gentle bottom fade — subtle, not aggressive */}
                 <div

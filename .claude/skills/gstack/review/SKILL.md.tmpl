@@ -1,5 +1,6 @@
 ---
 name: review
+preamble-tier: 4
 version: 1.0.0
 description: |
   Pre-landing PR review. Analyzes diff against the base branch for SQL safety, LLM trust
@@ -44,8 +45,11 @@ Before reviewing code quality, check: **did they build what was requested — no
    Read commit messages (`git log origin/<base>..HEAD --oneline`).
    **If no PR exists:** rely on commit messages and TODOS.md for stated intent — this is the common case since /review runs before /ship creates the PR.
 2. Identify the **stated intent** — what was this branch supposed to accomplish?
-3. Run `git diff origin/<base> --stat` and compare the files changed against the stated intent.
-4. Evaluate with skepticism:
+3. Run `git diff origin/<base>...HEAD --stat` and compare the files changed against the stated intent.
+
+{{PLAN_COMPLETION_AUDIT_REVIEW}}
+
+4. Evaluate with skepticism (incorporating plan completion results if available):
 
    **SCOPE CREEP detection:**
    - Files changed that are unrelated to the stated intent
@@ -125,6 +129,14 @@ Follow the output format specified in the checklist. Respect the suppressions �
 {{DESIGN_REVIEW_LITE}}
 
 Include any design findings alongside the findings from Step 4. They follow the same Fix-First flow in Step 5 — AUTO-FIX for mechanical CSS fixes, ASK for everything else.
+
+---
+
+## Step 4.75: Test Coverage Diagram
+
+{{TEST_COVERAGE_AUDIT_REVIEW}}
+
+This step subsumes the "Test Gaps" category from Pass 2 — do not duplicate findings between the checklist Test Gaps item and this coverage diagram. Include any coverage gaps alongside the findings from Step 4 and Step 4.5. They follow the same Fix-First flow — gaps are INFORMATIONAL findings.
 
 ---
 
@@ -241,6 +253,27 @@ If no documentation files exist, skip this step silently.
 ---
 
 {{ADVERSARIAL_STEP}}
+
+## Step 5.8: Persist Eng Review result
+
+After all review passes complete, persist the final `/review` outcome so `/ship` can
+recognize that Eng Review was run on this branch.
+
+Run:
+
+```bash
+~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"review","timestamp":"TIMESTAMP","status":"STATUS","issues_found":N,"critical":N,"informational":N,"commit":"COMMIT"}'
+```
+
+Substitute:
+- `TIMESTAMP` = ISO 8601 datetime
+- `STATUS` = `"clean"` if there are no remaining unresolved findings after Fix-First handling and adversarial review, otherwise `"issues_found"`
+- `issues_found` = total remaining unresolved findings
+- `critical` = remaining unresolved critical findings
+- `informational` = remaining unresolved informational findings
+- `COMMIT` = output of `git rev-parse --short HEAD`
+
+If the review exits early before a real review completes (for example, no diff against the base branch), do **not** write this entry.
 
 ## Important Rules
 

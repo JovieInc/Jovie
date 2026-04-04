@@ -1,4 +1,5 @@
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 
 const CONTACTS_HEADER_KEYS = [
   'col-role',
@@ -10,8 +11,13 @@ const CONTACTS_HEADER_KEYS = [
 ] as const;
 
 const CONTACTS_ROW_KEYS = Array.from(
-  { length: 5 },
+  { length: SKELETON_ROW_COUNT.TABLE },
   (_, i) => `contacts-row-${i + 1}`
+);
+
+const CONTACTS_MOBILE_ROW_KEYS = Array.from(
+  { length: SKELETON_ROW_COUNT.MOBILE },
+  (_, i) => `contacts-mobile-${i + 1}`
 );
 
 /** Column widths matching the actual contacts table columns */
@@ -28,9 +34,9 @@ export default function ContactsLoading() {
   return (
     <div className='flex h-full min-h-0 flex-col' aria-busy='true'>
       {/* Mobile: card layout (visible below sm) */}
-      <div className='flex-1 min-h-0 overflow-auto sm:hidden'>
+      <div className='flex-1 min-h-0 overflow-hidden sm:hidden'>
         <div className='divide-y divide-subtle'>
-          {CONTACTS_ROW_KEYS.map(key => (
+          {CONTACTS_MOBILE_ROW_KEYS.map(key => (
             <div key={key} className='flex items-center gap-3 px-4 py-3'>
               {/* Avatar placeholder */}
               <LoadingSkeleton
@@ -58,7 +64,7 @@ export default function ContactsLoading() {
       </div>
 
       {/* Desktop: table layout (hidden below sm) */}
-      <div className='hidden flex-1 min-h-0 overflow-auto sm:block'>
+      <div className='max-sm:hidden flex-1 min-h-0 overflow-hidden'>
         <table className='w-full border-collapse text-[13px]'>
           <thead className='sticky top-0 z-10 bg-(--linear-app-content-surface) shadow-inset-divider'>
             <tr className='border-b border-subtle'>

@@ -6,49 +6,47 @@
       "url": ["http://localhost:3000/", "http://localhost:3000/tim"]
     },
     "assert": {
-      "preset": "lighthouse:no-pwa",
-      "assertions": {
-        "interactive": [
-          "warn",
-          {
-            "maxNumericValue": 2000
-          }
-        ],
-        "first-contentful-paint": [
-          "warn",
-          {
-            "maxNumericValue": 2500
-          }
-        ],
-        "largest-contentful-paint": [
-          "warn",
-          {
-            "maxNumericValue": 3000
-          }
-        ],
-        "cumulative-layout-shift": [
-          "warn",
-          {
-            "maxNumericValue": 0.1
-          }
-        ],
-        "total-blocking-time": [
-          "warn",
-          {
-            "maxNumericValue": 500
-          }
-        ],
-        "speed-index": [
-          "warn",
-          {
-            "maxNumericValue": 3000
-          }
-        ]
-      },
       "assertMatrix": [
         {
           "matchingUrlPattern": ".*",
+          "preset": "lighthouse:no-pwa",
           "assertions": {
+            "interactive": [
+              "warn",
+              {
+                "maxNumericValue": 2000
+              }
+            ],
+            "first-contentful-paint": [
+              "warn",
+              {
+                "maxNumericValue": 2500
+              }
+            ],
+            "largest-contentful-paint": [
+              "warn",
+              {
+                "maxNumericValue": 3000
+              }
+            ],
+            "cumulative-layout-shift": [
+              "warn",
+              {
+                "maxNumericValue": 0.1
+              }
+            ],
+            "total-blocking-time": [
+              "warn",
+              {
+                "maxNumericValue": 500
+              }
+            ],
+            "speed-index": [
+              "warn",
+              {
+                "maxNumericValue": 3000
+              }
+            ],
             "categories:performance": [
               "warn",
               {
@@ -66,7 +64,8 @@
               {
                 "minScore": 0.9
               }
-            ]
+            ],
+            "forced-reflow-insight": "warn"
           }
         }
       ]

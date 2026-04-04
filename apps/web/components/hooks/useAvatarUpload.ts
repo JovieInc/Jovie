@@ -22,6 +22,7 @@ export interface UseAvatarUploadProps {
   readonly onRetryableError?: (error: string, code: UploadErrorCode) => void;
   readonly maxFileSize?: number;
   readonly acceptedTypes?: readonly string[];
+  readonly analyticsPrefix?: string;
 }
 
 export interface UseAvatarUploadReturn {
@@ -46,6 +47,7 @@ export function useAvatarUpload({
   onRetryableError,
   maxFileSize = DEFAULT_MAX_FILE_SIZE,
   acceptedTypes = DEFAULT_ACCEPTED_TYPES,
+  analyticsPrefix = 'avatar',
 }: UseAvatarUploadProps): UseAvatarUploadReturn {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -138,7 +140,7 @@ export function useAvatarUpload({
       if (validationError) {
         onError?.(validationError);
         setUploadStatus('error');
-        track('avatar_upload_error', {
+        track(`${analyticsPrefix}_upload_error`, {
           error: 'validation_failed',
           message: validationError,
         });
@@ -160,7 +162,7 @@ export function useAvatarUpload({
           setUploadProgress(100);
           setUploadStatus('error');
           onError?.(message);
-          track('avatar_upload_error', {
+          track(`${analyticsPrefix}_upload_error`, {
             error: 'heic_conversion_failed',
             message,
           });
@@ -171,7 +173,7 @@ export function useAvatarUpload({
       }
 
       setPreviewFromFile(uploadFile);
-      track('avatar_upload_start', {
+      track(`${analyticsPrefix}_upload_start`, {
         file_size: uploadFile.size,
         file_type: uploadFile.type,
         original_file_type: file.type,
@@ -194,7 +196,7 @@ export function useAvatarUpload({
         setUploadProgress(100);
         setPreviewUrl(imageUrl);
         onSuccess?.(imageUrl);
-        track('avatar_upload_success', {
+        track(`${analyticsPrefix}_upload_success`, {
           file_size: uploadFile.size,
           file_type: uploadFile.type,
         });
@@ -218,7 +220,7 @@ export function useAvatarUpload({
           onRetryableError(errorMessage, errorCode);
         }
 
-        track('avatar_upload_error', {
+        track(`${analyticsPrefix}_upload_error`, {
           error: errorCode ?? 'upload_failed',
           message: errorMessage,
           retryable: isRetryable,
@@ -240,6 +242,7 @@ export function useAvatarUpload({
       clearProgressInterval,
       clearStatusReset,
       maxFileSize,
+      analyticsPrefix,
       onError,
       onRetryableError,
       onSuccess,

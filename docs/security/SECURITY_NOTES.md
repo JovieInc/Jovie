@@ -1,6 +1,6 @@
 # Security Posture Notes
 
-_Last reviewed: 2025-11-29_
+_Last reviewed: 2026-04-01_
 
 ## 1. Environment & secrets
 
@@ -53,7 +53,7 @@ _Last reviewed: 2025-11-29_
   - **Profile updates** (`/api/dashboard/profile`): Now fully validated with `ProfileUpdateSchema` (Zod).
   - **Tip creation** (`/api/create-tip-intent`): Now validated with `tipIntentSchema` (Zod) + `amountToCents()` overflow protection.
   - **Link wrapping** (`/api/wrap-link`): Now validated with Zod schemas (`wrapLinkPostSchema`, `wrapLinkPutSchema`, `wrapLinkDeleteSchema`) including SSRF-safe URL validation via `safeHttpUrlSchema`.
-  - **Growth access** (`/api/growth-access-request`): Now validated with Zod schema.
+  - **Max access** (`/api/max-access-request`): Now validated with Zod schema.
 
 - **Near-term hardening plan**
   - Add Zod schemas per route instead of ad-hoc checks:

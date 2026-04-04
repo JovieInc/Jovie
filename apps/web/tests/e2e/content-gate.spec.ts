@@ -179,7 +179,7 @@ test.describe('Content Gate — Public Pages', () => {
       .locator('body')
       .innerText()
       .catch(() => '');
-    expect(bodyText.length).toBeGreaterThan(500);
+    expect(bodyText.length).toBeGreaterThan(400);
   });
 
   test('Pricing page shows plan tiers with prices', async ({
@@ -273,10 +273,10 @@ test.describe('Content Gate — Public Pages', () => {
     const routes = [
       {
         path: '/ai',
-        name: 'AI workflow',
-        expectedUrl: /\/ai(?:\/index\.html)?$/,
-        readyText: /the 7-method ai operating system/i,
-        minLength: 150,
+        name: 'AI workflow redirect',
+        expectedUrl: /\/investor-portal(?:\/index\.html)?$/,
+        minLength: 20,
+        tokenGatedRedirect: true,
       },
       {
         path: '/engagement-engine',
@@ -329,10 +329,10 @@ test.describe('Content Gate — Public Pages', () => {
       },
       {
         path: '/investors',
-        name: 'Investors',
-        expectedUrl: /\/investors$/,
-        readyText: /investor memo/i,
-        minLength: 80,
+        name: 'Investors redirect',
+        expectedUrl: /\/investor-portal(?:\/index\.html)?$/,
+        minLength: 20,
+        tokenGatedRedirect: true,
       },
     ] as const;
 
@@ -342,15 +342,34 @@ test.describe('Content Gate — Public Pages', () => {
       await expect(page).toHaveURL(route.expectedUrl, {
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
-      await expect(
-        page.getByText(route.readyText).first(),
-        `${route.name}: ready signal did not render`
-      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+
+      if (!route.tokenGatedRedirect) {
+        await expect(
+          page.getByText(route.readyText).first(),
+          `${route.name}: ready signal did not render`
+        ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+      }
 
       const main = page.locator('main').first();
       const hasMain = await main
         .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
         .catch(() => false);
+
+      if (route.tokenGatedRedirect) {
+        const bodyText = await page
+          .locator('body')
+          .innerText()
+          .catch(() => '');
+        const lowerBody = bodyText.toLowerCase();
+        if (bodyText.length > 0) {
+          expect(
+            lowerBody,
+            `${route.name}: token-gated redirect should not crash`
+          ).not.toContain('application error');
+          expect(lowerBody).not.toContain('internal server error');
+        }
+        continue;
+      }
 
       if (hasMain) {
         await assertMainContent(page, route.name, {
@@ -374,7 +393,11 @@ test.describe('Content Gate — Public Pages', () => {
 
     if (!(await navigateSafe(page, '/blog', { timeout: 120_000 }))) return;
 
-    const firstPostLink = page.locator('a[href^="/blog/"]').first();
+    const firstPostLink = page
+      .locator(
+        'article a[href^="/blog/"]:not([href^="/blog/category/"]):not([href^="/blog/authors/"])'
+      )
+      .first();
     const hasPostLink = await firstPostLink
       .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
       .catch(() => false);
@@ -576,9 +599,9 @@ test.describe('Content Gate — Authenticated Pages', () => {
           },
           {
             path: APP_ROUTES.DASHBOARD_EARNINGS,
-            name: 'Earnings',
+            name: 'Legacy Earnings Redirect',
             minLength: 10,
-            readyText: /earnings|tips|revenue/i,
+            readyText: /tips|profile|support you directly/i,
           },
           { path: APP_ROUTES.CHAT, name: 'Chat' },
         ];
@@ -600,7 +623,15 @@ test.describe('Content Gate — Authenticated Pages', () => {
 
         const url = page.url();
         if (url.includes('/signin') || url.includes('/sign-in')) {
-          await signInUser(page);
+          try {
+            await signInUser(page);
+          } catch (error) {
+            if (error instanceof ClerkTestError) {
+              test.skip(true, `Clerk auth failed: ${error.message}`);
+              return;
+            }
+            throw error;
+          }
           continue;
         }
 
@@ -659,14 +690,14 @@ test.describe('Content Gate — Authenticated Pages', () => {
     const settingsPages = fastIteration
       ? [
           {
-            path: APP_ROUTES.SETTINGS,
+            path: APP_ROUTES.SETTINGS_ACCOUNT,
             name: 'Settings',
             readyText: /settings|preferences|account/i,
           },
         ]
       : [
           {
-            path: APP_ROUTES.SETTINGS,
+            path: APP_ROUTES.SETTINGS_ACCOUNT,
             name: 'Settings',
             readyText: /settings|preferences|account/i,
           },

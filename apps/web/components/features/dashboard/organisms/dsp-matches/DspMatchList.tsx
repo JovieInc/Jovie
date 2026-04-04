@@ -91,7 +91,7 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
   if (error) {
     return (
       <ContentSurfaceCard
-        className={cn('border-red-500/30 bg-red-500/10 p-4', className)}
+        className={cn('border-destructive/15 bg-destructive/5 p-4', className)}
       >
         <div className='flex items-center gap-2 text-destructive'>
           <Icon name='AlertCircle' className='h-4 w-4' />
@@ -123,7 +123,7 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
                 <span className='inline-flex items-center gap-1.5'>
                   <span>{filter.label}</span>
                   {count > 0 && (
-                    <span className='rounded-full border border-subtle bg-surface-1 px-1.5 py-0.5 text-[10px] text-tertiary-token'>
+                    <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-[10px] text-secondary-token tabular-nums'>
                       {count}
                     </span>
                   )}
@@ -143,14 +143,14 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
           {[1, 2, 3].map(i => (
             <ContentSurfaceCard key={i} className='p-4'>
               <div className='flex items-center gap-3'>
-                <div className='h-10 w-10 rounded-full skeleton' />
+                <div className='h-10 w-10 rounded-[10px] skeleton' />
                 <div className='flex-1 space-y-2'>
                   <div className='h-4 w-32 rounded skeleton' />
                   <div className='h-3 w-24 rounded skeleton' />
                 </div>
                 <div className='space-y-1'>
-                  <div className='h-5 w-16 rounded-full skeleton' />
-                  <div className='h-5 w-12 rounded-full skeleton' />
+                  <div className='h-5 w-16 rounded-[6px] skeleton' />
+                  <div className='h-5 w-12 rounded-[6px] skeleton' />
                 </div>
               </div>
             </ContentSurfaceCard>

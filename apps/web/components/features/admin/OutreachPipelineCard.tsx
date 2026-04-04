@@ -10,7 +10,7 @@ import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
+import type { AdminFunnelMetrics } from '@/lib/admin/types';
 
 interface OutreachPipelineCardProps {
   readonly metrics: AdminFunnelMetrics;
@@ -104,9 +104,9 @@ export function OutreachPipelineCard({
       <div className='space-y-4 px-5 py-4'>
         <div className='flex items-center gap-2'>
           <PipelineStep
-            label='Sent'
+            label='Contacted'
             value={metrics.outreachSent7d.toLocaleString('en-US')}
-            detail='Emails & DMs'
+            detail='Queued emails & sent DMs'
             icon={Mail}
             iconClassName='text-info'
           />

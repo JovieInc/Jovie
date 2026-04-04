@@ -13,7 +13,7 @@ export default function SettingsTouringLoading() {
             <div className='h-8 w-48 rounded skeleton' />
             <div className='h-4 w-80 rounded skeleton' />
           </div>
-          <div className='rounded-2xl bg-surface-1/40 p-6 shadow-none'>
+          <div className='rounded-2xl border border-subtle bg-surface-0 p-6'>
             <TouringSectionSkeleton />
           </div>
         </section>

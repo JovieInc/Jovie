@@ -126,6 +126,11 @@ export function ReleaseTable({
 
   // Stable callbacks for UnifiedTable props
   const getRowId = useCallback((row: ReleaseViewModel) => row.id, []);
+  const getRowTestId = useCallback(
+    (_row: ReleaseViewModel, index: number) =>
+      index === 0 ? 'release-row' : undefined,
+    []
+  );
   const getRowClassName = useCallback(
     (row: ReleaseViewModel) => {
       const isRowExpanded = showTracks && isExpanded(row.id);
@@ -136,13 +141,13 @@ export function ReleaseTable({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-row-selected)_24%,var(--linear-bg-surface-0))] shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_14%,var(--linear-app-frame-seam))] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_28%,var(--linear-bg-surface-0))] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_32%,var(--linear-bg-surface-0))]';
+          'bg-[color-mix(in_oklab,var(--linear-row-selected)_20%,transparent)] shadow-[inset_2px_0_0_0_var(--linear-border-focus)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_24%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_28%,transparent)]';
       } else if (isRowExpanded) {
         baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,var(--linear-bg-surface-0))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_64%,var(--linear-bg-surface-0))] focus-within:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_68%,var(--linear-bg-surface-0))]';
+          'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_52%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_58%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_62%,transparent)]';
       } else {
         baseClassName =
-          'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_84%,transparent)] transition-[background-color,box-shadow] duration-150 ease-out';
+          'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_84%,transparent)] transition-[background-color,box-shadow,color] duration-150 ease-out [&:hover_span]:text-primary-token [&:hover_p]:text-primary-token';
       }
 
       const refreshClassName = isRefreshing
@@ -154,8 +159,6 @@ export function ReleaseTable({
 
       return [
         'rounded-none transition-[background-color,box-shadow] duration-150 ease-out',
-        'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_30%,transparent)]',
-        'data-[state=selected]:bg-(--linear-row-selected)',
         baseClassName,
         refreshClassName,
         flashClassName,
@@ -201,9 +204,10 @@ export function ReleaseTable({
             artistName,
             isExpanded,
             isLoadingTracks,
-            toggleExpansion
+            toggleExpansion,
+            onEdit
           )
-        : createReleaseCellRenderer(artistName),
+        : createReleaseCellRenderer(artistName, onEdit),
       minSize: 200,
       size: 9999, // Large value to make it flex and fill available space
       enableSorting: false,
@@ -218,14 +222,15 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 236,
-      minSize: 188,
-      meta: { className: 'hidden pl-2 pr-4 sm:table-cell' },
+      size: 260,
+      minSize: 100,
+      meta: { className: 'max-sm:hidden pl-2 pr-4 sm:table-cell' },
     });
 
     return [releaseColumn, rightMetaColumn];
   }, [
     artistName,
+    onEdit,
     showTracks,
     isExpanded,
     isLoadingTracks,
@@ -346,13 +351,14 @@ export function ReleaseTable({
       getContextMenuItems={getContextMenuItems}
       onRowClick={onEdit}
       getRowId={getRowId}
+      getRowTestId={getRowTestId}
       getRowClassName={getRowClassName}
       enableVirtualization={shouldVirtualize && !groupByYear}
       rowHeight={rowHeight}
       minWidth={minWidth}
       hideHeader
       className='text-[12.5px] text-primary-token'
-      containerClassName='h-full px-2.5 pb-2.5 pt-1 md:px-3 md:pb-3 md:pt-1.5'
+      containerClassName='h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
       columnVisibility={tanstackColumnVisibility}
       onFocusedRowChange={handleFocusedRowChange}
       skeletonRows={14}

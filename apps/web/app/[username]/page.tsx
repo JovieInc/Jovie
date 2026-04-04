@@ -24,10 +24,9 @@ import type {
 } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
 import {
-  checkGate,
-  FEATURE_FLAG_KEYS,
-  getSubscribeCTAVariant,
-} from '@/lib/feature-flags/server';
+  FEATURE_FLAGS,
+  type SubscribeCTAVariant,
+} from '@/lib/feature-flags/shared';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { getProfileOgImageUrl } from '@/lib/profile/og-image';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
@@ -53,6 +52,7 @@ import {
   convertCreatorProfileToArtist,
   LegacySocialLink,
 } from '@/types/db';
+import type { PressPhoto } from '@/types/press-photos';
 
 /**
  * Generate JSON-LD structured data for artist profile SEO.
@@ -173,6 +173,7 @@ const fetchProfileAndLinks = async (
   creatorClerkId: string | null;
   genres: string[] | null;
   latestRelease: DiscogRelease | null;
+  pressPhotos: PressPhoto[];
   status: 'ok' | 'not_found' | 'error';
 }> => {
   try {
@@ -181,7 +182,7 @@ const fetchProfileAndLinks = async (
     // Use truthy check (not strict equality) for isPublic because the neon-http
     // driver may return boolean columns as non-boolean truthy values (e.g., 1, "t")
     // in edge cases — same class of issue as dates-as-strings (see JOVIE-WEB-6X).
-    if (!result || !result.isPublic) {
+    if (!result?.isPublic) {
       // Expected 404 — profile not found or not public. No Sentry capture needed;
       // these are normal from typos, crawlers, and enumeration traffic (JOV-1321).
       return {
@@ -192,6 +193,7 @@ const fetchProfileAndLinks = async (
         creatorClerkId: null,
         genres: null,
         latestRelease: null,
+        pressPhotos: [],
         status: 'not_found',
       };
     }
@@ -278,6 +280,7 @@ const fetchProfileAndLinks = async (
       creatorClerkId,
       genres: result.genres ?? null,
       latestRelease,
+      pressPhotos: result.pressPhotos ?? [],
       status: 'ok',
     };
   } catch (error) {
@@ -293,6 +296,7 @@ const fetchProfileAndLinks = async (
       creatorClerkId: null,
       genres: null,
       latestRelease: null,
+      pressPhotos: [],
       status: 'error',
     };
   }
@@ -329,26 +333,18 @@ const getCachedProfileAndLinks = async (username: string) => {
     return fetchProfileAndLinks(username);
   }
 
-  // Fetch the profile data
-  const data = await fetchProfileAndLinks(username);
-
-  // Only cache successful results — not_found and error are always fresh
-  if (data.status !== 'ok') {
-    return data;
-  }
-
-  // Cache the successful result with unstable_cache for 1 hour
+  // Single fetch path via unstable_cache. The cached function is the sole
+  // fetch path, eliminating the previous double-fetch on first visit.
   try {
     const cachedFetch = unstable_cache(
       async () => {
-        // Re-fetch on revalidation
-        const freshData = await fetchProfileAndLinks(username);
-        if (freshData.status !== 'ok') {
-          // Profile was removed or errored — don't cache, throw to prevent
-          // stale success from being served
-          throw new Error(`Profile ${username} no longer available`);
+        const data = await fetchProfileAndLinks(username);
+        if (data.status !== 'ok') {
+          // Don't cache not_found or error results — throw to prevent
+          // stale success from being served on background revalidation
+          throw new Error(`Profile ${username} status: ${data.status}`);
         }
-        return freshData;
+        return data;
       },
       [`public-profile-${username}`],
       {
@@ -358,8 +354,8 @@ const getCachedProfileAndLinks = async (username: string) => {
     );
     return await cachedFetch();
   } catch {
-    // Cache layer failure — return the fresh data we already have
-    return data;
+    // Cache miss for non-ok status, or cache layer failure — fetch fresh
+    return fetchProfileAndLinks(username);
   }
 };
 
@@ -369,37 +365,45 @@ const getProfileAndLinks = cache(async (username: string) => {
   return getCachedProfileAndLinks(username.toLowerCase());
 });
 
-const PROFILE_FLAG_CACHE_TTL_SECONDS = 5 * 60;
+function getLatestReleaseGate(): boolean {
+  return FEATURE_FLAGS.LATEST_RELEASE_CARD;
+}
 
-const getCachedLatestReleaseGate = unstable_cache(
-  async () => {
-    return checkGate(null, FEATURE_FLAG_KEYS.LATEST_RELEASE_CARD, false);
-  },
-  ['public-profile-latest-release-gate'],
-  {
-    revalidate: PROFILE_FLAG_CACHE_TTL_SECONDS,
-  }
-);
+function getProfileV2Gate(): boolean {
+  return FEATURE_FLAGS.PROFILE_V2;
+}
 
-const getCachedProfileV2Gate = unstable_cache(
-  async () => {
-    return checkGate(null, FEATURE_FLAG_KEYS.PROFILE_V2, false);
-  },
-  ['public-profile-v2-gate'],
-  {
-    revalidate: PROFILE_FLAG_CACHE_TTL_SECONDS,
-  }
-);
+function getSubscribeCTAVariant(): SubscribeCTAVariant {
+  return 'two_step';
+}
 
-const getCachedSubscribeCTAVariant = unstable_cache(
-  async (profileId: string) => {
-    return getSubscribeCTAVariant(profileId);
-  },
-  ['public-profile-subscribe-cta-variant'],
-  {
-    revalidate: PROFILE_FLAG_CACHE_TTL_SECONDS,
+/**
+ * Pre-render featured artist profiles at build time to eliminate cold-start latency.
+ * Limited to 100 profiles to keep build times reasonable.
+ */
+export async function generateStaticParams() {
+  try {
+    const { db } = await import('@/lib/db');
+    const { creatorProfiles } = await import('@/lib/db/schema/profiles');
+    const { eq, and } = await import('drizzle-orm');
+
+    const featured = await db
+      .select({ username: creatorProfiles.username })
+      .from(creatorProfiles)
+      .where(
+        and(
+          eq(creatorProfiles.isPublic, true),
+          eq(creatorProfiles.isFeatured, true)
+        )
+      )
+      .limit(100);
+
+    return featured.map(row => ({ username: row.username }));
+  } catch {
+    // Build-time DB failures should not block deployment
+    return [];
   }
-);
+}
 
 interface Props {
   readonly params: Promise<{
@@ -511,6 +515,9 @@ async function renderListenMode(
   username: string,
   isPublicNoAuthSmoke: boolean
 ) {
+  // viewerCountryCode is intentionally omitted — the static render passes null
+  // and StaticArtistPage reads the country-code cookie client-side on hydration.
+  const viewerCountryCode = null;
   const profileResult = await getLightweightProfile(username);
   if (!profileResult) {
     notFound();
@@ -565,6 +572,7 @@ async function renderListenMode(
         mode='listen'
         artist={artist}
         socialLinks={socialLinks}
+        viewerCountryCode={viewerCountryCode}
         contacts={[]}
         subtitle={subtitle}
         showTipButton={profileResult.hasVenmoLink}
@@ -590,7 +598,7 @@ async function renderListenMode(
 
 const getLightweightProfile = cache(async (username: string) => {
   const result = await getCreatorProfileWithUser(username.toLowerCase());
-  if (!result || !result.isPublic) {
+  if (!result?.isPublic) {
     return null;
   }
 
@@ -624,11 +632,16 @@ export default async function ArtistPage({
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
   const profileV2Enabled = isDevProfileV2OverrideEnabled(resolvedSearchParams)
     ? true
-    : await getCachedProfileV2Gate();
+    : getProfileV2Gate();
 
-  // NOTE: Cookie access removed from server component to enable static optimization.
-  // User-specific behavior (isIdentified, spotifyPreferred) is now handled client-side
-  // via the StaticArtistPage component which reads cookies on hydration.
+  // NOTE: headers() is intentionally not called here.
+  // - Block check runs in middleware (proxy.ts) before this page renders,
+  //   so blocked visitors are redirected before any RSC/ISR content is served.
+  // - viewerCountryCode is set as a client-readable cookie (COUNTRY_CODE_COOKIE)
+  //   by middleware; StaticArtistPage reads it on mount for DSP geo-sorting.
+  // Removing these dynamic function calls allows this page to participate in ISR.
+  const viewerCountryCode = null;
+
   if (mode === 'listen' && !profileV2Enabled) {
     const { schemas, body } = await renderListenMode(
       username,
@@ -656,6 +669,7 @@ export default async function ArtistPage({
     status,
     creatorIsPro,
     latestRelease: fetchedLatestRelease,
+    pressPhotos,
   } = profileResult;
 
   if (status === 'error') {
@@ -691,17 +705,10 @@ export default async function ArtistPage({
     // Secret not configured — visit tracking will proceed without token auth
   }
 
-  // Cache Statsig decisions for public profile traffic to avoid per-request latency.
-  // Tour dates are parallelized with statsig to eliminate sequential waterfall.
-  const [showLatestRelease, subscribeCTAVariant, tourDates] = await Promise.all(
-    [
-      getCachedLatestReleaseGate(),
-      getCachedSubscribeCTAVariant(profile.id),
-      profileV2Enabled || mode === 'tour'
-        ? getPublicTourDates(profile.id)
-        : Promise.resolve([] as TourDateViewModel[]),
-    ]
-  );
+  // Tour dates are always fetched (non-blocking — errors fall back to empty).
+  const showLatestRelease = getLatestReleaseGate();
+  const subscribeCTAVariant = getSubscribeCTAVariant();
+  const tourDatesPromise = getPublicTourDates(profile.id);
 
   const latestRelease = showLatestRelease ? fetchedLatestRelease : null;
   const subscribeTwoStep = subscribeCTAVariant === 'two_step';
@@ -735,6 +742,14 @@ export default async function ArtistPage({
     links
   );
 
+  // Await tour dates (started above, non-blocking — errors resolve to empty)
+  // Sort server-side so the client doesn't need a useMemo sort
+  const tourDates = (
+    await tourDatesPromise.catch(() => [] as TourDateViewModel[])
+  ).sort(
+    (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+  );
+
   return (
     <>
       {/* JSON-LD Structured Data for SEO — rendered inline for crawler visibility */}
@@ -757,6 +772,7 @@ export default async function ArtistPage({
         mode={mode}
         artist={artist}
         socialLinks={links}
+        viewerCountryCode={viewerCountryCode}
         contacts={publicContacts}
         subtitle={subtitle}
         showTipButton={showTipButton}
@@ -766,6 +782,7 @@ export default async function ArtistPage({
         latestRelease={latestRelease}
         photoDownloadSizes={photoDownloadSizes}
         allowPhotoDownloads={allowPhotoDownloads}
+        pressPhotos={pressPhotos}
         subscribeTwoStep={subscribeTwoStep}
         genres={genres}
         tourDates={tourDates}
@@ -937,7 +954,7 @@ export async function generateMetadata({
   const { username } = await params;
   const resolvedSearchParams = await searchParams;
   const mode = getProfileMode(resolvedSearchParams?.mode);
-  const profileV2Enabled = await getCachedProfileV2Gate();
+  const profileV2Enabled = getProfileV2Gate();
 
   if (mode === 'listen' && !profileV2Enabled) {
     const lightweightProfile = await getLightweightProfile(username);

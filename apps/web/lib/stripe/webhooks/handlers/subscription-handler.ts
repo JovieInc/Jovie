@@ -20,6 +20,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
+import { attributeLeadPaidConversionByClerkUserId } from '@/lib/leads/funnel-events';
 import { notifySlackUpgrade } from '@/lib/notifications/providers/slack';
 import {
   expireReferralOnChurn,
@@ -173,6 +174,21 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
 
     await invalidateBillingCache(userId);
 
+    if (result.success && result.isActive) {
+      try {
+        await attributeLeadPaidConversionByClerkUserId(userId, subscription.id);
+      } catch (error) {
+        logger.warn(
+          'Failed to attribute lead paid conversion on subscription created',
+          {
+            userId,
+            subscriptionId: subscription.id,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }
+        );
+      }
+    }
+
     return result;
   }
 
@@ -198,7 +214,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       .limit(1);
 
     const displayName = userData?.displayName ?? userData?.email ?? 'A user';
-    const planName = plan === 'growth' ? 'Growth' : 'Pro';
+    const planName = plan === 'max' || plan === 'growth' ? 'Max' : 'Pro';
 
     await notifySlackUpgrade(displayName, planName);
   }
@@ -232,6 +248,21 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
     });
 
     await invalidateBillingCache(userId);
+
+    if (result.success && result.isActive) {
+      try {
+        await attributeLeadPaidConversionByClerkUserId(userId, subscription.id);
+      } catch (error) {
+        logger.warn(
+          'Failed to attribute lead paid conversion on subscription updated',
+          {
+            userId,
+            subscriptionId: subscription.id,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }
+        );
+      }
+    }
 
     return result;
   }

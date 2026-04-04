@@ -57,6 +57,10 @@ Sentry.init({
     // is not authenticated. These are handled by the client error boundary
     // and are not bugs (JOV-1065).
     /^Unauthorized$/,
+    // FeaturedCreators: table check timeout with graceful fallback already in place.
+    /\[FeaturedCreators\].*(?:timed out|failed or timed out)/,
+    // OutreachPipeline: hitting configured daily budget limit is expected behavior.
+    /Daily query budget exhausted/,
   ],
 
   // AI Agent Monitoring: Track Vercel AI SDK calls (LLM requests, token usage)

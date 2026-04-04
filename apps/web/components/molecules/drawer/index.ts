@@ -7,6 +7,11 @@ export {
   type DrawerActionRowProps,
 } from './DrawerActionRow';
 export {
+  DrawerAnalyticsSummaryCard,
+  type DrawerAnalyticsSummaryCardProps,
+  type DrawerAnalyticsSummaryMetric,
+} from './DrawerAnalyticsSummaryCard';
+export {
   DrawerAsyncToggle,
   type DrawerAsyncToggleProps,
 } from './DrawerAsyncToggle';
@@ -19,6 +24,16 @@ export {
   DrawerButton,
   type DrawerButtonProps,
 } from './DrawerButton';
+export {
+  DRAWER_CARD_ACTION_BUTTON_CLASSNAME,
+  DrawerCardActionBar,
+  type DrawerCardActionBarProps,
+} from './DrawerCardActionBar';
+export {
+  DrawerEditableTextField,
+  type DrawerEditableTextFieldAction,
+  type DrawerEditableTextFieldProps,
+} from './DrawerEditableTextField';
 export {
   DrawerEmptyState,
   type DrawerEmptyStateProps,
@@ -67,12 +82,21 @@ export {
   DrawerSettingsToggle,
   type DrawerSettingsToggleProps,
 } from './DrawerSettingsToggle';
+export {
+  DrawerSplitButton,
+  type DrawerSplitButtonAction,
+  type DrawerSplitButtonProps,
+} from './DrawerSplitButton';
 export { DrawerStatGrid, type DrawerStatGridProps } from './DrawerStatGrid';
 export {
   DRAWER_SURFACE_CARD_CLASSNAME,
   DrawerSurfaceCard,
   type DrawerSurfaceCardProps,
 } from './DrawerSurfaceCard';
+export {
+  DrawerTabbedCard,
+  type DrawerTabbedCardProps,
+} from './DrawerTabbedCard';
 export { DrawerTabs, type DrawerTabsProps } from './DrawerTabs';
 export {
   EntityHeaderCard,

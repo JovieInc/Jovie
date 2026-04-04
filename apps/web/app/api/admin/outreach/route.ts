@@ -11,7 +11,6 @@ import {
 } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getAppUrl } from '@/constants/domains';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { campaignSettings } from '@/lib/db/schema/admin';
@@ -23,7 +22,10 @@ import {
   getSafeErrorMessage,
 } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import { pushLeadToInstantly } from '@/lib/leads/instantly';
+import {
+  OUTREACH_QUEUE_CLAIM_TTL_MS,
+  processOutreachBatch,
+} from '@/lib/leads/outreach-batch';
 import { outreachListQuerySchema } from '@/lib/validation/lead-schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -33,8 +35,6 @@ export const runtime = 'nodejs';
 const queueOutreachBodySchema = z.object({
   limit: z.number().int().min(1).max(100).default(10),
 });
-
-const OUTREACH_QUEUE_CLAIM_TTL_MS = 5 * 60 * 1000;
 
 function jsonError(message: string, status: number) {
   return NextResponse.json(
@@ -90,7 +90,7 @@ function getPendingEmailWhereClause(now = new Date()) {
   );
 }
 
-function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
+function isMissingLeadSchemaColumnError(error: unknown): boolean {
   // Use getDeepErrorMessage to unwrap Drizzle's error wrapping —
   // the actual PG "column X does not exist" lives on .cause, not the outer error.
   const normalized = getDeepErrorMessage(error).toLowerCase();
@@ -102,7 +102,21 @@ function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
     normalized.includes('column "latest_release_date" does not exist') ||
     normalized.includes('column "priority_score" does not exist') ||
     normalized.includes('column "is_linktree_verified" does not exist') ||
-    normalized.includes('column "music_tools_detected" does not exist')
+    normalized.includes('column "music_tools_detected" does not exist') ||
+    normalized.includes('column "source_platform" does not exist') ||
+    normalized.includes('column "source_handle" does not exist') ||
+    normalized.includes('column "source_url" does not exist') ||
+    normalized.includes('column "has_tracking_pixels" does not exist') ||
+    normalized.includes('column "tracking_pixel_platforms" does not exist') ||
+    normalized.includes('column "signal_snapshot" does not exist') ||
+    normalized.includes('column "first_contacted_at" does not exist') ||
+    normalized.includes('column "last_contacted_at" does not exist') ||
+    normalized.includes('column "signup_user_id" does not exist') ||
+    normalized.includes('column "signup_at" does not exist') ||
+    normalized.includes('column "paid_at" does not exist') ||
+    normalized.includes('column "paid_subscription_id" does not exist') ||
+    normalized.includes('column "attribution_status" does not exist') ||
+    normalized.includes('column "scrape_attempts" does not exist')
   );
 }
 
@@ -161,12 +175,12 @@ export async function GET(request: NextRequest) {
         db.select({ total: count() }).from(leads).where(pendingWhereClause),
       ]);
     } catch (error) {
-      if (!isMissingLeadEnrichmentColumnError(error)) {
+      if (!isMissingLeadSchemaColumnError(error)) {
         throw error;
       }
 
       await captureWarning(
-        '[admin/outreach] leads enrichment columns missing; falling back to legacy select',
+        '[admin/outreach] leads schema columns missing; falling back to legacy select',
         error,
         { route: '/api/admin/outreach' }
       );
@@ -275,102 +289,12 @@ export async function POST(request: NextRequest) {
     }
 
     const { limit } = validated.data;
-    const now = new Date();
-    const claimCutoff = new Date(now.getTime() - OUTREACH_QUEUE_CLAIM_TTL_MS);
-    const pendingEmailWhereClause = getPendingEmailWhereClause(now);
-
-    const pendingEmailLeads = await db
-      .select({
-        id: leads.id,
-        linktreeHandle: leads.linktreeHandle,
-        displayName: leads.displayName,
-        contactEmail: leads.contactEmail,
-        claimToken: leads.claimToken,
-        priorityScore: leads.priorityScore,
-      })
-      .from(leads)
-      .where(pendingEmailWhereClause)
-      .orderBy(desc(leads.priorityScore), desc(leads.createdAt))
-      .limit(limit);
-
-    let attempted = 0;
-    let queued = 0;
-    let failed = 0;
-
-    for (const lead of pendingEmailLeads) {
-      const claimedAt = new Date();
-      const [claimedLead] = await db
-        .update(leads)
-        .set({
-          outreachQueuedAt: claimedAt,
-          updatedAt: claimedAt,
-        })
-        .where(
-          and(
-            eq(leads.id, lead.id),
-            eq(leads.outreachStatus, 'pending'),
-            or(
-              isNull(leads.outreachQueuedAt),
-              lt(leads.outreachQueuedAt, claimCutoff)
-            )
-          )
-        )
-        .returning({ id: leads.id });
-
-      if (!claimedLead) {
-        continue;
-      }
-
-      attempted++;
-
-      try {
-        const instantlyLeadId = await pushLeadToInstantly({
-          email: lead.contactEmail!,
-          firstName: lead.displayName ?? lead.linktreeHandle,
-          claimLink: getAppUrl(`/claim/${lead.claimToken}`),
-          artistName: lead.displayName ?? lead.linktreeHandle,
-          priorityScore: lead.priorityScore ?? 0,
-        });
-
-        await db
-          .update(leads)
-          .set({
-            instantlyLeadId,
-            outreachStatus: 'queued',
-            updatedAt: claimedAt,
-          })
-          .where(eq(leads.id, lead.id));
-
-        queued++;
-      } catch (error) {
-        failed++;
-        await db
-          .update(leads)
-          .set({
-            outreachQueuedAt: null,
-            updatedAt: new Date(),
-          })
-          .where(eq(leads.id, lead.id));
-        await captureError('Manual outreach queue failed', error, {
-          route: '/api/admin/outreach',
-          contextData: { leadId: lead.id },
-        });
-      }
-    }
-
-    const [remainingPending] = await db
-      .select({ total: count() })
-      .from(leads)
-      .where(pendingEmailWhereClause);
+    const result = await processOutreachBatch(limit, {
+      ignorePipelineEnabled: true,
+    });
 
     return NextResponse.json(
-      {
-        ok: true,
-        attempted,
-        queued,
-        failed,
-        remainingPending: Number(remainingPending?.total ?? 0),
-      },
+      { ok: true, ...result },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {

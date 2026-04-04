@@ -14,8 +14,7 @@ import {
   getAvailableDSPs,
   sortDSPsForDevice,
 } from '@/lib/dsp';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { useCodeFlag } from '@/lib/feature-flags/client';
 import { detectPlatformFromUA } from '@/lib/utils';
 import { Artist } from '@/types/db';
 
@@ -40,10 +39,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   dspsOverride,
   enableDynamicEngagement = false,
 }: StaticListenInterfaceProps) {
-  const enableDevicePriority = useFeatureGate(
-    FEATURE_FLAG_KEYS.IOS_APPLE_MUSIC_PRIORITY,
-    false
-  );
+  const enableDevicePriority = useCodeFlag('IOS_APPLE_MUSIC_PRIORITY');
 
   const dsps = useMemo(() => {
     const countryCode =
@@ -150,7 +146,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
       {/* DSP Buttons */}
       <div className='space-y-3'>
         {availableDSPs.length === 0 ? (
-          <div className='bg-surface-0 backdrop-blur-sm border border-subtle rounded-xl p-6 shadow-sm text-center'>
+          <div className='rounded-2xl border border-subtle bg-surface-1 p-5 shadow-sm text-center'>
             <p className='text-sm text-secondary-token'>
               Streaming links aren&apos;t available for this profile yet.
             </p>

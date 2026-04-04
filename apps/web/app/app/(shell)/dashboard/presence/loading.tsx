@@ -1,6 +1,6 @@
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
-const CARD_KEYS = ['a', 'b', 'c', 'd', 'e', 'f'] as const;
+const CARD_KEYS = ['a', 'b', 'c'] as const;
 
 export default function PresenceLoading() {
   return (
@@ -17,30 +17,30 @@ export default function PresenceLoading() {
       </div>
 
       {/* Card grid skeleton */}
-      <div className='flex-1 min-h-0 overflow-y-auto px-3.5 pb-3.5 pt-2.5 lg:px-4 lg:pb-4 lg:pt-3'>
-        <div className='grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3'>
+      <div className='flex-1 min-h-0 overflow-hidden p-4'>
+        <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3'>
           {CARD_KEYS.map(key => (
             <div
               key={key}
-              className='rounded-xl border border-subtle bg-(--linear-app-content-surface) p-3.5'
+              className='rounded-xl border border-subtle bg-surface-0 p-3 animate-pulse'
             >
-              <div className='space-y-2.5'>
-                <div className='flex items-start justify-between gap-2.5'>
-                  <div className='flex items-center gap-2.5'>
-                    <LoadingSkeleton
-                      height='h-10'
-                      width='w-10'
-                      rounded='full'
-                      className='shrink-0'
-                    />
-                    <div className='space-y-1'>
-                      <LoadingSkeleton height='h-4' width='w-28' rounded='md' />
-                      <LoadingSkeleton height='h-3' width='w-20' rounded='sm' />
-                    </div>
-                  </div>
-                  <LoadingSkeleton height='h-5' width='w-16' rounded='full' />
-                </div>
-                <LoadingSkeleton height='h-3' width='w-24' rounded='sm' />
+              <div className='flex items-center gap-2'>
+                <LoadingSkeleton
+                  height='h-6'
+                  width='w-6'
+                  rounded='full'
+                  className='shrink-0'
+                />
+                <LoadingSkeleton height='h-4' width='w-32' rounded='sm' />
+              </div>
+              <div className='flex items-center gap-1.5 mt-2'>
+                <LoadingSkeleton
+                  height='h-3'
+                  width='w-3'
+                  rounded='sm'
+                  className='shrink-0'
+                />
+                <LoadingSkeleton height='h-3' width='w-16' rounded='sm' />
               </div>
             </div>
           ))}

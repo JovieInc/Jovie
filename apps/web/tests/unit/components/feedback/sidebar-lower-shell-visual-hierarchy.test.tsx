@@ -3,6 +3,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 
+const mockUsePathname = vi.fn(() => '/app/chat');
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => mockUsePathname(),
+}));
+
 vi.mock('@/lib/env-client', () => ({
   env: {
     IS_TEST: false,
@@ -15,7 +21,7 @@ vi.mock('@/lib/billing/verified-upgrade', () => ({
     priceId: 'price_123',
     interval: 'month',
   }),
-  formatVerifiedPriceLabel: () => '$5/mo',
+  formatVerifiedPriceLabel: () => '$20/mo',
 }));
 
 vi.mock('@/lib/queries', () => ({
@@ -53,17 +59,25 @@ describe('Sidebar lower shell visual hierarchy', () => {
   it('keeps upgrade banner visually quieter than nav rows', () => {
     const { container } = render(<SidebarUpgradeBanner />);
 
-    const card = container.querySelector('[class*="rounded-[10px]"]');
+    const card = container.querySelector('[class*="rounded-xl"]');
     expect(card).toBeTruthy();
     expect(card?.className).toContain('bg-sidebar-accent/12');
 
     expect(screen.getByRole('button', { name: 'Upgrade' })).toBeInTheDocument();
   });
 
+  it('suppresses the upgrade banner on nested demo routes', () => {
+    mockUsePathname.mockReturnValueOnce('/demo/showcase/settings');
+
+    const { container } = render(<SidebarUpgradeBanner />);
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('keeps install banner visually quieter than nav rows', () => {
     const { container } = render(<SidebarInstallBanner />);
 
-    const card = container.querySelector('[class*="rounded-[10px]"]');
+    const card = container.querySelector('[class*="rounded-xl"]');
     expect(card).toBeTruthy();
     expect(card?.className).toContain('bg-sidebar-accent/12');
 

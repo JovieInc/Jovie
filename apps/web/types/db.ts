@@ -121,6 +121,8 @@ export interface CreatorProfile {
   location?: string | null;
   active_since_year?: number | null;
   genres?: string[] | null;
+  career_highlights?: string | null;
+  target_playlists?: string[] | null;
   // Monitoring and analytics
   last_login_at?: string;
   profile_views: number;
@@ -170,7 +172,8 @@ export interface Artist {
   hometown?: string | null;
   active_since_year?: number | null;
   genres?: string[] | null;
-  pitch_context?: string | null;
+  career_highlights?: string | null;
+  target_playlists?: string[] | null;
   published: boolean; // maps to is_public
   is_verified: boolean;
   is_featured: boolean;
@@ -410,6 +413,8 @@ type CanonicalArtistProfileShape = {
   hometown?: string | null;
   activeSinceYear?: number | null;
   genres?: string[] | null;
+  careerHighlights?: string | null;
+  targetPlaylists?: string[] | null;
   isPublic: boolean;
   isVerified: boolean;
   isFeatured: boolean;
@@ -463,6 +468,8 @@ function mapCanonicalProfileToArtist(
     hometown,
     active_since_year: profile.activeSinceYear ?? null,
     genres: profile.genres ?? null,
+    career_highlights: profile.careerHighlights ?? null,
+    target_playlists: profile.targetPlaylists ?? null,
     published: profile.isPublic,
     is_verified: profile.isVerified,
     is_featured: profile.isFeatured,
@@ -492,6 +499,8 @@ export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
     location: profile.location,
     activeSinceYear: profile.active_since_year,
     genres: profile.genres,
+    careerHighlights: profile.career_highlights,
+    targetPlaylists: profile.target_playlists,
     isPublic: profile.is_public,
     isVerified: profile.is_verified,
     isFeatured: profile.is_featured,
@@ -526,6 +535,7 @@ export function convertArtistToCreatorProfile(
     apple_music_url: artist.apple_music_url,
     youtube_url: artist.youtube_url,
     spotify_id: artist.spotify_id,
+    career_highlights: artist.career_highlights ?? null,
     is_public: artist.published,
     is_verified: artist.is_verified,
     is_featured: artist.is_featured,
@@ -559,6 +569,8 @@ export function convertDrizzleCreatorProfileToArtist(
     location: profile.location,
     activeSinceYear: profile.activeSinceYear,
     genres: profile.genres,
+    careerHighlights: profile.careerHighlights,
+    targetPlaylists: profile.targetPlaylists,
     isPublic: profile.isPublic ?? false,
     isVerified: profile.isVerified ?? false,
     isFeatured: profile.isFeatured ?? false,

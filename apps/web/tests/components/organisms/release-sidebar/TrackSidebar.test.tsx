@@ -22,11 +22,20 @@ function buildTrack(
     previewUrl: null,
     audioUrl: null,
     audioFormat: null,
+    previewSource: null,
+    previewVerification: 'unknown',
+    providerConfidenceSummary: {
+      canonical: 1,
+      searchFallback: 0,
+      unknown: 3,
+      unresolvedProviders: ['apple_music', 'youtube', 'soundcloud'],
+    },
     providers: [
       {
         key: 'spotify',
         label: 'Spotify',
         url: 'https://open.spotify.com/track/123',
+        confidence: 'canonical',
       },
     ],
     releaseTitle: 'Midnight Echo (EP)',
@@ -37,7 +46,7 @@ function buildTrack(
 }
 
 describe('TrackSidebar', () => {
-  it('shows details content by default and switches to platforms tab', async () => {
+  it('shows playback content by default and switches to platforms tab', async () => {
     const user = userEvent.setup();
 
     render(
@@ -49,16 +58,15 @@ describe('TrackSidebar', () => {
       />
     );
 
-    expect(screen.getByText('Track')).toBeInTheDocument();
-    expect(screen.getByText('Smart link')).toBeInTheDocument();
-    expect(screen.getByText('Actions')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
-
+    expect(screen.getAllByText('Midnight Echo').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Preview Unverified/i)).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Platforms' })
+      screen.getByText(/Providers: 1 canonical, 0 fallback, 3 unknown/i)
     ).toBeInTheDocument();
-    expect(screen.queryByText('Actions')).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('drawer-tab-platforms'));
+
+    expect(screen.getByText(/Canonical DSPs/i)).toBeInTheDocument();
   });
 
   it('renders empty platforms state when there are no provider links', async () => {
@@ -72,12 +80,12 @@ describe('TrackSidebar', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
+    await user.click(screen.getByTestId('drawer-tab-platforms'));
 
     expect(screen.getByTestId('track-platforms-empty')).toBeInTheDocument();
   });
 
-  it('keeps the track header and details cards visible together in the default view', () => {
+  it('keeps the playback card visible in the default view', () => {
     render(
       <TrackSidebar
         track={buildTrack()}
@@ -87,8 +95,53 @@ describe('TrackSidebar', () => {
       />
     );
 
-    expect(screen.getByText('Track')).toBeInTheDocument();
-    expect(screen.getByText('Smart link')).toBeInTheDocument();
-    expect(screen.getByText('Actions')).toBeInTheDocument();
+    expect(screen.getAllByText('Midnight Echo').length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('button', { name: /copy track link/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Preview Unverified/i)).toBeInTheDocument();
+    expect(screen.getByTestId('track-sidebar')).toHaveAttribute(
+      'data-surface-tone',
+      'quiet'
+    );
+    expect(screen.getByTestId('track-tabbed-card')).toHaveAttribute(
+      'data-surface-variant',
+      'quiet'
+    );
+  });
+
+  it('treats missing preview verification as not checked and keeps unknown-confidence links out of canonical DSPs', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <TrackSidebar
+        track={buildTrack({
+          previewVerification: undefined,
+          providerConfidenceSummary: {
+            canonical: 0,
+            searchFallback: 0,
+            unknown: 1,
+            unresolvedProviders: ['soundcloud'],
+          },
+          providers: [
+            {
+              key: 'soundcloud',
+              label: 'SoundCloud',
+              url: 'https://soundcloud.com/track/123',
+              confidence: undefined,
+            },
+          ],
+        })}
+        isOpen={true}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(/Preview Not Checked/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Verified Preview/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('drawer-tab-platforms'));
+
+    expect(screen.getByText(/Unverified DSPs/i)).toBeInTheDocument();
   });
 });

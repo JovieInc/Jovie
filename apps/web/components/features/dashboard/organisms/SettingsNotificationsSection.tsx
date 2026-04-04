@@ -1,7 +1,7 @@
 'use client';
 
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
+import { ShieldCheck } from 'lucide-react';
+import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { useOptimisticToggle } from '@/features/dashboard/hooks/useOptimisticToggle';
 import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
 import { useNotificationSettingsMutation } from '@/lib/queries';
@@ -24,29 +24,32 @@ export function SettingsNotificationsSection({
   });
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
+    <SettingsPanel
+      title='Verification'
+      description='Choose how email confirmation works before fan notifications begin.'
     >
-      <ContentSectionHeader
-        title='Notifications'
-        subtitle='Control how fan verification works.'
-        className='min-h-0 px-4 py-3'
-      />
-      <div className='border-t border-subtle/60 px-4 py-3'>
-        <SettingsToggleRow
-          title='Double opt-in verification'
-          description='New fans verify their email before notifications begin. This prevents spam signups and protects your deliverability. On Growth, you can disable this.'
-          checked={checked}
-          onCheckedChange={handleToggle}
-          disabled={isPending || !isGrowth}
-          ariaLabel='Toggle double opt-in email confirmation'
-          gated={!isGrowth}
-          gatePlanName='Growth'
-          gateFeatureContext='Double opt-in confirmation'
-        />
+      <div className='px-4 py-4 sm:px-5'>
+        {isGrowth ? (
+          <SettingsToggleRow
+            icon={<ShieldCheck className='h-4 w-4' aria-hidden />}
+            title='Double opt-in verification'
+            description='New fans verify their email before notifications begin. This prevents spam signups and protects your deliverability. On Growth, you can disable this.'
+            checked={checked}
+            onCheckedChange={handleToggle}
+            disabled={isPending}
+            ariaLabel='Toggle double opt-in email confirmation'
+          />
+        ) : (
+          <SettingsToggleRow
+            gated
+            icon={<ShieldCheck className='h-4 w-4' aria-hidden />}
+            title='Double opt-in verification'
+            description='New fans verify their email before notifications begin. This prevents spam signups and protects your deliverability. On Growth, you can disable this.'
+            gatePlanName='Growth'
+            gateFeatureContext='Double opt-in confirmation'
+          />
+        )}
       </div>
-    </DashboardCard>
+    </SettingsPanel>
   );
 }

@@ -1,6 +1,6 @@
 import { and, eq, or } from 'drizzle-orm';
 import { createFingerprint } from '@/app/api/audience/lib/audience-utils';
-import { APP_URL, AUDIENCE_IDENTIFIED_COOKIE } from '@/constants/app';
+import { AUDIENCE_IDENTIFIED_COOKIE, BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import {
   audienceMembers,
@@ -290,7 +290,7 @@ async function sendSubscriptionConfirmationEmail(
   normalizedEmail: string,
   artistProfile: { displayName: string | null; username: string | null }
 ): Promise<Awaited<ReturnType<typeof sendNotification>>> {
-  const profileUrl = `${APP_URL.replace(/\/$/, '')}/${artistProfile.username}`;
+  const profileUrl = `${BASE_URL.replace(/\/$/, '')}/${artistProfile.username}`;
   const artistName =
     artistProfile.displayName || artistProfile.username || 'this artist';
   const dedupKey = `notification_subscribe:${artist_id}:${normalizedEmail}`;

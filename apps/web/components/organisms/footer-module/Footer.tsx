@@ -3,11 +3,11 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Copyright } from '@/components/atoms/Copyright';
+import { CookieSettingsFooterButton } from '@/components/molecules/CookieSettingsFooterButton';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { useCodeFlag } from '@/lib/feature-flags/client';
 import { cn } from '@/lib/utils';
 
 // Dynamic import to exclude ThemeToggle from bundle when not used
@@ -36,7 +36,7 @@ const FOOTER_COLUMNS = [
     id: 'features',
     heading: 'Features',
     links: [
-      { href: '/#analytics', label: 'Analytics' },
+      { href: '/#release', label: 'Analytics' },
       { href: '/#profile', label: 'Fan Capture' },
       { href: '/#profile', label: 'Tipping' },
       { href: '/#profile', label: 'Tour Dates' },
@@ -88,10 +88,7 @@ export function Footer({
   containerSize = 'lg',
   links,
 }: FooterProps) {
-  const isLightModeEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
-    false
-  );
+  const isLightModeEnabled = useCodeFlag('ENABLE_LIGHT_MODE');
   const effectiveShowThemeToggle = showThemeToggle && isLightModeEnabled;
   const shouldHideBranding = artistSettings?.hide_branding ?? hideBranding;
   const maxWidthClass = CONTAINER_SIZES[containerSize];
@@ -126,7 +123,7 @@ export function Footer({
           />
         </div>
 
-        <div className='hidden md:block fixed bottom-4 left-4 z-10'>
+        <div className='max-md:hidden fixed bottom-4 left-4 z-10'>
           <FooterNavigation
             variant={config.colorVariant}
             ariaLabel='Legal'
@@ -231,6 +228,10 @@ export function Footer({
                 >
                   Terms
                 </Link>
+                <CookieSettingsFooterButton
+                  className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)] cursor-pointer'
+                  style={{ color: 'var(--linear-text-tertiary)' }}
+                />
               </div>
             </div>
           </div>
@@ -292,6 +293,10 @@ export function Footer({
                       {link.label}
                     </Link>
                   ))}
+                  <CookieSettingsFooterButton
+                    className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-secondary)] cursor-pointer'
+                    style={{ color: 'var(--linear-text-tertiary)' }}
+                  />
                 </nav>
               )}
               {effectiveShowThemeToggle && (
@@ -303,7 +308,7 @@ export function Footer({
                       variant='linear'
                     />
                   </div>
-                  <div className='hidden md:flex items-center'>
+                  <div className='max-md:hidden md:flex items-center'>
                     <ThemeToggle
                       appearance={config.themeAppearance}
                       shortcutKey={themeShortcutKey}

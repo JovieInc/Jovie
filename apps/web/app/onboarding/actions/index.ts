@@ -4,11 +4,12 @@
 
 'use server';
 
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { currentUser } from '@clerk/nextjs/server';
 import { revalidatePath } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -21,6 +22,7 @@ import {
   OnboardingErrorCode,
   onboardingErrorToError,
 } from '@/lib/errors/onboarding';
+import { attributeLeadSignupFromClerkUserId } from '@/lib/leads/funnel-events';
 import { cacheHandleAvailability } from '@/lib/onboarding/handle-availability-cache';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
@@ -54,7 +56,7 @@ export async function completeOnboarding({
 }): Promise<CompletionResult> {
   try {
     // Step 1: Authentication check
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       const error = createOnboardingError(
         OnboardingErrorCode.NOT_AUTHENTICATED,
@@ -253,6 +255,15 @@ export async function completeOnboarding({
 
     // Step 8: Sync operations (parallel, fire-and-forget)
     runBackgroundSyncOperations(userId, completion.username);
+
+    try {
+      await attributeLeadSignupFromClerkUserId(userId);
+    } catch (error) {
+      await captureError('Lead signup attribution failed', error, {
+        route: 'onboarding',
+        contextData: { userId },
+      });
+    }
 
     // ENG-002: Set completion cookie to prevent redirect loop race condition
     // The proxy checks this cookie and bypasses needsOnboarding check for 30s

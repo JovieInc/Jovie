@@ -48,9 +48,9 @@ In `apps/web/app/globals.css`, the import order MUST be:
 ```css
 :root {
   /* Theme customization */
-  --theme-base-hue: 240;
+  --theme-base-hue: 282;
   --theme-base-chroma: 0.015;
-  --theme-accent-hue: 271;
+  --theme-accent-hue: 282;
 
   /* Background surfaces */
   --color-bg-base: oklch(96% var(--theme-base-chroma) var(--theme-base-hue));

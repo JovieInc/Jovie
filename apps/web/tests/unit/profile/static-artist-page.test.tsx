@@ -72,6 +72,7 @@ vi.mock('@/lib/dsp', () => ({
     },
   },
   getAvailableDSPs: vi.fn(() => []),
+  sortDSPsByGeoPopularity: vi.fn(dsps => dsps),
 }));
 
 // Mock useUserLocation so the geolocation API is never invoked in jsdom.
@@ -231,6 +232,74 @@ describe('StaticArtistPage', () => {
     expect(screen.getByTestId('notifications-cta')).toBeDefined();
   });
 
+  it('renders a compact empty state in tour mode when no dates exist', () => {
+    render(
+      <StaticArtistPage
+        mode='tour'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Tour dates'
+        showTipButton={false}
+        showBackButton={true}
+        tourDates={[]}
+      />
+    );
+
+    expect(screen.getByTestId('tour-empty-state')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /is not currently on tour\. Get notified when dates are announced\./i
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /turn on notifications/i })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps contact mode on the legacy template when no contacts exist', () => {
+    render(
+      <StaticArtistPage
+        mode='contact'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Contact'
+        showTipButton={false}
+        showBackButton={true}
+        profileV2Enabled
+      />
+    );
+
+    expect(
+      screen.queryByTestId('public-profile-template-v2')
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('artist-page-shell')).toBeDefined();
+  });
+
+  it('renders V2 contact mode when contacts exist', () => {
+    render(
+      <StaticArtistPage
+        mode='contact'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[
+          {
+            id: 'contact-1',
+            type: 'email',
+            value: 'bookings@example.com',
+          } as never,
+        ]}
+        subtitle='Contact'
+        showTipButton={false}
+        showBackButton={true}
+        profileV2Enabled
+      />
+    );
+
+    expect(screen.getByTestId('public-profile-template-v2')).toBeDefined();
+  });
+
   it('renders latest release card when in profile mode with release', () => {
     const mockRelease = {
       id: 'release-1',
@@ -322,34 +391,46 @@ describe('StaticArtistPage', () => {
     expect(screen.getByTestId('public-profile-template-v2')).toBeDefined();
   });
 
-  it('keeps contact mode on the legacy template when V2 is enabled', () => {
+  it.each([
+    'profile',
+    'listen',
+    'subscribe',
+    'tour',
+    'tip',
+    'about',
+  ] as const)('routes %s mode through the V2 template when enabled', mode => {
+    render(
+      <StaticArtistPage
+        mode={mode}
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Artist'
+        showTipButton={mode === 'tip'}
+        showBackButton={mode !== 'profile'}
+        profileV2Enabled
+      />
+    );
+
+    expect(screen.getByTestId('public-profile-template-v2')).toBeDefined();
+  });
+
+  it('routes contact mode through the V2 template when contacts exist', () => {
     render(
       <StaticArtistPage
         mode='contact'
         artist={mockArtist}
         socialLinks={mockSocialLinks}
-        contacts={[]}
-        subtitle='Contact'
+        contacts={[
+          {
+            id: 'contact-2',
+            type: 'email',
+            value: 'booking@example.com',
+          } as never,
+        ]}
+        subtitle='Artist'
         showTipButton={false}
-        showBackButton={true}
-        profileV2Enabled
-      />
-    );
-
-    expect(screen.queryByTestId('public-profile-template-v2')).toBeNull();
-    expect(screen.getByTestId('artist-page-shell')).toBeDefined();
-  });
-
-  it('still routes subscribe mode through the V2 template when enabled', () => {
-    render(
-      <StaticArtistPage
-        mode='subscribe'
-        artist={mockArtist}
-        socialLinks={mockSocialLinks}
-        contacts={[]}
-        subtitle='Get notified'
-        showTipButton={false}
-        showBackButton={true}
+        showBackButton
         profileV2Enabled
       />
     );

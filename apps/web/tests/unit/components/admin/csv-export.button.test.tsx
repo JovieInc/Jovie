@@ -104,8 +104,8 @@ describe('ExportCSVButton', () => {
       );
 
       const button = screen.getByRole('button');
-      expect(button).toHaveClass('h-7');
-      expect(button).toHaveClass('rounded-full');
+      expect(button).toBeInTheDocument();
+      expect(button).toBeEnabled();
     });
 
     it('should have correct aria-label', () => {

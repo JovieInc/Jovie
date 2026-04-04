@@ -1,7 +1,8 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { QueryErrorBoundary } from '@/lib/queries';
+import { useEffect } from 'react';
+import { usePendingShell } from '@/components/organisms/AuthShellWrapper';
 
 interface ReleasesClientBoundaryProps {
   readonly children: ReactNode;
@@ -10,5 +11,11 @@ interface ReleasesClientBoundaryProps {
 export function ReleasesClientBoundary({
   children,
 }: ReleasesClientBoundaryProps) {
-  return <QueryErrorBoundary>{children}</QueryErrorBoundary>;
+  const { clearPendingShell } = usePendingShell();
+
+  useEffect(() => {
+    clearPendingShell('releases');
+  }, [clearPendingShell]);
+
+  return <>{children}</>;
 }

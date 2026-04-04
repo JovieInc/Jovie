@@ -31,11 +31,11 @@ import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdmin
 import { useCreatorActions } from '@/features/admin/useCreatorActions';
 import { useCreatorVerification } from '@/features/admin/useCreatorVerification';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import {
   CREATORS_CSV_FILENAME_PREFIX,
   creatorsCSVColumns,
 } from '@/lib/admin/csv-configs/creators';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { useAdminCreatorsInfiniteQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -488,6 +488,9 @@ export function AdminCreatorProfilesUnified({
               onRowClick={handleRowClick}
               getContextMenuItems={getContextMenuItems}
               enableVirtualization={true}
+              // Disabled: this table uses page-level useAdminTableKeyboardNavigation
+              // for arrow-key nav, which conflicts with UnifiedTable's row-level focus tracking.
+              enableKeyboardNavigation={false}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
               className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-[10px] [&_thead_th]:tracking-[0.07em]'
               hasNextPage={hasNextPage}

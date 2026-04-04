@@ -6,12 +6,11 @@ import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
-import { getDashboardData } from '../actions';
-import type { DashboardData } from '../actions/dashboard-data';
+import { getDashboardShellData } from '../actions';
 import {
-  checkAppleMusicConnection,
-  checkSpotifyConnection,
-  loadReleaseMatrix,
+  checkAppleMusicConnectionForProfile,
+  checkSpotifyConnectionForProfile,
+  loadReleaseMatrixForProfile,
 } from './actions';
 import { primaryProviderKeys, providerConfig } from './config';
 import { ReleaseTableSkeleton } from './loading';
@@ -34,7 +33,21 @@ export default async function ReleasesPage() {
     );
   }
 
-  const dashboardData = await getDashboardData();
+  return (
+    <ReleasesClientBoundary>
+      <Suspense fallback={<ReleaseTableSkeleton />}>
+        <ReleasesContent userId={userId} />
+      </Suspense>
+    </ReleasesClientBoundary>
+  );
+}
+
+/**
+ * Async server component that fetches all release data in parallel.
+ * Wrapped in Suspense above so the skeleton shows instantly.
+ */
+async function ReleasesContent({ userId }: Readonly<{ userId: string }>) {
+  const dashboardData = await getDashboardShellData(userId);
 
   if (dashboardData.dashboardLoadError) {
     void captureError(
@@ -47,38 +60,38 @@ export default async function ReleasesPage() {
     );
   }
 
-  if (dashboardData.needsOnboarding) {
+  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
     redirect(APP_ROUTES.ONBOARDING);
   }
 
-  return (
-    <ReleasesClientBoundary>
-      <Suspense fallback={<ReleaseTableSkeleton />}>
-        <ReleasesContent dashboardData={dashboardData} />
-      </Suspense>
-    </ReleasesClientBoundary>
-  );
-}
+  const selectedProfile = dashboardData.selectedProfile;
+  if (!selectedProfile) {
+    redirect(APP_ROUTES.ONBOARDING);
+  }
 
-/**
- * Async server component that fetches all release data in parallel.
- * Wrapped in Suspense above so the skeleton shows instantly.
- */
-async function ReleasesContent({
-  dashboardData,
-}: {
-  dashboardData: DashboardData;
-}) {
+  const releaseProfile = {
+    userId,
+    profileId: selectedProfile.id,
+    profileHandle:
+      selectedProfile.usernameNormalized ?? selectedProfile.username,
+    spotifyId: selectedProfile.spotifyId ?? null,
+    appleMusicId: selectedProfile.appleMusicId ?? null,
+    settings:
+      (selectedProfile.settings as Record<string, unknown> | null) ?? null,
+  };
+
+  const profileSettings =
+    (selectedProfile.settings as Record<string, unknown>) ?? {};
   // Fire all fetches in parallel — no sequential waterfall
   const [releasesResult, spotifyResult, appleMusicResult] =
     await Promise.allSettled([
-      loadReleaseMatrix(),
-      checkSpotifyConnection(),
-      checkAppleMusicConnection(),
+      loadReleaseMatrixForProfile(releaseProfile),
+      checkSpotifyConnectionForProfile(releaseProfile),
+      checkAppleMusicConnectionForProfile(releaseProfile),
     ]);
 
   // Handle releases — check for redirect errors, extract value
-  let releases: Awaited<ReturnType<typeof loadReleaseMatrix>> = [];
+  let releases: Awaited<ReturnType<typeof loadReleaseMatrixForProfile>> = [];
   if (releasesResult.status === 'fulfilled') {
     releases = releasesResult.value;
   } else {
@@ -112,9 +125,6 @@ async function ReleasesContent({
     );
   }
 
-  // Read allow artwork downloads setting from profile settings
-  const profileSettings =
-    (dashboardData.selectedProfile?.settings as Record<string, unknown>) ?? {};
   const allowArtworkDownloads =
     (profileSettings.allowArtworkDownloads as boolean) ?? false;
   const spotifyImportStatus =

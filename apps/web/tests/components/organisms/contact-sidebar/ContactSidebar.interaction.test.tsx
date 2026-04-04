@@ -99,6 +99,10 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerSection: ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   ),
+  DrawerSurfaceCard: ({ children }: { children?: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  DrawerCardActionBar: () => null,
   DrawerLinkSectionSkeleton: () => null,
   DrawerTabs: ({
     value,
@@ -123,21 +127,28 @@ vi.mock('@/components/molecules/drawer', () => ({
       ))}
     </div>
   ),
+  DrawerTabbedCard: ({
+    children,
+    tabs,
+  }: {
+    children?: React.ReactNode;
+    tabs?: React.ReactNode;
+  }) => (
+    <div>
+      {tabs}
+      {children}
+    </div>
+  ),
 }));
 
 // Mock ContactSidebarHeader — useContactHeaderParts hook
 vi.mock('@/components/organisms/contact-sidebar/ContactSidebarHeader', () => ({
-  useContactHeaderParts: () => ({ title: 'Contact', actions: null }),
-}));
-
-// Mock ContactAvatar — simple stub
-vi.mock('@/components/organisms/contact-sidebar/ContactAvatar', () => ({
-  ContactAvatar: ({
-    fullName,
-  }: {
-    fullName: string;
-    [key: string]: unknown;
-  }) => <div data-testid='contact-avatar'>{fullName}</div>,
+  useContactHeaderParts: () => ({
+    title: 'Contact',
+    actions: null,
+    primaryActions: [],
+    overflowActions: [],
+  }),
 }));
 
 // Mock SocialIcon
@@ -190,7 +201,6 @@ describe('ContactSidebar', () => {
     render(<ContactSidebar contact={mockContact} mode='admin' isOpen={true} />);
 
     expect(screen.getByTestId('contact-sidebar')).toBeInTheDocument();
-    expect(screen.getByTestId('contact-avatar')).toBeInTheDocument();
   });
 
   it('tab switching between Details and Social works', async () => {
@@ -203,8 +213,8 @@ describe('ContactSidebar', () => {
     expect(detailsTab).toHaveAttribute('aria-selected', 'true');
     expect(socialTab).toHaveAttribute('aria-selected', 'false');
 
-    // Details content visible
-    expect(screen.getByTestId('contact-avatar')).toBeInTheDocument();
+    // Details content visible — name field present
+    expect(screen.getByPlaceholderText('Full name')).toBeInTheDocument();
 
     // Switch to Social tab
     await user.click(socialTab);
@@ -213,14 +223,11 @@ describe('ContactSidebar', () => {
 
     // Social content visible — Social links section
     expect(screen.getByText('Social links')).toBeInTheDocument();
-    // Avatar still visible above tabs
-    expect(screen.getByTestId('contact-avatar')).toBeInTheDocument();
   });
 
-  it('Details tab shows avatar and name fields', () => {
+  it('Details tab shows name fields', () => {
     render(<ContactSidebar contact={mockContact} mode='admin' isOpen={true} />);
 
-    expect(screen.getByTestId('contact-avatar')).toHaveTextContent('John Doe');
     expect(screen.getByPlaceholderText('Full name')).toHaveValue('John Doe');
   });
 

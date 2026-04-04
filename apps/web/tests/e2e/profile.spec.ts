@@ -35,6 +35,8 @@ const hasDatabase = !!(
 const runProfileTests = process.env.E2E_ARTIST_PROFILE === '1' || hasDatabase;
 const describeProfile = runProfileTests ? test.describe : test.describe.skip;
 
+test.describe.configure({ mode: 'serial' });
+
 async function interceptAnalytics(page: Page) {
   await page.route('**/api/profile/view', (r: Route) =>
     r.fulfill({ status: 200, body: '{}' })
@@ -54,6 +56,10 @@ function isUnavailablePage(text: string): boolean {
     body.includes('temporarily unavailable') ||
     body.includes('loading jovie profile')
   );
+}
+
+function artistNameLocator(page: Page) {
+  return page.getByText('Dua Lipa', { exact: true }).first();
 }
 
 async function assertProfilePageHealthy(page: Page) {
@@ -81,7 +87,10 @@ describeProfile('Profile - Core Rendering', () => {
 
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
-    await page.goto('/dualipa', { timeout: 120_000 });
+    await page.goto('/dualipa', {
+      timeout: 120_000,
+      waitUntil: 'domcontentloaded',
+    });
 
     const h1Visible = await page
       .locator('h1')
@@ -93,7 +102,7 @@ describeProfile('Profile - Core Rendering', () => {
   });
 
   test('displays artist name, subtitle, and avatar', async ({ page }) => {
-    await expect(page.locator('h1')).toContainText('Dua Lipa');
+    await expect(artistNameLocator(page)).toBeVisible();
     await expect(page.getByText(/Pop artist|Artist/).first()).toBeVisible();
 
     // Avatar
@@ -149,14 +158,15 @@ describeProfile('Profile - Core Rendering', () => {
 
   test('is responsive on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await expect(page.locator('h1')).toContainText('Dua Lipa');
+    await expect(artistNameLocator(page)).toBeVisible();
     await expect(page.getByText(/Pop artist|Artist/).first()).toBeVisible();
   });
 
   test('has proper heading structure with single h1', async ({ page }) => {
     const h1Count = await page.locator('h1').count();
     expect(h1Count).toBe(1);
-    await expect(page.locator('h1')).toContainText('Dua Lipa');
+    await expect(artistNameLocator(page)).toBeVisible();
+    await expect(page.locator('h1')).toBeVisible();
   });
 });
 
@@ -170,7 +180,10 @@ describeProfile('Profile - 404 Page', () => {
   test('shows 404 with navigation for non-existent profile', async ({
     page,
   }) => {
-    await page.goto('/nonexistent-artist', { timeout: 120_000 });
+    await page.goto('/nonexistent-artist', {
+      timeout: 120_000,
+      waitUntil: 'domcontentloaded',
+    });
 
     const h1 = page.locator('h1');
     const isH1Visible = await h1
@@ -192,7 +205,10 @@ describeProfile('Profile - 404 Page', () => {
   });
 
   test('404 page has noindex meta tag', async ({ page }) => {
-    await page.goto('/nonexistent-artist', { timeout: 120_000 });
+    await page.goto('/nonexistent-artist', {
+      timeout: 120_000,
+      waitUntil: 'domcontentloaded',
+    });
 
     const h1 = page.locator('h1');
     const isH1Visible = await h1
@@ -293,7 +309,7 @@ test.describe('Profile Modes @smoke @critical', () => {
             return;
           }
 
-          await expect(page.locator('h1').first()).toContainText(/Dua Lipa/i, {
+          await expect(artistNameLocator(page)).toBeVisible({
             timeout: SMOKE_TIMEOUTS.VISIBILITY,
           });
 
@@ -454,6 +470,7 @@ test.describe('Profile Modes @smoke @critical', () => {
 
     await page.waitForURL(new RegExp(`/${handle}(?:$|\\?)`), {
       timeout: SMOKE_TIMEOUTS.URL_STABLE,
+      waitUntil: 'domcontentloaded',
     });
     await waitForHydration(page);
     const bodyText = await assertProfilePageHealthy(page);

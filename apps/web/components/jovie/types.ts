@@ -73,6 +73,13 @@ export interface ChatInsightsToolResult extends ChatInsightSummary {
   readonly success: boolean;
 }
 
+export interface SocialLinkRemovalToolResult {
+  readonly success: boolean;
+  readonly linkId: string;
+  readonly platform: string;
+  readonly url: string;
+}
+
 export interface ToolInvocationPart {
   type: 'tool-invocation';
   toolInvocationId: string;
@@ -139,6 +146,7 @@ export const TOOL_LABELS: Record<string, string> = {
   markCanvasUploaded: 'Updating canvas status...',
   createRelease: 'Creating release...',
   submitFeedback: 'Submitting feedback...',
+  generateReleasePitch: 'Generating pitches...',
 };
 
 /** A chat suggestion card with icon, label, and prompt */
@@ -166,12 +174,35 @@ export interface StarterSuggestionContext {
  */
 export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
+    icon: 'Eye',
+    label: 'Preview profile',
+    prompt: 'Preview my profile.',
+    accent: 'purple',
+  },
+  {
     icon: 'Camera',
-    label: 'Change profile photo',
+    label: 'Change photo',
     prompt: 'Help me change my profile photo.',
     accent: 'purple',
   },
+  {
+    icon: 'Link2',
+    label: 'Release link',
+    prompt: 'Set up a link for my latest release.',
+    accent: 'blue',
+  },
 ] as const;
+
+/**
+ * Pitch generation suggestion shown only to paid-plan users.
+ * Personalized with latestReleaseTitle when available.
+ */
+export const PITCH_SUGGESTION: ChatSuggestion = {
+  icon: 'Music',
+  label: 'Generate pitches',
+  prompt: 'Generate playlist pitches for my latest release.',
+  accent: 'blue',
+};
 
 /**
  * Special feedback suggestion shown in both suggestion lists.
@@ -187,19 +218,19 @@ export const FEEDBACK_SUGGESTION: ChatSuggestion = {
 export const FIRST_SESSION_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
     icon: 'Link2',
-    label: 'Set up a link for my latest release',
+    label: 'Release link',
     prompt: 'Set up a link for my latest release.',
     accent: 'blue',
   },
   {
     icon: 'Eye',
-    label: 'Preview my profile',
+    label: 'Preview profile',
     prompt: 'Preview my profile.',
     accent: 'purple',
   },
   {
     icon: 'DollarSign',
-    label: 'How do I get paid?',
+    label: 'Getting paid',
     prompt: 'How do I get paid?',
     accent: 'green',
   },

@@ -21,6 +21,7 @@ import {
   type ReconciliationStats,
   updateStatsFromResult,
 } from '@/lib/billing/reconciliation/batch-processor';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog } from '@/lib/db/schema/billing';
@@ -98,13 +99,11 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
  * Daily cron job to reconcile billing status between DB and Stripe
  */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/billing-reconciliation',
+    cronSecret: CRON_SECRET,
+  });
+  if (authError) return authError;
 
   try {
     const result = await runReconciliation();
@@ -163,6 +162,7 @@ async function reconcileUsersWithSubscriptions(
   errors: string[]
 ): Promise<void> {
   let lastUserId: string | null = null;
+  let lastBatchWasFull = false;
   let batchCount = 0;
 
   while (batchCount < MAX_BATCHES) {
@@ -170,9 +170,12 @@ async function reconcileUsersWithSubscriptions(
 
     const batch = await fetchUserBatch(db, lastUserId);
     if (batch.length === 0) break;
+    lastBatchWasFull = batch.length === BATCH_SIZE;
 
     // Update cursor to last user in batch before parallel processing
-    lastUserId = batch.at(-1)!.id;
+    const lastUser = batch.at(-1);
+    if (!lastUser) break;
+    lastUserId = lastUser.id;
 
     // Process users with bounded concurrency to avoid Stripe rate limits
     for (
@@ -190,10 +193,21 @@ async function reconcileUsersWithSubscriptions(
     if (batch.length < BATCH_SIZE) break;
   }
 
-  if (batchCount >= MAX_BATCHES) {
+  if (batchCount >= MAX_BATCHES && lastBatchWasFull && lastUserId) {
+    const [remainingUsersResult] = await db
+      .select({
+        count: drizzleSql<number>`count(*)`,
+      })
+      .from(users)
+      .where(
+        drizzleSql`${users.stripeSubscriptionId} IS NOT NULL AND ${users.id} > ${lastUserId}`
+      );
+    const estimatedRemainingUsers = Number(remainingUsersResult?.count ?? 0);
+
     await captureWarning('Billing reconciliation hit batch limit', undefined, {
       batchCount,
       usersChecked: stats.usersChecked,
+      estimatedRemainingUsers,
     });
   }
 }

@@ -6,6 +6,14 @@ import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSect
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { getConversionFunnelData } from '@/lib/admin/conversion-funnel';
 
+const FUNNEL_SKELETON_KEYS = [
+  'visitors',
+  'profiles',
+  'completed',
+  'subscribers',
+  'paid',
+] as const;
+
 function formatPercent(rate: number | null): string {
   if (rate === null) return '—';
   return `${(rate * 100).toFixed(1)}%`;
@@ -59,8 +67,8 @@ export function AdminConversionFunnelSectionSkeleton() {
         className='min-h-0 px-(--linear-app-header-padding-x) py-3'
       />
       <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-5'>
-        {Array.from({ length: 5 }, (_, i) => (
-          <ContentMetricCardSkeleton key={`funnel-${i + 1}`} />
+        {FUNNEL_SKELETON_KEYS.map(metricKey => (
+          <ContentMetricCardSkeleton key={metricKey} />
         ))}
       </div>
     </ContentSurfaceCard>

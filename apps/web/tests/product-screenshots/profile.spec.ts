@@ -13,8 +13,9 @@
  *   public/product-screenshots/
  */
 
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
+  assertNoDevOverlays,
   hideTransientUI,
   OUTPUT_DIR,
   TIMEOUTS,
@@ -24,6 +25,16 @@ import {
 
 /** The seeded E2E test user's username handle */
 const PROFILE_USERNAME = 'e2e-test-user';
+
+async function assertProfileLoaded(
+  page: import('@playwright/test').Page
+): Promise<void> {
+  await expect(page).toHaveURL(new RegExp(`/${PROFILE_USERNAME}$`));
+  await expect(page.locator('body')).not.toContainText('Page not found');
+  await expect(page.locator('body')).not.toContainText(
+    'The link you followed may be broken'
+  );
+}
 
 test.describe('Product Screenshots – Public Profile', () => {
   test('profile – phone viewport', async ({ page }) => {
@@ -36,10 +47,14 @@ test.describe('Product Screenshots – Public Profile', () => {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
     });
+    await assertProfileLoaded(page);
 
-    // Wait for profile content to load — look for avatar or profile header
+    // Wait for profile content to load — look for profile-specific elements
+    // (not img[alt] which matches hidden dark-mode logos)
     await page
-      .locator('img[alt], [data-testid="profile-header"], h1')
+      .locator(
+        '[data-testid="profile-header"]:visible, h1:visible, main img[alt]:visible'
+      )
       .first()
       .waitFor({ state: 'visible', timeout: TIMEOUTS.CONTENT_VISIBLE });
 
@@ -51,6 +66,7 @@ test.describe('Product Screenshots – Public Profile', () => {
 
     await waitForSettle(page);
     await hideTransientUI(page);
+    await assertNoDevOverlays(page);
 
     await page.screenshot({
       path: `${OUTPUT_DIR}/profile-phone.png`,
@@ -67,9 +83,12 @@ test.describe('Product Screenshots – Public Profile', () => {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
     });
+    await assertProfileLoaded(page);
 
     await page
-      .locator('img[alt], [data-testid="profile-header"], h1')
+      .locator(
+        '[data-testid="profile-header"]:visible, h1:visible, main img[alt]:visible'
+      )
       .first()
       .waitFor({ state: 'visible', timeout: TIMEOUTS.CONTENT_VISIBLE });
 
@@ -79,6 +98,7 @@ test.describe('Product Screenshots – Public Profile', () => {
 
     await waitForSettle(page);
     await hideTransientUI(page);
+    await assertNoDevOverlays(page);
 
     await page.screenshot({
       path: `${OUTPUT_DIR}/profile-desktop.png`,

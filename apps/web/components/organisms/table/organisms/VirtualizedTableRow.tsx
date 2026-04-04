@@ -36,6 +36,7 @@ export interface VirtualizedTableRowProps<TData> {
   ) => void;
   readonly onFocusChange: (index: number) => void;
   readonly getRowClassName?: (row: TData, index: number) => string;
+  readonly getRowTestId?: (row: TData, index: number) => string | undefined;
   readonly measureElement?: (el: HTMLTableRowElement | null) => void;
   /**
    * Called when the row is shift-clicked.
@@ -73,6 +74,7 @@ function VirtualizedTableRowComponent<TData>({
   onKeyDown,
   onFocusChange,
   getRowClassName,
+  getRowTestId,
   measureElement,
   onRowShiftClick,
   ...htmlProps
@@ -144,6 +146,7 @@ function VirtualizedTableRowComponent<TData>({
       key={row.id}
       ref={handleRef}
       data-index={rowIndex}
+      data-testid={getRowTestId?.(rowData, rowIndex)}
       tabIndex={shouldEnableKeyboardNav ? 0 : undefined}
       className={cn(
         presets.tableRow,
@@ -157,7 +160,6 @@ function VirtualizedTableRowComponent<TData>({
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       onFocus={handleFocusChange}
-      onMouseEnter={handleFocusChange}
       onContextMenu={handleContextMenu}
       style={
         shouldVirtualize && virtualStart !== undefined

@@ -120,6 +120,15 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** Tip checkout: 30 sessions per hour per IP - public endpoint, higher limit for shared IPs */
+  tipCheckout: {
+    name: 'Tip Checkout',
+    limit: 30,
+    window: '1 h',
+    prefix: 'tip_checkout',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   // ---------------------------------------------------------------------------
   // Admin Operations
   // ---------------------------------------------------------------------------
@@ -158,6 +167,15 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'admin:creator-ingest',
     analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Deploy promote: 1 request per minute globally */
+  deployPromote: {
+    name: 'Deploy Promote',
+    limit: 1,
+    window: '1 m',
+    prefix: 'admin:deploy-promote',
+    analytics: false,
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -250,6 +268,15 @@ export const RATE_LIMITERS = {
     limit: 60,
     window: '1 m',
     prefix: 'general',
+    analytics: false,
+  } satisfies RateLimitConfig,
+
+  /** Changelog subscribe: 1 request per 10 seconds per IP */
+  changelogSubscribe: {
+    name: 'Changelog Subscribe',
+    limit: 1,
+    window: '10 s',
+    prefix: 'changelog:subscribe',
     analytics: false,
   } satisfies RateLimitConfig,
 
@@ -445,12 +472,12 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
-  /** AI Chat daily quota (Growth): derived from ENTITLEMENT_REGISTRY */
-  aiChatDailyGrowth: {
-    name: 'AI Chat Daily (Growth)',
-    limit: ENTITLEMENT_REGISTRY.growth.limits.aiDailyMessageLimit,
+  /** AI Chat daily quota (Max): derived from ENTITLEMENT_REGISTRY */
+  aiChatDailyMax: {
+    name: 'AI Chat Daily (Max)',
+    limit: ENTITLEMENT_REGISTRY.max.limits.aiDailyMessageLimit,
     window: '1 d',
-    prefix: 'ai:chat:daily:growth',
+    prefix: 'ai:chat:daily:max',
     analytics: true,
   } satisfies RateLimitConfig,
 

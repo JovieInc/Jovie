@@ -19,6 +19,10 @@ interface ChecklistItem {
   action?: 'copy-url';
 }
 
+const CHECKLIST_ITEM_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  'set-up-tips': ['connect-venmo'],
+};
+
 const CHECKLIST_ITEMS: ChecklistItem[] = [
   {
     id: 'share-instagram',
@@ -43,10 +47,10 @@ const CHECKLIST_ITEMS: ChecklistItem[] = [
     href: `${APP_ROUTES.SETTINGS}/referral`,
   },
   {
-    id: 'connect-venmo',
-    label: 'Connect Venmo for tips',
+    id: 'set-up-tips',
+    label: 'Set Up Tips',
     description: 'Let fans support you directly',
-    href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    href: `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#tips`,
   },
 ];
 
@@ -62,7 +66,16 @@ function loadCompleted(userId: string): Set<string> {
   try {
     const raw = localStorage.getItem(getStorageKey(userId));
     if (!raw) return new Set();
-    return new Set(JSON.parse(raw) as string[]);
+    const stored = JSON.parse(raw) as string[];
+    const normalized = new Set(stored);
+
+    for (const [itemId, aliases] of Object.entries(CHECKLIST_ITEM_ALIASES)) {
+      if (aliases.some(alias => normalized.has(alias))) {
+        normalized.add(itemId);
+      }
+    }
+
+    return normalized;
   } catch {
     return new Set();
   }
@@ -162,9 +175,9 @@ export function GetStartedChecklistCard({
 
   return (
     <ContentSurfaceCard className='overflow-hidden p-0'>
-      <div className='flex items-center justify-between px-2 py-1'>
+      <div className='flex items-center justify-between gap-3 border-b border-(--linear-app-frame-seam) px-3 py-2'>
         <div className='flex items-center gap-1.5'>
-          <h3 className='text-[11px] font-[510] text-secondary-token'>
+          <h3 className='text-[12px] font-[510] tracking-[-0.01em] text-primary-token'>
             Get started
           </h3>
           <span className='text-[11px] text-tertiary-token'>
@@ -185,7 +198,7 @@ export function GetStartedChecklistCard({
           <button
             type='button'
             onClick={handleDismiss}
-            className='text-[11px] text-tertiary-token transition-colors hover:text-secondary-token'
+            className='rounded-full border border-transparent px-2 py-0.5 text-[11px] text-tertiary-token transition-colors hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-secondary-token'
           >
             Dismiss
           </button>
@@ -193,16 +206,16 @@ export function GetStartedChecklistCard({
       </div>
 
       {/* Progress bar */}
-      <div className='mx-2 mb-px h-px rounded-full bg-surface-2'>
+      <div className='mx-3 mt-2 h-1 rounded-full bg-surface-0'>
         <div
-          className='h-px rounded-full bg-[var(--linear-accent)] transition-all duration-300'
+          className='h-1 rounded-full bg-[var(--linear-accent)] transition-all duration-300'
           style={{
             width: `${(completedCount / CHECKLIST_ITEMS.length) * 100}%`,
           }}
         />
       </div>
 
-      <ul className='px-1 pb-0.5'>
+      <ul className='px-2 py-2'>
         {CHECKLIST_ITEMS.map(item => {
           const isDone = completed.has(item.id);
 
@@ -213,24 +226,24 @@ export function GetStartedChecklistCard({
                 e.stopPropagation();
                 toggleItem(item.id);
               }}
-              className={`flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
+              className={`flex h-4.5 w-4.5 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
                 isDone
                   ? 'border-[var(--linear-accent)] bg-[var(--linear-accent)]'
-                  : 'border-subtle hover:border-secondary-token'
+                  : 'border-subtle bg-(--linear-app-content-surface) hover:border-secondary-token'
               }`}
               aria-label={
                 isDone ? `Unmark ${item.label}` : `Mark ${item.label} as done`
               }
             >
               {isDone ? (
-                <Check className='h-2 w-2 text-white' aria-hidden='true' />
+                <Check className='h-2.5 w-2.5 text-white' aria-hidden='true' />
               ) : null}
             </button>
           );
 
           const labelEl = (
             <p
-              className={`min-w-0 flex-1 text-[11px] leading-tight ${isDone ? 'line-through text-tertiary-token' : 'text-secondary-token'}`}
+              className={`min-w-0 flex-1 text-[12px] leading-snug ${isDone ? 'line-through text-tertiary-token' : 'text-secondary-token'}`}
             >
               {item.label}
             </p>
@@ -240,7 +253,7 @@ export function GetStartedChecklistCard({
             return (
               <li
                 key={item.id}
-                className='flex items-center gap-1.5 rounded px-1 py-px hover:bg-surface-0/60'
+                className='flex items-center gap-2 rounded-full border border-transparent px-2.5 py-1.5 hover:border-(--linear-app-frame-seam) hover:bg-surface-0'
               >
                 {checkboxEl}
                 <Link
@@ -256,8 +269,10 @@ export function GetStartedChecklistCard({
           return (
             <li
               key={item.id}
-              className={`flex items-center gap-1.5 rounded px-1 py-px transition-colors ${
-                isDone ? 'opacity-50' : 'hover:bg-surface-0/60'
+              className={`flex items-center gap-2 rounded-full border border-transparent px-2.5 py-1.5 transition-colors ${
+                isDone
+                  ? 'bg-surface-0/70 opacity-50'
+                  : 'hover:border-(--linear-app-frame-seam) hover:bg-surface-0'
               }`}
             >
               {checkboxEl}
@@ -269,7 +284,7 @@ export function GetStartedChecklistCard({
                     e.stopPropagation();
                     handleCopyUrl();
                   }}
-                  className='text-[10px] text-tertiary-token transition-colors hover:text-secondary-token'
+                  className='rounded-full border border-transparent px-2 py-0.5 text-[10px] text-tertiary-token transition-colors hover:border-(--linear-app-frame-seam) hover:bg-surface-1 hover:text-secondary-token'
                 >
                   Copy
                 </button>

@@ -1,58 +1,51 @@
-'use client';
-
 import { MarketingContainer } from '@/components/marketing';
 import { ClaimHandleForm } from './claim-handle';
 
 export function FinalCTASection() {
   return (
     <section
-      className='relative z-10 overflow-hidden'
+      className='section-glow section-glow-cta relative z-10 overflow-hidden'
       style={{
         borderTop: '1px solid var(--linear-border-subtle)',
         paddingTop: 'var(--linear-cta-section-pt)',
         paddingBottom: 'var(--linear-cta-section-pb)',
       }}
     >
+      {/* Orb glow behind headline */}
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2'
+        style={{
+          width: '600px',
+          height: '400px',
+          background:
+            'radial-gradient(ellipse at center, oklch(18% 0.04 270 / 0.3), transparent 65%)',
+          filter: 'blur(40px)',
+        }}
+      />
       <MarketingContainer width='landing'>
-        <div className='reveal-on-scroll relative grid gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start'>
-          <div className='max-w-[32rem]'>
-            <p className='marketing-kicker'>Start free</p>
-            <h2
-              data-testid='final-cta-headline'
-              className='marketing-h2-linear mt-6 text-primary-token'
-            >
-              Available today.
-            </h2>
+        <div className='reveal-on-scroll relative mx-auto max-w-[36rem] text-center'>
+          <h2
+            data-testid='final-cta-headline'
+            className='marketing-h2-linear text-primary-token'
+          >
+            Claim your handle.
+          </h2>
 
-            <p className='mt-4 max-w-[30rem] marketing-lead-linear text-secondary-token'>
-              Claim your handle and get your release system ready before the
-              next song drops.
-            </p>
+          <p className='marketing-lead-linear mt-4 text-secondary-token'>
+            Your next release does the rest.
+          </p>
 
-            <div className='mt-5 flex flex-col items-start gap-2 text-left text-[length:var(--linear-label-size)] text-tertiary-token'>
-              <p className='flex items-center gap-2'>
-                <span
-                  aria-hidden='true'
-                  className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)]'
-                />
-                Live in minutes
-              </p>
-              <p>No credit card required</p>
-            </div>
+          <div
+            data-testid='final-cta-form'
+            className='mx-auto mt-7 w-full max-w-[27rem]'
+          >
+            <ClaimHandleForm />
           </div>
 
-          <div className='w-full max-w-[34rem] lg:justify-self-end'>
-            <div
-              id='final-cta-dock'
-              data-testid='final-cta-dock'
-              className='homepage-surface-card relative w-full overflow-hidden rounded-[1rem] p-2'
-              style={{
-                borderColor: 'var(--linear-border-default)',
-              }}
-            >
-              <ClaimHandleForm />
-            </div>
-          </div>
+          <p className='mt-5 text-[11px] tracking-[0.01em] text-quaternary-token'>
+            Be one of the first artists on Jovie.
+          </p>
         </div>
       </MarketingContainer>
     </section>

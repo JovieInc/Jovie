@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { APP_ROUTES } from '@/constants/routes';
 import { isProfileComplete } from '@/lib/auth/profile-completeness';
 
 /**
@@ -12,15 +13,20 @@ import { isProfileComplete } from '@/lib/auth/profile-completeness';
  * this guard ensures authenticated users without a usable profile
  * are sent to onboarding.
  *
- * Uses the canonical isProfileComplete() check, plus an additional
- * avatar check — avatar is enforced client-side only because it uploads
- * asynchronously during onboarding steps 1-2.
+ * Uses the canonical isProfileComplete() check only. Avatar is NOT
+ * checked here — it's a soft requirement handled by the onboarding
+ * step-resume logic (resolveInitialStep). Adding avatar here causes
+ * an infinite redirect loop: /app → /onboarding (ACTIVE guard) → /app.
  */
 export function ProfileCompletionRedirect() {
-  const { selectedProfile, dashboardLoadError } = useDashboardData();
+  const { selectedProfile, dashboardLoadError, isAdmin } = useDashboardData();
   const router = useRouter();
 
   useEffect(() => {
+    if (isAdmin) {
+      return;
+    }
+
     // Don't redirect when profile is null due to a data loading error —
     // the null selectedProfile reflects a transient failure, not a missing
     // profile. Redirecting here would loop: /app → /onboarding → /app.
@@ -29,19 +35,15 @@ export function ProfileCompletionRedirect() {
     }
 
     if (!selectedProfile) {
-      router.replace('/onboarding');
+      router.replace(APP_ROUTES.ONBOARDING);
       return;
     }
 
-    // Canonical completeness check (username, displayName, isPublic, onboarding)
-    // plus avatar which is only enforced client-side.
-    if (
-      !isProfileComplete(selectedProfile) ||
-      !selectedProfile.avatarUrl?.trim()
-    ) {
-      router.replace('/onboarding');
+    // Canonical completeness check (username, displayName, isPublic, onboarding).
+    if (!isProfileComplete(selectedProfile)) {
+      router.replace(APP_ROUTES.ONBOARDING);
     }
-  }, [router, selectedProfile, dashboardLoadError]);
+  }, [dashboardLoadError, isAdmin, router, selectedProfile]);
 
   return null;
 }

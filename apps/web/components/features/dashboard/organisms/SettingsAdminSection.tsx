@@ -1,23 +1,15 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import * as Switch from '@radix-ui/react-switch';
-import {
-  ExternalLink,
-  Send,
-  ShieldCheck,
-  Terminal,
-  UserPlus,
-  Users,
-} from 'lucide-react';
+import { ExternalLink, Terminal } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { CampaignSettingsPanel } from '@/components/features/admin/campaigns/CampaignSettingsPanel';
 import { WaitlistSettingsPanel } from '@/components/features/admin/WaitlistSettingsPanel';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { APP_ROUTES } from '@/constants/routes';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
+import { adminSettingsNavigationSections } from '@/components/features/dashboard/dashboard-nav/config';
+import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
+import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
 
 const DEV_TOOLBAR_COOKIE = '__dev_toolbar';
 
@@ -50,25 +42,23 @@ interface AdminLinkProps {
 
 function AdminLink({ href, icon: Icon, title, description }: AdminLinkProps) {
   return (
-    <ContentSurfaceCard className='flex items-center justify-between gap-3 bg-surface-0 p-4'>
-      <div className='flex min-w-0 items-center gap-3'>
-        <Icon className='h-4 w-4 shrink-0 text-secondary-token' aria-hidden />
-        <div>
-          <p className='text-[13px] font-[510] text-primary-token'>{title}</p>
-          <p className='mt-0.5 text-[13px] text-secondary-token'>
-            {description}
-          </p>
-        </div>
-      </div>
-      <Button variant='outline' size='sm' asChild>
-        <Link href={href}>
-          Open
-          <ExternalLink className='h-3.5 w-3.5 ml-1.5' />
-        </Link>
-      </Button>
-    </ContentSurfaceCard>
+    <SettingsActionRow
+      icon={<Icon className='h-4 w-4' aria-hidden />}
+      title={title}
+      description={description}
+      action={
+        <Button variant='outline' size='sm' asChild>
+          <Link href={href}>
+            Open
+            <ExternalLink className='ml-1.5 h-3.5 w-3.5' />
+          </Link>
+        </Button>
+      }
+    />
   );
 }
+
+const quickLinkSections = adminSettingsNavigationSections;
 
 /**
  * Admin settings section - only visible to admin users.
@@ -81,48 +71,21 @@ export function SettingsAdminSection() {
 
   return (
     <div className='space-y-6'>
-      {/* Dev Toolbar toggle */}
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
+      <SettingsPanel
+        title='Developer tools'
+        description='Controls for the on-screen dev toolbar.'
       >
-        <ContentSectionHeader
-          title='Developer tools'
-          subtitle='Controls for the on-screen dev toolbar.'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='px-4 py-3'>
-          <ContentSurfaceCard className='flex items-center justify-between gap-3 bg-surface-0 p-4'>
-            <div className='flex min-w-0 items-center gap-3'>
-              <Terminal
-                className='h-4 w-4 shrink-0 text-secondary-token'
-                aria-hidden
-              />
-              <div>
-                <p className='text-[13px] font-[510] text-primary-token'>
-                  Dev Toolbar
-                </p>
-                <p className='mt-0.5 text-[13px] text-secondary-token'>
-                  Show the dev toolbar with feature flag overrides and
-                  environment info.
-                </p>
-              </div>
-            </div>
-            <Switch.Root
-              checked={devToolbar.enabled}
-              onCheckedChange={devToolbar.toggle}
-              className={`relative w-9 h-5 rounded-full transition-colors outline-none cursor-pointer shrink-0 ${
-                devToolbar.enabled
-                  ? 'bg-[var(--color-accent)]'
-                  : 'bg-[var(--color-bg-surface-3,#333)]'
-              }`}
-            >
-              <Switch.Thumb className='block w-4 h-4 bg-white rounded-full transition-transform translate-x-0.5 data-[state=checked]:translate-x-[18px] shadow-sm' />
-            </Switch.Root>
-          </ContentSurfaceCard>
+        <div className='px-4 py-4 sm:px-5'>
+          <SettingsToggleRow
+            icon={<Terminal className='h-4 w-4' aria-hidden />}
+            title='Dev toolbar'
+            description='Show the toolbar with feature-flag overrides and environment details.'
+            checked={devToolbar.enabled}
+            onCheckedChange={devToolbar.toggle}
+            ariaLabel='Toggle dev toolbar'
+          />
         </div>
-      </DashboardCard>
+      </SettingsPanel>
 
       {/* Waitlist settings */}
       <WaitlistSettingsPanel />
@@ -130,44 +93,31 @@ export function SettingsAdminSection() {
       {/* Campaign targeting & throttling */}
       <CampaignSettingsPanel />
 
-      {/* Admin quick links */}
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
+      <SettingsPanel
+        title='Admin dashboards'
+        description='Quick links to admin data views and operational tools.'
       >
-        <ContentSectionHeader
-          title='Admin dashboards'
-          subtitle='Quick links to admin data views and operational tools.'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='space-y-2 px-4 py-3'>
-          <AdminLink
-            href={APP_ROUTES.ADMIN_WAITLIST}
-            icon={UserPlus}
-            title='Waitlist'
-            description='Review signups and approval queue.'
-          />
-          <AdminLink
-            href={APP_ROUTES.ADMIN_CAMPAIGNS}
-            icon={Send}
-            title='Campaigns'
-            description='Invite throughput, claim funnel, and send controls.'
-          />
-          <AdminLink
-            href={APP_ROUTES.ADMIN_CREATORS}
-            icon={Users}
-            title='Creator Management'
-            description='Verify, feature, and manage creator profiles.'
-          />
-          <AdminLink
-            href={APP_ROUTES.ADMIN}
-            icon={ShieldCheck}
-            title='Admin Dashboard'
-            description='Platform metrics, activity logs, and system health.'
-          />
+        <div className='space-y-4 px-4 py-4 sm:px-5'>
+          {quickLinkSections.map(section => (
+            <div key={section.label} className='space-y-2'>
+              <p className='text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
+                {section.label}
+              </p>
+              <div className='divide-y divide-subtle/60'>
+                {section.items.map(item => (
+                  <AdminLink
+                    key={item.id}
+                    href={item.href}
+                    icon={item.icon}
+                    title={item.name}
+                    description={item.description ?? 'Open admin workspace'}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
-      </DashboardCard>
+      </SettingsPanel>
     </div>
   );
 }

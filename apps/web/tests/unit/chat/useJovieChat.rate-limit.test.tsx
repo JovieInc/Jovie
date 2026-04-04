@@ -18,6 +18,8 @@ const mutateAsyncMock = vi.fn();
 const setMessagesMock = vi.fn();
 let onRejectHandler: (() => void) | undefined;
 let mockStatus: 'ready' | 'streaming' = 'ready';
+let currentChatId = 'new-chat';
+let currentTransportConversationId: string | null = null;
 let mockMessages: Array<{
   id: string;
   role: string;
@@ -38,16 +40,24 @@ let mockConversationData:
 
 vi.mock('@ai-sdk/react', () => ({
   useChat: ({
+    id,
     transport,
   }: {
+    id?: string;
     transport: { body?: { conversationId?: string } };
   }) => {
-    const currentConversationId = transport.body?.conversationId;
+    if (id && id !== currentChatId) {
+      currentChatId = id;
+      currentTransportConversationId = transport.body?.conversationId ?? null;
+    } else if (!id && currentChatId === 'new-chat') {
+      currentTransportConversationId = transport.body?.conversationId ?? null;
+    }
+
     return {
       messages: mockMessages,
       sendMessage: (payload: unknown) =>
         sendMessageMock({
-          conversationIdAtSend: currentConversationId ?? null,
+          conversationIdAtSend: currentTransportConversationId,
           payload,
         }),
       status: mockStatus,
@@ -101,6 +111,8 @@ describe('useJovieChat', () => {
     });
     onRejectHandler = undefined;
     mockStatus = 'ready';
+    currentChatId = 'new-chat';
+    currentTransportConversationId = null;
     mockMessages = [];
     mockConversationData = undefined;
   });

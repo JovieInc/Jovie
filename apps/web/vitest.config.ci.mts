@@ -13,6 +13,7 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     exclude: [
       'tests/e2e/**',
+      'tests/eval/**',
       'tests/performance/**',
       'tests/product-screenshots/**',
       'node_modules/**',
@@ -38,7 +39,7 @@ export default defineConfig({
     // Coverage optimization
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'json', 'html', 'lcov'],
       exclude: [
         'node_modules/**',
         'tests/**',
@@ -48,6 +49,15 @@ export default defineConfig({
         '.next/**',
         'dist/**',
       ],
+      // Coverage ratchet: prevents coverage from DECREASING on main branch.
+      // Calibrate by running: doppler run -- pnpm vitest run --config=vitest.config.ci.mts --coverage
+      // Then set thresholds 1% below current values.
+      // These are placeholder zeros — calibrate before enforcing.
+      thresholds: {
+        lines: 0,
+        functions: 0,
+        branches: 0,
+      },
     },
     // Test timeout - 5s safety net (tests target <200ms)
     testTimeout: 5000,
@@ -80,8 +90,12 @@ export default defineConfig({
         replacement: `${path.resolve(__dirname, './app/(marketing)')}/`,
       },
       {
+        find: /^@\/app\/\(shell\)\//,
+        replacement: `${path.resolve(__dirname, './app/app/(shell)')}/`,
+      },
+      {
         find: /^@\/app\//,
-        replacement: `${path.resolve(__dirname, './app/app')}/`,
+        replacement: `${path.resolve(__dirname, './app')}/`,
       },
       {
         find: /^@\/features\//,

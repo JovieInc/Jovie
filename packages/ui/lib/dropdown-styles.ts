@@ -15,9 +15,9 @@
  *   Content padding: p-0.5, Item: px-2 py-1 text-[12.5px] leading-[16px]
  *
  * Design tokens used:
- * - Border radius: rounded-lg (8px)
- * - Background: bg-surface-0 / dark:bg-surface-2 (elevated)
- * - Border: border-subtle (uses design token for both modes)
+ * - Border radius: rounded-(--linear-app-radius-menu) / rounded-(--linear-app-radius-item)
+ * - Background: bg-(--linear-bg-surface-0) (elevated)
+ * - Border: border-(--linear-border-default) (uses design token for both modes)
  * - Shadow: consistent across all variants
  * - Transition: duration-normal ease-interactive
  */
@@ -52,7 +52,7 @@ export const DROPDOWN_SLIDE_ANIMATIONS =
  * Border uses --linear-border-default (slightly more opaque than --linear-border-subtle used by separators)
  */
 export const DROPDOWN_CONTENT_BASE =
-  'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-subtle)/70 bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)';
+  'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)';
 
 /**
  * Shadow effect for elevated appearance
@@ -211,13 +211,13 @@ export const SELECT_ITEM_BASE =
  * Compact menu item — smaller padding & font for dense UIs (tables, sidebars)
  */
 export const MENU_ITEM_COMPACT =
-  'relative flex cursor-default select-none items-center gap-2 rounded-(--linear-app-radius-item) px-2 py-1 text-[12.5px] font-[400] leading-4 outline-none ' +
+  'relative flex min-h-8 cursor-default select-none items-center gap-2 rounded-(--linear-app-radius-item) px-2.5 py-1 text-[12.5px] font-[400] leading-4 outline-none ' +
   'transition-colors duration-normal ease-interactive ' +
   'text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-[0.46] ' +
   'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1) ' +
-  '[&_svg]:pointer-events-none [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0 [&_svg]:[stroke-width:1.5] [&_svg]:text-(--linear-text-tertiary) ' +
+  '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:[stroke-width:1.5] [&_svg]:text-(--linear-text-tertiary) ' +
   'hover:[&_svg]:text-(--linear-text-primary) data-[highlighted]:[&_svg]:text-(--linear-text-primary)';
 
 /**
@@ -285,10 +285,10 @@ export const subMenuContentClasses = [
 // ============================================================================
 
 /**
- * Compact base — same surface/border/animation but tighter padding
+ * Compact base — currently equivalent to DROPDOWN_CONTENT_BASE; retained for future divergence
  */
 export const DROPDOWN_CONTENT_COMPACT_BASE =
-  'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)';
+  'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)';
 
 /**
  * Complete compact DropdownMenu content classes

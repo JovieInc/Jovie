@@ -1,11 +1,12 @@
-/* eslint-disable react-hooks/rules-of-hooks */
 import { test as base } from '@playwright/test';
+import { isExpectedError, isExpectedWarning } from './utils/smoke-test-utils';
 
 declare global {
   interface Window {
     __REACT_DEVTOOLS_GLOBAL_HOOK__?: {
+      renderers: Map<unknown, unknown>;
       supportsFiber: boolean;
-      inject: () => void;
+      inject: () => number;
       onCommitFiberRoot: () => void;
       onCommitFiberUnmount: () => void;
     };
@@ -15,7 +16,7 @@ declare global {
 // Extend the base test with custom setup
 export const test = base.extend({
   // Override the page to handle React context issues and monitor console errors
-  page: async ({ page }, usePage) => {
+  page: async ({ page }, runPage) => {
     // Array to collect console errors
     const consoleErrors: string[] = [];
     const consoleWarnings: string[] = [];
@@ -26,6 +27,7 @@ export const test = base.extend({
         const errorText = msg.text();
         // Skip expected test-related errors
         if (
+          !isExpectedError(errorText) &&
           !errorText.includes('Failed to load resource') && // Common in tests
           !errorText.includes('ERR_INTERNET_DISCONNECTED') && // Network simulation
           !errorText.includes('Navigation cancelled') && // Test navigation
@@ -37,11 +39,7 @@ export const test = base.extend({
       if (msg.type() === 'warning') {
         const warningText = msg.text();
         // Skip expected warnings
-        if (
-          !warningText.includes('React Hook') &&
-          !warningText.includes('useContext') &&
-          !warningText.includes('Invalid hook call')
-        ) {
+        if (!isExpectedWarning(warningText)) {
           consoleWarnings.push(warningText);
         }
       }
@@ -51,15 +49,16 @@ export const test = base.extend({
     await page.addInitScript(() => {
       // Mock React context providers for testing
       window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
+        renderers: new Map(),
         supportsFiber: true,
-        inject: () => {},
+        inject: () => 1,
         onCommitFiberRoot: () => {},
         onCommitFiberUnmount: () => {},
       };
     });
 
     // Use the page
-    await usePage(page);
+    await runPage(page);
 
     // After test completion, log console errors and warnings
     if (consoleErrors.length > 0) {

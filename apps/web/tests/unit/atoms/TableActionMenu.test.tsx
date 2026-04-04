@@ -14,6 +14,7 @@ vi.mock('@jovie/ui', async () => {
       items,
       triggerIcon: TriggerIcon,
       trigger,
+      triggerClassName,
       children,
     }: {
       items: Array<{
@@ -24,11 +25,16 @@ vi.mock('@jovie/ui', async () => {
       }>;
       triggerIcon?: React.ComponentType<{ className?: string }>;
       trigger?: React.ReactNode;
+      triggerClassName?: string;
       children?: React.ReactNode;
     }) => (
       <div data-testid='common-dropdown'>
         {TriggerIcon && (
-          <button type='button' aria-label='Open menu'>
+          <button
+            type='button'
+            aria-label='Open menu'
+            className={triggerClassName}
+          >
             <TriggerIcon className='h-4 w-4' />
           </button>
         )}
@@ -73,6 +79,14 @@ describe('TableActionMenu', () => {
     ).toBeInTheDocument();
   });
 
+  it('renders an accessible default trigger button', () => {
+    render(<TableActionMenu items={sampleItems} />);
+
+    const trigger = screen.getByRole('button', { name: 'Open menu' });
+    expect(trigger).toBeInTheDocument();
+    expect(trigger).toHaveAccessibleName('Open menu');
+  });
+
   it('converts action items to dropdown items', () => {
     render(<TableActionMenu items={sampleItems} />);
     expect(screen.getByTestId('item-edit')).toBeInTheDocument();
@@ -81,8 +95,7 @@ describe('TableActionMenu', () => {
 
   it('converts separator items to dropdown separators', () => {
     render(<TableActionMenu items={sampleItems} />);
-    // Separator gets an auto-generated id prefixed with "separator-"
-    expect(screen.getByTestId('item-separator-1')).toBeInTheDocument();
+    expect(screen.getByTestId('item-menu-separator-1')).toBeInTheDocument();
   });
 
   it('renders destructive items', () => {

@@ -432,4 +432,25 @@ describe('POST /api/webhooks/resend-inbound', () => {
       })
     );
   });
+
+  // -------------------------------------------------------------------
+  // 10. Signature bypass prevention — requires headers when secret set
+  // -------------------------------------------------------------------
+
+  it('returns 401 when webhook secret is configured but signature headers are missing', async () => {
+    const { env: mockEnv } = await import('@/lib/env-server');
+    const original = mockEnv.RESEND_INBOUND_WEBHOOK_SECRET;
+    (mockEnv as Record<string, unknown>).RESEND_INBOUND_WEBHOOK_SECRET =
+      'whsec_test123';
+
+    const req = makeRequest(validPayload());
+    const res = await POST(req as never);
+
+    expect(res.status).toBe(401);
+    const json = await res.json();
+    expect(json.error).toBe('Missing signature headers');
+
+    (mockEnv as Record<string, unknown>).RESEND_INBOUND_WEBHOOK_SECRET =
+      original;
+  });
 });

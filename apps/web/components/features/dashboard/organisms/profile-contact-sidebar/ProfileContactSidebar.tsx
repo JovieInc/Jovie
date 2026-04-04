@@ -1,35 +1,45 @@
 'use client';
 
-import { CommonDropdown } from '@jovie/ui';
-import { ExternalLink, MoreHorizontal, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
+  type PreviewPanelData,
   type PreviewPanelLink,
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
-import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
-import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
+import {
+  DrawerMediaThumb,
+  DrawerSurfaceCard,
+  DrawerTabbedCard,
+  DrawerTabs,
+  EntityHeaderCard,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { BASE_URL } from '@/constants/domains';
-import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
+import { APP_ROUTES } from '@/constants/routes';
+import { ProfileTipsSurface } from '@/features/dashboard/molecules/ProfileTipsSurface';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
-  useAvatarMutation,
+  useDeletePressPhotoMutation,
+  usePressPhotosQuery,
+  usePressPhotoUploadMutation,
+  useProfileMonetizationSummary,
   useProfileSaveMutation,
   useRemoveSocialLinkMutation,
 } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { ProfileAboutTab } from './ProfileAboutTab';
-import { ProfileAnalyticsSummary } from './ProfileAnalyticsSummary';
-import { ProfileContactHeader } from './ProfileContactHeader';
 import { type CategoryOption, ProfileLinkList } from './ProfileLinkList';
-import { useProfileHeaderParts } from './ProfileSidebarHeader';
-import { buildProfileShareDropdownItems } from './profileLinkShareMenu';
+import { ProfileSmartLinkAnalytics } from './ProfileSmartLinkAnalytics';
 import { SidebarLinkInput } from './SidebarLinkInput';
 
 /** Map a platform's category to a sidebar tab, returning null if no switch is needed. */
@@ -61,6 +71,23 @@ const LINK_ACTION_CATEGORIES: ReadonlySet<CategoryOption> = new Set([
   'earnings',
 ]);
 
+function resolveCategoryFromTab(
+  tab: string | null
+): CategoryOption | 'about' | null {
+  switch (tab) {
+    case 'social':
+      return 'social';
+    case 'music':
+      return 'dsp';
+    case 'earn':
+      return 'earnings';
+    case 'about':
+      return 'about';
+    default:
+      return null;
+  }
+}
+
 let tempLinkIdCounter = 0;
 
 function createTempLinkId(): string {
@@ -68,10 +95,118 @@ function createTempLinkId(): string {
   return `temp-${Date.now()}-${tempLinkIdCounter}`;
 }
 
+/** Persist a detected link to the server. Returns the server-assigned linkId. */
+async function confirmLinkOnServer(
+  profileId: string,
+  link: DetectedLink
+): Promise<string> {
+  const response = await fetch('/api/chat/confirm-link', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      profileId,
+      platform: link.platform.id,
+      url: link.originalUrl,
+      normalizedUrl: link.normalizedUrl,
+    }),
+  });
+  if (!response.ok) throw new Error('Failed to add link');
+  const { linkId } = (await response.json()) as { linkId: string };
+  return linkId;
+}
+
+function ProfileEntityHeader({
+  previewData,
+}: Readonly<{
+  previewData: PreviewPanelData;
+}>) {
+  const primaryLabel =
+    previewData.displayName?.trim() || `@${previewData.username}`;
+  const secondaryLabel =
+    previewData.displayName?.trim() &&
+    previewData.displayName !== previewData.username
+      ? `@${previewData.username}`
+      : previewData.profilePath;
+  const detailChips = [
+    previewData.location?.trim() || null,
+    `${previewData.links.length} link${previewData.links.length === 1 ? '' : 's'}`,
+  ].filter(Boolean);
+  const fallbackLabel = primaryLabel.replace(/^@/, '').charAt(0).toUpperCase();
+
+  return (
+    <div className='p-3.5'>
+      <EntityHeaderCard
+        title={primaryLabel}
+        subtitle={secondaryLabel}
+        meta={
+          <div className='mt-1 flex flex-wrap items-center gap-2 text-[11px] text-tertiary-token'>
+            {detailChips.map(detail => (
+              <span key={detail}>{detail}</span>
+            ))}
+          </div>
+        }
+        image={
+          <DrawerMediaThumb
+            src={previewData.avatarUrl}
+            alt={primaryLabel}
+            sizeClassName='h-[60px] w-[60px] rounded-[14px]'
+            sizes='60px'
+            fallback={
+              <span className='text-[18px] font-[590] text-secondary-token'>
+                {fallbackLabel}
+              </span>
+            }
+          />
+        }
+        className='pr-8'
+      />
+    </div>
+  );
+}
+
+function ProfileSidebarHeaderCard({
+  previewData,
+  profileUrl,
+  onClose,
+  overflowActions,
+}: Readonly<{
+  previewData: PreviewPanelData;
+  profileUrl: string;
+  onClose: () => void;
+  overflowActions: ReturnType<typeof useProfileHeaderParts>['overflowActions'];
+}>) {
+  return (
+    <DrawerSurfaceCard
+      className='overflow-hidden'
+      testId='profile-contact-header-card'
+    >
+      <div className='relative'>
+        <div className='absolute right-2.5 top-2.5 z-10'>
+          <DrawerHeaderActions
+            primaryActions={[]}
+            overflowActions={overflowActions}
+            onClose={onClose}
+          />
+        </div>
+        <ProfileEntityHeader previewData={previewData} />
+        <div>
+          <ProfileSmartLinkAnalytics profileUrl={profileUrl} variant='flat' />
+        </div>
+      </div>
+    </DrawerSurfaceCard>
+  );
+}
+
 export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { data: monetizationSummary } = useProfileMonetizationSummary(
+    Boolean(selectedProfile)
+  );
 
   // Keep a ref to the latest previewData so async callbacks avoid stale closures
   const previewDataRef = useRef(previewData);
@@ -81,14 +216,26 @@ export function ProfileContactSidebar() {
   const [selectedCategory, setSelectedCategory] = useState<
     CategoryOption | 'about'
   >('social');
+  const selectedCategoryRef = useRef<CategoryOption | 'about'>('social');
+  selectedCategoryRef.current = selectedCategory;
 
   // Mutations for profile editing
   const profileMutation = useProfileSaveMutation();
-  const avatarMutation = useAvatarMutation();
+  const pressPhotoUploadMutation = usePressPhotoUploadMutation(
+    selectedProfile?.id
+  );
+  const deletePressPhotoMutation = useDeletePressPhotoMutation(
+    selectedProfile?.id
+  );
   const removeLinkMutation = useRemoveSocialLinkMutation();
+  const { data: pressPhotos = [] } = usePressPhotosQuery(
+    selectedProfile?.id ?? ''
+  );
 
   // Add link state
   const [isAddingLink, setIsAddingLink] = useState(false);
+  const isAddingLinkRef = useRef(false);
+  isAddingLinkRef.current = isAddingLink;
 
   // Track temp link IDs with pending server adds. If user deletes a temp link
   // while its confirm-link request is in flight, we queue a server delete for
@@ -111,55 +258,43 @@ export function ProfileContactSidebar() {
     }
   }, [resolvedCategory, selectedCategory]);
 
+  useEffect(() => {
+    const requestedCategory = resolveCategoryFromTab(searchParams.get('tab'));
+    if (
+      requestedCategory &&
+      requestedCategory !== selectedCategoryRef.current
+    ) {
+      setSelectedCategory(requestedCategory);
+    }
+
+    if (
+      requestedCategory === 'earnings' &&
+      searchParams.get('addLink') === '1' &&
+      !isAddingLinkRef.current
+    ) {
+      setIsAddingLink(true);
+    }
+  }, [searchParams]);
+
   const supportsAddAction = LINK_ACTION_CATEGORIES.has(
     resolvedCategory as CategoryOption
   );
 
-  // Handle display name change — save to server and instantly update sidebar
-  const handleDisplayNameChange = useCallback(
-    (value: string) => {
-      if (!selectedProfile || !previewData) return;
-
-      // Instantly update sidebar
-      setPreviewData({
-        ...previewData,
-        displayName: value,
-      });
-
-      // Save to server
-      profileMutation.mutate(
-        { updates: { displayName: value } },
-        {
-          onError: () => {
-            // Revert on failure
-            setPreviewData({
-              ...previewData,
-              displayName: previewData.displayName,
-            });
-          },
-        }
-      );
+  const handlePressPhotoUpload = useCallback(
+    async (file: File) => {
+      const uploadedPhoto = await pressPhotoUploadMutation.mutateAsync(file);
+      toast.success('Press photo uploaded');
+      return uploadedPhoto;
     },
-    [selectedProfile, previewData, setPreviewData, profileMutation]
+    [pressPhotoUploadMutation]
   );
 
-  // Handle avatar upload — save to server and instantly update sidebar
-  const handleAvatarUpload = useCallback(
-    async (file: File): Promise<string> => {
-      const url = await avatarMutation.mutateAsync(file);
-
-      // Instantly update sidebar
-      if (previewData) {
-        setPreviewData({
-          ...previewData,
-          avatarUrl: url,
-        });
-      }
-
-      toast.success('Profile photo updated');
-      return url;
+  const handlePressPhotoDelete = useCallback(
+    async (photoId: string) => {
+      await deletePressPhotoMutation.mutateAsync(photoId);
+      toast.success('Press photo deleted');
     },
-    [avatarMutation, previewData, setPreviewData]
+    [deletePressPhotoMutation]
   );
 
   // Handle bio change — save to server and instantly update sidebar
@@ -246,10 +381,106 @@ export function ProfileContactSidebar() {
     [previewData?.links]
   );
 
+  // Reconcile optimistic ID with server ID, or clean up if user deleted while pending
+  const reconcileAfterPersist = useCallback(
+    (
+      linkId: string,
+      optimisticId: string,
+      platformName: string,
+      profileId: string
+    ) => {
+      if (deletedWhilePendingRef.current.has(optimisticId)) {
+        deletedWhilePendingRef.current.delete(optimisticId);
+        if (linkId) {
+          removeLinkMutation.mutate(
+            { profileId, linkId },
+            { onError: () => {} }
+          );
+        }
+        return;
+      }
+      if (linkId) {
+        const current = previewDataRef.current;
+        if (current) {
+          setPreviewData({
+            ...current,
+            links: current.links.map(l =>
+              l.id === optimisticId ? { ...l, id: linkId } : l
+            ),
+          });
+        }
+      }
+      toast.success(`${platformName} link added`);
+    },
+    [removeLinkMutation, setPreviewData]
+  );
+
+  // Revert optimistic add on failure
+  const revertOptimisticAdd = useCallback(
+    (optimisticId: string) => {
+      if (deletedWhilePendingRef.current.has(optimisticId)) {
+        deletedWhilePendingRef.current.delete(optimisticId);
+        return;
+      }
+      const current = previewDataRef.current;
+      if (current) {
+        setPreviewData({
+          ...current,
+          links: current.links.filter(l => l.id !== optimisticId),
+        });
+      }
+      toast.error('Failed to add link');
+    },
+    [setPreviewData]
+  );
+
   // Handle adding a new link (opens smart input)
   const handleAddLink = useCallback((_category?: string) => {
     setIsAddingLink(true);
   }, []);
+
+  const handleSetUsername = useCallback(() => {
+    if (pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE) {
+      const usernameInput = document.getElementById('username');
+      if (usernameInput instanceof HTMLInputElement) {
+        usernameInput.focus();
+        usernameInput.select();
+        usernameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+    }
+
+    router.push(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}#username`);
+  }, [pathname, router]);
+
+  const handleSetUpTips = useCallback(() => {
+    if (monetizationSummary?.manageHref === APP_ROUTES.SETTINGS_PAYMENTS) {
+      router.push(monetizationSummary.manageHref);
+      return;
+    }
+
+    setSelectedCategory('earnings');
+    setIsAddingLink(true);
+
+    if (pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE) {
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.set('tab', 'earn');
+      nextParams.set('addLink', '1');
+      const nextSearch = nextParams.toString();
+      router.replace(`${pathname}${nextSearch ? `?${nextSearch}` : ''}#tips`, {
+        scroll: false,
+      });
+    }
+  }, [monetizationSummary, pathname, router, searchParams]);
+
+  const handleManagePayments = useCallback(() => {
+    if (!monetizationSummary) return;
+    router.push(monetizationSummary.manageHref);
+  }, [monetizationSummary, router]);
+
+  const handleViewAnalytics = useCallback(() => {
+    router.push(APP_ROUTES.DASHBOARD_AUDIENCE);
+  }, [router]);
 
   // Handle smart add — receives a detected link from SidebarLinkInput
   const handleSmartAddLink = useCallback(
@@ -294,65 +525,15 @@ export function ProfileContactSidebar() {
       // Save to server via confirm-link endpoint
       pendingAddsRef.current.add(optimisticLink.id);
       try {
-        const response = await fetch('/api/chat/confirm-link', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profileId: selectedProfile.id,
-            platform: link.platform.id,
-            url: link.originalUrl,
-            normalizedUrl: link.normalizedUrl,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to add link');
-        }
-
-        const { linkId } = (await response.json()) as { linkId: string };
-        const wasDeletedWhilePending = deletedWhilePendingRef.current.has(
-          optimisticLink.id
+        const linkId = await confirmLinkOnServer(selectedProfile.id, link);
+        reconcileAfterPersist(
+          linkId,
+          optimisticLink.id,
+          link.platform.name,
+          selectedProfile.id
         );
-
-        if (wasDeletedWhilePending) {
-          deletedWhilePendingRef.current.delete(optimisticLink.id);
-          if (linkId && selectedProfile) {
-            removeLinkMutation.mutate(
-              { profileId: selectedProfile.id, linkId },
-              { onError: () => {} }
-            );
-          }
-          return;
-        }
-
-        if (linkId) {
-          const current = previewDataRef.current;
-          if (current) {
-            setPreviewData({
-              ...current,
-              links: current.links.map(l =>
-                l.id === optimisticLink.id ? { ...l, id: linkId } : l
-              ),
-            });
-          }
-        }
-
-        toast.success(`${link.platform.name} link added`);
       } catch {
-        // If deleted while pending, the UI is already correct (link removed)
-        if (deletedWhilePendingRef.current.has(optimisticLink.id)) {
-          deletedWhilePendingRef.current.delete(optimisticLink.id);
-          return;
-        }
-        // Revert on failure
-        const current = previewDataRef.current;
-        if (current) {
-          setPreviewData({
-            ...current,
-            links: current.links.filter(l => l.id !== optimisticLink.id),
-          });
-        }
-        toast.error('Failed to add link');
+        revertOptimisticAdd(optimisticLink.id);
       } finally {
         pendingAddsRef.current.delete(optimisticLink.id);
       }
@@ -362,7 +543,8 @@ export function ProfileContactSidebar() {
       previewData,
       setPreviewData,
       resolvedCategory,
-      removeLinkMutation,
+      reconcileAfterPersist,
+      revertOptimisticAdd,
     ]
   );
 
@@ -418,7 +600,7 @@ export function ProfileContactSidebar() {
   );
 
   // Header parts hook needs to be called unconditionally
-  const { title: headerTitle, actions: headerActions } = useProfileHeaderParts({
+  const { overflowActions } = useProfileHeaderParts({
     username: previewData?.username ?? '',
     displayName: previewData?.displayName ?? '',
     profilePath: previewData?.profilePath ?? '',
@@ -431,54 +613,46 @@ export function ProfileContactSidebar() {
       <EntitySidebarShell
         isOpen={isOpen}
         ariaLabel='Profile Contact'
-        title={<div className='h-4 w-24 rounded skeleton' />}
-        onClose={close}
-        entityHeader={
-          <div className='space-y-3'>
-            <div
-              className={cn(
-                LINEAR_SURFACE.sidebarCard,
-                'flex items-center gap-3 px-3.5 py-3'
-              )}
-            >
-              <div className='h-10 w-10 rounded-full skeleton' />
-              <div className='space-y-1.5'>
-                <div className='h-4 w-24 rounded skeleton' />
-                <div className='h-3 w-16 rounded skeleton' />
+        headerMode='minimal'
+        hideMinimalHeaderBar
+      >
+        <div className='flex min-h-full flex-col gap-2.5 pt-0.5'>
+          <div className='space-y-2.5 p-3'>
+            <div className='grid grid-cols-2 gap-3'>
+              <div className='space-y-1'>
+                <div className='h-[9px] w-12 rounded skeleton' />
+                <div className='h-4 w-8 rounded skeleton' />
+              </div>
+              <div className='space-y-1'>
+                <div className='h-[9px] w-12 rounded skeleton' />
+                <div className='h-4 w-8 rounded skeleton' />
               </div>
             </div>
-            <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-2.5')}>
-              <div className='h-16 rounded-[10px] skeleton' />
-              <div className='h-10 rounded-[10px] skeleton' />
-            </div>
+            <div className='h-8 rounded-full skeleton' />
           </div>
-        }
-        tabs={
           <div className='flex items-center gap-1'>
-            <div className='h-9 flex-1 rounded-[10px] skeleton' />
-            <div className='h-[26px] w-[26px] rounded-[8px] skeleton' />
+            <div className='h-7 w-14 rounded-full skeleton' />
+            <div className='h-7 w-14 rounded-full skeleton' />
+            <div className='h-7 w-12 rounded-full skeleton' />
+            <div className='h-7 w-14 rounded-full skeleton' />
           </div>
-        }
-      >
-        <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-2')}>
-          {[1, 2, 3, 4, 5].map(i => (
-            <div
-              key={i}
-              className='flex items-center gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'
-            >
-              <div className='h-8 w-8 shrink-0 rounded-[8px] skeleton' />
-              <div className='flex-1 h-4 rounded skeleton' />
-            </div>
-          ))}
+          <div className={cn(LINEAR_SURFACE.drawerCardSm, 'space-y-2 p-2')}>
+            {[1, 2, 3, 4, 5].map(i => (
+              <div
+                key={i}
+                className='flex items-center gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'
+              >
+                <div className='h-8 w-8 shrink-0 rounded-[8px] skeleton' />
+                <div className='flex-1 h-4 rounded skeleton' />
+              </div>
+            ))}
+          </div>
         </div>
       </EntitySidebarShell>
     );
   }
 
   const {
-    username,
-    displayName,
-    avatarUrl,
     bio,
     genres,
     location,
@@ -490,23 +664,6 @@ export function ProfileContactSidebar() {
   } = previewData;
 
   const profileUrl = `${BASE_URL}${profilePath}`;
-  const profileShareItems = buildProfileShareDropdownItems({
-    profileUrl,
-    campaignSlug: `${username}-profile`,
-    artistName: displayName,
-    onCopy: (url, presetLabel) => {
-      navigator.clipboard
-        .writeText(url)
-        .then(() => {
-          toast.success(`${presetLabel} link copied`, {
-            description: 'Profile URL includes UTM parameters.',
-          });
-        })
-        .catch(() => {
-          toast.error('Unable to copy UTM link');
-        });
-    },
-  });
 
   const allowPhotoDownloads =
     (selectedProfile?.settings as Record<string, unknown> | null)
@@ -516,150 +673,110 @@ export function ProfileContactSidebar() {
     <EntitySidebarShell
       isOpen={isOpen}
       ariaLabel='Profile Contact'
-      title={headerTitle}
-      headerActions={headerActions}
+      headerMode='minimal'
+      hideMinimalHeaderBar
       entityHeader={
-        <div className='space-y-3'>
-          <div
-            className={cn(
-              LINEAR_SURFACE.sidebarCard,
-              'px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
-            )}
-          >
-            <ProfileContactHeader
-              displayName={displayName}
-              username={username}
-              avatarUrl={avatarUrl}
-              editable
-              onDisplayNameChange={handleDisplayNameChange}
-              onAvatarUpload={handleAvatarUpload}
-            />
-          </div>
-
-          <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-2.5')}>
-            <div className={cn(LINEAR_SURFACE.drawerCardSm, 'p-2.5')}>
-              <ProfileAnalyticsSummary />
-            </div>
-
-            <div className={cn(LINEAR_SURFACE.drawerCardSm, 'p-2.5')}>
-              <DrawerPropertyRow
-                label='Profile link'
-                value={
-                  <div className='flex items-center gap-1.5'>
-                    <CopyLinkInput
-                      url={profileUrl}
-                      size='md'
-                      className='flex-1'
-                      inputClassName='h-8 rounded-[10px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
-                    />
-                    <button
-                      type='button'
-                      className='shrink-0 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
-                      onClick={() =>
-                        globalThis.open(
-                          profileUrl,
-                          '_blank',
-                          'noopener,noreferrer'
-                        )
-                      }
-                      aria-label='Open public profile'
-                    >
-                      <ExternalLink className='h-3 w-3' aria-hidden='true' />
-                    </button>
-                    <CommonDropdown
-                      variant='dropdown'
-                      size='compact'
-                      align='end'
-                      side='bottom'
-                      items={profileShareItems}
-                      trigger={
-                        <button
-                          type='button'
-                          className='shrink-0 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
-                          aria-label='Open profile share options'
-                        >
-                          <MoreHorizontal
-                            className='h-3 w-3'
-                            aria-hidden='true'
-                          />
-                        </button>
-                      }
-                    />
-                  </div>
-                }
-              />
-            </div>
-          </div>
-        </div>
-      }
-      tabs={
-        <div className='flex items-center gap-1'>
-          <DrawerTabs
-            value={resolvedCategory}
-            onValueChange={value =>
-              setSelectedCategory(value as CategoryOption | 'about')
-            }
-            options={PROFILE_TAB_OPTIONS}
-            className='flex-1'
-            ariaLabel='Profile sidebar view'
-          />
-          <div className='h-[26px] w-[26px] shrink-0'>
-            {supportsAddAction && (
-              <AppIconButton
-                type='button'
-                onClick={() => handleAddLink(resolvedCategory)}
-                className='h-[26px] w-[26px] rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 text-tertiary-token hover:border-default hover:bg-surface-1 hover:text-primary-token'
-                ariaLabel={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
-              >
-                <Plus className='h-3.5 w-3.5' />
-              </AppIconButton>
-            )}
-          </div>
-        </div>
+        <ProfileSidebarHeaderCard
+          previewData={previewData}
+          profileUrl={profileUrl}
+          onClose={close}
+          overflowActions={overflowActions}
+        />
       }
     >
-      {resolvedCategory === 'about' ? (
-        <ProfileAboutTab
-          bio={bio}
-          genres={genres}
-          location={location}
-          hometown={hometown}
-          activeSinceYear={activeSinceYear}
-          allowPhotoDownloads={allowPhotoDownloads}
-          onBioChange={handleBioChange}
-          onLocationChange={handleLocationChange}
-          onHometownChange={handleHometownChange}
-          onGenresChange={handleGenresChange}
-        />
-      ) : (
-        <>
-          <ProfileLinkList
-            links={links}
-            selectedCategory={resolvedCategory as CategoryOption}
-            onAddLink={handleAddLink}
-            onRemoveLink={handleRemoveLink}
-            dspConnections={dspConnections}
-          />
-
-          {isAddingLink && (
-            <div className='mt-2.5'>
-              <SidebarLinkInput
-                categoryFilter={
-                  resolvedCategory === 'social' ||
-                  resolvedCategory === 'dsp' ||
-                  resolvedCategory === 'earnings'
-                    ? resolvedCategory
-                    : 'social'
+      <div className='flex min-h-full flex-col'>
+        <div className='min-h-0 flex-1'>
+          <DrawerTabbedCard
+            testId='profile-contact-tabbed-card'
+            className='mt-2.5'
+            tabs={
+              <DrawerTabs
+                value={resolvedCategory}
+                onValueChange={value =>
+                  setSelectedCategory(value as CategoryOption | 'about')
                 }
-                existingPlatforms={existingPlatformIds}
-                onAdd={handleSmartAddLink}
-                onCancel={() => setIsAddingLink(false)}
-                creatorName={previewData?.displayName}
+                options={PROFILE_TAB_OPTIONS}
+                ariaLabel='Profile sidebar view'
+                actions={
+                  supportsAddAction ? (
+                    <AppIconButton
+                      type='button'
+                      onClick={() => handleAddLink(resolvedCategory)}
+                      className='h-[26px] w-[26px] rounded-full border-0 bg-transparent text-tertiary-token shadow-none hover:bg-surface-0 hover:text-primary-token'
+                      ariaLabel={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
+                    >
+                      <Plus className='h-3.5 w-3.5' />
+                    </AppIconButton>
+                  ) : undefined
+                }
+                actionsClassName='h-[26px] w-[26px]'
+                overflowMode='scroll'
+                distribution='intrinsic'
               />
-            </div>
-          )}
-        </>
-      )}
+            }
+            contentClassName='pt-2'
+          >
+            {resolvedCategory === 'about' ? (
+              <ProfileAboutTab
+                bio={bio}
+                genres={genres}
+                location={location}
+                hometown={hometown}
+                activeSinceYear={activeSinceYear}
+                allowPhotoDownloads={allowPhotoDownloads}
+                pressPhotos={pressPhotos}
+                onBioChange={handleBioChange}
+                onLocationChange={handleLocationChange}
+                onHometownChange={handleHometownChange}
+                onGenresChange={handleGenresChange}
+                onPressPhotoUpload={handlePressPhotoUpload}
+                onPressPhotoDelete={handlePressPhotoDelete}
+              />
+            ) : (
+              <>
+                {resolvedCategory === 'earnings' && monetizationSummary ? (
+                  <div className='mb-2.5'>
+                    <ProfileTipsSurface
+                      summary={monetizationSummary}
+                      variant='drawer'
+                      onSetUsername={handleSetUsername}
+                      onSetUpTips={handleSetUpTips}
+                      onManagePayments={handleManagePayments}
+                      onViewAnalytics={handleViewAnalytics}
+                    />
+                  </div>
+                ) : null}
+                <ProfileLinkList
+                  links={links}
+                  selectedCategory={resolvedCategory as CategoryOption}
+                  onAddLink={handleAddLink}
+                  onRemoveLink={handleRemoveLink}
+                  dspConnections={dspConnections}
+                  surface='plain'
+                />
+
+                {isAddingLink && (
+                  <div className='mt-2.5'>
+                    <SidebarLinkInput
+                      categoryFilter={
+                        resolvedCategory === 'social' ||
+                        resolvedCategory === 'dsp' ||
+                        resolvedCategory === 'earnings'
+                          ? resolvedCategory
+                          : 'social'
+                      }
+                      existingPlatforms={existingPlatformIds}
+                      onAdd={handleSmartAddLink}
+                      onCancel={() => setIsAddingLink(false)}
+                      creatorName={previewData.displayName}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </DrawerTabbedCard>
+        </div>
+      </div>
     </EntitySidebarShell>
   );
 }

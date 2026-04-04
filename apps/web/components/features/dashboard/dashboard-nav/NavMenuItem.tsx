@@ -9,7 +9,7 @@ import {
 } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import { type ReactNode, useCallback, useMemo } from 'react';
+import { type MouseEvent, type ReactNode, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
   SidebarMenuBadge,
@@ -25,10 +25,18 @@ interface NavMenuItemProps {
   readonly item: NavItem;
   readonly isActive: boolean;
   readonly shortcut?: KeyboardShortcut;
+  readonly prefetch?: boolean;
   readonly actions?: ReactNode;
   readonly children?: ReactNode;
-  /** When provided, renders a button instead of a link */
+  readonly onNavigate?: () => void;
+  /** Optional click side effect for links or buttons */
   readonly onClick?: () => void;
+  /** When true, keeps link markup but prevents navigation on click */
+  readonly preventNavigation?: boolean;
+  /** When true, renders a button instead of a link */
+  readonly renderAsButton?: boolean;
+  /** Hover/focus prefetch handler — wired by DashboardNav, not this component */
+  readonly onPrefetch?: () => void;
 }
 
 /**
@@ -80,9 +88,14 @@ export function NavMenuItem({
   item,
   isActive,
   shortcut,
+  prefetch,
   actions,
   children,
+  onNavigate,
   onClick,
+  preventNavigation = false,
+  renderAsButton = false,
+  onPrefetch,
 }: NavMenuItemProps) {
   // Memoize tooltip to prevent creating new objects on every render,
   // which would cause unnecessary re-renders in SidebarMenuButton
@@ -114,9 +127,9 @@ export function NavMenuItem({
       {/* Fixed-width icon container keeps sidebar glyphs optically quiet. */}
       <span
         data-sidebar-icon
-        className='flex size-3 shrink-0 items-center justify-center'
+        className='flex h-4 w-4 shrink-0 items-center justify-center'
       >
-        <item.icon className='size-3' aria-hidden='true' />
+        <item.icon className='h-4 w-4' strokeWidth={1.9} aria-hidden='true' />
       </span>
       <span className='truncate group-data-[collapsible=icon]:hidden'>
         {item.name}
@@ -124,15 +137,34 @@ export function NavMenuItem({
     </>
   );
 
+  const handleButtonClick = useCallback(() => {
+    onNavigate?.();
+    onClick?.();
+  }, [onClick, onNavigate]);
+
+  const handleLinkClick = useCallback(
+    (event: MouseEvent<HTMLAnchorElement>) => {
+      if (preventNavigation) {
+        event.preventDefault();
+      }
+      onNavigate?.();
+      onClick?.();
+    },
+    [onClick, onNavigate, preventNavigation]
+  );
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <SidebarMenuItem>
           <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
-            {onClick ? (
+            {renderAsButton ? (
               <button
                 type='button'
-                onClick={onClick}
+                onClick={handleButtonClick}
+                onMouseDown={onPrefetch}
+                onMouseEnter={onPrefetch}
+                onFocus={onPrefetch}
                 aria-pressed={isActive}
                 className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
               >
@@ -141,7 +173,13 @@ export function NavMenuItem({
             ) : (
               <Link
                 href={item.href}
+                prefetch={prefetch}
+                onClick={handleLinkClick}
+                onMouseDown={onPrefetch}
+                onMouseEnter={onPrefetch}
+                onFocus={onPrefetch}
                 aria-current={isActive ? 'page' : undefined}
+                aria-disabled={preventNavigation || undefined}
                 className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
               >
                 {innerContent}

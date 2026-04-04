@@ -1,78 +1,80 @@
 import * as Sentry from '@sentry/nextjs';
-import { cookies } from 'next/headers';
-import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
+import { headers } from 'next/headers';
+import { redirect, unstable_rethrow } from 'next/navigation';
+import { Suspense } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
-import { OperatorBanner } from '@/features/admin/OperatorBanner';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
+import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
-import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';
-import type { FeatureFlagsBootstrap } from '@/lib/feature-flags/shared';
-import { HydrateClient } from '@/lib/queries';
-import { getDehydratedState } from '@/lib/queries/server';
-import { getDashboardData, setSidebarCollapsed } from './dashboard/actions';
-import { DashboardDataProvider } from './dashboard/DashboardDataContext';
-import { ProfileCompletionRedirect } from './ProfileCompletionRedirect';
+import ChatLoading from './chat/loading';
+import { DashboardShellContent } from './DashboardShellContent';
+import { DashboardShellSkeleton } from './DashboardShellSkeleton';
+import { ReleaseTableSkeleton } from './dashboard/releases/loading';
+import {
+  isChatShellRoute,
+  isReleasesShellRoute,
+  resolveAppShellRequestPath,
+} from './shell-route-matches';
 
-export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-const EMPTY_FEATURE_FLAGS_BOOTSTRAP: FeatureFlagsBootstrap = { gates: {} };
 
 export default async function AppShellLayout({
   children,
 }: {
   readonly children: React.ReactNode;
 }) {
-  const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
-
-  // NO MORE AUTH GATE - proxy.ts already routed us correctly!
-  // If we're rendering this layout, user is ACTIVE and can access the app.
   try {
-    // Get auth first (fast — reads from request headers, cached via React cache()).
-    // This lets us start feature flags in parallel with dashboard data,
-    // rather than waiting for the entire Promise.all to complete before starting flags.
+    const headerStorePromise = headers();
+
+    // Auth check is fast — reads JWT from request headers, cached via React cache().
+    // Must run before Suspense so unauthenticated users redirect immediately
+    // instead of seeing a dashboard skeleton flash.
     const auth = await getCachedAuth();
+    const headerStore = await headerStorePromise;
+    const nextUrlHeader = headerStore.get('next-url');
+    const pathname = resolveAppShellRequestPath(
+      nextUrlHeader,
+      headerStore.get('x-matched-path'),
+      headerStore.get('x-invoke-path')
+    );
 
-    // Parallelize dashboard data and feature flags.
-    // getDashboardData internally calls getCachedAuth() which is deduplicated.
-    // Feature flags now run in parallel instead of waiting for dashboard data.
-    const [dashboardData, featureFlagsBootstrap] = await Promise.all([
-      getDashboardData(),
-      isE2EClientRuntime
-        ? Promise.resolve(EMPTY_FEATURE_FLAGS_BOOTSTRAP)
-        : getFeatureFlagsBootstrap(auth.userId ?? null),
-    ]);
+    if (!auth.userId) {
+      redirect(buildAppShellSignInUrl(nextUrlHeader));
+    }
 
-    // Read sidebar cookie server-side so SSR matches client state (no flash)
-    const cookieStore = await cookies();
-    const sidebarCookie = cookieStore.get('sidebar:state');
-    const sidebarDefaultOpen = sidebarCookie?.value !== 'false';
+    let shellFallback: React.ReactNode;
+    if (isChatShellRoute(pathname)) {
+      shellFallback = (
+        <DashboardShellSkeleton>
+          <ChatLoading />
+        </DashboardShellSkeleton>
+      );
+    } else if (isReleasesShellRoute(pathname)) {
+      shellFallback = (
+        <DashboardShellSkeleton>
+          <ReleaseTableSkeleton />
+        </DashboardShellSkeleton>
+      );
+    } else {
+      shellFallback = <DashboardShellSkeleton />;
+    }
 
+    // Ban check moved inside DashboardShellContent (runs in parallel with
+    // shell data fetch). Banned users are 1-in-a-million — their experience
+    // is not worth adding a blocking DB query to the critical path of every
+    // dashboard page load for every user.
+
+    // Stream the shell: the route-aware skeleton renders at first byte while
+    // DashboardShellContent resolves dashboard data + feature flags.
     return (
-      <HydrateClient state={getDehydratedState()}>
-        {/* ENG-004: Show environment issues to admins in non-production */}
-        <OperatorBanner isAdmin={dashboardData.isAdmin} />
-        <ImpersonationBannerWrapper />
-        <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
-          <DashboardDataProvider value={dashboardData}>
-            <ProfileCompletionRedirect />
-            <AuthShellWrapper
-              persistSidebarCollapsed={setSidebarCollapsed}
-              sidebarDefaultOpen={sidebarDefaultOpen}
-              previewPanelDefaultOpen
-            >
-              {children}
-            </AuthShellWrapper>
-          </DashboardDataProvider>
-        </FeatureFlagsProvider>
-      </HydrateClient>
+      <Suspense fallback={shellFallback}>
+        <DashboardShellContent userId={auth.userId} pathname={pathname}>
+          {children}
+        </DashboardShellContent>
+      </Suspense>
     );
   } catch (error) {
-    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
-      throw error;
-    }
+    unstable_rethrow(error);
 
     Sentry.captureException(error);
 

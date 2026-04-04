@@ -45,10 +45,7 @@ function FeatureCard({
 }: Readonly<(typeof UNLOCKED_FEATURES)[number]>) {
   return (
     <ContentSurfaceCard surface='nested' className='space-y-2 p-4 text-left'>
-      <Icon
-        className='h-5 w-5 text-[var(--linear-accent)]'
-        aria-hidden='true'
-      />
+      <Icon className='h-5 w-5 text-accent' aria-hidden='true' />
       <p className='text-[13px] font-[560] text-primary-token'>{title}</p>
       <p className='text-[12px] leading-5 text-tertiary-token'>{description}</p>
     </ContentSurfaceCard>
@@ -130,7 +127,7 @@ export default function CheckoutSuccessPage() {
 
   const successTitle = isOnboardingUpgrade
     ? 'Your profile is live and upgraded'
-    : 'Welcome to ' + planName + '!';
+    : `Welcome to ${planName}!`;
   const successSubtitle = isOnboardingUpgrade
     ? "You're all set. Here's what you just unlocked."
     : "Your plan is active. Here's what you just unlocked.";
@@ -142,7 +139,7 @@ export default function CheckoutSuccessPage() {
       className='relative'
       contentClassName='relative z-10'
     >
-      <ConfettiOverlay />
+      <ConfettiOverlay viewport />
 
       <ContentSurfaceCard surface='details' className='overflow-hidden'>
         <ContentSectionHeader
@@ -158,8 +155,8 @@ export default function CheckoutSuccessPage() {
               : 'space-y-6 px-5 py-5 text-center opacity-0 translate-y-6 scale-[0.98] transition-all duration-700 ease-out sm:px-6'
           }
         >
-          <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[color-mix(in_oklab,var(--linear-success)_28%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-success)_10%,var(--linear-app-content-surface))]'>
-            <PartyPopper className='h-8 w-8 text-[var(--linear-success)]' />
+          <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'>
+            <PartyPopper className='h-8 w-8 text-success' />
           </div>
 
           <div className='grid gap-4 sm:grid-cols-3'>
@@ -193,7 +190,11 @@ export default function CheckoutSuccessPage() {
             ) : null}
 
             {feedback ? (
-              <output className='text-[13px] text-secondary-token'>
+              <output
+                className='text-[13px] text-secondary-token'
+                aria-live='polite'
+                aria-atomic='true'
+              >
                 {feedback}
               </output>
             ) : null}

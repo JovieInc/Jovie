@@ -8,6 +8,7 @@
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { creatorTypeEnum } from '@/lib/db/schema/enums';
 import type { CreatorContact, CreatorProfile } from '@/lib/db/schema/profiles';
+import type { PressPhoto } from '@/types/press-photos';
 
 /** Creator type enum values */
 export type CreatorType = (typeof creatorTypeEnum.enumValues)[number];
@@ -102,6 +103,7 @@ export type ProfileWithLinks = ProfileWithUser & {
   socialLinks: ProfileSocialLink[];
   contacts: CreatorContact[];
   latestRelease: DiscogRelease | null;
+  pressPhotos: PressPhoto[];
 };
 
 /**

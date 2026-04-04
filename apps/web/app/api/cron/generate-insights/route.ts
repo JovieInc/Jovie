@@ -1,12 +1,12 @@
 import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { clickEvents } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { insightGenerationRuns } from '@/lib/db/schema/insights';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { env } from '@/lib/env-server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { withTimeout } from '@/lib/resilience/primitives';
 import { aggregateMetrics } from '@/lib/services/insights/data-aggregator';
@@ -115,14 +115,10 @@ function processChunkResults(
 export async function GET(request: Request) {
   const startTime = Date.now();
 
-  // Verify cron secret
-  const authHeader = request.headers.get('authorization');
-  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/generate-insights',
+  });
+  if (authError) return authError;
 
   try {
     // 1. Expire stale insights first
@@ -150,7 +146,7 @@ export async function GET(request: Request) {
           INNER JOIN ${users} u ON u.id = cp.user_id
           WHERE cp.is_claimed = true
             AND cp.user_id IS NOT NULL
-            AND (u.plan IN ('pro', 'founding', 'growth') OR u.is_pro = true)
+            AND (u.plan IN ('pro', 'founding', 'max') OR u.is_pro = true)
             AND NOT EXISTS (
               SELECT 1 FROM ${insightGenerationRuns} igr
               WHERE igr.creator_profile_id = cp.id

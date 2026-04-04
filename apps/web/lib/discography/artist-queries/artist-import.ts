@@ -16,6 +16,13 @@ import { deleteReleaseArtists, upsertReleaseArtist } from './release-artists';
 import { deleteTrackArtists, upsertTrackArtist } from './track-artists';
 import type { ArtistWithRole } from './types';
 
+type ArtistImportSourceType = 'manual' | 'admin' | 'ingested';
+
+type ArtistImportOptions = {
+  deleteExisting?: boolean;
+  sourceType?: ArtistImportSourceType;
+};
+
 /**
  * Process parsed artist credits for a track
  *
@@ -25,10 +32,7 @@ import type { ArtistWithRole } from './types';
 export async function processTrackArtistCredits(
   trackId: string,
   credits: ParsedArtistCredit[],
-  options?: {
-    deleteExisting?: boolean;
-    sourceType?: 'manual' | 'admin' | 'ingested';
-  }
+  options?: ArtistImportOptions
 ): Promise<ArtistWithRole[]> {
   const { deleteExisting = true, sourceType = 'ingested' } = options ?? {};
 
@@ -86,10 +90,7 @@ export async function processTrackArtistCredits(
 export async function processReleaseArtistCredits(
   releaseId: string,
   credits: ParsedArtistCredit[],
-  options?: {
-    deleteExisting?: boolean;
-    sourceType?: 'manual' | 'admin' | 'ingested';
-  }
+  options?: ArtistImportOptions
 ): Promise<ArtistWithRole[]> {
   const { deleteExisting = true, sourceType = 'ingested' } = options ?? {};
 
@@ -145,10 +146,7 @@ export async function processReleaseArtistCredits(
 export async function processRecordingArtistCredits(
   recordingId: string,
   credits: ParsedArtistCredit[],
-  options?: {
-    deleteExisting?: boolean;
-    sourceType?: 'manual' | 'admin' | 'ingested';
-  }
+  options?: ArtistImportOptions
 ): Promise<ArtistWithRole[]> {
   const { deleteExisting = true, sourceType = 'ingested' } = options ?? {};
 

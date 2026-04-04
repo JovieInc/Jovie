@@ -58,6 +58,18 @@ export interface ReleaseExperienceAdapter {
   ) => Promise<void>;
   readonly onRescanIsrc?: (releaseId: string) => void;
   readonly onSaveLyrics?: (releaseId: string, lyrics: string) => Promise<void>;
+  readonly onSaveMetadata?: (
+    releaseId: string,
+    values: { upc: string | null; label: string | null }
+  ) => Promise<void>;
+  readonly onSavePrimaryIsrc?: (
+    releaseId: string,
+    isrc: string | null
+  ) => Promise<void>;
+  readonly onSaveTargetPlaylists?: (
+    releaseId: string,
+    targetPlaylists: string[]
+  ) => Promise<void>;
   readonly onFormatLyrics?: (
     releaseId: string,
     lyrics: string
@@ -99,6 +111,13 @@ export interface UseReleaseProviderMatrixReturn {
   totalOverrides: number;
   openEditor: (release: ReleaseViewModel) => void;
   closeEditor: () => void;
+  handleReleaseCreated: (
+    createdRelease: ReleaseViewModel,
+    options?: { readonly openEditor?: boolean }
+  ) => void;
+  updateRow: (updated: ReleaseViewModel) => void;
+  patchRow: (releaseId: string, patch: Partial<ReleaseViewModel>) => void;
+  handleReleaseArtworkUploaded: (releaseId: string, artworkUrl: string) => void;
   handleCopy: (path: string, label: string, testId: string) => Promise<string>;
   handleSave: (provider: ProviderKey) => void;
   handleReset: (provider: ProviderKey) => void;
@@ -117,7 +136,19 @@ export interface UseReleaseProviderMatrixReturn {
     provider: ProviderKey,
     url: string
   ) => Promise<void>;
+  handleSaveMetadata: (
+    releaseId: string,
+    values: { upc: string | null; label: string | null }
+  ) => Promise<void>;
+  handleSavePrimaryIsrc: (
+    releaseId: string,
+    isrc: string | null
+  ) => Promise<void>;
   handleSaveLyrics: (releaseId: string, lyrics: string) => Promise<void>;
+  handleSaveTargetPlaylists: (
+    releaseId: string,
+    targetPlaylists: string[]
+  ) => Promise<void>;
   handleFormatLyrics: (releaseId: string, lyrics: string) => Promise<string[]>;
   isLyricsSaving: boolean;
   setDrafts: React.Dispatch<React.SetStateAction<DraftState>>;

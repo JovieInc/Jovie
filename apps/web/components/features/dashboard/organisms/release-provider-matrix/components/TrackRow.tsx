@@ -152,10 +152,12 @@ export const TrackRow = memo(function TrackRow({
                 )}
               </button>
             ) : (
-              <VolumeX
-                className='h-3 w-3 text-quaternary-token/40'
-                aria-label='No preview available'
-              />
+              <span className='flex h-5 w-5 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,transparent)] text-secondary-token/80'>
+                <VolumeX
+                  className='h-3.5 w-3.5'
+                  aria-label='No preview available'
+                />
+              </span>
             )}
           </div>
         </td>
@@ -313,6 +315,9 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
         previewUrl: track.previewUrl,
         audioUrl: track.audioUrl,
         audioFormat: track.audioFormat,
+        previewSource: track.previewSource,
+        previewVerification: track.previewVerification,
+        providerConfidenceSummary: track.providerConfidenceSummary,
         providers: track.providers,
         releaseTitle: release.title,
         releaseArtworkUrl: release.artworkUrl,

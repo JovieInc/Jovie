@@ -21,6 +21,10 @@ vi.mock('sonner', () => ({
   Toaster: () => null,
 }));
 
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: vi.fn(),
+}));
+
 // Mock the ToastProvider from providers
 vi.mock('@/components/providers/ToastProvider', () => ({
   ToastProvider: ({ children }: { children: React.ReactNode }) => (

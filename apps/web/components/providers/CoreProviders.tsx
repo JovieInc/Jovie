@@ -33,7 +33,7 @@ function ThemeKeyboardShortcut({ isEnabled }: { isEnabled: boolean }) {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (!event.key || event.key.toLowerCase() !== 't') return;
+      if (event.key?.toLowerCase() !== 't') return;
       if (isFormElement(event.target)) return;
 
       event.preventDefault();
@@ -45,6 +45,61 @@ function ThemeKeyboardShortcut({ isEnabled }: { isEnabled: boolean }) {
       globalThis.removeEventListener('keydown', handleKeyDown);
     };
   }, [resolvedTheme, setTheme, isEnabled]);
+
+  return null;
+}
+
+function SearchKeyboardShortcut() {
+  useEffect(() => {
+    function getVisibleSearchField() {
+      return Array.from(
+        document.querySelectorAll<HTMLInputElement>(
+          'input[data-app-search-field="true"]'
+        )
+      ).find(input => {
+        if (input.disabled || input.readOnly) return false;
+        return input.getClientRects().length > 0;
+      });
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key !== '/') return;
+      if (isFormElement(event.target)) return;
+
+      const searchField = getVisibleSearchField();
+
+      if (searchField) {
+        event.preventDefault();
+        searchField.focus();
+        searchField.select();
+        return;
+      }
+
+      const searchTrigger = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[data-app-search-trigger="true"]'
+        )
+      ).find(element => element.getClientRects().length > 0);
+
+      if (!searchTrigger) return;
+
+      event.preventDefault();
+      searchTrigger.click();
+
+      globalThis.requestAnimationFrame(() => {
+        const promotedSearchField = getVisibleSearchField();
+        promotedSearchField?.focus();
+        promotedSearchField?.select();
+      });
+    }
+
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => {
+      globalThis.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   return null;
 }
@@ -151,6 +206,7 @@ function CoreProvidersInner({
       disableTransitionOnChange
       storageKey='jovie-theme'
     >
+      <SearchKeyboardShortcut />
       <ThemeKeyboardShortcut isEnabled={themeEnabled} />
       <TooltipProvider delayDuration={1200}>
         <LazyProviders enableAnalytics={enableAnalytics}>
@@ -219,9 +275,13 @@ const THEME_ENABLED_PREFIXES = [
   '/waitlist',
 ] as const;
 
-type CoreProviderVariant = 'full' | 'public';
+type CoreProviderVariant = 'full' | 'homepage' | 'public';
 
 export function getCoreProviderVariant(pathname: string): CoreProviderVariant {
+  if (pathname === '/') {
+    return 'homepage';
+  }
+
   return FULL_PROVIDER_PREFIXES.some(prefix => pathname.startsWith(prefix))
     ? 'full'
     : 'public';
@@ -238,6 +298,7 @@ export function CoreProviders({
   const pathname = usePathname() ?? '';
   const variant = useMemo(() => getCoreProviderVariant(pathname), [pathname]);
   const themeEnabled = useMemo(() => isThemeEnabledRoute(pathname), [pathname]);
+  const isHomepageVariant = variant === 'homepage';
   const isPublicVariant = variant === 'public';
   const isTestRuntime = env.IS_TEST || env.IS_E2E;
   const enableAnalytics = useMemo(
@@ -247,6 +308,10 @@ export function CoreProviders({
       !MARKETING_PREFIXES.some(prefix => pathname.startsWith(prefix)),
     [isTestRuntime, pathname]
   );
+
+  if (isHomepageVariant) {
+    return <>{children}</>;
+  }
 
   const providers = (
     <NuqsProvider>

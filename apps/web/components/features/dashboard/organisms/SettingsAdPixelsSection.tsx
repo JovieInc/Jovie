@@ -9,10 +9,9 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PixelsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { useSaveStatus } from '@/features/dashboard/hooks/useSaveStatus';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
@@ -413,48 +412,32 @@ export function SettingsAdPixelsSection({
 
   if (!isPro) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
+      <SettingsPanel
+        title='Pixel tracking'
+        description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
       >
-        <ContentSectionHeader
-          title='Pixel tracking'
-          subtitle='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='px-4 py-3'>
-          <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
-            <SettingsToggleRow
-              title='Pixel tracking'
-              description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
-              checked={false}
-              onCheckedChange={() => {}}
-              ariaLabel='Pixel tracking'
-              gated
-            />
-          </ContentSurfaceCard>
+        <div className='px-4 py-4 sm:px-5'>
+          <SettingsToggleRow
+            gated
+            title='Pixel tracking'
+            description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
+            gateFeatureContext='Pixel tracking'
+          />
         </div>
-      </DashboardCard>
+      </SettingsPanel>
     );
   }
 
   if (isLoading) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
+      <SettingsPanel
+        title='Pixel tracking'
+        description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
       >
-        <ContentSectionHeader
-          title='Pixel tracking'
-          subtitle='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='px-4 py-3'>
+        <div className='px-4 py-4 sm:px-5'>
           <PixelsSectionSkeleton />
         </div>
-      </DashboardCard>
+      </SettingsPanel>
     );
   }
 
@@ -467,50 +450,25 @@ export function SettingsAdPixelsSection({
     );
   }
 
-  // Check if any pixels are configured
-  const hasAnyPixels =
-    existingSettings?.pixels?.facebookPixelId ||
-    existingSettings?.pixels?.googleMeasurementId ||
-    existingSettings?.pixels?.tiktokPixelId;
-
   return (
-    <form onSubmit={handlePixelSubmit} className='space-y-6'>
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
+    <form onSubmit={handlePixelSubmit} className='space-y-4'>
+      <SettingsPanel
+        title='Pixel tracking'
+        description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
+        actions={
+          <div className='flex items-center gap-2'>
+            <span className='text-[13px] font-[510] tracking-normal text-secondary-token'>
+              {pixelData.enabled ? 'Enabled' : 'Disabled'}
+            </span>
+            <Switch
+              checked={pixelData.enabled}
+              onCheckedChange={checked => handleInputChange('enabled', checked)}
+              aria-label='Enable pixel tracking'
+            />
+          </div>
+        }
       >
-        <ContentSectionHeader
-          title='Pixel tracking'
-          subtitle='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
-          className='min-h-0 px-4 py-3'
-          actionsClassName='w-auto shrink-0'
-          actions={
-            <div className='flex items-center gap-2'>
-              <span className='text-[13px] font-[510] tracking-normal text-secondary-token'>
-                {pixelData.enabled ? 'Enabled' : 'Disabled'}
-              </span>
-              <Switch
-                checked={pixelData.enabled}
-                onCheckedChange={checked =>
-                  handleInputChange('enabled', checked)
-                }
-                aria-label='Enable pixel tracking'
-              />
-            </div>
-          }
-        />
-
-        <div className='space-y-3 px-4 py-3'>
-          {!hasAnyPixels && (
-            <ContentSurfaceCard className='bg-surface-0 px-6 py-5 text-center'>
-              <p className='text-[13px] leading-[18px] text-secondary-token'>
-                No tracking pixels configured yet. Add your first destination to
-                start tracking conversions.
-              </p>
-            </ContentSurfaceCard>
-          )}
-
+        <div className='space-y-3 px-4 py-4 sm:px-5'>
           <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
             <p className='text-[13px] leading-[18px] text-secondary-token'>
               Configure each retargeting destination independently.
@@ -618,7 +576,7 @@ export function SettingsAdPixelsSection({
             </p>
           </ContentSurfaceCard>
         </div>
-      </DashboardCard>
+      </SettingsPanel>
 
       <div className='flex items-center justify-end gap-3 pt-2'>
         <SettingsStatusPill status={saveStatus} />

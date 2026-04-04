@@ -1,15 +1,21 @@
 import { eq } from 'drizzle-orm';
+import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
 import { investorLinks } from '@/lib/db/schema/investors';
 import { getMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
 import { getInvestorManifest } from '@/lib/investors/manifest';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { DeckViewer } from './_components/DeckViewer';
+
+export const metadata: Metadata = {
+  robots: NOINDEX_ROBOTS,
+};
 
 /**
  * Investor portal landing page.
  * Centered hero with personalized greeting, headline, and pitch deck.
- * Slides loaded server-side from content/investors/deck/slides/*.md.
+ * Slides loaded server-side from investors/deck/slides/*.md.
  */
 export default async function InvestorLandingPage() {
   const cookieStore = await cookies();
@@ -32,7 +38,7 @@ export default async function InvestorLandingPage() {
     manifest.deck.slides.map(async filename => {
       try {
         const doc = await getMarkdownDocument(
-          `content/investors/deck/slides/${filename}`
+          `investors/deck/slides/${filename}`
         );
         // Extract title from first h1 heading in TOC, fallback to filename
         const h1 = doc.toc.find(entry => entry.level === 1);

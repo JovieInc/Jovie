@@ -60,20 +60,22 @@ export const ServerEnvSchema = z.object({
   STRIPE_WEBHOOK_SECRET_TIPS: z.string().optional(),
   TIP_PLATFORM_FEE_PERCENT: z.string().optional(),
 
-  // Stripe price IDs for Founding tier ($9/mo, locked-in early supporter pricing)
-  STRIPE_PRICE_FOUNDING_MONTHLY: z.string().startsWith('price_').optional(),
-
-  // Stripe price IDs for Pro tier ($39/mo, $348/yr)
+  // Stripe price IDs for Pro tier ($20/mo, $192/yr)
   STRIPE_PRICE_PRO_MONTHLY: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_ANNUAL: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_YEARLY: z.string().startsWith('price_').optional(),
 
-  // Stripe price IDs for Growth tier ($99/mo, $948/yr)
+  // Stripe price IDs for Growth tier (legacy, kept for backward compat)
   STRIPE_PRICE_GROWTH_MONTHLY: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_GROWTH_YEARLY: z.string().startsWith('price_').optional(),
+
+  // Stripe price IDs for Max tier ($200/mo, $1,920/yr)
+  STRIPE_PRICE_MAX_MONTHLY: z.string().startsWith('price_').optional(),
+  STRIPE_PRICE_MAX_YEARLY: z.string().startsWith('price_').optional(),
   INGESTION_CRON_SECRET: z.string().optional(),
 
   // URL encryption (required in production/preview)
+  LEAD_ATTRIBUTION_SECRET: z.string().optional(),
   URL_ENCRYPTION_KEY: z.string().optional(),
 
   // Cron job authentication
@@ -99,6 +101,9 @@ export const ServerEnvSchema = z.object({
   APPLE_MUSIC_KEY_ID: z.string().optional(),
   APPLE_MUSIC_TEAM_ID: z.string().optional(),
   APPLE_MUSIC_PRIVATE_KEY: z.string().optional(),
+
+  // SoundCloud API v2 (Pro badge detection)
+  SOUNDCLOUD_CLIENT_ID: z.string().optional(),
 
   // MusicFetch.io (cross-platform DSP profiles + social links via ISRC/UPC)
   MUSICFETCH_API_TOKEN: z.string().optional(),
@@ -165,6 +170,11 @@ export const ServerEnvSchema = z.object({
   JOVIE_GOOGLE_API_SECRET: z.string().optional(),
   JOVIE_TIKTOK_PIXEL_ID: z.string().optional(),
   JOVIE_TIKTOK_ACCESS_TOKEN: z.string().optional(),
+
+  // E2E / Playwright auth helpers
+  E2E_USE_TEST_AUTH_BYPASS: z.string().optional(),
+  E2E_CLERK_USER_ID: z.string().optional(),
+  E2E_CLERK_USER_USERNAME: z.string().optional(),
 });
 
 /**
@@ -195,13 +205,15 @@ export const ENV_KEYS = [
   'STRIPE_CONNECT_WEBHOOK_SECRET',
   'STRIPE_WEBHOOK_SECRET_TIPS',
   'TIP_PLATFORM_FEE_PERCENT',
-  'STRIPE_PRICE_FOUNDING_MONTHLY',
   'STRIPE_PRICE_PRO_MONTHLY',
   'STRIPE_PRICE_PRO_ANNUAL',
   'STRIPE_PRICE_PRO_YEARLY',
   'STRIPE_PRICE_GROWTH_MONTHLY',
   'STRIPE_PRICE_GROWTH_YEARLY',
+  'STRIPE_PRICE_MAX_MONTHLY',
+  'STRIPE_PRICE_MAX_YEARLY',
   'INGESTION_CRON_SECRET',
+  'LEAD_ATTRIBUTION_SECRET',
   'URL_ENCRYPTION_KEY',
   'CRON_SECRET',
   'METADATA_HASH_KEY',
@@ -217,6 +229,7 @@ export const ENV_KEYS = [
   'APPLE_MUSIC_KEY_ID',
   'APPLE_MUSIC_TEAM_ID',
   'APPLE_MUSIC_PRIVATE_KEY',
+  'SOUNDCLOUD_CLIENT_ID',
   'MUSICFETCH_API_TOKEN',
   'MUSICFETCH_DAILY_HARD_LIMIT',
   'MUSICFETCH_MONTHLY_HARD_LIMIT',
@@ -253,4 +266,7 @@ export const ENV_KEYS = [
   'JOVIE_GOOGLE_API_SECRET',
   'JOVIE_TIKTOK_PIXEL_ID',
   'JOVIE_TIKTOK_ACCESS_TOKEN',
+  'E2E_USE_TEST_AUTH_BYPASS',
+  'E2E_CLERK_USER_ID',
+  'E2E_CLERK_USER_USERNAME',
 ] as const satisfies readonly (keyof z.infer<typeof ServerEnvSchema>)[];

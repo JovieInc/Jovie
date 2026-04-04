@@ -16,6 +16,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
     playbackState,
     toggleTrack,
+    seek: vi.fn(),
   }),
 }));
 
@@ -89,7 +90,10 @@ describe('ReleaseCell', () => {
     render(<ReleaseCell release={baseRelease} artistName='Jovie Artist' />);
 
     expect(screen.getByText('Skyline Dreams')).toBeInTheDocument();
-    expect(screen.getByText('Single')).toBeInTheDocument();
+    // Without a previewUrl the type renders as a colored dot with title, not text
+    const typeDot = screen.getByTitle('Single');
+    expect(typeDot).toBeInTheDocument();
+    expect(typeDot.className).toContain('shrink-0');
     expect(screen.getByText('Jovie Artist')).toBeInTheDocument();
   });
 
@@ -126,6 +130,25 @@ describe('ReleaseCell', () => {
     });
   });
 
+  it('opens the release drawer when a primary select handler is provided', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+
+    render(
+      <ReleaseCell
+        release={baseRelease}
+        artistName='Jovie Artist'
+        onSelect={onSelect}
+      />
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Open Skyline Dreams' })
+    );
+
+    expect(onSelect).toHaveBeenCalledWith(baseRelease);
+  });
+
   it('keeps the active preview control visible while playing', () => {
     playbackState = { activeTrackId: 'release-1', isPlaying: true };
 
@@ -144,6 +167,6 @@ describe('ReleaseCell', () => {
     });
 
     expect(pauseButton).toHaveAttribute('aria-pressed', 'true');
-    expect(pauseButton.className).toContain('aria-[pressed=true]:opacity-100');
+    expect(pauseButton.className).toContain('opacity-100');
   });
 });

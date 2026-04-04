@@ -1,8 +1,8 @@
 import 'server-only';
 
-import { and, desc, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
+import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 
-import { checkDbHealth, db, doesTableExist, TABLE_NAMES } from '@/lib/db';
+import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
@@ -10,6 +10,11 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getAdminMercuryMetrics } from './mercury-metrics';
 import { getAdminStripeOverviewMetrics } from './stripe-metrics';
+
+export {
+  type AdminReliabilitySummary,
+  getAdminReliabilitySummary,
+} from './reliability';
 
 const DISABLED_TABLES = new Set<string>();
 
@@ -141,13 +146,6 @@ export interface AdminUsagePoint {
   value: number;
 }
 
-export interface AdminReliabilitySummary {
-  errorRatePercent: number;
-  p95LatencyMs: number | null;
-  incidents24h: number;
-  lastIncidentAt: Date | null;
-}
-
 export type AdminActivityStatus = 'success' | 'warning' | 'error';
 
 export interface AdminActivityItem {
@@ -208,125 +206,6 @@ export async function getAdminUsageSeries(
   }
 
   return points;
-}
-
-export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySummary> {
-  const now = new Date();
-  const dayAgo = new Date(now.getTime() - MS_PER_DAY);
-  const hasStripeEvents =
-    !DISABLED_TABLES.has(TABLE_NAMES.stripeWebhookEvents) &&
-    (await doesTableExist(TABLE_NAMES.stripeWebhookEvents));
-
-  if (!hasStripeEvents) {
-    const dbHealth = await checkDbHealth();
-    return {
-      errorRatePercent: 0,
-      p95LatencyMs: dbHealth.latency ?? null,
-      incidents24h: 0,
-      lastIncidentAt: null,
-    };
-  }
-
-  try {
-    const dbHealth = await checkDbHealth();
-
-    let totalEvents = 0;
-    let incidentCount = 0;
-    let lastIncidentAt: Date | null = null;
-
-    try {
-      const rows = await db
-        .select({ count: drizzleSql<number>`count(*)` })
-        .from(stripeWebhookEvents)
-        .where(
-          drizzleSql`${stripeWebhookEvents.createdAt} >= ${sqlTimestamp(dayAgo)}`
-        );
-      totalEvents = Number(rows[0]?.count ?? 0);
-    } catch {
-      DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-      captureWarning(
-        'Stripe webhook events unavailable; skipping reliability summary.'
-      );
-
-      return {
-        errorRatePercent: 0,
-        p95LatencyMs: dbHealth.latency ?? null,
-        incidents24h: 0,
-        lastIncidentAt: null,
-      };
-    }
-
-    try {
-      const rows = await db
-        .select({
-          count: drizzleSql<number>`count(*)`,
-          lastAt: drizzleSql<Date | null>`max(${stripeWebhookEvents.createdAt})`,
-        })
-        .from(stripeWebhookEvents)
-        .where(
-          and(
-            drizzleSql`${stripeWebhookEvents.createdAt} >= ${sqlTimestamp(dayAgo)}`,
-            inArray(stripeWebhookEvents.type, [
-              'checkout.session.completed',
-              'customer.subscription.created',
-              'invoice.payment_failed',
-            ])
-          )
-        );
-
-      const row = rows[0];
-      incidentCount = Number(row?.count ?? 0);
-      const rawLastAt = row?.lastAt;
-      // Extract nested ternary for clarity (S3358)
-      if (rawLastAt instanceof Date) {
-        lastIncidentAt = rawLastAt;
-      } else if (rawLastAt != null) {
-        lastIncidentAt = new Date(String(rawLastAt));
-      }
-      // Note: else case is not needed since lastIncidentAt is already initialized to null
-    } catch {
-      DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-      captureWarning(
-        'Stripe webhook incidents unavailable; skipping reliability summary.'
-      );
-
-      return {
-        errorRatePercent: 0,
-        p95LatencyMs: dbHealth.latency ?? null,
-        incidents24h: 0,
-        lastIncidentAt: null,
-      };
-    }
-
-    const errorRatePercent =
-      totalEvents > 0 ? (Number(incidentCount) / Number(totalEvents)) * 100 : 0;
-
-    return {
-      errorRatePercent,
-      p95LatencyMs: dbHealth.latency ?? null,
-      incidents24h: Number(incidentCount),
-      lastIncidentAt,
-    };
-  } catch (error) {
-    captureError('Error loading admin reliability summary', error);
-
-    try {
-      const dbHealth = await checkDbHealth();
-      return {
-        errorRatePercent: 0,
-        p95LatencyMs: dbHealth.latency ?? null,
-        incidents24h: 0,
-        lastIncidentAt: null,
-      };
-    } catch {
-      return {
-        errorRatePercent: 0,
-        p95LatencyMs: null,
-        incidents24h: 0,
-        lastIncidentAt: null,
-      };
-    }
-  }
 }
 
 function formatTimestamp(timestamp: Date): string {

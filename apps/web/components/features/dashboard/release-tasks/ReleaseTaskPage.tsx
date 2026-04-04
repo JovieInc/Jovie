@@ -4,12 +4,15 @@ import { useMemo } from 'react';
 import { useTaskToggleMutation } from '@/lib/queries/useReleaseTaskMutations';
 import { useReleaseTasksQuery } from '@/lib/queries/useReleaseTasksQuery';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
+import { MetadataAgentPanel } from './MetadataAgentPanel';
 import { ReleaseTaskChecklist } from './ReleaseTaskChecklist';
 import { ReleaseTaskRow } from './ReleaseTaskRow';
 
 interface ReleaseTaskPageProps {
+  readonly profileId: string;
   readonly releaseId: string;
   readonly releaseTitle: string;
+  readonly releaseDate?: Date | string | null;
 }
 
 function getUpNextTasks(tasks: ReleaseTaskView[]): ReleaseTaskView[] {
@@ -19,7 +22,7 @@ function getUpNextTasks(tasks: ReleaseTaskView[]): ReleaseTaskView[] {
 
   // Sort by due date (nearest first), then by position (template order)
   return incomplete
-    .sort((a, b) => {
+    .toSorted((a, b) => {
       // Tasks with due dates come first
       if (a.dueDate && !b.dueDate) return -1;
       if (!a.dueDate && b.dueDate) return 1;
@@ -33,8 +36,10 @@ function getUpNextTasks(tasks: ReleaseTaskView[]): ReleaseTaskView[] {
 }
 
 export function ReleaseTaskPage({
+  profileId,
   releaseId,
   releaseTitle,
+  releaseDate,
 }: ReleaseTaskPageProps) {
   const { data: tasks } = useReleaseTasksQuery(releaseId);
   const toggle = useTaskToggleMutation(releaseId);
@@ -52,7 +57,10 @@ export function ReleaseTaskPage({
   };
 
   return (
-    <div className='mx-auto max-w-2xl px-4 py-6'>
+    <div
+      className='mx-auto max-w-2xl px-4 py-6'
+      data-testid='release-task-page'
+    >
       {/* Breadcrumb */}
       <nav className='mb-4 text-[12px] text-tertiary-token'>
         <span className='hover:text-secondary-token cursor-pointer'>
@@ -66,13 +74,19 @@ export function ReleaseTaskPage({
         <span className='text-primary-token'>Tasks</span>
       </nav>
 
+      <MetadataAgentPanel
+        profileId={profileId}
+        releaseId={releaseId}
+        releaseTitle={releaseTitle}
+      />
+
       {/* Up Next section (only when tasks exist and not all done) */}
       {upNextTasks.length > 0 && !allDone && (
         <div className='mb-6'>
           <h3 className='px-4 text-[11px] font-medium uppercase tracking-wider text-tertiary-token mb-2'>
             Up Next
           </h3>
-          <div className='rounded-lg border border-subtle/45 bg-[var(--linear-bg-surface-card)]'>
+          <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1'>
             {upNextTasks.map(task => (
               <ReleaseTaskRow
                 key={task.id}
@@ -85,7 +99,11 @@ export function ReleaseTaskPage({
       )}
 
       {/* Main checklist */}
-      <ReleaseTaskChecklist releaseId={releaseId} variant='full' />
+      <ReleaseTaskChecklist
+        releaseId={releaseId}
+        variant='full'
+        releaseDate={releaseDate}
+      />
     </div>
   );
 }

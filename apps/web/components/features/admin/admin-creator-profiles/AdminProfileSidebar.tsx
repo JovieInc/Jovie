@@ -1,19 +1,26 @@
 'use client';
 
-import { Button, type CommonDropdownItem, Label } from '@jovie/ui';
-import { ExternalLink } from 'lucide-react';
+import { type CommonDropdownItem, Label } from '@jovie/ui';
 import { useMemo, useState } from 'react';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
+import {
+  DrawerCardActionBar,
+  DrawerSurfaceCard,
+  DrawerTabbedCard,
+  DrawerTabs,
+  EntityHeaderCard,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
+import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
+import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { BASE_URL } from '@/constants/domains';
 import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { ProfileAboutTab } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab';
-import { ProfileContactHeader } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileContactHeader';
 import {
   type CategoryOption,
   ProfileLinkList,
 } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import type { Contact } from '@/types';
 
 const PROFILE_TAB_OPTIONS = [
@@ -57,6 +64,12 @@ export function AdminProfileSidebar({
     return mapContactLinksToPreviewLinks(contact);
   }, [contact]);
 
+  const { primaryActions } = useProfileHeaderParts({
+    username: profile?.username ?? '',
+    displayName: profile?.displayName ?? profile?.username ?? '',
+    profilePath: profile?.username ? `/${profile.username}` : '',
+  });
+
   if (!profile || !contact) {
     return (
       <EntitySidebarShell
@@ -64,6 +77,7 @@ export function AdminProfileSidebar({
         ariaLabel='Creator profile'
         title='Creator profile'
         onClose={onClose}
+        headerMode='minimal'
         contextMenuItems={contextMenuItems}
         isEmpty
         emptyMessage='Select a creator profile to view details.'
@@ -79,73 +93,90 @@ export function AdminProfileSidebar({
       isOpen={isOpen}
       ariaLabel='Creator profile'
       title='Creator profile'
-      onClose={onClose}
+      headerMode='minimal'
       entityHeader={
-        <div className='space-y-1.5'>
-          <ProfileContactHeader
-            displayName={profile.displayName ?? profile.username}
-            username={profile.username}
-            avatarUrl={profile.avatarUrl}
-          />
-          <div className='pt-0.5'>
-            <div className='grid grid-cols-[88px,minmax(0,1fr)] items-center gap-3'>
-              <Label className='text-xs font-medium text-secondary-token'>
-                Profile link
-              </Label>
-              <div className='flex items-center gap-2'>
-                <CopyLinkInput
-                  url={`${BASE_URL}/${profile.username}`}
-                  size='md'
-                  className='flex-1'
-                  inputClassName='h-7 rounded-md border-subtle bg-surface-0 px-2 py-1 text-[11px]'
+        <DrawerSurfaceCard variant='card' className='relative overflow-hidden'>
+          <div className='space-y-3 p-3'>
+            <EntityHeaderCard
+              eyebrow='Creator profile'
+              title={profile.displayName ?? profile.username}
+              subtitle={`@${profile.username}`}
+              image={
+                <AvatarUploadable
+                  src={profile.avatarUrl}
+                  alt={`${profile.displayName ?? profile.username} avatar`}
+                  name={profile.displayName ?? profile.username}
+                  size='2xl'
+                  rounded='md'
                 />
-                <Button
-                  type='button'
-                  size='icon'
-                  variant='ghost'
-                  className='h-7 w-7 shrink-0 border border-transparent bg-surface-0 hover:border-subtle hover:bg-surface-1'
-                  onClick={() =>
-                    globalThis.open(
-                      `${BASE_URL}/${profile.username}`,
-                      '_blank',
-                      'noopener,noreferrer'
-                    )
-                  }
-                  aria-label='Open public profile'
-                >
-                  <ExternalLink className='h-4 w-4' aria-hidden='true' />
-                </Button>
-              </div>
-            </div>
+              }
+              actions={
+                <DrawerCardActionBar
+                  primaryActions={primaryActions}
+                  menuItems={contextMenuItems}
+                  onClose={onClose}
+                  overflowTriggerPlacement='card-top-right'
+                />
+              }
+              meta={
+                <div className='flex flex-wrap items-center gap-2 text-[11px] text-tertiary-token'>
+                  <span>
+                    {links.length} linked destination
+                    {links.length === 1 ? '' : 's'}
+                  </span>
+                  {profile.location ? <span>{profile.location}</span> : null}
+                </div>
+              }
+              footer={
+                <div className='grid grid-cols-[72px,minmax(0,1fr)] items-center gap-3'>
+                  <Label className='text-[11px] font-medium text-secondary-token'>
+                    Profile link
+                  </Label>
+                  <CopyLinkInput
+                    url={`${BASE_URL}/${profile.username}`}
+                    size='md'
+                    className='flex-1'
+                    inputClassName='h-7 rounded-md border-subtle bg-surface-0 px-2 py-1 text-[11px]'
+                  />
+                </div>
+              }
+              bodyClassName='pr-9'
+            />
           </div>
-        </div>
-      }
-      tabs={
-        <DrawerTabs
-          value={selectedCategory}
-          onValueChange={value =>
-            setSelectedCategory(value as CategoryOption | 'about')
-          }
-          options={PROFILE_TAB_OPTIONS}
-          ariaLabel='Creator profile sidebar view'
-        />
+        </DrawerSurfaceCard>
       }
     >
-      {selectedCategory === 'about' ? (
-        <ProfileAboutTab
-          bio={profile.bio ?? null}
-          genres={profile.genres ?? null}
-          location={profile.location ?? null}
-          hometown={profile.hometown ?? null}
-          activeSinceYear={profile.activeSinceYear ?? null}
-          allowPhotoDownloads={false}
-        />
-      ) : (
-        <ProfileLinkList
-          links={links}
-          selectedCategory={selectedCategory as CategoryOption}
-        />
-      )}
+      <DrawerTabbedCard
+        testId='admin-profile-tabbed-card'
+        tabs={
+          <DrawerTabs
+            value={selectedCategory}
+            onValueChange={value =>
+              setSelectedCategory(value as CategoryOption | 'about')
+            }
+            options={PROFILE_TAB_OPTIONS}
+            ariaLabel='Creator profile sidebar view'
+          />
+        }
+        contentClassName='pt-2'
+      >
+        {selectedCategory === 'about' ? (
+          <ProfileAboutTab
+            bio={profile.bio ?? null}
+            genres={profile.genres ?? null}
+            location={profile.location ?? null}
+            hometown={profile.hometown ?? null}
+            activeSinceYear={profile.activeSinceYear ?? null}
+            allowPhotoDownloads={false}
+          />
+        ) : (
+          <ProfileLinkList
+            links={links}
+            selectedCategory={selectedCategory as CategoryOption}
+            surface='plain'
+          />
+        )}
+      </DrawerTabbedCard>
     </EntitySidebarShell>
   );
 }

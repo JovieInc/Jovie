@@ -28,6 +28,13 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Rule:** When mocking a custom hook, destructure the hook's return type and ensure ALL fields are present in the mock — especially arrays (use `[]` as default). Partial mocks that omit array fields will crash on `.map()` / `.filter()` calls.
 
+
+### Local auth bypass must stay host-stable
+
+**Mistake:** Local perf auth bootstrap assumed the test-auth bypass was broken when `/api/dev/test-auth/enter` redirected a `127.0.0.1` request to `localhost`. The bypass cookies were host-only, so the redirected `/app` request arrived signed out and bounced to `/signin`.
+
+**Rule:** For local authenticated testing, keep test-auth redirects app-relative so bypass cookies survive on the original loopback host. When debugging local auth, verify whether the failure is a host mismatch (`localhost` vs `127.0.0.1`) before blaming Clerk or missing test users.
+
 ---
 
 ## Marketing Pages
@@ -36,6 +43,11 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 **Mistake:** PricingSection CTAs linked to `/claim` which 404s. The correct signup route is `/signup`.
 
 **Rule:** Marketing CTAs always link to `/signup` (not `/claim`, `/register`, or `/waitlist`). `/claim` is the artist profile claim flow (different intent).
+
+### Marketing traction copy must be factual
+**Mistake:** Homepage marketing copy claimed artist adoption counts that were not true (`500+` and `47+ artists already on Jovie`).
+
+**Rule:** Never invent or estimate adoption metrics in marketing copy. If the current number is not verified, use qualitative launch-stage language instead of a hard count.
 
 ### CSS cache corruption after git worktree switches
 **Mistake:** Switching branches or running `git stash`/`pop` while the dev server is running corrupts the Turbopack CSS cache. Tokens appear to render wrong values even though source CSS is correct.
@@ -56,6 +68,16 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Rule:** Tailwind v4 utilities MUST be declared in `@theme` or `@theme inline` blocks in `globals.css`. Variables in `:root` are CSS-only; they don't generate utility classes automatically.
 
+### Shell canvas and card surfaces must stay separate
+**Mistake:** A dark-shell cleanup changed tokens, but some task/preview routes still rendered bordered cards and even full table routes directly on `bg-(--linear-app-content-surface)`. That made cards blend into the canvas and left task pages looking like one flat rectangle.
+
+**Rule:** In the app shell, `bg-(--linear-app-content-surface)` is shell chrome/canvas only. Shared cards and panels use `bg-surface-1`, recessed wells use `bg-surface-0`, and table/workspace routes must wrap primary content in `DashboardWorkspacePanel` plus `LINEAR_SURFACE.contentContainer`.
+
+### AI-generated UI defaults drift toward all-caps and border-heavy layouts
+**Mistake:** Agents produced generic AI-looking product UI with uppercase eyebrow labels, long explanatory copy, and bordered cards used as the main hierarchy device. The result felt cheap and off-brand instead of Linear-inspired and premium.
+
+**Rule:** For Jovie product UI, default to small type, normal Title Case labels, restrained emphasis, and minimal chrome. Do not use uppercase labels or extra borders as the default way to make something feel designed. Solve hierarchy with spacing, typography, and surface contrast first.
+
 ---
 
 ## Git Workflow
@@ -68,6 +90,11 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 ---
 
 ## CI / Build
+
+### Local Doppler commands must pin `jovie-web/dev`
+**Mistake:** Local commands were run as bare `doppler run -- ...`, which depends on ambient Doppler scope. In fresh worktrees that can fail with "You must specify a config" even though the repo always expects the `jovie-web/dev` local setup.
+
+**Rule:** For local development, testing, and agent commands that need secrets, use `doppler run --project jovie-web --config dev -- <command>`. `scripts/setup.sh` and printed examples should use the same explicit form.
 
 ### New generated Drizzle migrations must be allowed to update `_journal.json`
 **Mistake:** The root migration rule and file-protection hook treated any `_journal.json` edit as forbidden, even though the repo's migration scripts require a new migration to append the journal and add a snapshot.

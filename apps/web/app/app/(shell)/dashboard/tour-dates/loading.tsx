@@ -1,6 +1,15 @@
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 
-const ROW_KEYS = Array.from({ length: 6 }, (_, i) => `tour-row-${i + 1}`);
+const ROW_KEYS = Array.from(
+  { length: SKELETON_ROW_COUNT.TABLE },
+  (_, i) => `tour-row-${i + 1}`
+);
+
+const MOBILE_ROW_KEYS = Array.from(
+  { length: SKELETON_ROW_COUNT.MOBILE },
+  (_, i) => `tour-mobile-${i + 1}`
+);
 
 /**
  * Tour dates loading skeleton
@@ -23,9 +32,9 @@ export default function TourDatesLoading() {
       </div>
 
       {/* Mobile: card layout (visible below sm) */}
-      <div className='flex-1 min-h-0 overflow-auto sm:hidden'>
+      <div className='flex-1 min-h-0 overflow-hidden sm:hidden'>
         <div className='divide-y divide-subtle'>
-          {ROW_KEYS.map(key => (
+          {MOBILE_ROW_KEYS.map(key => (
             <div key={key} className='flex items-start gap-3 px-4 py-3'>
               {/* Date block */}
               <div className='shrink-0 flex flex-col items-center rounded-lg bg-(--linear-app-surface-elevated) p-2'>
@@ -59,7 +68,7 @@ export default function TourDatesLoading() {
       </div>
 
       {/* Desktop: table layout (hidden below sm) */}
-      <div className='hidden flex-1 min-h-0 overflow-auto sm:block'>
+      <div className='max-sm:hidden flex-1 min-h-0 overflow-hidden'>
         <table className='w-full border-collapse text-[13px]'>
           <thead className='sticky top-0 z-10 bg-(--linear-app-content-surface) shadow-inset-divider'>
             <tr className='border-b border-subtle'>

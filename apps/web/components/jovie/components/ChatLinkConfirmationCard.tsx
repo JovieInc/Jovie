@@ -4,6 +4,7 @@ import { Check, Loader2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useConfirmChatLinkMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -117,7 +118,7 @@ export function ChatLinkConfirmationCard({
 
   if (state === 'added') {
     return (
-      <ContentSurfaceCard className='rounded-[18px] border-success/30 bg-success-subtle p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'>
+      <ContentSurfaceCard className='border-subtle bg-surface-1 p-4'>
         <div className='flex items-center gap-2 text-success'>
           <Check className='h-4 w-4' />
           <span className='text-sm font-medium'>
@@ -130,7 +131,7 @@ export function ChatLinkConfirmationCard({
 
   if (state === 'dismissed') {
     return (
-      <ContentSurfaceCard className='rounded-[18px] border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] p-4 opacity-60 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+      <ContentSurfaceCard className='border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4 opacity-60'>
         <div className='flex items-center gap-2 text-secondary-token'>
           <X className='h-4 w-4' />
           <span className='text-sm'>Link dismissed</span>
@@ -140,9 +141,14 @@ export function ChatLinkConfirmationCard({
   }
 
   return (
-    <ContentSurfaceCard className='rounded-[18px] border-accent/20 bg-accent/5 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'>
+    <ContentSurfaceCard className='border-accent/20 bg-[color-mix(in_oklab,var(--linear-accent)_8%,var(--linear-app-content-surface))] p-4'>
       <div className='flex items-center gap-3'>
-        <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] border border-accent/20 bg-white/50'>
+        <span
+          className={cn(
+            LINEAR_SURFACE.drawerCardSm,
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border-accent/20 bg-[color-mix(in_oklab,var(--linear-accent)_10%,var(--linear-app-content-surface))]'
+          )}
+        >
           <SocialIcon
             platform={normalizeSocialPlatform(platform.icon)}
             className='h-5 w-5 shrink-0'
@@ -168,7 +174,7 @@ export function ChatLinkConfirmationCard({
             onClick={handleAdd}
             disabled={state === 'adding'}
             className={cn(
-              'inline-flex items-center gap-1 rounded-[10px] px-2.5 py-1.5 text-xs font-medium',
+              'inline-flex items-center gap-1 rounded-[8px] px-2.5 py-1.5 text-xs font-medium',
               'bg-accent text-accent-foreground hover:bg-accent/90',
               'disabled:opacity-50 transition-colors'
             )}
@@ -185,7 +191,7 @@ export function ChatLinkConfirmationCard({
             onClick={handleDismiss}
             disabled={state === 'adding'}
             className={cn(
-              'inline-flex items-center gap-1 rounded-[10px] border border-transparent p-1.5 text-xs',
+              'inline-flex items-center gap-1 rounded-[8px] border border-transparent p-1.5 text-xs',
               'text-secondary-token hover:bg-surface-0 hover:text-primary-token',
               'disabled:opacity-50 transition-colors'
             )}

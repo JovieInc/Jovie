@@ -418,7 +418,7 @@ describe('@critical PaymentHandler - payment failed', () => {
 
     expect(result.success).toBe(true);
     expect(mockLogFallback).toHaveBeenCalledWith(
-      'No user ID in subscription metadata for payment failure',
+      'No user ID in subscription metadata',
       expect.objectContaining({ event: 'invoice.payment_failed' })
     );
     expect(mockGetUserIdFromStripeCustomer).toHaveBeenCalledWith(
@@ -562,7 +562,7 @@ describe('@critical PaymentHandler - payment failed', () => {
     expect(result.reason).toBe('stale_event');
   });
 
-  it('skips fallback when customer is not a string', async () => {
+  it('falls back when customer is an expanded object', async () => {
     const mockSubscription = {
       id: 'sub_expanded_customer',
       status: 'past_due',
@@ -572,6 +572,7 @@ describe('@critical PaymentHandler - payment failed', () => {
     } as unknown as Stripe.Subscription;
 
     mockStripeSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
+    mockGetUserIdFromStripeCustomer.mockResolvedValue('user_from_expanded');
 
     const context: WebhookContext = {
       event: {
@@ -595,8 +596,14 @@ describe('@critical PaymentHandler - payment failed', () => {
     const result = await handler.handle(context);
 
     expect(result.success).toBe(true);
-    expect(result.skipped).toBe(true);
-    expect(result.reason).toBe('cannot_identify_user_for_payment_failure');
-    expect(mockGetUserIdFromStripeCustomer).not.toHaveBeenCalled();
+    expect(result.skipped).toBeFalsy();
+    expect(mockGetUserIdFromStripeCustomer).toHaveBeenCalledWith(
+      'cus_expanded'
+    );
+    expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkUserId: 'user_from_expanded',
+      })
+    );
   });
 });

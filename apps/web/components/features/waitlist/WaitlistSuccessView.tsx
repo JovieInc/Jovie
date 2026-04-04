@@ -2,6 +2,8 @@
 
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout } from '@/features/auth';
+import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
+import { cn } from '@/lib/utils';
 
 export function WaitlistSuccessView() {
   return (
@@ -11,11 +13,12 @@ export function WaitlistSuccessView() {
       showFooterPrompt={false}
       showLogoutButton
       logoutRedirectUrl={APP_ROUTES.SIGNIN}
-      formTitleClassName='text-lg font-medium text-primary-token mb-4 text-center'
     >
-      <p className='text-sm text-secondary-token text-center'>
-        Early access is rolling out in stages.
-      </p>
+      <div className={cn('w-full px-6 py-7 text-center', AUTH_SURFACE.card)}>
+        <p className={cn(FORM_LAYOUT.hint, 'mt-0')}>
+          Early access is rolling out in stages.
+        </p>
+      </div>
     </AuthLayout>
   );
 }

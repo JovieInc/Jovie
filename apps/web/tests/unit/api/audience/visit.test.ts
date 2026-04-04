@@ -57,10 +57,15 @@ vi.mock('@/lib/utils/ip-extraction', () => ({
   extractClientIP: vi.fn().mockReturnValue('127.0.0.1'),
 }));
 
+vi.mock('@/lib/audience/block-check', () => ({
+  isVisitorBlocked: vi.fn().mockResolvedValue(false),
+}));
+
+const { POST } = await import('@/app/api/audience/visit/route');
+
 describe('POST /api/audience/visit', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
 
     mockPublicVisitLimiterGetStatus.mockReturnValue({
       blocked: false,
@@ -83,7 +88,6 @@ describe('POST /api/audience/visit', () => {
       reset: new Date(Date.now() + 60_000),
     });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -101,8 +105,39 @@ describe('POST /api/audience/visit', () => {
 
   it('silently filters bot traffic', async () => {
     mockDetectBot.mockReturnValue({ isBot: true, reason: 'User-Agent match' });
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'profile_123', isPublic: true }]),
+        }),
+      }),
+    });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
+    const insertedValues: unknown[] = [];
+    mockWithSystemIngestionSession.mockImplementation(async callback => {
+      const mockInsert = vi.fn().mockReturnValue({
+        values: vi.fn().mockImplementation(value => {
+          insertedValues.push(value);
+          return {
+            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          };
+        }),
+      });
+
+      await callback({
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        insert: mockInsert,
+      });
+    });
+
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -116,11 +151,99 @@ describe('POST /api/audience/visit', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(data.fingerprint).toBe('bot-filtered');
+    expect(data.fingerprint).toBeDefined();
+    expect(insertedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          engagementScore: 0,
+          tags: ['bot'],
+          visits: 0,
+        }),
+      ])
+    );
+  });
+
+  it('returns 403 when visitor is blocked', async () => {
+    const { isVisitorBlocked } = await import('@/lib/audience/block-check');
+    vi.mocked(isVisitorBlocked).mockResolvedValueOnce(true);
+
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'profile_123', isPublic: true }]),
+        }),
+      }),
+    });
+
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.status).toBe('blocked');
+    // Verify no downstream writes occurred
+    expect(mockWithSystemIngestionSession).not.toHaveBeenCalled();
+  });
+
+  it('uses the resolved user agent for bot detection', async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'profile_123', isPublic: true }]),
+        }),
+      }),
+    });
+
+    mockWithSystemIngestionSession.mockImplementation(async callback => {
+      await callback({
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        insert: vi.fn().mockReturnValue({
+          values: vi.fn().mockReturnValue({
+            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      });
+    });
+
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'user-agent': 'Header User Agent',
+      },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+        userAgent: 'Body User Agent',
+      }),
+    });
+
+    await POST(request);
+
+    expect(mockDetectBot).toHaveBeenCalledWith(
+      expect.any(NextRequest),
+      '/api/audience/visit',
+      expect.objectContaining({ userAgent: 'Body User Agent' })
+    );
   });
 
   it('returns 400 for invalid payload', async () => {
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -143,7 +266,6 @@ describe('POST /api/audience/visit', () => {
       }),
     });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -170,7 +292,6 @@ describe('POST /api/audience/visit', () => {
       }),
     });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -223,7 +344,6 @@ describe('POST /api/audience/visit', () => {
       });
     });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -310,7 +430,6 @@ describe('POST /api/audience/visit', () => {
       });
     });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -360,7 +479,6 @@ describe('POST /api/audience/visit', () => {
       });
     });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -405,7 +523,6 @@ describe('POST /api/audience/visit', () => {
       });
     });
 
-    const { POST } = await import('@/app/api/audience/visit/route');
     const request = new NextRequest('http://localhost/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

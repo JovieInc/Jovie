@@ -7,12 +7,15 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 const { version: APP_VERSION } = require('../../version.json');
 
 const nextConfig = {
+  // Local and CI E2E runs use loopback hosts (`localhost` and `127.0.0.1`).
+  // Allow both so Next dev accepts asset/server-action requests from either host.
+  allowedDevOrigins: ['localhost', '127.0.0.1', '::1', '[::1]'],
   // Move dev indicator to top-right so it doesn't overlap the DevToolbar
   devIndicators: {
     position: 'top-right',
   },
   // Transpile workspace packages for proper module resolution
-  transpilePackages: ['@jovie/ui'],
+  transpilePackages: ['@jovie/ui', '@clerk/ui'],
   turbopack: {
     // Path aliases are automatically resolved from tsconfig.json paths.
     // Do NOT add resolveAlias entries for @/* — that conflicts with
@@ -224,6 +227,117 @@ const nextConfig = {
       { source: '/TIMWHITE', destination: '/tim', permanent: true },
     ];
 
+    const legacyAppRedirects = [
+      { source: '/app/contact', destination: '/app/settings/contacts' },
+      { source: '/app/profile', destination: '/app/chat?panel=profile' },
+      { source: '/app/contacts', destination: '/app/settings/contacts' },
+      {
+        source: '/app/earnings',
+        destination: '/app/settings/artist-profile?tab=earn#tips',
+      },
+      {
+        source: '/app/tipping',
+        destination: '/app/settings/artist-profile?tab=earn#tips',
+      },
+      { source: '/app/tour-dates', destination: '/app/settings/touring' },
+      { source: '/app/dashboard', destination: '/app' },
+      { source: '/app/dashboard/overview', destination: '/app' },
+      {
+        source: '/app/dashboard/earnings',
+        destination: '/app/settings/artist-profile?tab=earn#tips',
+      },
+      {
+        source: '/app/dashboard/links',
+        destination: '/app/chat?panel=profile',
+      },
+      {
+        source: '/app/dashboard/tipping',
+        destination: '/app/settings/artist-profile?tab=earn#tips',
+      },
+      {
+        source: '/app/dashboard/profile',
+        destination: '/app/chat?panel=profile',
+      },
+      { source: '/app/dashboard/chat', destination: '/app/chat' },
+      {
+        source: '/app/dashboard/contacts',
+        destination: '/app/settings/contacts',
+      },
+      {
+        source: '/app/dashboard/tour-dates',
+        destination: '/app/settings/touring',
+      },
+      { source: '/app/settings', destination: '/app/settings/account' },
+      {
+        source: '/app/settings/profile',
+        destination: '/app/settings/artist-profile',
+      },
+      {
+        source: '/app/settings/appearance',
+        destination: '/app/settings/account',
+      },
+      {
+        source: '/app/settings/notifications',
+        destination: '/app/settings/account',
+      },
+      {
+        source: '/app/settings/delete-account',
+        destination: '/app/settings/data-privacy',
+      },
+      {
+        source: '/app/settings/retargeting-ads',
+        destination: '/app/settings/audience',
+      },
+      { source: '/app/settings/referral', destination: '/app/referrals' },
+      {
+        source: '/app/settings/remove-branding',
+        destination: '/app/settings/artist-profile',
+      },
+      {
+        source: '/app/settings/ad-pixels',
+        destination: '/app/settings/audience',
+      },
+      {
+        source: '/app/settings/branding',
+        destination: '/app/settings/artist-profile',
+      },
+      {
+        source: '/app/admin/waitlist',
+        destination: '/app/admin/people?view=waitlist',
+      },
+      {
+        source: '/app/admin/creators',
+        destination: '/app/admin/people?view=creators',
+      },
+      {
+        source: '/app/admin/users',
+        destination: '/app/admin/people?view=users',
+      },
+      {
+        source: '/app/admin/feedback',
+        destination: '/app/admin/people?view=feedback',
+      },
+      {
+        source: '/app/admin/leads',
+        destination: '/app/admin/growth?view=leads',
+      },
+      {
+        source: '/app/admin/outreach',
+        destination: '/app/admin/growth?view=outreach',
+      },
+      {
+        source: '/app/admin/campaigns',
+        destination: '/app/admin/growth?view=campaigns',
+      },
+      {
+        source: '/app/admin/ingest',
+        destination: '/app/admin/growth?view=ingest',
+      },
+    ].map(route => ({
+      ...route,
+      permanent: false,
+    }));
+
     return [
       // Legal page redirects
       {
@@ -237,6 +351,11 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: '/cookies',
+        destination: '/legal/cookies',
+        permanent: true,
+      },
+      {
         source: '/app/analytics',
         destination: '/app/dashboard/audience',
         permanent: false,
@@ -246,6 +365,7 @@ const nextConfig = {
         destination: '/app/dashboard/audience',
         permanent: false,
       },
+      ...legacyAppRedirects,
       // VIP username redirects
       ...vipUsernameRedirects,
     ];
@@ -254,32 +374,12 @@ const nextConfig = {
     return [
       // Rewrite /app/* to /app/dashboard/* for cleaner URLs
       {
-        source: '/app/profile',
-        destination: '/app/dashboard/profile',
-      },
-      {
-        source: '/app/contacts',
-        destination: '/app/dashboard/contacts',
-      },
-      {
         source: '/app/releases',
         destination: '/app/dashboard/releases',
       },
       {
-        source: '/app/tour-dates',
-        destination: '/app/dashboard/tour-dates',
-      },
-      {
         source: '/app/audience',
         destination: '/app/dashboard/audience',
-      },
-      {
-        source: '/app/earnings',
-        destination: '/app/dashboard/earnings',
-      },
-      {
-        source: '/app/chat',
-        destination: '/app/dashboard/chat',
       },
       {
         source: '/app/insights',
@@ -292,11 +392,30 @@ const nextConfig = {
     ];
   },
   env: {
+    // Build-time env vars — these get inlined into client bundles by Next.js
     NEXT_PUBLIC_APP_VERSION: APP_VERSION,
     NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(
       0,
       7
     ),
+    // Clerk JS bundle URL — decoded from the publishable key at build time.
+    // For pk_live_ keys, this points to the FAPI domain (CNAME to Clerk CDN)
+    // so Clerk JS + chunks load directly from Clerk infrastructure instead of
+    // going through the /__clerk middleware proxy which can't serve chunks.
+    ...(() => {
+      const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
+      if (!pk.startsWith('pk_live_')) return {};
+      try {
+        const b64 = pk.replace(/^pk_live_/, '');
+        const host = Buffer.from(b64, 'base64').toString().replace(/\$$/, '');
+        if (!host) return {};
+        return {
+          NEXT_PUBLIC_CLERK_JS_URL: `https://${host}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`,
+        };
+      } catch {
+        return {};
+      }
+    })(),
   },
   experimental: {
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isContentClean } from '../content-filter';
+import { hasOnlyLowercaseLettersNumbersAndHyphens } from '../handle';
 
 /**
  * Onboarding validation schemas for user registration and profile setup.
@@ -24,7 +25,7 @@ export const handleSchema = z
   .string()
   .min(3, { message: 'Must be at least 3 characters' })
   .max(24, { message: 'Must be no more than 24 characters' })
-  .regex(/^[a-z0-9-]+$/, {
+  .refine(hasOnlyLowercaseLettersNumbersAndHyphens, {
     message: 'Only lowercase letters, numbers, and hyphens are allowed',
   });
 

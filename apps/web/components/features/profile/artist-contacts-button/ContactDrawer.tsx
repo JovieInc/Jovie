@@ -2,10 +2,9 @@
 
 import { Badge } from '@jovie/ui';
 import { useCallback, useEffect } from 'react';
-import { Drawer } from 'vaul';
 import { track } from '@/lib/analytics';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
-import { DRAWER_OVERLAY_CLASS } from '../drawer-overlay-styles';
+import { ProfileDrawerShell } from '../ProfileDrawerShell';
 import { ChannelIcon } from './ContactIcons';
 import { useArtistContacts } from './useArtistContacts';
 
@@ -50,90 +49,78 @@ export function ContactDrawer({
   );
 
   return (
-    <Drawer.Root open={open} onOpenChange={handleOpenChange}>
-      <Drawer.Portal>
-        <Drawer.Overlay className={DRAWER_OVERLAY_CLASS} />
-        <Drawer.Content
-          className='fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] w-full max-w-full flex-col overflow-x-hidden rounded-t-[20px] border-t border-subtle bg-surface-2 shadow-xl'
-          data-testid='contact-drawer'
-          aria-describedby={undefined}
-        >
-          <div className='mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-quaternary-token/40' />
+    <ProfileDrawerShell
+      open={open}
+      onOpenChange={handleOpenChange}
+      title={`Contact ${artistName}`}
+      subtitle='Reach the right person without leaving the profile.'
+      dataTestId='contact-drawer'
+    >
+      <div className='space-y-3'>
+        {contacts.map(contact => {
+          const primary = primaryChannel(contact);
+          const primaryHref = getActionHref(primary);
 
-          <Drawer.Title className='px-6 pt-4 pb-2 text-center text-[15px] font-semibold tracking-tight text-primary-token'>
-            Contact {artistName}
-          </Drawer.Title>
-
-          <div className='overflow-y-auto overscroll-contain px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
-            <div className='space-y-2'>
-              {contacts.map(contact => {
-                const primary = primaryChannel(contact);
-                const primaryHref = getActionHref(primary);
-
-                return (
-                  <div
-                    key={contact.id}
-                    className='flex items-center justify-between gap-3 rounded-xl border border-subtle/70 bg-surface-2 px-3.5 py-3 transition-colors duration-150 ease-out hover:bg-surface-3 active:bg-surface-3'
-                    data-testid='contact-drawer-item'
-                  >
-                    {primaryHref ? (
-                      <a
-                        href={primaryHref}
-                        className='flex flex-1 flex-col items-start gap-1 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
-                        onClick={() => trackAction(primary, contact)}
-                      >
-                        <div className='flex items-center gap-2'>
-                          <span className='text-[13px] font-medium text-primary-token'>
-                            {contact.roleLabel}
-                          </span>
-                          {contact.territorySummary ? (
-                            <Badge size='sm'>{contact.territorySummary}</Badge>
-                          ) : null}
-                        </div>
-                        {contact.secondaryLabel ? (
-                          <span className='text-[11px] text-secondary-token'>
-                            {contact.secondaryLabel}
-                          </span>
-                        ) : null}
-                        {contact.primaryContactLabel ? (
-                          <span className='text-[11px] text-secondary-token/90'>
-                            {contact.primaryContactLabel}
-                          </span>
-                        ) : null}
-                      </a>
+          return (
+            <div
+              key={contact.id}
+              className='flex items-center justify-between gap-4 rounded-[26px] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] px-4 py-4 shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl transition-[background-color,border-color] duration-150 ease-out hover:bg-[var(--profile-pearl-bg-hover)]'
+              data-testid='contact-drawer-item'
+            >
+              {primaryHref ? (
+                <a
+                  href={primaryHref}
+                  className='flex min-w-0 flex-1 flex-col items-start gap-1.5 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+                  onClick={() => trackAction(primary, contact)}
+                >
+                  <div className='flex flex-wrap items-center gap-2'>
+                    <span className='text-sm font-[590] text-primary-token'>
+                      {contact.roleLabel}
+                    </span>
+                    {contact.territorySummary ? (
+                      <Badge size='sm'>{contact.territorySummary}</Badge>
                     ) : null}
-                    <div className='flex items-center gap-2'>
-                      {contact.channels.map(channel => {
-                        const channelHref = getActionHref(channel);
-                        if (!channelHref) return null;
-
-                        const channelLabels: Record<string, string> = {
-                          email: 'Email',
-                          sms: 'Text',
-                        };
-                        const channelLabel =
-                          channelLabels[channel.type] ?? 'Call';
-                        return (
-                          <a
-                            key={`${contact.id}-${channel.type}`}
-                            href={channelHref}
-                            className='flex h-9 w-9 items-center justify-center rounded-full text-primary-token transition-colors hover:bg-surface-1 active:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
-                            aria-label={`${channelLabel} ${contact.roleLabel}`}
-                            onClick={() => trackAction(channel, contact)}
-                            data-testid='contact-drawer-channel-action'
-                          >
-                            <ChannelIcon type={channel.type} />
-                          </a>
-                        );
-                      })}
-                    </div>
                   </div>
-                );
-              })}
+                  {contact.secondaryLabel ? (
+                    <span className='text-xs text-secondary-token'>
+                      {contact.secondaryLabel}
+                    </span>
+                  ) : null}
+                  {contact.primaryContactLabel ? (
+                    <span className='text-xs text-secondary-token/90'>
+                      {contact.primaryContactLabel}
+                    </span>
+                  ) : null}
+                </a>
+              ) : null}
+              <div className='flex shrink-0 items-center gap-2'>
+                {contact.channels.map(channel => {
+                  const channelHref = getActionHref(channel);
+                  if (!channelHref) return null;
+
+                  const channelLabels: Record<string, string> = {
+                    email: 'Email',
+                    sms: 'Text',
+                  };
+                  const channelLabel = channelLabels[channel.type] ?? 'Call';
+                  return (
+                    <a
+                      key={`${contact.id}-${channel.type}`}
+                      href={channelHref}
+                      className='flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-active)] text-primary-token shadow-[var(--profile-pearl-shadow)] transition-[background-color,border-color] hover:bg-[var(--profile-pearl-bg-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+                      aria-label={`${channelLabel} ${contact.roleLabel}`}
+                      onClick={() => trackAction(channel, contact)}
+                      data-testid='contact-drawer-channel-action'
+                    >
+                      <ChannelIcon type={channel.type} />
+                    </a>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </Drawer.Content>
-      </Drawer.Portal>
-    </Drawer.Root>
+          );
+        })}
+      </div>
+    </ProfileDrawerShell>
   );
 }

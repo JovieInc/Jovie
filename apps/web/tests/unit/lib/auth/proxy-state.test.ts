@@ -376,10 +376,10 @@ describe('proxy-state.ts', () => {
 
       const result = await getUserState('clerk_123');
 
-      // Should return safe fallback (require waitlist)
+      // Should return safe fallback (onboarding — waitlist gate is disabled)
       expect(result).toEqual({
-        needsWaitlist: true,
-        needsOnboarding: false,
+        needsWaitlist: false,
+        needsOnboarding: true,
         isActive: false,
         isBanned: false,
       });
@@ -441,8 +441,8 @@ describe('proxy-state.ts', () => {
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
-        needsWaitlist: true,
-        needsOnboarding: false,
+        needsWaitlist: false,
+        needsOnboarding: true,
         isActive: false,
         isBanned: false,
       });

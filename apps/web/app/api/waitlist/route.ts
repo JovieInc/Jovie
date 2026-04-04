@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { currentUser } from '@clerk/nextjs/server';
 import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -560,10 +561,10 @@ function buildPostErrorResponse(error: unknown, isDev: boolean): NextResponse {
 
 export async function GET() {
   logger.info('Waitlist API GET request received');
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     return NextResponse.json(
-      { hasEntry: false, status: null, inviteToken: null },
+      { hasEntry: false, status: null },
       { status: 401, headers: NO_STORE_HEADERS }
     );
   }
@@ -572,7 +573,7 @@ export async function GET() {
   const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
   if (!emailRaw) {
     return NextResponse.json(
-      { hasEntry: false, status: null, inviteToken: null },
+      { hasEntry: false, status: null },
       { status: 400, headers: NO_STORE_HEADERS }
     );
   }
@@ -606,8 +607,6 @@ export async function GET() {
     {
       hasEntry: Boolean(entry),
       status: entry?.status ?? null,
-      // claim token hash is never exposed via API — raw tokens are only sent via email
-      inviteToken: null,
       inviteUsername: invite?.username ?? null,
     },
     { headers: NO_STORE_HEADERS }
@@ -618,7 +617,7 @@ export async function POST(request: Request) {
   const isDev = process.env.NODE_ENV === 'development';
 
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return unauthorizedResponse();
     }

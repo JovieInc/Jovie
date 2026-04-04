@@ -1,4 +1,5 @@
-import { memo } from 'react';
+import { Check, Dot, TriangleAlert } from 'lucide-react';
+import { memo, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 interface ProviderStatusDotProps {
@@ -6,29 +7,64 @@ interface ProviderStatusDotProps {
   readonly accent: string;
 }
 
+function getProviderStatusConfig(
+  status: ProviderStatusDotProps['status'],
+  accent: string
+): {
+  label: string;
+  icon: ReactNode;
+  className: string;
+  style?: React.CSSProperties;
+} {
+  switch (status) {
+    case 'available':
+      return {
+        label: 'Auto-synced provider link',
+        icon: <Check className='h-2.5 w-2.5' aria-hidden='true' />,
+        className: 'shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
+        style: {
+          backgroundColor: `color-mix(in oklab, ${accent} 12%, transparent)`,
+          borderColor: `color-mix(in oklab, ${accent} 28%, var(--linear-app-frame-seam))`,
+          color: accent,
+        },
+      };
+    case 'manual':
+      return {
+        label: 'Manually added provider link',
+        icon: <TriangleAlert className='h-2.5 w-2.5' aria-hidden='true' />,
+        className:
+          'border-[color:color-mix(in_oklab,var(--color-warning)_28%,var(--linear-app-frame-seam))] bg-[color:color-mix(in_oklab,var(--color-warning)_12%,transparent)] text-[var(--color-warning)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
+      };
+    default:
+      return {
+        label: 'Missing provider link',
+        icon: <Dot className='h-2.5 w-2.5' aria-hidden='true' />,
+        className:
+          'border-subtle bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] text-tertiary-token',
+      };
+  }
+}
+
 export const ProviderStatusDot = memo(function ProviderStatusDot({
   status,
   accent,
 }: Readonly<ProviderStatusDotProps>) {
-  if (status === 'missing') {
-    return (
-      <span className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'>
-        <span className='h-1 w-1 rounded-full bg-(--linear-text-tertiary)' />
-      </span>
-    );
-  }
+  const config = getProviderStatusConfig(status, accent);
 
   return (
     <span
+      role='img'
       className={cn(
-        'relative flex h-2.5 w-2.5 items-center justify-center rounded-full',
-        status === 'manual' && 'ring-2 ring-amber-400/20'
+        'inline-flex h-4 w-4 items-center justify-center rounded-full border',
+        config.className
       )}
-      style={{ backgroundColor: accent }}
+      style={config.style}
+      title={config.label}
+      aria-label={config.label}
+      data-provider-status={status}
     >
-      {status === 'manual' && (
-        <span className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-(--color-warning)' />
-      )}
+      {config.icon}
+      <span className='sr-only'>{config.label}</span>
     </span>
   );
 });

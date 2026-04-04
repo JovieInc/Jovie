@@ -73,7 +73,7 @@ export function selectDashboardProfile(
  * Moved from app/app/dashboard/actions/tipping-stats.ts
  */
 export interface TippingStats {
-  /** Total number of tip-related clicks (QR + link combined) */
+  /** Total number of tip-link visits across all tracked sources */
   tipClicks: number;
   /** Number of tip clicks originating from QR codes */
   qrTipClicks: number;

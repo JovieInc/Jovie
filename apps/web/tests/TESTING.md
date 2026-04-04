@@ -128,6 +128,104 @@ PR created
     └── Deploy (if all pass)
 ```
 
+## E2E Authentication
+
+### How Clerk Test Auth Works
+
+E2E tests authenticate using Clerk's official testing library (`@clerk/testing/playwright`). The test user uses a **`+clerk_test` email** pattern which enables passwordless auth via a magic OTP code.
+
+| Concept | Detail |
+|---------|--------|
+| Test email format | `*+clerk_test@jov.ie` (e.g. `browse+clerk_test@jov.ie`) |
+| Magic OTP code | `424242` (auto-handled by Clerk testing library) |
+| Auth strategy | `email_code` (not password) |
+| Password needed? | **NO** — `+clerk_test` emails are passwordless |
+| Testing token | Generated via `@clerk/testing/playwright`'s `clerkSetup()` |
+
+### Required Doppler Environment Variables
+
+All E2E auth credentials are stored in Doppler (`jovie-web` project, `dev` config):
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `E2E_CLERK_USER_USERNAME` | Yes | Test user email (must contain `+clerk_test`) |
+| `E2E_CLERK_USER_PASSWORD` | No | Not needed for `+clerk_test` emails |
+| `CLERK_SECRET_KEY` | Yes | Server-side Clerk API key |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Yes | Client-side Clerk key |
+| `DATABASE_URL` | Yes | For seeding test data |
+
+### Auth Flow in Tests
+
+1. **`global-setup.ts`**: Loads env vars, calls `clerkSetup()` to get testing token, seeds test data
+2. **`auth.setup.ts`**: Navigates to `/signin`, signs in via `clerk.signIn()` with `email_code` strategy, saves session to `tests/.auth/user.json`
+3. **Screenshot/E2E specs**: Use `signInUser(page)` from `helpers/clerk-auth.ts` which detects `+clerk_test` emails and uses the correct auth strategy
+4. **`shouldSkipAuth()`**: Guards authenticated specs — skips if credentials missing or Clerk setup failed. `+clerk_test` emails do NOT require a password.
+
+### Product Screenshots
+
+Generate marketing screenshots for the homepage:
+
+```bash
+# Full pipeline: seed data + auth + capture all screenshots
+doppler run -p jovie-web -c dev -- pnpm --filter web screenshots
+
+# Capture only (skip seed, use existing data)
+doppler run -p jovie-web -c dev -- pnpm --filter web screenshots:capture
+
+# Seed only (populate "Aria Chen" test artist data)
+doppler run -p jovie-web -c dev -- pnpm --filter web screenshots:seed
+```
+
+Screenshots are saved to `apps/web/public/product-screenshots/` and used by homepage components (`ReleasesSection`, `PhoneProfileDemo`, `AudienceCRMSection`).
+
+### Local Browse Auth Bootstrap
+
+Local `/browse` and `/qa` runs should use the app's dev auth bootstrap, not manual Clerk login.
+
+Start the local browse-compatible server:
+
+```bash
+doppler run -- pnpm --filter web dev:local:browse
+```
+
+Then authenticate the browse session with one route hit:
+
+```text
+/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings
+```
+
+Notes:
+1. `creator` is the default browse persona and is the normal choice for dashboard QA.
+2. `admin` is opt-in:
+   `/api/dev/test-auth/enter?persona=admin&redirect=/app/admin`
+3. This flow sets the bypass cookies directly and works without `NEXT_PUBLIC_E2E_MODE=1`.
+4. It auto-provisions the local browse persona if it is missing.
+
+### Fallback Helper For Non-Loopback Hosts
+
+If you need cookie export for a non-loopback preview host that already has a real Clerk test user configured, use:
+
+```bash
+doppler run -- pnpm tsx scripts/browse-auth.ts --base-url https://<preview-host> --persona creator
+```
+
+The helper now prefers the local dev auth route on loopback/private hosts and only uses the Clerk testing-token flow as fallback on non-loopback hosts. That fallback requires real `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, and `E2E_CLERK_USER_USERNAME` values plus a matching live Clerk test account. In practice, localhost with `/api/dev/test-auth/enter?...` is the normal browse path; staging usually uses the live Clerk instance and is not the default flow for this bootstrap.
+
+### Common Auth Failures
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `⚠ Skipping: E2E_CLERK_USER_USERNAME not configured` | Missing Doppler env var | Run with `doppler run -p jovie-web -c dev --` |
+| `⚠ Skipping: Clerk testing setup was not successful` | `clerkSetup()` failed | Check `CLERK_SECRET_KEY` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` are real keys |
+| Screenshots show login screen | Auth guard skipping tests | Ensure `E2E_CLERK_USER_USERNAME` contains `+clerk_test` |
+| `audience-crm.png` missing | Auth guard skipped `audience.spec.ts` | Same as above — fix the auth guard |
+| `CLERK_SETUP_FAILED` | Real Clerk keys not in env | Run via Doppler, not bare `pnpm` |
+| `Failed to load Clerk JS` on localhost | Clerk proxy forces HTTPS, localhost has no SSL | The app now auto-disables the Clerk proxy on insecure local/private HTTP origins. If you are reusing an already-running dev server, restart it so the new runtime path is active. You can still force the old behavior with `NEXT_PUBLIC_CLERK_PROXY_DISABLED=1` when needed for test pipelines. |
+| Local `/browse` still looks signed out | Dev server was not started in browse mode | Restart with `doppler run -- pnpm --filter web dev:local:browse` |
+| Local `/browse` hits `/signin` | Dev auth bootstrap route was not used | Open `/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings` first |
+| OTP input not visible | Testing token not set before navigation | Only relevant for non-loopback fallback; check `setupClerkTestingToken()` runs in `auth.setup.ts` |
+| `Couldn't find your account` on staging | Staging uses live Clerk instance, test user is in test instance | Always run screenshots against localhost (dev server), not staging |
+
 ## Troubleshooting
 
 ### Tests timing out

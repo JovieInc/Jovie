@@ -69,25 +69,25 @@ export function CopyableUrlRow({
 
   const sizeClasses = {
     sm: {
-      container: 'h-[20px] gap-[3px] rounded-md px-1',
+      container: 'h-[22px] gap-1 rounded-full px-2',
       icon: 'h-[11px] w-[11px]',
       value: 'text-[10.5px]',
       button: 'h-4 w-4 rounded-full',
       glyph: 'h-[10px] w-[10px]',
     },
     md: {
-      container: 'h-[22px] gap-1 rounded-md px-1.5',
-      icon: 'h-[11px] w-[11px]',
-      value: 'text-[10.5px]',
-      button: 'h-4 w-4 rounded-full',
-      glyph: 'h-[10px] w-[10px]',
+      container: 'h-7 gap-1.5 rounded-full px-2.5',
+      icon: 'h-3 w-3',
+      value: 'text-[11px]',
+      button: 'h-5 w-5 rounded-full',
+      glyph: 'h-3 w-3',
     },
     lg: {
-      container: 'h-[24px] gap-1 rounded-md px-1.5',
+      container: 'h-8 gap-1.5 rounded-full px-3',
       icon: 'h-3.5 w-3.5',
-      value: 'text-[10.5px]',
-      button: 'h-4.5 w-4.5 rounded-full',
-      glyph: 'h-3 w-3',
+      value: 'text-[11.5px]',
+      button: 'h-5.5 w-5.5 rounded-full',
+      glyph: 'h-3.5 w-3.5',
     },
   } as const;
 
@@ -99,7 +99,7 @@ export function CopyableUrlRow({
       className={cn(
         'flex items-center transition-[background-color,border-color] duration-150',
         surface === 'boxed'
-          ? 'border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_84%,var(--linear-bg-surface-0))] hover:bg-surface-1'
+          ? 'border border-(--linear-app-frame-seam) bg-surface-0 hover:bg-surface-1'
           : 'border border-transparent bg-transparent hover:bg-surface-1/80',
         styles.container,
         className
@@ -113,6 +113,7 @@ export function CopyableUrlRow({
         className={cn(
           'min-w-0 flex-1 truncate font-mono tracking-[-0.01em] text-secondary-token',
           styles.value,
+          'leading-none',
           valueClassName
         )}
         title={url}

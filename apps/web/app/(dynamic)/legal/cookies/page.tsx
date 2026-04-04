@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { LegalPage } from '@/components/organisms/LegalPage';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getLegalDocument } from '@/lib/legal/getLegalDocument';
 
 // Full SSG - markdown content is read at build time, no runtime regeneration needed
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   title: `Cookie Policy | ${APP_NAME}`,
   description: 'Learn how we use cookies and how to manage your preferences.',
   alternates: {
-    canonical: `${APP_URL}/legal/cookies`,
+    canonical: `${BASE_URL}/legal/cookies`,
   },
   robots: {
     index: true,

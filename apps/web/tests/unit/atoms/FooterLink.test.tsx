@@ -81,6 +81,7 @@ describe('FooterLink', () => {
     const { container } = render(
       <FooterLink href='/test'>Accessible Link</FooterLink>
     );
-    await expectNoA11yViolations(container);
+    const result = await expectNoA11yViolations(container);
+    expect(result).toBeUndefined();
   });
 });

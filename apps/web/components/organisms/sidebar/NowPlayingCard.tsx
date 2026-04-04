@@ -4,13 +4,14 @@ import { Pause, Play } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { SeekBar } from '@/components/atoms/SeekBar';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { useSidebar } from './context';
 
 export function NowPlayingCard() {
-  const { playbackState, toggleTrack, onError } = useTrackAudioPlayer();
+  const { playbackState, toggleTrack, seek, onError } = useTrackAudioPlayer();
   const { state: sidebarState } = useSidebar();
   const isCollapsed = sidebarState === 'closed';
 
@@ -32,22 +33,10 @@ export function NowPlayingCard() {
     toggleTrack({
       id: playbackState.activeTrackId,
       title: playbackState.trackTitle,
-      audioUrl: '', // Not needed for toggle — same track ID triggers pause/resume
     }).catch(() => {});
   }, [playbackState.activeTrackId, playbackState.trackTitle, toggleTrack]);
 
   if (!playbackState.activeTrackId) return null;
-
-  const progressPercent =
-    playbackState.duration > 0
-      ? Math.min(
-          100,
-          Math.max(
-            0,
-            (playbackState.currentTime / playbackState.duration) * 100
-          )
-        )
-      : 0;
 
   const currentTimeFormatted = formatDuration(
     Math.round(playbackState.currentTime) * 1000
@@ -63,7 +52,7 @@ export function NowPlayingCard() {
         <button
           type='button'
           onClick={handleToggle}
-          className='flex h-8 w-8 items-center justify-center rounded-[8px] text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          className='flex h-8 w-8 items-center justify-center rounded-full text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
           aria-label={
             playbackState.isPlaying ? 'Pause playback' : 'Resume playback'
           }
@@ -79,7 +68,7 @@ export function NowPlayingCard() {
   }
 
   return (
-    <div className='animate-in fade-in slide-in-from-bottom-2 duration-200 space-y-1.5 rounded-[8px] border border-subtle bg-surface-0/50 p-2'>
+    <div className='animate-in fade-in slide-in-from-bottom-2 duration-200 space-y-1.5 rounded-xl border border-subtle bg-surface-0/50 p-2'>
       <div className='flex items-center gap-2.5'>
         {playbackState.artworkUrl && !imgError ? (
           <Image
@@ -87,12 +76,12 @@ export function NowPlayingCard() {
             alt=''
             width={36}
             height={36}
-            className='h-9 w-9 shrink-0 rounded-[6px] object-cover'
+            className='h-9 w-9 shrink-0 rounded-lg object-cover'
             unoptimized
             onError={() => setImgError(true)}
           />
         ) : (
-          <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] bg-surface-1'>
+          <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-1'>
             <Play className='h-3.5 w-3.5 text-tertiary-token' />
           </div>
         )}
@@ -133,15 +122,20 @@ export function NowPlayingCard() {
       </div>
 
       <div className='space-y-0.5'>
-        <div className='h-[3px] w-full overflow-hidden rounded-full bg-surface-1'>
-          <div
-            className='h-full rounded-full bg-(--linear-accent) transition-[width] duration-200'
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
+        <SeekBar
+          currentTime={playbackState.currentTime}
+          duration={playbackState.duration}
+          onSeek={seek}
+          className='h-[3px] w-full bg-surface-1'
+        />
         <div className='flex items-center justify-between text-[10px] tabular-nums text-quaternary-token'>
           <span>{currentTimeFormatted}</span>
-          {durationFormatted && <span>{durationFormatted}</span>}
+          <span>
+            {durationFormatted}
+            {playbackState.duration > 0 && playbackState.duration < 45
+              ? ' · Preview'
+              : ''}
+          </span>
         </div>
       </div>
     </div>

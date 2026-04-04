@@ -98,7 +98,7 @@ export function DashboardMockup({
             }}
           >
             {/* Desktop row layout */}
-            <div className='hidden md:grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-2.5'>
+            <div className='max-md:hidden md:grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-2.5'>
               <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-surface-2'>
                 <Image
                   src={release.artwork}
@@ -219,7 +219,7 @@ export function DashboardMockup({
       })}
 
       {/* Footer punchline */}
-      {!isHero ? (
+      {isHero ? null : (
         <div
           ref={footerRef}
           className='flex items-center justify-center px-5 py-2.5'
@@ -229,7 +229,7 @@ export function DashboardMockup({
             link
           </p>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

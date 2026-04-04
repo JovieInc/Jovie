@@ -233,7 +233,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
       <button
         type='button'
         className={cn(
-          'inline-flex h-6 w-6 items-center justify-center rounded-full text-tertiary-token transition-colors duration-normal ease-interactive hover:bg-interactive-hover hover:text-secondary-token active:bg-interactive-active focus-visible:outline-none focus-visible:bg-interactive-hover',
+          'inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-transparent bg-transparent text-tertiary-token transition-[background-color,color,box-shadow] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-focus',
           triggerClassName
         )}
         aria-label={ariaLabel || 'More actions'}
@@ -251,17 +251,22 @@ export function CommonDropdown(props: CommonDropdownProps) {
         align={align}
         side={side}
         sideOffset={sideOffset}
+        data-menu-surface='toolbar'
         className={cn(dropdownContentBase, contentClassName)}
       >
         {searchable && (
-          <div className='relative px-2 pb-1 pt-1'>
-            <Search className='absolute left-4.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
+          <div
+            data-menu-header
+            className='relative border-b border-subtle px-2.5 pb-2 pt-2'
+          >
+            <Search className='absolute left-5 top-[25px] h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
             <input
               type='text'
               placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className='w-full rounded-md border-0 border-b border-subtle bg-transparent py-1.5 pl-8 pr-3 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-0'
+              className='w-full rounded-[8px] border border-subtle bg-surface-1 py-1.5 pl-8 pr-3 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/15'
             />
           </div>
         )}
@@ -300,6 +305,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
   function renderContextMenuContent() {
     const content = (
       <ContextMenuPrimitive.Content
+        data-menu-surface='toolbar'
         className={cn(contextContentBase, contentClassName)}
       >
         {(() => {
@@ -417,6 +423,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
     return (
       <MenuItem
         key={item.id}
+        data-menu-row=''
         onClick={e => {
           e.stopPropagation();
           if (!item.disabled) {
@@ -474,6 +481,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
     return (
       <CheckboxItem
         key={item.id}
+        data-menu-row=''
         checked={item.checked}
         onCheckedChange={item.onCheckedChange}
         disabled={item.disabled}
@@ -519,6 +527,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
           return (
             <RadioItem
               key={radioItem.id}
+              data-menu-row=''
               value={radioItem.value}
               disabled={radioItem.disabled}
               className={cn(CHECKBOX_RADIO_ITEM_BASE, radioItem.className)}
@@ -562,6 +571,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
       <Sub key={item.id}>
         <SubTrigger
           disabled={item.disabled}
+          data-menu-row=''
           className={cn(itemBase, item.className)}
         >
           {renderIcon(item.icon, 'h-4 w-4')}
@@ -569,7 +579,10 @@ export function CommonDropdown(props: CommonDropdownProps) {
           <ChevronRight className='ml-auto' />
         </SubTrigger>
         <Portal>
-          <SubContent className={cn(subMenuContentClasses, transformOrigin)}>
+          <SubContent
+            data-menu-surface='toolbar'
+            className={cn(subMenuContentClasses, transformOrigin)}
+          >
             {renderItems(item.items, isContextMenu)}
           </SubContent>
         </Portal>

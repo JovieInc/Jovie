@@ -1,18 +1,22 @@
 'use client';
 
-import { Copy, ExternalLink } from 'lucide-react';
+import { Copy, ExternalLink, ShieldCheck, ShieldOff } from 'lucide-react';
 import type { ContextMenuItemType } from '@/components/organisms/table';
-import type { AdminUserRow } from '@/lib/admin/users';
+import type { AdminUserRow } from '@/lib/admin/types';
 
 // Module-level icon constants — allocated once, reused across all rows and renders.
 const ICON_COPY = <Copy className='h-3.5 w-3.5' />;
 const ICON_EXTERNAL = <ExternalLink className='h-3.5 w-3.5' />;
+const ICON_SUSPEND = <ShieldOff className='h-3.5 w-3.5' />;
+const ICON_RESTORE = <ShieldCheck className='h-3.5 w-3.5' />;
 
 export interface BuildAdminUserActionsCallbacks {
   readonly onCopyClerkId: (user: AdminUserRow) => void;
   readonly onCopyEmail: (user: AdminUserRow) => void;
   readonly onCopyUserId: (user: AdminUserRow) => void;
   readonly onOpenInClerk: (user: AdminUserRow) => void;
+  readonly onBanUser: (user: AdminUserRow) => void;
+  readonly onUnbanUser: (user: AdminUserRow) => void;
 }
 
 /**
@@ -62,6 +66,28 @@ export function buildAdminUserActions(
       }
     );
   }
+
+  // ── Moderation group ──
+  const isBanned =
+    user.userStatus === 'banned' || user.userStatus === 'suspended';
+
+  items.push(
+    { type: 'separator' as const },
+    isBanned
+      ? {
+          id: 'restore-user',
+          label: 'Restore user',
+          icon: ICON_RESTORE,
+          onClick: () => callbacks.onUnbanUser(user),
+        }
+      : {
+          id: 'suspend-user',
+          label: 'Suspend user',
+          icon: ICON_SUSPEND,
+          onClick: () => callbacks.onBanUser(user),
+          destructive: true,
+        }
+  );
 
   return items;
 }

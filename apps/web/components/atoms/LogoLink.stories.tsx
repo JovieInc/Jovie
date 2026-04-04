@@ -57,7 +57,7 @@ export const ExtraLarge: Story = {
 
 export const CustomHref: Story = {
   args: {
-    href: APP_ROUTES.DASHBOARD_OVERVIEW,
+    href: APP_ROUTES.DASHBOARD,
     logoSize: 'sm',
   },
 };

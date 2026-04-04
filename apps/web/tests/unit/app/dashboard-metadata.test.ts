@@ -21,8 +21,11 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
   ChatPageClient: () => null,
 }));
 
+const mockGetDashboardData = vi.fn().mockResolvedValue({
+  selectedProfile: null,
+});
 vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
-  getDashboardData: vi.fn().mockResolvedValue({}),
+  getDashboardData: (...args: unknown[]) => mockGetDashboardData(...args),
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
@@ -47,16 +50,11 @@ describe('dashboard metadata generation', () => {
     mockLimit.mockResolvedValue([]);
   });
 
-  it('uses display name for app root tab title when available', async () => {
-    mockGetSessionContext.mockResolvedValue({
-      user: { id: 'user-id' },
-      profile: { displayName: 'Ada' },
-    });
-
+  it('uses the static dashboard title for the app root', async () => {
     const { generateMetadata } = await import('@/app/app/(shell)/page');
     const metadata = await generateMetadata();
 
-    expect(metadata.title).toBe('Ada | Jovie');
+    expect(metadata.title).toBe('Home | Jovie');
   });
 
   it('falls back to dashboard title when profile display name is missing', async () => {
@@ -88,5 +86,15 @@ describe('dashboard metadata generation', () => {
     });
 
     expect(metadata.title).toBe('Thread | Jovie');
+  });
+
+  it('home page renders the same chat client as /app/chat (AGENTS.md #16)', async () => {
+    const { DeferredChatPageClient } = await import(
+      '@/app/app/(shell)/chat/DeferredChatPageClient'
+    );
+    const homePage = await import('@/app/app/(shell)/page');
+
+    const result = homePage.default();
+    expect(result.type).toBe(DeferredChatPageClient);
   });
 });

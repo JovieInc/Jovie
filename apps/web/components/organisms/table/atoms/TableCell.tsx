@@ -34,7 +34,7 @@ export function TableCell({
         // Alignment
         alignmentClasses[align],
         // Responsive hiding
-        hideOnMobile && 'hidden md:table-cell',
+        hideOnMobile && 'max-md:hidden md:table-cell',
         // Custom classes
         className
       )}

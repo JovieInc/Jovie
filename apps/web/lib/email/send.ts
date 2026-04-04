@@ -107,6 +107,7 @@ export async function sendTipThankYouEmail(options: {
     socialLinks: options.socialLinks,
     unsubscribeToken: options.unsubscribeToken,
     profileId: options.profileId,
+    recipientEmail: options.to,
   });
 
   return sendEmail({

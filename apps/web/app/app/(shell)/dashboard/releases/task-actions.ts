@@ -1,33 +1,24 @@
 'use server';
 
-import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, count, sql as drizzleSql, eq, isNull, max } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
-import { releaseTasks } from '@/lib/db/schema/release-tasks';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { tasks } from '@/lib/db/schema/tasks';
+import {
+  requireReleasePlanGenerationAccess,
+  requireTasksWorkspaceAccess,
+} from '@/lib/entitlements/tasks-gate';
 import {
   DEFAULT_RELEASE_TASK_TEMPLATE,
   type DefaultTemplateItem,
 } from '@/lib/release-tasks/default-template';
-import { getDashboardData } from '../actions';
-
-// ─── Auth Helper ────────────────────────────────────────────────────
-
-async function requireProfileId(): Promise<string> {
-  const data = await getDashboardData();
-
-  if (data.needsOnboarding && !data.dashboardLoadError) {
-    redirect('/onboarding');
-  }
-
-  if (!data.selectedProfile) {
-    redirect('/onboarding');
-  }
-
-  return data.selectedProfile.id;
-}
+import type { ReleaseTaskView } from '@/lib/release-tasks/types';
+import type { TaskView } from '@/lib/tasks/types';
+import { requireProfileId } from '../requireProfileId';
+import { createTask, deleteTask, updateTask } from '../tasks/task-actions';
 
 async function requireReleaseAccess(
   releaseId: string,
@@ -49,234 +40,318 @@ async function requireReleaseAccess(
   }
 }
 
-// ─── Instantiate Release Tasks ──────────────────────────────────────
-
-export async function instantiateReleaseTasks(releaseId: string) {
-  const profileId = await requireProfileId();
-  await requireReleaseAccess(releaseId, profileId);
-
-  // Idempotent: check if tasks already exist
-  const [existing] = await db
-    .select({ taskCount: count() })
-    .from(releaseTasks)
-    .where(eq(releaseTasks.releaseId, releaseId));
-
-  if (existing && existing.taskCount > 0) {
-    return getReleaseTasks(releaseId);
-  }
-
-  // Get release date for computing due dates
-  const [release] = await db
-    .select({ releaseDate: discogReleases.releaseDate })
-    .from(discogReleases)
-    .where(eq(discogReleases.id, releaseId))
-    .limit(1);
-
-  const releaseDate = release?.releaseDate;
-
-  // Build task rows from template constant
-  const taskRows = DEFAULT_RELEASE_TASK_TEMPLATE.map(
-    (item: DefaultTemplateItem, index: number) => ({
-      releaseId,
-      creatorProfileId: profileId,
-      title: item.title,
-      description: item.description ?? null,
-      explainerText: item.explainerText ?? null,
-      learnMoreUrl: item.learnMoreUrl ?? null,
-      category: item.category,
-      status: 'todo' as const,
-      priority: item.priority,
-      position: index,
-      assigneeType: item.assigneeType,
-      aiWorkflowId: item.aiWorkflowId ?? null,
-      dueDaysOffset: item.dueDaysOffset,
-      dueDate: releaseDate
-        ? computeDueDate(releaseDate, item.dueDaysOffset)
-        : null,
-    })
-  );
-
-  await db.insert(releaseTasks).values(taskRows);
-
-  revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
-  return getReleaseTasks(releaseId);
+function readMetadataText(
+  metadata: Record<string, unknown> | null,
+  key: 'explainerText' | 'learnMoreUrl' | 'videoUrl'
+): string | null {
+  const value = metadata?.[key];
+  return typeof value === 'string' ? value : null;
 }
 
-// ─── Get Release Tasks ──────────────────────────────────────────────
-
-export async function getReleaseTasks(releaseId: string) {
-  const profileId = await requireProfileId();
-
-  const tasks = await db
-    .select()
-    .from(releaseTasks)
-    .where(
-      and(
-        eq(releaseTasks.releaseId, releaseId),
-        eq(releaseTasks.creatorProfileId, profileId)
-      )
-    )
-    .orderBy(releaseTasks.position);
-
-  return tasks;
+function readMetadataNumber(
+  metadata: Record<string, unknown> | null,
+  key: 'dueDaysOffset'
+): number | null {
+  const value = metadata?.[key];
+  return typeof value === 'number' ? value : null;
 }
 
-// ─── Update Release Task ────────────────────────────────────────────
-
-export async function updateReleaseTask(
-  taskId: string,
-  data: {
-    status?: 'backlog' | 'todo' | 'in_progress' | 'done' | 'cancelled';
-    priority?: 'urgent' | 'high' | 'medium' | 'low' | 'none';
-    assigneeType?: 'human' | 'ai_workflow';
-    title?: string;
-    description?: string | null;
-    dueDate?: Date | null;
-  }
-) {
-  const profileId = await requireProfileId();
-
-  // Verify ownership
-  const [task] = await db
-    .select({ id: releaseTasks.id, releaseId: releaseTasks.releaseId })
-    .from(releaseTasks)
-    .where(
-      and(
-        eq(releaseTasks.id, taskId),
-        eq(releaseTasks.creatorProfileId, profileId)
-      )
-    )
-    .limit(1);
-
-  if (!task) {
-    throw new Error('Task not found or access denied');
-  }
-
-  const updateData: Record<string, unknown> = {
-    ...data,
-    updatedAt: new Date(),
+function mapTaskToReleaseTaskView(task: TaskView): ReleaseTaskView {
+  return {
+    id: task.id,
+    releaseId: task.releaseId ?? '',
+    creatorProfileId: task.creatorProfileId,
+    templateItemId: task.sourceTemplateId,
+    title: task.title,
+    description: task.description,
+    explainerText: readMetadataText(task.metadata, 'explainerText'),
+    learnMoreUrl: readMetadataText(task.metadata, 'learnMoreUrl'),
+    videoUrl: readMetadataText(task.metadata, 'videoUrl'),
+    category: task.category,
+    status: task.status,
+    priority: task.priority,
+    position: task.position,
+    assigneeType: task.assigneeKind === 'jovie' ? 'ai_workflow' : 'human',
+    assigneeUserId: task.assigneeUserId,
+    aiWorkflowId: task.agentType,
+    dueDaysOffset: readMetadataNumber(task.metadata, 'dueDaysOffset'),
+    dueDate: task.dueAt,
+    completedAt: task.completedAt,
+    metadata: task.metadata,
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
   };
-
-  // Set completedAt when status changes to done, clear when un-done
-  if (data.status === 'done') {
-    updateData.completedAt = new Date();
-  } else if (data.status) {
-    updateData.completedAt = null;
-  }
-
-  await db
-    .update(releaseTasks)
-    .set(updateData)
-    .where(eq(releaseTasks.id, taskId));
-
-  revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
-  return { success: true };
 }
-
-// ─── Add Release Task ───────────────────────────────────────────────
-
-export async function addReleaseTask(
-  releaseId: string,
-  data: {
-    title: string;
-    description?: string;
-    category?: string;
-    priority?: 'urgent' | 'high' | 'medium' | 'low' | 'none';
-    assigneeType?: 'human' | 'ai_workflow';
-    dueDate?: Date;
-  }
-) {
-  const profileId = await requireProfileId();
-  await requireReleaseAccess(releaseId, profileId);
-
-  // Get next position
-  const [maxPos] = await db
-    .select({ maxPosition: drizzleSql<number>`COALESCE(MAX(position), -1)` })
-    .from(releaseTasks)
-    .where(eq(releaseTasks.releaseId, releaseId));
-
-  const [newTask] = await db
-    .insert(releaseTasks)
-    .values({
-      releaseId,
-      creatorProfileId: profileId,
-      title: data.title,
-      description: data.description ?? null,
-      category: data.category ?? 'Custom',
-      priority: data.priority ?? 'medium',
-      assigneeType: data.assigneeType ?? 'human',
-      dueDate: data.dueDate ?? null,
-      position: (maxPos?.maxPosition ?? -1) + 1,
-    })
-    .returning();
-
-  revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
-  return newTask;
-}
-
-// ─── Delete Release Task ────────────────────────────────────────────
-
-export async function deleteReleaseTask(taskId: string) {
-  const profileId = await requireProfileId();
-
-  const [task] = await db
-    .select({ id: releaseTasks.id })
-    .from(releaseTasks)
-    .where(
-      and(
-        eq(releaseTasks.id, taskId),
-        eq(releaseTasks.creatorProfileId, profileId)
-      )
-    )
-    .limit(1);
-
-  if (!task) {
-    throw new Error('Task not found or access denied');
-  }
-
-  await db.delete(releaseTasks).where(eq(releaseTasks.id, taskId));
-
-  revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
-  return { success: true };
-}
-
-// ─── Get Task Summary (for progress badges) ─────────────────────────
-
-export async function getReleaseTaskSummary(profileId: string) {
-  const rows = await db
-    .select({
-      releaseId: releaseTasks.releaseId,
-      total: count(),
-      done: drizzleSql<number>`COUNT(*) FILTER (WHERE status = 'done')`,
-    })
-    .from(releaseTasks)
-    .where(eq(releaseTasks.creatorProfileId, profileId))
-    .groupBy(releaseTasks.releaseId);
-
-  return new Map(
-    rows.map(r => [r.releaseId, { total: r.total, done: Number(r.done) }])
-  );
-}
-
-// ─── Recompute Due Dates (called when release date changes) ─────────
-
-export async function recomputeTaskDueDates(
-  releaseId: string,
-  newReleaseDate: Date
-) {
-  await db.execute(drizzleSql`
-    UPDATE release_tasks
-    SET due_date = ${newReleaseDate}::timestamp + (due_days_offset || ' days')::interval,
-        updated_at = NOW()
-    WHERE release_id = ${releaseId}
-      AND due_days_offset IS NOT NULL
-  `);
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────
 
 function computeDueDate(releaseDate: Date, offsetDays: number): Date {
   const date = new Date(releaseDate);
   date.setDate(date.getDate() + offsetDays);
   return date;
+}
+
+export async function instantiateReleaseTasks(releaseId: string) {
+  await requireReleasePlanGenerationAccess();
+  const profileId = await requireProfileId();
+  await requireReleaseAccess(releaseId, profileId);
+
+  const [existing] = await db
+    .select({ taskCount: count() })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.releaseId, releaseId),
+        eq(tasks.creatorProfileId, profileId),
+        isNull(tasks.deletedAt)
+      )
+    );
+
+  if (existing && existing.taskCount > 0) {
+    return getReleaseTasks(releaseId);
+  }
+
+  const [release, positionRow, counterRow] = await Promise.all([
+    db
+      .select({ releaseDate: discogReleases.releaseDate })
+      .from(discogReleases)
+      .where(eq(discogReleases.id, releaseId))
+      .limit(1)
+      .then(rows => rows[0]),
+    db
+      .select({ maxPosition: max(tasks.position) })
+      .from(tasks)
+      .where(
+        and(eq(tasks.creatorProfileId, profileId), isNull(tasks.deletedAt))
+      )
+      .then(rows => rows[0]),
+    db
+      .update(creatorProfiles)
+      .set({
+        nextTaskNumber: drizzleSql`${creatorProfiles.nextTaskNumber} + ${DEFAULT_RELEASE_TASK_TEMPLATE.length}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profileId))
+      .returning({ nextTaskNumber: creatorProfiles.nextTaskNumber })
+      .then(rows => rows[0]),
+  ]);
+
+  const firstTaskNumber =
+    (counterRow?.nextTaskNumber ?? DEFAULT_RELEASE_TASK_TEMPLATE.length + 1) -
+    DEFAULT_RELEASE_TASK_TEMPLATE.length;
+  const startPosition = (positionRow?.maxPosition ?? -1) + 1;
+  const releaseDate = release?.releaseDate ?? null;
+
+  const taskRows = DEFAULT_RELEASE_TASK_TEMPLATE.map(
+    (item: DefaultTemplateItem, index: number) => ({
+      taskNumber: firstTaskNumber + index,
+      creatorProfileId: profileId,
+      title: item.title,
+      description: item.description ?? null,
+      status: 'todo' as const,
+      priority: item.priority,
+      assigneeKind:
+        item.assigneeType === 'ai_workflow'
+          ? ('jovie' as const)
+          : ('human' as const),
+      agentType: item.aiWorkflowId ?? null,
+      agentStatus: 'idle' as const,
+      releaseId,
+      category: item.category,
+      dueAt:
+        releaseDate !== null
+          ? computeDueDate(releaseDate, item.dueDaysOffset)
+          : null,
+      position: startPosition + index,
+      sourceTemplateId: null,
+      metadata: {
+        dueDaysOffset: item.dueDaysOffset,
+        explainerText: item.explainerText ?? null,
+        learnMoreUrl: item.learnMoreUrl ?? null,
+        videoUrl: null,
+        ...(item.descriptionHelper
+          ? { descriptionHelper: item.descriptionHelper }
+          : {}),
+      },
+    })
+  );
+
+  await db.insert(tasks).values(taskRows);
+
+  revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
+  revalidatePath(APP_ROUTES.TASKS);
+
+  return getReleaseTasks(releaseId);
+}
+
+export async function getReleaseTasks(
+  releaseId: string
+): Promise<ReleaseTaskView[]> {
+  await requireTasksWorkspaceAccess();
+  const profileId = await requireProfileId();
+  await requireReleaseAccess(releaseId, profileId);
+
+  const rows = await db
+    .select()
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.releaseId, releaseId),
+        eq(tasks.creatorProfileId, profileId),
+        isNull(tasks.deletedAt)
+      )
+    )
+    .orderBy(tasks.position);
+
+  return rows.map(row =>
+    mapTaskToReleaseTaskView({
+      id: row.id,
+      taskNumber: row.taskNumber,
+      creatorProfileId: row.creatorProfileId,
+      title: row.title,
+      description: row.description ?? null,
+      status: row.status,
+      priority: row.priority,
+      assigneeKind: row.assigneeKind,
+      assigneeUserId: row.assigneeUserId ?? null,
+      agentType: row.agentType ?? null,
+      agentStatus: row.agentStatus,
+      agentInput: row.agentInput ?? null,
+      agentOutput: row.agentOutput ?? null,
+      agentError: row.agentError ?? null,
+      releaseId: row.releaseId ?? null,
+      releaseTitle: null,
+      parentTaskId: row.parentTaskId ?? null,
+      category: row.category ?? null,
+      dueAt: row.dueAt ?? null,
+      scheduledFor: row.scheduledFor ?? null,
+      startedAt: row.startedAt ?? null,
+      completedAt: row.completedAt ?? null,
+      position: row.position,
+      sourceTemplateId: row.sourceTemplateId ?? null,
+      metadata: row.metadata ?? null,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    })
+  );
+}
+
+function resolveAssigneeKind(
+  assigneeType: 'human' | 'ai_workflow' | undefined
+): 'jovie' | 'human' | undefined {
+  if (assigneeType === undefined) return undefined;
+  return assigneeType === 'ai_workflow' ? 'jovie' : 'human';
+}
+
+export async function updateReleaseTask(
+  taskId: string,
+  data: {
+    readonly status?: 'backlog' | 'todo' | 'in_progress' | 'done' | 'cancelled';
+    readonly priority?: 'urgent' | 'high' | 'medium' | 'low' | 'none';
+    readonly assigneeType?: 'human' | 'ai_workflow';
+    readonly title?: string;
+    readonly description?: string | null;
+    readonly dueDate?: Date | null;
+  }
+) {
+  await requireTasksWorkspaceAccess();
+  await updateTask(taskId, {
+    status: data.status,
+    priority: data.priority,
+    assigneeKind: resolveAssigneeKind(data.assigneeType),
+    title: data.title,
+    description: data.description,
+    dueAt: data.dueDate,
+  });
+
+  return { success: true };
+}
+
+export async function addReleaseTask(
+  releaseId: string,
+  data: {
+    readonly title: string;
+    readonly description?: string;
+    readonly category?: string;
+    readonly priority?: 'urgent' | 'high' | 'medium' | 'low' | 'none';
+    readonly assigneeType?: 'human' | 'ai_workflow';
+    readonly dueDate?: Date;
+  }
+): Promise<ReleaseTaskView> {
+  await requireTasksWorkspaceAccess();
+  const profileId = await requireProfileId();
+  await requireReleaseAccess(releaseId, profileId);
+
+  const task = await createTask({
+    title: data.title,
+    description: data.description ?? null,
+    category: data.category ?? 'Custom',
+    priority: data.priority ?? 'medium',
+    assigneeKind: data.assigneeType === 'ai_workflow' ? 'jovie' : 'human',
+    releaseId,
+    dueAt: data.dueDate ?? null,
+  });
+
+  return mapTaskToReleaseTaskView(task);
+}
+
+export async function deleteReleaseTask(taskId: string) {
+  await requireTasksWorkspaceAccess();
+  await deleteTask(taskId);
+  return { success: true };
+}
+
+export async function getReleaseTaskSummary(
+  _profileId?: string
+): Promise<Map<string, { total: number; done: number }>> {
+  await requireTasksWorkspaceAccess();
+  const profileId = await requireProfileId();
+
+  const rows = await db
+    .select({
+      releaseId: tasks.releaseId,
+      total: count(),
+      done: drizzleSql<number>`COUNT(*) FILTER (WHERE ${tasks.status} = 'done')`,
+    })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.creatorProfileId, profileId),
+        isNull(tasks.deletedAt),
+        drizzleSql`${tasks.releaseId} IS NOT NULL`
+      )
+    )
+    .groupBy(tasks.releaseId);
+
+  return new Map(
+    rows.flatMap(row =>
+      row.releaseId === null
+        ? []
+        : [
+            [
+              row.releaseId,
+              {
+                total: Number(row.total),
+                done: Number(row.done),
+              },
+            ] as const,
+          ]
+    )
+  );
+}
+
+export async function recomputeTaskDueDates(
+  releaseId: string,
+  newReleaseDate: Date
+) {
+  await requireTasksWorkspaceAccess();
+  await db.execute(drizzleSql`
+    UPDATE tasks
+    SET due_at = ${newReleaseDate}::timestamp + (((metadata ->> 'dueDaysOffset')::int) || ' days')::interval,
+        updated_at = NOW()
+    WHERE release_id = ${releaseId}
+      AND deleted_at IS NULL
+      AND metadata ->> 'dueDaysOffset' IS NOT NULL
+  `);
+
+  revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
+  revalidatePath(APP_ROUTES.TASKS);
 }

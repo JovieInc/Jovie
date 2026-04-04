@@ -5,7 +5,7 @@
  * Used by both the main smart link page and the /sounds page.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { db } from '@/lib/db';
@@ -17,6 +17,7 @@ import {
   discogReleaseTracks,
   discogTracks,
   providerLinks,
+  recordingArtists,
   releaseArtists,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -25,9 +26,9 @@ import { toISOStringOrNull } from '@/lib/utils/date';
 
 export type ContentType = 'release' | 'track';
 type HiddenCreditRole = 'vs' | 'with';
-type SmartLinkCreditRole = Exclude<ArtistRole, HiddenCreditRole>;
+export type SmartLinkCreditRole = Exclude<ArtistRole, HiddenCreditRole>;
 
-const CREDIT_ROLE_ORDER: SmartLinkCreditRole[] = [
+export const CREDIT_ROLE_ORDER: readonly SmartLinkCreditRole[] = [
   'main_artist',
   'featured_artist',
   'producer',
@@ -42,7 +43,7 @@ const CREDIT_ROLE_ORDER: SmartLinkCreditRole[] = [
   'other',
 ];
 
-const CREDIT_ROLE_LABELS: Record<SmartLinkCreditRole, string> = {
+export const CREDIT_ROLE_LABELS: Record<SmartLinkCreditRole, string> = {
   main_artist: 'Primary artist',
   featured_artist: 'Featured artist',
   producer: 'Producer',
@@ -57,7 +58,7 @@ const CREDIT_ROLE_LABELS: Record<SmartLinkCreditRole, string> = {
   other: 'Additional credits',
 };
 
-function normalizeCreditRole(role: ArtistRole): SmartLinkCreditRole {
+export function normalizeCreditRole(role: ArtistRole): SmartLinkCreditRole {
   if (role === 'vs' || role === 'with') {
     return 'other';
   }
@@ -65,9 +66,8 @@ function normalizeCreditRole(role: ArtistRole): SmartLinkCreditRole {
   return role;
 }
 
-function getRoleOrder(role: SmartLinkCreditRole): number {
-  return CREDIT_ROLE_ORDER.indexOf(role);
-}
+export const getRoleOrder = (role: SmartLinkCreditRole): number =>
+  CREDIT_ROLE_ORDER.indexOf(role);
 
 export interface SmartLinkCreditEntry {
   artistId: string;
@@ -83,7 +83,7 @@ export interface SmartLinkCreditGroup {
   entries: SmartLinkCreditEntry[];
 }
 
-function groupReleaseCredits(
+export function groupReleaseCredits(
   rows: Array<{
     artistId: string;
     artistName: string;
@@ -154,6 +154,27 @@ async function fetchReleaseCredits(
   return groupReleaseCredits(rows);
 }
 
+async function fetchRecordingCredits(
+  recordingId: string
+): Promise<SmartLinkCreditGroup[]> {
+  const rows = await db
+    .select({
+      artistId: artists.id,
+      artistName: artists.name,
+      creditName: recordingArtists.creditName,
+      handle: creatorProfiles.usernameNormalized,
+      role: recordingArtists.role,
+      position: recordingArtists.position,
+    })
+    .from(recordingArtists)
+    .innerJoin(artists, eq(recordingArtists.artistId, artists.id))
+    .leftJoin(creatorProfiles, eq(artists.creatorProfileId, creatorProfiles.id))
+    .where(eq(recordingArtists.recordingId, recordingId))
+    .orderBy(recordingArtists.position);
+
+  return groupReleaseCredits(rows);
+}
+
 export interface ContentData {
   type: ContentType;
   id: string;
@@ -161,12 +182,22 @@ export interface ContentData {
   slug: string;
   artworkUrl: string | null;
   releaseDate: Date | null;
-  providerLinks: Array<{ providerId: string; url: string }>;
+  providerLinks: Array<{
+    providerId: string;
+    url: string;
+    sourceType?: string | null;
+    metadata?: Record<string, unknown> | null;
+  }>;
   artworkSizes?: Record<string, string> | null;
   releaseType?: string | null;
   totalTracks?: number | null;
   previewUrl?: string | null;
+  previewMetadata?: Record<string, unknown> | null;
   releaseId?: string | null;
+  /** Parent release slug — present for tracks, used for nested deep link URLs */
+  releaseSlug?: string | null;
+  /** Parent release title — present for tracks, shown as "from [Release]" link */
+  releaseTitle?: string | null;
   credits?: SmartLinkCreditGroup[];
   creator: {
     id: string;
@@ -188,12 +219,20 @@ export interface CachedContentData {
   slug: string;
   artworkUrl: string | null;
   releaseDate: string | null;
-  providerLinks: Array<{ providerId: string; url: string }>;
+  providerLinks: Array<{
+    providerId: string;
+    url: string;
+    sourceType?: string | null;
+    metadata?: Record<string, unknown> | null;
+  }>;
   artworkSizes?: Record<string, string> | null;
   releaseType?: string | null;
   totalTracks?: number | null;
   previewUrl?: string | null;
+  previewMetadata?: Record<string, unknown> | null;
   releaseId?: string | null;
+  releaseSlug?: string | null;
+  releaseTitle?: string | null;
   credits?: SmartLinkCreditGroup[];
 }
 
@@ -276,11 +315,13 @@ const fetchContentBySlug = async (
     .limit(1);
 
   if (release) {
-    const [links, credits] = await Promise.all([
+    const [links, credits, previewRow] = await Promise.all([
       db
         .select({
           providerId: providerLinks.providerId,
           url: providerLinks.url,
+          sourceType: providerLinks.sourceType,
+          metadata: providerLinks.metadata,
         })
         .from(providerLinks)
         .where(
@@ -290,6 +331,28 @@ const fetchContentBySlug = async (
           )
         ),
       fetchReleaseCredits(release.id),
+      db
+        .select({
+          previewUrl: discogRecordings.previewUrl,
+          previewMetadata: discogRecordings.metadata,
+        })
+        .from(discogRecordings)
+        .innerJoin(
+          discogReleaseTracks,
+          eq(discogReleaseTracks.recordingId, discogRecordings.id)
+        )
+        .where(
+          and(
+            eq(discogReleaseTracks.releaseId, release.id),
+            isNotNull(discogRecordings.previewUrl)
+          )
+        )
+        .orderBy(
+          discogReleaseTracks.discNumber,
+          discogReleaseTracks.trackNumber
+        )
+        .limit(1)
+        .then(rows => rows[0]),
     ]);
 
     const metadata = release.metadata as Record<string, unknown> | null;
@@ -308,6 +371,8 @@ const fetchContentBySlug = async (
       releaseType: release.releaseType,
       totalTracks: release.totalTracks,
       releaseId: release.id,
+      previewUrl: previewRow?.previewUrl ?? null,
+      previewMetadata: previewRow?.previewMetadata ?? null,
       credits,
     };
   }
@@ -319,6 +384,7 @@ const fetchContentBySlug = async (
       title: discogRecordings.title,
       slug: discogRecordings.slug,
       previewUrl: discogRecordings.previewUrl,
+      previewMetadata: discogRecordings.metadata,
     })
     .from(discogRecordings)
     .where(
@@ -349,12 +415,14 @@ const fetchContentBySlug = async (
 
     const releaseId = rt?.releaseId;
 
-    const [releaseData, links] = await Promise.all([
+    const [releaseData, links, credits] = await Promise.all([
       releaseId
         ? db
             .select({
               artworkUrl: discogReleases.artworkUrl,
               releaseDate: discogReleases.releaseDate,
+              slug: discogReleases.slug,
+              title: discogReleases.title,
             })
             .from(discogReleases)
             .where(eq(discogReleases.id, releaseId))
@@ -366,6 +434,8 @@ const fetchContentBySlug = async (
             .select({
               providerId: providerLinks.providerId,
               url: providerLinks.url,
+              sourceType: providerLinks.sourceType,
+              metadata: providerLinks.metadata,
             })
             .from(providerLinks)
             .where(
@@ -375,6 +445,7 @@ const fetchContentBySlug = async (
               )
             )
         : Promise.resolve([]),
+      fetchRecordingCredits(recording.id),
     ]);
 
     return {
@@ -386,7 +457,11 @@ const fetchContentBySlug = async (
       releaseDate: toISOStringOrNull(releaseData?.releaseDate),
       providerLinks: links,
       previewUrl: recording.previewUrl,
+      previewMetadata: recording.previewMetadata ?? null,
       releaseId: releaseId ?? null,
+      releaseSlug: releaseData?.slug ?? null,
+      releaseTitle: releaseData?.title ?? null,
+      credits,
     };
   }
 
@@ -414,6 +489,8 @@ const fetchContentBySlug = async (
         .select({
           artworkUrl: discogReleases.artworkUrl,
           releaseDate: discogReleases.releaseDate,
+          slug: discogReleases.slug,
+          title: discogReleases.title,
         })
         .from(discogReleases)
         .where(eq(discogReleases.id, track.releaseId))
@@ -423,6 +500,8 @@ const fetchContentBySlug = async (
         .select({
           providerId: providerLinks.providerId,
           url: providerLinks.url,
+          sourceType: providerLinks.sourceType,
+          metadata: providerLinks.metadata,
         })
         .from(providerLinks)
         .where(
@@ -442,7 +521,10 @@ const fetchContentBySlug = async (
       releaseDate: toISOStringOrNull(releaseData?.releaseDate),
       providerLinks: links,
       previewUrl: track.previewUrl,
+      previewMetadata: null,
       releaseId: track.releaseId,
+      releaseSlug: releaseData?.slug ?? null,
+      releaseTitle: releaseData?.title ?? null,
     };
   }
 
@@ -491,6 +573,152 @@ export const getContentBySlug = cache(
     )();
 
     return cached ? rehydrateContent(cached) : null;
+  }
+);
+
+/**
+ * Get a track within a specific release by slug.
+ * Three-tier lookup: discog_release_tracks → discog_tracks (legacy), scoped to the release.
+ * Returns null if the track doesn't exist in this release.
+ */
+export const getTrackBySlugInRelease = cache(
+  async function getTrackBySlugInRelease(
+    releaseId: string,
+    trackSlug: string
+  ): Promise<Omit<ContentData, 'creator'> | null> {
+    // Try new model: discog_release_tracks joined to discog_recordings
+    const [releaseTrack] = await db
+      .select({
+        id: discogReleaseTracks.id,
+        recordingId: discogReleaseTracks.recordingId,
+        title: discogReleaseTracks.title,
+        slug: discogReleaseTracks.slug,
+      })
+      .from(discogReleaseTracks)
+      .where(
+        and(
+          eq(discogReleaseTracks.releaseId, releaseId),
+          eq(discogReleaseTracks.slug, trackSlug)
+        )
+      )
+      .limit(1);
+
+    if (releaseTrack) {
+      // Fetch recording, release data, and provider links in parallel
+      const [[recording], [releaseData], links] = await Promise.all([
+        db
+          .select({
+            title: discogRecordings.title,
+            previewUrl: discogRecordings.previewUrl,
+            previewMetadata: discogRecordings.metadata,
+          })
+          .from(discogRecordings)
+          .where(eq(discogRecordings.id, releaseTrack.recordingId))
+          .limit(1),
+        db
+          .select({
+            artworkUrl: discogReleases.artworkUrl,
+            releaseDate: discogReleases.releaseDate,
+            slug: discogReleases.slug,
+            title: discogReleases.title,
+          })
+          .from(discogReleases)
+          .where(eq(discogReleases.id, releaseId))
+          .limit(1),
+        db
+          .select({
+            providerId: providerLinks.providerId,
+            url: providerLinks.url,
+            sourceType: providerLinks.sourceType,
+            metadata: providerLinks.metadata,
+          })
+          .from(providerLinks)
+          .where(
+            and(
+              eq(providerLinks.ownerType, 'release_track'),
+              eq(providerLinks.releaseTrackId, releaseTrack.id)
+            )
+          ),
+      ]);
+
+      return {
+        type: 'track',
+        id: releaseTrack.recordingId,
+        title: releaseTrack.title ?? recording?.title ?? trackSlug,
+        slug: releaseTrack.slug ?? trackSlug,
+        artworkUrl: releaseData?.artworkUrl ?? null,
+        releaseDate: releaseData?.releaseDate ?? null,
+        providerLinks: links,
+        previewUrl: recording?.previewUrl ?? null,
+        previewMetadata: recording?.previewMetadata ?? null,
+        releaseId,
+        releaseSlug: releaseData?.slug ?? null,
+        releaseTitle: releaseData?.title ?? null,
+      };
+    }
+
+    // Fall back to legacy discog_tracks
+    const [legacyTrack] = await db
+      .select({
+        id: discogTracks.id,
+        title: discogTracks.title,
+        slug: discogTracks.slug,
+        previewUrl: discogTracks.previewUrl,
+      })
+      .from(discogTracks)
+      .where(
+        and(
+          eq(discogTracks.releaseId, releaseId),
+          eq(discogTracks.slug, trackSlug)
+        )
+      )
+      .limit(1);
+
+    if (legacyTrack) {
+      const [[releaseData], links] = await Promise.all([
+        db
+          .select({
+            artworkUrl: discogReleases.artworkUrl,
+            releaseDate: discogReleases.releaseDate,
+            slug: discogReleases.slug,
+            title: discogReleases.title,
+          })
+          .from(discogReleases)
+          .where(eq(discogReleases.id, releaseId))
+          .limit(1),
+        db
+          .select({
+            providerId: providerLinks.providerId,
+            url: providerLinks.url,
+            sourceType: providerLinks.sourceType,
+            metadata: providerLinks.metadata,
+          })
+          .from(providerLinks)
+          .where(
+            and(
+              eq(providerLinks.ownerType, 'track'),
+              eq(providerLinks.trackId, legacyTrack.id)
+            )
+          ),
+      ]);
+
+      return {
+        type: 'track',
+        id: legacyTrack.id,
+        title: legacyTrack.title,
+        slug: legacyTrack.slug,
+        artworkUrl: releaseData?.artworkUrl ?? null,
+        releaseDate: releaseData?.releaseDate ?? null,
+        providerLinks: links,
+        previewUrl: legacyTrack.previewUrl,
+        previewMetadata: null,
+        releaseId,
+        releaseSlug: releaseData?.slug ?? null,
+        releaseTitle: releaseData?.title ?? null,
+      };
+    }
+
+    return null;
   }
 );
 

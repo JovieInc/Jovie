@@ -4,8 +4,8 @@ import { Button, Input } from '@jovie/ui';
 import { Check, ExternalLink, ShoppingBag, X } from 'lucide-react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { BASE_URL } from '@/constants/domains';
+import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { isShopifyDomain } from '@/lib/profile/shop-settings';
 
 type SaveState = 'idle' | 'saving' | 'success' | 'error';
@@ -108,25 +108,29 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
   if (!loaded) return null;
 
   return (
-    <ContentSurfaceCard className='p-4 sm:p-5'>
-      <div className='flex items-center gap-2 mb-3'>
-        <div
-          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/10'
-          aria-hidden='true'
-        >
-          <ShoppingBag className='h-3.5 w-3.5 text-accent-token' />
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='divide-y divide-subtle/60 overflow-hidden'
+    >
+      <div className='px-4 py-2.5 sm:px-5 sm:py-3'>
+        <div className='mb-2.5 flex items-center gap-2'>
+          <div
+            className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0'
+            aria-hidden='true'
+          >
+            <ShoppingBag className='h-3.5 w-3.5 text-secondary-token' />
+          </div>
+          <h3 className='text-[13px] font-[510] text-primary-token'>Shop</h3>
         </div>
-        <h3 className='text-[13px] font-[510] text-primary-token'>
-          Shopify Store
-        </h3>
+
+        <p className='text-[12.5px] leading-5 text-secondary-token'>
+          Link your Shopify store to add a shop button on your public profile.
+          Fans will be redirected to your store with Jovie attribution.
+        </p>
       </div>
 
-      <p className='text-[13px] leading-5 text-secondary-token mb-3'>
-        Link your Shopify store to add a shop button on your public profile.
-        Fans will be redirected to your store with Jovie attribution.
-      </p>
-
-      <div className='space-y-3'>
+      <div className='space-y-3 px-4 py-2.5 sm:px-5 sm:py-3'>
         <div>
           <label
             htmlFor='shopify-url'
@@ -144,13 +148,13 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
               if (saveState === 'error') setSaveState('idle');
             }}
             placeholder='https://my-store.myshopify.com'
-            className='w-full'
+            className='h-8 w-full border-subtle bg-surface-0 text-[13px]'
           />
         </div>
 
         {errorMessage && (
           <output
-            className='flex items-center gap-2 rounded-lg bg-danger-subtle px-3 py-2 text-[13px] font-[510] text-danger'
+            className='flex items-center gap-2 rounded-[8px] border border-destructive/15 bg-destructive/5 px-3 py-2 text-[13px] font-[510] text-destructive'
             aria-live='polite'
           >
             <X className='h-3.5 w-3.5 shrink-0' />
@@ -160,7 +164,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
 
         {saveState === 'success' && (
           <output
-            className='flex items-center gap-2 rounded-lg bg-success-subtle px-3 py-2 text-[13px] font-[510] text-success'
+            className='flex items-center gap-2 rounded-[8px] border border-emerald-500/15 bg-emerald-500/6 px-3 py-2 text-[13px] font-[510] text-emerald-700 dark:text-emerald-300'
             aria-live='polite'
           >
             <Check className='h-3.5 w-3.5' />
@@ -174,6 +178,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
             disabled={saveState === 'saving' || !hasChanges}
             variant='primary'
             size='sm'
+            className='h-7 rounded-[8px] px-2.5 text-[11px] font-[510]'
           >
             {saveState === 'saving' ? 'Saving…' : 'Save'}
           </Button>
@@ -183,6 +188,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
               disabled={saveState === 'saving'}
               variant='ghost'
               size='sm'
+              className='h-7 rounded-[8px] border border-transparent px-2.5 text-[11px] font-[510] text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
             >
               Disconnect
             </Button>
@@ -194,13 +200,13 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
             href={shopPageUrl}
             target='_blank'
             rel='noopener noreferrer'
-            className='inline-flex items-center gap-1.5 text-[13px] font-[510] text-accent-token hover:underline'
+            className='inline-flex items-center gap-1.5 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[12px] font-[510] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token'
           >
             <ExternalLink className='h-3 w-3' />
             Preview shop link
           </a>
         )}
       </div>
-    </ContentSurfaceCard>
+    </DashboardCard>
   );
 });

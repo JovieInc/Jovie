@@ -34,6 +34,11 @@ export function DemoRealAudiencePanel() {
       onViewProfile: noopMember,
       onSendNotification: noopMember,
       getTouringCity,
+      hiddenMetadataColumns: {
+        location: false,
+        engagement: false,
+        lastSeen: false,
+      },
     }),
     [toggleSelect, noop, noopMember, getContextMenuItems, getTouringCity]
   );
@@ -57,8 +62,8 @@ export function DemoRealAudiencePanel() {
           data-testid='demo-audience-table'
         >
           {/* Summary bar */}
-          <div className='flex items-center gap-4 border-b border-subtle px-4 py-2 text-[13px]'>
-            <span className='font-medium text-primary-token'>
+          <div className='flex items-center gap-4 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-4 py-2 text-[12.5px]'>
+            <span className='font-[510] text-primary-token'>
               {DEMO_AUDIENCE_MEMBERS.length} visitors
             </span>
             <span className='text-tertiary-token'>

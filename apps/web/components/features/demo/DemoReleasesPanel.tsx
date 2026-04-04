@@ -168,7 +168,7 @@ export function DemoReleasesPanel({
                     className={cn(
                       'flex h-[32px] cursor-pointer items-center gap-3 border-b border-(--linear-app-frame-seam) px-4 text-app',
                       isSelected &&
-                        'bg-accent/8 shadow-[inset_2px_0_0_var(--color-accent)]',
+                        'bg-[color-mix(in_oklab,var(--linear-row-selected)_20%,transparent)] shadow-[inset_2px_0_0_var(--color-accent)]',
                       isFocused && !isSelected && 'bg-surface-2',
                       !isSelected && !isFocused && ''
                     )}
@@ -181,7 +181,7 @@ export function DemoReleasesPanel({
                     )}
 
                     {/* Release ID */}
-                    <span className='hidden w-[54px] shrink-0 font-mono text-[12px] text-quaternary-token sm:block'>
+                    <span className='max-sm:hidden w-[54px] shrink-0 font-mono text-[12px] text-quaternary-token'>
                       {release.displayId}
                     </span>
 
@@ -199,7 +199,7 @@ export function DemoReleasesPanel({
                     </div>
 
                     {/* Labels */}
-                    <div className='hidden items-center gap-1 sm:flex'>
+                    <div className='max-sm:hidden items-center gap-1 sm:flex'>
                       {release.labels.slice(0, 2).map(label => (
                         <span
                           key={label.id}
@@ -215,7 +215,7 @@ export function DemoReleasesPanel({
                     </div>
 
                     {/* Type badge */}
-                    <span className='hidden shrink-0 text-2xs text-quaternary-token lg:block'>
+                    <span className='max-lg:hidden shrink-0 text-2xs text-quaternary-token'>
                       {release.type}
                     </span>
 
@@ -223,7 +223,7 @@ export function DemoReleasesPanel({
                     <DemoAvatar assignee={release.assignee} size={16} />
 
                     {/* Date */}
-                    <span className='hidden w-16 shrink-0 text-right text-[12px] text-quaternary-token xl:block'>
+                    <span className='max-xl:hidden w-16 shrink-0 text-right text-[12px] text-quaternary-token'>
                       {release.releaseDate}
                     </span>
                   </div>

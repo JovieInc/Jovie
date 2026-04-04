@@ -1,9 +1,13 @@
 import 'server-only';
 
 import { auth, currentUser } from '@clerk/nextjs/server';
-import { headers } from 'next/headers';
 import { cache } from 'react';
-import { resolveTestBypassUserId } from '@/lib/auth/test-mode';
+import {
+  buildDevTestAuthCurrentUser,
+  getCachedDevTestAuthSession,
+} from '@/lib/auth/dev-test-auth.server';
+
+type CachedCurrentUser = Awaited<ReturnType<typeof currentUser>>;
 
 /**
  * Cached version of Clerk's auth() function.
@@ -24,20 +28,13 @@ import { resolveTestBypassUserId } from '@/lib/auth/test-mode';
  * @returns The same AuthObject that Clerk's auth() returns
  */
 export const getCachedAuth = cache(async () => {
-  if (process.env.NODE_ENV === 'test') {
-    try {
-      const headerStore = await headers();
-      const testUserId = resolveTestBypassUserId(headerStore);
-      if (testUserId) {
-        return {
-          userId: testUserId,
-          sessionId: 'sess_test_bypass',
-          orgId: null,
-        };
-      }
-    } catch {
-      // Ignore missing request context in test-only paths.
-    }
+  const bypassSession = await getCachedDevTestAuthSession();
+  if (bypassSession) {
+    return {
+      userId: bypassSession.clerkUserId,
+      sessionId: 'sess_test_bypass',
+      orgId: null,
+    };
   }
 
   return auth();
@@ -64,5 +61,12 @@ export const getCachedAuth = cache(async () => {
  * @returns The same User object (or null) that Clerk's currentUser() returns
  */
 export const getCachedCurrentUser = cache(async () => {
+  const bypassSession = await getCachedDevTestAuthSession();
+  if (bypassSession) {
+    return buildDevTestAuthCurrentUser(
+      bypassSession
+    ) as unknown as NonNullable<CachedCurrentUser>;
+  }
+
   return currentUser();
 });

@@ -54,7 +54,10 @@ describe('POST /api/webhooks/sentry', () => {
   });
 
   it('returns deduplicated response when a recent dispatch exists', async () => {
-    mockAcquireRecentDispatch.mockResolvedValue(false);
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: false,
+      reason: 'duplicate',
+    });
 
     const { POST } = await import('@/app/api/webhooks/sentry/route');
     const payload = {
@@ -83,12 +86,56 @@ describe('POST /api/webhooks/sentry', () => {
     expect(mockClearRecentDispatch).not.toHaveBeenCalled();
   });
 
+  it('returns 503 when webhook dedupe backend is unavailable', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: false,
+      reason: 'backend_unavailable',
+    });
+
+    const { POST } = await import('@/app/api/webhooks/sentry/route');
+    const payload = {
+      data: {
+        issue: {
+          id: '42',
+          title: 'Webhook error',
+        },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/sentry', {
+      method: 'POST',
+      headers: {
+        'sentry-hook-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: 'Webhook dedupe unavailable',
+    });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+      'Sentry webhook dedupe backend unavailable',
+      expect.any(Error),
+      expect.objectContaining({
+        route: '/api/webhooks/sentry',
+        issueId: '42',
+      })
+    );
+  });
+
   it('returns 502 when the GitHub dispatch times out', async () => {
     const { ServerFetchTimeoutError } = await import('@/lib/http/server-fetch');
 
-    mockAcquireRecentDispatch.mockResolvedValue(true);
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
     mockServerFetch.mockRejectedValue(
-      new ServerFetchTimeoutError('timed out', 10000)
+      new ServerFetchTimeoutError('timed out', 10000, 'Sentry dispatch')
     );
 
     const { POST } = await import('@/app/api/webhooks/sentry/route');
@@ -123,5 +170,47 @@ describe('POST /api/webhooks/sentry', () => {
         timeoutMs: 10000,
       })
     );
+  });
+
+  it('does not retry the GitHub dispatch POST', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(
+      new Response(null, {
+        status: 204,
+      })
+    );
+
+    const { POST } = await import('@/app/api/webhooks/sentry/route');
+    const payload = {
+      data: {
+        issue: {
+          id: '42',
+          title: 'Webhook error',
+        },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/sentry', {
+      method: 'POST',
+      headers: {
+        'sentry-hook-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+
+    expect(response.status).toBe(200);
+    expect(mockServerFetch).toHaveBeenCalledWith(
+      'https://api.github.com/repos/TheBlackFuture/Jovie/dispatches',
+      expect.objectContaining({
+        method: 'POST',
+        timeoutMs: 10000,
+      })
+    );
+    expect(mockServerFetch.mock.calls[0]?.[1]).not.toHaveProperty('retry');
   });
 });

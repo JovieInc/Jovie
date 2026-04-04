@@ -28,7 +28,7 @@ export function AudienceRowSelectionCell({
   return (
     <div
       className={cn(
-        'relative flex h-6 w-6 items-center justify-center',
+        'relative flex h-6 w-full items-center justify-end',
         className
       )}
     >
@@ -40,7 +40,7 @@ export function AudienceRowSelectionCell({
       >
         <span
           className={cn(
-            'select-none text-[13px] tabular-nums text-tertiary-token transition-opacity',
+            'select-none text-[11px] tabular-nums text-tertiary-token transition-opacity',
             isChecked ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
           )}
           aria-hidden='true'

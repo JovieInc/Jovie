@@ -107,7 +107,7 @@ export function DefaultStatusBanner({
             {runwayCopy}
           </span>
           <span className='text-right tabular-nums'>
-            <span className='hidden sm:inline'>MRR growth (30d): </span>
+            <span className='max-sm:hidden sm:inline'>MRR growth (30d): </span>
             <span className='sm:hidden'>30d: </span>
             {growthLabel}
           </span>

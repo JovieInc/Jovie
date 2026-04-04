@@ -34,6 +34,91 @@ import { cn } from '@/lib/utils';
 
 export const PREVIEW_PANEL_WIDTH = 360;
 
+/** Empty / loading state shown while preview data is hydrating. */
+function PreviewPanelEmpty({
+  isOpen,
+  close,
+}: Readonly<{
+  isOpen: boolean;
+  close: () => void;
+}>) {
+  return (
+    <RightDrawer
+      isOpen={isOpen}
+      width={PREVIEW_PANEL_WIDTH}
+      ariaLabel='Live Preview'
+    >
+      <div className='flex h-full flex-col'>
+        <DrawerHeader
+          title='Live preview'
+          actions={
+            <DrawerHeaderActions
+              primaryActions={[]}
+              overflowActions={[]}
+              onClose={close}
+            />
+          }
+        />
+
+        <div className='flex-1 min-h-0 overflow-y-auto px-4 py-3'>
+          <div className='space-y-3 pb-5'>
+            <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
+              <div className='space-y-0.5'>
+                <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                  Live preview
+                </p>
+                <p className='text-xs text-secondary-token'>
+                  This drawer will populate as soon as the profile preview state
+                  hydrates.
+                </p>
+              </div>
+
+              <DrawerEmptyState message='Loading profile preview…' />
+
+              <div className='mx-auto w-full max-w-[320px]'>
+                <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>
+                  <div className='rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
+                    <div className='mb-2 flex items-center justify-between px-2.5 pt-1'>
+                      <div className='h-2.5 w-16 rounded skeleton' />
+                      <div className='h-5 w-20 rounded-[8px] skeleton' />
+                    </div>
+                    <div className='relative aspect-[9/19.5] overflow-hidden rounded-[22px] border border-(--linear-app-frame-seam) bg-surface-0'>
+                      <div className='pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2.5'>
+                        <div className='h-1.5 w-24 rounded-full bg-black/55' />
+                      </div>
+                      <div className='flex h-full flex-col items-center justify-center gap-3 px-6'>
+                        <div className='h-16 w-16 rounded-full skeleton' />
+                        <div className='h-3 w-28 rounded skeleton' />
+                        <div className='h-3 w-40 rounded skeleton' />
+                        <div className='mt-2 h-9 w-full rounded-[16px] skeleton' />
+                        <div className='h-9 w-full rounded-[16px] skeleton' />
+                        <div className='h-9 w-full rounded-[16px] skeleton' />
+                      </div>
+                      <div className='pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-2.5'>
+                        <div className='h-1.5 w-28 rounded-full bg-black/55' />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </RightDrawer>
+  );
+}
+
+function getHometownTag(
+  hometown: string | null | undefined,
+  location: string | null | undefined
+): string | null {
+  if (!hometown || hometown === location || hometown.trim().length === 0) {
+    return null;
+  }
+  return `From ${hometown}`;
+}
+
 function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -125,6 +210,18 @@ export function PreviewPanel() {
       },
       {
         type: 'action',
+        id: 'open-profile',
+        label: 'Open profile in new tab',
+        icon: <ExternalLink className='h-3.5 w-3.5' />,
+        onClick: () =>
+          globalThis.open(profileUrl, '_blank', 'noopener,noreferrer'),
+      },
+      {
+        type: 'separator',
+        id: 'preview-panel-separator-downloads',
+      },
+      {
+        type: 'action',
         id: 'download-qr',
         label: 'Download QR Code',
         icon: <QrCode className='h-3.5 w-3.5' />,
@@ -138,7 +235,7 @@ export function PreviewPanel() {
         onClick: handleDownloadVcard,
       },
     ],
-    [handleCopyUrl, handleDownloadQr, handleDownloadVcard]
+    [handleCopyUrl, handleDownloadQr, handleDownloadVcard, profileUrl]
   );
 
   // Header actions using DrawerHeaderActions for consistent styling
@@ -162,109 +259,26 @@ export function PreviewPanel() {
     [handleCopyUrl, isUrlCopied, profileUrl]
   );
 
-  const overflowActions: DrawerHeaderAction[] = useMemo(
-    () => [
-      {
-        id: 'download-qr',
-        label: 'Download QR Code',
-        icon: QrCode,
-        onClick: () => {
-          handleDownloadQr();
-        },
-      },
-      {
-        id: 'download-vcard',
-        label: 'Download vCard',
-        icon: Download,
-        onClick: handleDownloadVcard,
-      },
-    ],
-    [handleDownloadQr, handleDownloadVcard]
-  );
-
   if (!previewData) {
-    return (
-      <RightDrawer
-        isOpen={isOpen}
-        width={PREVIEW_PANEL_WIDTH}
-        ariaLabel='Live Preview'
-      >
-        <div className='flex h-full flex-col'>
-          <DrawerHeader
-            title='Live preview'
-            actions={
-              <DrawerHeaderActions
-                primaryActions={[]}
-                overflowActions={[]}
-                onClose={close}
-              />
-            }
-          />
-
-          <div className='flex-1 min-h-0 overflow-y-auto px-4 py-3'>
-            <div className='space-y-3 pb-5'>
-              <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
-                <div className='space-y-0.5'>
-                  <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
-                    Live preview
-                  </p>
-                  <p className='text-xs text-secondary-token'>
-                    This drawer will populate as soon as the profile preview
-                    state hydrates.
-                  </p>
-                </div>
-
-                <DrawerEmptyState message='Loading profile preview…' />
-
-                <div className='mx-auto w-full max-w-[320px]'>
-                  <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>
-                    <div className='rounded-[28px] border border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-2 shadow-[0_20px_50px_-34px_rgba(15,23,42,0.7)]'>
-                      <div className='mb-2 flex items-center justify-between px-2.5 pt-1'>
-                        <div className='h-2.5 w-16 rounded skeleton' />
-                        <div className='h-5 w-20 rounded-full skeleton' />
-                      </div>
-                      <div className='relative aspect-[9/19.5] overflow-hidden rounded-[24px] border border-subtle bg-surface-1/40'>
-                        <div className='pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2.5'>
-                          <div className='h-1.5 w-24 rounded-full bg-black/55' />
-                        </div>
-                        <div className='flex h-full flex-col items-center justify-center gap-3 px-6'>
-                          <div className='h-16 w-16 rounded-full skeleton' />
-                          <div className='h-3 w-28 rounded skeleton' />
-                          <div className='h-3 w-40 rounded skeleton' />
-                          <div className='mt-2 h-9 w-full rounded-[16px] skeleton' />
-                          <div className='h-9 w-full rounded-[16px] skeleton' />
-                          <div className='h-9 w-full rounded-[16px] skeleton' />
-                        </div>
-                        <div className='pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-2.5'>
-                          <div className='h-1.5 w-28 rounded-full bg-black/55' />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </RightDrawer>
-    );
+    return <PreviewPanelEmpty isOpen={isOpen} close={close} />;
   }
 
   const { username, displayName, avatarUrl, links } = previewData;
   const visibleLinkCount = links.filter(link => link.isVisible).length;
   const hiddenLinkCount = links.length - visibleLinkCount;
+  const hiddenDraftLabel = `${hiddenLinkCount} draft${hiddenLinkCount === 1 ? '' : 's'}`;
   const connectedDspCount = [
     previewData.dspConnections.spotify.connected,
     previewData.dspConnections.appleMusic.connected,
   ].filter(Boolean).length;
   const hasBio = (previewData.bio?.trim().length ?? 0) > 0;
+  const hometownTag = getHometownTag(
+    previewData.hometown,
+    previewData.location
+  );
   const snapshotTags = [
     previewData.location,
-    previewData.hometown &&
-    previewData.hometown !== previewData.location &&
-    previewData.hometown.trim().length > 0
-      ? `From ${previewData.hometown}`
-      : null,
+    hometownTag,
     ...(previewData.genres?.slice(0, 2) ?? []),
     previewData.activeSinceYear ? `Since ${previewData.activeSinceYear}` : null,
     hasBio ? 'Bio live' : null,
@@ -304,7 +318,7 @@ export function PreviewPanel() {
           actions={
             <DrawerHeaderActions
               primaryActions={primaryActions}
-              overflowActions={overflowActions}
+              menuItems={contextMenuItems}
               onClose={close}
             />
           }
@@ -323,14 +337,14 @@ export function PreviewPanel() {
                   </p>
                 </div>
                 <div className='flex items-center gap-1.5'>
-                  <div className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'>
+                  <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-[510] tracking-[-0.01em] text-secondary-token'>
                     Mobile
                   </div>
-                  <div className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'>
+                  <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-[510] tracking-[-0.01em] text-secondary-token'>
                     {visibleLinkCount} live
                   </div>
                   {hiddenLinkCount > 0 && (
-                    <div className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'>
+                    <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-[510] tracking-[-0.01em] text-secondary-token'>
                       {hiddenLinkCount} draft{hiddenLinkCount === 1 ? '' : 's'}
                     </div>
                   )}
@@ -339,17 +353,17 @@ export function PreviewPanel() {
 
               <div className='mx-auto w-full max-w-[320px]'>
                 <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>
-                  <div className='rounded-[28px] border border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-2 shadow-[0_20px_50px_-34px_rgba(15,23,42,0.7)]'>
-                    <div className='mb-2 flex items-center justify-between px-2.5 pt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'>
+                  <div className='rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
+                    <div className='mb-2 flex items-center justify-between px-2.5 pt-1 text-[10px] font-[510] tracking-[-0.01em] text-secondary-token'>
                       <span>Preview</span>
-                      <span className='rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-[9px]'>
+                      <span className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-[9px] tracking-[-0.01em]'>
                         {username ? `@${username}` : 'Profile'}
                       </span>
                     </div>
 
-                    <div className='relative aspect-[9/19.5] max-h-[740px] overflow-hidden rounded-[24px] border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/3 shadow-sm shadow-black/10 dark:ring-white/5 dark:shadow-black/40'>
+                    <div className='relative aspect-[9/19.5] max-h-[740px] overflow-hidden rounded-[22px] border border-(--linear-app-frame-seam) bg-surface-0'>
                       <div className='pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2.5'>
-                        <div className='h-1.5 w-24 rounded-full bg-black/55 shadow-[0_1px_2px_rgba(255,255,255,0.08)]' />
+                        <div className='h-1.5 w-24 rounded-full bg-black/55' />
                       </div>
                       <ProfilePreview
                         username={username}
@@ -359,7 +373,7 @@ export function PreviewPanel() {
                         className='h-full w-full'
                       />
                       <div className='pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-2.5'>
-                        <div className='h-1.5 w-28 rounded-full bg-black/55 shadow-[0_1px_2px_rgba(255,255,255,0.08)]' />
+                        <div className='h-1.5 w-28 rounded-full bg-black/55' />
                       </div>
                     </div>
                   </div>
@@ -369,7 +383,7 @@ export function PreviewPanel() {
               <Button
                 asChild
                 variant='primary'
-                className='h-9 w-full rounded-full text-[11px] font-medium uppercase tracking-[0.12em]'
+                className='h-9 w-full rounded-[10px] text-[12px] font-[510] tracking-[-0.01em]'
               >
                 <a href={profileUrl} target='_blank' rel='noopener noreferrer'>
                   <ExternalLink
@@ -384,7 +398,7 @@ export function PreviewPanel() {
                 <DrawerButton
                   type='button'
                   tone='secondary'
-                  className='h-8 rounded-[12px] px-2 text-[11px]'
+                  className='h-8 rounded-[10px] px-2 text-[11px]'
                   disabled={isUrlCopied}
                   onClick={handleCopyUrl}
                 >
@@ -398,7 +412,7 @@ export function PreviewPanel() {
                 <DrawerButton
                   type='button'
                   tone='secondary'
-                  className='h-8 rounded-[12px] px-2 text-[11px]'
+                  className='h-8 rounded-[10px] px-2 text-[11px]'
                   disabled={qrCodeDownload.isPending}
                   onClick={handleDownloadQr}
                 >
@@ -415,7 +429,7 @@ export function PreviewPanel() {
                 <DrawerButton
                   type='button'
                   tone='secondary'
-                  className='h-8 rounded-[12px] px-2 text-[11px]'
+                  className='h-8 rounded-[10px] px-2 text-[11px]'
                   onClick={handleDownloadVcard}
                 >
                   <Download className='mr-1.5 h-3.5 w-3.5' aria-hidden='true' />
@@ -439,11 +453,11 @@ export function PreviewPanel() {
                   url={profileUrl}
                   size='md'
                   className='flex-1'
-                  inputClassName='h-8 rounded-[10px] border-subtle bg-surface-0 px-2.5 py-1.5 text-[11px]'
+                  inputClassName='h-8 rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
                 />
                 <button
                   type='button'
-                  className='shrink-0 rounded-[10px] border border-subtle bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
+                  className='shrink-0 rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
                   onClick={() =>
                     globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
                   }
@@ -460,7 +474,7 @@ export function PreviewPanel() {
 
             <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-3')}>
               <div className='space-y-0.5'>
-                <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                <p className='text-[10.5px] font-[510] leading-none text-tertiary-token'>
                   Profile snapshot
                 </p>
                 <p className='text-xs text-secondary-token'>
@@ -468,37 +482,37 @@ export function PreviewPanel() {
                 </p>
               </div>
 
-              <p className='rounded-[12px] border border-subtle bg-surface-0 px-2.5 py-2 text-[11px] leading-5 text-secondary-token'>
+              <p className='rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2 text-[11px] leading-5 text-secondary-token'>
                 {visibleLinkCount} visible link
                 {visibleLinkCount === 1 ? '' : 's'} currently anchor the public
                 profile
                 {hiddenLinkCount > 0
-                  ? `, with ${hiddenLinkCount} draft${hiddenLinkCount === 1 ? '' : 's'} still hidden from visitors.`
+                  ? `, with ${hiddenDraftLabel} still hidden from visitors.`
                   : '.'}
               </p>
 
-              <div className='grid grid-cols-3 gap-2'>
-                <div className='rounded-[12px] border border-subtle bg-surface-0 px-2.5 py-2'>
-                  <p className='text-[10px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+              <div className='grid grid-cols-3 divide-x divide-(--linear-app-frame-seam)'>
+                <div className='space-y-px pr-3'>
+                  <p className='text-[10.5px] font-[500] leading-[14px] text-tertiary-token'>
                     Visible
                   </p>
-                  <p className='mt-1 text-sm font-[560] text-primary-token'>
+                  <p className='tabular-nums text-[18px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
                     {visibleLinkCount}
                   </p>
                 </div>
-                <div className='rounded-[12px] border border-subtle bg-surface-0 px-2.5 py-2'>
-                  <p className='text-[10px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+                <div className='space-y-px px-3'>
+                  <p className='text-[10.5px] font-[500] leading-[14px] text-tertiary-token'>
                     Hidden
                   </p>
-                  <p className='mt-1 text-sm font-[560] text-primary-token'>
+                  <p className='tabular-nums text-[18px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
                     {hiddenLinkCount}
                   </p>
                 </div>
-                <div className='rounded-[12px] border border-subtle bg-surface-0 px-2.5 py-2'>
-                  <p className='text-[10px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+                <div className='space-y-px pl-3'>
+                  <p className='text-[10.5px] font-[500] leading-[14px] text-tertiary-token'>
                     DSPs
                   </p>
-                  <p className='mt-1 text-sm font-[560] text-primary-token'>
+                  <p className='tabular-nums text-[18px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
                     {connectedDspCount}
                   </p>
                 </div>
@@ -508,7 +522,7 @@ export function PreviewPanel() {
                 {snapshotTags.map(tag => (
                   <span
                     key={tag}
-                    className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'
+                    className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-[510] tracking-[-0.01em] text-secondary-token'
                   >
                     {tag}
                   </span>

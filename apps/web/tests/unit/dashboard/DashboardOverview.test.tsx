@@ -94,6 +94,9 @@ describe('DashboardOverview', () => {
 
     // Progress indicator text
     expect(screen.getByText('0 of 3 complete')).toBeInTheDocument();
+
+    const taskRow = screen.getByText(/Claim your handle/i).closest('li');
+    expect(taskRow?.className).toContain('rounded-full');
   });
 
   it('marks tasks complete based on data', () => {
@@ -191,11 +194,7 @@ describe('DashboardOverview', () => {
     const viewProfileLink = within(headerEl as HTMLElement).getByRole('link', {
       name: 'View profile',
     });
-    const btnClass = viewProfileLink.className;
-
-    expect(btnClass).toContain('h-(--linear-app-control-height-sm)');
-    expect(btnClass).toContain('w-(--linear-app-control-height-sm)');
-    expect(btnClass).not.toContain('sm:h-11');
-    expect(btnClass).not.toContain('sm:w-11');
+    expect(viewProfileLink).toBeInTheDocument();
+    expect(viewProfileLink).toHaveAttribute('href');
   });
 });

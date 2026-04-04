@@ -13,6 +13,7 @@ import { memo, useState } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
+import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import {
   ExportCSVButton,
   PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
@@ -26,6 +27,7 @@ import {
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
+import { useCodeFlag } from '@/lib/feature-flags/client';
 import { GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
 import { useReleaseFilterCounts } from './hooks/useReleaseFilterCounts';
@@ -72,12 +74,20 @@ interface ReleaseTableSubheaderProps {
   readonly releaseView?: ReleaseView;
   /** Callback when release view changes */
   readonly onReleaseViewChange?: (view: ReleaseView) => void;
+  /** Current table search query */
+  readonly searchQuery: string;
+  /** Callback when search query changes */
+  readonly onSearchQueryChange: (value: string) => void;
+  /** Callback to create a release */
+  readonly onCreateRelease?: () => void;
+  /** Whether create release is available */
+  readonly canCreateManualReleases?: boolean;
 }
 
 /** Options for release view segmented control */
 const RELEASE_VIEW_OPTIONS = [
-  { value: 'tracks', label: 'Tracks', icon: 'ListMusic' },
-  { value: 'releases', label: 'Releases', icon: 'Disc3' },
+  { value: 'tracks', label: 'Tracks' },
+  { value: 'releases', label: 'Releases' },
 ] as const;
 
 function ReleaseViewButtons({
@@ -95,21 +105,12 @@ function ReleaseViewButtons({
       onValueChange={onChange}
       options={RELEASE_VIEW_OPTIONS.map(option => ({
         value: option.value,
-        label: (
-          <span className='flex items-center justify-center gap-1.5'>
-            <Icon
-              name={option.icon}
-              className={PAGE_TOOLBAR_ICON_CLASS}
-              strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
-            />
-            <span>{option.label}</span>
-          </span>
-        ),
+        label: option.label,
       }))}
       size='sm'
-      surface='ghost'
-      className={cn('w-full md:w-auto', className)}
-      triggerClassName='min-w-[88px] px-2.5'
+      surface='muted'
+      className={cn('w-auto', className)}
+      triggerClassName='min-w-[72px] px-3'
       aria-label='Choose releases view'
     />
   );
@@ -129,16 +130,11 @@ function ReleaseViewSegmentedControl({
       onValueChange={onChange}
       options={RELEASE_VIEW_OPTIONS.map(option => ({
         value: option.value,
-        label: (
-          <span className='flex items-center justify-center gap-1.5'>
-            <Icon name={option.icon} className='h-4 w-4' />
-            <span>{option.label}</span>
-          </span>
-        ),
+        label: option.label,
       }))}
       size='md'
       className='grid w-full grid-cols-2'
-      triggerClassName='min-h-[36px] px-3 py-1.5 text-[12px]'
+      triggerClassName='min-h-[34px] px-3 py-1.5 text-[12px]'
       aria-label='Choose releases view'
     />
   );
@@ -160,7 +156,7 @@ function ToggleSwitch({
       role='switch'
       aria-checked={checked}
       onClick={onToggle}
-      className='flex w-full items-center justify-between gap-2 rounded-[8px] px-2 py-1.5 transition-[background-color,color] duration-150 hover:bg-surface-1 focus-visible:outline-none focus-visible:bg-surface-1'
+      className='flex w-full items-center justify-between gap-2 rounded-full px-2 py-1.5 transition-[background-color,color] duration-150 hover:bg-surface-1 focus-visible:outline-none focus-visible:bg-surface-1'
     >
       <span className='text-[12px] font-[510] text-secondary-token'>
         {label}
@@ -219,7 +215,7 @@ function LinearStyleDisplayMenu({
             size='sm'
             className={cn(
               PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-              'h-7 rounded-[8px] px-1.5 [&_svg]:h-3 [&_svg]:w-3',
+              'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3',
               compact && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
               compact && 'w-7',
               isOpen && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
@@ -237,10 +233,10 @@ function LinearStyleDisplayMenu({
       </TooltipShortcut>
       <PopoverContent
         align='end'
-        className='w-[248px] rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] p-0 shadow-[0_10px_20px_rgba(0,0,0,0.06)]'
+        className='w-[248px] rounded-[12px] border border-subtle bg-surface-1 p-0 shadow-popover'
       >
         {/* Header */}
-        <div className='flex items-center justify-between border-b border-(--linear-app-frame-seam) px-3 py-2'>
+        <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
           <span className='text-[13px] font-[510] text-primary-token'>
             Display
           </span>
@@ -257,7 +253,7 @@ function LinearStyleDisplayMenu({
 
         {/* Release view toggle */}
         {onReleaseViewChange && (
-          <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+          <div className='border-b border-subtle px-3 py-2'>
             <ReleaseViewSegmentedControl
               value={releaseView ?? 'releases'}
               onChange={onReleaseViewChange}
@@ -267,7 +263,7 @@ function LinearStyleDisplayMenu({
 
         {/* List options */}
         {onGroupByYearChange && (
-          <div className='border-b border-(--linear-app-frame-seam) px-3 py-1.5'>
+          <div className='border-b border-subtle px-3 py-1.5'>
             <p className='px-1 pb-1 text-[13px] font-[510] tracking-normal text-secondary-token'>
               List options
             </p>
@@ -295,42 +291,67 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onGroupByYearChange,
   releaseView = 'releases',
   onReleaseViewChange,
+  searchQuery,
+  onSearchQueryChange,
+  onCreateRelease,
+  canCreateManualReleases = false,
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts for displaying badges
   const counts = useReleaseFilterCounts(releases);
+  const showToolbarExtras = useCodeFlag('SHOW_RELEASE_TOOLBAR_EXTRAS');
 
   return (
     <PageToolbar
-      className={cn(LINEAR_SURFACE.toolbar, 'min-h-[32px] border-b')}
+      className={cn(LINEAR_SURFACE.toolbar, 'min-h-[30px]')}
       start={
         onReleaseViewChange ? (
           <ReleaseViewButtons
             value={releaseView}
             onChange={onReleaseViewChange}
-            className='w-full pb-px md:w-auto'
+            className='pb-px'
           />
         ) : null
       }
       end={
         <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
+          <HeaderSearchAction
+            searchValue={searchQuery}
+            onSearchValueChange={onSearchQueryChange}
+            onClearAction={() => onSearchQueryChange('')}
+            onApply={() => undefined}
+            placeholder='Search releases'
+            ariaLabel='Search releases'
+            submitAriaLabel='Search releases'
+            submitIcon={
+              <Icon
+                name='Search'
+                className={PAGE_TOOLBAR_ICON_CLASS}
+                strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+              />
+            }
+            tooltipLabel='Search'
+            className='h-7 text-[12px] text-tertiary-token hover:text-primary-token'
+          />
           <ReleaseFilterDropdown
             filters={filters}
             onFiltersChange={onFiltersChange}
             counts={counts}
             buttonClassName={cn(
               PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-              'h-7 rounded-[8px] px-1.5 [&_svg]:h-3 [&_svg]:w-3'
+              'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3'
             )}
             iconOnly
           />
-          <LinearStyleDisplayMenu
-            groupByYear={groupByYear}
-            onGroupByYearChange={onGroupByYearChange}
-            releaseView={releaseView}
-            onReleaseViewChange={onReleaseViewChange}
-            triggerClassName={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
-            compact
-          />
+          {showToolbarExtras && (
+            <LinearStyleDisplayMenu
+              groupByYear={groupByYear}
+              onGroupByYearChange={onGroupByYearChange}
+              releaseView={releaseView}
+              onReleaseViewChange={onReleaseViewChange}
+              triggerClassName={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
+              compact
+            />
+          )}
           <ExportCSVButton
             getData={() => getReleasesForExport(releases, selectedIds)}
             columns={RELEASES_CSV_COLUMNS}
@@ -341,14 +362,14 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             chrome='page-toolbar'
             iconOnly
             tooltipLabel='Export'
-            className='h-7 w-7 rounded-[8px] px-0 [&_svg]:h-3 [&_svg]:w-3'
+            className='h-7 w-7 rounded-full px-0 [&_svg]:h-3 [&_svg]:w-3'
           />
           <DrawerToggleButton
             chrome='page-toolbar'
             ariaLabel='Toggle release preview'
             label='Preview'
             tooltipLabel='Preview'
-            className='h-7 w-7 rounded-[8px] px-0 [&_svg]:h-3 [&_svg]:w-3'
+            className='h-7 w-7 text-tertiary-token hover:text-primary-token'
           />
         </div>
       }

@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { gateway } from '@ai-sdk/gateway';
-import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { convertToModelMessages, streamText, tool, type UIMessage } from 'ai';
 import { and, count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
@@ -8,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
@@ -40,6 +40,7 @@ import {
 } from '@/lib/services/canvas/service';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { getInsightsSummary } from '@/lib/services/insights/lifecycle';
+import { buildPitchInput, generatePitches } from '@/lib/services/pitch';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
 import { toISOStringOrNull } from '@/lib/utils/date';
@@ -141,7 +142,7 @@ async function fetchArtistContext(
       .then(r => r[0]),
     db
       .select({
-        total: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') in ('qr', 'link'))`,
+        total: drizzleSql<number>`count(*)`,
       })
       .from(clickEvents)
       .where(
@@ -1096,6 +1097,77 @@ function createSubmitFeedbackTool(clerkUserId: string) {
 }
 
 /**
+ * Creates the generateReleasePitch tool for generating AI playlist pitches from chat.
+ * Saves generated pitches to the release's generatedPitches field.
+ */
+function createGenerateReleasePitchTool(resolvedProfileId: string) {
+  return tool({
+    description:
+      "Generate AI-powered playlist pitches for a release. Creates pitches formatted for Spotify, Apple Music, Amazon Music, and general use. Saves them to the release automatically. Use when the artist asks about playlist pitches, editorial submissions, or wants help submitting their music to playlists. Ask which release they want to pitch if unclear. If the artist provides custom guidance (e.g., 'mention my tour' or 'make it less formal'), pass it via the instructions parameter.",
+    inputSchema: z.object({
+      releaseTitle: z
+        .string()
+        .max(200)
+        .describe('The title of the release to generate pitches for'),
+      instructions: z
+        .string()
+        .max(500)
+        .optional()
+        .describe(
+          'Optional instructions to guide pitch generation, e.g. "mention my Nashville show" or "make it less formal"'
+        ),
+    }),
+    execute: async ({ releaseTitle, instructions }) => {
+      try {
+        const releases = await fetchReleasesForChat(resolvedProfileId);
+
+        if (releases.length === 0) {
+          return {
+            success: false as const,
+            error: "You don't have any releases yet. Add a release first.",
+          };
+        }
+
+        const release = findReleaseByTitle(releases, releaseTitle);
+
+        if (!release) {
+          return {
+            success: false as const,
+            error: `Release "${releaseTitle}" not found. Available releases: ${formatAvailableReleases(releases)}`,
+          };
+        }
+
+        const pitchInput = await buildPitchInput(resolvedProfileId, release.id);
+
+        const result = await generatePitches(pitchInput, instructions);
+
+        // Save to database
+        await db
+          .update(discogReleases)
+          .set({ generatedPitches: result.pitches })
+          .where(eq(discogReleases.id, release.id));
+
+        return {
+          success: true as const,
+          releaseTitle: release.title,
+          pitches: result.pitches,
+        };
+      } catch (error) {
+        Sentry.captureException(error, {
+          tags: { feature: 'chat-pitch-generation' },
+          extra: { releaseTitle, profileId: resolvedProfileId },
+        });
+
+        return {
+          success: false as const,
+          error: 'Failed to generate pitches. Please try again.',
+        };
+      }
+    },
+  });
+}
+
+/**
  * Build tools available on ALL plans (including Free).
  * These are basic profile management tools that don't require a paid plan.
  */
@@ -1138,7 +1210,11 @@ function buildChatTools(
     markCanvasUploaded: createMarkCanvasUploadedTool(resolvedProfileId),
     formatLyrics: createLyricsFormatTool(),
     ...(resolvedProfileId
-      ? { createRelease: createReleaseTool(resolvedProfileId) }
+      ? {
+          createRelease: createReleaseTool(resolvedProfileId),
+          generateReleasePitch:
+            createGenerateReleasePitchTool(resolvedProfileId),
+        }
       : {}),
   };
 }
@@ -1300,7 +1376,7 @@ export async function POST(req: Request) {
   );
 
   // Auth check - ensure user is authenticated
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized', requestId },

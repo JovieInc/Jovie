@@ -11,7 +11,7 @@ const FREE_OUTCOMES = [
   'See core audience and click activity',
 ] as const;
 
-const FOUNDING_OUTCOMES = [
+const PRO_OUTCOMES = [
   'Send paid release notifications to fans',
   'Unlock deeper audience intelligence',
   'Run every release from one branded home',
@@ -23,7 +23,7 @@ const FREE_FEATURE_PREVIEW = [
   'Basic analytics (30 days)',
 ] as const;
 
-const FOUNDING_FEATURE_PREVIEW = [
+const PRO_FEATURE_PREVIEW = [
   'Release notifications',
   'Advanced analytics & geographic insights',
   'Remove Jovie branding',
@@ -31,15 +31,15 @@ const FOUNDING_FEATURE_PREVIEW = [
 
 export function PricingSection() {
   const freePlan = ENTITLEMENT_REGISTRY.free.marketing;
-  const foundingPlan = ENTITLEMENT_REGISTRY.founding.marketing;
+  const proPlan = ENTITLEMENT_REGISTRY.pro.marketing;
   const freeIncludes = freePlan.features.filter(feature =>
     FREE_FEATURE_PREVIEW.includes(
       feature as (typeof FREE_FEATURE_PREVIEW)[number]
     )
   );
-  const foundingIncludes = foundingPlan.features.filter(feature =>
-    FOUNDING_FEATURE_PREVIEW.includes(
-      feature as (typeof FOUNDING_FEATURE_PREVIEW)[number]
+  const proIncludes = proPlan.features.filter(feature =>
+    PRO_FEATURE_PREVIEW.includes(
+      feature as (typeof PRO_FEATURE_PREVIEW)[number]
     )
   );
 
@@ -52,9 +52,6 @@ export function PricingSection() {
         <div className='homepage-section-shell'>
           <div className='homepage-section-intro reveal-on-scroll'>
             <div className='flex max-w-[22rem] flex-col gap-4 lg:max-w-none'>
-              <Badge variant='outline' size='xl' className='w-fit'>
-                Pricing
-              </Badge>
               <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-[12ch] lg:max-w-none'>
                 Simple pricing.
               </h2>
@@ -142,7 +139,7 @@ export function PricingSection() {
               />
               <div className='flex items-center justify-between'>
                 <p className='text-sm font-medium tracking-[-0.01em] text-tertiary-token'>
-                  {foundingPlan.displayName}
+                  {proPlan.displayName}
                 </p>
                 <Badge variant='default' size='lg'>
                   Limited time
@@ -150,7 +147,7 @@ export function PricingSection() {
               </div>
               <div className='mt-4 flex items-baseline gap-1'>
                 <span className='text-4xl font-semibold tracking-tight text-primary-token'>
-                  ${foundingPlan.price?.monthly ?? 0}
+                  ${proPlan.price?.monthly ?? 0}
                 </span>
                 <span className='text-[14px] text-tertiary-token'>/mo</span>
               </div>
@@ -160,7 +157,7 @@ export function PricingSection() {
               </p>
 
               <ul className='mt-6 flex flex-1 flex-col gap-2.25'>
-                {FOUNDING_OUTCOMES.map(feature => (
+                {PRO_OUTCOMES.map(feature => (
                   <li
                     key={feature}
                     className='flex items-center gap-3 text-[14px] text-secondary-token'
@@ -182,7 +179,7 @@ export function PricingSection() {
                   Includes
                 </p>
                 <p className='mt-2 text-sm leading-6 text-secondary-token'>
-                  {foundingIncludes.join(' • ')}
+                  {proIncludes.join(' • ')}
                 </p>
               </div>
 
@@ -192,7 +189,7 @@ export function PricingSection() {
                 size='xl'
                 className='mt-7 w-full text-[var(--linear-btn-primary-fg)] hover:text-[var(--linear-btn-primary-fg)]'
               >
-                <Link href='/signup?plan=founding'>Choose Founding Member</Link>
+                <Link href='/signup?plan=pro'>Choose Pro</Link>
               </Button>
             </div>
           </div>

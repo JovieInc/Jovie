@@ -1,7 +1,9 @@
 'use client';
 
 import { BadgeCheck } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
+import { isDemoRoutePath } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import {
   formatVerifiedPriceLabel,
@@ -15,10 +17,16 @@ import {
 } from '@/lib/queries';
 
 export function SidebarUpgradeBanner() {
+  const pathname = usePathname();
   const isPassiveRuntime = env.IS_TEST || env.IS_E2E;
+  const isDemoRoute = isDemoRoutePath(pathname);
 
-  const billingStatus = useBillingStatusQuery({ enabled: !isPassiveRuntime });
-  const pricing = usePricingOptionsQuery({ enabled: !isPassiveRuntime });
+  const billingStatus = useBillingStatusQuery({
+    enabled: !isPassiveRuntime && !isDemoRoute,
+  });
+  const pricing = usePricingOptionsQuery({
+    enabled: !isPassiveRuntime && !isDemoRoute,
+  });
   const checkoutMutation = useCheckoutMutation();
 
   const selectedPrice = useMemo(
@@ -54,6 +62,7 @@ export function SidebarUpgradeBanner() {
 
   if (
     isPassiveRuntime ||
+    isDemoRoute ||
     billingStatus.isLoading ||
     billingStatus.data?.isPro
   ) {
@@ -62,7 +71,7 @@ export function SidebarUpgradeBanner() {
 
   return (
     <div className='group-data-[collapsible=icon]:hidden px-2.5 pb-1.5'>
-      <div className='rounded-[10px] border border-sidebar-border/70 bg-sidebar-accent/12 px-2.5 py-2 text-sidebar-muted'>
+      <div className='rounded-xl border border-sidebar-border/70 bg-sidebar-accent/12 px-2.5 py-2 text-sidebar-muted'>
         <div className='flex items-start gap-1.5'>
           <BadgeCheck className='mt-0.5 size-3 shrink-0 text-sidebar-item-icon/60' />
           <div className='min-w-0'>

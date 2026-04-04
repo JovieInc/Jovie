@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import { AdminCreatorProfilesUnified } from './AdminCreatorProfilesUnified';
 
 // Platform options for social links

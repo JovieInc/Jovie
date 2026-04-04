@@ -1,38 +1,17 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
-import { getSessionContext } from '@/lib/auth/session';
-import { ChatPageClient } from './chat/ChatPageClient';
-import { getDashboardData } from './dashboard/actions';
+// Must render the same chat UI as /app/chat — see AGENTS.md guardrail #16
+import { DeferredChatPageClient } from './chat/DeferredChatPageClient';
 
 const DASHBOARD_DESCRIPTION = 'Start a new thread with Jovie AI';
+const DASHBOARD_TITLE = 'Home | Jovie';
 
-const getDashboardTitle = async () => {
-  const profile = await getSessionContext({ requireProfile: false })
-    .then(result => result.profile)
-    .catch(() => null);
-  const displayName = profile?.displayName?.trim();
-
-  return displayName ? `${displayName} | Jovie` : 'Home | Jovie';
-};
-
-export async function generateMetadata(): Promise<Metadata> {
+export function generateMetadata(): Metadata {
   return {
-    title: await getDashboardTitle(),
+    title: DASHBOARD_TITLE,
     description: DASHBOARD_DESCRIPTION,
   };
 }
 
-// Chat-first experience: /app renders the new chat directly
-export default async function AppRootPage() {
-  const dashboardData = await getDashboardData();
-
-  // Only redirect to onboarding for genuine missing profiles, not DB errors.
-  // When getDashboardData() catches a DB error it sets needsOnboarding: true
-  // as a fallback, but the proxy doesn't agree — causing a redirect loop:
-  // /app → /onboarding → proxy redirects back → /app → repeat.
-  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-    redirect('/onboarding');
-  }
-
-  return <ChatPageClient isFirstSession={dashboardData.isFirstSession} />;
+export default function AppRootPage() {
+  return <DeferredChatPageClient />;
 }

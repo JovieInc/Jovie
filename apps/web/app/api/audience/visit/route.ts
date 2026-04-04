@@ -8,6 +8,7 @@ import {
   isTrackingTokenEnabled,
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
+import { isVisitorBlocked } from '@/lib/audience/block-check';
 import { type DbOrTransaction, db, doesTableExist } from '@/lib/db';
 import { audienceMembers, dailyProfileViews } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -21,6 +22,7 @@ import { visitSchema } from '@/lib/validation/schemas';
 import {
   createFingerprint,
   deriveIntentLevel,
+  mergeAudienceTags,
   trimHistory,
 } from '../lib/audience-utils';
 
@@ -183,16 +185,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Bot detection - silently skip recording for bots
-    const botResult = detectBot(request, '/api/audience/visit');
-    if (botResult.isBot) {
-      // Return success but don't record - prevents metric inflation
-      return NextResponse.json(
-        { success: true, fingerprint: 'bot-filtered' },
-        { headers: NO_STORE_HEADERS }
-      );
-    }
-
     const body = await request.json();
     const parsed = visitSchema.safeParse(body);
 
@@ -229,6 +221,10 @@ export async function POST(request: NextRequest) {
     const resolvedUserAgent =
       userAgent ?? request.headers.get('user-agent') ?? undefined;
     const resolvedIpAddress = ipAddress ?? clientIP ?? undefined;
+    const botResult = detectBot(request, '/api/audience/visit', {
+      userAgent: resolvedUserAgent,
+    });
+    const audienceTags = botResult.isBot ? ['bot'] : [];
     // Use the client-provided referrer (document.referrer) if available.
     // The HTTP Referer header on same-origin fetch() is the current page URL,
     // NOT the external referrer, so we filter out self-referrals from the fallback.
@@ -291,6 +287,16 @@ export async function POST(request: NextRequest) {
     }
 
     const fingerprint = createFingerprint(resolvedIpAddress, resolvedUserAgent);
+
+    // Block check: reject visits from blocked fingerprints
+    const blocked = await isVisitorBlocked(profile.id, fingerprint);
+    if (blocked) {
+      return NextResponse.json(
+        { status: 'blocked' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const normalizedDevice =
       deviceType ?? inferDeviceType(resolvedUserAgent ?? null);
     const now = new Date();
@@ -305,22 +311,6 @@ export async function POST(request: NextRequest) {
     await withSystemIngestionSession(async tx => {
       const viewDate = now.toISOString().slice(0, 10);
 
-      if (hasDailyProfileViewsTable) {
-        try {
-          await incrementDailyProfileViews(tx, profileId, viewDate, now);
-        } catch (error) {
-          if (!isMissingDailyProfileViewsTableError(error)) {
-            throw error;
-          }
-
-          await captureWarning(
-            '[audience/visit] daily_profile_views table missing; skipping aggregate write',
-            error,
-            { profileId, viewDate }
-          );
-        }
-      }
-
       const [existing] = await tx
         .select({
           id: audienceMembers.id,
@@ -332,6 +322,7 @@ export async function POST(request: NextRequest) {
           geoCountry: audienceMembers.geoCountry,
           deviceType: audienceMembers.deviceType,
           utmParams: audienceMembers.utmParams,
+          tags: audienceMembers.tags,
         })
         .from(audienceMembers)
         .where(
@@ -342,12 +333,20 @@ export async function POST(request: NextRequest) {
         )
         .limit(1);
 
-      const updatedVisits = (existing?.visits ?? 0) + 1;
+      const mergedTags = mergeAudienceTags(existing?.tags, audienceTags);
+      const isBotAudienceMember = mergedTags.includes('bot');
+      const updatedVisits = isBotAudienceMember
+        ? (existing?.visits ?? 0)
+        : (existing?.visits ?? 0) + 1;
       const actionCount = Array.isArray(existing?.latestActions)
         ? existing.latestActions.length
         : 0;
-      const updatedIntent = deriveIntentLevel(updatedVisits, actionCount);
-      const updatedScore = (existing?.engagementScore ?? 0) + 1;
+      const updatedIntent = isBotAudienceMember
+        ? 'low'
+        : deriveIntentLevel(updatedVisits, actionCount);
+      const updatedScore = isBotAudienceMember
+        ? (existing?.engagementScore ?? 0)
+        : (existing?.engagementScore ?? 0) + 1;
       const previousReferrers = Array.isArray(existing?.referrerHistory)
         ? existing.referrerHistory
         : [];
@@ -368,6 +367,21 @@ export async function POST(request: NextRequest) {
       const resolvedUtmParams = hasUtmParams
         ? utmParams
         : (existing?.utmParams ?? {});
+      if (hasDailyProfileViewsTable && !isBotAudienceMember) {
+        try {
+          await incrementDailyProfileViews(tx, profileId, viewDate, now);
+        } catch (error) {
+          if (!isMissingDailyProfileViewsTableError(error)) {
+            throw error;
+          }
+
+          await captureWarning(
+            '[audience/visit] daily_profile_views table missing; skipping aggregate write',
+            error,
+            { profileId, viewDate }
+          );
+        }
+      }
 
       if (existing) {
         await tx
@@ -382,6 +396,7 @@ export async function POST(request: NextRequest) {
             geoCountry: geoCountryValue,
             deviceType: normalizedDevice,
             referrerHistory,
+            tags: mergedTags,
             ...(utmParams && { utmParams: resolvedUtmParams }),
           })
           .where(eq(audienceMembers.id, existing.id));
@@ -397,15 +412,15 @@ export async function POST(request: NextRequest) {
           displayName: 'Visitor',
           firstSeenAt: now,
           lastSeenAt: now,
-          visits: 1,
-          engagementScore: 1,
-          intentLevel: 'low',
+          visits: updatedVisits,
+          engagementScore: updatedScore,
+          intentLevel: updatedIntent,
           geoCity: geoCityValue,
           geoCountry: geoCountryValue,
           deviceType: normalizedDevice,
           referrerHistory,
           utmParams: resolvedUtmParams,
-          tags: [],
+          tags: mergedTags,
           latestActions: [],
           updatedAt: now,
           createdAt: now,

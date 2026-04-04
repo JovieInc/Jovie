@@ -1,29 +1,34 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
-import { ProfileHeaderV2 } from '@/components/organisms/profile-header-v2/ProfileHeaderV2';
 import {
   ProfileNotificationsContext,
   useProfileShell,
 } from '@/components/organisms/profile-shell';
+import { ContactDrawer } from '@/features/profile/artist-contacts-button/ContactDrawer';
+import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import {
+  PROFILE_MODE_KEYS,
   type ProfileMode,
-  SWIPEABLE_MODES,
-  type SwipeableProfileMode,
+  type ProfileV2OverlayMode,
 } from '@/features/profile/contracts';
 import { ListenDrawer } from '@/features/profile/ListenDrawer';
-import { ProfileHeroCard } from '@/features/profile/ProfileHeroCard';
-import { SwipeableModeContainer } from '@/features/profile/SwipeableModeContainer';
-import { useSwipeMode } from '@/hooks/useSwipeMode';
+import { resolveFeaturedContent } from '@/features/profile/ProfileFeaturedCard';
+import { ArtistHero } from '@/features/profile/ProfileHeroCard';
+import { ProfileScrollBody } from '@/features/profile/ProfileScrollBody';
+import { ProfileViewportShell } from '@/features/profile/ProfileViewportShell';
+import { resolveProfileV2Presentation } from '@/features/profile/profile-v2-presentation';
+import { TipDrawer } from '@/features/profile/TipDrawer';
+import { extractVenmoUsername } from '@/features/profile/utils/venmo';
+import { sortDSPsByGeoPopularity } from '@/lib/dsp';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
-import {
-  detectSourcePlatform,
-  getHeaderSocialLinks,
-} from '@/lib/utils/context-aware-links';
+import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
+import type { PressPhoto } from '@/types/press-photos';
 
 interface PublicProfileTemplateV2Props {
   readonly mode: ProfileMode;
@@ -40,21 +45,30 @@ interface PublicProfileTemplateV2Props {
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly genres?: string[] | null;
+  readonly pressPhotos?: readonly PressPhoto[];
+  readonly allowPhotoDownloads?: boolean;
+  readonly photoDownloadSizes?: AvatarSize[];
   readonly tourDates: TourDateViewModel[];
   readonly visitTrackingToken?: string;
-  readonly photoDownloadSizes?: AvatarSize[];
-  readonly allowPhotoDownloads?: boolean;
+  readonly viewerCountryCode?: string | null;
 }
 
-function normalizeInitialMode(mode: ProfileMode): SwipeableProfileMode {
-  if (SWIPEABLE_MODES.includes(mode as SwipeableProfileMode)) {
-    return mode as SwipeableProfileMode;
+function unwrapNextImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+
+  try {
+    const parsed = new URL(url, 'http://localhost');
+    if (parsed.pathname !== '/_next/image') {
+      return url;
+    }
+
+    return parsed.searchParams.get('url') ?? url;
+  } catch {
+    return url;
   }
-
-  return 'profile';
 }
 
-function buildModeHref(mode: SwipeableProfileMode): string {
+function buildModeHref(mode: ProfileMode): string {
   const url = new URL(globalThis.location.href);
   if (mode === 'profile') {
     url.searchParams.delete('mode');
@@ -66,16 +80,13 @@ function buildModeHref(mode: SwipeableProfileMode): string {
   return `${url.pathname}${search ? `?${search}` : ''}`;
 }
 
-function getModeFromLocation(): SwipeableProfileMode {
+function getModeFromLocation(): ProfileMode {
   const searchMode = new URLSearchParams(globalThis.location.search).get(
     'mode'
   );
 
-  if (
-    searchMode &&
-    SWIPEABLE_MODES.includes(searchMode as SwipeableProfileMode)
-  ) {
-    return searchMode as SwipeableProfileMode;
+  if (searchMode && PROFILE_MODE_KEYS.includes(searchMode as ProfileMode)) {
+    return searchMode as ProfileMode;
   }
 
   return 'profile';
@@ -90,17 +101,37 @@ export function PublicProfileTemplateV2({
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   genres,
+  photoDownloadSizes = [],
   tourDates,
   visitTrackingToken,
+  viewerCountryCode,
 }: PublicProfileTemplateV2Props) {
-  const [listenDrawerOpen, setListenDrawerOpen] = useState(false);
-  const lastNavigationModeRef = useRef<SwipeableProfileMode | null>(null);
-  const initialMode = normalizeInitialMode(mode);
-  const initialIndex = SWIPEABLE_MODES.indexOf(initialMode);
+  const [activeOverlay, setActiveOverlay] =
+    useState<ProfileV2OverlayMode>(null);
+  const [historyMode, setHistoryMode] = useState<ProfileMode>(mode);
+  const aboutSectionRef = useRef<HTMLElement | null>(null);
+  const subscribeSectionRef = useRef<HTMLElement | null>(null);
+  const tourSectionRef = useRef<HTMLElement | null>(null);
+  const prefersReducedMotion = useReducedMotion();
   const mergedDSPs = useMemo(
-    () => getCanonicalProfileDSPs(artist, socialLinks),
-    [artist, socialLinks]
+    () =>
+      sortDSPsByGeoPopularity(
+        getCanonicalProfileDSPs(artist, socialLinks),
+        viewerCountryCode
+      ),
+    [artist, socialLinks, viewerCountryCode]
   );
+  const {
+    available,
+    primaryChannel,
+    isEnabled: hasContacts,
+  } = useArtistContacts({
+    contacts,
+    artistHandle: artist.handle,
+  });
+  const venmoLink =
+    socialLinks.find(link => link.platform === 'venmo')?.url ?? null;
+  const venmoUsername = extractVenmoUsername(venmoLink);
   const initialSource = useMemo(() => {
     if (typeof window === 'undefined') {
       return null;
@@ -109,152 +140,368 @@ export function PublicProfileTemplateV2({
     return new URLSearchParams(globalThis.location.search).get('source');
   }, []);
 
-  const {
-    activeIndex,
-    containerRef,
-    dragOffset,
-    handlers,
-    isDragging,
-    setActiveIndex,
-  } = useSwipeMode({
-    count: SWIPEABLE_MODES.length,
-    initialIndex,
-  });
+  const heroImageUrl = useMemo(() => {
+    return unwrapNextImageUrl(
+      photoDownloadSizes.find(size => size.key === 'large')?.url ??
+        photoDownloadSizes.find(size => size.key === 'original')?.url ??
+        artist.image_url ??
+        null
+    );
+  }, [artist.image_url, photoDownloadSizes]);
 
-  const activeMode = SWIPEABLE_MODES[activeIndex] ?? 'profile';
   const { notificationsContextValue } = useProfileShell({
     artist,
     socialLinks,
+    viewerCountryCode,
     contacts,
     visitTrackingToken,
-    modeOverride: activeMode,
+    modeOverride: historyMode,
     sourceOverride: initialSource,
   });
 
-  useEffect(() => {
-    const nextMode = normalizeInitialMode(mode);
-    const nextIndex = SWIPEABLE_MODES.indexOf(nextMode);
-    setActiveIndex(nextIndex);
-  }, [mode, setActiveIndex]);
+  const scrollToTourSection = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    let frame = 0;
+    let cancelled = false;
+
+    const attemptScroll = () => {
+      if (cancelled) {
+        return;
+      }
+
+      const tourSection = tourSectionRef.current;
+      if (tourSection) {
+        tourSection.scrollIntoView({
+          behavior: prefersReducedMotion ? 'auto' : 'smooth',
+          block: 'start',
+        });
+        return;
+      }
+
+      frame += 1;
+      if (frame < 10) {
+        globalThis.requestAnimationFrame(attemptScroll);
+      }
+    };
+
+    globalThis.requestAnimationFrame(attemptScroll);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [prefersReducedMotion]);
+
+  const scrollToSubscribeSection = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const subscribeSection = subscribeSectionRef.current;
+    if (!subscribeSection) {
+      return;
+    }
+
+    subscribeSection.scrollIntoView({
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  }, [prefersReducedMotion]);
+
+  const scrollToAboutSection = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const aboutSection = aboutSectionRef.current;
+    if (!aboutSection) {
+      return;
+    }
+
+    aboutSection.scrollIntoView({
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  }, [prefersReducedMotion]);
+
+  const applyRequestedMode = useCallback(
+    (nextMode: ProfileMode) => {
+      setHistoryMode(nextMode);
+
+      const presentation = resolveProfileV2Presentation(nextMode);
+      let nextOverlay = presentation.initialOverlay;
+
+      if (nextOverlay === 'listen' && mergedDSPs.length === 0) {
+        nextOverlay = null;
+      }
+      if (nextOverlay === 'contact' && !hasContacts) {
+        nextOverlay = null;
+      }
+      if (nextOverlay === 'tip' && !venmoLink) {
+        nextOverlay = null;
+      }
+      if (nextMode === 'subscribe') {
+        nextOverlay = null;
+      }
+
+      setActiveOverlay(nextOverlay);
+
+      if (nextMode === 'subscribe') {
+        scrollToSubscribeSection();
+        return undefined;
+      }
+
+      if (presentation.scrollTarget === 'about') {
+        scrollToAboutSection();
+        return undefined;
+      }
+
+      if (presentation.scrollTarget === 'tour' && tourDates.length > 0) {
+        return scrollToTourSection();
+      }
+
+      return undefined;
+    },
+    [
+      hasContacts,
+      mergedDSPs.length,
+      scrollToAboutSection,
+      scrollToSubscribeSection,
+      scrollToTourSection,
+      tourDates.length,
+      venmoLink,
+    ]
+  );
+
+  useEffect(() => applyRequestedMode(mode), [applyRequestedMode, mode]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined') {
+      return;
+    }
 
     const handlePopState = () => {
-      const nextMode = getModeFromLocation();
-      const nextIndex = SWIPEABLE_MODES.indexOf(nextMode);
-      lastNavigationModeRef.current = nextMode;
-      setActiveIndex(nextIndex);
+      applyRequestedMode(getModeFromLocation());
     };
 
     globalThis.addEventListener('popstate', handlePopState);
     return () => globalThis.removeEventListener('popstate', handlePopState);
-  }, [setActiveIndex]);
+  }, [applyRequestedMode]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const href = buildModeHref(activeMode);
-    const currentHref = `${globalThis.location.pathname}${globalThis.location.search}`;
-
-    if (currentHref === href) {
-      lastNavigationModeRef.current = activeMode;
+    if (typeof window === 'undefined') {
       return;
     }
 
-    if (lastNavigationModeRef.current === activeMode) {
+    const href = buildModeHref(historyMode);
+    const currentHref = `${globalThis.location.pathname}${globalThis.location.search}`;
+    if (currentHref === href) {
       return;
     }
 
     globalThis.history.pushState(globalThis.history.state, '', href);
-    lastNavigationModeRef.current = activeMode;
-  }, [activeMode]);
+  }, [historyMode]);
 
-  const headerSocialLinks = useMemo(() => {
-    if (typeof document === 'undefined') {
-      return [];
+  const visibleSocialLinks = useMemo(() => {
+    return getHeaderSocialLinks(socialLinks, viewerCountryCode, 3);
+  }, [socialLinks, viewerCountryCode]);
+
+  const featuredContent = useMemo(
+    () => resolveFeaturedContent(tourDates, latestRelease),
+    [latestRelease, tourDates]
+  );
+
+  const primaryActionKind = useMemo(() => {
+    if (featuredContent.kind === 'tour') {
+      return 'tickets' as const;
     }
 
-    const sourcePlatform = detectSourcePlatform(
-      document.referrer,
-      new URLSearchParams(globalThis.location.search)
-    );
+    if (mergedDSPs.length > 0) {
+      return 'listen' as const;
+    }
 
-    return getHeaderSocialLinks(socialLinks, sourcePlatform);
-  }, [socialLinks]);
+    return 'subscribe' as const;
+  }, [featuredContent.kind, mergedDSPs.length]);
 
-  const handleModeSelect = (nextMode: SwipeableProfileMode) => {
-    setActiveIndex(SWIPEABLE_MODES.indexOf(nextMode));
-  };
+  const setOverlayState = useCallback((nextOverlay: ProfileV2OverlayMode) => {
+    setActiveOverlay(nextOverlay);
+    setHistoryMode(nextOverlay ?? 'profile');
+  }, []);
 
-  const handlePlayClick = () => {
+  const handlePlayClick = useCallback(() => {
     if (mergedDSPs.length === 0) {
-      handleModeSelect('listen');
+      setHistoryMode('subscribe');
+      setActiveOverlay(null);
+      scrollToSubscribeSection();
       return;
     }
 
-    setListenDrawerOpen(true);
-  };
+    setOverlayState('listen');
+  }, [mergedDSPs.length, scrollToSubscribeSection, setOverlayState]);
+
+  const handleBellClick = useCallback(() => {
+    setHistoryMode('subscribe');
+    setActiveOverlay(null);
+    scrollToSubscribeSection();
+  }, [scrollToSubscribeSection]);
+
+  const handleContactClick = useCallback(() => {
+    if (!hasContacts) {
+      return;
+    }
+
+    setOverlayState('contact');
+  }, [hasContacts, setOverlayState]);
+
+  const handleTipClick = useCallback(() => {
+    if (!venmoLink) {
+      return;
+    }
+
+    setOverlayState('tip');
+  }, [setOverlayState, venmoLink]);
+
+  const primaryAction = useMemo(() => {
+    switch (primaryActionKind) {
+      case 'tickets':
+        return {
+          label: 'Get Tickets',
+          href:
+            featuredContent.kind === 'tour'
+              ? (featuredContent.tourDate.ticketUrl ?? null)
+              : null,
+          external:
+            featuredContent.kind === 'tour' &&
+            Boolean(featuredContent.tourDate.ticketUrl),
+          // When no external ticket URL exists, ProfileHeroCard renders a
+          // button and uses this handler to jump down to the tour section.
+          onClick: () => {
+            setHistoryMode('tour');
+            scrollToTourSection();
+          },
+          ariaLabel: `Get tickets for ${artist.name}`,
+        };
+      case 'listen':
+        return null;
+      case 'subscribe':
+      default:
+        return null;
+    }
+  }, [artist.name, featuredContent, primaryActionKind, scrollToTourSection]);
+
+  const heroSpotlight = useMemo(() => {
+    if (featuredContent.kind === 'tour') {
+      return {
+        label: 'Next show',
+        value: new Intl.DateTimeFormat('en-US', {
+          month: 'short',
+          day: 'numeric',
+        }).format(new Date(featuredContent.tourDate.startDate)),
+      };
+    }
+
+    if (
+      featuredContent.kind === 'release' &&
+      featuredContent.release.releaseDate
+    ) {
+      return {
+        label: 'Latest release',
+        value: new Intl.DateTimeFormat('en-US', {
+          month: 'short',
+          day: 'numeric',
+        }).format(new Date(featuredContent.release.releaseDate)),
+      };
+    }
+
+    return {
+      label: mergedDSPs.length > 0 ? 'Listen now' : 'Profile',
+      value:
+        mergedDSPs.length > 0
+          ? `${mergedDSPs.length} platforms`
+          : artist.handle,
+    };
+  }, [artist.handle, featuredContent, mergedDSPs.length]);
 
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
-      <div
-        className='relative h-[100dvh] overflow-hidden bg-base text-primary-token'
-        data-test='public-profile-root'
-      >
-        <div className='pointer-events-none absolute inset-0 overflow-hidden'>
-          <div className='absolute left-[-10%] top-10 h-48 w-48 rounded-full bg-surface-2/70 blur-3xl' />
-          <div className='absolute bottom-0 right-[-10%] h-56 w-56 rounded-full bg-surface-3/60 blur-3xl' />
-        </div>
-
-        <div className='relative mx-auto grid h-full w-full max-w-2xl grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden px-2 pt-[max(env(safe-area-inset-top),0.75rem)]'>
-          <ProfileHeaderV2
+      <ProfileViewportShell
+        ambientImageUrl={heroImageUrl}
+        artistName={artist.name}
+        header={
+          <ArtistHero
             artist={artist}
-            activeMode={activeMode}
-            activeIndex={activeIndex}
-            modes={SWIPEABLE_MODES}
-            headerSocialLinks={headerSocialLinks}
-            onModeSelect={handleModeSelect}
-            onPlayClick={handlePlayClick}
-          />
-
-          <ProfileHeroCard
-            artist={artist}
-            socialLinks={socialLinks}
-            mergedDSPs={mergedDSPs}
+            heroImageUrl={heroImageUrl}
             latestRelease={latestRelease}
-            enableDynamicEngagement={enableDynamicEngagement}
-            subscribeTwoStep={subscribeTwoStep}
-            autoOpenCapture={mode === 'subscribe'}
+            primaryAction={primaryAction}
+            primaryActionKind={primaryActionKind}
+            spotlightLabel={heroSpotlight.label}
+            spotlightValue={heroSpotlight.value}
+            socialLinks={visibleSocialLinks}
+            onPlayClick={handlePlayClick}
+            onBellClick={handleBellClick}
+            compact={historyMode === 'subscribe'}
           />
-
-          <SwipeableModeContainer
+        }
+      >
+        <div
+          className='relative flex h-full flex-col overflow-hidden'
+          data-test='public-profile-root'
+        >
+          <ProfileScrollBody
             artist={artist}
-            socialLinks={socialLinks}
+            socialLinks={visibleSocialLinks}
+            contacts={available}
             latestRelease={latestRelease}
             mergedDSPs={mergedDSPs}
             enableDynamicEngagement={enableDynamicEngagement}
             genres={genres}
             tourDates={tourDates}
-            modes={SWIPEABLE_MODES}
-            activeIndex={activeIndex}
-            dragOffset={dragOffset}
-            isDragging={isDragging}
-            containerRef={containerRef}
-            handlers={handlers}
+            hasTip={Boolean(venmoLink)}
+            primaryActionKind={primaryActionKind}
+            subscribeTwoStep={subscribeTwoStep}
+            aboutSectionRef={aboutSectionRef}
+            subscribeSectionRef={subscribeSectionRef}
+            subscribeModeActive={historyMode === 'subscribe'}
+            onTipClick={handleTipClick}
+            onContactClick={handleContactClick}
+            tourSectionRef={tourSectionRef}
           />
         </div>
 
         {mergedDSPs.length > 0 ? (
           <ListenDrawer
-            open={listenDrawerOpen}
-            onOpenChange={setListenDrawerOpen}
+            open={activeOverlay === 'listen'}
+            onOpenChange={open => setOverlayState(open ? 'listen' : null)}
             artist={artist}
             dsps={mergedDSPs}
             enableDynamicEngagement={enableDynamicEngagement}
           />
         ) : null}
-      </div>
+
+        {venmoLink ? (
+          <TipDrawer
+            open={activeOverlay === 'tip'}
+            onOpenChange={open => setOverlayState(open ? 'tip' : null)}
+            artistName={artist.name}
+            artistHandle={artist.handle}
+            venmoLink={venmoLink}
+            venmoUsername={venmoUsername}
+          />
+        ) : null}
+
+        {hasContacts ? (
+          <ContactDrawer
+            open={activeOverlay === 'contact'}
+            onOpenChange={open => setOverlayState(open ? 'contact' : null)}
+            artistName={artist.name}
+            artistHandle={artist.handle}
+            contacts={available}
+            primaryChannel={primaryChannel}
+          />
+        ) : null}
+      </ProfileViewportShell>
     </ProfileNotificationsContext.Provider>
   );
 }

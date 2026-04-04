@@ -24,6 +24,7 @@ export const RESERVED_USERNAMES = [
   'dashboard',
   'onboarding',
   'settings',
+  'unavailable',
   'profile',
   'login',
   'signin',
@@ -43,6 +44,7 @@ export const RESERVED_USERNAMES = [
   'mail',
   'changelog',
   'engagement-engine',
+  'artist-profiles',
 
   // Legal/company pages
   'about',

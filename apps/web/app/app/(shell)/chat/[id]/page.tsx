@@ -7,7 +7,7 @@ import { db } from '@/lib/db';
 import { chatConversations } from '@/lib/db/schema/chat';
 import { getDashboardData } from '../../dashboard/actions';
 import { checkAppleMusicConnection } from '../../dashboard/releases/actions';
-import { ChatPageClient } from '../ChatPageClient';
+import { DeferredChatPageClient } from '../DeferredChatPageClient';
 
 interface Props {
   readonly params: Promise<{
@@ -18,22 +18,33 @@ interface Props {
 const CONVERSATION_DESCRIPTION = 'Thread with Jovie AI';
 
 const getConversationTitle = async (conversationId: string) => {
-  const { user } = await getSessionContext({ requireProfile: false });
+  try {
+    const { user } = await getSessionContext({
+      requireUser: false,
+      requireProfile: false,
+    });
 
-  const [conversation] = await db
-    .select({ title: chatConversations.title })
-    .from(chatConversations)
-    .where(
-      and(
-        eq(chatConversations.id, conversationId),
-        eq(chatConversations.userId, user.id)
+    if (!user) return 'Thread | Jovie';
+
+    const [conversation] = await db
+      .select({ title: chatConversations.title })
+      .from(chatConversations)
+      .where(
+        and(
+          eq(chatConversations.id, conversationId),
+          eq(chatConversations.userId, user.id)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  const conversationTitle = conversation?.title?.trim();
+    const conversationTitle = conversation?.title?.trim();
 
-  return conversationTitle ? `${conversationTitle} | Jovie` : 'Thread | Jovie';
+    return conversationTitle
+      ? `${conversationTitle} | Jovie`
+      : 'Thread | Jovie';
+  } catch {
+    return 'Thread | Jovie';
+  }
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -60,7 +71,7 @@ export default async function ChatConversationPage({ params }: Props) {
 
   const { id } = await params;
   return (
-    <ChatPageClient
+    <DeferredChatPageClient
       conversationId={id}
       isFirstSession={dashboardData.isFirstSession}
       appleMusicConnected={appleMusicResult.connected}

@@ -6,6 +6,7 @@ export interface ContentSectionHeaderProps {
   readonly subtitle?: ReactNode;
   readonly actions?: ReactNode;
   readonly density?: 'default' | 'compact';
+  readonly variant?: 'default' | 'plain';
   readonly className?: string;
   readonly bodyClassName?: string;
   readonly titleClassName?: string;
@@ -18,6 +19,7 @@ export function ContentSectionHeader({
   subtitle,
   actions,
   density = 'default',
+  variant = 'default',
   className,
   bodyClassName,
   titleClassName,
@@ -27,9 +29,10 @@ export function ContentSectionHeader({
   return (
     <div
       className={cn(
-        'flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] px-(--linear-app-header-padding-x)',
+        'flex min-w-0 shrink-0 items-center justify-between gap-2 px-(--linear-app-header-padding-x)',
+        variant === 'default' && 'border-b border-subtle bg-transparent',
         density === 'compact'
-          ? 'min-h-[36px] py-1'
+          ? 'min-h-[38px] py-1.5'
           : 'min-h-(--linear-app-header-height) py-1.5',
         className
       )}
@@ -37,7 +40,7 @@ export function ContentSectionHeader({
       <div className={cn('min-w-0 flex-1 space-y-0', bodyClassName)}>
         <h2
           className={cn(
-            'truncate text-[12px] font-[560] tracking-[-0.014em] text-primary-token',
+            'truncate text-[12.5px] font-[560] tracking-[-0.012em] text-primary-token',
             titleClassName
           )}
         >
@@ -46,7 +49,7 @@ export function ContentSectionHeader({
         {subtitle ? (
           <p
             className={cn(
-              'text-[11px] leading-[14px] text-tertiary-token',
+              'text-[11.5px] leading-[15px] text-tertiary-token',
               subtitleClassName
             )}
           >
@@ -56,7 +59,10 @@ export function ContentSectionHeader({
       </div>
       {actions ? (
         <div
-          className={cn('w-full sm:w-auto sm:justify-end', actionsClassName)}
+          className={cn(
+            'ml-auto flex shrink-0 items-center justify-end gap-1',
+            actionsClassName
+          )}
         >
           {actions}
         </div>

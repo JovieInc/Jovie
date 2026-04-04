@@ -33,13 +33,16 @@ vi.mock('@clerk/nextjs', () => ({
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(searchParamsState.value),
-  useRouter: () => ({ prefetch: routerPrefetchMock }),
 }));
 
 vi.mock('@/features/auth', () => ({
   AuthLayout: ({ children }: { children: ReactNode }) => (
     <div data-testid='auth-layout'>{children}</div>
   ),
+  AuthRoutePrefetch: ({ href }: { href: string }) => {
+    routerPrefetchMock(href);
+    return null;
+  },
 }));
 
 vi.mock('@/lib/analytics', () => ({
@@ -163,5 +166,21 @@ describe('signup page', () => {
     );
 
     replaceStateSpy.mockRestore();
+  });
+
+  it('preserves redirect_url on the Clerk sign-in footer link', async () => {
+    searchParamsState.value = 'redirect_url=%2Fonboarding';
+
+    render(<SignUpPage />);
+
+    await waitFor(() => {
+      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(clerkSignUpMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signInUrl: '/signin?redirect_url=%2Fonboarding',
+      })
+    );
   });
 });

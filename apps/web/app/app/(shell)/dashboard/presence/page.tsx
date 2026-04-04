@@ -1,12 +1,14 @@
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { DspPresenceView } from '@/features/dashboard/organisms/dsp-presence/DspPresenceView';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
-import { getDashboardData } from '../actions';
-import { loadDspPresence } from './actions';
+import { getDashboardShellData } from '../actions';
+import { loadDspPresenceForProfile } from './actions';
+import PresenceLoading from './loading';
 
 export const runtime = 'nodejs';
 
@@ -16,39 +18,45 @@ export default async function PresencePage() {
     redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.PRESENCE}`);
   }
 
-  const dashboardData = await getDashboardData();
+  return (
+    <Suspense fallback={<PresenceLoading />}>
+      <PresenceContent userId={userId} />
+    </Suspense>
+  );
+}
 
-  if (dashboardData.dashboardLoadError) {
-    void captureError(
-      'Dashboard data load failed on presence page',
-      dashboardData.dashboardLoadError,
-      {
-        route: APP_ROUTES.PRESENCE,
-      }
-    );
+async function PresenceContent({ userId }: Readonly<{ userId: string }>) {
+  try {
+    const dashboardData = await getDashboardShellData(userId);
+    if (dashboardData.dashboardLoadError) {
+      void captureError(
+        'Dashboard data load failed on presence page',
+        dashboardData.dashboardLoadError,
+        { route: APP_ROUTES.PRESENCE }
+      );
+      return (
+        <PageErrorState message='Failed to load presence data. Please refresh the page.' />
+      );
+    }
+
+    if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
+      redirect(APP_ROUTES.ONBOARDING);
+    }
+
+    const selectedProfile = dashboardData.selectedProfile;
+    if (!selectedProfile) {
+      redirect(APP_ROUTES.ONBOARDING);
+    }
+
+    const presenceData = await loadDspPresenceForProfile(selectedProfile.id);
+    return <DspPresenceView data={presenceData} />;
+  } catch (error) {
+    throwIfRedirect(error);
+    void captureError('Presence page failed', error, {
+      route: APP_ROUTES.PRESENCE,
+    });
     return (
       <PageErrorState message='Failed to load presence data. Please refresh the page.' />
     );
   }
-
-  if (dashboardData.needsOnboarding) {
-    redirect(APP_ROUTES.ONBOARDING);
-  }
-
-  let presenceData: Awaited<ReturnType<typeof loadDspPresence>> = {
-    items: [],
-    confirmedCount: 0,
-    suggestedCount: 0,
-  };
-
-  try {
-    presenceData = await loadDspPresence();
-  } catch (error) {
-    throwIfRedirect(error);
-    void captureError('loadDspPresence failed', error, {
-      route: APP_ROUTES.PRESENCE,
-    });
-  }
-
-  return <DspPresenceView data={presenceData} />;
 }

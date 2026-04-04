@@ -32,7 +32,13 @@ function formatRunway(runwayMonths: number | null): string {
 }
 
 function formatUpdatedTime(value: string): string {
-  return new Date(value).toLocaleTimeString('en-US');
+  return new Date(value).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: 'UTC',
+    timeZoneName: 'short',
+  });
 }
 
 function formatDeploymentTime(value: string): string {
@@ -41,6 +47,8 @@ function formatDeploymentTime(value: string): string {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'UTC',
+    timeZoneName: 'short',
   });
 }
 
@@ -72,7 +80,7 @@ function DeploymentRow({
   readonly run: HudMetrics['deployments']['recent'][number];
 }>) {
   return (
-    <div className='flex items-center justify-between gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5'>
+    <div className='flex items-center justify-between gap-3 rounded-xl border border-subtle bg-surface-0 px-3 py-2.5'>
       <div className='min-w-0'>
         <p className='truncate text-[13px] font-[560] text-primary-token'>
           #{run.runNumber}
@@ -118,7 +126,7 @@ export function HudDashboardClient({
         className='flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5'
       >
         <div className='flex items-center gap-3'>
-          <div className='relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]'>
+          <div className='relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-subtle bg-surface-0'>
             <Image
               src='/brand/Jovie-Logo-Icon-White.svg'
               alt='Jovie'
@@ -224,7 +232,7 @@ export function HudDashboardClient({
                 Open the live HUD on another device using this kiosk link.
               </p>
             </div>
-            <div className='rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+            <div className='rounded-[12px] border border-subtle bg-surface-0 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
               <QRCode
                 data={hudUrl}
                 size={196}

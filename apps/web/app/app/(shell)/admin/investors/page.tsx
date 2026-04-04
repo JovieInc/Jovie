@@ -10,13 +10,14 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import { investorLinks } from '@/lib/db/schema/investors';
 import { cn } from '@/lib/utils';
+import { TokenCopyButton } from './TokenCopyButton';
 
 export const metadata: Metadata = {
   title: 'Investor Pipeline',
@@ -31,50 +32,47 @@ export const dynamic = 'force-dynamic';
  */
 export default function InvestorPipelinePage() {
   return (
-    <PageShell>
-      <PageContent>
-        <div className='space-y-4'>
-          <ContentSurfaceCard className='overflow-hidden p-0'>
-            <ContentSectionHeader
-              title='Investor pipeline'
-              subtitle='Track investor links, interest signals, and active fundraising conversations without leaving the admin shell.'
-              actions={
-                <div className='flex items-center gap-2'>
-                  <Button variant='secondary' size='sm' asChild>
-                    <Link href={APP_ROUTES.ADMIN_INVESTORS_SETTINGS}>
-                      <Settings2 className='mr-1.5 h-3.5 w-3.5' />
-                      Settings
-                    </Link>
-                  </Button>
-                  <CreateLinkButton />
-                </div>
-              }
-            />
-            <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-3'>
-              <SummaryCard
-                label='Pipeline view'
-                value='Investor links'
-                description='Every link is a lightweight deal room with stage tracking.'
-              />
-              <SummaryCard
-                label='Signal capture'
-                value='View + stage history'
-                description='Keep engagement, recency, and status visible in one list.'
-              />
-              <SummaryCard
-                label='Next action'
-                value='Create or follow up'
-                description='Use links, notes, and stage changes to keep momentum moving.'
-              />
-            </div>
-          </ContentSurfaceCard>
-
-          <Suspense fallback={<TableSkeleton />}>
-            <InvestorTable />
-          </Suspense>
+    <AdminToolPage
+      title='Investors'
+      description='Track investor links, view signals, and active fundraising conversations.'
+      testId='admin-investors-page'
+      actions={
+        <div className='flex items-center gap-2'>
+          <Button variant='secondary' size='sm' asChild>
+            <Link href={APP_ROUTES.ADMIN_INVESTORS_SETTINGS}>
+              <Settings2 className='mr-1.5 h-3.5 w-3.5' />
+              Settings
+            </Link>
+          </Button>
+          <CreateLinkButton />
         </div>
-      </PageContent>
-    </PageShell>
+      }
+    >
+      <div
+        className='grid gap-3 sm:grid-cols-3'
+        data-testid='admin-investors-summary'
+      >
+        <SummaryCard
+          label='Pipeline View'
+          value='Investor links'
+          description='Every link is a lightweight deal room with stage tracking.'
+        />
+        <SummaryCard
+          label='Signal Capture'
+          value='View + stage history'
+          description='Keep engagement, recency, and status visible in one list.'
+        />
+        <SummaryCard
+          label='Next Action'
+          value='Create or follow up'
+          description='Use links, notes, and stage changes to keep momentum moving.'
+        />
+      </div>
+
+      <Suspense fallback={<TableSkeleton />}>
+        <InvestorTable />
+      </Suspense>
+    </AdminToolPage>
   );
 }
 
@@ -113,7 +111,7 @@ async function InvestorTable() {
           subtitle='Create a first link to start tracking investor views and responses.'
         />
         <div className='flex flex-col items-center gap-3 px-6 py-10 text-center'>
-          <div className='flex h-11 w-11 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token'>
+          <div className='flex h-11 w-11 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
             <Link2 className='h-4 w-4' aria-hidden='true' />
           </div>
           <p className='max-w-md text-[13px] leading-[19px] text-secondary-token'>
@@ -127,15 +125,18 @@ async function InvestorTable() {
   }
 
   return (
-    <ContentSurfaceCard className='overflow-hidden p-0'>
+    <ContentSurfaceCard
+      className='overflow-hidden p-0'
+      data-testid='admin-investors-table'
+    >
       <ContentSectionHeader
         title='Active investor links'
         subtitle={`${links.length} tracked link${links.length === 1 ? '' : 's'} across your pipeline.`}
       />
       <div className='overflow-x-auto'>
         <table className='w-full min-w-[760px] border-collapse text-[13px]'>
-          <thead className='bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]'>
-            <tr className='border-b border-(--linear-app-frame-seam) text-left text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
+          <thead className='bg-surface-0'>
+            <tr className='border-b border-subtle text-left text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
               <th className='px-4 py-2.5 font-[560]'>Label</th>
               <th className='px-4 py-2.5 font-[560]'>Investor</th>
               <th className='px-4 py-2.5 font-[560]'>Stage</th>
@@ -149,16 +150,14 @@ async function InvestorTable() {
             {links.map(link => (
               <tr
                 key={link.id}
-                className='border-b border-(--linear-app-frame-seam) bg-transparent transition-colors duration-150 hover:bg-(--linear-row-hover)'
+                className='border-b border-subtle bg-transparent transition-colors duration-150 hover:bg-surface-1'
               >
                 <td className='px-4 py-3 align-middle'>
                   <div className='flex min-w-0 flex-col'>
                     <span className='truncate font-[560] text-primary-token'>
                       {link.label}
                     </span>
-                    <span className='text-[11px] text-tertiary-token'>
-                      Token: {link.token}
-                    </span>
+                    <TokenDisplay token={link.token} />
                   </div>
                 </td>
                 <td className='px-4 py-3 align-middle text-secondary-token'>
@@ -190,7 +189,7 @@ async function InvestorTable() {
   );
 }
 
-function StageBadge({ stage }: { stage: string }) {
+function StageBadge({ stage }: Readonly<{ stage: string }>) {
   const styles: Record<
     string,
     {
@@ -219,13 +218,14 @@ function StageBadge({ stage }: { stage: string }) {
   );
 }
 
-function ScoreBadge({ score }: { score: number }) {
-  const toneClassName =
-    score >= 50
-      ? 'text-[var(--linear-success)]'
-      : score >= 25
-        ? 'text-[var(--linear-warning)]'
-        : 'text-secondary-token';
+function ScoreBadge({ score }: Readonly<{ score: number }>) {
+  let toneClassName = 'text-secondary-token';
+
+  if (score >= 50) {
+    toneClassName = 'text-success';
+  } else if (score >= 25) {
+    toneClassName = 'text-warning';
+  }
 
   return (
     <span
@@ -242,7 +242,7 @@ function ScoreBadge({ score }: { score: number }) {
 function StatusBadge({ isActive }: { readonly isActive: boolean }) {
   return isActive ? (
     <span className='inline-flex items-center gap-1.5 text-[12px] text-secondary-token'>
-      <CheckCircle2 className='h-3.5 w-3.5 text-[var(--linear-success)]' />
+      <CheckCircle2 className='h-3.5 w-3.5 text-success' />
       Active
     </span>
   ) : (
@@ -275,9 +275,7 @@ function SummaryCard({
 }>) {
   return (
     <ContentSurfaceCard surface='nested' className='p-3.5'>
-      <p className='text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
-        {label}
-      </p>
+      <p className='text-[11px] text-tertiary-token'>{label}</p>
       <p className='mt-1 text-[14px] font-[560] tracking-[-0.016em] text-primary-token'>
         {value}
       </p>
@@ -286,6 +284,10 @@ function SummaryCard({
       </p>
     </ContentSurfaceCard>
   );
+}
+
+function TokenDisplay({ token }: { readonly token: string }) {
+  return <TokenCopyButton token={token} />;
 }
 
 const TABLE_SKELETON_KEYS = [

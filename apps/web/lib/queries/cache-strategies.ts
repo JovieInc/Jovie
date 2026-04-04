@@ -137,3 +137,41 @@ export const SEARCH_CACHE: CacheStrategyOptions = {
   refetchOnMount: false,
   refetchOnWindowFocus: false,
 };
+
+// =============================================================================
+// Composite presets (common override combos)
+// =============================================================================
+
+/**
+ * Standard cache that skips refetch on remount.
+ * Use for: detail views, drawer panels, data stable within stale window.
+ */
+export const STANDARD_NO_REMOUNT_CACHE: CacheStrategyOptions = {
+  ...STANDARD_CACHE,
+  refetchOnMount: false,
+};
+
+/**
+ * Frequent cache with no automatic refetch on mount or window focus.
+ * Use for: earnings, billing stats — data that updates often but
+ * shouldn't flicker on tab switch or component remount.
+ */
+export const FREQUENT_BACKGROUND_CACHE: CacheStrategyOptions = {
+  ...FREQUENT_CACHE,
+  refetchOnWindowFocus: false,
+  refetchOnMount: false,
+};
+
+// =============================================================================
+// Retry presets
+// =============================================================================
+
+/**
+ * Reusable retry config: 3 retries with exponential backoff capped at 30s.
+ * Use for: analytics, DSP enrichment, and other queries that benefit from
+ * retrying transient failures.
+ */
+export const RETRY_BACKOFF = {
+  retry: 3,
+  retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 30_000),
+} as const;

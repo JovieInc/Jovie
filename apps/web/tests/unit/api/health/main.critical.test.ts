@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockHealthLimiterLimit = vi.hoisted(() => vi.fn());
-const mockDbSelect = vi.hoisted(() => vi.fn());
+const mockDbExecute = vi.hoisted(() => vi.fn());
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit', () => ({
@@ -14,12 +14,8 @@ vi.mock('@/lib/rate-limit', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: {
-    select: mockDbSelect,
+    execute: mockDbExecute,
   },
-}));
-
-vi.mock('@/lib/db/schema', () => ({
-  creatorProfiles: {},
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -62,26 +58,19 @@ describe('@critical GET /api/health', () => {
   });
 
   it('returns ok status when database is healthy', async () => {
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ count: 5 }]),
-      }),
-    });
+    mockDbExecute.mockResolvedValue(undefined);
 
     const { GET } = await import('@/app/api/health/route');
     const response = await GET(new Request('http://localhost/api/health'));
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.status).toBe('ok');
-    expect(data.database).toBe('ok');
+    expect(data).toEqual({ status: 'ok' });
     expect(mockCaptureWarning).not.toHaveBeenCalled();
   });
 
   it('captures warning when database check throws', async () => {
-    mockDbSelect.mockImplementation(() => {
-      throw new Error('Connection refused');
-    });
+    mockDbExecute.mockRejectedValue(new Error('Connection refused'));
 
     const { GET } = await import('@/app/api/health/route');
     const response = await GET(new Request('http://localhost/api/health'));

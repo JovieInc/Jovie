@@ -7,6 +7,8 @@ bun install          # install dependencies
 bun test             # run free tests (browse + snapshot + skill validation)
 bun run test:evals   # run paid evals: LLM judge + E2E (diff-based, ~$4/run max)
 bun run test:evals:all  # run ALL paid evals regardless of diff
+bun run test:gate    # run gate-tier tests only (CI default, blocks merge)
+bun run test:periodic  # run periodic-tier tests only (weekly cron / manual)
 bun run test:e2e     # run E2E tests only (diff-based, ~$3.85/run max)
 bun run test:e2e:all # run ALL E2E tests regardless of diff
 bun run eval:select  # show which tests would run based on current diff
@@ -29,8 +31,16 @@ against the previous run.
 **Diff-based test selection:** `test:evals` and `test:e2e` auto-select tests based
 on `git diff` against the base branch. Each test declares its file dependencies in
 `test/helpers/touchfiles.ts`. Changes to global touchfiles (session-runner, eval-store,
-llm-judge, gen-skill-docs) trigger all tests. Use `EVALS_ALL=1` or the `:all` script
+touchfiles.ts itself) trigger all tests. Use `EVALS_ALL=1` or the `:all` script
 variants to force all tests. Run `eval:select` to preview which tests would run.
+
+**Two-tier system:** Tests are classified as `gate` or `periodic` in `E2E_TIERS`
+(in `test/helpers/touchfiles.ts`). CI runs only gate tests (`EVALS_TIER=gate`);
+periodic tests run weekly via cron or manually. Use `EVALS_TIER=gate` or
+`EVALS_TIER=periodic` to filter. When adding new E2E tests, classify them:
+1. Safety guardrail or deterministic functional test? -> `gate`
+2. Quality benchmark, Opus model test, or non-deterministic? -> `periodic`
+3. Requires external service (Codex, Gemini)? -> `periodic`
 
 ## Testing
 
@@ -55,6 +65,7 @@ gstack/
 │   └── dist/        # Compiled binary
 ├── scripts/         # Build + DX tooling
 │   ├── gen-skill-docs.ts  # Template → SKILL.md generator
+│   ├── resolvers/   # Template resolver modules (preamble, design, review, etc.)
 │   ├── skill-check.ts     # Health dashboard
 │   └── dev-skill.ts       # Watch mode
 ├── test/            # Skill validation + eval tests
@@ -71,10 +82,31 @@ gstack/
 ├── review/          # PR review skill
 ├── plan-ceo-review/ # /plan-ceo-review skill
 ├── plan-eng-review/ # /plan-eng-review skill
+├── autoplan/        # /autoplan skill (auto-review pipeline: CEO → design → eng)
+├── benchmark/       # /benchmark skill (performance regression detection)
+├── canary/          # /canary skill (post-deploy monitoring loop)
+├── codex/           # /codex skill (multi-AI second opinion via OpenAI Codex CLI)
+├── land-and-deploy/ # /land-and-deploy skill (merge → deploy → canary verify)
 ├── office-hours/    # /office-hours skill (YC Office Hours — startup diagnostic + builder brainstorm)
 ├── investigate/     # /investigate skill (systematic root-cause debugging)
-├── retro/           # Retrospective skill
+├── retro/           # Retrospective skill (includes /retro global cross-project mode)
+├── bin/             # CLI utilities (gstack-repo-mode, gstack-slug, gstack-config, etc.)
 ├── document-release/ # /document-release skill (post-ship doc updates)
+├── cso/             # /cso skill (OWASP Top 10 + STRIDE security audit)
+├── design-consultation/ # /design-consultation skill (design system from scratch)
+├── design-shotgun/  # /design-shotgun skill (visual design exploration)
+├── connect-chrome/  # /connect-chrome skill (headed Chrome with side panel)
+├── design/          # Design binary CLI (GPT Image API)
+│   ├── src/         # CLI + commands (generate, variants, compare, serve, etc.)
+│   ├── test/        # Integration tests
+│   └── dist/        # Compiled binary
+├── extension/       # Chrome extension (side panel + activity feed)
+├── lib/             # Shared libraries (worktree.ts)
+├── docs/designs/    # Design documents
+├── setup-deploy/    # /setup-deploy skill (one-time deploy config)
+├── .github/         # CI workflows + Docker image
+│   ├── workflows/   # evals.yml (E2E on Ubicloud), skill-docs.yml, actionlint.yml
+│   └── docker/      # Dockerfile.ci (pre-baked toolchain + Playwright/Chromium)
 ├── setup            # One-time setup: build binary + symlink skills
 ├── SKILL.md         # Generated from SKILL.md.tmpl (don't edit directly)
 ├── SKILL.md.tmpl    # Template: edit this, run gen:skill-docs
@@ -149,9 +181,29 @@ symlink or a real copy. If it's a symlink to your working directory, be aware th
 - During large refactors, remove the symlink (`rm .claude/skills/gstack`) so the
   global install at `~/.claude/skills/gstack/` is used instead
 
+**Prefix setting:** Skill symlinks use either short names (`qa -> gstack/qa`) or
+namespaced (`gstack-qa -> gstack/qa`), controlled by `skill_prefix` in
+`~/.gstack/config.yaml`. When vendoring into a project, run `./setup` after
+symlinking to create the per-skill symlinks with your preferred naming. Pass
+`--no-prefix` or `--prefix` to skip the interactive prompt.
+
 **For plan reviews:** When reviewing plans that modify skill templates or the
 gen-skill-docs pipeline, consider whether the changes should be tested in isolation
 before going live (especially if the user is actively using gstack in other windows).
+
+## Compiled binaries — NEVER commit browse/dist/ or design/dist/
+
+The `browse/dist/` and `design/dist/` directories contain compiled Bun binaries
+(`browse`, `find-browse`, `design`, ~58MB each). These are Mach-O arm64 only — they
+do NOT work on Linux, Windows, or Intel Macs. The `./setup` script already builds
+from source for every platform, so the checked-in binaries are redundant. They are
+tracked by git due to a historical mistake and should eventually be removed with
+`git rm --cached`.
+
+**NEVER stage or commit these files.** They show up as modified in `git status`
+because they're tracked despite `.gitignore` — ignore them. When staging files,
+always use specific filenames (`git add file1 file2`) — never `git add .` or
+`git add -A`, which will accidentally include the binaries.
 
 ## Commit style
 
@@ -169,7 +221,42 @@ Examples of good bisection:
 When the user says "bisect commit" or "bisect and push," split staged/unstaged
 changes into logical commits and push.
 
-## CHANGELOG style
+## Community PR guardrails
+
+When reviewing or merging community PRs, **always AskUserQuestion** before accepting
+any commit that:
+
+1. **Touches ETHOS.md** — this file is Garry's personal builder philosophy. No edits
+   from external contributors or AI agents, period.
+2. **Removes or softens promotional material** — YC references, founder perspective,
+   and product voice are intentional. PRs that frame these as "unnecessary" or
+   "too promotional" must be rejected.
+3. **Changes Garry's voice** — the tone, humor, directness, and perspective in skill
+   templates, CHANGELOG, and docs are not generic. PRs that rewrite voice to be
+   more "neutral" or "professional" must be rejected.
+
+Even if the agent strongly believes a change improves the project, these three
+categories require explicit user approval via AskUserQuestion. No exceptions.
+No auto-merging. No "I'll just clean this up."
+
+## CHANGELOG + VERSION style
+
+**VERSION and CHANGELOG are branch-scoped.** Every feature branch that ships gets its
+own version bump and CHANGELOG entry. The entry describes what THIS branch adds —
+not what was already on main.
+
+**When to write the CHANGELOG entry:**
+- At `/ship` time (Step 5), not during development or mid-branch.
+- The entry covers ALL commits on this branch vs the base branch.
+- Never fold new work into an existing CHANGELOG entry from a prior version that
+  already landed on main. If main has v0.10.0.0 and your branch adds features,
+  bump to v0.10.1.0 with a new entry — don't edit the v0.10.0.0 entry.
+
+**Key questions before writing:**
+1. What branch am I on? What did THIS branch change?
+2. Is the base branch version already released? (If yes, bump and create new entry.)
+3. Does an existing entry on this branch already cover earlier work? (If yes, replace
+   it with one unified entry for the final version.)
 
 CHANGELOG.md is **for users**, not contributors. Write it like product release notes:
 
@@ -246,6 +333,30 @@ them. Report progress at each check (which tests passed, which are running, any
 failures so far). The user wants to see the run complete, not a promise that
 you'll check later.
 
+## E2E test fixtures: extract, don't copy
+
+**NEVER copy a full SKILL.md file into an E2E test fixture.** SKILL.md files are
+1500-2000 lines. When `claude -p` reads a file that large, context bloat causes
+timeouts, flaky turn limits, and tests that take 5-10x longer than necessary.
+
+Instead, extract only the section the test actually needs:
+
+```typescript
+// BAD — agent reads 1900 lines, burns tokens on irrelevant sections
+fs.copyFileSync(path.join(ROOT, 'ship', 'SKILL.md'), path.join(dir, 'ship-SKILL.md'));
+
+// GOOD — agent reads ~60 lines, finishes in 38s instead of timing out
+const full = fs.readFileSync(path.join(ROOT, 'ship', 'SKILL.md'), 'utf-8');
+const start = full.indexOf('## Review Readiness Dashboard');
+const end = full.indexOf('\n---\n', start);
+fs.writeFileSync(path.join(dir, 'ship-SKILL.md'), full.slice(start, end > start ? end : undefined));
+```
+
+Also when running targeted E2E tests to debug failures:
+- Run in **foreground** (`bun test ...`), not background with `&` and `tee`
+- Never `pkill` running eval processes and restart — you lose results and waste money
+- One clean run beats three killed-and-restarted runs
+
 ## Deploying to the active skill
 
 The active skill lives at `~/.claude/skills/gstack/`. After making changes:
@@ -254,4 +365,6 @@ The active skill lives at `~/.claude/skills/gstack/`. After making changes:
 2. Fetch and reset in the skill directory: `cd ~/.claude/skills/gstack && git fetch origin && git reset --hard origin/main`
 3. Rebuild: `cd ~/.claude/skills/gstack && bun run build`
 
-Or copy the binary directly: `cp browse/dist/browse ~/.claude/skills/gstack/browse/dist/browse`
+Or copy the binaries directly:
+- `cp browse/dist/browse ~/.claude/skills/gstack/browse/dist/browse`
+- `cp design/dist/design ~/.claude/skills/gstack/design/dist/design`

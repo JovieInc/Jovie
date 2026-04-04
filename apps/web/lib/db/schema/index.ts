@@ -19,9 +19,11 @@ export {
   selectCampaignSettingsSchema,
 } from './admin';
 
-// Analytics (Clicks, Audience, Tips)
+// Analytics (Clicks, Audience, Tips, Blocks)
 export {
+  type AudienceBlock,
   type AudienceMember,
+  audienceBlocks,
   audienceMembers,
   type ClickEvent,
   clickEvents,
@@ -30,9 +32,11 @@ export {
   FAN_NOTIFICATION_CONTENT_TYPES,
   type FanNotificationContentType,
   type FanNotificationPreferences,
+  insertAudienceBlockSchema,
   insertClickEventSchema,
   insertNotificationSubscriptionSchema,
   insertTipSchema,
+  type NewAudienceBlock,
   type NewAudienceMember,
   type NewClickEvent,
   type NewDailyProfileView,
@@ -40,6 +44,7 @@ export {
   type NewTip,
   type NotificationSubscription,
   notificationSubscriptions,
+  selectAudienceBlockSchema,
   selectClickEventSchema,
   selectNotificationSubscriptionSchema,
   selectTipSchema,
@@ -176,7 +181,6 @@ export {
   type NewDspBioSyncRequest,
   selectDspBioSyncRequestSchema,
 } from './dsp-bio-sync';
-
 // DSP Enrichment (Cross-platform matches, enrichment data)
 export {
   type DspArtistMatch,
@@ -199,7 +203,6 @@ export {
   selectSocialLinkSuggestionSchema,
   socialLinkSuggestions,
 } from './dsp-enrichment';
-
 // Email Engagement (Opens, Clicks, Drip Campaigns)
 export {
   type CampaignEnrollment,
@@ -254,11 +257,16 @@ export {
   insightRunStatusEnum,
   insightStatusEnum,
   insightTypeEnum,
+  leadAttributionStatusEnum,
   leadDiscoverySourceEnum,
   leadOutreachRouteEnum,
   leadOutreachStatusEnum,
+  leadRampModeEnum,
+  leadSourcePlatformEnum,
   leadStatusEnum,
   linkTypeEnum,
+  metadataSubmissionIssueStatusEnum,
+  metadataSubmissionStatusEnum,
   notificationChannelEnum,
   outreachChannelEnum,
   outreachStatusEnum,
@@ -284,6 +292,8 @@ export {
   subscriptionPlanEnum,
   subscriptionStatusEnum,
   suppressionReasonEnum,
+  taskAgentStatusEnum,
+  taskAssigneeKindEnum,
   themeModeEnum,
   tipStatusEnum,
   userStatusLifecycleEnum,
@@ -299,6 +309,14 @@ export {
   type NewFeedbackItem,
   selectFeedbackItemSchema,
 } from './feedback';
+// Identity (Cross-platform artist identity links)
+export {
+  type ArtistIdentityLink,
+  artistIdentityLinks,
+  insertArtistIdentityLinkSchema,
+  type NewArtistIdentityLink,
+  selectArtistIdentityLinkSchema,
+} from './identity';
 // Inbox (Inbound emails, Threads, Outbound routing replies)
 export {
   type EmailThread,
@@ -363,18 +381,30 @@ export {
   type DiscoveryKeyword,
   discoveryKeywords,
   insertDiscoveryKeywordSchema,
+  insertLeadFunnelEventSchema,
   insertLeadPipelineSettingsSchema,
   insertLeadSchema,
+  insertLeadSearchResultSchema,
   type Lead,
+  type LeadFunnelEvent,
+  type LeadGuardrailThresholds,
   type LeadPipelineSettings,
+  type LeadSearchResult,
+  type LeadSignalSnapshot,
+  leadFunnelEvents,
   leadPipelineSettings,
+  leadSearchResults,
   leads,
   type NewDiscoveryKeyword,
   type NewLead,
+  type NewLeadFunnelEvent,
   type NewLeadPipelineSettings,
+  type NewLeadSearchResult,
   selectDiscoveryKeywordSchema,
+  selectLeadFunnelEventSchema,
   selectLeadPipelineSettingsSchema,
   selectLeadSchema,
+  selectLeadSearchResultSchema,
 } from './leads';
 // Links (Social, Wrapped, Signed)
 export {
@@ -402,6 +432,34 @@ export {
   type WrappedLink,
   wrappedLinks,
 } from './links';
+export {
+  insertMetadataSubmissionArtifactSchema,
+  insertMetadataSubmissionIssueSchema,
+  insertMetadataSubmissionRequestSchema,
+  insertMetadataSubmissionSnapshotSchema,
+  insertMetadataSubmissionTargetSchema,
+  type MetadataSubmissionArtifact,
+  type MetadataSubmissionIssue,
+  type MetadataSubmissionRequest,
+  type MetadataSubmissionSnapshot,
+  type MetadataSubmissionSnapshotData,
+  type MetadataSubmissionTarget,
+  metadataSubmissionArtifacts,
+  metadataSubmissionIssues,
+  metadataSubmissionRequests,
+  metadataSubmissionSnapshots,
+  metadataSubmissionTargets,
+  type NewMetadataSubmissionArtifact,
+  type NewMetadataSubmissionIssue,
+  type NewMetadataSubmissionRequest,
+  type NewMetadataSubmissionSnapshot,
+  type NewMetadataSubmissionTarget,
+  selectMetadataSubmissionArtifactSchema,
+  selectMetadataSubmissionIssueSchema,
+  selectMetadataSubmissionRequestSchema,
+  selectMetadataSubmissionSnapshotSchema,
+  selectMetadataSubmissionTargetSchema,
+} from './metadata-submissions';
 // Pixel Tracking (Events, Creator Configs)
 export {
   type CreatorPixel,
@@ -564,6 +622,14 @@ export {
   type WebhookEvent,
   webhookEvents,
 } from './suppression';
+// Tasks
+export {
+  insertTaskSchema,
+  type NewTask,
+  selectTaskSchema,
+  type Task,
+  tasks,
+} from './tasks';
 // Tip Audience (Fan notifications from tips)
 export {
   insertTipAudienceSchema,

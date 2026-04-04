@@ -5,6 +5,7 @@
  * Import these directly for the most common rate limiting scenarios.
  */
 
+import { env } from '@/lib/env-server';
 import { RATE_LIMITERS } from './config';
 import { createPlanAwareRateLimiter } from './plan-aware-limiter';
 import { createRateLimiter, RateLimiter } from './rate-limiter';
@@ -77,6 +78,13 @@ export const paymentIntentLimiter = createRateLimiter(
   RATE_LIMITERS.paymentIntent
 );
 
+/**
+ * Tip checkout session rate limiter
+ * Limit: 30 sessions per hour per IP
+ * Higher than paymentIntent because this is a public endpoint keyed by IP (shared NATs)
+ */
+export const tipCheckoutLimiter = createRateLimiter(RATE_LIMITERS.tipCheckout);
+
 // ============================================================================
 // Admin Operations
 // ============================================================================
@@ -106,6 +114,17 @@ export const adminFitScoresLimiter = createRateLimiter(
  */
 export const adminCreatorIngestLimiter = createRateLimiter(
   RATE_LIMITERS.adminCreatorIngest
+);
+
+/**
+ * Deploy promote rate limiter
+ * Limit: 1 request per minute globally
+ */
+export const deployPromoteLimiter = createRateLimiter(
+  RATE_LIMITERS.deployPromote,
+  {
+    requireRedis: true,
+  }
 );
 
 /**
@@ -199,6 +218,17 @@ export const healthLimiter = createRateLimiter(RATE_LIMITERS.health, {
 export const generalLimiter = createRateLimiter(RATE_LIMITERS.general, {
   requireRedis: true,
 });
+
+/**
+ * Changelog subscribe limiter
+ * Limit: 1 request per 10 seconds per IP
+ */
+export const changelogSubscribeLimiter = createRateLimiter(
+  RATE_LIMITERS.changelogSubscribe,
+  {
+    requireRedis: true,
+  }
+);
 
 // ============================================================================
 // Convenience Functions
@@ -420,16 +450,16 @@ export const aiChatDailyFreeLimiter = createRateLimiter(
 export const aiChatDailyProLimiter = createRateLimiter(
   RATE_LIMITERS.aiChatDailyPro
 );
-export const aiChatDailyGrowthLimiter = createRateLimiter(
-  RATE_LIMITERS.aiChatDailyGrowth
+export const aiChatDailyMaxLimiter = createRateLimiter(
+  RATE_LIMITERS.aiChatDailyMax
 );
 
 /**
  * Plan-aware AI chat daily limiter.
  * Automatically selects the correct daily quota based on the user's plan tier.
- * - Free: 25 messages/day
- * - Pro/Founding: 100 messages/day
- * - Growth: 500 messages/day
+ * - Free: 10 messages/day
+ * - Pro: 100 messages/day
+ * - Max: 500 messages/day
  */
 export const aiChatDailyPlanAwareLimiter: PlanAwareRateLimiter =
   createPlanAwareRateLimiter({
@@ -437,10 +467,10 @@ export const aiChatDailyPlanAwareLimiter: PlanAwareRateLimiter =
       free: RATE_LIMITERS.aiChatDailyFree,
       pro: RATE_LIMITERS.aiChatDailyPro,
       // founding falls back to pro automatically via the factory
-      growth: RATE_LIMITERS.aiChatDailyGrowth,
+      max: RATE_LIMITERS.aiChatDailyMax,
     },
     errorMessage: plan =>
-      plan === 'growth' || plan === 'pro' || plan === 'founding'
+      plan === 'max' || plan === 'pro'
         ? 'You have reached your daily AI message limit. Your quota resets tomorrow.'
         : 'You have reached your daily AI message limit. Upgrade to Pro for 100 messages per day.',
   });
@@ -522,6 +552,19 @@ export const appleMusicSearchLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for MusicBrainz lookups.
+ * Limit: 1 request per second across the configured backend.
+ */
+export const musicBrainzLookupLimiter = createRateLimiter(
+  RATE_LIMITERS.musicBrainzLookup,
+  {
+    // Intentionally fail closed in production so a Redis outage doesn't
+    // degrade into unsynchronized per-instance bursting against MusicBrainz.
+    requireRedis: env.NODE_ENV === 'production',
+  }
+);
+
+/**
  * Rate limiter for DSP artist discovery
  * Limit: 10 discoveries per minute per user
  * Protects 3rd-party platform APIs (Apple Music, Deezer, MusicBrainz)
@@ -598,7 +641,7 @@ export const appleMusicRescanPaidLimiter = _appleMusicRescanPaidLimiter;
  * Plan-aware Apple Music rescan limiter.
  * Automatically selects the correct limit based on the user's plan tier.
  * - Free: 1 per day
- * - Pro/Founding/Growth: 1 per hour
+ * - Pro/Max: 1 per hour
  */
 export const appleMusicRescanPlanAwareLimiter: PlanAwareRateLimiter =
   createPlanAwareRateLimiter({
@@ -606,17 +649,17 @@ export const appleMusicRescanPlanAwareLimiter: PlanAwareRateLimiter =
       free: RATE_LIMITERS.appleMusicRescanFree,
       pro: RATE_LIMITERS.appleMusicRescanPaid,
       // founding falls back to pro automatically via the factory
-      growth: RATE_LIMITERS.appleMusicRescanPaid,
+      max: RATE_LIMITERS.appleMusicRescanPaid,
     },
     errorMessage: plan =>
-      plan === 'growth' || plan === 'pro' || plan === 'founding'
+      plan === 'max' || plan === 'pro'
         ? 'Apple Music was recently refreshed. Please wait 1 hour before refreshing again.'
         : 'Apple Music was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to Pro for hourly refreshes.',
   });
 
 /**
  * Check Apple Music rescan rate limit (plan-aware).
- * Free: 1/day, Paid (pro/founding/growth): 1/hour.
+ * Free: 1/day, Paid (pro/max): 1/hour.
  */
 export async function checkAppleMusicRescanRateLimit(
   profileId: string,
@@ -659,7 +702,7 @@ export const releaseRefreshPaidLimiter = _releaseRefreshPaidLimiter;
  * Plan-aware release refresh limiter.
  * Automatically selects the correct limit based on the user's plan tier.
  * - Free: 1 per day
- * - Pro/Founding/Growth: 1 per hour
+ * - Pro/Max: 1 per hour
  */
 export const releaseRefreshPlanAwareLimiter: PlanAwareRateLimiter =
   createPlanAwareRateLimiter({
@@ -667,17 +710,17 @@ export const releaseRefreshPlanAwareLimiter: PlanAwareRateLimiter =
       free: RATE_LIMITERS.releaseRefreshFree,
       pro: RATE_LIMITERS.releaseRefreshPaid,
       // founding falls back to pro automatically via the factory
-      growth: RATE_LIMITERS.releaseRefreshPaid,
+      max: RATE_LIMITERS.releaseRefreshPaid,
     },
     errorMessage: plan =>
-      plan === 'growth' || plan === 'pro' || plan === 'founding'
+      plan === 'max' || plan === 'pro'
         ? 'This release was recently refreshed. Please wait 1 hour before refreshing again.'
         : 'This release was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to Pro for hourly refreshes.',
   });
 
 /**
  * Check release refresh rate limit (plan-aware).
- * Free: 1/day, Paid (pro/founding/growth): 1/hour.
+ * Free: 1/day, Paid (pro/max): 1/hour.
  */
 export async function checkReleaseRefreshRateLimit(
   releaseId: string,
@@ -825,10 +868,12 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     handleCheck: handleCheckLimiter,
     dashboardLinks: dashboardLinksLimiter,
     paymentIntent: paymentIntentLimiter,
+    tipCheckout: tipCheckoutLimiter,
     adminImpersonate: adminImpersonateLimiter,
     adminFitScores: adminFitScoresLimiter,
     adminCreatorIngest: adminCreatorIngestLimiter,
     adminOutreach: adminOutreachLimiter,
+    deployPromote: deployPromoteLimiter,
     dspDiscovery: dspDiscoveryLimiter,
     isrcRescan: isrcRescanLimiter,
     trackingClicks: trackingClicksLimiter,
@@ -840,6 +885,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     publicVisit: publicVisitLimiter,
     health: healthLimiter,
     general: generalLimiter,
+    changelogSubscribe: changelogSubscribeLimiter,
     spotifySearch: spotifySearchLimiter,
     spotifySearchApi: spotifySearchApiLimiter,
     spotifyClaim: spotifyClaimLimiter,
@@ -848,6 +894,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     aiChat: aiChatLimiter,
     bandsintownSync: bandsintownSyncLimiter,
     appleMusicSearch: appleMusicSearchLimiter,
+    musicBrainzLookup: musicBrainzLookupLimiter,
     appleMusicRescanFree: _appleMusicRescanFreeLimiter,
     appleMusicRescanPaid: _appleMusicRescanPaidLimiter,
     releaseRefreshFree: _releaseRefreshFreeLimiter,

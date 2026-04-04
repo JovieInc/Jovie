@@ -1,6 +1,6 @@
 'use server';
 
-import { and, count, eq, ne } from 'drizzle-orm';
+import { and, count, eq, inArray, ne } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -11,10 +11,14 @@ import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import { CACHE_TTL, createSmartLinkContentTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
-import { discogReleases } from '@/lib/db/schema/content';
+import {
+  discogRecordings,
+  discogReleases,
+  discogTracks,
+} from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
@@ -23,9 +27,13 @@ import {
   getProviderLink,
   getReleaseById,
   getReleasesForProfile as getReleasesFromDb,
+  getReleaseTracksForReleaseWithProviders,
+  getTracksForRelease,
   type ReleaseWithProviders,
   resetProviderLink as resetProviderLinkDb,
   upsertProviderLink,
+  upsertRecording,
+  upsertReleaseTrack,
 } from '@/lib/discography/queries';
 import { loadReleaseTracksForProfile } from '@/lib/discography/release-track-loader';
 import {
@@ -53,9 +61,9 @@ import { processReleaseEnrichmentJobStandalone } from '@/lib/dsp-enrichment/jobs
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import {
-  enqueueDspArtistDiscoveryJob,
   enqueueDspTrackEnrichmentJob,
   enqueueMusicFetchEnrichmentJob,
+  fireDspDiscovery,
 } from '@/lib/ingestion/jobs';
 import type { LyricsFormat } from '@/lib/lyrics';
 import { formatLyrics } from '@/lib/lyrics';
@@ -74,13 +82,71 @@ import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { slugify } from '@/lib/utils';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
-import { getDashboardData } from '../actions';
+import { targetPlaylistsSchema } from '@/lib/validation/schemas/dashboard/profile';
+import { getDashboardData, getDashboardShellData } from '../actions';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
   'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
+const EDITABLE_ISRC_REGEX = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
 
 function isSpotifyIdUniqueViolation(error: unknown): boolean {
   return isUniqueViolation(error, 'creator_profiles_spotify_id_unique');
+}
+
+function normalizeEditableText(
+  value: string | null | undefined
+): string | null {
+  const trimmed = value?.trim() ?? '';
+  return trimmed ? trimmed : null;
+}
+
+function normalizeEditableUpc(value: string | null | undefined): string | null {
+  const normalized = normalizeEditableText(value);
+  if (!normalized) return null;
+  if (!/^\d+$/u.test(normalized)) {
+    throw new Error('UPC must contain only digits');
+  }
+  return normalized;
+}
+
+function normalizeEditableIsrc(
+  value: string | null | undefined
+): string | null {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return null;
+
+  const normalized = trimmed.replaceAll(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (!EDITABLE_ISRC_REGEX.test(normalized)) {
+    throw new Error('ISRC must be 12 letters and digits');
+  }
+
+  return normalized;
+}
+
+function rethrowReleaseMetadataError(
+  error: unknown,
+  field: 'upc' | 'isrc'
+): never {
+  if (
+    isUniqueViolation(
+      error,
+      field === 'upc'
+        ? 'discog_releases_creator_upc_unique'
+        : 'discog_recordings_creator_isrc_unique'
+    )
+  ) {
+    throw new Error(
+      field === 'upc'
+        ? 'This UPC is already used on another release'
+        : 'This ISRC is already used on another track'
+    );
+  }
+
+  if (error instanceof Error) {
+    throw error;
+  }
+
+  throw new Error(`Failed to save ${field.toUpperCase()}`);
 }
 
 function normalizeSpotifyArtistUrl(rawUrl: string, spotifyArtistId: string) {
@@ -209,6 +275,7 @@ function mapReleaseToViewModel(
       release.genres && release.genres.length > 0
         ? release.genres
         : extractGenres(release.metadata),
+    targetPlaylists: release.targetPlaylists ?? [],
     copyrightLine: release.copyrightLine ?? null,
     distributor: release.distributor ?? null,
     canvasStatus: getCanvasStatusFromMetadata(release.metadata),
@@ -221,6 +288,7 @@ function mapReleaseToViewModel(
       (
         release.metadata as Record<string, unknown> | null
       )?.lyrics?.toString() || undefined,
+    previewUrl: release.trackSummary?.primaryPreviewUrl || null,
   };
 }
 
@@ -239,6 +307,15 @@ async function fetchReleaseMatrixCore(
   );
 }
 
+export interface ReleaseProfileContext {
+  readonly userId: string;
+  readonly profileId: string;
+  readonly profileHandle: string;
+  readonly spotifyId: string | null;
+  readonly appleMusicId: string | null;
+  readonly settings: Record<string, unknown> | null;
+}
+
 /**
  * Core release matrix loading logic (cacheable).
  * Cache is invalidated on mutations (save/reset provider links, Spotify sync)
@@ -254,12 +331,13 @@ async function resolveReleaseMatrix(
 
   const profile = await requireProfile(profileId);
 
-  // Cache with 30s TTL and tags for invalidation
+  // Cache with 5min TTL and tags for invalidation.
+  // Releases only change on import/sync — tag-based invalidation handles mutations.
   return unstable_cache(
     () => fetchReleaseMatrixCore(profile.id, profile.handle),
     ['releases-matrix', userId, profile.id],
     {
-      revalidate: 30,
+      revalidate: CACHE_TTL.MEDIUM,
       tags: [`releases:${userId}:${profile.id}`],
     }
   )();
@@ -270,6 +348,30 @@ async function resolveReleaseMatrix(
  * Uses React's cache() for request-level deduplication.
  */
 export const loadReleaseMatrix = cache(resolveReleaseMatrix);
+
+export async function loadReleaseMatrixForProfile(
+  profile: ReleaseProfileContext
+): Promise<ReleaseViewModel[]> {
+  // Auth guard: verify caller owns this profile
+  const { userId } = await getCachedAuth();
+  if (!userId || userId !== profile.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  return unstable_cache(
+    () => fetchReleaseMatrixCore(profile.profileId, profile.profileHandle),
+    [
+      'releases-matrix',
+      profile.userId,
+      profile.profileId,
+      profile.profileHandle,
+    ],
+    {
+      revalidate: CACHE_TTL.MEDIUM,
+      tags: [`releases:${profile.userId}:${profile.profileId}`],
+    }
+  )();
+}
 
 export async function saveProviderOverride(params: {
   profileId: string;
@@ -413,11 +515,11 @@ export async function resetProviderOverride(params: {
   }
 }
 
-export async function saveReleaseLyrics(params: {
-  profileId: string;
-  releaseId: string;
-  lyrics: string;
-}): Promise<ReleaseViewModel> {
+/** Shared auth/ownership check, DB update, cache invalidation, and view-model return for release mutations. */
+async function mutateRelease(
+  params: { profileId: string; releaseId: string },
+  applyUpdate: (releaseId: string, profileId: string) => Promise<void>
+): Promise<ReleaseViewModel> {
   noStore();
 
   const { userId } = await getCachedAuth();
@@ -435,20 +537,7 @@ export async function saveReleaseLyrics(params: {
     throw new TypeError('Release not found');
   }
 
-  const metadata = (release.metadata as Record<string, unknown> | null) ?? {};
-
-  await db
-    .update(discogReleases)
-    .set({
-      metadata: { ...metadata, lyrics: params.lyrics },
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(discogReleases.id, params.releaseId),
-        eq(discogReleases.creatorProfileId, profile.id)
-      )
-    );
+  await applyUpdate(params.releaseId, profile.id);
 
   const updated = await getReleaseById(params.releaseId);
   if (!updated) {
@@ -456,10 +545,7 @@ export async function saveReleaseLyrics(params: {
   }
 
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
-  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
-  // Query, and a path revalidation resets client-side state (closing the sidebar).
 
   return mapReleaseToViewModel(
     updated,
@@ -469,68 +555,207 @@ export async function saveReleaseLyrics(params: {
   );
 }
 
+/** Update columns on a release row, scoped to owner. */
+async function updateReleaseColumns(
+  releaseId: string,
+  profileId: string,
+  values: Partial<typeof discogReleases.$inferInsert>
+) {
+  await db
+    .update(discogReleases)
+    .set({ ...values, updatedAt: new Date() })
+    .where(
+      and(
+        eq(discogReleases.id, releaseId),
+        eq(discogReleases.creatorProfileId, profileId)
+      )
+    );
+}
+
+export async function saveReleaseLyrics(params: {
+  profileId: string;
+  releaseId: string;
+  lyrics: string;
+}): Promise<ReleaseViewModel> {
+  return mutateRelease(params, async (releaseId, profileId) => {
+    const release = await getReleaseById(releaseId);
+    const metadata =
+      (release?.metadata as Record<string, unknown> | null) ?? {};
+    await updateReleaseColumns(releaseId, profileId, {
+      metadata: { ...metadata, lyrics: params.lyrics },
+    });
+  });
+}
+
+export async function saveReleaseTargetPlaylists(params: {
+  profileId: string;
+  releaseId: string;
+  targetPlaylists: string[];
+}): Promise<ReleaseViewModel> {
+  return mutateRelease(params, async (releaseId, profileId) => {
+    const parsed = targetPlaylistsSchema.parse(params.targetPlaylists);
+    const validated = parsed ?? [];
+    await updateReleaseColumns(releaseId, profileId, {
+      targetPlaylists: validated.length > 0 ? validated : null,
+    });
+  });
+}
+
 export async function saveCanvasStatus(params: {
   profileId: string;
   releaseId: string;
   status: CanvasStatus;
 }): Promise<ReleaseViewModel> {
-  noStore();
+  return mutateRelease(params, async (releaseId, profileId) => {
+    const release = await getReleaseById(releaseId);
+    const metadata =
+      (release?.metadata as Record<string, unknown> | null) ?? {};
+    const nextMetadata: Record<string, unknown> = {
+      ...metadata,
+      ...buildCanvasMetadata(params.status),
+    };
 
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
+    if (params.status === 'not_set') {
+      delete nextMetadata.canvasVideoUrl;
+    }
 
-  const profile = await requireProfile();
-  if (profile.id !== params.profileId) {
-    throw new TypeError('Profile mismatch');
-  }
-
-  const release = await getReleaseById(params.releaseId);
-  if (release?.creatorProfileId !== profile.id) {
-    throw new TypeError('Release not found');
-  }
-
-  const metadata = (release.metadata as Record<string, unknown> | null) ?? {};
-  const nextMetadata: Record<string, unknown> = {
-    ...metadata,
-    ...buildCanvasMetadata(params.status),
-  };
-
-  if (params.status === 'not_set') {
-    delete nextMetadata.canvasVideoUrl;
-  }
-
-  await db
-    .update(discogReleases)
-    .set({
+    await updateReleaseColumns(releaseId, profileId, {
       metadata: nextMetadata,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(discogReleases.id, params.releaseId),
-        eq(discogReleases.creatorProfileId, profile.id)
-      )
-    );
+    });
+  });
+}
 
-  const updated = await getReleaseById(params.releaseId);
-  if (!updated) {
-    throw new TypeError('Release not found');
-  }
+export async function saveReleaseMetadata(params: {
+  profileId: string;
+  releaseId: string;
+  upc: string | null;
+  label: string | null;
+}): Promise<ReleaseViewModel> {
+  const normalizedUpc = normalizeEditableUpc(params.upc);
+  const normalizedLabel = normalizeEditableText(params.label);
 
-  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  return mutateRelease(params, async (releaseId, profileId) => {
+    try {
+      await updateReleaseColumns(releaseId, profileId, {
+        upc: normalizedUpc,
+        label: normalizedLabel,
+      });
+    } catch (error) {
+      rethrowReleaseMetadataError(error, 'upc');
+    }
+  });
+}
 
-  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
-  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
-  // Query, and a path revalidation resets client-side state (closing the sidebar).
+export async function savePrimaryIsrc(params: {
+  profileId: string;
+  releaseId: string;
+  isrc: string | null;
+}): Promise<ReleaseViewModel> {
+  const normalizedIsrc = normalizeEditableIsrc(params.isrc);
 
-  return mapReleaseToViewModel(
-    updated,
-    buildProviderLabels(),
-    profile.id,
-    profile.handle
-  );
+  return mutateRelease(params, async (releaseId, profileId) => {
+    const release = await getReleaseById(releaseId);
+    if (!release) {
+      throw new TypeError('Release not found');
+    }
+
+    const [releaseTrackResult, legacyTracks, existingRecording] =
+      await Promise.all([
+        getReleaseTracksForReleaseWithProviders(releaseId, {
+          limit: 1,
+          offset: 0,
+        }),
+        getTracksForRelease(releaseId),
+        normalizedIsrc
+          ? db
+              .select({ id: discogRecordings.id })
+              .from(discogRecordings)
+              .where(
+                and(
+                  eq(discogRecordings.creatorProfileId, profileId),
+                  eq(discogRecordings.isrc, normalizedIsrc)
+                )
+              )
+              .limit(1)
+          : Promise.resolve([]),
+      ]);
+
+    const primaryReleaseTrack = releaseTrackResult.tracks[0] ?? null;
+    const primaryLegacyTrack = legacyTracks[0] ?? null;
+    const existingRecordingId = existingRecording[0]?.id ?? null;
+
+    if (
+      normalizedIsrc &&
+      existingRecordingId &&
+      existingRecordingId !== primaryReleaseTrack?.recordingId
+    ) {
+      throw new Error('This ISRC is already used on another track');
+    }
+
+    if (primaryReleaseTrack?.recordingId) {
+      try {
+        await db
+          .update(discogRecordings)
+          .set({ isrc: normalizedIsrc, updatedAt: new Date() })
+          .where(eq(discogRecordings.id, primaryReleaseTrack.recordingId));
+      } catch (error) {
+        rethrowReleaseMetadataError(error, 'isrc');
+      }
+      return;
+    }
+
+    if (primaryLegacyTrack?.id) {
+      try {
+        await db
+          .update(discogTracks)
+          .set({ isrc: normalizedIsrc, updatedAt: new Date() })
+          .where(eq(discogTracks.id, primaryLegacyTrack.id));
+      } catch (error) {
+        rethrowReleaseMetadataError(error, 'isrc');
+      }
+      return;
+    }
+
+    if (normalizedIsrc == null) {
+      return;
+    }
+
+    if (release.sourceType !== 'manual') {
+      throw new Error(
+        'ISRC can only be edited automatically for manual releases without tracks'
+      );
+    }
+
+    const baseSlug = slugify(release.title) || `${release.slug}-track-1`;
+
+    try {
+      const recording = await upsertRecording({
+        creatorProfileId: profileId,
+        title: release.title,
+        slug: baseSlug,
+        isrc: normalizedIsrc,
+        isExplicit: release.isExplicit,
+        sourceType: 'manual',
+      });
+
+      await upsertReleaseTrack({
+        releaseId,
+        recordingId: recording.id,
+        title: release.title,
+        slug: baseSlug,
+        trackNumber: 1,
+        discNumber: 1,
+        isExplicit: release.isExplicit,
+        sourceType: 'manual',
+      });
+
+      if ((release.totalTracks ?? 0) < 1) {
+        await updateReleaseColumns(releaseId, profileId, { totalTracks: 1 });
+      }
+    } catch (error) {
+      rethrowReleaseMetadataError(error, 'isrc');
+    }
+  });
 }
 
 export async function formatReleaseLyrics(params: {
@@ -625,6 +850,22 @@ export async function refreshRelease(params: { releaseId: string }): Promise<{
         }
       );
     });
+
+    // Re-trigger DSP artist discovery to pick up new ISRCs from the sync
+    fireDspDiscovery({
+      creatorProfileId: profile.id,
+      spotifyArtistId: profile.spotifyId,
+      onError: error =>
+        void captureError(
+          'DSP artist discovery enqueue failed on refresh',
+          error,
+          {
+            action: 'refreshRelease',
+            creatorProfileId: profile.id,
+            releaseId: params.releaseId,
+          }
+        ),
+    });
   }
 
   const refreshedRelease = await getReleaseById(params.releaseId);
@@ -685,10 +926,11 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
     };
   }
 
-  // Look up the Apple Music match for this profile
-  const [match] = await db
+  // Look up confirmed DSP matches for this profile (Apple Music + Deezer)
+  const dspMatches = await db
     .select({
       id: dspArtistMatches.id,
+      providerId: dspArtistMatches.providerId,
       externalArtistId: dspArtistMatches.externalArtistId,
       status: dspArtistMatches.status,
     })
@@ -696,25 +938,25 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
     .where(
       and(
         eq(dspArtistMatches.creatorProfileId, profile.id),
-        eq(dspArtistMatches.providerId, 'apple_music')
+        inArray(dspArtistMatches.providerId, ['apple_music', 'deezer'])
       )
-    )
-    .limit(1);
+    );
 
   let linksFound = 0;
 
-  if (
-    match &&
-    (match.status === 'confirmed' || match.status === 'auto_confirmed')
-  ) {
-    // Run enrichment for all unlinked releases (including this one)
-    const result = await processReleaseEnrichmentJobStandalone({
-      creatorProfileId: profile.id,
-      matchId: match.id,
-      providerId: 'apple_music',
-      externalArtistId: match.externalArtistId,
-    });
-    linksFound = result.releasesEnriched;
+  for (const match of dspMatches) {
+    if (
+      (match.status === 'confirmed' || match.status === 'auto_confirmed') &&
+      match.externalArtistId
+    ) {
+      const result = await processReleaseEnrichmentJobStandalone({
+        creatorProfileId: profile.id,
+        matchId: match.id,
+        providerId: match.providerId as 'apple_music' | 'deezer',
+        externalArtistId: match.externalArtistId,
+      });
+      linksFound += result.releasesEnriched;
+    }
   }
 
   // Re-fetch the release to get updated provider links
@@ -899,15 +1141,15 @@ export async function syncFromSpotify(): Promise<{
     });
 
     // Re-trigger DSP artist discovery on resync to pick up new ISRCs
-    void enqueueDspArtistDiscoveryJob({
+    fireDspDiscovery({
       creatorProfileId: profile.id,
       spotifyArtistId: profile.spotifyId,
-      targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
-    }).catch(error => {
-      void captureError('DSP artist discovery enqueue failed on sync', error, {
-        action: 'syncFromSpotify',
-        creatorProfileId: profile.id,
-      });
+      onError: error =>
+        void captureError(
+          'DSP artist discovery enqueue failed on sync',
+          error,
+          { action: 'syncFromSpotify', creatorProfileId: profile.id }
+        ),
     });
 
     // Re-trigger MusicFetch enrichment to discover cross-platform DSP profiles
@@ -1034,6 +1276,81 @@ export async function checkSpotifyConnection(): Promise<{
     throwIfRedirect(error);
     return { connected: false, spotifyId: null, artistName: null };
   }
+}
+
+export async function checkSpotifyConnectionForProfile(
+  profile: ReleaseProfileContext
+): Promise<{
+  connected: boolean;
+  spotifyId: string | null;
+  artistName: string | null;
+}> {
+  noStore();
+
+  // Auth guard: verify caller owns this profile
+  const { userId } = await getCachedAuth();
+  if (!userId || userId !== profile.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const settings = profile.settings;
+  const artistName = (settings?.spotifyArtistName as string) ?? null;
+
+  if (profile.spotifyId) {
+    return { connected: true, spotifyId: profile.spotifyId, artistName };
+  }
+
+  const spotifyImportStatus =
+    typeof settings?.spotifyImportStatus === 'string'
+      ? settings.spotifyImportStatus
+      : null;
+  if (
+    artistName &&
+    (spotifyImportStatus === 'importing' || spotifyImportStatus === 'complete')
+  ) {
+    return { connected: true, spotifyId: null, artistName };
+  }
+
+  if (artistName) {
+    void captureError(
+      '[checkSpotifyConnectionForProfile] Spotify state inconsistency: artistName set but spotifyId is null',
+      new Error('Spotify state inconsistency'),
+      {
+        profileId: profile.profileId,
+        artistName,
+        spotifyImportStatus: spotifyImportStatus ?? 'none',
+      }
+    );
+  }
+
+  const [spotifyMatch] = await db
+    .select({
+      externalArtistId: dspArtistMatches.externalArtistId,
+      externalArtistName: dspArtistMatches.externalArtistName,
+      status: dspArtistMatches.status,
+    })
+    .from(dspArtistMatches)
+    .where(
+      and(
+        eq(dspArtistMatches.creatorProfileId, profile.profileId),
+        eq(dspArtistMatches.providerId, 'spotify')
+      )
+    )
+    .limit(1);
+
+  if (
+    spotifyMatch &&
+    (spotifyMatch.status === 'confirmed' ||
+      spotifyMatch.status === 'auto_confirmed')
+  ) {
+    return {
+      connected: true,
+      spotifyId: spotifyMatch.externalArtistId,
+      artistName: spotifyMatch.externalArtistName ?? artistName,
+    };
+  }
+
+  return { connected: false, spotifyId: null, artistName };
 }
 
 /**
@@ -1286,16 +1603,15 @@ export async function connectSpotifyArtist(params: {
       });
 
       // Auto-trigger DSP artist discovery
-      void enqueueDspArtistDiscoveryJob({
+      fireDspDiscovery({
         creatorProfileId: profile.id,
         spotifyArtistId: params.spotifyArtistId,
-        targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
-      }).catch(err => {
-        void captureError(
-          'DSP artist discovery enqueue failed on connect',
-          err,
-          { action: 'connectSpotifyArtist', creatorProfileId: profile.id }
-        );
+        onError: err =>
+          void captureError(
+            'DSP artist discovery enqueue failed on connect',
+            err,
+            { action: 'connectSpotifyArtist', creatorProfileId: profile.id }
+          ),
       });
 
       // Auto-trigger MusicFetch enrichment
@@ -1470,7 +1786,8 @@ export async function checkAppleMusicConnection(): Promise<{
   }
 
   try {
-    const data = await getDashboardData();
+    // Use shell data path (skips settings/entitlements) — only need the profile
+    const data = await getDashboardShellData(userId);
 
     if (data.needsOnboarding || !data.selectedProfile) {
       return { connected: false, artistName: null, artistId: null };
@@ -1519,6 +1836,58 @@ export async function checkAppleMusicConnection(): Promise<{
     throwIfRedirect(error);
     return { connected: false, artistName: null, artistId: null };
   }
+}
+
+export async function checkAppleMusicConnectionForProfile(
+  profile: ReleaseProfileContext
+): Promise<{
+  connected: boolean;
+  artistName: string | null;
+  artistId: string | null;
+}> {
+  noStore();
+
+  // Auth guard: verify caller owns this profile
+  const { userId } = await getCachedAuth();
+  if (!userId || userId !== profile.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const [match] = await db
+    .select({
+      externalArtistName: dspArtistMatches.externalArtistName,
+      externalArtistId: dspArtistMatches.externalArtistId,
+      status: dspArtistMatches.status,
+    })
+    .from(dspArtistMatches)
+    .where(
+      and(
+        eq(dspArtistMatches.creatorProfileId, profile.profileId),
+        eq(dspArtistMatches.providerId, 'apple_music')
+      )
+    )
+    .limit(1);
+
+  if (
+    match &&
+    (match.status === 'confirmed' || match.status === 'auto_confirmed')
+  ) {
+    return {
+      connected: true,
+      artistName: match.externalArtistName,
+      artistId: match.externalArtistId,
+    };
+  }
+
+  if (profile.appleMusicId) {
+    return {
+      connected: true,
+      artistName: null,
+      artistId: profile.appleMusicId,
+    };
+  }
+
+  return { connected: false, artistName: null, artistId: null };
 }
 
 /**
@@ -1867,41 +2236,18 @@ export async function revertReleaseArtwork(
   return { artworkUrl: originalArtworkUrl, originalArtworkUrl };
 }
 
-async function upsertReleaseProviderUrls(
-  releaseId: string,
-  providerUrls: Record<string, string>
-): Promise<void> {
-  const providerLabels = buildProviderLabels();
-  const entries = Object.entries(providerUrls).filter(
-    ([, url]) => url.trim().length > 0
-  );
-  for (const [key, url] of entries) {
-    const provider = key as ProviderKey;
-    const providerLabel = providerLabels[provider];
-    if (!providerLabel) continue;
-    const trimmedUrl = url.trim();
-    const validation = validateProviderUrl(trimmedUrl, provider, providerLabel);
-    if (!validation.valid) continue;
-    await upsertProviderLink({
-      releaseId,
-      providerId: provider,
-      url: trimmedUrl,
-      sourceType: 'manual',
-    });
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/*  createRelease — manually add a release to the creator's discography */
-/* ------------------------------------------------------------------ */
-
 export async function createRelease(formData: {
   title: string;
   releaseType: 'single' | 'ep' | 'album' | 'compilation' | 'live';
   releaseDate?: string | null;
-  artworkUrl?: string | null;
-  providerUrls?: Record<string, string>;
-}): Promise<{ success: boolean; message: string; releaseId?: string }> {
+  genres?: string[];
+  isExplicit?: boolean;
+}): Promise<{
+  success: boolean;
+  message: string;
+  releaseId?: string;
+  release?: ReleaseViewModel;
+}> {
   noStore();
 
   const profile = await requireProfile();
@@ -1932,26 +2278,41 @@ export async function createRelease(formData: {
         slug,
         releaseType: formData.releaseType,
         releaseDate,
-        artworkUrl: formData.artworkUrl ?? null,
+        genres: formData.genres?.slice(0, 3) ?? null,
+        isExplicit: formData.isExplicit ?? false,
         sourceType: 'manual',
         totalTracks: formData.releaseType === 'single' ? 1 : 0,
       })
       .returning({ id: discogReleases.id });
 
     const releaseId = inserted.id;
-
-    // Upsert any provider URLs the user supplied
-    if (formData.providerUrls) {
-      await upsertReleaseProviderUrls(releaseId, formData.providerUrls);
-    }
+    const insertedRelease = await getReleaseById(releaseId);
+    const providerLabels = buildProviderLabels();
 
     revalidatePath(APP_ROUTES.RELEASES);
     revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+
+    if (insertedRelease == null) {
+      return {
+        success: false,
+        message:
+          'Release was created but could not be loaded. Please refresh and try again.',
+        releaseId,
+      };
+    }
+
+    const release = mapReleaseToViewModel(
+      insertedRelease,
+      providerLabels,
+      profile.id,
+      profile.handle
+    );
 
     return {
       success: true,
       message: `Release "${title}" created.`,
       releaseId,
+      release,
     };
   } catch (error) {
     throwIfRedirect(error);

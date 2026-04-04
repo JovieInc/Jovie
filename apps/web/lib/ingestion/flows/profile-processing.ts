@@ -55,8 +55,51 @@ export interface ExtractionData {
 }
 
 /**
- * Result of profile extraction processing
+ * Run an enrichment step, logging a warning on failure instead of throwing.
  */
+async function safeEnrich(
+  label: string,
+  profileId: string,
+  fn: () => Promise<void>
+): Promise<void> {
+  try {
+    await fn();
+  } catch (error) {
+    logger.warn(`${label} failed`, {
+      profileId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * Post-merge enrichment: pixels, fit score, contact email.
+ */
+async function runPostMergeEnrichment(
+  tx: DbOrTransaction,
+  profileId: string,
+  extraction: ExtractionData
+): Promise<void> {
+  if (extraction.discoveredPixels) {
+    await safeEnrich('Discovered pixels storage', profileId, () =>
+      storeDiscoveredPixels(tx, profileId, extraction.discoveredPixels!)
+    );
+  }
+
+  await safeEnrich('Fit score calculation', profileId, async () => {
+    if (typeof extraction.hasPaidTier === 'boolean') {
+      await updatePaidTierScore(tx, profileId, extraction.hasPaidTier);
+    }
+    await calculateAndStoreFitScore(tx, profileId);
+  });
+
+  if (extraction.contactEmail) {
+    await safeEnrich('Contact email storage', profileId, () =>
+      storeContactEmail(tx, profileId, extraction.contactEmail!)
+    );
+  }
+}
+
 export interface ProcessingResult {
   mergeError: string | null;
 }
@@ -119,49 +162,8 @@ export async function processProfileExtraction(
   // Mark ingestion as idle or failed based on merge result
   await IngestionStatusManager.markIdleOrFailed(tx, profile.id, mergeError);
 
-  // Store discovered tracking pixels with merge semantics (before fit score so scoring sees them)
-  if (extraction.discoveredPixels) {
-    try {
-      await storeDiscoveredPixels(tx, profile.id, extraction.discoveredPixels);
-    } catch (pixelError) {
-      logger.warn('Discovered pixels storage failed', {
-        profileId: profile.id,
-        error:
-          pixelError instanceof Error ? pixelError.message : 'Unknown error',
-      });
-    }
-  }
-
-  // Calculate fit score for the profile (after pixel storage so hasTrackingPixels is accurate)
-  try {
-    if (typeof extraction.hasPaidTier === 'boolean') {
-      await updatePaidTierScore(tx, profile.id, extraction.hasPaidTier);
-    }
-    await calculateAndStoreFitScore(tx, profile.id);
-  } catch (fitScoreError) {
-    logger.warn('Fit score calculation failed', {
-      profileId: profile.id,
-      error:
-        fitScoreError instanceof Error
-          ? fitScoreError.message
-          : 'Unknown error',
-    });
-  }
-
-  // Store extracted contact email if found
-  if (extraction.contactEmail) {
-    try {
-      await storeContactEmail(tx, profile.id, extraction.contactEmail);
-    } catch (contactError) {
-      logger.warn('Contact email storage failed', {
-        profileId: profile.id,
-        error:
-          contactError instanceof Error
-            ? contactError.message
-            : 'Unknown error',
-      });
-    }
-  }
+  // Run post-merge enrichment steps (pixels, fit score, contact email)
+  await runPostMergeEnrichment(tx, profile.id, extraction);
 
   return { mergeError };
 }

@@ -1,0 +1,68 @@
+name: SonarCloud
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: sonarcloud-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sonarcloud:
+    name: SonarCloud
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SONAR_SCAN_ENABLED: ${{ secrets.SONAR_TOKEN != '' }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    steps:
+      - name: Skip SonarCloud scan when SONAR_TOKEN is unavailable
+        if: ${{ env.SONAR_SCAN_ENABLED != 'true' }}
+        run: echo "SONAR_TOKEN is not configured; skipping SonarCloud scan."
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
+
+      - name: Run apps/web coverage
+        if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
+        run: pnpm --filter=@jovie/web run test:ci -- --config=vitest.config.ci.mts --coverage
+
+      - name: Verify apps/web coverage artifact
+        if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
+        run: test -f apps/web/coverage/lcov.info
+
+      - name: Run packages/ui coverage
+        if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
+        run: pnpm --filter=@jovie/ui exec vitest run --coverage
+
+      - name: Verify packages/ui coverage artifact
+        if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
+        run: test -f packages/ui/coverage/lcov.info
+
+      - name: Cache SonarQube packages
+        if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: SonarQube Scan
+        if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
+        uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9 # v7.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

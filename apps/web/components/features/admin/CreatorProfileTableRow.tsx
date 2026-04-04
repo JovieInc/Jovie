@@ -25,7 +25,7 @@ import { CreatorActionsMenu } from '@/features/admin/creator-actions-menu';
 import { CreatorActionsMenuContent } from '@/features/admin/creator-actions-menu/CreatorActionsMenuContent';
 import { TableRowActions } from '@/features/admin/table/TableRowActions';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -297,12 +297,12 @@ function CreatorProfileTableRowComponent({
           </div>
         </div>
       </td>
-      <td className='px-4 py-2.5 align-middle hidden lg:table-cell'>
+      <td className='px-4 py-2.5 align-middle max-lg:hidden lg:table-cell'>
         <div className='flex max-w-[230px] justify-start overflow-hidden'>
           <CreatorProfileSocialLinks socialLinks={profile.socialLinks} />
         </div>
       </td>
-      <td className='hidden whitespace-nowrap px-4 py-2.5 text-center align-middle text-[12px] text-tertiary-token md:table-cell'>
+      <td className='max-md:hidden whitespace-nowrap px-4 py-2.5 text-center align-middle text-[12px] text-tertiary-token md:table-cell'>
         {profile.createdAt ? dateFormatter.format(profile.createdAt) : '—'}
       </td>
       <td

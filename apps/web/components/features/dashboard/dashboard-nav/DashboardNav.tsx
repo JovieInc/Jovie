@@ -1,23 +1,26 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { Flagged } from '@/components/features/dev/Flagged';
+import { usePendingShell } from '@/components/organisms/AuthShellWrapper';
 import {
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { env } from '@/lib/env-client';
 import { useCodeFlag } from '@/lib/feature-flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
-import { useReleasesQuery } from '@/lib/queries';
+import { usePlanGate } from '@/lib/queries';
+import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   adminNavigationSections,
   artistSettingsNavigation,
@@ -41,7 +44,24 @@ const RecentChats = dynamic(
 );
 
 function isItemActive(pathname: string, item: NavItem): boolean {
-  if (pathname === item.href) {
+  const normalizedPathname = (() => {
+    if (
+      pathname === APP_ROUTES.DASHBOARD_RELEASES ||
+      pathname === APP_ROUTES.RELEASES
+    ) {
+      return APP_ROUTES.RELEASES;
+    }
+    if (pathname === APP_ROUTES.AUDIENCE) {
+      return APP_ROUTES.DASHBOARD_AUDIENCE;
+    }
+    return pathname;
+  })();
+
+  if (
+    normalizedPathname === item.href ||
+    (normalizedPathname === APP_ROUTES.RELEASES &&
+      item.href === APP_ROUTES.DASHBOARD_RELEASES)
+  ) {
     return true;
   }
 
@@ -50,13 +70,22 @@ function isItemActive(pathname: string, item: NavItem): boolean {
     return false;
   }
 
-  return pathname.startsWith(`${item.href}/`);
+  return normalizedPathname.startsWith(`${item.href}/`);
+}
+
+function formatTaskBadge(
+  taskStats: { activeTodoCount: number } | undefined
+): string | number | undefined {
+  if (!taskStats || taskStats.activeTodoCount <= 0) return undefined;
+  return taskStats.activeTodoCount > 99 ? '99+' : taskStats.activeTodoCount;
 }
 
 export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
+  const { showPendingShell } = usePendingShell();
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const threadsEnabled = useCodeFlag('THREADS_ENABLED');
   const { isOpen: isPreviewOpen, open: openPreviewPanel } =
     usePreviewPanelState();
@@ -77,22 +106,12 @@ export function DashboardNav(_: DashboardNavProps) {
   // Replace "Profile" label with artist display name when available
   const artistName = selectedProfile?.displayName;
   const profileId = selectedProfile?.id ?? '';
-  const { data: releases } = useReleasesQuery(profileId);
-  const releaseCount = releases?.length ?? 0;
-
-  const primaryItems = useMemo(() => {
-    return primaryNavigation.map(item => {
-      if (item.id === 'profile' && artistName) {
-        return { ...item, name: artistName };
-      }
-      if (item.id === 'releases' && releaseCount > 0) {
-        return { ...item, badge: releaseCount };
-      }
-      return item;
-    });
-  }, [artistName, releaseCount]);
-
-  const isDemo = pathname === APP_ROUTES.DEMO;
+  const isDemo = isDemoRoutePath(pathname);
+  const { canAccessTasksWorkspace, isLoading: isPlanGateLoading } =
+    usePlanGate();
+  const { data: taskStats } = useTaskStatsQuery(profileId, {
+    enabled: !isDemo && canAccessTasksWorkspace,
+  });
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
 
   // Settings nav: "General" (user) and artist name (or "Artist") groups
@@ -100,8 +119,27 @@ export function DashboardNav(_: DashboardNavProps) {
 
   // Memoize nav sections for dashboard (non-settings) mode
   const navSections = useMemo(
-    () => [{ key: 'primary', items: primaryItems }],
-    [primaryItems]
+    () => [
+      {
+        key: 'primary',
+        items: primaryNavigation.map(item =>
+          item.id === 'tasks'
+            ? {
+                ...item,
+                badge:
+                  isPlanGateLoading ? undefined : canAccessTasksWorkspace ? (
+                    formatTaskBadge(taskStats)
+                  ) : (
+                    <span className='rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] px-1.5 py-0.5 text-[9px] font-[600] tracking-[0.02em] text-secondary-token'>
+                      Pro
+                    </span>
+                  ),
+              }
+            : item
+        ),
+      },
+    ],
+    [canAccessTasksWorkspace, isPlanGateLoading, taskStats]
   );
 
   // Profile nav item opens the preview drawer instead of navigating to a separate page.
@@ -115,6 +153,30 @@ export function DashboardNav(_: DashboardNavProps) {
       queueMicrotask(() => openPreviewPanel());
     }
   }, [pathname, openPreviewPanel, router]);
+
+  // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
+  const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    },
+    []
+  );
+
+  const handlePrefetch = useCallback(
+    (itemId: string) => {
+      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+      const prefetchDelayMs = itemId === 'releases' ? 0 : 150;
+      prefetchTimerRef.current = setTimeout(() => {
+        void import('@/lib/queries/prefetch-dashboard')
+          .then(({ prefetchForRoute }) =>
+            prefetchForRoute(itemId, queryClient, profileId || undefined)
+          )
+          .catch(() => {});
+      }, prefetchDelayMs);
+    },
+    [queryClient, profileId]
+  );
 
   // In demo mode, intercept nav clicks for tabs without demo data
   const handleDemoNavClick = useCallback((item: NavItem) => {
@@ -133,6 +195,7 @@ export function DashboardNav(_: DashboardNavProps) {
 
       // In demo mode, only Releases has real content — intercept all other nav clicks
       const demoUnavailable = isDemo && !isReleasesItem;
+      const renderAsButton = isProfileItem && !demoUnavailable;
       let onClick: (() => void) | undefined;
       if (demoUnavailable) onClick = () => handleDemoNavClick(item);
       else if (isProfileItem) onClick = handleProfileClick;
@@ -143,8 +206,17 @@ export function DashboardNav(_: DashboardNavProps) {
           item={item}
           isActive={isActive}
           shortcut={shortcut}
+          prefetch={isReleasesItem ? false : undefined}
           actions={isProfileItem ? profileActions : null}
           onClick={onClick}
+          preventNavigation={demoUnavailable}
+          renderAsButton={renderAsButton}
+          onNavigate={
+            isReleasesItem ? () => showPendingShell('releases') : undefined
+          }
+          onPrefetch={
+            isReleasesItem ? undefined : () => handlePrefetch(item.id)
+          }
         />
       );
     },
@@ -153,6 +225,8 @@ export function DashboardNav(_: DashboardNavProps) {
       profileActions,
       handleProfileClick,
       handleDemoNavClick,
+      handlePrefetch,
+      showPendingShell,
       isPreviewOpen,
       isDemo,
     ]
@@ -181,16 +255,11 @@ export function DashboardNav(_: DashboardNavProps) {
         </>
       ) : (
         <SidebarGroup className='mb-0.5'>
-          <SidebarGroupLabel className='h-6 px-2.5 text-[11px] font-[510] tracking-[-0.01em] text-sidebar-muted/85'>
-            Workspace
-          </SidebarGroupLabel>
           <SidebarGroupContent className='space-y-0.5'>
             {navSections.map((section, index) => (
               <div key={section.key} data-nav-section>
                 {/* Section divider for visual separation (except for first section) */}
-                {index > 0 && (
-                  <div className='mx-2.5 my-1.5 border-t border-sidebar-border/70' />
-                )}
+                {index > 0 && <div className='my-1.5' />}
                 {renderSection(section.items)}
               </div>
             ))}
@@ -199,27 +268,28 @@ export function DashboardNav(_: DashboardNavProps) {
       )}
 
       {!isInSettings && threadsEnabled && !env.IS_E2E && (
-        <div className='mt-3.5'>
-          <RecentChats />
-        </div>
+        <Flagged name='THREADS_ENABLED'>
+          <div className='mt-3.5'>
+            <RecentChats />
+          </div>
+        </Flagged>
       )}
 
       {isAdmin && !isInSettings && (
         <div data-testid='admin-nav-section' className='mt-3'>
           <SidebarCollapsibleGroup label='Admin' defaultOpen>
-            <div className='space-y-2'>
-              {adminNavigationSections.map((section, index) => (
-                <div key={section.label} data-admin-section={section.label}>
-                  {index > 0 ? (
-                    <div className='mx-2.5 my-1.5 border-t border-sidebar-border/70' />
-                  ) : null}
-                  <p className='px-2.5 pb-0.5 text-[11px] font-[510] tracking-[-0.01em] text-sidebar-muted/80 group-data-[collapsible=icon]:hidden'>
-                    {section.label}
-                  </p>
-                  {renderSection(section.items)}
-                </div>
-              ))}
-            </div>
+            {adminNavigationSections.map(section => (
+              <div
+                key={section.label}
+                className='space-y-2'
+                data-admin-section={section.label}
+              >
+                <p className='px-2.5 pb-0.5 text-[11px] font-[560] tracking-[-0.01em] text-sidebar-muted/80 group-data-[collapsible=icon]:hidden'>
+                  {section.label}
+                </p>
+                {renderSection(section.items)}
+              </div>
+            ))}
           </SidebarCollapsibleGroup>
         </div>
       )}

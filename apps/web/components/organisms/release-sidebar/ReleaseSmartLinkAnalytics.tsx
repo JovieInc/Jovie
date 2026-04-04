@@ -1,12 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { CommonDropdown } from '@jovie/ui';
+import { Copy, ExternalLink, Link2, Share2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import {
-  DrawerEmptyState,
-  DrawerSurfaceCard,
+  DrawerAnalyticsSummaryCard,
+  DrawerInlineIconButton,
 } from '@/components/molecules/drawer';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
-import { cn } from '@/lib/utils';
+import { copyToClipboard } from '@/hooks/useClipboard';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
 import type { Release, ReleaseSidebarAnalytics } from './types';
 
 async function fetchReleaseAnalytics(
@@ -30,11 +34,139 @@ const numberFormatter = new Intl.NumberFormat();
 interface ReleaseSmartLinkAnalyticsProps {
   readonly release: Release;
   readonly analyticsOverride?: ReleaseSidebarAnalytics | null;
+  readonly artistName?: string | null;
+  readonly variant?: 'card' | 'flat';
+}
+
+function getReleaseAnalyticsState({
+  isLoading,
+  hasError,
+  data,
+}: {
+  readonly isLoading: boolean;
+  readonly hasError: boolean;
+  readonly data: ReleaseSidebarAnalytics | null;
+}) {
+  const isInitialLoading = isLoading && !data;
+
+  if (isInitialLoading) {
+    return 'loading' as const;
+  }
+
+  if (hasError) {
+    return 'error' as const;
+  }
+
+  return 'ready' as const;
+}
+
+function ReleaseSmartLinkControl({
+  release,
+  artistName,
+  helperText,
+}: {
+  readonly release: Release;
+  readonly artistName?: string | null;
+  readonly helperText?: string;
+}) {
+  const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
+  const smartLinkLabel = smartLinkUrl.replace(/^https?:\/\//u, '');
+  const shareItems = useMemo(() => {
+    const items = getUTMShareDropdownItems({
+      smartLinkUrl,
+      context: buildUTMContext({
+        smartLinkUrl,
+        releaseSlug: release.slug,
+        releaseTitle: release.title,
+        artistName: artistName ?? release.artistNames?.[0],
+        releaseDate: release.releaseDate,
+      }),
+    });
+
+    if (items.length === 1 && items[0]?.type === 'submenu') {
+      return items[0].items;
+    }
+
+    return items;
+  }, [
+    artistName,
+    release.artistNames,
+    release.releaseDate,
+    release.slug,
+    release.title,
+    smartLinkUrl,
+  ]);
+
+  return (
+    <div className='space-y-1.5'>
+      <div
+        className='flex h-9 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2.5'
+        data-testid='release-smart-link-control'
+      >
+        <Link2
+          className='h-3 w-3 shrink-0 text-tertiary-token'
+          aria-hidden='true'
+        />
+        <span
+          className='min-w-0 flex-1 truncate font-mono text-[10.5px] leading-none tracking-[-0.01em] text-secondary-token'
+          title={smartLinkUrl}
+        >
+          {smartLinkLabel}
+        </span>
+        <DrawerInlineIconButton
+          onClick={async event => {
+            event.stopPropagation();
+            const copied = await copyToClipboard(smartLinkUrl);
+            if (copied) {
+              toast.success('Smart link copied');
+              return;
+            }
+            toast.error('Failed to copy link');
+          }}
+          title='Copy smart link'
+          className='h-7 w-7 rounded-full text-tertiary-token'
+        >
+          <Copy className='h-3 w-3' />
+        </DrawerInlineIconButton>
+        <DrawerInlineIconButton
+          onClick={event => {
+            event.stopPropagation();
+            globalThis.open(smartLinkUrl, '_blank', 'noopener,noreferrer');
+          }}
+          title='Open smart link'
+          className='h-7 w-7 rounded-full text-tertiary-token'
+        >
+          <ExternalLink className='h-3 w-3' />
+        </DrawerInlineIconButton>
+        <CommonDropdown
+          variant='dropdown'
+          size='compact'
+          align='end'
+          items={shareItems}
+          trigger={
+            <DrawerInlineIconButton
+              title='Share smart link'
+              className='h-7 w-7 rounded-full text-tertiary-token'
+            >
+              <Share2 className='h-3 w-3' />
+            </DrawerInlineIconButton>
+          }
+        />
+      </div>
+      {helperText ? (
+        <p className='px-2.5 text-[10px] leading-[14px] text-tertiary-token'>
+          {helperText}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 export function ReleaseSmartLinkAnalytics({
   release,
   analyticsOverride,
+  artistName,
+  variant = 'card',
 }: ReleaseSmartLinkAnalyticsProps) {
   const [data, setData] = useState<ReleaseSidebarAnalytics | null>(
     analyticsOverride ?? null
@@ -80,99 +212,34 @@ export function ReleaseSmartLinkAnalytics({
   const totalClicks = data?.totalClicks ?? 0;
   const last7DaysClicks = data?.last7DaysClicks ?? 0;
 
-  const showEmpty = !isLoading && !hasError && totalClicks === 0;
-
-  const showSkeleton = isLoading && !data;
+  const state = getReleaseAnalyticsState({ isLoading, hasError, data });
 
   return (
-    <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
+    <DrawerAnalyticsSummaryCard
+      metrics={[
+        {
+          id: 'total-clicks',
+          label: 'Total clicks',
+          value: numberFormatter.format(totalClicks),
+          hint: 'All time',
+        },
+        {
+          id: 'last-7-days-clicks',
+          label: 'Last 7 days',
+          value: numberFormatter.format(last7DaysClicks),
+          hint: 'Recent',
+        },
+      ]}
+      state={state}
+      dimmed={isSwitching}
+      errorMessage='Analytics unavailable'
       testId='release-smart-link-analytics'
-    >
-      <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-        <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-          Analytics
-        </p>
-      </div>
-
-      <div className='p-3'>
-        {showSkeleton && (
-          <div className='grid grid-cols-2 divide-x divide-(--linear-app-frame-seam)'>
-            <div className='space-y-1 pr-3'>
-              <div className='h-[9px] w-12 rounded skeleton' />
-              <div className='h-4 w-8 rounded skeleton' />
-              <div className='h-[9px] w-10 rounded skeleton' />
-            </div>
-            <div className='space-y-1 pl-3'>
-              <div className='h-[9px] w-12 rounded skeleton' />
-              <div className='h-4 w-8 rounded skeleton' />
-              <div className='h-[9px] w-10 rounded skeleton' />
-            </div>
-          </div>
-        )}
-
-        {!showSkeleton && hasError && (
-          <DrawerEmptyState
-            className='min-h-[52px] px-0 py-0'
-            message='Analytics unavailable'
-          />
-        )}
-
-        {!showSkeleton && !hasError && (
-          <div
-            className={cn(
-              'space-y-2 transition-opacity duration-100',
-              isSwitching && 'opacity-50'
-            )}
-          >
-            <div className='grid grid-cols-2 divide-x divide-(--linear-app-frame-seam)'>
-              <AnalyticsMetric
-                label='Total clicks'
-                value={numberFormatter.format(totalClicks)}
-                hint='All time'
-                className='pr-3'
-              />
-              <AnalyticsMetric
-                label='Last 7 days'
-                value={numberFormatter.format(last7DaysClicks)}
-                hint='Recent'
-                className='pl-3'
-              />
-            </div>
-
-            {showEmpty && (
-              <DrawerEmptyState
-                className='min-h-[32px] px-0 py-0'
-                message='Share your smart link to start tracking clicks.'
-              />
-            )}
-          </div>
-        )}
-      </div>
-    </DrawerSurfaceCard>
-  );
-}
-
-function AnalyticsMetric({
-  label,
-  value,
-  hint,
-  className,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly hint: string;
-  readonly className?: string;
-}) {
-  return (
-    <div className={cn('space-y-px', className)}>
-      <p className='text-[10.5px] font-[500] leading-[14px] text-tertiary-token'>
-        {label}
-      </p>
-      <p className='tabular-nums text-[18px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
-        {value}
-      </p>
-      <p className='text-[10px] leading-[13px] text-tertiary-token'>{hint}</p>
-    </div>
+      variant={variant}
+      footer={
+        release.smartLinkPath ? (
+          <ReleaseSmartLinkControl release={release} artistName={artistName} />
+        ) : undefined
+      }
+    />
   );
 }

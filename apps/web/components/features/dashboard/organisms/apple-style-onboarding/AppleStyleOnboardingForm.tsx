@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { enrichProfileFromDsp } from '@/app/onboarding/actions/enrich-profile';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthBackButton } from '@/features/auth';
 import { ProfileLiveCelebration } from '@/features/dashboard/molecules/ProfileLiveCelebration';
@@ -14,14 +15,10 @@ import {
 } from '@/features/dashboard/organisms/onboarding';
 import { track } from '@/lib/analytics';
 import {
-  clearPlanIntent,
   DEFAULT_UPSELL_PLAN,
   getPlanIntent,
   isPaidIntent,
 } from '@/lib/auth/plan-intent';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
-import { getOnboardingDashboardInitialQuery } from './onboardingDashboardQuery';
 
 import type { AppleStyleOnboardingFormProps } from './types';
 import { ONBOARDING_STEPS } from './types';
@@ -38,6 +35,7 @@ export function AppleStyleOnboardingForm({
   shouldAutoSubmitHandle = false,
   initialStepIndex = 0,
   existingAvatarUrl = null,
+  existingAvatarQuality = null,
   existingBio = null,
   existingGenres = null,
 }: Readonly<AppleStyleOnboardingFormProps>) {
@@ -66,15 +64,10 @@ export function AppleStyleOnboardingForm({
 
   const [isDspEnriching, setIsDspEnriching] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
-  const checkoutStepEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.ONBOARDING_CHECKOUT_STEP
-  );
-
   const {
     state,
     handleSubmit,
     isPendingSubmit,
-    spotifyImportState,
     autoSubmitClaimed,
     enrichedProfile,
     setEnrichedProfile,
@@ -209,26 +202,13 @@ export function AppleStyleOnboardingForm({
       return;
     }
 
-    // Always route to checkout when flag is on
-    // &source= disambiguates organic upsell from explicit paid intent for analytics
-    if (checkoutStepEnabled) {
-      const planIntent = getPlanIntent();
-      const hasIntent = isPaidIntent(planIntent);
-      const plan = hasIntent ? planIntent : DEFAULT_UPSELL_PLAN;
-      const source = hasIntent ? 'intent' : 'organic';
-      globalThis.location.href = `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=${plan}&source=${source}`;
-      return;
-    }
-
-    // Free flow (flag off): clear any stale intent and go to dashboard
-    clearPlanIntent();
-    const initialQuery = getOnboardingDashboardInitialQuery(
-      spotifyImportState.status
-    );
-    const dashboardUrl = `${APP_ROUTES.DASHBOARD}?q=${encodeURIComponent(initialQuery)}`;
-
-    globalThis.location.href = dashboardUrl;
-  }, [spotifyImportState.status, checkoutStepEnabled]);
+    // Route to checkout — &source= disambiguates organic upsell from explicit paid intent
+    const planIntent = getPlanIntent();
+    const hasIntent = isPaidIntent(planIntent);
+    const plan = hasIntent ? planIntent : DEFAULT_UPSELL_PLAN;
+    const source = hasIntent ? 'intent' : 'organic';
+    globalThis.location.href = `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=${plan}&source=${source}`;
+  }, []);
 
   const goToDashboard = useCallback(() => {
     if (process.env.NEXT_PUBLIC_E2E_MODE === '1') {
@@ -323,6 +303,7 @@ export function AppleStyleOnboardingForm({
               isDspEnriching || isAutoConnectEnriching || isConnecting
             }
             existingAvatarUrl={existingAvatarUrl}
+            avatarQuality={existingAvatarQuality}
             existingBio={existingBio}
             existingGenres={existingGenres}
             isStepResume={initialStepIndex > 0}
@@ -347,7 +328,7 @@ export function AppleStyleOnboardingForm({
 
         <Link
           href='#main-content'
-          className='sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 px-4 py-2 rounded-md z-50 btn btn-primary btn-sm'
+          className={`sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 focus-visible:z-50 ${APP_CONTROL_BUTTON_CLASS}`}
         >
           Skip to main content
         </Link>

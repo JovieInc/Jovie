@@ -20,7 +20,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Conductor workspace archive script
+- Workspace archive script
 
 ### Changed
 
@@ -29,17 +29,17 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- Conductor run script no longer double-wraps Doppler secrets
+- Run script no longer double-wraps secrets
 
 ## [26.4.7] - 2026-03-18
 
 ### Added
 
-- Non-interactive cleanup mode for E2E test accounts
+- New cleanup mode for test accounts
 
 ### Changed
 
-- Admin tables now use identical bulk actions toolbar UX
+- Tables now use identical bulk actions toolbar UX
 `;
 
 const EMPTY_UNRELEASED = `# Changelog
@@ -102,7 +102,7 @@ describe('parseChangelog', () => {
     expect(result.releases[0].version).toBe('26.4.8');
     expect(result.releases[0].date).toBe('2026-03-18');
     expect(result.releases[0].sections.added).toEqual([
-      'Conductor workspace archive script',
+      'Workspace archive script',
     ]);
     expect(result.releases[0].sections.changed).toHaveLength(2);
     expect(result.releases[0].sections.fixed).toHaveLength(1);
@@ -145,6 +145,147 @@ describe('parseChangelog', () => {
     const result = parseChangelog(md);
     expect(result.releases[0].version).toBe('1.0.0');
     expect(result.releases[0].date).toBe('');
+  });
+
+  it('auto-filters entries with vendor names into internalSections', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+### Fixed
+
+- Fixed sign-in page loading
+- Fix auth not loading by reverting Clerk proxy
+- Reduced Sentry error noise
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].sections.fixed).toEqual([
+      'Fixed sign-in page loading',
+    ]);
+    expect(result.releases[0].internalSections.fixed).toEqual([
+      'Fix auth not loading by reverting Clerk proxy',
+      'Reduced Sentry error noise',
+    ]);
+  });
+
+  it('auto-filters entries with dev tooling and infrastructure keywords', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+### Added
+
+- New feature for users
+- E2E test coverage for onboarding
+- Dev toolbar toggle button
+- Screenshot spec uses demo route
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].sections.added).toEqual([
+      'New feature for users',
+    ]);
+    expect(result.releases[0].internalSections.added).toHaveLength(3);
+  });
+
+  it('does not auto-filter legitimate user-facing entries', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+### Added
+
+- Spotify import shows real progress
+- Your profile now shows your top 3 genres
+
+### Fixed
+
+- Tips now process correctly
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].sections.added).toEqual([
+      'Spotify import shows real progress',
+      'Your profile now shows your top 3 genres',
+    ]);
+    expect(result.releases[0].sections.fixed).toEqual([
+      'Tips now process correctly',
+    ]);
+  });
+
+  it('does not treat lowercase common words as vendor leaks', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+### Changed
+
+- Added turbo mode for playlist cleanup
+- conductor notes now show in exported setlists
+- Reduced Sentry error noise
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].sections.changed).toEqual([
+      'Added turbo mode for playlist cleanup',
+      'conductor notes now show in exported setlists',
+    ]);
+    expect(result.releases[0].internalSections.changed).toEqual([
+      'Reduced Sentry error noise',
+    ]);
+  });
+
+  it('treats suffix-tagged internal entries as internal', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+### Changed
+
+- Public launch checklist refresh
+- Shared cron auth helper with timing-safe bearer verification [INTERNAL]
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].sections.changed).toEqual([
+      'Public launch checklist refresh',
+    ]);
+    expect(result.releases[0].internalSections.changed).toEqual([
+      'Shared cron auth helper with timing-safe bearer verification [INTERNAL]',
+    ]);
+  });
+
+  it('drops internal summaries from public output', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+> Hardened webhook dispatch with Redis-backed dedupe [internal]
+
+### Fixed
+
+- Tips now process correctly
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].summary).toBe('');
+    expect(result.releases[0].sections.fixed).toEqual([
+      'Tips now process correctly',
+    ]);
+  });
+
+  it('does not promote a later blockquote when the first summary is internal', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+> Hardened webhook dispatch with Redis-backed dedupe [internal]
+> Customer-facing summary that should stay hidden
+
+### Fixed
+
+- Tips now process correctly
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].summary).toBe('');
+  });
+
+  it('keeps public admin-role and token entries visible', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+### Changed
+
+- Team admins can now manage subscription billing
+- Users can now revoke personal API tokens
+- Design tokens now support accent overrides
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].sections.changed).toEqual([
+      'Team admins can now manage subscription billing',
+      'Users can now revoke personal API tokens',
+      'Design tokens now support accent overrides',
+    ]);
   });
 });
 

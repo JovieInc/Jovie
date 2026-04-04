@@ -44,12 +44,23 @@ If a dedicated helper is added later (for example `./scripts/dev-db-branch.sh`),
 
 ### Running tests and commands requiring secrets
 
-ALL commands that need secrets MUST be prefixed with `doppler run --`:
+ALL commands that need secrets MUST be prefixed with Doppler, and local/dev commands should pin the repo's default scope explicitly as `doppler run --project jovie-web --config dev --`:
 
-- `doppler run -- pnpm test`
-- `doppler run -- pnpm exec playwright test`
-- `doppler run -- pnpm run dev:local`
+- `doppler run --project jovie-web --config dev -- pnpm test`
+- `doppler run --project jovie-web --config dev -- pnpm exec playwright test`
+- `doppler run --project jovie-web --config dev -- pnpm run dev:local`
 - `pnpm test` alone **will fail** — missing env vars
+
+Reason: local agents and worktrees should not rely on whatever Doppler scope happens to be active in the shell.
+
+### Local Auth Bypass For Perf And E2E
+
+When local perf or E2E work needs an authenticated session on loopback/private hosts, prefer the repo's dev auth bypass before assuming Clerk bootstrap is required or broken.
+
+- Enable `E2E_USE_TEST_AUTH_BYPASS=1` for local authenticated test runs.
+- Use `/api/dev/test-auth/session` to mint bypass cookies for programmatic flows and `/api/dev/test-auth/enter?persona=...&redirect=/app` for browser bootstrap flows.
+- Validate the loopback host you are actually using (`localhost` vs `127.0.0.1`) because host-only cookies do not cross between them.
+- If auth bootstrap fails locally, debug the bypass route/cookie flow first instead of treating it as an expected limitation.
 
 ### If Doppler is not installed
 
@@ -259,6 +270,34 @@ These rules are enforced by `.claude/hooks/` and will **block your changes** if 
 - For decorative indicators, use small SVG icon components (e.g., Lucide icons or inline SVGs)
 - This applies to marketing pages, dashboards, mockups, and all user-facing surfaces
 
+### 4a. Text Casing Rules
+
+- All user-facing text must follow `DESIGN.md` casing rules
+- **Title Case** for labels, headings, buttons, badges, column headers, nav items
+- **Sentence case** for body text, descriptions, tooltips, toasts
+- Never lowercase the first word of a visible label or heading
+- Use `capitalizeFirst()` from `apps/web/lib/utils/string-utils.ts` for dynamic data from the database
+
+### 4b. Subtraction Principle (Tim White Canon)
+
+- UI cleanup must follow the subtraction principle: remove before adding
+- When a screen feels messy, agents should first look for duplicated labels, redundant helper text, nested containers, extra borders, repeated actions, and unnecessary variants
+- Prefer one clear heading, one clear action cluster, and one clear surface hierarchy instead of layering multiple decorative cues
+- If an existing label, icon, placeholder, or layout already communicates the action, remove the extra explanatory UI around it
+- Agents should not "solve" weak hierarchy by adding more badges, more cards, more copy, or more controls unless subtraction has clearly failed
+- During refactors and polish passes, explicitly audit for what can be deleted, merged, flattened, or simplified before introducing anything new
+
+### 4c. No AI-Slop Product UI
+
+- Jovie product UI must feel closer to Linear than generic AI-generated dashboards: compact, quiet, precise, and premium
+- Default to small typography, restrained weight changes, and clean spacing before adding decorative treatment
+- Do **NOT** use all-caps labels, eyebrow text, or section headers as a default styling move; use normal Title Case labels unless an existing canonical pattern explicitly calls for something else
+- Do **NOT** wrap every block in rounded cards or bordered boxes just to create structure; first solve hierarchy with spacing, alignment, type, and surface contrast
+- Borders are a supporting tool, not the main design language; if a border can be removed without losing meaning, remove it
+- Avoid the common AI mockup pattern of tiny uppercase eyebrow + long explanatory paragraph inside a large rounded bordered card
+- Prefer one compact, well-set label and one clear body line over stacked label, headline, description, and chrome all saying the same thing
+- When implementing or revising UI, compare the result against this smell test: if it looks like a generic AI admin template, it is off-style and should be simplified
+
 ### 5. Conventional Commits Required
 
 ```bash
@@ -320,6 +359,7 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 - `app/layout.tsx` must not read per-request headers for marketing; theme init belongs in static `/public/theme-init.js` (no nonce).
 - Middleware (`proxy.ts`) should only issue CSP nonces for app/protected/API paths. Marketing routes must not depend on nonce or geo headers for rendering.
 - Homepage "See It In Action" must not hit the database during SSR; use static `FALLBACK_AVATARS` only.
+- Marketing copy must not invent adoption metrics, customer counts, waitlist sizes, or traction claims. If a number is not verified and current, use non-quantified launch-stage copy instead.
 - Blog and changelog pages must be fully static, reading content from filesystem at build time only.
 - Cookie banner remains client-driven (localStorage + server cookie write) without server-provided `x-show-cookie-banner` headers.
 - Structured data on marketing pages should be rendered without `biome-ignore`; use string children inside `<script type="application/ld+json">` and `safeJsonLdStringify()` whenever user-controlled content is involved.
@@ -389,6 +429,13 @@ Never mark a task complete without confirming the fix works:
 - For UI changes: confirm the component renders without errors
 - For API changes: confirm the endpoint returns expected shape
 - Paste the passing output as evidence in the PR description
+
+### 16. Performance Must Not Replace Route UIs
+
+- **NEVER** replace a route's component with a different layout/design as a performance optimization
+- Use code-splitting (`dynamic()`), skeleton states, `Suspense`, and progressive hydration to make the *same* design faster
+- Screenshot test: before and after a perf PR, the fully-loaded page must look identical
+- If a route needs a genuinely different UI, that is a product decision requiring explicit approval, not a perf side effect
 
 ---
 
@@ -478,16 +525,16 @@ When scanning Linear for issues to work on, always filter with:
 
 ### Pre-Push Gate
 
-Before pushing to a branch, agents MUST pass locally:
-1. `pnpm turbo typecheck` (monorepo typecheck)
-2. `pnpm --filter web exec tsc --noEmit` (web typecheck)
-3. `pnpm biome check --write apps/web` (lint + auto-fix formatting) — **must use `--write` to apply fixes before checking**
-4. `pnpm vitest --run --changed` (affected tests)
-5. `pnpm --filter web lint:server-boundaries` (boundaries)
+The gstack skill pipeline handles verification. The standard agent workflow is:
 
-**IMPORTANT:** Always run `pnpm biome check --write apps/web` (not just `--check`) so formatting issues are fixed in-place before the pre-push hook runs. The pre-push hook calls `biome check .` (read-only) and will reject pushes with formatter violations. Running `--write` first prevents this.
+1. `/qa` — Systematic QA testing (skip if already run manually)
+2. `/review` — Pre-landing code review (skip if already run manually)
+3. `/ship` — Tests, review, version bump, PR creation/update
+4. `/land-and-deploy` — Merge, CI wait, deploy verification
 
-Do NOT push code that fails any of these. Fix first, push once.
+`/ship` runs typecheck, lint, and tests as part of its pre-flight checks. There is no separate `/verify` step.
+
+**IMPORTANT:** Always run `pnpm biome check --write apps/web` before pushing so formatting issues are fixed in-place. The pre-push hook calls `biome check .` (read-only) and will reject pushes with formatter violations.
 
 ### One PR = One Concern
 
@@ -497,26 +544,55 @@ Do NOT push code that fails any of these. Fix first, push once.
 
 ### Branch Hygiene
 
-- Always rebase on develop before pushing (not merge)
-- Follow the branch strategy: `feature/* -> develop -> preview -> production`
-- If a PR has been open >24h without progress, close it and re-create from fresh develop
+- Always rebase on main before pushing (not merge)
+- Follow the branch strategy: `feature/* -> main` (CI deploys to staging, then promotes to production)
+- If a PR has been open >24h without progress, close it and re-create from fresh main
 
 ### Incremental Shipping (Ship Fast, Fail Fast)
 
 - When a command produces multiple independent fixes, ship each as its own PR
-- Push and enable auto-merge immediately — don't wait for CI before starting the next fix
+- **Open a draft PR on first push** — CI runs immediately, giving early feedback
+- Push frequently — concurrency groups cancel stale CI runs automatically
+- Run `/ship` when ready — it detects the draft PR and promotes it to ready-for-review
 - CI runs in parallel on all PRs while the agent continues working
 - This maximizes throughput: N PRs x parallel CI > 1 large PR x serial CI
-- If a PR fails CI, the agent can fix it while other PRs continue merging
-- Each PR must still pass /verify locally before pushing
+- If a PR fails CI, fix and push again; don't create a new PR
+- Enable auto-merge only after the PR is marked ready (not while draft)
+
+### Draft PR First Workflow (Parallel Agents)
+
+AI agents MUST follow the "draft PR first, commit often" pattern for all non-trivial work:
+
+1. **First commit on branch:** Push immediately and open a draft PR:
+   ```bash
+   git push -u origin <branch-name>
+   gh pr create --draft --base main --title "WIP: <description>" --body "Draft — CI feedback loop in progress"
+   ```
+
+2. **Iterate on CI feedback:** Push frequently. Each push triggers CI with cancel-in-progress
+   (stale runs are automatically cancelled). Check CI status:
+   ```bash
+   gh pr checks <pr-number> --json name,state,conclusion
+   ```
+   Fix failures, push again.
+
+3. **Finalize:** When CI is green and code is ready, run `/ship`. The ship skill detects
+   the existing draft PR, updates its title/body with the standard template, and marks
+   it ready for review.
+
+**Why draft PRs first:**
+- CI catches build failures (now a merge gate), type errors, and test regressions within minutes
+- Parallel agents see each other's in-progress branches via PR list
+- Concurrency groups cancel stale CI runs automatically — frequent pushes are cheap
+- The PR summary comment gives a structured view of all check statuses
 
 ### PR Labels (Required)
 
 Agents must apply PR labels intentionally. Labels are part of the CI control plane, not just project organization.
 
-- Add `testing` when a PR needs the heavyweight verification lanes beyond the default fast merge gate.
-- Add `testing` for changes affecting public routes, rendering, deploy behavior, migrations, auth, billing, middleware/proxy logic, environment/config loading, or any flow that should get preview QA and extended CI before merge.
-- Add `testing` when agent QA, browser crawling, or preview-environment validation should run against the PR before it merges.
+- Add `testing` when a PR needs the heavyweight verification lanes (E2E, smoke tests, full build with secrets) beyond the default merge gate.
+- Add `testing` for changes affecting deploy behavior, migrations, auth, billing, middleware/proxy logic, environment/config loading, or any flow that should get E2E and preview QA before merge.
+- Note: Build (public routes), Lighthouse, a11y, and layout-guard now run on ALL PRs without the `testing` label. The `testing` label is only needed for E2E/smoke/preview-deploy lanes.
 
 - Add `needs-human` when the PR should be held for human review or automation must stop.
 - Add `needs-human` for risky or ambiguous changes, incidents/hotfixes needing human judgment, unexpected CI/deploy behavior, security-sensitive changes, or any case where the agent is not confident the PR should continue through auto-merge.
@@ -561,13 +637,12 @@ When in doubt, skip auto-merge and request review.
 
 ## Pre-PR Checklist (required before opening any PR)
 
-1. **Run `/verify`** - Self-verification: typecheck, lint, tests, security checks
-2. **Run `/simplify`** - Simplify recently modified code for clarity
-3. **After pushing your branch, immediately open a draft PR** using GitHub CLI:
-   ```bash
-   gh pr create --draft --base main --title "<Linear issue title>" --body "## Summary\n- ...\n\nLinear: https://linear.app/jovie/issue/<ISSUE-ID>"
-   ```
-4. **Enable automerge** with squash:
+1. **Open a draft PR early** — push your first meaningful commit and create a draft PR immediately (see "Draft PR First Workflow" above)
+2. **Iterate** — push frequently, let CI catch issues, fix and push again
+3. **When ready to ship:** run `/qa` → `/review` → `/ship` (skip `/qa` or `/review` if already run manually)
+4. `/ship` handles: tests, review, version bump, CHANGELOG, commit, push, PR creation/update
+5. `/land-and-deploy` handles: merge, CI wait, deploy verification
+6. **Enable automerge** with squash after the PR is marked ready:
    ```bash
    gh pr merge --auto --squash
    ```
@@ -754,12 +829,41 @@ Name tests by behavior: `describe('ComponentName')` → `it('shows error when in
 | Language | TypeScript (strict mode) |
 | Styling | Tailwind CSS v4 |
 | Database | Neon PostgreSQL + Drizzle ORM |
-| Auth | Clerk |
+| Auth | Clerk (single instance, proxy via `/__clerk`) |
 | Payments | Stripe |
 | Linting | Biome |
 | Package Manager | pnpm 9.15.4 |
 | Monorepo | Turborepo |
 | Runtime | Node.js 22 LTS |
+
+### Clerk Auth Proxy Architecture
+
+**CRITICAL — read this before touching anything Clerk-related.**
+
+Each environment has its own Clerk instance with its own publishable key (set in Doppler):
+- **Production** (`prd`): `pk_live_...LmllJA` → FAPI host `clerk.jov.ie`
+- **Staging** (`stg`): `pk_live_...aWUk` → FAPI host `clerk.staging.jov.ie`
+- **Dev** (`dev`): `pk_test_...ZGlzdGluY3Q...` → FAPI host `distinct-giraffe-5.clerk.accounts.dev`
+
+The proxy path is `/__clerk`. ClerkProvider sets `proxyUrl="/__clerk"`. All Clerk JS requests go to `/__clerk/*` on the current origin. Dev mode doesn't use the proxy — ClerkProvider talks directly to Clerk.
+
+**How the proxy works:**
+- Middleware in `proxy.ts` intercepts `/__clerk/*` and `/clerk/*` paths
+- Decodes the FAPI host from `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` at runtime
+- Uses `fetch()` to proxy with the correct `Host` header set to the decoded FAPI host
+- Each environment automatically routes to the correct Clerk instance via Doppler
+
+**DO NOT:**
+- Use `NextResponse.rewrite()` for clerk paths — Vercel doesn't set the Host header correctly, causing Clerk 400 "Invalid host"
+- Use `vercel.json` rewrites as the primary mechanism — same Host header problem
+- Hardcode FAPI hosts — always decode from the publishable key
+- Use `clerk.jov.ie` or `clerk.staging.jov.ie` as public-facing URLs — traffic goes through `/__clerk` path proxy only
+- Add satellite/custom proxy domains — they cost money and are unnecessary with the fetch proxy
+
+**If Clerk auth breaks:**
+1. Check the `fetch()` proxy in `proxy.ts` decodes the FAPI host from the publishable key
+2. Check the publishable key in Doppler (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`) for each env
+3. Check CSP allows the decoded FAPI host in connect-src, script-src, frame-src
 
 ### API Runtime
 
@@ -782,7 +886,7 @@ All API routes run on **Node.js runtime** (the Next.js default). Do not use Edge
 **Typecheck Gate (Mandatory):**
 - **ALWAYS** run `pnpm turbo typecheck` before pushing any branch or creating a PR
 - If typecheck fails, fix all errors before pushing — do not push with known type errors
-- Use `/verify` or `/ship` commands which include typecheck as part of their validation
+- Use `/ship` which includes typecheck as part of its validation
 - The CI pipeline will block merges on type errors, but catching them locally is faster and prevents wasted CI cycles
 
 **Null Safety for String Methods:**
@@ -865,7 +969,7 @@ Remove the import or remove "use client" if this should be a server component.
 | Use `db.query.*` or `db.select()` | Direct SQL strings outside lib/db |
 | `db.insert().values([...items])` | Loop with individual `db.insert()` calls |
 
-The project uses `@neondatabase/serverless` with the HTTP driver and Neon's built-in connection pooling. The `lib/db/client.ts` is a legacy HTTP-based client - do not use it.
+The project uses `@neondatabase/serverless` with the **WebSocket driver** for stateful RLS connections. Application code creates a client-side `Pool` (max 20 per Vercel container) because WebSocket connections are stateful and need lifecycle management. The DATABASE_URL uses Neon's **direct** endpoint (not the `-pooler` endpoint). Scripts and migrations use the HTTP driver for stateless one-off operations. The `lib/db/client.ts` is a legacy HTTP-based client — do not use it.
 
 **Transaction Restrictions (Canonical Policy):**
 - **NEVER** introduce new direct `db.transaction()` usage in app code without explicit human approval.
@@ -877,7 +981,7 @@ The project uses `@neondatabase/serverless` with the HTTP driver and Neon's buil
 **Forbidden Database Patterns:**
 | Forbidden                          | Why                               | Alternative                            |
 | ---------------------------------- | --------------------------------- | -------------------------------------- |
-| `db.transaction(async (tx) => ...)` | Neon HTTP driver incompatible     | Sequential operations or batch insert  |
+| `db.transaction(async (tx) => ...)` | Requires explicit approval; use approved RLS wrappers | Sequential operations or batch insert  |
 | `import { Pool } from 'pg'`        | Manual pooling conflicts with Neon | Use `import { db } from '@/lib/db'`   |
 | `import pg from 'pg'`              | Direct postgres driver            | Use `import { db } from '@/lib/db'`   |
 | `new Pool()` or `pool.connect()`   | Manual connection management      | Use `import { db } from '@/lib/db'`   |
@@ -1001,6 +1105,45 @@ useQuery({
 - Follow existing design tokens in `tailwind.config.ts`
 - Mobile-first responsive design
 
+#### Surface Elevation Rules (Card/Background Consistency)
+
+The main content area (`<main>`) uses `bg-(--linear-app-content-surface)`, a dedicated shell canvas tone. In dark mode it must stay distinct from both recessed wells (`bg-surface-0`) and shared cards (`bg-surface-1`).
+
+**Allowed patterns:**
+- Card on app-shell canvas parent → use `bg-surface-1` for shared cards and panels
+- Recessed/"well" element inside the shell or a card → use `bg-surface-0` (e.g., skeleton containers, empty states, input wells)
+- Sticky shell chrome (toolbars, table headers, shell frame) → use `bg-(--linear-app-content-surface)`
+- Card with elevation → use `Card` component as-is (has `bg-surface-1 border border-subtle shadow-card`)
+- Nested card inside card → use `bg-surface-0` for the inner element
+- Table/workspace routes → wrap the primary content in `DashboardWorkspacePanel` plus a bordered `LINEAR_SURFACE.contentContainer`; do not render route content directly on the shell canvas
+
+**Banned patterns (will cause invisible cards):**
+- `bg-(--linear-app-content-surface)` on card-like elements inside the shell unless the element is shell chrome (toolbar/header/frame)
+- Table/task routes that place their main list or empty state directly on the shell canvas instead of inside a framed content container
+- `bg-surface-1` on elements inside a `surface-1` parent WITHOUT border+shadow — same color on same color
+- `bg-surface-1/XX` (semi-transparent) — low opacity surface-1 on surface-1 parent is nearly invisible
+- `Card className='border-0 shadow-none'` — strips all elevation from a surface-1 card, making it invisible on surface-1 parent
+- `bg-surface-0/XX` (semi-transparent) — use solid `bg-surface-0` instead
+- Card-within-card nesting (e.g., `DrawerSurfaceCard variant='card'` inside another card) — use `variant='flat'` for inner elements
+
+**Quick test:** If removing the element would cause no visual change, it's an elevation bug.
+
+#### No Duplicate Page Titles (Breadcrumb + Toolbar)
+
+The `DashboardHeader` breadcrumb already renders the page name prominently. Do NOT repeat the page name in `PageToolbar start={}`. The toolbar should only contain contextual metadata (counts, status) and action buttons.
+
+**Allowed:** `<PageToolbar start={<span>3 matched platforms</span>} end={<ActionButton />} />`
+**Banned:** `<PageToolbar start={<span>Earnings</span>} />` — duplicates the breadcrumb
+
+### Performance Optimization Loop
+
+`/perf-loop` runs an autonomous optimization loop that measures, experiments,
+and keeps only improvements. State is persisted to `.context/perf/` for resume
+capability. The skill uses `perf:loop` (performance-optimizer.ts) as its
+measurement primitive and commits each accepted improvement atomically.
+
+Runtime: ~30-50 minutes for a full run (4-10 iterations with builds).
+
 ### Testing
 
 - Unit tests: Vitest with jsdom
@@ -1031,9 +1174,11 @@ Use Clerk's official Playwright testing helpers whenever an E2E test needs auth.
 - Do **not** use pre-authenticated Clerk tokens to skip sign-up/sign-in flows unless the test scope explicitly starts post-auth.
 - Do **not** mock Clerk auth in Playwright E2E tests.
 
-**Golden path reference:**
+**Golden path references:**
 
-- `apps/web/tests/e2e/golden-path-signup.spec.ts` is the canonical Clerk-authenticated onboarding example.
+- `apps/web/tests/e2e/onboarding.spec.ts` shows the canonical fresh-user Clerk-authenticated onboarding flow using `setupClerkTestingToken({ page })` plus `createOrReuseTestUserSession(page, email)`.
+- `apps/web/tests/e2e/auth.setup.ts` is the canonical shared auth bootstrap that writes `tests/.auth/user.json`.
+- For manual browse auth outside Playwright, use `doppler run --project jovie-web --config dev -- pnpm tsx scripts/browse-auth.ts --base-url http://localhost:3002 --output /tmp/browse-clerk-cookies.json --persona creator` and import the exported cookies into browse.
 
 **Test user cleanup:**
 
@@ -1463,48 +1608,65 @@ Or use `/gstack-upgrade` from within Claude Code.
 
 ### QA & Browse Authentication (Jovie-Specific)
 
-When running `/qa` or `/browse` against Jovie (localhost or staging), agents **MUST** handle authentication automatically using the project's E2E test credentials from Doppler. **Do NOT prompt the user for credentials.**
+When running `/qa` or `/browse` against local Jovie, agents **MUST** use the built-in dev auth bootstrap. **Do NOT prompt the user for credentials. Do NOT ask for cookie import help.**
 
-**Why this is different from Playwright E2E auth:** The browse binary runs a standalone Playwright browser session, NOT the Playwright test runner. Clerk testing tokens (`setupClerkTestingToken`) are NOT available. Instead, sign in by filling the login form directly.
+**Local default flow (`localhost`, `127.0.0.1`, private dev IPs):**
 
-**Steps:**
+1. Start the browse-compatible dev server:
 
-1. Get credentials from environment (requires `doppler run --` prefix on the parent command):
-   - Email: `$E2E_CLERK_USER_USERNAME` (contains `+clerk_test` suffix)
-   - OTP code: `424242` (Clerk auto-accepts this for `+clerk_test` emails in test mode)
-
-2. Check if already authenticated:
    ```bash
-   $B goto <base-url>/signin
-   $B snapshot -D
-   ```
-   If the URL redirected to `/app` (dashboard), authentication is already active — **skip the rest and proceed to QA**.
-
-3. If on the sign-in page, fill the login form:
-   ```bash
-   $B snapshot -i                    # identify email input element
-   $B fill <email-element> "$E2E_CLERK_USER_USERNAME"
-   $B click <submit-button>          # click "Continue" or submit
-   $B snapshot -i                    # identify OTP code input
-   $B fill <otp-element> "424242"
-   $B click <verify-button>          # submit OTP
-   $B snapshot -D                    # verify redirect to dashboard
+   doppler run -- pnpm --filter web dev:local:browse
    ```
 
-4. Verify authentication succeeded:
-   - URL should contain `/app` (not `/signin` or `/sign-in`)
-   - Dashboard navigation should be visible
+2. Authenticate the browse session by opening:
+
+   ```text
+   /api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings
+   ```
+
+3. Use `persona=admin` only when you intentionally need admin QA:
+
+   ```text
+   /api/dev/test-auth/enter?persona=admin&redirect=/app/admin
+   ```
+
+**What this does:**
+- sets the local auth-bypass cookies automatically
+- provisions a stable creator browse persona by default
+- avoids Clerk sign-in, OTP entry, and cookie handoff
+- works without `NEXT_PUBLIC_E2E_MODE=1`
+
+**Agent rules:**
+- `/browse` on local Jovie means: use the dev auth bootstrap route above
+- default persona is `creator`; `admin` is opt-in
+- if auth is needed on local browse QA, solve it yourself with this flow
+- only use `scripts/browse-auth.ts` as a fallback helper for non-loopback hosts
+- only use `/setup-browser-cookies` for importing a real human session when a human explicitly wants that path
 
 **Do NOT:**
-- Prompt the user for credentials — use Doppler env vars
-- Use `/setup-browser-cookies` for automated QA runs — that is for importing human browser sessions
-- Hardcode the test email address — always read from `$E2E_CLERK_USER_USERNAME`
-
-**After QA/browse sessions that create test accounts**, run cleanup:
-```bash
-doppler run -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --force
-```
+- prompt the user for credentials
+- fill the Clerk sign-in form manually for local QA
+- claim auth is blocked on local `/browse` without trying `/api/dev/test-auth/enter?...`
+- enable `NEXT_PUBLIC_E2E_MODE=1` just to make browse auth work
 
 ---
 
 **Remember: When in doubt, verify your Node version (`node --version`) and use pnpm from the repository root.**
+
+## Skill routing
+
+When the user's request matches an available skill, ALWAYS invoke it using the Skill
+tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
+The skill has specialized workflows that produce better results than ad-hoc answers.
+
+Key routing rules:
+- Product ideas, "is this worth building", brainstorming → invoke `office-hours`
+- Bugs, errors, "why is this broken", 500 errors → invoke `investigate`
+- Ship, deploy, push, create PR → invoke `ship`
+- QA, test the site, find bugs → invoke `qa`
+- Code review, check my diff → invoke `review`
+- Update docs after shipping → invoke `document-release`
+- Weekly retro → invoke `retro`
+- Design system, brand → invoke `design-consultation`
+- Visual audit, design polish → invoke `design-review`
+- Architecture review → invoke `plan-eng-review`

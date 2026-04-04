@@ -185,6 +185,7 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerAsyncToggle: ({ label }: { label: string }) => (
     <div data-testid='async-toggle'>{label}</div>
   ),
+  DrawerCardActionBar: () => <div data-testid='drawer-card-action-bar' />,
   DrawerMediaThumb: () => <div data-testid='drawer-media-thumb' />,
   DrawerSurfaceCard: ({
     children,
@@ -209,15 +210,18 @@ vi.mock('@/components/molecules/drawer', () => ({
     value,
     onValueChange,
     options,
+    actions,
   }: {
     value: string;
     onValueChange: (value: string) => void;
     options: Array<{ value: string; label: string }>;
+    actions?: React.ReactNode;
   }) => (
     <div>
       {options.map(option => (
         <button
           key={option.value}
+          data-testid={`drawer-tab-${option.value}`}
           type='button'
           aria-selected={value === option.value}
           role='tab'
@@ -226,6 +230,57 @@ vi.mock('@/components/molecules/drawer', () => ({
           {option.label}
         </button>
       ))}
+      {actions}
+    </div>
+  ),
+  DrawerSplitButton: ({
+    primaryAction,
+    menuItems,
+  }: {
+    primaryAction?: {
+      ariaLabel: string;
+      label?: string;
+      onClick: () => void;
+      testId?: string;
+    };
+    menuItems?: Array<{ id: string; label?: string; onClick?: () => void }>;
+  }) =>
+    !primaryAction && (!menuItems || menuItems.length === 0) ? null : (
+      <div data-testid='drawer-split-button'>
+        {primaryAction ? (
+          <button
+            type='button'
+            aria-label={primaryAction.ariaLabel}
+            onClick={primaryAction.onClick}
+            data-testid={primaryAction.testId}
+          >
+            {primaryAction.label ?? primaryAction.ariaLabel}
+          </button>
+        ) : null}
+        {menuItems?.map(item => (
+          <button
+            key={item.id}
+            type='button'
+            onClick={item.onClick}
+            data-testid={`drawer-split-menu-item-${item.id}`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    ),
+  DrawerTabbedCard: ({
+    children,
+    tabs,
+    testId,
+  }: {
+    children?: React.ReactNode;
+    tabs?: React.ReactNode;
+    testId?: string;
+  }) => (
+    <div data-testid={testId}>
+      {tabs}
+      {children}
     </div>
   ),
 }));
@@ -235,7 +290,11 @@ vi.mock('@/features/dashboard/atoms/DspProviderIcon', () => ({
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
-  useReleaseHeaderParts: () => ({ title: 'Header', actions: null }),
+  useReleaseHeaderParts: () => ({
+    headerLabel: '',
+    primaryActions: [],
+    overflowActions: [],
+  }),
 }));
 vi.mock('next/image', () => ({
   default: (props: { alt: string }) => <img alt={props.alt} />,
@@ -260,6 +319,9 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseTrackList', () => ({
 }));
 vi.mock('@/components/organisms/release-sidebar/ReleaseMetadata', () => ({
   ReleaseMetadata: () => <div>Metadata</div>,
+}));
+vi.mock('@/components/organisms/release-sidebar/ReleasePitchSection', () => ({
+  ReleasePitchSection: () => <div>Pitch Section</div>,
 }));
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   updateAllowArtworkDownloads: vi.fn().mockResolvedValue(undefined),
@@ -295,7 +357,14 @@ vi.mock('@/lib/utils/platform-detection', () => ({
 }));
 vi.mock('@/lib/utm', () => ({
   buildUTMContext: () => ({}),
+  getUTMShareContextMenuItems: () => [],
   getUTMShareDropdownItems: () => [],
+}));
+vi.mock('@/lib/queries', () => ({
+  usePlanGate: () => ({
+    canAccessTasksWorkspace: true,
+    isLoading: false,
+  }),
 }));
 
 const { ReleaseSidebar } = await import(
@@ -338,8 +407,9 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
-    await user.click(screen.getByRole('button', { name: 'Add platform link' }));
+    await user.click(screen.getByTestId('drawer-tab-links'));
+    expect(screen.getByTestId('drawer-split-button')).toBeInTheDocument();
+    await user.click(screen.getByTestId('release-sidebar-add-dsp-link'));
     await user.click(screen.getByRole('button', { name: 'Apple Music' }));
 
     const urlInput = screen.getByPlaceholderText(
@@ -372,8 +442,8 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
-    await user.click(screen.getByRole('button', { name: 'Add platform link' }));
+    await user.click(screen.getByTestId('drawer-tab-links'));
+    await user.click(screen.getByTestId('release-sidebar-add-dsp-link'));
     await user.click(screen.getByRole('button', { name: 'Spotify' }));
     await user.type(
       screen.getByPlaceholderText('https://open.spotify.com/...'),
@@ -405,7 +475,10 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
+    await user.click(screen.getByTestId('drawer-tab-links'));
+    expect(
+      screen.queryByTestId('release-sidebar-add-dsp-link')
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove Spotify' }));
 
     expect(onRemoveDspLink).toHaveBeenCalledWith(release.id, 'spotify');

@@ -6,6 +6,7 @@ import type {
   DashboardAnalyticsResponse,
   DashboardAnalyticsView,
 } from '@/types/analytics';
+import { RETRY_BACKOFF } from './cache-strategies';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -78,8 +79,7 @@ export function useDashboardAnalyticsQuery({
     refetchOnReconnect: false,
     refetchOnMount: false,
     gcTime: 30 * 60 * 1000, // 30 minutes
-    retry: 3,
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+    ...RETRY_BACKOFF,
     enabled,
   });
 }

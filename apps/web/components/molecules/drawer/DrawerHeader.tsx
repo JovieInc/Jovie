@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 export interface DrawerHeaderProps {
   /** Title displayed on the left side of the header */
-  readonly title: ReactNode;
+  readonly title?: ReactNode;
   /** Additional actions rendered in the header */
   readonly actions?: ReactNode;
   readonly className?: string;
@@ -26,7 +26,7 @@ export function DrawerHeader({ title, actions, className }: DrawerHeaderProps) {
             {title}
           </p>
         ) : (
-          title
+          (title ?? <div aria-hidden='true' className='h-4' />)
         )}
       </div>
       {actions && <div className='flex items-center gap-1'>{actions}</div>}

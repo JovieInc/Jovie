@@ -29,15 +29,17 @@ export {
 export {
   getDashboardData,
   getDashboardDataCached,
+  getDashboardDataEssential,
   getDashboardDataFresh,
+  getDashboardShellData,
   prefetchDashboardData,
 } from './dashboard-data';
-
 // User dashboard settings server actions
 export { setSidebarCollapsed } from './settings';
-
 // Social links server actions
 export { getProfileSocialLinks } from './social-links';
+// Profile switching and creation
+export { createAdditionalProfile, switchActiveProfile } from './switch-profile';
 
 // Types, constants, and utility functions should be imported directly from source modules:
 // - import type { DashboardData } from './dashboard-data';

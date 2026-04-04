@@ -11,15 +11,15 @@ const badgeVariants = cva(
           'bg-(--color-bg-primary) text-(--linear-text-primary) border border-(--color-border-strong)',
         secondary:
           'bg-(--color-bg-primary) text-(--linear-text-tertiary) border border-(--color-border-strong)',
-        destructive: 'bg-(--linear-error)/15 text-(--linear-error)',
+        destructive: 'bg-(--color-error-subtle) text-error',
         outline:
           'border border-(--color-border-default) text-(--linear-text-secondary) bg-transparent',
-        success: 'bg-(--linear-success)/15 text-(--linear-success)',
-        warning: 'bg-(--linear-warning)/15 text-(--linear-warning)',
+        success: 'bg-(--color-success-subtle) text-success',
+        warning: 'bg-(--color-warning-subtle) text-warning',
         // Backwards-compat aliases
         primary:
           'bg-(--color-bg-primary) text-(--linear-text-primary) border border-(--color-border-strong)',
-        error: 'bg-(--linear-error)/15 text-(--linear-error)',
+        error: 'bg-(--color-error-subtle) text-error',
       },
       size: {
         sm: 'px-1.5 py-0 text-[10px] leading-[18px]',

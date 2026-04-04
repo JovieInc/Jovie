@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
+import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -6,10 +7,14 @@ import { StandaloneProductPage } from '@/components/organisms/StandaloneProductP
 import { authorizeHud } from '@/lib/auth/hud';
 import { publicEnv } from '@/lib/env-public';
 import { getHudMetrics } from '@/lib/hud/metrics';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { HudDashboardClient } from './HudDashboardClient';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = {
+  robots: NOINDEX_ROBOTS,
+};
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -81,7 +86,7 @@ export default async function HudPage({
             <p className='text-[13px] leading-6 text-secondary-token'>
               {message}
             </p>
-            <div className='rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0 px-4 py-3 text-[12px] leading-5 text-tertiary-token'>
+            <div className='rounded-[12px] border border-subtle bg-surface-0 px-4 py-3 text-[12px] leading-5 text-tertiary-token'>
               Tip: open{' '}
               <span className='font-mono text-[11px] text-primary-token'>
                 /hud?kiosk=YOUR_TOKEN

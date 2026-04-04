@@ -1,4 +1,4 @@
-import type { AdminUserRow, AdminUsersSort } from '@/lib/admin/users';
+import type { AdminUserRow, AdminUsersSort } from '@/lib/admin/types';
 
 export interface AdminUsersTableProps {
   readonly users: AdminUserRow[];
@@ -7,4 +7,5 @@ export interface AdminUsersTableProps {
   readonly total: number;
   readonly search: string;
   readonly sort: AdminUsersSort;
+  readonly basePath?: string;
 }

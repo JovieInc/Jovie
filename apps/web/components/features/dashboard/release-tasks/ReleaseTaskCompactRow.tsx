@@ -17,7 +17,7 @@ export function ReleaseTaskCompactRow({
   const isAi = task.assigneeType === 'ai_workflow';
 
   return (
-    <div className='flex items-center gap-2 px-3 py-1.5 min-h-[32px] group'>
+    <div className='flex items-center gap-2 px-3 py-1.5 min-h-[32px] group hover:bg-surface-1 rounded transition-colors'>
       <input
         type='checkbox'
         checked={isDone}
@@ -41,6 +41,7 @@ export function ReleaseTaskCompactRow({
       <ReleaseTaskDueBadge
         dueDate={task.dueDate}
         dueDaysOffset={task.dueDaysOffset}
+        isCompleted={isDone}
       />
     </div>
   );

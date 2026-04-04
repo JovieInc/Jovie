@@ -6,7 +6,7 @@
  * adding one entry here — nothing else.
  *
  * ┌─────────────────────────────────┐
- * │        DSP_REGISTRY (40)        │
+ * │        DSP_REGISTRY (41)        │
  * └──────────┬──────────────────────┘
  *            │ derives
  *      ┌─────┴─────┬──────────┬────────────┬──────────────┐
@@ -222,7 +222,7 @@ const INTERNATIONAL_STREAMING_DSP_INPUTS: readonly CompactDspInput[] = [
   [
     'netease',
     'NetEase Music',
-    'netEase',
+    'netease',
     '#C20C0C',
     ['music.163.com', 'y.music.163.com'],
     null,
@@ -306,7 +306,7 @@ export const DSP_REGISTRY: readonly DspRegistryEntry[] = [
   dsp({
     key: 'soundcloud',
     name: 'SoundCloud',
-    musicfetchService: 'soundCloud',
+    musicfetchService: 'soundcloud',
     color: '#FF5500',
     logoSvg: SOUNDCLOUD_LOGO,
     domains: ['soundcloud.com', 'on.soundcloud.com', 'm.soundcloud.com'],
@@ -478,6 +478,14 @@ export const DSP_REGISTRY: readonly DspRegistryEntry[] = [
     category: 'metadata',
   }),
   dsp({
+    key: 'allmusic',
+    name: 'AllMusic',
+    musicfetchService: 'allMusic',
+    color: '#E0344B',
+    domains: ['allmusic.com', 'www.allmusic.com'],
+    category: 'metadata',
+  }),
+  dsp({
     key: 'musicbrainz',
     name: 'MusicBrainz',
     musicfetchService: 'musicBrainz',
@@ -505,7 +513,7 @@ export const DSP_REGISTRY: readonly DspRegistryEntry[] = [
   dsp({
     key: 'telmor_musik',
     name: 'Telmor Musik',
-    musicfetchService: 'telmorMusik',
+    musicfetchService: 'telmoreMusik',
     color: '#666666',
     domains: [],
     category: 'metadata',
@@ -513,7 +521,7 @@ export const DSP_REGISTRY: readonly DspRegistryEntry[] = [
   dsp({
     key: 'yousee_musik',
     name: 'YouSee Musik',
-    musicfetchService: 'youSeeMusik',
+    musicfetchService: 'youseeMusik',
     color: '#666666',
     domains: [],
     category: 'metadata',
@@ -673,6 +681,14 @@ export const MUSICFETCH_LINK_MAPPINGS: Array<{
   serviceKey: e.musicfetchService,
   platformId: e.key,
 }));
+
+/**
+ * MusicFetch service key → DSP registry entry lookup.
+ * Used by the identity layer to map raw MusicFetch services to DSP metadata.
+ */
+export const MUSICFETCH_SERVICE_TO_DSP = new Map(
+  DSP_REGISTRY.map(e => [e.musicfetchService, e] as const)
+);
 
 /**
  * Build a search URL for a DSP using the registry template.

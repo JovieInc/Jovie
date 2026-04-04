@@ -114,11 +114,24 @@ export async function POST(request: NextRequest) {
     issueIdForDedupe = issueId;
 
     // Dedupe: acquire cross-instance lock before dispatch
-    dedupeAcquired = await acquireRecentDispatch(
+    const dedupeResult = await acquireRecentDispatch(
       'sentry',
       issueId,
       DEDUPE_TTL_SECONDS
     );
+    dedupeAcquired = dedupeResult.acquired;
+
+    if (dedupeResult.reason === 'backend_unavailable') {
+      await captureCriticalError(
+        'Sentry webhook dedupe backend unavailable',
+        new Error('Redis unavailable for webhook dedupe'),
+        { route: '/api/webhooks/sentry', issueId }
+      );
+      return NextResponse.json(
+        { error: 'Webhook dedupe unavailable' },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
 
     if (!dedupeAcquired) {
       logger.info('[Sentry Webhook] Duplicate dispatch suppressed', {
@@ -174,6 +187,7 @@ export async function POST(request: NextRequest) {
           },
         }),
         timeoutMs: DISPATCH_TIMEOUT_MS,
+        context: 'GitHub repository dispatch for Sentry webhook',
       }
     );
 

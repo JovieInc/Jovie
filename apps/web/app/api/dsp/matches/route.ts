@@ -11,9 +11,9 @@
  * Authentication: Required (creator must own the profile)
  */
 
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
+import { getCachedAuth } from '@/lib/auth/cached';
 import { getDspMatchesForProfile } from '@/lib/dsp-enrichment/queries.server';
 import type { DspMatchStatus } from '@/lib/dsp-enrichment/types';
 import { captureError } from '@/lib/error-tracking';
@@ -25,7 +25,7 @@ import { captureError } from '@/lib/error-tracking';
 export async function GET(request: Request) {
   try {
     // Authenticate user
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

@@ -2,7 +2,7 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { CommonDropdown } from '@jovie/ui';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { cn } from '@/lib/utils';
@@ -20,6 +20,21 @@ function useBodyScrollLock(isOpen: boolean, isMobile: boolean) {
       document.body.style.overflow = prev;
     };
   }, [isMobile, isOpen]);
+}
+
+function hasOpenModalDialog() {
+  return Array.from(
+    document.querySelectorAll<HTMLElement>(
+      '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]'
+    )
+  ).some(element => {
+    const style = window.getComputedStyle(element);
+    return (
+      element.getAttribute('aria-hidden') !== 'true' &&
+      style.display !== 'none' &&
+      style.visibility !== 'hidden'
+    );
+  });
 }
 
 export interface RightDrawerProps
@@ -48,6 +63,13 @@ export function RightDrawer({
 }: RightDrawerProps) {
   const asideRef = useRef<HTMLElement>(null);
   const isMobile = useBreakpointDown('lg');
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  // Suppress width/opacity transition on first paint to prevent layout shift
+  // when the right panel mounts after hydration.
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   // Prevent background scroll when mobile drawer is open
   useBodyScrollLock(isOpen, isMobile);
@@ -57,6 +79,14 @@ export function RightDrawer({
     if (!isOpen || !onKeyDown) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (event.defaultPrevented || hasOpenModalDialog()) {
+          return;
+        }
+        onKeyDown(event);
+        return;
+      }
+
       // Only handle events when the drawer or its children have focus
       if (
         asideRef.current &&
@@ -95,9 +125,9 @@ export function RightDrawer({
         tabIndex={isOpen ? -1 : undefined}
         className={cn(
           'fixed inset-0 z-50 flex flex-col',
-          'overflow-hidden border-l border-(--linear-app-frame-seam)',
-          'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))]',
-          'shadow-[-16px_0_40px_rgba(0,0,0,0.16)]',
+          'overflow-hidden',
+          'border-l border-(--linear-app-frame-seam) bg-surface-0',
+          'shadow-[var(--linear-app-drawer-shadow)]',
           'pb-[env(safe-area-inset-bottom)]',
           'transition-transform duration-300 ease-out',
           isOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none',
@@ -118,13 +148,14 @@ export function RightDrawer({
       aria-label={ariaLabel}
       tabIndex={isOpen ? -1 : undefined}
       className={cn(
-        'shrink-0 h-full flex flex-col',
-        'bg-transparent shadow-none',
-        'transition-[width,opacity] duration-300 ease-out',
+        'z-10 shrink-0 h-full min-h-0 flex flex-col',
+        hasHydrated
+          ? 'transition-[width,opacity] duration-300 ease-out'
+          : 'transition-none',
         'overflow-hidden',
         isOpen
-          ? 'opacity-100 visible'
-          : 'opacity-0 pointer-events-none invisible',
+          ? 'visible opacity-100 bg-surface-0'
+          : 'opacity-0 pointer-events-none invisible bg-transparent',
         className
       )}
       style={{ width: isOpen ? width : 0, maxWidth: '100vw' }}

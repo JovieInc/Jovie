@@ -5,16 +5,14 @@ import {
   ArrowLeftRight,
   Flame,
   Globe,
-  Instagram,
   Music,
   Search,
   Sparkles,
   Star,
   TrendingDown,
   TrendingUp,
-  Twitter,
-  Youtube,
 } from 'lucide-react';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type {
   AudienceIntentLevel,
   AudienceMember,
@@ -98,12 +96,26 @@ const DOMAIN_MAP: Record<string, string> = {
 };
 
 const SOURCE_ICONS: Record<string, React.ReactElement> = {
-  X: <Twitter className={`${ICON_CLS} text-tertiary-token`} aria-hidden />,
+  X: (
+    <SocialIcon
+      platform='twitter'
+      className={`${ICON_CLS} text-tertiary-token`}
+      aria-hidden
+    />
+  ),
   Instagram: (
-    <Instagram className={`${ICON_CLS} text-tertiary-token`} aria-hidden />
+    <SocialIcon
+      platform='instagram'
+      className={`${ICON_CLS} text-tertiary-token`}
+      aria-hidden
+    />
   ),
   YouTube: (
-    <Youtube className={`${ICON_CLS} text-tertiary-token`} aria-hidden />
+    <SocialIcon
+      platform='youtube'
+      className={`${ICON_CLS} text-tertiary-token`}
+      aria-hidden
+    />
   ),
   Spotify: <Music className={`${ICON_CLS} text-tertiary-token`} aria-hidden />,
   Google: <Search className={`${ICON_CLS} text-tertiary-token`} aria-hidden />,

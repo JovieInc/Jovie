@@ -1,6 +1,8 @@
 'use client';
 
 import type { CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
+import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import { cn } from '@/lib/utils';
 
 export interface CookieSettingsFooterButtonProps {
@@ -12,6 +14,19 @@ export function CookieSettingsFooterButton({
   className,
   style,
 }: CookieSettingsFooterButtonProps) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const match = document.cookie
+      .split(';')
+      .find(c => c.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`));
+    if (match && match.split('=')[1]?.trim() !== '0') {
+      setVisible(true);
+    }
+  }, []);
+
+  if (!visible) return null;
+
   return (
     <button
       type='button'
@@ -21,7 +36,6 @@ export function CookieSettingsFooterButton({
       )}
       style={style}
       onClick={() => {
-        if (typeof window === 'undefined') return;
         window.dispatchEvent(new CustomEvent('jv:cookie:open'));
       }}
     >

@@ -1,42 +1,33 @@
-import { auth } from '@clerk/nextjs/server';
 import { Button } from '@jovie/ui';
-import { AlertTriangle } from 'lucide-react';
+import { XCircle } from 'lucide-react';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { APP_ROUTES } from '@/constants/routes';
+import { AuthLayout } from '@/features/auth';
+import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
+import { cn } from '@/lib/utils';
 
 export const runtime = 'nodejs';
 
-export default async function UserCreationFailedPage() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    redirect(APP_ROUTES.SIGNIN);
-  }
-
+export default function UserCreationFailedPage() {
   return (
-    <StandaloneProductPage width='sm' centered>
-      <ContentSurfaceCard className='overflow-hidden'>
-        <ContentSectionHeader
-          density='compact'
-          title='Account setup error'
-          subtitle="We're having trouble setting up your account. This is usually temporary."
-        />
-
-        <div className='space-y-5 px-5 py-5 text-center sm:px-6'>
-          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[color-mix(in_oklab,var(--linear-warning)_32%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-warning)_10%,var(--linear-app-content-surface))]'>
-            <AlertTriangle
-              className='h-5 w-5 text-[var(--linear-warning)]'
+    <AuthLayout
+      formTitle='Account setup error'
+      showFooterPrompt={false}
+      showLogoutButton={false}
+    >
+      <div className={cn('w-full px-6 py-7 text-center', AUTH_SURFACE.card)}>
+        <div className='w-full space-y-5 text-center'>
+          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[oklch(65%_0.2_25_/_0.3)] bg-[oklch(65%_0.2_25_/_0.1)]'>
+            <XCircle
+              className='h-5 w-5 text-[oklch(65%_0.2_25)]'
               aria-hidden='true'
             />
           </div>
 
-          <p className='text-[13px] leading-5 text-secondary-token'>
-            Our team has been notified and is working to resolve this issue.
-            Please try again in a few minutes.
+          <p className={cn(FORM_LAYOUT.hint, 'mt-0')}>
+            We&apos;re having trouble setting up your account. This is usually
+            temporary. Our team has been notified and is working to resolve this
+            issue. Please try again in a few minutes.
           </p>
 
           <div className='flex flex-col gap-2 sm:flex-row'>
@@ -50,11 +41,11 @@ export default async function UserCreationFailedPage() {
             </Button>
           </div>
 
-          <p className='text-[11px] uppercase tracking-[0.14em] text-tertiary-token'>
+          <p className='text-[11px] text-tertiary-token'>
             Error code: USER_CREATION_FAILED
           </p>
         </div>
-      </ContentSurfaceCard>
-    </StandaloneProductPage>
+      </div>
+    </AuthLayout>
   );
 }

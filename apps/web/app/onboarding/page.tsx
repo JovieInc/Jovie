@@ -2,10 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/(shell)/dashboard/actions';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout } from '@/features/auth';
-import { PROFILE_REVIEW_STEP_INDEX } from '@/features/dashboard/organisms/apple-style-onboarding/types';
 import { OnboardingFormWrapper } from '@/features/dashboard/organisms/OnboardingFormWrapper';
-import { resolveInitialStep } from '@/features/dashboard/organisms/onboarding/profile-review-guards';
 import { getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
@@ -17,6 +14,7 @@ import { extractErrorMessage } from '@/lib/utils/errors';
 interface OnboardingPageProps {
   readonly searchParams?: Promise<{
     readonly handle?: string;
+    readonly resume?: string;
   }>;
 }
 
@@ -41,14 +39,11 @@ export default async function OnboardingPage({
   // Gate blocked states — proxy normally prevents these from reaching here,
   // but the page must not render for banned/failed users regardless.
   if (authResult.state === CanonicalUserState.BANNED) {
-    redirect('/banned');
+    redirect(APP_ROUTES.UNAVAILABLE);
   }
   if (authResult.state === CanonicalUserState.USER_CREATION_FAILED) {
     redirect('/error/user-creation-failed');
   }
-
-  // Waitlist guard: if user needs waitlist, redirect to /waitlist.
-  // Prevents rendering onboarding when proxy cache is stale.
   if (
     authResult.state === CanonicalUserState.NEEDS_WAITLIST_SUBMISSION ||
     authResult.state === CanonicalUserState.WAITLIST_PENDING
@@ -56,36 +51,26 @@ export default async function OnboardingPage({
     redirect(APP_ROUTES.WAITLIST);
   }
 
+  const hasOnboardingContinuationSignal = Boolean(
+    resolvedSearchParams?.handle || resolvedSearchParams?.resume
+  );
+
   // ACTIVE guard: break redirect loops caused by stale proxy cache or
-  // direct navigation. If the user is already active, send them to /app.
-  if (authResult.state === CanonicalUserState.ACTIVE) {
+  // direct navigation. V2 intentionally allows explicit resume targets
+  // after handle completion, because step 0 activates the user record.
+  // The handle query is also treated as a continuation signal because
+  // completeOnboarding triggers a server rerender before the client can
+  // upgrade the URL to a resume target.
+  if (
+    authResult.state === CanonicalUserState.ACTIVE &&
+    !hasOnboardingContinuationSignal
+  ) {
     redirect('/app');
   }
 
   // Defensive check: ensure we have a valid Clerk user ID
-  // This can happen legitimately in certain scenarios:
-  // - Clerk bypass/mock mode is enabled
-  // - Session expired between proxy.ts and page render
-  // - Clerk context propagation race condition
   if (!authResult.clerkUserId) {
-    const isClerkBypassed =
-      publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
-      !publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-    // Only report to Sentry if this is truly unexpected (not bypass mode)
-    if (!isClerkBypassed) {
-      Sentry.captureMessage('Missing clerkUserId despite proxy routing', {
-        level: 'warning', // Changed from 'error' - this is handled gracefully
-        tags: {
-          context: 'onboarding_defensive_check',
-          vercel_env: env.VERCEL_ENV || 'unknown',
-        },
-        extra: {
-          userState: authResult.state,
-          hasDbUser: !!authResult.dbUserId,
-        },
-      });
-    }
+    reportMissingClerkUserId(authResult);
     redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.ONBOARDING}`);
   }
 
@@ -120,18 +105,6 @@ export default async function OnboardingPage({
   const initialDisplayName =
     existingProfile?.displayName || clerkIdentity.displayName || '';
 
-  // Step-resume: existing user with completed onboarding but missing photo
-  // Routes them directly to profile review to upload a photo
-  const initialStepIndex = resolveInitialStep(
-    existingProfile
-      ? {
-          onboardingCompletedAt: existingProfile.onboardingCompletedAt ?? null,
-          avatarUrl: existingProfile.avatarUrl ?? null,
-        }
-      : null,
-    PROFILE_REVIEW_STEP_INDEX
-  );
-
   const spotifySuggestedHandle = clerkIdentity.spotifyUsername ?? '';
 
   const providedHandle =
@@ -154,29 +127,41 @@ export default async function OnboardingPage({
     !user?.username;
 
   return (
-    <AuthLayout
-      formTitle='Choose your handle'
-      showFooterPrompt={false}
-      showFormTitle={false}
-      logoSpinDelayMs={10000}
-      showLogoutButton
-      logoutRedirectUrl={APP_ROUTES.SIGNIN}
-    >
-      <div className='relative min-h-[500px]'>
-        {/* Unified onboarding form */}
-        <OnboardingFormWrapper
-          initialDisplayName={initialDisplayName}
-          initialHandle={initialHandle}
-          isReservedHandle={Boolean(reservedHandle)}
-          userEmail={userEmail}
-          userId={userId}
-          shouldAutoSubmitHandle={shouldAutoSubmitHandle}
-          initialStepIndex={initialStepIndex}
-          existingAvatarUrl={existingProfile?.avatarUrl ?? null}
-          existingBio={existingProfile?.bio ?? null}
-          existingGenres={existingProfile?.genres ?? null}
-        />
-      </div>
-    </AuthLayout>
+    <OnboardingFormWrapper
+      initialDisplayName={initialDisplayName}
+      initialHandle={initialHandle}
+      isReservedHandle={Boolean(reservedHandle)}
+      userEmail={userEmail}
+      userId={userId}
+      shouldAutoSubmitHandle={shouldAutoSubmitHandle}
+      initialProfileId={existingProfile?.id ?? authResult.profileId}
+      initialResumeStep={resolvedSearchParams?.resume ?? null}
+      existingAvatarUrl={existingProfile?.avatarUrl ?? null}
+      existingBio={existingProfile?.bio ?? null}
+      existingGenres={existingProfile?.genres ?? null}
+    />
   );
+}
+
+function reportMissingClerkUserId(authResult: {
+  state: CanonicalUserState;
+  dbUserId: string | null;
+}) {
+  const isClerkBypassed =
+    publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+    !publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+  if (!isClerkBypassed) {
+    Sentry.captureMessage('Missing clerkUserId despite proxy routing', {
+      level: 'warning',
+      tags: {
+        context: 'onboarding_defensive_check',
+        vercel_env: env.VERCEL_ENV || 'unknown',
+      },
+      extra: {
+        userState: authResult.state,
+        hasDbUser: !!authResult.dbUserId,
+      },
+    });
+  }
 }

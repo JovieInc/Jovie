@@ -1,6 +1,10 @@
 'use client';
 
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
+import {
+  getAccentCssVars,
+  TASK_PRIORITY_ACCENT,
+} from '@/lib/ui/accent-palette';
 import { ReleaseTaskAssigneeBadge } from './ReleaseTaskAssigneeBadge';
 import { ReleaseTaskDueBadge } from './ReleaseTaskDueBadge';
 import { ReleaseTaskExplainerPopover } from './ReleaseTaskExplainerPopover';
@@ -10,21 +14,26 @@ interface ReleaseTaskRowProps {
   readonly onToggle: (taskId: string, done: boolean) => void;
 }
 
-const PRIORITY_DISPLAY: Record<string, { dots: string; color: string }> = {
-  urgent: { dots: '!!!!', color: 'text-red-500' },
-  high: { dots: '•••', color: 'text-red-400' },
-  medium: { dots: '••', color: 'text-amber-400' },
-  low: { dots: '•', color: 'text-tertiary-token' },
-  none: { dots: '', color: '' },
+const PRIORITY_DISPLAY: Record<string, { dots: string }> = {
+  urgent: { dots: '!!!!' },
+  high: { dots: '•••' },
+  medium: { dots: '••' },
+  low: { dots: '•' },
+  none: { dots: '' },
 };
 
 export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
   const isDone = task.status === 'done';
   const isAi = task.assigneeType === 'ai_workflow';
   const priority = PRIORITY_DISPLAY[task.priority] ?? PRIORITY_DISPLAY.medium;
+  const priorityAccent =
+    task.priority === 'none'
+      ? null
+      : getAccentCssVars(TASK_PRIORITY_ACCENT[task.priority]);
+  const aiAccent = getAccentCssVars('purple');
 
   return (
-    <div className='flex items-center gap-3 px-4 py-2 min-h-[44px] group hover:bg-surface-1/50 rounded transition-colors'>
+    <div className='flex items-center gap-3 px-4 py-2 min-h-[44px] group hover:bg-surface-1 rounded transition-colors'>
       {/* Checkbox */}
       <input
         type='checkbox'
@@ -45,14 +54,17 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
       >
         {task.title}
         {isAi && (
-          <span className='ml-1.5 text-[10px] text-purple-500 font-medium'>
+          <span
+            className='ml-1.5 text-[10px] font-medium'
+            style={{ color: aiAccent.solid }}
+          >
             Automatic with Pro
           </span>
         )}
       </span>
 
       {/* Assignee badge */}
-      <div className='flex-shrink-0 hidden md:block'>
+      <div className='flex-shrink-0 max-md:hidden'>
         <ReleaseTaskAssigneeBadge assigneeType={task.assigneeType} />
       </div>
 
@@ -61,13 +73,15 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
         <ReleaseTaskDueBadge
           dueDate={task.dueDate}
           dueDaysOffset={task.dueDaysOffset}
+          isCompleted={isDone}
         />
       </div>
 
       {/* Priority */}
       {priority.dots && (
         <span
-          className={`flex-shrink-0 text-[10px] w-8 text-right ${priority.color}`}
+          className='flex-shrink-0 w-8 text-right text-[10px]'
+          style={priorityAccent ? { color: priorityAccent.solid } : undefined}
           title={task.priority}
         >
           {priority.dots}

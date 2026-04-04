@@ -101,7 +101,7 @@ describe('ProfileCompletionRedirect', () => {
     expect(mockReplace).toHaveBeenCalledWith('/onboarding');
   });
 
-  it('redirects when avatar URL is blank (avatar is required)', () => {
+  it('does NOT redirect when avatar URL is blank (avatar is soft requirement)', () => {
     mockReplace.mockClear();
     renderGuard({
       ...baseDashboardData,
@@ -111,7 +111,7 @@ describe('ProfileCompletionRedirect', () => {
       },
     });
 
-    expect(mockReplace).toHaveBeenCalledWith('/onboarding');
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('does NOT redirect when selectedProfile is null due to dashboardLoadError', () => {
@@ -155,5 +155,19 @@ describe('ProfileCompletionRedirect', () => {
     });
 
     expect(mockReplace).toHaveBeenCalledWith('/onboarding');
+  });
+
+  it('does NOT redirect admins when their profile is incomplete', () => {
+    mockReplace.mockClear();
+    renderGuard({
+      ...baseDashboardData,
+      isAdmin: true,
+      selectedProfile: {
+        ...baseDashboardData.selectedProfile!,
+        isPublic: false,
+      },
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });

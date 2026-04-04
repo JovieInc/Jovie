@@ -10,24 +10,37 @@
 
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq, isNull, ne, or } from 'drizzle-orm';
 import { z } from 'zod';
 
-import { type DbOrTransaction } from '@/lib/db';
+import { type DbOrTransaction, db as plainDb } from '@/lib/db';
+import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { importReleasesFromSpotify } from '@/lib/discography/spotify-import';
 import {
+  extractAllMusicFetchServices,
   extractMusicFetchLinks,
   type MusicFetchProfileFieldState,
   mapMusicFetchProfileFields,
 } from '@/lib/dsp-enrichment/musicfetch-mapping';
+import {
+  MUSICFETCH_SERVICE_TO_DSP,
+  STREAMING_DSP_KEYS,
+} from '@/lib/dsp-registry';
+import { publishIdentityLinks } from '@/lib/identity/publish';
+import { storeRawIdentityLinks } from '@/lib/identity/store';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
-import { MusicfetchRequestError } from '@/lib/musicfetch/resilient-client';
+import { detectAndStoreSoundCloudProStatus } from '@/lib/ingestion/strategies/soundcloud';
+import {
+  isMusicfetchInvalidServicesError,
+  MusicfetchRequestError,
+} from '@/lib/musicfetch/resilient-client';
 import { isBlacklistedSpotifyId } from '@/lib/spotify/blacklist';
 import { logger } from '@/lib/utils/logger';
 import { setEnrichmentJobStatus } from '../enrichment-status';
 import {
   fetchArtistBySpotifyUrl,
+  getMusicFetchServiceUrl,
   isMusicFetchAvailable,
   type MusicFetchArtistResult,
 } from '../providers/musicfetch';
@@ -234,6 +247,170 @@ async function importDiscography(
   }
 }
 
+// ============================================================================
+// DSP Presence Seeding
+// ============================================================================
+
+const streamingDspKeySet = new Set(STREAMING_DSP_KEYS);
+
+/**
+ * Seed dspArtistMatches from MusicFetch discovery results.
+ *
+ * For each streaming DSP that MusicFetch resolved a URL for, upsert a row
+ * into dspArtistMatches. Uses onConflictDoUpdate on URL/name/image fields, and
+ * backfills missing external IDs when MusicFetch provides one, so
+ * ISRC-discovered matches retain their richer confidence data.
+ *
+ * Runs outside the enrichment transaction (plainDb) so failures don't abort
+ * the enrichment job — same pattern as the identity layer.
+ */
+async function seedPresenceFromMusicFetch(
+  artistData: MusicFetchArtistResult,
+  creatorProfileId: string,
+  spotifyUrl: string
+): Promise<number> {
+  const now = new Date();
+  let seeded = 0;
+  const seededProviderIds = new Set<string>();
+
+  for (const [serviceKey, service] of Object.entries(artistData.services)) {
+    const url = getMusicFetchServiceUrl(service);
+    if (!url) continue;
+
+    const dspEntry = MUSICFETCH_SERVICE_TO_DSP.get(serviceKey);
+    if (!dspEntry) continue;
+
+    // Only seed streaming DSPs (not video, metadata, or social)
+    if (!streamingDspKeySet.has(dspEntry.key)) continue;
+
+    // Spotify has a more reliable fallback path: derive the artist ID from the
+    // known Spotify URL when MusicFetch omits it from the service payload.
+    if (dspEntry.key === 'spotify' && !service.id) continue;
+
+    if (seededProviderIds.has(dspEntry.key)) continue;
+
+    try {
+      await plainDb
+        .insert(dspArtistMatches)
+        .values({
+          creatorProfileId,
+          providerId: dspEntry.key,
+          externalArtistId: service.id ?? null,
+          externalArtistName: artistData.name ?? null,
+          externalArtistUrl: url,
+          externalArtistImageUrl: artistData.image?.url ?? null,
+          confidenceScore: null,
+          confidenceBreakdown: null,
+          matchingIsrcCount: 0,
+          matchingUpcCount: 0,
+          totalTracksChecked: 0,
+          status: 'auto_confirmed',
+          confirmedAt: now,
+          matchSource: 'musicfetch',
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [
+            dspArtistMatches.creatorProfileId,
+            dspArtistMatches.providerId,
+          ],
+          set: {
+            ...(service.id
+              ? {
+                  externalArtistId: drizzleSql`COALESCE(${dspArtistMatches.externalArtistId}, excluded.external_artist_id)`,
+                }
+              : {}),
+            externalArtistUrl: url,
+            externalArtistName: artistData.name ?? null,
+            externalArtistImageUrl: artistData.image?.url ?? null,
+            updatedAt: now,
+          },
+          where: or(
+            isNull(dspArtistMatches.matchSource),
+            ne(dspArtistMatches.matchSource, 'manual')
+          ),
+        });
+      seeded++;
+      seededProviderIds.add(dspEntry.key);
+    } catch (error) {
+      // Non-blocking — log and continue to next DSP
+      logger.warn('MusicFetch presence seed: failed to upsert DSP match', {
+        creatorProfileId,
+        providerId: dspEntry.key,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  // Also seed Spotify from the known URL
+  if (spotifyUrl && !seededProviderIds.has('spotify')) {
+    try {
+      const spotifyId = extractSpotifyArtistId(spotifyUrl, null);
+      await plainDb
+        .insert(dspArtistMatches)
+        .values({
+          creatorProfileId,
+          providerId: 'spotify',
+          externalArtistId: spotifyId,
+          externalArtistName: artistData.name ?? null,
+          externalArtistUrl: spotifyUrl,
+          externalArtistImageUrl: artistData.image?.url ?? null,
+          confidenceScore: null,
+          confidenceBreakdown: null,
+          matchingIsrcCount: 0,
+          matchingUpcCount: 0,
+          totalTracksChecked: 0,
+          status: 'auto_confirmed',
+          confirmedAt: now,
+          matchSource: 'musicfetch',
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [
+            dspArtistMatches.creatorProfileId,
+            dspArtistMatches.providerId,
+          ],
+          set: {
+            ...(spotifyId
+              ? {
+                  externalArtistId: drizzleSql`COALESCE(${dspArtistMatches.externalArtistId}, excluded.external_artist_id)`,
+                }
+              : {}),
+            externalArtistUrl: spotifyUrl,
+            externalArtistName: artistData.name ?? null,
+            externalArtistImageUrl: artistData.image?.url ?? null,
+            updatedAt: now,
+          },
+          where: or(
+            isNull(dspArtistMatches.matchSource),
+            ne(dspArtistMatches.matchSource, 'manual')
+          ),
+        });
+      seeded++;
+    } catch (error) {
+      logger.warn('MusicFetch presence seed: failed to upsert Spotify match', {
+        creatorProfileId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  if (seeded > 0) {
+    logger.info('MusicFetch enrichment: seeded DSP presence matches', {
+      creatorProfileId,
+      seeded,
+    });
+  }
+
+  return seeded;
+}
+
+// ============================================================================
+// Job Processor
+// ============================================================================
+
 /**
  * Process a MusicFetch enrichment job.
  *
@@ -242,6 +419,7 @@ async function importDiscography(
  * 3. Creates social_links entries for Instagram, TikTok, etc.
  * 4. Updates bio if the profile has none
  * 5. Imports Spotify discography (releases, tracks, cross-platform links)
+ * 6. Seeds dspArtistMatches for streaming DSP presence
  */
 export async function processMusicFetchEnrichmentJob(
   tx: DbOrTransaction,
@@ -319,6 +497,15 @@ export async function processMusicFetchEnrichmentJob(
   } catch (error) {
     // 400 = bad URL, removed artist, non-artist entity — permanent failure, don't retry
     if (error instanceof MusicfetchRequestError && error.statusCode === 400) {
+      if (isMusicfetchInvalidServicesError(error)) {
+        await setEnrichmentJobStatus(
+          tx,
+          creatorProfileId,
+          'musicfetch',
+          'failed'
+        );
+        throw error;
+      }
       logger.warn('MusicFetch enrichment: permanent failure (400)', {
         creatorProfileId,
         spotifyUrl,
@@ -347,7 +534,40 @@ export async function processMusicFetchEnrichmentJob(
     return result;
   }
 
-  // Apply DSP field updates, merge social links, and import discography
+  // Store ALL platform data in the identity layer (raw, multi-source).
+  // Uses plainDb (not tx) so identity layer errors don't abort the
+  // enrichment transaction — identity layer is additive, not critical.
+  let publishResult = { inserted: 0, updated: 0 };
+  try {
+    const rawLinks = extractAllMusicFetchServices(artistData, spotifyUrl);
+    const storedCount = await storeRawIdentityLinks(
+      plainDb,
+      creatorProfileId,
+      'musicfetch',
+      spotifyUrl,
+      rawLinks
+    );
+
+    logger.info('MusicFetch enrichment: identity layer stored', {
+      creatorProfileId,
+      totalServicesReturned: Object.keys(artistData.services).length,
+      servicesWithValidUrl: rawLinks.length,
+      servicesStored: storedCount,
+    });
+
+    // Publish streaming links from identity layer to social_links
+    publishResult = await publishIdentityLinks(plainDb, profile, {
+      sourceFilter: 'musicfetch',
+    });
+  } catch (error) {
+    // Identity layer is additive — don't fail the enrichment job
+    logger.warn('MusicFetch enrichment: identity layer error (non-blocking)', {
+      creatorProfileId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+
+  // Apply DSP field updates to profile columns (backward compat)
   result.dspFieldsUpdated = await applyDspUpdates(
     tx,
     artistData,
@@ -355,20 +575,57 @@ export async function processMusicFetchEnrichmentJob(
     spotifyUrl,
     creatorProfileId
   );
+
+  // Also run legacy merge for backward compatibility (handles social links
+  // that may not be in the identity layer yet, e.g. during migration)
   const linkResult = await mergeSocialLinks(
     tx,
     artistData,
     profile,
     spotifyUrl
   );
-  result.socialLinksInserted = linkResult.inserted;
-  result.socialLinksUpdated = linkResult.updated;
+  // Identity layer publishes streaming DSPs only. Legacy path handles all links
+  // but streaming ones already exist from identity layer (counted as updates, not inserts).
+  // Sum is correct: identity inserts streaming + legacy inserts non-streaming.
+  result.socialLinksInserted = publishResult.inserted + linkResult.inserted;
+  result.socialLinksUpdated = publishResult.updated + linkResult.updated;
   await importDiscography(
     spotifyUrl,
     profile.spotifyId,
     creatorProfileId,
     result
   );
+
+  // Seed dspArtistMatches for streaming DSP presence (non-blocking, outside tx)
+  try {
+    await seedPresenceFromMusicFetch(artistData, creatorProfileId, spotifyUrl);
+  } catch (error) {
+    // Non-blocking — presence seeding is additive, don't fail the job
+    logger.warn(
+      'MusicFetch enrichment: presence seeding error (non-blocking)',
+      {
+        creatorProfileId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }
+    );
+  }
+
+  // Detect SoundCloud Pro badge (non-blocking, outside tx)
+  const scSlug = profile.soundcloudId;
+  if (scSlug) {
+    try {
+      await detectAndStoreSoundCloudProStatus(
+        plainDb,
+        creatorProfileId,
+        scSlug
+      );
+    } catch (error) {
+      logger.warn('SoundCloud Pro detection failed (non-blocking)', {
+        creatorProfileId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
 
   // Mark enrichment as complete
   await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'complete');

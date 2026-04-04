@@ -20,7 +20,7 @@ export function AppShellSkeleton() {
   return (
     <AppShellFrame
       sidebar={
-        <div className='hidden bg-sidebar lg:flex lg:w-[232px] lg:shrink-0 lg:flex-col'>
+        <div className='max-lg:hidden bg-sidebar lg:flex lg:w-[232px] lg:shrink-0 lg:flex-col'>
           <div className='flex h-9 items-center gap-2 px-2 pt-2'>
             <div className='skeleton h-6 w-6 rounded-md' />
             <div className='skeleton h-4 w-24 rounded' />
@@ -82,7 +82,7 @@ export function AppShellSkeleton() {
               <div className='skeleton h-9 w-28 rounded-md' />
             </div>
 
-            <div className='space-y-2 rounded-xl bg-surface-1/20 p-2.5'>
+            <div className='space-y-2 rounded-xl bg-surface-0 p-2.5'>
               <div className='grid grid-cols-[minmax(0,1.4fr)_110px_68px] gap-3 border-b border-subtle/60 pb-2'>
                 <div className='skeleton h-3 w-24 rounded' />
                 <div className='skeleton h-3 w-16 rounded' />

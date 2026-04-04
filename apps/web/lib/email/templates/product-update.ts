@@ -5,7 +5,7 @@
  * Includes one-click unsubscribe (RFC 8058).
  */
 
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { escapeHtml } from '../utils';
 
 export interface ProductUpdateTemplateData {
@@ -26,13 +26,13 @@ export function getProductUpdateSubject(
 }
 
 export function getProductUpdateText(data: ProductUpdateTemplateData): string {
-  const unsubscribeUrl = `${APP_URL}/api/changelog/unsubscribe?token=${data.unsubscribeToken}`;
+  const unsubscribeUrl = `${BASE_URL}/api/changelog/unsubscribe?token=${data.unsubscribeToken}`;
 
   return `What's new at ${APP_NAME} — v${data.version} (${data.date})
 
 ${data.entriesText}
 
-View full changelog: ${APP_URL}/changelog
+View full changelog: ${BASE_URL}/changelog
 
 ---
 You're receiving this because you subscribed to ${APP_NAME} product updates.
@@ -40,8 +40,8 @@ Unsubscribe: ${unsubscribeUrl}`;
 }
 
 export function getProductUpdateHtml(data: ProductUpdateTemplateData): string {
-  const changelogUrl = `${APP_URL}/changelog`;
-  const unsubscribeUrl = `${APP_URL}/api/changelog/unsubscribe?token=${escapeHtml(data.unsubscribeToken)}`;
+  const changelogUrl = `${BASE_URL}/changelog`;
+  const unsubscribeUrl = `${BASE_URL}/api/changelog/unsubscribe?token=${escapeHtml(data.unsubscribeToken)}`;
 
   return `
 <!DOCTYPE html>
@@ -122,7 +122,7 @@ export function getProductUpdateHtml(data: ProductUpdateTemplateData): string {
 export function getProductUpdateUnsubscribeHeaders(
   unsubscribeToken: string
 ): Record<string, string> {
-  const unsubscribeUrl = `${APP_URL}/api/changelog/unsubscribe?token=${unsubscribeToken}`;
+  const unsubscribeUrl = `${BASE_URL}/api/changelog/unsubscribe?token=${unsubscribeToken}`;
   return {
     'List-Unsubscribe': `<${unsubscribeUrl}>`,
     'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',

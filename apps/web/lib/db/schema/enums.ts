@@ -11,6 +11,7 @@ export const creatorTypeEnum = pgEnum('creator_type', [
 export const themeModeEnum = pgEnum('theme_mode', ['system', 'light', 'dark']);
 
 export const photoStatusEnum = pgEnum('photo_status', [
+  'draft',
   'uploading',
   'processing',
   'ready',
@@ -364,6 +365,27 @@ export const dspBioSyncStatusEnum = pgEnum('dsp_bio_sync_status', [
   'unsupported',
 ]);
 
+export const metadataSubmissionStatusEnum = pgEnum(
+  'metadata_submission_status',
+  [
+    'draft',
+    'awaiting_approval',
+    'queued',
+    'sent',
+    'acknowledged',
+    'live',
+    'drifted',
+    'failed',
+    'manual_followup_needed',
+    'cancelled',
+  ]
+);
+
+export const metadataSubmissionIssueStatusEnum = pgEnum(
+  'metadata_submission_issue_status',
+  ['open', 'resolved', 'ignored']
+);
+
 // Chat Enums
 export const chatMessageRoleEnum = pgEnum('chat_message_role', [
   'user',
@@ -452,6 +474,23 @@ export const leadOutreachStatusEnum = pgEnum('lead_outreach_status', [
   'dismissed',
 ]);
 
+export const leadSourcePlatformEnum = pgEnum('lead_source_platform', [
+  'linktree',
+  'beacons',
+  'laylo',
+]);
+
+export const leadAttributionStatusEnum = pgEnum('lead_attribution_status', [
+  'unattributed',
+  'attributed',
+  'expired',
+]);
+
+export const leadRampModeEnum = pgEnum('lead_ramp_mode', [
+  'manual',
+  'recommend_only',
+]);
+
 // Tip Status Enum
 export const tipStatusEnum = pgEnum('tip_status', [
   'pending',
@@ -496,6 +535,20 @@ export const releaseTaskAssigneeTypeEnum = pgEnum(
   'release_task_assignee_type',
   ['human', 'ai_workflow']
 );
+
+export const taskAssigneeKindEnum = pgEnum('task_assignee_kind', [
+  'human',
+  'jovie',
+]);
+
+export const taskAgentStatusEnum = pgEnum('task_agent_status', [
+  'idle',
+  'queued',
+  'drafting',
+  'awaiting_review',
+  'approved',
+  'failed',
+]);
 
 // Referral Program Enums
 export const referralStatusEnum = pgEnum('referral_status', [

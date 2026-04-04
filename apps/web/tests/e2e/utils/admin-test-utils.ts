@@ -9,6 +9,10 @@
 
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
+import {
+  getAdminCredentials as getSharedAdminCredentials,
+  hasAdminCredentials as hasSharedAdminCredentials,
+} from '../../helpers/clerk-auth';
 
 // ============================================================================
 // Admin Credentials
@@ -24,52 +28,14 @@ interface AdminCredentials {
  * Supports passwordless Clerk test emails (containing +clerk_test)
  */
 export function hasAdminCredentials(): boolean {
-  const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
-  const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
-  const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
-
-  // Allow passwordless auth for Clerk test emails
-  const isClerkTestEmail = adminUsername.includes('+clerk_test');
-
-  // Use admin-specific credentials if available
-  if (
-    adminUsername.length > 0 &&
-    (adminPassword.length > 0 || isClerkTestEmail)
-  ) {
-    return clerkSetupSuccess;
-  }
-
-  // Fall back to regular credentials
-  const username = process.env.E2E_CLERK_USER_USERNAME ?? '';
-  const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
-  const isRegularClerkTestEmail = username.includes('+clerk_test');
-
-  return (
-    username.length > 0 &&
-    (password.length > 0 || isRegularClerkTestEmail) &&
-    clerkSetupSuccess
-  );
+  return hasSharedAdminCredentials();
 }
 
 /**
  * Get admin credentials (admin-specific or fallback to regular)
  */
 export function getAdminCredentials(): AdminCredentials {
-  const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
-  const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
-  const isClerkTestEmail = adminUsername.includes('+clerk_test');
-
-  if (
-    adminUsername.length > 0 &&
-    (adminPassword.length > 0 || isClerkTestEmail)
-  ) {
-    return { username: adminUsername, password: adminPassword };
-  }
-
-  return {
-    username: process.env.E2E_CLERK_USER_USERNAME ?? '',
-    password: process.env.E2E_CLERK_USER_PASSWORD ?? '',
-  };
+  return getSharedAdminCredentials();
 }
 
 // ============================================================================

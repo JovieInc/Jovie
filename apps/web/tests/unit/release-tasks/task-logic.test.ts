@@ -22,6 +22,15 @@ function buildTaskRows(
     description: item.description ?? null,
     explainerText: item.explainerText ?? null,
     learnMoreUrl: item.learnMoreUrl ?? null,
+    metadata: {
+      dueDaysOffset: item.dueDaysOffset,
+      explainerText: item.explainerText ?? null,
+      learnMoreUrl: item.learnMoreUrl ?? null,
+      videoUrl: null,
+      ...(item.descriptionHelper
+        ? { descriptionHelper: item.descriptionHelper }
+        : {}),
+    },
     category: item.category,
     status: 'todo' as const,
     priority: item.priority,
@@ -130,6 +139,28 @@ describe('buildTaskRows', () => {
         DEFAULT_RELEASE_TASK_TEMPLATE[i].explainerText ?? null
       );
     }
+  });
+
+  it('copies description helpers into metadata for supported tasks', () => {
+    const rows = buildTaskRows(releaseId, profileId, null);
+    const pressReleaseTask = rows.find(
+      row => row.title === 'Draft press release'
+    );
+    const distributorFormTask = rows.find(
+      row => row.title === 'Complete distributor marketing/pitching form'
+    );
+
+    expect(pressReleaseTask?.metadata.descriptionHelper).toBeTruthy();
+    expect(distributorFormTask?.metadata.descriptionHelper).toBeTruthy();
+  });
+
+  it('omits description helpers for tasks without helper payloads', () => {
+    const rows = buildTaskRows(releaseId, profileId, null);
+    const artworkTask = rows.find(
+      row => row.title === 'Finalize cover artwork (3000×3000)'
+    );
+
+    expect(artworkTask?.metadata.descriptionHelper).toBeUndefined();
   });
 
   it('ai_workflow tasks have workflow IDs', () => {

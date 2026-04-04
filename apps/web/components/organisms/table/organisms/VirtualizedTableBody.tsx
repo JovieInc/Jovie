@@ -95,6 +95,11 @@ export interface VirtualizedTableBodyProps<TData> {
   readonly getRowClassName?: (row: TData, index: number) => string;
 
   /**
+   * Get a stable test ID for a row when callers need selector-level targeting.
+   */
+  readonly getRowTestId?: (row: TData, index: number) => string | undefined;
+
+  /**
    * Called when the row is shift-clicked (for range selection).
    * @param rowIndex - The index of the clicked row
    * @param rowData  - The data of the clicked row
@@ -174,6 +179,7 @@ export function VirtualizedTableBody<TData>({
   onRowShiftClick,
   getContextMenuItems,
   getRowClassName,
+  getRowTestId,
   renderRow,
   getRowId,
   expandedRowIds,
@@ -245,6 +251,7 @@ export function VirtualizedTableBody<TData>({
             onKeyDown={onKeyDown}
             onFocusChange={onFocusChange}
             getRowClassName={getRowClassName}
+            getRowTestId={getRowTestId}
             measureElement={rowVirtualizer?.measureElement}
             onRowShiftClick={onRowShiftClick}
           />

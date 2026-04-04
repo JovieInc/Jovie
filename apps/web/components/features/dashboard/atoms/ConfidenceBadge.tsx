@@ -22,17 +22,17 @@ const CONFIDENCE_STYLES: Record<
 > = {
   high: {
     label: 'High',
-    className: 'border-success/25 bg-success-subtle text-success',
+    className: 'border-success/20 bg-surface-1 text-success',
     dotClassName: 'bg-success',
   },
   medium: {
     label: 'Medium',
-    className: 'border-warning/25 bg-warning-subtle text-warning',
+    className: 'border-warning/20 bg-surface-1 text-warning',
     dotClassName: 'bg-warning',
   },
   low: {
     label: 'Low',
-    className: 'border-error/25 bg-error-subtle text-error',
+    className: 'border-error/20 bg-surface-1 text-error',
     dotClassName: 'bg-error',
   },
 };
@@ -83,4 +83,4 @@ export function ConfidenceBadge({
   );
 }
 
-export { getConfidenceLevel, CONFIDENCE_THRESHOLDS };
+export { CONFIDENCE_THRESHOLDS, getConfidenceLevel };

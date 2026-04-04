@@ -23,10 +23,12 @@ import VenmoTipSelector from '@/features/profile/VenmoTipSelector';
 import { buildProfilePublicViewModel } from '@/features/profile/view-models';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { AvailableDSP } from '@/lib/dsp';
+import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
+import type { PressPhoto } from '@/types/press-photos';
 
 const TIP_AMOUNTS = [3, 5, 7];
 
@@ -47,6 +49,7 @@ export interface StaticArtistPageProps {
   readonly photoDownloadSizes?: AvatarSize[];
   /** Whether profile photo downloads are allowed */
   readonly allowPhotoDownloads?: boolean;
+  readonly pressPhotos?: PressPhoto[];
   /** Whether to show the two-step notification subscribe variant */
   readonly subscribeTwoStep?: boolean;
   /** Artist genres for the about section */
@@ -57,14 +60,22 @@ export interface StaticArtistPageProps {
   readonly showSubscriptionConfirmedBanner?: boolean;
   readonly showShopButton?: boolean;
   readonly profileV2Enabled?: boolean;
+  readonly viewerCountryCode?: string | null;
 }
 
 /**
  * Merge artist-level DSPs with social-link-derived DSPs, deduped by key.
  * Artist DSPs take priority (listed first).
  */
-function getMergedDSPs(artist: Artist, socialLinks: LegacySocialLink[]) {
-  return getCanonicalProfileDSPs(artist, socialLinks);
+function getMergedDSPs(
+  artist: Artist,
+  socialLinks: LegacySocialLink[],
+  viewerCountryCode?: string | null
+) {
+  return sortDSPsByGeoPopularity(
+    getCanonicalProfileDSPs(artist, socialLinks),
+    viewerCountryCode
+  );
 }
 
 interface RenderContentOptions {
@@ -122,7 +133,7 @@ function renderContent({ viewModel, mergedDSPs }: RenderContentOptions) {
       return (
         <div className='space-y-3 py-2 sm:py-3'>
           {viewModel.subscribeTwoStep ? (
-            <TwoStepNotificationsCTA artist={viewModel.artist} />
+            <TwoStepNotificationsCTA artist={viewModel.artist} startExpanded />
           ) : (
             <ArtistNotificationsCTA
               artist={viewModel.artist}
@@ -144,7 +155,12 @@ function renderContent({ viewModel, mergedDSPs }: RenderContentOptions) {
 
     case 'about':
       return (
-        <AboutSection artist={viewModel.artist} genres={viewModel.genres} />
+        <AboutSection
+          artist={viewModel.artist}
+          genres={viewModel.genres}
+          pressPhotos={viewModel.pressPhotos}
+          allowPhotoDownloads={viewModel.allowPhotoDownloads}
+        />
       );
 
     case 'tour':
@@ -185,6 +201,7 @@ export function StaticArtistPage({
   latestRelease,
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
+  pressPhotos = [],
   subscribeTwoStep = false,
   genres,
   tourDates = [],
@@ -192,8 +209,9 @@ export function StaticArtistPage({
   showSubscriptionConfirmedBanner = true,
   showShopButton = false,
   profileV2Enabled = false,
+  viewerCountryCode,
 }: StaticArtistPageProps) {
-  const mergedDSPs = getMergedDSPs(artist, socialLinks);
+  const mergedDSPs = getMergedDSPs(artist, socialLinks, viewerCountryCode);
   const viewModel = buildProfilePublicViewModel({
     mode,
     artist,
@@ -209,6 +227,7 @@ export function StaticArtistPage({
     latestRelease,
     photoDownloadSizes,
     allowPhotoDownloads,
+    pressPhotos,
     subscribeTwoStep,
     genres,
     tourDates,
@@ -217,7 +236,7 @@ export function StaticArtistPage({
     showShopButton,
   });
 
-  if (profileV2Enabled && supportsProfileV2Mode(mode)) {
+  if (profileV2Enabled && supportsProfileV2Mode(mode, contacts.length > 0)) {
     return (
       <PublicProfileTemplateV2
         mode={mode}
@@ -228,16 +247,21 @@ export function StaticArtistPage({
         enableDynamicEngagement={enableDynamicEngagement}
         subscribeTwoStep={subscribeTwoStep}
         genres={genres}
+        pressPhotos={pressPhotos}
+        allowPhotoDownloads={allowPhotoDownloads}
+        photoDownloadSizes={photoDownloadSizes}
         tourDates={tourDates}
         visitTrackingToken={visitTrackingToken}
-        photoDownloadSizes={photoDownloadSizes}
-        allowPhotoDownloads={allowPhotoDownloads}
+        viewerCountryCode={viewerCountryCode}
       />
     );
   }
 
   return (
-    <PublicProfileTemplate viewModel={viewModel}>
+    <PublicProfileTemplate
+      viewModel={viewModel}
+      viewerCountryCode={viewerCountryCode}
+    >
       <div>
         {viewModel.showSubscriptionConfirmedBanner ? (
           <Suspense>

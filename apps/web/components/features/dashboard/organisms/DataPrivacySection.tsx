@@ -12,15 +12,14 @@ import {
   Input,
 } from '@jovie/ui';
 import { Download, Trash2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
+import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useDeleteAccountMutation, useExportDataMutation } from '@/lib/queries';
 
 export function DataPrivacySection() {
-  const router = useRouter();
+  const { signOut } = useAuthSafe();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
 
@@ -38,70 +37,54 @@ export function DataPrivacySection() {
       {
         onSuccess: () => {
           setDeleteDialogOpen(false);
-          // Redirect to home after deletion
-          router.push('/');
+          // Sign out to clear session cookies, then redirect to home
+          signOut({ redirectUrl: '/' });
         },
       }
     );
-  }, [confirmText, deleteMutation, router]);
+  }, [confirmText, deleteMutation, signOut]);
 
   return (
     <div className='space-y-4'>
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
-      >
-        <ContentSectionHeader
-          title='Data & privacy'
-          subtitle='Export your account data or permanently delete your profile and settings.'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='space-y-3 px-4 py-3'>
-          <ContentSurfaceCard className='flex flex-col justify-between gap-3 bg-surface-0 p-4 sm:flex-row sm:items-start sm:gap-4'>
-            <div className='min-w-0'>
-              <p className='text-[13px] font-[510] text-primary-token'>
-                Export your data
-              </p>
-              <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
-                Download a copy of your profile information, links, contacts,
-                and settings.
-              </p>
-            </div>
-            <Button
-              variant='outline'
-              onClick={handleExport}
-              disabled={exportMutation.isPending}
-              className='w-full shrink-0 sm:w-auto'
-            >
-              <Download className='mr-2 h-4 w-4' aria-hidden />
-              {exportMutation.isPending ? 'Exporting...' : 'Export Data'}
-            </Button>
-          </ContentSurfaceCard>
-
-          <ContentSurfaceCard className='flex flex-col justify-between gap-3 bg-surface-0 p-4 sm:flex-row sm:items-start sm:gap-4'>
-            <div className='min-w-0'>
-              <p className='text-[13px] font-[510] text-primary-token'>
-                Delete account
-              </p>
-              <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
-                Permanently delete your account and all associated data. This
-                action cannot be undone.
-              </p>
-            </div>
-            <Button
-              variant='destructive'
-              onClick={() => setDeleteDialogOpen(true)}
-              className='w-full shrink-0 sm:w-auto'
-            >
-              <Trash2 className='mr-2 h-4 w-4' aria-hidden />
-              Delete Account
-            </Button>
-          </ContentSurfaceCard>
+      <SettingsPanel>
+        <div className='px-4 py-4 sm:px-5'>
+          <SettingsActionRow
+            icon={<Download className='h-4 w-4' aria-hidden />}
+            title='Export your data'
+            description='Download a portable copy of your profile, links, contacts, and account settings.'
+            action={
+              <Button
+                variant='outline'
+                onClick={handleExport}
+                disabled={exportMutation.isPending}
+                className='w-full shrink-0 sm:w-auto'
+              >
+                {exportMutation.isPending ? 'Exporting...' : 'Export data'}
+              </Button>
+            }
+          />
         </div>
-      </DashboardCard>
+      </SettingsPanel>
 
-      {/* Delete Confirmation Dialog */}
+      <SettingsPanel>
+        <div className='px-4 py-4 sm:px-5'>
+          <SettingsActionRow
+            icon={<Trash2 className='h-4 w-4' aria-hidden />}
+            title='Delete your account'
+            description='Permanently remove your account, profile, contacts, and all associated data. This action cannot be undone.'
+            action={
+              <Button
+                variant='destructive'
+                onClick={() => setDeleteDialogOpen(true)}
+                className='w-full shrink-0 sm:w-auto'
+              >
+                Delete account
+              </Button>
+            }
+          />
+        </div>
+      </SettingsPanel>
+
       <AlertDialog
         open={deleteDialogOpen}
         onOpenChange={open => {

@@ -2,6 +2,17 @@
  * Legal pages loading skeleton
  * Matches the legal layout with document-style content
  */
+const LEGAL_PARAGRAPH_KEYS = [
+  'introduction',
+  'scope',
+  'eligibility',
+  'usage',
+  'content',
+  'privacy',
+  'liability',
+  'updates',
+] as const;
+
 export default function LegalLoading() {
   return (
     <div className='prose prose-neutral dark:prose-invert max-w-none'>
@@ -12,10 +23,10 @@ export default function LegalLoading() {
 
       {/* Content paragraphs skeleton */}
       <div className='space-y-6'>
-        {Array.from({ length: 8 }, (_, i) => (
-          <div key={`legal-para-${i + 1}`} className='space-y-2'>
+        {LEGAL_PARAGRAPH_KEYS.map((paragraphKey, index) => (
+          <div key={paragraphKey} className='space-y-2'>
             {/* Section heading */}
-            {i % 3 === 0 && (
+            {index % 3 === 0 && (
               <div className='h-6 w-48 skeleton rounded-md mb-3' />
             )}
             {/* Paragraph lines */}

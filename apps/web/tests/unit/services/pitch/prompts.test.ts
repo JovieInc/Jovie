@@ -14,8 +14,9 @@ const FULL_INPUT: PitchInput = {
     activeSinceYear: 2018,
     spotifyFollowers: 15000,
     spotifyPopularity: 45,
-    pitchContext:
+    careerHighlights:
       '500K+ streams on Spotify. Featured on New Music Friday twice. Recent radio play on KCRW.',
+    targetPlaylists: ['Pollen', 'mint'],
   },
   release: {
     title: 'Midnight Drive',
@@ -44,7 +45,8 @@ const MINIMAL_INPUT: PitchInput = {
     activeSinceYear: null,
     spotifyFollowers: null,
     spotifyPopularity: null,
-    pitchContext: null,
+    careerHighlights: null,
+    targetPlaylists: null,
   },
   release: {
     title: 'Untitled',
@@ -73,6 +75,32 @@ describe('buildSystemPrompt', () => {
     const prompt = buildSystemPrompt();
     expect(prompt.toLowerCase()).toContain('never fabricate');
   });
+
+  it('instructs first-person voice', () => {
+    const prompt = buildSystemPrompt();
+    expect(prompt.toLowerCase()).toContain('first person');
+  });
+
+  it('includes the 3-beat formula', () => {
+    const prompt = buildSystemPrompt();
+    expect(prompt).toContain('EMOTIONAL CORE');
+    expect(prompt).toContain('SONIC PLACEMENT');
+    expect(prompt).toContain('CONTEXT + FIT');
+  });
+
+  it('includes anti-pattern rules', () => {
+    const prompt = buildSystemPrompt();
+    expect(prompt.toLowerCase()).toContain('never use hype words');
+    expect(prompt.toLowerCase()).toContain('never include links');
+    expect(prompt.toLowerCase()).toContain('never include streaming stats');
+    expect(prompt.toLowerCase()).toContain('never copy-paste');
+  });
+
+  it('includes an example pitch', () => {
+    const prompt = buildSystemPrompt();
+    expect(prompt).toContain('EXAMPLE');
+    expect(prompt).toContain('4AM Mercy');
+  });
 });
 
 describe('buildUserPrompt', () => {
@@ -86,11 +114,24 @@ describe('buildUserPrompt', () => {
     expect(prompt).toContain('2018');
   });
 
-  it('includes pitch context when provided', () => {
+  it('includes career highlights when provided', () => {
     const prompt = buildUserPrompt(FULL_INPUT);
     expect(prompt).toContain('500K+ streams');
     expect(prompt).toContain('New Music Friday');
     expect(prompt).toContain('KCRW');
+  });
+
+  it('includes target playlists when provided', () => {
+    const prompt = buildUserPrompt(FULL_INPUT);
+    expect(prompt).toContain('Target Playlists');
+    expect(prompt).toContain('Pollen');
+    expect(prompt).toContain('mint');
+  });
+
+  it('shows fallback text when no target playlists', () => {
+    const prompt = buildUserPrompt(MINIMAL_INPUT);
+    expect(prompt).toContain('Target Playlists');
+    expect(prompt).toContain('suggest');
   });
 
   it('includes release data', () => {
@@ -115,8 +156,8 @@ describe('buildUserPrompt', () => {
     expect(prompt).not.toContain('null');
   });
 
-  it('does not include pitch context section when empty', () => {
+  it('does not include career highlights section when empty', () => {
     const prompt = buildUserPrompt(MINIMAL_INPUT);
-    expect(prompt).not.toContain('Artist-Provided Context');
+    expect(prompt).not.toContain('Career Highlights');
   });
 });

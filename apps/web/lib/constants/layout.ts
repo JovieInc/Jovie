@@ -19,8 +19,8 @@ export const SIDEBAR_WIDTH = 360; // px
  * - TALL: 56px - deprecated, kept for backwards compatibility
  */
 export const TABLE_ROW_HEIGHTS = {
-  COMPACT: 36, // Unified standard row height
-  STANDARD: 36, // Same as COMPACT - all tables use 36px
+  COMPACT: 40, // Unified standard row height
+  STANDARD: 40, // Same as COMPACT - all tables use 40px
   TALL: 56, // Deprecated - remove after full migration
 } as const;
 
@@ -37,6 +37,21 @@ export const TABLE_MIN_WIDTHS = {
   SMALL: 800, // 4-5 columns
   MEDIUM: 960, // 6-8 columns
   LARGE: 1100, // 9+ columns
+} as const;
+
+/**
+ * Skeleton row count for loading shells.
+ *
+ * Sized to fill the tallest common viewport (1440px minus shell chrome)
+ * so the skeleton always covers the visible area with no gap at the bottom.
+ * The overflow-hidden on the table container clips any excess rows.
+ * Using a single generous count avoids layout shift when real data lands.
+ */
+export const SKELETON_ROW_COUNT = {
+  /** Desktop table rows (44px each → 25 rows covers ~1100px) */
+  TABLE: 25,
+  /** Mobile card rows (taller cards → fewer needed) */
+  MOBILE: 16,
 } as const;
 
 /**

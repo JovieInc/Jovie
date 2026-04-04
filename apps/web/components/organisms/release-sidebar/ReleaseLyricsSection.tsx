@@ -35,6 +35,7 @@ interface ReleaseLyricsSectionProps {
   readonly lyrics?: string;
   readonly isEditable: boolean;
   readonly isSaving?: boolean;
+  readonly variant?: 'card' | 'flat';
   readonly onSaveLyrics?: (releaseId: string, lyrics: string) => Promise<void>;
   readonly onFormatLyrics?: (
     releaseId: string,
@@ -48,6 +49,7 @@ export function ReleaseLyricsSection({
   lyrics,
   isEditable,
   isSaving = false,
+  variant = 'card',
   onSaveLyrics,
   onFormatLyrics,
 }: ReleaseLyricsSectionProps) {
@@ -177,49 +179,42 @@ export function ReleaseLyricsSection({
   const showFormatOptions = isEditable && onFormatLyrics;
 
   return (
-    <div className='space-y-2'>
-      <DrawerSurfaceCard
-        className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
-      >
-        <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-          <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-            Editor
-          </p>
-        </div>
-        <div className='space-y-2.5 p-3'>
-          <Textarea
-            placeholder='Paste your lyrics here'
-            value={draftLyrics}
-            onChange={event => setDraftLyrics(event.target.value)}
-            rows={draftLyrics ? 10 : 4}
-            disabled={!isEditable || isSaving}
-            className='min-h-[140px] resize-y border-(--linear-app-frame-seam) bg-surface-0 text-[12px]'
-          />
-          {/* Auto-save status indicator */}
-          {saveStatus !== 'idle' && (
-            <div className='flex items-center gap-1 text-2xs text-tertiary-token'>
-              {saveStatus === 'saving' && (
-                <>
-                  <Loader2
-                    className='h-3 w-3 animate-spin'
-                    aria-hidden='true'
-                  />
-                  <span>Saving…</span>
-                </>
-              )}
-              {saveStatus === 'saved' && (
-                <>
-                  <Check className='h-3 w-3 text-success' aria-hidden='true' />
-                  <span>Saved</span>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </DrawerSurfaceCard>
+    <DrawerSurfaceCard
+      variant={variant}
+      className={cn(
+        variant === 'card' && LINEAR_SURFACE.drawerCardSm,
+        'overflow-hidden'
+      )}
+    >
+      <div className='space-y-2.5 p-3'>
+        <Textarea
+          placeholder='Paste your lyrics here'
+          value={draftLyrics}
+          onChange={event => setDraftLyrics(event.target.value)}
+          rows={draftLyrics ? 10 : 4}
+          disabled={!isEditable || isSaving}
+          className='min-h-[140px] resize-y border-(--linear-app-frame-seam) bg-surface-0 text-[12px]'
+        />
+        {/* Auto-save status indicator */}
+        {saveStatus !== 'idle' && (
+          <div className='flex items-center gap-1 text-2xs text-tertiary-token'>
+            {saveStatus === 'saving' && (
+              <>
+                <Loader2 className='h-3 w-3 animate-spin' aria-hidden='true' />
+                <span>Saving…</span>
+              </>
+            )}
+            {saveStatus === 'saved' && (
+              <>
+                <Check className='h-3 w-3 text-success' aria-hidden='true' />
+                <span>Saved</span>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
-      <div className='flex flex-wrap items-center gap-2 pt-0.5'>
-        {/* Copy button */}
+      <div className='flex flex-wrap items-center gap-2 border-t border-(--linear-app-frame-seam) px-3 py-2.5'>
         <DrawerButton
           type='button'
           disabled={isActionsDisabled || isCopying}
@@ -234,10 +229,8 @@ export function ReleaseLyricsSection({
           {isCopying ? 'Copied!' : 'Copy'}
         </DrawerButton>
 
-        {/* Format split button: primary action + dropdown chevron */}
         {showFormatOptions && (
-          <div className='inline-flex items-center rounded-[8px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'>
-            {/* Primary format action — uses the most recently selected format */}
+          <div className='inline-flex items-center rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'>
             <DrawerButton
               type='button'
               disabled={isActionsDisabled || isFormatting}
@@ -254,7 +247,6 @@ export function ReleaseLyricsSection({
                 : `Format: ${LYRICS_FORMAT_LABELS[selectedFormat]}`}
             </DrawerButton>
 
-            {/* Dropdown chevron — shows all format options */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <DrawerButton
@@ -290,6 +282,6 @@ export function ReleaseLyricsSection({
           </div>
         )}
       </div>
-    </div>
+    </DrawerSurfaceCard>
   );
 }

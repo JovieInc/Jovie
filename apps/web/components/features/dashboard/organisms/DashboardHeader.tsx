@@ -36,19 +36,16 @@ export function DashboardHeader({
   return (
     <header
       data-testid='dashboard-header'
-      className={cn(
-        'z-20 border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-[12px]',
-        className
-      )}
+      className={cn('z-20 bg-(--linear-app-content-surface)', className)}
     >
       {/* Mobile: Large page title with action buttons + profile */}
-      <div className='flex items-center justify-between px-4 pb-2 pt-3 sm:hidden'>
-        <h1 className='text-[18px] font-[580] leading-tight tracking-[-0.02em] text-primary-token'>
+      <div className='hidden max-sm:flex items-center justify-between px-4 pb-2 pt-3'>
+        <h1 className='text-[17px] font-[560] leading-tight tracking-[-0.018em] text-primary-token'>
           {currentLabel}
         </h1>
         <div className='flex items-center gap-2'>
           {action ? (
-            <div className='flex items-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] [&_button]:h-8 [&_button]:rounded-[10px] [&_button]:border [&_button]:border-(--linear-app-frame-seam) [&_button]:bg-surface-0 [&_button>svg]:h-4 [&_button>svg]:w-4'>
+            <div className='flex items-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1 [&_button]:h-8 [&_button]:rounded-full [&_button]:shadow-none [&_button>svg]:h-4 [&_button>svg]:w-4'>
               {action}
             </div>
           ) : (
@@ -57,36 +54,38 @@ export function DashboardHeader({
         </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}
-      <div className='relative hidden h-[calc(var(--linear-app-header-height)-4px)] w-full items-center gap-1.5 px-(--linear-app-header-padding-x) sm:flex'>
+      <div className='relative max-sm:hidden h-(--linear-app-header-height-compact) w-full items-center gap-2 px-2.5 sm:flex'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
-          <div className='hidden items-center lg:flex'>{sidebarTrigger}</div>
+          <div className='max-lg:hidden items-center lg:flex'>
+            {sidebarTrigger}
+          </div>
         ) : null}
         {/* Conditional vertical separator between sidebar trigger and actions */}
         {showDivider && sidebarTrigger && action ? (
-          <div className='hidden lg:flex items-center'>
+          <div className='max-lg:hidden lg:flex items-center'>
             <VerticalDivider />
           </div>
         ) : null}
         {/* Desktop: Simplified breadcrumb - just current page */}
         <div className='flex min-w-0 flex-1 items-center gap-1 tracking-[-0.012em]'>
           {usesSectionTitleLayout ? (
-            <span className='truncate text-[11px] font-[565] tracking-[-0.014em] text-primary-token'>
+            <span className='truncate text-[12px] font-[560] tracking-[-0.01em] text-primary-token'>
               {currentLabel}
             </span>
           ) : (
             <>
-              <span className='shrink-0 text-[10px] font-[555] uppercase tracking-[0.08em] text-tertiary-token'>
+              <span className='shrink-0 text-[11px] font-[510] tracking-[-0.01em] text-tertiary-token'>
                 {rootLabel}
               </span>
-              <ChevronRight className='size-3 shrink-0 text-quaternary-token' />
+              <ChevronRight className='size-3 shrink-0 text-quaternary-token/85' />
               {breadcrumbSuffix ? (
-                <div className='min-w-0 truncate text-[11px] text-secondary-token'>
+                <div className='min-w-0 truncate text-[12px] tracking-[-0.01em] text-secondary-token'>
                   {breadcrumbSuffix}
                 </div>
               ) : (
-                <span className='truncate text-[11px] font-[555] text-primary-token'>
+                <span className='truncate text-[12px] font-[560] tracking-[-0.01em] text-primary-token'>
                   {currentLabel}
                 </span>
               )}
@@ -94,9 +93,7 @@ export function DashboardHeader({
           )}
         </div>
         {action ? (
-          <div className='ml-auto flex items-center gap-(--linear-app-toolbar-gap)'>
-            {action}
-          </div>
+          <div className='ml-auto flex items-center gap-1'>{action}</div>
         ) : null}
       </div>
     </header>

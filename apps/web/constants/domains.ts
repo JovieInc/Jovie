@@ -15,6 +15,10 @@ import { publicEnv } from '@/lib/env-public';
 
 /** Main domain hostname (jov.ie) */
 export const HOSTNAME = publicEnv.NEXT_PUBLIC_PROFILE_HOSTNAME;
+const STAGING_HOSTNAMES = new Set([
+  `staging.${HOSTNAME}`,
+  `main.${HOSTNAME}`, // Legacy staging hostname
+]);
 
 /** @deprecated Use HOSTNAME instead */
 export const PROFILE_HOSTNAME = HOSTNAME;
@@ -68,7 +72,11 @@ export function getAppUrl(path: string = ''): string {
  * Check if a hostname matches the main domain
  */
 export function isMainDomain(hostname: string): boolean {
-  return hostname === HOSTNAME || hostname === `www.${HOSTNAME}`;
+  return (
+    hostname === HOSTNAME ||
+    hostname === `www.${HOSTNAME}` ||
+    STAGING_HOSTNAMES.has(hostname)
+  );
 }
 
 /** @deprecated Use isMainDomain instead */
@@ -83,7 +91,7 @@ export const isAppDomain = isMainDomain;
 export function isPreviewEnvironment(hostname: string): boolean {
   return (
     hostname.includes('vercel.app') ||
-    hostname === `main.${HOSTNAME}` ||
+    STAGING_HOSTNAMES.has(hostname) ||
     hostname === 'localhost'
   );
 }
@@ -120,6 +128,10 @@ export const INGESTION_USER_AGENT = `jovie-link-ingestion/1.0 (+${BASE_URL})`;
 // Clerk Configuration
 // ============================================================================
 
-/** Clerk proxy URL for custom domain setup */
-export const CLERK_PROXY_HOSTNAME = 'clerk.jov.ie';
-export const CLERK_PROXY_URL = `https://${CLERK_PROXY_HOSTNAME}`;
+/**
+ * Clerk FAPI URL — the actual Clerk frontend API endpoint.
+ * Both staging and production use the same instance.
+ * Proxied via /__clerk/* path (vercel.json rewrites).
+ * Do NOT use clerk.jov.ie — that domain is dead.
+ */
+export const CLERK_FAPI_URL = 'https://distinct-giraffe-5.clerk.accounts.dev';

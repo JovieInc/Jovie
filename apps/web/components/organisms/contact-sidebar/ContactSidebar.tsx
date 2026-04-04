@@ -4,13 +4,17 @@ import type { CommonDropdownItem } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 
-import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
+import {
+  DrawerTabbedCard,
+  DrawerTabs,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import {
   type ContextMenuItemType,
   convertToCommonDropdownItems,
 } from '@/components/organisms/table';
 
-import { ContactAvatar } from './ContactAvatar';
 import { ContactFields } from './ContactFields';
 import { useContactHeaderParts } from './ContactSidebarHeader';
 import { ContactSocialLinks } from './ContactSocialLinks';
@@ -45,8 +49,6 @@ export const ContactSidebar = memo(function ContactSidebar({
     hasContact,
     fullName,
     displayName,
-    canUploadAvatar,
-    handleAvatarUpload,
     handleCopyProfileUrl,
     handleNameChange,
     handleUsernameChange,
@@ -60,16 +62,6 @@ export const ContactSidebar = memo(function ContactSidebar({
     onClose,
     onContactChange,
     onAvatarUpload,
-  });
-
-  const { title: headerTitle, actions: headerActions } = useContactHeaderParts({
-    contact,
-    hasContact,
-    onRefresh,
-    onCopyProfileUrl: () => {
-      handleCopyProfileUrl();
-    },
-    onClose,
   });
 
   // Only depend on specific contact fields, not the entire contact object
@@ -128,6 +120,16 @@ export const ContactSidebar = memo(function ContactSidebar({
   ]);
 
   const contextMenuItems = providedContextMenuItems ?? fallbackContextMenuItems;
+  const {
+    title: headerTitle,
+    primaryActions,
+    overflowActions,
+  } = useContactHeaderParts({
+    contact,
+    hasContact,
+    onRefresh,
+    onClose,
+  });
 
   return (
     <EntitySidebarShell
@@ -137,35 +139,32 @@ export const ContactSidebar = memo(function ContactSidebar({
       contextMenuItems={contextMenuItems}
       data-testid='contact-sidebar'
       title={headerTitle}
-      onClose={onClose}
-      headerActions={headerActions}
+      onClose={contact ? undefined : onClose}
+      headerMode='minimal'
+      headerActions={
+        <DrawerHeaderActions
+          primaryActions={primaryActions}
+          overflowActions={overflowActions}
+          menuItems={contextMenuItems}
+          onClose={onClose}
+        />
+      }
       isEmpty={!contact}
       emptyMessage='Select a row in the table to view contact details.'
-      entityHeader={
-        contact ? (
-          <ContactAvatar
-            avatarUrl={contact.avatarUrl ?? null}
-            fullName={fullName}
-            username={contact.username}
-            isVerified={contact.isVerified}
-            canUploadAvatar={canUploadAvatar}
-            onAvatarUpload={canUploadAvatar ? handleAvatarUpload : undefined}
-          />
-        ) : undefined
-      }
-      tabs={
-        contact ? (
-          <DrawerTabs
-            value={activeTab}
-            onValueChange={value => setActiveTab(value as SidebarTab)}
-            options={SIDEBAR_TAB_OPTIONS}
-            ariaLabel='Contact sidebar view'
-          />
-        ) : undefined
-      }
     >
       {contact && (
-        <>
+        <DrawerTabbedCard
+          testId='contact-tabbed-card'
+          tabs={
+            <DrawerTabs
+              value={activeTab}
+              onValueChange={value => setActiveTab(value as SidebarTab)}
+              options={SIDEBAR_TAB_OPTIONS}
+              ariaLabel='Contact sidebar view'
+            />
+          }
+          contentClassName='pt-2'
+        >
           {activeTab === 'details' && (
             <ContactFields
               name={displayName ?? ''}
@@ -188,7 +187,7 @@ export const ContactSidebar = memo(function ContactSidebar({
               onNewLinkKeyDown={handleNewLinkKeyDown}
             />
           )}
-        </>
+        </DrawerTabbedCard>
       )}
     </EntitySidebarShell>
   );

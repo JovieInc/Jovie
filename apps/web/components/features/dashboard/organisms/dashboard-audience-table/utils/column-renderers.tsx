@@ -6,6 +6,7 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
   AudienceActionsCell,
   AudienceDeviceCell,
+  AudienceEngagementCell,
   AudienceIdentificationIndicator,
   AudienceIntentScoreCell,
   AudienceLastActionCell,
@@ -22,7 +23,9 @@ import {
   AudienceVisitsCell,
   convertContextMenuItems,
 } from '@/components/organisms/table';
-import type { AudienceMember } from '@/types';
+import { cn } from '@/lib/utils';
+import { formatTimeAgo } from '@/lib/utils/audience';
+import type { AudienceMember, AudienceMemberType } from '@/types';
 import {
   useAudienceTableStableContext,
   useAudienceTableVolatileContext,
@@ -38,6 +41,7 @@ export function renderUserCell({
     <AudienceUserCell
       displayName={row.original.displayName}
       type={row.original.type}
+      tags={row.original.tags}
       deviceType={row.original.deviceType}
       geoCity={row.original.geoCity}
       geoCountry={row.original.geoCountry}
@@ -269,6 +273,177 @@ export function TouringCityCell({ row }: CellContext<AudienceMember, unknown>) {
     <AudienceTouringBadge
       touringCity={info?.city ?? null}
       showDate={info?.showDate ?? null}
+    />
+  );
+}
+
+/**
+ * Renders the user cell with type dot, inline touring badge,
+ * and a metadata subtitle that ensures info density at every breakpoint.
+ *
+ * The subtitle shows engagement, location, and last-seen data so the
+ * User column remains informative even when other columns are hidden
+ * at narrow viewport widths.
+ */
+export function UserCellWithTouring({
+  row,
+}: CellContext<AudienceMember, string | null>) {
+  const { getTouringCity, hiddenMetadataColumns } =
+    useAudienceTableStableContext();
+  const touringInfo = getTouringCity(row.original);
+  const m = row.original;
+
+  // Build subtitle tokens for the metadata that is hidden in the current layout.
+  const subtitleParts: {
+    key: string;
+    text: string;
+    className?: string;
+  }[] = [];
+
+  if (hiddenMetadataColumns.engagement) {
+    if (m.intentLevel === 'high') {
+      subtitleParts.push({
+        key: 'intent',
+        text: 'High',
+        className: 'font-[510] text-emerald-600 dark:text-emerald-400',
+      });
+    } else if (m.intentLevel === 'medium') {
+      subtitleParts.push({
+        key: 'intent',
+        text: 'Medium',
+        className: 'font-[510] text-amber-600 dark:text-amber-400',
+      });
+    }
+
+    if (m.visits > 0) {
+      subtitleParts.push({
+        key: 'visits',
+        text: `${m.visits} ${m.visits === 1 ? 'visit' : 'visits'}`,
+      });
+    }
+  }
+
+  if (hiddenMetadataColumns.location) {
+    const locationCity = m.geoCity ?? m.geoCountry ?? null;
+    if (locationCity) {
+      try {
+        subtitleParts.push({
+          key: 'location',
+          text: decodeURIComponent(locationCity),
+        });
+      } catch {
+        subtitleParts.push({ key: 'location', text: locationCity });
+      }
+    }
+  }
+
+  if (hiddenMetadataColumns.lastSeen && m.lastSeenAt) {
+    subtitleParts.push({
+      key: 'last-seen',
+      text: formatTimeAgo(m.lastSeenAt),
+      className: 'tabular-nums',
+    });
+  }
+
+  return (
+    <div className='flex items-center gap-2 min-w-0'>
+      <div className='flex-1 min-w-0 flex flex-col justify-center'>
+        <AudienceUserCell
+          displayName={m.displayName}
+          type={m.type}
+          tags={m.tags}
+          deviceType={m.deviceType}
+          geoCity={m.geoCity}
+          geoCountry={m.geoCountry}
+          showTypeDot
+          className='min-w-0'
+        />
+        {subtitleParts.length > 0 && (
+          <div className='flex items-center gap-1 min-w-0 pl-[22px] text-[11px] text-tertiary-token leading-tight'>
+            {subtitleParts.map((part, i) => (
+              <span key={part.key} className='flex items-center gap-1 min-w-0'>
+                {i > 0 && (
+                  <span
+                    className='text-quaternary-token select-none shrink-0'
+                    aria-hidden='true'
+                  >
+                    ·
+                  </span>
+                )}
+                <span className={cn('truncate', part.className)}>
+                  {part.text}
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      {touringInfo && (
+        <AudienceTouringBadge
+          touringCity={touringInfo.city}
+          showDate={touringInfo.showDate}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Renders the location cell from the row's locationLabel field.
+ */
+export function renderLocationCellFromRow({
+  row,
+}: CellContext<AudienceMember, string | null>) {
+  return <AudienceLocationCell locationLabel={row.original.locationLabel} />;
+}
+
+/**
+ * Renders a plain numeric visits cell without intent decoration.
+ */
+export function renderVisitsNumberCell({
+  getValue,
+}: CellContext<AudienceMember, number>) {
+  const visits = getValue();
+  return (
+    <span className='tabular-nums text-[13px] font-[400] text-secondary-token'>
+      {visits}
+    </span>
+  );
+}
+
+/**
+ * Renders the type badge cell (standalone column version).
+ */
+export function renderTypeBadgeCell({
+  getValue,
+}: CellContext<AudienceMember, AudienceMemberType>) {
+  return <AudienceTypeBadge type={getValue()} />;
+}
+
+/**
+ * Renders the engagement cell (visits count + intent icon).
+ */
+export function renderEngagementCell({
+  row,
+}: CellContext<AudienceMember, number>) {
+  return (
+    <AudienceEngagementCell
+      visits={row.original.visits}
+      intentLevel={row.original.intentLevel}
+    />
+  );
+}
+
+/**
+ * Renders last action + last seen time combined in one cell.
+ */
+export function renderLastSeenActionCell({
+  row,
+}: CellContext<AudienceMember, AudienceMember['latestActions']>) {
+  return (
+    <AudienceLastActionCell
+      actions={row.original.latestActions}
+      lastSeenAt={row.original.lastSeenAt}
     />
   );
 }

@@ -6,9 +6,17 @@ import { fastRender } from '@/tests/utils/fast-render';
 
 vi.mock('motion/react', () => ({
   motion: {
-    div: ({ children, ...props }: ComponentProps<'div'>) => (
-      <div {...props}>{children}</div>
-    ),
+    div: ({
+      children,
+      initial: _initial,
+      animate: _animate,
+      transition: _transition,
+      ...props
+    }: ComponentProps<'div'> & {
+      initial?: unknown;
+      animate?: unknown;
+      transition?: unknown;
+    }) => <div {...props}>{children}</div>,
   },
   useReducedMotion: () => true,
 }));
@@ -22,6 +30,19 @@ vi.mock('@/components/jovie/components/ChatMarkdown', () => ({
 }));
 
 describe('ChatMessage analytics cards', () => {
+  it('renders assistant replies with neutral message chrome', () => {
+    const messageProps = {
+      id: 'assistant-2',
+      role: 'assistant' as const,
+      parts: [{ type: 'text', text: 'Here is a cleaner response.' }],
+    };
+    fastRender(<ChatMessage {...messageProps} />);
+
+    expect(screen.getByTestId('chat-message-reply-bubble')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copy message' })).toBeTruthy();
+    expect(screen.queryByText('Copy')).toBeNull();
+  });
+
   it('renders a chat analytics card for showTopInsights tool results', () => {
     const parts = [
       { type: 'text', text: 'Here are the strongest signals I see.' },
