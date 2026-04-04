@@ -25,10 +25,6 @@ export const FEATURE_FLAG_KEYS = {
   SHOW_SEE_IT_IN_ACTION: 'show_see_it_in_action',
 } as const;
 
-/** @deprecated */
-export type FeatureFlagKey =
-  (typeof FEATURE_FLAG_KEYS)[keyof typeof FEATURE_FLAG_KEYS];
-
 export type SubscribeCTAVariant = 'two_step' | 'inline';
 
 /** @deprecated — bootstrap is no longer needed (Statsig removed). */
