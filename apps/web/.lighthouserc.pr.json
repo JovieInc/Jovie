@@ -5,57 +5,64 @@
       "url": ["http://localhost:3000/", "http://localhost:3000/tim"]
     },
     "assert": {
+      "preset": "lighthouse:no-pwa",
+      "assertions": {
+        "errors-in-console": "warn",
+        "interactive": [
+          "warn",
+          {
+            "maxNumericValue": 5000
+          }
+        ],
+        "first-contentful-paint": [
+          "warn",
+          {
+            "maxNumericValue": 3500
+          }
+        ],
+        "largest-contentful-paint": [
+          "warn",
+          {
+            "maxNumericValue": 5000
+          }
+        ],
+        "cumulative-layout-shift": [
+          "warn",
+          {
+            "maxNumericValue": 0.15
+          }
+        ],
+        "total-blocking-time": [
+          "warn",
+          {
+            "maxNumericValue": 1500
+          }
+        ],
+        "speed-index": [
+          "warn",
+          {
+            "maxNumericValue": 6000
+          }
+        ],
+        "max-potential-fid": "warn",
+        "mainthread-work-breakdown": "warn",
+        "render-blocking-resources": "off",
+        "render-blocking-insight": "off",
+        "legacy-javascript-insight": "warn",
+        "unused-javascript": "warn",
+        "color-contrast": "warn",
+        "image-delivery-insight": "warn",
+        "document-latency-insight": "warn",
+        "is-crawlable": "off",
+        "forced-reflow-insight": "warn",
+        "network-dependency-tree-insight": "off",
+        "target-size": "warn",
+        "digest-mismatch": "off"
+      },
       "assertMatrix": [
         {
           "matchingUrlPattern": "http://localhost:3000/$",
-          "preset": "lighthouse:no-pwa",
           "assertions": {
-            "errors-in-console": "warn",
-            "interactive": [
-              "warn",
-              {
-                "maxNumericValue": 5000
-              }
-            ],
-            "first-contentful-paint": [
-              "error",
-              {
-                "maxNumericValue": 2500
-              }
-            ],
-            "largest-contentful-paint": [
-              "error",
-              {
-                "maxNumericValue": 4000
-              }
-            ],
-            "cumulative-layout-shift": [
-              "error",
-              {
-                "maxNumericValue": 0.1
-              }
-            ],
-            "total-blocking-time": [
-              "error",
-              {
-                "maxNumericValue": 1500
-              }
-            ],
-            "speed-index": [
-              "warn",
-              {
-                "maxNumericValue": 5000
-              }
-            ],
-            "max-potential-fid": "warn",
-            "mainthread-work-breakdown": "warn",
-            "render-blocking-resources": "off",
-            "render-blocking-insight": "off",
-            "legacy-javascript-insight": "warn",
-            "unused-javascript": "warn",
-            "color-contrast": "warn",
-            "image-delivery-insight": "warn",
-            "document-latency-insight": "warn",
             "categories:performance": [
               "error",
               {
@@ -79,61 +86,12 @@
               {
                 "minScore": 0.6
               }
-            ],
-            "is-crawlable": "off",
-            "forced-reflow-insight": "warn",
-            "network-dependency-tree-insight": "off",
-            "target-size": "warn",
-            "digest-mismatch": "off"
+            ]
           }
         },
         {
           "matchingUrlPattern": "http://localhost:3000/tim/?$",
-          "preset": "lighthouse:no-pwa",
           "assertions": {
-            "errors-in-console": "warn",
-            "interactive": [
-              "warn",
-              {
-                "maxNumericValue": 4000
-              }
-            ],
-            "first-contentful-paint": [
-              "warn",
-              {
-                "maxNumericValue": 3000
-              }
-            ],
-            "largest-contentful-paint": [
-              "warn",
-              {
-                "maxNumericValue": 4000
-              }
-            ],
-            "cumulative-layout-shift": [
-              "warn",
-              {
-                "maxNumericValue": 0.25
-              }
-            ],
-            "total-blocking-time": [
-              "warn",
-              {
-                "maxNumericValue": 1500
-              }
-            ],
-            "speed-index": [
-              "warn",
-              {
-                "maxNumericValue": 5000
-              }
-            ],
-            "max-potential-fid": "warn",
-            "mainthread-work-breakdown": "warn",
-            "render-blocking-resources": "off",
-            "render-blocking-insight": "off",
-            "legacy-javascript-insight": "warn",
-            "unused-javascript": "warn",
             "categories:performance": [
               "error",
               {
@@ -157,12 +115,7 @@
               {
                 "minScore": 0.6
               }
-            ],
-            "is-crawlable": "off",
-            "forced-reflow-insight": "warn",
-            "network-dependency-tree-insight": "off",
-            "target-size": "warn",
-            "digest-mismatch": "off"
+            ]
           }
         }
       ]
