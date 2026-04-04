@@ -77,7 +77,6 @@ function ProfilePane({
           latestRelease={latestRelease}
           tourDates={tourDates}
           dsps={mergedDSPs}
-          enableDynamicEngagement={enableDynamicEngagement}
         />
       ) : null}
 
@@ -101,7 +100,6 @@ function ProfilePane({
             latestRelease={latestRelease}
             tourDates={[]}
             dsps={mergedDSPs}
-            enableDynamicEngagement={enableDynamicEngagement}
           />
         </div>
       ) : null}

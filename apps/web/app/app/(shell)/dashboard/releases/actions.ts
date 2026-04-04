@@ -97,7 +97,7 @@ function normalizeEditableText(
   value: string | null | undefined
 ): string | null {
   const trimmed = value?.trim() ?? '';
-  return trimmed ? trimmed : null;
+  return trimmed || null;
 }
 
 function normalizeEditableUpc(value: string | null | undefined): string | null {
