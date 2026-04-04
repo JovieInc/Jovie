@@ -1,11 +1,4 @@
-import {
-  BellRing,
-  CheckCircle2,
-  Circle,
-  Pencil,
-  Rocket,
-  TrendingUp,
-} from 'lucide-react';
+import { BellRing, CheckCircle2, Circle } from 'lucide-react';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
 import { APP_ROUTES } from '@/constants/routes';
@@ -60,7 +53,7 @@ function HomeHero() {
 
       <Container size='homepage'>
         <div className='mx-auto max-w-[1120px]'>
-          <div className='grid items-center gap-12 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-10 xl:grid-cols-[minmax(0,1.22fr)_minmax(0,0.78fr)]'>
+          <div className='grid items-center gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]'>
             <div>
               <p className='homepage-section-eyebrow'>
                 The release system for independent artists
@@ -343,84 +336,79 @@ function CommandCenterSection() {
     <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
       <Container size='homepage'>
         <div className='mx-auto max-w-[1120px]'>
-          <div className='text-center'>
-            <p className='homepage-section-eyebrow mx-auto'>Task & Playbook</p>
-            <h2 className='marketing-h2-linear mx-auto mt-4 text-primary-token'>
-              Command center for your career.
-            </h2>
-          </div>
-
-          <div className='mt-14 grid gap-3 lg:grid-cols-3'>
-            <div className='rounded-2xl bg-white/[0.04] p-6'>
-              <div className='flex items-center gap-2'>
-                <Circle className='h-3.5 w-3.5 text-white/25' />
-                <span className='text-[11px] font-medium text-white/40'>
-                  To do
-                </span>
-              </div>
-              <h3 className='mt-4 text-[15px] font-[560] text-white'>
-                Pitch to editorial playlists
-              </h3>
-              <p className='mt-2 text-[12px] text-white/35'>Due in 3 days</p>
-            </div>
-
-            <div className='rounded-2xl bg-white/[0.04] p-6'>
-              <div className='flex items-center gap-2'>
-                <span className='h-3.5 w-3.5 rounded-full border-2 border-sky-400' />
-                <span className='text-[11px] font-medium text-sky-400/70'>
-                  In progress
-                </span>
-              </div>
-              <h3 className='mt-4 text-[15px] font-[560] text-white'>
-                Upload Canvas to Spotify
-              </h3>
-              <p className='mt-2 text-[12px] text-white/35'>Started today</p>
-            </div>
-
-            <div className='rounded-2xl bg-white/[0.04] p-6'>
-              <div className='flex items-center gap-2'>
-                <CheckCircle2 className='h-3.5 w-3.5 text-emerald-400' />
-                <span className='text-[11px] font-medium text-emerald-400/70'>
-                  Done
-                </span>
-              </div>
-              <h3 className='mt-4 text-[15px] font-[560] text-white'>
-                Metadata verified
-              </h3>
-              <p className='mt-2 text-[12px] text-white/35'>
-                ISRC and UPC synced
+          <div className='grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:items-start'>
+            <div>
+              <p className='homepage-section-eyebrow'>Task & Playbook</p>
+              <h2 className='marketing-h2-linear mt-4 text-primary-token'>
+                Command center for your career.
+              </h2>
+              <p className='mt-5 max-w-[28rem] text-[15px] leading-[1.7] text-secondary-token'>
+                Jovie generates a release playbook from your brief. Tasks track
+                themselves.
               </p>
-            </div>
-          </div>
 
-          <div className='mt-3 grid gap-3 lg:grid-cols-2'>
-            <div className='rounded-2xl bg-white/[0.04] p-6'>
-              <p className='text-[11px] font-medium text-white/40'>
-                Jovie generated
-              </p>
-              <h3 className='mt-3 text-[15px] font-[560] text-white'>
-                Release playbook ready
-              </h3>
-              <p className='mt-2 text-[12px] text-white/35'>
-                4 tasks created from your release brief. 1 done, 1 in progress,
-                2 to go.
-              </p>
-            </div>
-
-            <div className='rounded-2xl bg-white/[0.04] p-6'>
-              <p className='text-[11px] font-medium text-white/40'>
-                Monitoring
-              </p>
-              <h3 className='mt-3 text-[15px] font-[560] text-white'>
-                All platforms synced
-              </h3>
-              <div className='mt-3 flex items-center gap-4'>
+              <div className='mt-8 flex items-center gap-4'>
                 {TRUST_LABELS.map(partner => (
                   <HomepageLabelLogoMark
                     key={partner}
                     partner={partner}
-                    className='text-white/40'
+                    className='text-white/30'
                   />
+                ))}
+              </div>
+            </div>
+
+            <div className='rounded-2xl bg-white/[0.04] p-5'>
+              <div className='flex items-center justify-between pb-4'>
+                <p className='text-[11px] font-medium text-white/40'>
+                  Release playbook
+                </p>
+                <p className='text-[11px] text-white/25'>3 of 4 done</p>
+              </div>
+
+              <div className='space-y-0'>
+                {[
+                  {
+                    title: 'Metadata verified',
+                    detail: 'ISRC and UPC synced',
+                    done: true,
+                  },
+                  {
+                    title: 'Upload Canvas to Spotify',
+                    detail: 'Started today',
+                    done: true,
+                  },
+                  {
+                    title: 'Pitch to editorial playlists',
+                    detail: 'Due in 3 days',
+                    done: true,
+                  },
+                  {
+                    title: 'Schedule launch day posts',
+                    detail: 'Queued',
+                    done: false,
+                  },
+                ].map(item => (
+                  <div
+                    key={item.title}
+                    className='flex items-center justify-between border-t border-white/6 py-3'
+                  >
+                    <div className='flex items-center gap-3'>
+                      {item.done ? (
+                        <CheckCircle2 className='h-3.5 w-3.5 text-emerald-400/70' />
+                      ) : (
+                        <Circle className='h-3.5 w-3.5 text-white/20' />
+                      )}
+                      <span
+                        className={`text-[13px] ${item.done ? 'text-white/40 line-through' : 'text-white/80'}`}
+                      >
+                        {item.title}
+                      </span>
+                    </div>
+                    <span className='text-[11px] text-white/25'>
+                      {item.detail}
+                    </span>
+                  </div>
                 ))}
               </div>
             </div>
@@ -436,48 +424,39 @@ function WorkflowSection() {
     <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
       <Container size='homepage'>
         <div className='mx-auto max-w-[1120px]'>
-          <div className='text-center'>
-            <p className='homepage-section-eyebrow mx-auto'>
-              Full Release Lifecycle
-            </p>
-            <h2 className='marketing-h2-linear mx-auto mt-4 text-primary-token'>
-              Momentum starts with a system.
-            </h2>
-          </div>
+          <SectionHeader
+            eyebrow='Full Release Lifecycle'
+            title='Momentum starts with a system.'
+            body='Before, during, and after the drop. One system covers the whole arc.'
+          />
 
-          <div className='mt-14 grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
-            <div className='rounded-2xl bg-white/[0.04] p-6'>
-              <Pencil className='h-5 w-5 text-white/30' aria-hidden='true' />
-              <h3 className='mt-4 text-[15px] font-[560] text-white'>
-                Pre-release
-              </h3>
-              <p className='mt-2 text-[12px] leading-5 text-white/40'>
-                Pitch, metadata, and assets ready before anyone hears it.
-              </p>
-            </div>
-
-            <div className='rounded-2xl bg-white/[0.04] p-6'>
-              <Rocket className='h-5 w-5 text-white/30' aria-hidden='true' />
-              <h3 className='mt-4 text-[15px] font-[560] text-white'>
-                Launch day
-              </h3>
-              <p className='mt-2 text-[12px] leading-5 text-white/40'>
-                Smart links live, fans notified, streams tracked in real time.
-              </p>
-            </div>
-
-            <div className='rounded-2xl bg-white/[0.04] p-6'>
-              <TrendingUp
-                className='h-5 w-5 text-white/30'
-                aria-hidden='true'
-              />
-              <h3 className='mt-4 text-[15px] font-[560] text-white'>
-                Post-release
-              </h3>
-              <p className='mt-2 text-[12px] leading-5 text-white/40'>
-                Playlist tracking, follow-ups, and momentum that compounds.
-              </p>
-            </div>
+          <div className='mt-12 flex flex-col gap-0 sm:flex-row sm:items-stretch'>
+            {[
+              {
+                phase: 'Before',
+                line: 'Pitch, metadata, assets.',
+              },
+              {
+                phase: 'Launch',
+                line: 'Links live, fans notified, streams tracked.',
+              },
+              {
+                phase: 'After',
+                line: 'Playlist tracking, follow-ups, momentum.',
+              },
+            ].map((step, i) => (
+              <div
+                key={step.phase}
+                className={`flex-1 border-t border-white/8 py-6 sm:border-l sm:border-t-0 sm:pl-6 ${i === 0 ? 'sm:border-l-0 sm:pl-0' : ''}`}
+              >
+                <p className='text-[11px] font-medium text-white/40'>
+                  {step.phase}
+                </p>
+                <p className='mt-2 text-[13px] leading-relaxed text-white/60'>
+                  {step.line}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       </Container>
