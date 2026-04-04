@@ -91,7 +91,7 @@ export function DashboardShellSkeleton({
       </div>
 
       {/* Main content area */}
-      <main className='flex min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-0 lg:mt-[8px] lg:mr-[8px] lg:ml-px lg:rounded-t-[12px] lg:border lg:border-b-0 lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'>
+      <main className='flex min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-0 lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'>
         <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>
           {/* Header skeleton */}
           <div className='flex h-12 items-center gap-3 border-b border-(--linear-app-frame-seam) px-4'>
