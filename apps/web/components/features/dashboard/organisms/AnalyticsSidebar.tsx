@@ -63,6 +63,8 @@ function formatMetricValue(
 const BAR_OPACITY = ['bg-accent/15', 'bg-accent/10', 'bg-accent/6'] as const;
 
 const TRACK_BG = 'bg-surface-2';
+const ANALYTICS_CARD_CLASSNAME =
+  'rounded-[16px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] shadow-none';
 
 /** Single stage in the vertical funnel waterfall */
 function FunnelStage({
@@ -133,7 +135,13 @@ function FunnelCard({
   const maxValue = stages[0]?.value ?? 0;
 
   return (
-    <DrawerSurfaceCard className='divide-y divide-subtle overflow-hidden py-1'>
+    <DrawerSurfaceCard
+      variant='quiet'
+      className={cn(
+        ANALYTICS_CARD_CLASSNAME,
+        'divide-y divide-subtle overflow-hidden py-1'
+      )}
+    >
       {stages.map((stage, index) => {
         const barPercent = maxValue > 0 ? (stage.value / maxValue) * 100 : 0;
         const rate =
@@ -259,7 +267,10 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
       hideMinimalHeaderBar
       surfaceTone='quiet'
       entityHeader={
-        <DrawerSurfaceCard variant='quiet' className='overflow-hidden'>
+        <DrawerSurfaceCard
+          variant='quiet'
+          className={cn(ANALYTICS_CARD_CLASSNAME, 'overflow-hidden')}
+        >
           <div className='relative p-3.5'>
             <div className='absolute right-2.5 top-2.5'>
               <DrawerHeaderActions
@@ -300,7 +311,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
         <FunnelCard stages={stages} loading={loading} />
 
         {/* Engagement — compact 2-col, secondary to the funnel */}
-        <DrawerStatGrid variant='quiet'>
+        <DrawerStatGrid variant='quiet' className={ANALYTICS_CARD_CLASSNAME}>
           <div className='px-3 py-2'>
             <StatTile
               label='Link Clicks'
@@ -325,6 +336,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
         <DrawerTabbedCard
           testId='analytics-sidebar-tabbed-card'
           surfaceVariant='quiet'
+          className={ANALYTICS_CARD_CLASSNAME}
           tabs={
             <DrawerTabs
               value={activeTab}

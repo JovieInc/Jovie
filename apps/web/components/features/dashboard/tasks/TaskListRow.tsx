@@ -122,7 +122,7 @@ export function TaskListRow({
       data-selected={isSelected ? 'true' : undefined}
       data-testid={`task-list-row-${task.id}`}
       className={cn(
-        'grid h-full min-w-0 grid-cols-[1.25rem_minmax(0,1fr)_4.75rem] items-center gap-3 rounded-[12px] border border-transparent px-2.5 py-2 transition-[background-color,border-color,box-shadow,opacity]',
+        'grid h-full min-w-0 grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 rounded-[12px] border border-transparent px-3 py-2.5 transition-[background-color,border-color,box-shadow,opacity]',
         'group-hover/task-row:bg-[color-mix(in_oklab,var(--linear-row-hover)_72%,transparent)]',
         'group-focus-visible/task-row:border-[color-mix(in_oklab,var(--linear-border-focus)_58%,transparent)] group-focus-visible/task-row:bg-[color-mix(in_oklab,var(--linear-row-hover)_66%,var(--linear-app-content-surface))] group-focus-visible/task-row:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
         isSelected &&
@@ -146,7 +146,7 @@ export function TaskListRow({
 
         <div
           data-testid={`task-list-row-meta-${task.id}`}
-          className='mt-1 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 overflow-hidden text-[10.5px] leading-none text-secondary-token'
+          className='mt-1 grid min-w-0 grid-cols-[max-content_max-content_max-content_max-content_minmax(0,1fr)] items-center gap-x-2.5 overflow-hidden text-[10.5px] leading-none text-secondary-token'
         >
           <span className='shrink-0 truncate text-tertiary-token'>
             {stage.label}
@@ -154,10 +154,10 @@ export function TaskListRow({
           <span className='shrink-0 truncate font-[560] text-tertiary-token'>
             J-{task.taskNumber}
           </span>
-          <div className='min-w-0 max-w-full overflow-hidden text-left'>
+          <div className='min-w-0 overflow-hidden text-left'>
             <TaskPriorityInline task={task} />
           </div>
-          <div className='min-w-0 max-w-full overflow-hidden text-left'>
+          <div className='min-w-0 overflow-hidden text-left'>
             <TaskAssigneeInline task={task} artistName={artistName} />
           </div>
           {task.releaseTitle ? (
@@ -167,7 +167,7 @@ export function TaskListRow({
                 event.stopPropagation();
                 onOpenRelease(task);
               }}
-              className='inline-flex min-w-0 max-w-full items-center gap-1 text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:text-primary-token'
+              className='inline-flex min-w-0 items-center gap-1 overflow-hidden text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:text-primary-token'
               title={task.releaseTitle}
             >
               <Disc3 className='h-3 w-3 shrink-0 text-tertiary-token' />
@@ -177,8 +177,8 @@ export function TaskListRow({
         </div>
       </div>
 
-      <div className='flex min-w-[4.75rem] shrink-0 items-center justify-end gap-1.5'>
-        <div className='min-w-0 flex-1 truncate text-right'>
+      <div className='flex min-w-max shrink-0 items-center justify-end gap-2 self-start pt-0.5'>
+        <div className='shrink-0 text-right'>
           {task.dueAt ? (
             <ReleaseDueBadge
               dueDate={task.dueAt}

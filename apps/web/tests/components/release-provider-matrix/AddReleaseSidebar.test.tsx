@@ -290,19 +290,22 @@ describe('AddReleaseSidebar', () => {
     render(<AddReleaseSidebar {...defaultProps} />);
 
     const sidebar = screen.getByTestId('add-release-sidebar');
+    const previewCard = screen.getByTestId('entity-header-card');
 
     expect(sidebar).toBeInTheDocument();
     expect(screen.getByTestId('shell-title')).toHaveTextContent('New Release');
-    expect(screen.getByTestId('entity-header-title')).toHaveTextContent(
-      'Untitled'
-    );
-    expect(screen.getByTestId('entity-header-subtitle')).toHaveTextContent(
-      'Test Artist'
-    );
+    expect(within(previewCard).getByText('Untitled')).toBeInTheDocument();
+    expect(within(previewCard).getByText('Test Artist')).toBeInTheDocument();
     expect(within(sidebar).getByLabelText('Title')).toBeInTheDocument();
     expect(
       within(sidebar).getByRole('button', { name: 'Create Release' })
     ).toBeDisabled();
+  });
+
+  it('renders a normal-case details label above the form card', () => {
+    render(<AddReleaseSidebar {...defaultProps} />);
+
+    expect(screen.getByText('Details')).toBeInTheDocument();
   });
 
   it('updates the header preview title and release fields as form values change', async () => {
@@ -314,7 +317,7 @@ describe('AddReleaseSidebar', () => {
       target: { value: '2026-04-01' },
     });
 
-    expect(screen.getByTestId('entity-header-title')).toHaveTextContent(
+    expect(screen.getByTestId('entity-header-card')).toHaveTextContent(
       'Midnight Sun'
     );
     expect(screen.getByTestId('release-fields')).toHaveTextContent(

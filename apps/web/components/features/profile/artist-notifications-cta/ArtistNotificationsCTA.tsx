@@ -337,13 +337,189 @@ function isSubscribeFormVisible(
   );
 }
 
-export function ArtistNotificationsCTA({
+function CompactEmailNotificationsCTA({
+  artist,
+  autoOpen = false,
+  forceExpanded = false,
+  hideListenFallback = false,
+}: ArtistNotificationsCTAProps) {
+  const {
+    error,
+    emailInput,
+    otpStep,
+    isSubmitting,
+    handleChannelChange,
+    handleEmailChange,
+    handleFieldBlur,
+    handleSubscribe,
+    handleVerifyOtp,
+    handleKeyDown,
+    notificationsState,
+    notificationsEnabled,
+    channel,
+    subscribedChannels,
+    openSubscription,
+    registerInputFocus,
+    hydrationStatus,
+  } = useSubscriptionForm({ artist });
+
+  const inputId = useId();
+  const disclaimerId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+
+  useInputFocusRegistration(inputRef, registerInputFocus);
+  useAutoFocusOnEdit(notificationsState, inputRef);
+  useAutoOpen(
+    autoOpen,
+    notificationsEnabled,
+    notificationsState,
+    openSubscription
+  );
+
+  useEffect(() => {
+    if (channel !== 'email') {
+      handleChannelChange('email');
+    }
+  }, [channel, handleChannelChange]);
+
+  const showsSubscribeForm = isSubscribeFormVisible(
+    notificationsEnabled,
+    notificationsState,
+    autoOpen,
+    forceExpanded,
+    hideListenFallback
+  );
+  useImpressionTracking(showsSubscribeForm, artist.handle, 'compact');
+
+  const hasSubscriptions = Boolean(
+    subscribedChannels.email || subscribedChannels.sms
+  );
+  const isSubscribed = notificationsState === 'success' && hasSubscriptions;
+
+  useSubscribeModeRedirect(autoOpen, isSubscribed, artist.handle, artist.name);
+
+  if (hydrationStatus === 'checking') {
+    return <SubscriptionFormSkeleton />;
+  }
+
+  if (
+    shouldShowFallbackCTA(
+      notificationsEnabled,
+      notificationsState,
+      autoOpen,
+      forceExpanded,
+      hideListenFallback
+    )
+  ) {
+    return <ListenNowCTA variant='button' handle={artist.handle} />;
+  }
+
+  if (notificationsState === 'pending_confirmation') {
+    return <SubscriptionPendingConfirmation />;
+  }
+
+  if (isSubscribed) {
+    return (
+      <SubscriptionSuccess
+        artistName={artist.name}
+        handle={artist.handle}
+        subscribedChannels={subscribedChannels}
+        artistId={artist.id}
+        subscriberEmail={emailInput.trim() || undefined}
+      />
+    );
+  }
+
+  if (otpStep === 'verify') {
+    return (
+      <div className='space-y-3'>
+        <button
+          type='button'
+          onClick={() => {
+            handleVerifyOtp().catch(() => {});
+          }}
+          disabled={isSubmitting}
+          className='inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[var(--profile-pearl-primary-bg)] px-5 py-2.5 text-[15px] font-[590] tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] transition-opacity hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-50'
+          style={noFontSynthesisStyle}
+        >
+          {isSubmitting ? 'Working…' : 'Verify'}
+        </button>
+        <FormFooter
+          disclaimerId={disclaimerId}
+          isInputFocused={false}
+          error={error}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className='space-y-2'>
+      <SubscriptionPearlComposer
+        dataTestId='subscription-pearl-composer'
+        action={
+          <button
+            type='button'
+            onClick={() => {
+              handleSubscribe().catch(() => {});
+            }}
+            disabled={isSubmitting}
+            className='inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-[var(--profile-pearl-primary-bg)] px-4 text-[14px] font-[590] tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] transition-opacity hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-50'
+            style={noFontSynthesisStyle}
+          >
+            {isSubmitting ? 'Joining…' : 'Join'}
+          </button>
+        }
+        className={isInputFocused ? subscriptionComposerFocusClassName : ''}
+      >
+        <label htmlFor={inputId} className='sr-only'>
+          Email address
+        </label>
+        <input
+          ref={inputRef}
+          id={inputId}
+          data-testid='subscription-input'
+          aria-describedby={disclaimerId}
+          type='email'
+          inputMode='email'
+          className='h-10 w-full bg-transparent px-2 text-[15px] font-[560] tracking-[-0.02em] text-white placeholder:text-white/48 focus-visible:outline-none focus-visible:ring-0'
+          placeholder='Never miss a beat'
+          value={emailInput}
+          onChange={event => handleEmailChange(event.target.value)}
+          onFocus={() => setIsInputFocused(true)}
+          onBlur={() => {
+            setIsInputFocused(false);
+            handleFieldBlur();
+          }}
+          onKeyDown={handleKeyDown}
+          disabled={isSubmitting}
+          autoComplete='email'
+          maxLength={254}
+          style={noFontSynthesisStyle}
+        />
+      </SubscriptionPearlComposer>
+
+      <FormFooter
+        disclaimerId={disclaimerId}
+        isInputFocused={isInputFocused}
+        error={error}
+      />
+    </div>
+  );
+}
+
+// --- Full (multi-channel) variant ---
+
+function FullNotificationsCTA({
   artist,
   variant = 'link',
   autoOpen = false,
   forceExpanded = false,
   hideListenFallback = false,
-}: ArtistNotificationsCTAProps) {
+}: Omit<ArtistNotificationsCTAProps, 'variant'> & {
+  readonly variant?: 'link' | 'button';
+}) {
   const {
     country,
     setCountry,
@@ -556,5 +732,37 @@ export function ArtistNotificationsCTA({
         error={error}
       />
     </div>
+  );
+}
+
+// --- Public router component ---
+
+export function ArtistNotificationsCTA({
+  artist,
+  variant = 'link',
+  autoOpen = false,
+  forceExpanded = false,
+  hideListenFallback = false,
+}: ArtistNotificationsCTAProps) {
+  if (variant === 'compact') {
+    return (
+      <CompactEmailNotificationsCTA
+        artist={artist}
+        variant={variant}
+        autoOpen={autoOpen}
+        forceExpanded={forceExpanded}
+        hideListenFallback={hideListenFallback}
+      />
+    );
+  }
+
+  return (
+    <FullNotificationsCTA
+      artist={artist}
+      variant={variant}
+      autoOpen={autoOpen}
+      forceExpanded={forceExpanded}
+      hideListenFallback={hideListenFallback}
+    />
   );
 }

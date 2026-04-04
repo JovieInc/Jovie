@@ -49,6 +49,8 @@ interface ProfileFeaturedCardProps {
   readonly tourDates: readonly TourDateViewModel[];
   readonly dsps: AvailableDSP[];
   readonly enableDynamicEngagement?: boolean;
+  readonly variant?: 'default' | 'compact';
+  readonly onListenClick?: () => void;
 }
 
 export function ProfileFeaturedCard({
@@ -56,6 +58,8 @@ export function ProfileFeaturedCard({
   latestRelease,
   tourDates,
   dsps,
+  variant = 'default',
+  onListenClick,
 }: ProfileFeaturedCardProps) {
   const featuredContent = resolveFeaturedContent(tourDates, latestRelease);
 
@@ -68,6 +72,47 @@ export function ProfileFeaturedCard({
         ? 'EP'
         : featuredContent.release.releaseType.charAt(0).toUpperCase() +
           featuredContent.release.releaseType.slice(1);
+
+    if (variant === 'compact') {
+      return (
+        <section className='overflow-hidden rounded-[22px] border border-white/10 bg-[rgba(18,18,20,0.9)] shadow-[0_18px_42px_rgba(0,0,0,0.26)] backdrop-blur-xl'>
+          <div className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 p-3'>
+            <div className='relative aspect-square overflow-hidden rounded-[14px] border border-white/10 bg-surface-2'>
+              <ImageWithFallback
+                src={featuredContent.release.artworkUrl}
+                alt={`${featuredContent.release.title} artwork`}
+                fill
+                sizes='52px'
+                className='object-cover'
+                fallbackVariant='release'
+              />
+            </div>
+
+            <div className='min-w-0'>
+              <p className='text-[0.62rem] font-[600] tracking-[0.14em] text-white/46'>
+                Latest Release
+              </p>
+              <h2 className='mt-1 truncate text-[0.98rem] font-[590] tracking-[-0.03em] text-white'>
+                {featuredContent.release.title}
+              </h2>
+              <p className='mt-0.5 truncate text-[0.8rem] text-white/58'>
+                {releaseTypeLabel}
+                {releaseYear ? ` · ${releaseYear}` : ''}
+              </p>
+            </div>
+
+            <button
+              type='button'
+              onClick={onListenClick}
+              className='inline-flex min-h-10 items-center justify-center rounded-full bg-white px-4 py-2 text-[13px] font-[600] tracking-[-0.015em] text-black transition-opacity hover:opacity-92'
+              aria-label={`Listen to ${featuredContent.release.title}`}
+            >
+              Listen
+            </button>
+          </div>
+        </section>
+      );
+    }
 
     return (
       <section className='overflow-hidden rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] shadow-[0_24px_70px_rgba(0,0,0,0.16)]'>

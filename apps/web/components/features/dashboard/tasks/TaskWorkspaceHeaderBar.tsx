@@ -68,8 +68,8 @@ export function TaskWorkspaceHeaderBar({
             placeholder='Search Tasks'
             ariaLabel='Search tasks'
             autoFocus
-            className='h-8 max-w-[28rem] bg-transparent'
-            inputClassName='text-[12px]'
+            className='h-8 max-w-[26rem] rounded-[10px] border-[color-mix(in_oklab,var(--linear-app-frame-seam)_42%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_34%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_42%,transparent)] focus-within:border-[color-mix(in_oklab,var(--linear-border-focus)_36%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_52%,transparent)] focus-within:ring-0'
+            inputClassName='text-[12px] text-primary-token placeholder:text-tertiary-token'
           />
         ) : mode === 'create' ? (
           <form

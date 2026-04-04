@@ -3,6 +3,13 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PublicProfileTemplateV2 } from '@/components/features/profile/templates/PublicProfileTemplateV2';
 
+const mocks = vi.hoisted(() => ({
+  getHeaderSocialLinks: vi.fn((links: unknown[], _: unknown, max = 4) =>
+    links.slice(0, max)
+  ),
+  openSubscription: vi.fn(),
+}));
+
 const mockMergedDSPs = [{ key: 'spotify' }];
 const scrollIntoViewMock = vi.fn();
 
@@ -10,14 +17,18 @@ vi.mock('@/components/organisms/profile-shell', () => ({
   ProfileNotificationsContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,
   },
-  useProfileShell: () => ({ notificationsContextValue: null }),
+  useProfileShell: () => ({
+    notificationsContextValue: {
+      openSubscription: mocks.openSubscription,
+    },
+  }),
 }));
 
 vi.mock('@/features/profile/ProfileHeroCard', () => ({
   ArtistHero: ({ onPlayClick, onBellClick, primaryAction }: any) => (
     <div>
       <button type='button' onClick={onPlayClick}>
-        Play
+        Listen
       </button>
       <button type='button' onClick={onBellClick}>
         Bell
@@ -33,13 +44,13 @@ vi.mock('@/features/profile/ProfileHeroCard', () => ({
 
 vi.mock('@/features/profile/ProfileScrollBody', () => ({
   ProfileScrollBody: ({
+    socialLinks,
     tourSectionRef,
-    subscribeSectionRef,
     onTipClick,
     onContactClick,
   }: any) => (
     <main>
-      <section ref={subscribeSectionRef}>Subscribe Section</section>
+      <div data-testid='social-count'>{socialLinks.length}</div>
       <section ref={tourSectionRef}>Tour Section</section>
       <button type='button' onClick={onTipClick}>
         Tip
@@ -102,7 +113,7 @@ vi.mock('@/lib/profile-dsps', () => ({
 
 vi.mock('@/lib/utils/context-aware-links', () => ({
   detectSourcePlatform: () => null,
-  getHeaderSocialLinks: (links: unknown[]) => links,
+  getHeaderSocialLinks: mocks.getHeaderSocialLinks,
 }));
 
 const artist = {
@@ -110,7 +121,7 @@ const artist = {
   handle: 'tim',
   name: 'Tim White',
   image_url: 'https://example.com/tim.jpg',
-} as any;
+} as const;
 
 const contacts = [
   {
@@ -118,7 +129,7 @@ const contacts = [
     type: 'email',
     value: 'bookings@example.com',
   },
-] as any;
+] as const;
 
 const tipLinks = [
   {
@@ -129,12 +140,14 @@ const tipLinks = [
     clicks: 0,
     created_at: '2025-01-01T00:00:00Z',
   },
-] as any;
+] as const;
 
 describe('PublicProfileTemplateV2 history behavior', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', '/tim?ff_profile_v2=1');
     scrollIntoViewMock.mockReset();
+    mocks.openSubscription.mockReset();
+    mocks.getHeaderSocialLinks.mockClear();
     Element.prototype.scrollIntoView = scrollIntoViewMock;
   });
 
@@ -142,14 +155,14 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     render(
       <PublicProfileTemplateV2
         mode='profile'
-        artist={artist}
+        artist={artist as never}
         socialLinks={[]}
-        contacts={contacts}
+        contacts={contacts as never}
         tourDates={[]}
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Listen' }));
 
     await waitFor(() => {
       expect(window.location.search).toContain('mode=listen');
@@ -161,9 +174,9 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     render(
       <PublicProfileTemplateV2
         mode='profile'
-        artist={artist}
-        socialLinks={tipLinks}
-        contacts={contacts}
+        artist={artist as never}
+        socialLinks={tipLinks as never}
+        contacts={contacts as never}
         tourDates={[]}
       />
     );
@@ -187,9 +200,9 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     render(
       <PublicProfileTemplateV2
         mode='listen'
-        artist={artist}
+        artist={artist as never}
         socialLinks={[]}
-        contacts={contacts}
+        contacts={contacts as never}
         tourDates={[]}
       />
     );
@@ -199,20 +212,20 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     });
   });
 
-  it('maps legacy subscribe mode to the inline subscribe section', async () => {
+  it('maps legacy subscribe mode to inline email capture', async () => {
     render(
       <PublicProfileTemplateV2
         mode='subscribe'
-        artist={artist}
+        artist={artist as never}
         socialLinks={[]}
-        contacts={contacts}
+        contacts={contacts as never}
         tourDates={[]}
       />
     );
 
     await waitFor(() => {
       expect(window.location.search).toContain('mode=subscribe');
-      expect(scrollIntoViewMock).toHaveBeenCalled();
+      expect(mocks.openSubscription).toHaveBeenCalledWith('email');
     });
   });
 
@@ -220,9 +233,9 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     render(
       <PublicProfileTemplateV2
         mode='contact'
-        artist={artist}
+        artist={artist as never}
         socialLinks={[]}
-        contacts={contacts}
+        contacts={contacts as never}
         tourDates={[]}
       />
     );
@@ -236,9 +249,9 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     render(
       <PublicProfileTemplateV2
         mode='tip'
-        artist={artist}
-        socialLinks={tipLinks}
-        contacts={contacts}
+        artist={artist as never}
+        socialLinks={tipLinks as never}
+        contacts={contacts as never}
         tourDates={[]}
       />
     );
@@ -252,9 +265,9 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     render(
       <PublicProfileTemplateV2
         mode='tour'
-        artist={artist}
+        artist={artist as never}
         socialLinks={[]}
-        contacts={contacts}
+        contacts={contacts as never}
         tourDates={
           [
             {
@@ -266,7 +279,7 @@ describe('PublicProfileTemplateV2 history behavior', () => {
               venueName: 'The Forum',
               ticketUrl: 'https://example.com/tickets',
             },
-          ] as any
+          ] as never
         }
       />
     );
@@ -276,26 +289,55 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     });
   });
 
-  it('routes Play to inline subscribe when no DSP links exist', async () => {
+  it('routes Listen to inline subscribe when no DSP links exist', async () => {
     mockMergedDSPs.length = 0;
 
     render(
       <PublicProfileTemplateV2
         mode='profile'
-        artist={artist}
+        artist={artist as never}
         socialLinks={[]}
-        contacts={contacts}
+        contacts={contacts as never}
         tourDates={[]}
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Listen' }));
 
     await waitFor(() => {
       expect(window.location.search).toContain('mode=subscribe');
-      expect(scrollIntoViewMock).toHaveBeenCalled();
+      expect(mocks.openSubscription).toHaveBeenCalledWith('email');
     });
 
     mockMergedDSPs.push({ key: 'spotify' });
+  });
+
+  it('caps visible V2 social links at two', () => {
+    render(
+      <PublicProfileTemplateV2
+        mode='profile'
+        artist={artist as never}
+        socialLinks={
+          [
+            {
+              id: '1',
+              platform: 'instagram',
+              url: 'https://instagram.com/tim',
+            },
+            { id: '2', platform: 'tiktok', url: 'https://tiktok.com/@tim' },
+            { id: '3', platform: 'youtube', url: 'https://youtube.com/@tim' },
+          ] as never
+        }
+        contacts={contacts as never}
+        tourDates={[]}
+      />
+    );
+
+    expect(mocks.getHeaderSocialLinks).toHaveBeenCalledWith(
+      expect.any(Array),
+      undefined,
+      2
+    );
+    expect(screen.getByTestId('social-count')).toHaveTextContent('2');
   });
 });

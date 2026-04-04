@@ -32,7 +32,6 @@ import {
   DrawerInlineIconButton,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
   summarizePreviewCounts,
   summarizeReleaseProviderCounts,
@@ -49,6 +48,12 @@ import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type { Release } from './types';
 import { useTrackAudioPlayer } from './useTrackAudioPlayer';
+
+const RELEASE_PLAYBACK_CARD_CLASSNAME =
+  'rounded-[16px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] shadow-none';
+
+const RELEASE_PLAYBACK_SUBCARD_CLASSNAME =
+  'rounded-[12px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_52%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_88%,var(--linear-app-content-surface))] shadow-none';
 
 interface ReleaseTrackListProps {
   readonly release: Release;
@@ -203,8 +208,9 @@ export function ReleaseTrackList({
       </p>
 
       <DrawerSurfaceCard
+        variant='quiet'
         className={cn(
-          LINEAR_SURFACE.drawerCardSm,
+          RELEASE_PLAYBACK_CARD_CLASSNAME,
           'overflow-hidden px-2.5 py-2'
         )}
         data-testid='release-playback-summary'
@@ -247,7 +253,8 @@ export function ReleaseTrackList({
             .map(id => (
               <DrawerSurfaceCard
                 key={id}
-                className={cn(LINEAR_SURFACE.drawerCardSm, 'px-3 py-3')}
+                variant='quiet'
+                className={cn(RELEASE_PLAYBACK_CARD_CLASSNAME, 'px-3 py-3')}
               >
                 <div className='space-y-2'>
                   <div className='h-4 w-1/2 rounded skeleton' />
@@ -367,10 +374,12 @@ function TrackPlaybackRow({
 
   return (
     <DrawerSurfaceCard
+      variant='quiet'
       className={cn(
-        LINEAR_SURFACE.drawerCardSm,
+        RELEASE_PLAYBACK_CARD_CLASSNAME,
         'overflow-hidden',
-        expanded && 'bg-surface-0'
+        expanded &&
+          'border-[color-mix(in_oklab,var(--linear-border-focus)_34%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_100%,var(--linear-bg-surface-0))]'
       )}
       data-testid={`release-track-row-${track.id}`}
     >
@@ -579,7 +588,10 @@ function ProviderGroup({
           return (
             <div
               key={`${provider.key}-${provider.url}`}
-              className='flex items-center justify-between gap-2 rounded-[10px] bg-surface-0 px-2.5 py-2'
+              className={cn(
+                RELEASE_PLAYBACK_SUBCARD_CLASSNAME,
+                'flex items-center justify-between gap-2 px-2.5 py-2'
+              )}
             >
               <div className='min-w-0'>
                 <div className='flex items-center gap-2'>

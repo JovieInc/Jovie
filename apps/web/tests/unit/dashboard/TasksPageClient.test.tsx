@@ -431,7 +431,14 @@ describe('TasksPageClient', () => {
   it('renders separate list and document scroll regions on desktop', () => {
     renderPage();
 
-    expect(screen.getByTestId('task-list-pane')).toBeInTheDocument();
+    expect(screen.getByTestId('task-list-pane')).toHaveClass(
+      'flex-col',
+      'overflow-hidden'
+    );
+    expect(screen.getByTestId('task-document-pane')).toHaveClass(
+      'flex-col',
+      'overflow-hidden'
+    );
     expect(
       screen.getByTestId('task-document-scroll-region')
     ).toBeInTheDocument();
@@ -446,7 +453,7 @@ describe('TasksPageClient', () => {
     );
     expect(screen.getByTestId('tasks-table')).toHaveAttribute(
       'data-container-class-name',
-      'h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5'
+      'min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-2.5 pb-2 pt-0.5'
     );
   });
 
@@ -500,6 +507,10 @@ describe('TasksPageClient', () => {
     expect(
       screen.getByText(/tag @Jovie and ask her to draft a first pass/i)
     ).toBeInTheDocument();
+    expect(screen.getByLabelText('Task description')).toHaveAttribute(
+      'placeholder',
+      ''
+    );
   });
 
   it('does not show the helper when the selected task already has a description', () => {

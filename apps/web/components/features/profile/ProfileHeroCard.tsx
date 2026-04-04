@@ -1,11 +1,18 @@
 'use client';
 
-import { Bell, Check, Play, Share2, Ticket } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@jovie/ui';
+import { Bell, MoreHorizontal, Play, Ticket } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
-import { SocialLink } from '@/components/molecules/SocialLink';
+import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
 import { BASE_URL } from '@/constants/app';
-import type { Artist, LegacySocialLink } from '@/types/db';
+import type { Artist } from '@/types/db';
 
 type HeroRelease = {
   readonly title: string;
@@ -30,45 +37,21 @@ interface ArtistHeroProps {
   readonly spotlightLabel?: string | null;
   readonly spotlightValue?: string | null;
   readonly primaryActionKind?: 'tickets' | 'listen' | 'subscribe';
-  readonly socialLinks?: LegacySocialLink[];
   readonly compact?: boolean;
-}
-
-const dateFormatter = new Intl.DateTimeFormat('en-US', {
-  month: 'long',
-  day: 'numeric',
-});
-
-function getReleaseEyebrow(release: HeroRelease | null | undefined) {
-  if (!release?.releaseDate) return null;
-
-  const releaseDate = new Date(release.releaseDate);
-  const now = new Date();
-  const msUntilRelease = releaseDate.getTime() - now.getTime();
-  const daysSinceRelease =
-    (now.getTime() - releaseDate.getTime()) / (1000 * 60 * 60 * 24);
-
-  if (msUntilRelease > 0) return `Coming ${dateFormatter.format(releaseDate)}`;
-  if (daysSinceRelease <= 14) return 'Out now';
-  return 'Latest release';
 }
 
 export function ArtistHero({
   artist,
   heroImageUrl,
-  latestRelease,
   primaryAction,
   onPlayClick,
   onBellClick,
-  spotlightLabel,
-  spotlightValue,
   primaryActionKind = 'listen',
-  socialLinks = [],
   compact = false,
 }: ArtistHeroProps) {
-  const eyebrow = getReleaseEyebrow(latestRelease);
   const [shareSuccess, setShareSuccess] = useState(false);
   const shareTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bio = artist.tagline?.trim() ?? '';
 
   const handleShare = useCallback(async () => {
     const profileUrl = `${BASE_URL}/${artist.handle}`;
@@ -84,9 +67,8 @@ export function ArtistHero({
       if (shareTimeoutRef.current) clearTimeout(shareTimeoutRef.current);
       shareTimeoutRef.current = setTimeout(() => setShareSuccess(false), 2000);
     } catch (error) {
-      // AbortError = user cancelled share sheet, do nothing
       if (error instanceof Error && error.name === 'AbortError') return;
-      // Fallback: try clipboard if share failed for another reason
+
       try {
         await navigator.clipboard.writeText(profileUrl);
         setShareSuccess(true);
@@ -96,23 +78,17 @@ export function ArtistHero({
           2000
         );
       } catch {
-        // Silent failure — no toast, no error state
+        return;
       }
     }
   }, [artist.handle, artist.name]);
 
-  const heroPearlClassName =
-    'border border-white/12 bg-white/8 shadow-[0_12px_30px_rgba(0,0,0,0.18)] backdrop-blur-2xl';
   const primaryActionClassName =
-    'inline-flex min-h-12 items-center justify-center rounded-full bg-[var(--profile-pearl-primary-bg)] px-5 py-3 text-[15px] font-[590] tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-[0_18px_40px_rgba(0,0,0,0.3)] transition-[transform,opacity] duration-200 hover:opacity-94 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+    'inline-flex min-h-10 items-center justify-center rounded-full border border-white/12 bg-white/8 px-4 py-2 text-[14px] font-[590] tracking-[-0.015em] text-white/88 backdrop-blur-xl transition-opacity hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]';
 
   return (
     <section
-      className={`relative w-full overflow-hidden md:h-[56dvh] md:min-h-[520px] md:rounded-t-[30px] ${
-        compact
-          ? 'h-[40dvh] min-h-[320px] max-h-[460px]'
-          : 'h-[48dvh] min-h-[420px] max-h-[620px]'
-      }`}
+      className='relative w-full min-h-[100dvh] overflow-hidden md:h-[56dvh] md:min-h-[520px] md:rounded-t-[30px]'
       data-testid='profile-header'
     >
       <div className='absolute inset-0'>
@@ -128,97 +104,98 @@ export function ArtistHero({
         />
       </div>
 
-      <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_16%,rgba(255,255,255,0.18),transparent_28%),linear-gradient(180deg,rgba(4,6,10,0.02)_0%,rgba(6,8,12,0.14)_28%,rgba(7,8,10,0.76)_74%,rgba(7,8,10,0.96)_100%)]' />
-      <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,transparent_46%,rgba(6,7,10,0.5)_70%,rgba(5,6,8,0.9)_100%)]' />
+      <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_16%,rgba(255,255,255,0.16),transparent_28%),linear-gradient(180deg,rgba(4,6,10,0.05)_0%,rgba(8,8,10,0.2)_28%,rgba(7,8,10,0.82)_72%,rgba(6,6,8,0.98)_100%)]' />
+      <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.1)_0%,transparent_32%,rgba(5,6,8,0.36)_60%,rgba(6,7,8,0.92)_100%)]' />
 
-      <div className='relative flex h-full flex-col justify-between px-5 pb-6 pt-[max(env(safe-area-inset-top),1rem)] md:px-7 md:pb-8 md:pt-6'>
-        <div className='flex justify-between gap-3'>
-          <div className='flex items-start gap-2'>
-            {spotlightLabel && spotlightValue ? (
-              <div className={`${heroPearlClassName} rounded-full px-3.5 py-2`}>
-                <p className='text-[0.72rem] font-[560] tracking-[0.01em] text-white/52'>
-                  {spotlightLabel}
-                </p>
-                <p className='mt-0.5 text-[13px] font-[590] tracking-[-0.015em] text-white/90 md:text-sm'>
-                  {spotlightValue}
-                </p>
+      <div
+        className={`relative flex min-h-[100dvh] flex-col px-4 pt-[max(env(safe-area-inset-top),1rem)] md:min-h-full md:px-7 md:pt-6 ${
+          compact
+            ? 'pb-[calc(env(safe-area-inset-bottom)+0.9rem)] md:pb-8'
+            : 'pb-[calc(env(safe-area-inset-bottom)+1.25rem)] md:pb-8'
+        }`}
+      >
+        <div className='flex items-start justify-between gap-3'>
+          <div className='min-h-8'>
+            {artist.is_verified ? (
+              <div className='inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/22 px-2.5 py-1 text-[0.7rem] font-[600] tracking-[0.02em] text-white/74 backdrop-blur-xl'>
+                <VerifiedBadge
+                  size='sm'
+                  className='bg-transparent p-0 text-sky-400'
+                />
+                <span>Verified Artist</span>
               </div>
             ) : null}
           </div>
 
-          <div className='flex items-center gap-2'>
-            {socialLinks.map(link => (
-              <SocialLink
-                key={link.id}
-                link={link}
-                handle={artist.handle}
-                artistName={artist.name}
-              />
-            ))}
-            <button
-              type='button'
-              onClick={handleShare}
-              className={`${heroPearlClassName} inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-4 text-[15px] font-[590] tracking-[-0.015em] text-white/88 transition-[background-color,border-color,color,opacity] hover:bg-white/12 hover:text-white hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]`}
-              aria-label={
-                shareSuccess
-                  ? `Copied ${artist.name}'s profile link`
-                  : `Share ${artist.name}'s profile`
-              }
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <CircleIconButton
+                ariaLabel='Open profile actions'
+                size='sm'
+                variant='frosted'
+                className='border border-white/10 bg-black/18 text-white/78 hover:bg-black/28 hover:text-white'
+              >
+                <MoreHorizontal className='h-4 w-4' aria-hidden='true' />
+              </CircleIconButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align='end'
+              sideOffset={8}
+              className='min-w-[140px]'
             >
-              {shareSuccess ? (
-                <Check className='h-[17px] w-[17px]' aria-hidden='true' />
-              ) : (
-                <Share2 className='h-[17px] w-[17px]' aria-hidden='true' />
-              )}
-              <span className='sr-only md:not-sr-only md:inline'>
+              <DropdownMenuItem onClick={() => void handleShare()}>
                 {shareSuccess ? 'Copied' : 'Share'}
-              </span>
-            </button>
-            <button
-              type='button'
-              onClick={onBellClick}
-              className={`${heroPearlClassName} inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-4 text-[15px] font-[590] tracking-[-0.015em] text-white/88 transition-[background-color,border-color,color,opacity] hover:bg-white/12 hover:text-white hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]`}
-              aria-label={`Get notified about ${artist.name}`}
-            >
-              <Bell className='h-[17px] w-[17px]' aria-hidden='true' />
-              <span className='sr-only md:not-sr-only md:inline'>Notify</span>
-            </button>
-          </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
-        <div className='mt-auto max-w-[32rem] space-y-4 md:space-y-5'>
-          <div className='flex items-start justify-between gap-4'>
-            <div className='min-w-0 space-y-2 text-left'>
-              {eyebrow ? (
-                <p className='text-[12px] font-[560] tracking-[0.01em] text-white/58'>
-                  {eyebrow}
-                </p>
-              ) : null}
+        <div className='mt-auto space-y-3'>
+          <div className='space-y-2'>
+            <div className='flex items-start justify-between gap-3'>
+              <div className='min-w-0'>
+                <div className='flex items-center gap-2'>
+                  <h1 className='line-clamp-2 text-[2.1rem] font-[640] tracking-[-0.06em] text-white md:text-[3.5rem] md:leading-[0.94]'>
+                    {artist.name}
+                  </h1>
+                  {artist.is_verified ? (
+                    <VerifiedBadge
+                      size='sm'
+                      className='mt-1 shrink-0 text-sky-400'
+                    />
+                  ) : null}
+                </div>
+              </div>
 
-              <h1
-                className={`line-clamp-3 max-w-[21rem] font-[640] tracking-[-0.065em] text-white md:max-w-[30rem] md:text-[3.5rem] md:leading-[0.94] ${
-                  compact ? 'text-[2.25rem]' : 'text-[2.65rem]'
-                }`}
+              <CircleIconButton
+                ariaLabel={`Get notified about ${artist.name}`}
+                size='sm'
+                variant='frosted'
+                className='mt-1 shrink-0 border border-white/10 bg-black/18 text-white/78 hover:bg-black/28 hover:text-white'
+                onClick={onBellClick}
               >
-                {artist.name}
-              </h1>
+                <Bell className='h-4 w-4' aria-hidden='true' />
+              </CircleIconButton>
             </div>
 
+            {bio ? (
+              <p className='line-clamp-2 max-w-[18rem] text-[0.95rem] leading-5 text-white/62 md:max-w-[28rem] md:text-[1rem] md:leading-6'>
+                {bio}
+              </p>
+            ) : null}
+          </div>
+
+          <div className='flex items-center gap-2'>
             <button
               type='button'
               onClick={onPlayClick}
-              className={`${heroPearlClassName} inline-flex min-h-11 shrink-0 items-center justify-center rounded-full px-4 py-2.5 text-[15px] font-[590] tracking-[-0.015em] text-white/92 transition-[background-color,border-color,color,opacity] hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]`}
+              className='inline-flex min-h-10 items-center justify-center rounded-full border border-white/12 bg-white/8 px-4 py-2 text-[14px] font-[590] tracking-[-0.015em] text-white/92 backdrop-blur-xl transition-opacity hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
               aria-label={`Listen to ${artist.name}`}
             >
-              <Play
-                className='mr-2 h-[17px] w-[17px] fill-current'
-                aria-hidden='true'
-              />
-              Play
+              <Play className='mr-2 h-4 w-4 fill-current' aria-hidden='true' />
+              Listen
             </button>
-          </div>
 
-          <div className='flex flex-wrap items-center gap-3'>
             {primaryAction ? (
               primaryAction.href ? (
                 <a
@@ -231,13 +208,10 @@ export function ArtistHero({
                     primaryAction.external ? undefined : primaryAction.onClick
                   }
                   aria-label={primaryAction.ariaLabel ?? primaryAction.label}
-                  className={primaryActionClassName}
+                  className={`hidden md:inline-flex ${primaryActionClassName}`}
                 >
                   {primaryActionKind === 'tickets' ? (
-                    <Ticket
-                      className='mr-2 h-[17px] w-[17px]'
-                      aria-hidden='true'
-                    />
+                    <Ticket className='mr-2 h-4 w-4' aria-hidden='true' />
                   ) : null}
                   {primaryAction.label}
                 </a>
@@ -246,13 +220,10 @@ export function ArtistHero({
                   type='button'
                   onClick={primaryAction.onClick}
                   aria-label={primaryAction.ariaLabel ?? primaryAction.label}
-                  className={primaryActionClassName}
+                  className={`hidden md:inline-flex ${primaryActionClassName}`}
                 >
                   {primaryActionKind === 'tickets' ? (
-                    <Ticket
-                      className='mr-2 h-[17px] w-[17px]'
-                      aria-hidden='true'
-                    />
+                    <Ticket className='mr-2 h-4 w-4' aria-hidden='true' />
                   ) : null}
                   {primaryAction.label}
                 </button>

@@ -19,7 +19,6 @@ import {
   DrawerSection,
   DrawerSettingsToggle,
   DrawerSurfaceCard,
-  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { GenrePicker } from '@/components/molecules/GenrePicker';
@@ -39,7 +38,7 @@ const RELEASE_TYPE_OPTIONS = [
 
 const ADD_RELEASE_CARD_CLASSNAME = cn(
   LINEAR_SURFACE.sidebarCard,
-  'overflow-hidden'
+  'overflow-hidden rounded-[18px] border-[color-mix(in_oklab,var(--linear-app-shell-border)_64%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))] shadow-none'
 );
 
 type ReleaseType = (typeof RELEASE_TYPE_OPTIONS)[number]['value'];
@@ -236,45 +235,51 @@ export function AddReleaseSidebar({
       }
       entityHeader={
         <DrawerSurfaceCard
+          variant='quiet'
           className={ADD_RELEASE_CARD_CLASSNAME}
           testId='add-release-header-card'
         >
-          <div className='p-3'>
-            <EntityHeaderCard
-              eyebrow='Release preview'
-              image={
-                <AvatarUploadable
-                  src={stagedArtworkPreviewUrl}
-                  alt={title ? `${title} artwork` : 'New release artwork'}
-                  name={title || 'Untitled'}
-                  size='2xl'
-                  rounded='md'
-                  uploadable
-                  onUpload={handleArtworkStage}
-                  showHoverOverlay
-                />
-              }
-              title={title || 'Untitled'}
-              subtitle={
-                artistName ? <span>{artistName}</span> : 'No artist selected'
-              }
-              meta={
-                <ReleaseFields
-                  releaseDate={releaseDate || undefined}
-                  releaseType={releaseType}
-                  totalTracks={releaseType === 'single' ? 1 : undefined}
-                />
-              }
-              className='min-w-0 flex-1'
-              bodyClassName='pr-0'
-              data-testid='entity-header-card'
+          <div
+            className='flex items-start gap-3 p-2.5'
+            data-testid='entity-header-card'
+          >
+            <AvatarUploadable
+              src={stagedArtworkPreviewUrl}
+              alt={title ? `${title} artwork` : 'New release artwork'}
+              name={title || 'Untitled'}
+              size='xl'
+              rounded='md'
+              uploadable
+              onUpload={handleArtworkStage}
+              showHoverOverlay
+              className='shrink-0'
             />
+            <div className='min-w-0 flex-1 space-y-1'>
+              <p className='text-[11px] font-[560] leading-none text-tertiary-token'>
+                Release preview
+              </p>
+              <div className='space-y-0.5'>
+                <p className='truncate text-[13.5px] font-[590] leading-[18px] tracking-[-0.015em] text-primary-token'>
+                  {title || 'Untitled'}
+                </p>
+                <p className='truncate text-[12px] leading-[16px] text-secondary-token'>
+                  {artistName || 'No artist selected'}
+                </p>
+              </div>
+              <ReleaseFields
+                releaseDate={releaseDate || undefined}
+                releaseType={releaseType}
+                totalTracks={releaseType === 'single' ? 1 : undefined}
+              />
+            </div>
           </div>
         </DrawerSurfaceCard>
       }
     >
+      <div className='px-0.5 text-[11px] font-[560] leading-[14px] text-tertiary-token'>
+        Details
+      </div>
       <DrawerSection
-        title='Details'
         surface='card'
         collapsible={false}
         surfaceClassName='space-y-3.5'

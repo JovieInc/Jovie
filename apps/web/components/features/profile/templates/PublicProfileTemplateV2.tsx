@@ -110,7 +110,6 @@ export function PublicProfileTemplateV2({
     useState<ProfileV2OverlayMode>(null);
   const [historyMode, setHistoryMode] = useState<ProfileMode>(mode);
   const aboutSectionRef = useRef<HTMLElement | null>(null);
-  const subscribeSectionRef = useRef<HTMLElement | null>(null);
   const tourSectionRef = useRef<HTMLElement | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const mergedDSPs = useMemo(
@@ -158,6 +157,7 @@ export function PublicProfileTemplateV2({
     modeOverride: historyMode,
     sourceOverride: initialSource,
   });
+  const { openSubscription } = notificationsContextValue;
 
   const scrollToTourSection = useCallback(() => {
     if (typeof window === 'undefined') {
@@ -192,22 +192,6 @@ export function PublicProfileTemplateV2({
     return () => {
       cancelled = true;
     };
-  }, [prefersReducedMotion]);
-
-  const scrollToSubscribeSection = useCallback(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const subscribeSection = subscribeSectionRef.current;
-    if (!subscribeSection) {
-      return;
-    }
-
-    subscribeSection.scrollIntoView({
-      behavior: prefersReducedMotion ? 'auto' : 'smooth',
-      block: 'start',
-    });
   }, [prefersReducedMotion]);
 
   const scrollToAboutSection = useCallback(() => {
@@ -249,7 +233,7 @@ export function PublicProfileTemplateV2({
       setActiveOverlay(nextOverlay);
 
       if (nextMode === 'subscribe') {
-        scrollToSubscribeSection();
+        openSubscription('email');
         return undefined;
       }
 
@@ -267,8 +251,8 @@ export function PublicProfileTemplateV2({
     [
       hasContacts,
       mergedDSPs.length,
+      openSubscription,
       scrollToAboutSection,
-      scrollToSubscribeSection,
       scrollToTourSection,
       tourDates.length,
       venmoLink,
@@ -305,7 +289,7 @@ export function PublicProfileTemplateV2({
   }, [historyMode]);
 
   const visibleSocialLinks = useMemo(() => {
-    return getHeaderSocialLinks(socialLinks, viewerCountryCode, 3);
+    return getHeaderSocialLinks(socialLinks, viewerCountryCode, 2);
   }, [socialLinks, viewerCountryCode]);
 
   const featuredContent = useMemo(
@@ -332,20 +316,20 @@ export function PublicProfileTemplateV2({
 
   const handlePlayClick = useCallback(() => {
     if (mergedDSPs.length === 0) {
+      openSubscription('email');
       setHistoryMode('subscribe');
       setActiveOverlay(null);
-      scrollToSubscribeSection();
       return;
     }
 
     setOverlayState('listen');
-  }, [mergedDSPs.length, scrollToSubscribeSection, setOverlayState]);
+  }, [mergedDSPs.length, openSubscription, setOverlayState]);
 
   const handleBellClick = useCallback(() => {
+    openSubscription('email');
     setHistoryMode('subscribe');
     setActiveOverlay(null);
-    scrollToSubscribeSection();
-  }, [scrollToSubscribeSection]);
+  }, [openSubscription]);
 
   const handleContactClick = useCallback(() => {
     if (!hasContacts) {
@@ -391,39 +375,6 @@ export function PublicProfileTemplateV2({
     }
   }, [artist.name, featuredContent, primaryActionKind, scrollToTourSection]);
 
-  const heroSpotlight = useMemo(() => {
-    if (featuredContent.kind === 'tour') {
-      return {
-        label: 'Next show',
-        value: new Intl.DateTimeFormat('en-US', {
-          month: 'short',
-          day: 'numeric',
-        }).format(new Date(featuredContent.tourDate.startDate)),
-      };
-    }
-
-    if (
-      featuredContent.kind === 'release' &&
-      featuredContent.release.releaseDate
-    ) {
-      return {
-        label: 'Latest release',
-        value: new Intl.DateTimeFormat('en-US', {
-          month: 'short',
-          day: 'numeric',
-        }).format(new Date(featuredContent.release.releaseDate)),
-      };
-    }
-
-    return {
-      label: mergedDSPs.length > 0 ? 'Listen now' : 'Profile',
-      value:
-        mergedDSPs.length > 0
-          ? `${mergedDSPs.length} platforms`
-          : artist.handle,
-    };
-  }, [artist.handle, featuredContent, mergedDSPs.length]);
-
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <ProfileViewportShell
@@ -436,9 +387,6 @@ export function PublicProfileTemplateV2({
             latestRelease={latestRelease}
             primaryAction={primaryAction}
             primaryActionKind={primaryActionKind}
-            spotlightLabel={heroSpotlight.label}
-            spotlightValue={heroSpotlight.value}
-            socialLinks={visibleSocialLinks}
             onPlayClick={handlePlayClick}
             onBellClick={handleBellClick}
             compact={historyMode === 'subscribe'}
@@ -462,10 +410,10 @@ export function PublicProfileTemplateV2({
             primaryActionKind={primaryActionKind}
             subscribeTwoStep={subscribeTwoStep}
             aboutSectionRef={aboutSectionRef}
-            subscribeSectionRef={subscribeSectionRef}
             subscribeModeActive={historyMode === 'subscribe'}
             onTipClick={handleTipClick}
             onContactClick={handleContactClick}
+            onListenClick={handlePlayClick}
             tourSectionRef={tourSectionRef}
           />
         </div>

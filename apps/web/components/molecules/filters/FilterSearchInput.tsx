@@ -52,36 +52,35 @@ export function FilterSearchInput({
 
   return (
     <div className='relative'>
-      <div className='relative'>
-        <Icon
-          name='Search'
-          className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token'
-        />
-        <input
-          ref={inputRef}
-          type='text'
-          placeholder={placeholder}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className={cn(
-            'w-full rounded-[8px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_48%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_34%,transparent)] py-1.5 pl-8 pr-6 text-[12px]',
-            'text-primary-token placeholder:text-tertiary-token',
-            'transition-[background-color,border-color,box-shadow] duration-150',
-            'focus-visible:border-(--linear-border-focus) focus-visible:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_44%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/14'
-          )}
-          aria-label={placeholder}
-        />
-        {value && (
-          <DrawerInlineIconButton
-            onClick={onClear}
-            className='absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-tertiary-token'
-            aria-label='Clear search'
-          >
-            <Icon name='X' className='h-3 w-3' />
-          </DrawerInlineIconButton>
+      <Icon
+        name='Search'
+        className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token'
+      />
+      <input
+        ref={inputRef}
+        type='text'
+        placeholder={placeholder}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        className={cn(
+          'h-8 w-full rounded-[10px] border border-transparent bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_52%,transparent)] py-1.5 pl-8 pr-7 text-[12px] tracking-[-0.01em]',
+          'text-primary-token placeholder:text-tertiary-token',
+          'transition-[background-color,border-color,box-shadow] duration-150',
+          'hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,transparent)]',
+          'focus-visible:border-[color-mix(in_oklab,var(--linear-border-focus)_34%,transparent)] focus-visible:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_68%,transparent)] focus-visible:outline-none focus-visible:ring-0'
         )}
-      </div>
+        aria-label={placeholder}
+      />
+      {value && (
+        <DrawerInlineIconButton
+          onClick={onClear}
+          className='absolute right-1.5 top-1/2 -translate-y-1/2 rounded-[6px] p-0.5 text-tertiary-token hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,transparent)] hover:text-secondary-token'
+          aria-label='Clear search'
+        >
+          <Icon name='X' className='h-3 w-3' />
+        </DrawerInlineIconButton>
+      )}
     </div>
   );
 }

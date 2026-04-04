@@ -38,10 +38,10 @@ interface ProfileScrollBodyProps {
   readonly primaryActionKind: PrimaryActionKind;
   readonly subscribeTwoStep?: boolean;
   readonly aboutSectionRef: RefObject<HTMLElement | null>;
-  readonly subscribeSectionRef: RefObject<HTMLElement | null>;
   readonly subscribeModeActive?: boolean;
   readonly onTipClick: () => void;
   readonly onContactClick: () => void;
+  readonly onListenClick: () => void;
   readonly tourSectionRef: RefObject<HTMLElement | null>;
 }
 
@@ -147,7 +147,7 @@ function SocialLinksSection({
   return (
     <section
       aria-labelledby='profile-social-links-heading'
-      className='space-y-3'
+      className='hidden space-y-3 md:block'
     >
       <SectionLabel>Follow</SectionLabel>
       <div
@@ -335,23 +335,19 @@ function UtilityRail({
 function SubscribeSection({
   artist,
   subscribeTwoStep = false,
-  subscribeSectionRef,
   subscribeModeActive = false,
 }: {
   readonly artist: Artist;
   readonly subscribeTwoStep?: boolean;
-  readonly subscribeSectionRef: RefObject<HTMLElement | null>;
   readonly subscribeModeActive?: boolean;
 }) {
   return (
     <section
-      ref={subscribeSectionRef}
       aria-labelledby='profile-subscribe-heading'
-      className='space-y-3'
+      className='space-y-2'
       data-testid='subscribe-cta-container'
     >
-      <SectionLabel>Get Notified</SectionLabel>
-      <div id='profile-subscribe-heading' className={panelClassName}>
+      <div id='profile-subscribe-heading'>
         {subscribeTwoStep ? (
           <TwoStepNotificationsCTA
             artist={artist}
@@ -361,7 +357,7 @@ function SubscribeSection({
           <ArtistNotificationsCTA
             key={subscribeModeActive ? 'subscribe-focus' : 'subscribe-default'}
             artist={artist}
-            variant='button'
+            variant='compact'
             autoOpen={true}
             forceExpanded={true}
             hideListenFallback={true}
@@ -369,6 +365,33 @@ function SubscribeSection({
         )}
       </div>
     </section>
+  );
+}
+
+function BottomDock({
+  artist,
+  socialLinks,
+}: {
+  readonly artist: Artist;
+  readonly socialLinks: LegacySocialLink[];
+}) {
+  if (socialLinks.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className='flex justify-center'>
+      <div className='inline-flex items-center gap-2 rounded-full border border-white/10 bg-[rgba(18,18,20,0.88)] px-2.5 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.24)] backdrop-blur-xl'>
+        {socialLinks.map(link => (
+          <SocialLink
+            key={link.id}
+            link={link}
+            handle={artist.handle}
+            artistName={artist.name}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -381,73 +404,93 @@ export function ProfileScrollBody({
   genres,
   tourDates,
   hasTip,
+  primaryActionKind,
   subscribeTwoStep = false,
   aboutSectionRef,
-  subscribeSectionRef,
   subscribeModeActive = false,
   onTipClick,
   onContactClick,
+  onListenClick,
   tourSectionRef,
 }: ProfileScrollBodyProps) {
   const hasContacts = contacts.length > 0;
+  const showCompactRelease =
+    primaryActionKind === 'listen' && Boolean(latestRelease);
 
   return (
     <main
       className='min-h-0 flex-1 overflow-y-auto'
       aria-label='Artist profile'
     >
-      <div
-        className={`px-5 pb-[max(env(safe-area-inset-bottom),28px)] md:px-7 md:pb-8 ${
-          subscribeModeActive
-            ? 'space-y-6 pt-4 md:space-y-7 md:pt-6'
-            : 'space-y-7 pt-6 md:space-y-8 md:pt-7'
-        }`}
-      >
-        {/* Section order: Featured → Tour → Subscribe → Connect → About → Follow */}
+      <div className='relative -mt-[15.5rem] px-4 pb-[max(env(safe-area-inset-bottom),28px)] md:mt-0 md:px-7 md:pb-8'>
+        <div className='space-y-8'>
+          <div className='flex min-h-[calc(100dvh-25rem)] flex-col justify-end gap-3 md:min-h-0 md:justify-start md:pt-7'>
+            {showCompactRelease ? (
+              <section
+                aria-labelledby='profile-featured-heading'
+                className='space-y-3'
+              >
+                <div id='profile-featured-heading'>
+                  <ProfileFeaturedCard
+                    artist={artist}
+                    latestRelease={latestRelease}
+                    tourDates={tourDates}
+                    dsps={mergedDSPs}
+                    variant='compact'
+                    onListenClick={onListenClick}
+                  />
+                </div>
+              </section>
+            ) : null}
 
-        {latestRelease ? (
-          <section
-            aria-labelledby='profile-featured-heading'
-            className='space-y-3'
-          >
-            <SectionLabel>Latest Release</SectionLabel>
-            <div id='profile-featured-heading'>
-              <ProfileFeaturedCard
-                artist={artist}
-                latestRelease={latestRelease}
-                tourDates={tourDates}
-                dsps={mergedDSPs}
-              />
-            </div>
-          </section>
-        ) : null}
+            <SubscribeSection
+              artist={artist}
+              subscribeTwoStep={subscribeTwoStep}
+              subscribeModeActive={subscribeModeActive}
+            />
 
-        <TourSection
-          artist={artist}
-          tourDates={tourDates}
-          tourSectionRef={tourSectionRef}
-        />
+            <BottomDock artist={artist} socialLinks={socialLinks} />
+          </div>
 
-        <SubscribeSection
-          artist={artist}
-          subscribeTwoStep={subscribeTwoStep}
-          subscribeSectionRef={subscribeSectionRef}
-          subscribeModeActive={subscribeModeActive}
-        />
+          <div className='space-y-7 pt-2 md:space-y-8 md:pt-0'>
+            {!showCompactRelease && latestRelease ? (
+              <section
+                aria-labelledby='profile-featured-heading'
+                className='space-y-3'
+              >
+                <SectionLabel>Latest Release</SectionLabel>
+                <div id='profile-featured-heading'>
+                  <ProfileFeaturedCard
+                    artist={artist}
+                    latestRelease={latestRelease}
+                    tourDates={tourDates}
+                    dsps={mergedDSPs}
+                  />
+                </div>
+              </section>
+            ) : null}
 
-        <UtilityRail
-          hasTip={hasTip}
-          hasContacts={hasContacts}
-          onTipClick={onTipClick}
-          onContactClick={onContactClick}
-        />
+            <TourSection
+              artist={artist}
+              tourDates={tourDates}
+              tourSectionRef={tourSectionRef}
+            />
 
-        <ArtistBioSection
-          artist={artist}
-          genres={genres}
-          aboutSectionRef={aboutSectionRef}
-        />
-        <SocialLinksSection artist={artist} socialLinks={socialLinks} />
+            <UtilityRail
+              hasTip={hasTip}
+              hasContacts={hasContacts}
+              onTipClick={onTipClick}
+              onContactClick={onContactClick}
+            />
+
+            <ArtistBioSection
+              artist={artist}
+              genres={genres}
+              aboutSectionRef={aboutSectionRef}
+            />
+            <SocialLinksSection artist={artist} socialLinks={socialLinks} />
+          </div>
+        </div>
       </div>
     </main>
   );

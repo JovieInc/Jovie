@@ -35,7 +35,7 @@ const mockTask = {
 } as const;
 
 describe('TaskListRow', () => {
-  it('keeps long titles truncated and metadata in a wrapping flex row', () => {
+  it('keeps long titles truncated and metadata in a single-line grid', () => {
     const { getByText, getByTestId } = fastRender(
       <TaskListRow
         task={mockTask}
@@ -47,8 +47,8 @@ describe('TaskListRow', () => {
     expect(getByText(mockTask.title)).toHaveClass('truncate');
 
     const meta = getByTestId('task-list-row-meta-task-1');
-    expect(meta.className).toContain('flex-wrap');
-    expect(meta.className).not.toContain('grid-cols-');
+    expect(meta.className).toContain('grid-cols-');
+    expect(meta.className).not.toContain('flex-wrap');
   });
 
   it('keeps the release link clickable and marks the selected state on the row shell', () => {
@@ -69,5 +69,25 @@ describe('TaskListRow', () => {
       'data-selected',
       'true'
     );
+  });
+
+  it('lets the due badge and action rail size to content', () => {
+    const { getByTestId } = fastRender(
+      <TaskListRow
+        task={{
+          ...mockTask,
+          dueAt: new Date('2026-03-01T00:00:00.000Z'),
+        }}
+        artistName='Tim White'
+        onOpenRelease={vi.fn()}
+        actionSlot={<button type='button'>Menu</button>}
+      />
+    );
+
+    expect(getByTestId('task-list-row-task-1').className).toContain(
+      'grid-cols-[1.25rem_minmax(0,1fr)_auto]'
+    );
+    expect(getByTestId('task-list-row-task-1')).toHaveTextContent('Overdue');
+    expect(getByTestId('task-list-row-task-1')).toHaveTextContent('Menu');
   });
 });

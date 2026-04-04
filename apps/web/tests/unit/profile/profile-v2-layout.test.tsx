@@ -26,6 +26,8 @@ const artist = {
   handle: 'tim',
   id: 'artist-1',
   image_url: 'https://example.com/avatar.jpg',
+  is_verified: true,
+  tagline: 'Exploring the intersection of atmospheric soundscapes.',
   name: 'Tim White',
 } as const;
 
@@ -66,7 +68,7 @@ describe('profile V2 layout constraints', () => {
     );
   });
 
-  it('uses a taller immersive hero instead of the compressed banner height', () => {
+  it('uses a full-screen mobile hero for the minimal poster layout', () => {
     const { container } = render(
       <ArtistHero
         artist={artist as never}
@@ -80,10 +82,45 @@ describe('profile V2 layout constraints', () => {
       />
     );
 
-    expect(container.firstChild).toHaveClass(
-      'h-[48dvh]',
-      'min-h-[420px]',
-      'max-h-[620px]'
+    expect(container.firstChild).toHaveClass('min-h-[100dvh]');
+  });
+
+  it('moves share into an overflow menu and replaces Play with Listen', () => {
+    render(
+      <ArtistHero
+        artist={artist as never}
+        heroImageUrl='https://example.com/hero.jpg'
+        latestRelease={null}
+        primaryAction={{ label: 'Listen Now', onClick: () => {} }}
+        onBellClick={() => {}}
+        onPlayClick={() => {}}
+      />
     );
+
+    expect(
+      screen.queryByRole('button', { name: /share tim white/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /listen to tim white/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Play')).not.toBeInTheDocument();
+  });
+
+  it('shows a verified label and renders the overflow trigger', () => {
+    render(
+      <ArtistHero
+        artist={artist as never}
+        heroImageUrl='https://example.com/hero.jpg'
+        latestRelease={null}
+        primaryAction={{ label: 'Listen Now', onClick: () => {} }}
+        onBellClick={() => {}}
+        onPlayClick={() => {}}
+      />
+    );
+
+    expect(screen.getByText('Verified Artist')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /open profile actions/i })
+    ).toBeInTheDocument();
   });
 });

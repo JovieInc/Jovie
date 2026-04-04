@@ -688,7 +688,11 @@ function TaskDocumentPanel({
                 value={description}
                 onFocus={handleDescriptionFocus}
                 onChange={event => onDescriptionChange(event.target.value)}
-                placeholder='Start writing...'
+                placeholder={
+                  showDescriptionHelper && descriptionHelper
+                    ? ''
+                    : 'Start writing...'
+                }
                 className='min-h-[520px] w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
               />
               {showDescriptionHelper && descriptionHelper ? (
@@ -1628,12 +1632,12 @@ export function TasksPageClient() {
             <div
               data-testid='task-list-pane'
               className={cn(
-                'min-h-0 min-w-0',
+                'min-h-0 min-w-0 flex-col overflow-hidden',
                 TASK_WORKSPACE_PANE_CLASSNAME,
                 selectedTask && showTaskDocumentPane
                   ? 'xl:flex-none xl:basis-[32rem] xl:min-w-[28rem] xl:max-w-[36rem] xl:border-r xl:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
                   : 'flex-1',
-                showTaskListPane ? 'block' : 'hidden',
+                showTaskListPane ? 'flex' : 'hidden',
                 !selectedTask && 'xl:max-w-none'
               )}
             >
@@ -1658,13 +1662,13 @@ export function TasksPageClient() {
                   rowHeight={64}
                   skeletonRows={8}
                   className='text-[13px]'
-                  containerClassName='h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5'
+                  containerClassName='min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-2.5 pb-2 pt-0.5'
                   minWidth='100%'
                   onRowClick={row => openTaskDocument(row)}
                   getContextMenuItems={getTaskContextMenuItems}
                   getRowClassName={_row =>
                     cn(
-                      'group/task-row bg-transparent shadow-none hover:bg-transparent focus-within:shadow-none focus-visible:bg-transparent focus-visible:shadow-none'
+                      'group/task-row !bg-transparent !shadow-none hover:!bg-transparent focus-within:!bg-transparent focus-within:!shadow-none focus-visible:!bg-transparent focus-visible:!shadow-none'
                     )
                   }
                   emptyState={
@@ -1748,7 +1752,7 @@ export function TasksPageClient() {
             </div>
             <div
               className={cn(
-                'min-h-0 min-w-0 flex-1 overflow-hidden',
+                'min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
                 TASK_WORKSPACE_PANE_CLASSNAME,
                 showTaskDocumentPane ? 'flex' : 'hidden'
               )}

@@ -63,7 +63,9 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
             key={value}
             active={view === value}
             onClick={() => onViewChange(value)}
-            className={cn('h-7 whitespace-nowrap px-2.5 text-[11.5px]')}
+            className={cn(
+              'h-7 whitespace-nowrap rounded-full px-3 text-[11.5px]'
+            )}
             icon={
               <Icon
                 name={icon}
