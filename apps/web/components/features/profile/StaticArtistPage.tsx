@@ -42,6 +42,7 @@ export function StaticArtistPage({
   subscribeTwoStep = false,
   genres,
   photoDownloadSizes = [],
+  tourDates = [],
   visitTrackingToken,
   viewerCountryCode,
 }: StaticArtistPageProps) {
@@ -56,6 +57,7 @@ export function StaticArtistPage({
       subscribeTwoStep={subscribeTwoStep}
       genres={genres}
       photoDownloadSizes={photoDownloadSizes}
+      tourDates={tourDates}
       visitTrackingToken={visitTrackingToken}
       viewerCountryCode={viewerCountryCode}
     />

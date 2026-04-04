@@ -3,12 +3,15 @@
 import {
   BadgeCheck,
   Bell,
+  CalendarDays,
   Mail,
   MoreHorizontal,
   Play,
   Share2,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -58,6 +61,7 @@ interface ProfileCompactTemplateProps {
   readonly subscribeTwoStep?: boolean;
   readonly genres?: string[] | null;
   readonly photoDownloadSizes?: AvatarSize[];
+  readonly tourDates?: TourDateViewModel[];
   readonly visitTrackingToken?: string;
   readonly viewerCountryCode?: string | null;
 }
@@ -82,6 +86,7 @@ export function ProfileCompactTemplate({
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   photoDownloadSizes = [],
+  tourDates = [],
   visitTrackingToken,
   viewerCountryCode,
 }: ProfileCompactTemplateProps) {
@@ -294,6 +299,17 @@ export function ProfileCompactTemplate({
                           <Bell className='h-[14px] w-[14px] text-white/50' />
                           Get Notified
                         </button>
+                        {tourDates.length > 0 ? (
+                          <Link
+                            href={`/${artist.handle}?mode=tour`}
+                            role='menuitem'
+                            className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
+                            onClick={() => setMenuOpen(false)}
+                          >
+                            <CalendarDays className='h-[14px] w-[14px] text-white/50' />
+                            Tour Dates
+                          </Link>
+                        ) : null}
                         {hasContacts ? (
                           <button
                             type='button'
@@ -332,12 +348,12 @@ export function ProfileCompactTemplate({
 
               {/* ─── Content ─── */}
               <div className='relative z-10 flex flex-col gap-3 px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3'>
-                {/* Player row */}
+                {/* Player card */}
                 {latestRelease || mergedDSPs.length > 0 ? (
                   <button
                     type='button'
                     onClick={handlePlayClick}
-                    className='group flex w-full items-center gap-2.5 text-left'
+                    className={`group flex w-full items-center gap-2.5 rounded-[14px] border ${glass.border} ${glass.bg} px-2.5 py-2 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
                     aria-label={
                       latestRelease
                         ? `Play ${latestRelease.title}`
@@ -345,7 +361,7 @@ export function ProfileCompactTemplate({
                     }
                   >
                     {latestRelease?.artworkUrl ? (
-                      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md shadow-[0_2px_8px_rgba(0,0,0,0.3)]'>
+                      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
                         <ImageWithFallback
                           src={latestRelease.artworkUrl}
                           alt={latestRelease.title}
@@ -356,7 +372,7 @@ export function ProfileCompactTemplate({
                         />
                       </div>
                     ) : (
-                      <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white/[0.08]'>
+                      <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white/[0.06]'>
                         <Play className='h-3.5 w-3.5 fill-current text-white/60' />
                       </div>
                     )}
