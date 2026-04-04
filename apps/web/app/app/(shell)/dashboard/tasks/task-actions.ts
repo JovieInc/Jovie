@@ -220,7 +220,7 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-async function createTaskForProfile(
+export async function createTaskForProfile(
   profileId: string,
   data: CreateTaskInput,
   attempt = 0
@@ -413,12 +413,11 @@ export async function createTask(data: CreateTaskInput): Promise<TaskView> {
   return createTaskForProfile(profileId, data);
 }
 
-export async function updateTask(
+export async function updateTaskForProfile(
+  profileId: string,
   taskId: string,
   data: UpdateTaskInput
 ): Promise<TaskView> {
-  await requireTasksWorkspaceAccess();
-  const profileId = await requireProfileId();
   const existingTask = await getOwnedTaskOrThrow(profileId, taskId);
 
   await assertReleaseAccess(profileId, data.releaseId);
@@ -498,11 +497,19 @@ export async function updateTask(
   return mapTaskRow(updated);
 }
 
-export async function deleteTask(
-  taskId: string
-): Promise<{ readonly success: true }> {
+export async function updateTask(
+  taskId: string,
+  data: UpdateTaskInput
+): Promise<TaskView> {
   await requireTasksWorkspaceAccess();
   const profileId = await requireProfileId();
+  return updateTaskForProfile(profileId, taskId, data);
+}
+
+export async function deleteTaskForProfile(
+  profileId: string,
+  taskId: string
+): Promise<{ readonly success: true }> {
   await getOwnedTaskOrThrow(profileId, taskId);
 
   await db
@@ -517,6 +524,14 @@ export async function deleteTask(
   revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
 
   return { success: true };
+}
+
+export async function deleteTask(
+  taskId: string
+): Promise<{ readonly success: true }> {
+  await requireTasksWorkspaceAccess();
+  const profileId = await requireProfileId();
+  return deleteTaskForProfile(profileId, taskId);
 }
 
 export async function bulkUpdateTasks(
@@ -546,7 +561,7 @@ export async function bulkUpdateTasks(
   }
 
   for (const taskId of taskIds) {
-    await updateTask(taskId, data);
+    await updateTaskForProfile(profileId, taskId, data);
   }
 
   return { success: true };

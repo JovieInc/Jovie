@@ -30,8 +30,10 @@ import {
 const mockRouterPush = vi.fn();
 const mockRouterRefresh = vi.fn();
 const mockInstantiateReleaseTasks = vi.fn().mockResolvedValue(undefined);
+const mockCaptureError = vi.fn();
 const mockUsePlanGate = vi.fn(() => ({
   isLoading: false,
+  isError: false,
   smartLinksLimit: null,
   isPro: true,
   canCreateManualReleases: true,
@@ -79,7 +81,7 @@ vi.mock('sonner', () => ({
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
-  captureError: vi.fn(),
+  captureError: (...args: unknown[]) => mockCaptureError(...args),
 }));
 
 vi.mock('@/hooks/useClipboard', () => ({
@@ -494,6 +496,8 @@ describe('ReleaseProviderMatrix', () => {
     vi.clearAllMocks();
     capturedOnArtworkUploaded = null;
     mockUsePlanGate.mockReturnValue({
+      isLoading: false,
+      isError: false,
       smartLinksLimit: null,
       isPro: true,
       canCreateManualReleases: true,
@@ -766,6 +770,7 @@ describe('ReleaseProviderMatrix', () => {
     it('shows the upgrade prompt for free users after creating a release', async () => {
       mockUsePlanGate.mockReturnValue({
         isLoading: false,
+        isError: false,
         smartLinksLimit: 10,
         isPro: false,
         canCreateManualReleases: true,
@@ -808,6 +813,7 @@ describe('ReleaseProviderMatrix', () => {
     it('keeps the post-create modal neutral while release plan entitlements are loading', async () => {
       mockUsePlanGate.mockReturnValue({
         isLoading: true,
+        isError: false,
         smartLinksLimit: null,
         isPro: false,
         canCreateManualReleases: true,
@@ -851,6 +857,95 @@ describe('ReleaseProviderMatrix', () => {
           name: 'Upgrade To Generate A Release Plan',
         })
       ).not.toBeInTheDocument();
+    });
+
+    it('shows a neutral verification state when billing resolution fails', async () => {
+      mockUsePlanGate.mockReturnValue({
+        isLoading: false,
+        isError: true,
+        smartLinksLimit: null,
+        isPro: false,
+        canCreateManualReleases: true,
+        canGenerateReleasePlans: false,
+        canEditSmartLinks: true,
+        canAccessFutureReleases: true,
+      });
+
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease('existing-release')]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('mock-add-release-sidebar')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
+
+      expect(
+        await screen.findByRole('heading', { name: 'Release Plan' })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Unable to verify whether this workspace can generate release-plan tasks right now.'
+        )
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Unable To Verify Plan' })
+      ).toBeDisabled();
+    });
+
+    it('reports release-plan generation failures to error tracking', async () => {
+      mockInstantiateReleaseTasks.mockRejectedValueOnce(
+        new Error('generation failed')
+      );
+
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease('existing-release')]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('mock-add-release-sidebar')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Generate Release Plan' })
+      );
+
+      await waitFor(() => {
+        expect(mockCaptureError).toHaveBeenCalledWith(
+          'Failed to generate release plan',
+          expect.any(Error),
+          expect.objectContaining({
+            action: 'generateReleasePlan',
+            context: 'release-provider-matrix',
+            releaseId: 'created-release',
+            source: 'handleGenerateReleasePlan',
+          })
+        );
+      });
     });
 
     it('closes the modal and leaves the new release visible when the user chooses maybe later', async () => {

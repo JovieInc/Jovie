@@ -42,6 +42,7 @@ import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { captureError } from '@/lib/error-tracking';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
@@ -231,8 +232,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     ...planGate,
     ...experienceAdapter?.entitlements,
   };
-  const isReleasePlanGateLoading =
-    planGate.isLoading && releasePlanEntitlementOverride === undefined;
+  const isReleasePlanGatePending =
+    releasePlanEntitlementOverride === undefined &&
+    (planGate.isLoading || planGate.isError);
 
   /** Soft cap: show a "request higher limit" banner (not a hard lock) */
   const SMART_LINK_SOFT_CAP = 100;
@@ -424,17 +426,24 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       return;
     }
 
+    const releaseId = postCreateRelease.id;
     setIsGeneratingReleasePlan(true);
     try {
-      await instantiateReleaseTasks(postCreateRelease.id);
+      await instantiateReleaseTasks(releaseId);
       const releaseTasksPath = APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
         '[releaseId]',
-        postCreateRelease.id
+        releaseId
       );
       setIsPostCreatePlanModalOpen(false);
       setPostCreateRelease(null);
       router.push(releaseTasksPath);
-    } catch {
+    } catch (error) {
+      void captureError('Failed to generate release plan', error, {
+        context: 'release-provider-matrix',
+        releaseId,
+        action: 'generateReleasePlan',
+        source: 'handleGenerateReleasePlan',
+      });
       toast.error('Failed to generate the release plan. Try again.');
     } finally {
       setIsGeneratingReleasePlan(false);
@@ -941,15 +950,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         size='sm'
       >
         <DialogTitle>
-          {isReleasePlanGateLoading
+          {isReleasePlanGatePending
             ? 'Release Plan'
             : canGenerateReleasePlans
               ? 'Generate Release Plan'
               : 'Upgrade To Generate A Release Plan'}
         </DialogTitle>
         <DialogDescription>
-          {isReleasePlanGateLoading
-            ? 'Checking whether this workspace can generate tasks for the release plan.'
+          {isReleasePlanGatePending
+            ? planGate.isError
+              ? 'Unable to verify whether this workspace can generate release-plan tasks right now.'
+              : 'Checking whether this workspace can generate tasks for the release plan.'
             : canGenerateReleasePlans
               ? 'Create the step-by-step tasks for this release and jump straight into the plan.'
               : 'Upgrade to turn this release into a step-by-step plan with tasks you can assign to Jovie AI.'}
@@ -969,9 +980,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           >
             Maybe Later
           </Button>
-          {isReleasePlanGateLoading ? (
+          {isReleasePlanGatePending ? (
             <Button type='button' size='sm' disabled>
-              Loading...
+              {planGate.isError ? 'Unable To Verify Plan' : 'Loading...'}
             </Button>
           ) : canGenerateReleasePlans ? (
             <Button

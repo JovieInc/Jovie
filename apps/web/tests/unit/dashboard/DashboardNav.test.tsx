@@ -151,6 +151,7 @@ describe('DashboardNav', () => {
     mockUsePlanGate.mockReturnValueOnce({
       canAccessTasksWorkspace: false,
       isLoading: false,
+      isError: false,
     });
 
     const { getByText } = renderDashboardNav({ renderFn: fastRender });
@@ -165,6 +166,19 @@ describe('DashboardNav', () => {
     mockUsePlanGate.mockReturnValueOnce({
       canAccessTasksWorkspace: false,
       isLoading: true,
+      isError: false,
+    });
+
+    const { queryByText } = renderDashboardNav({ renderFn: fastRender });
+
+    expect(queryByText('Pro')).toBeNull();
+  });
+
+  it('does not render the Pro badge when task entitlements cannot be verified', () => {
+    mockUsePlanGate.mockReturnValueOnce({
+      canAccessTasksWorkspace: false,
+      isLoading: false,
+      isError: true,
     });
 
     const { queryByText } = renderDashboardNav({ renderFn: fastRender });

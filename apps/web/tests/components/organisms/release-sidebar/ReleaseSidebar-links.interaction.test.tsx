@@ -450,6 +450,7 @@ describe('ReleaseSidebar Links tab', () => {
     mockUsePlanGate.mockReturnValue({
       canAccessTasksWorkspace: false,
       isLoading: true,
+      isError: false,
     });
 
     const user = userEvent.setup();
@@ -464,6 +465,26 @@ describe('ReleaseSidebar Links tab', () => {
       screen.queryByTestId('compact-release-plan-upgrade-card')
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId('task-checklist')).not.toBeInTheDocument();
+  });
+
+  it('shows a neutral loading state when task access cannot be verified', async () => {
+    mockUsePlanGate.mockReturnValue({
+      canAccessTasksWorkspace: false,
+      isLoading: false,
+      isError: true,
+    });
+
+    const user = userEvent.setup();
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    await user.click(screen.getByTestId('drawer-tab-tasks'));
+
+    expect(screen.getByTestId('release-tasks-loading-state')).toHaveTextContent(
+      'Unable to verify task access...'
+    );
+    expect(
+      screen.queryByTestId('compact-release-plan-upgrade-card')
+    ).not.toBeInTheDocument();
   });
 
   it('does not render the generic Releases title row above the entity card', () => {

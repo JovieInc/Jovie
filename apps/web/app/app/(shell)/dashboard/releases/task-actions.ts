@@ -18,7 +18,11 @@ import {
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import type { TaskView } from '@/lib/tasks/types';
 import { requireProfileId } from '../requireProfileId';
-import { createTask, deleteTask, updateTask } from '../tasks/task-actions';
+import {
+  createTaskForProfile,
+  deleteTaskForProfile,
+  updateTaskForProfile,
+} from '../tasks/task-actions';
 
 async function requireReleaseAccess(
   releaseId: string,
@@ -252,8 +256,9 @@ export async function updateReleaseTask(
     readonly dueDate?: Date | null;
   }
 ) {
+  const profileId = await requireProfileId();
   await requireTasksWorkspaceAccess();
-  await updateTask(taskId, {
+  await updateTaskForProfile(profileId, taskId, {
     status: data.status,
     priority: data.priority,
     assigneeKind: resolveAssigneeKind(data.assigneeType),
@@ -276,11 +281,10 @@ export async function addReleaseTask(
     readonly dueDate?: Date;
   }
 ): Promise<ReleaseTaskView> {
-  await requireTasksWorkspaceAccess();
   const profileId = await requireProfileId();
-  await requireReleaseAccess(releaseId, profileId);
+  await requireTasksWorkspaceAccess();
 
-  const task = await createTask({
+  const task = await createTaskForProfile(profileId, {
     title: data.title,
     description: data.description ?? null,
     category: data.category ?? 'Custom',
@@ -294,8 +298,9 @@ export async function addReleaseTask(
 }
 
 export async function deleteReleaseTask(taskId: string) {
+  const profileId = await requireProfileId();
   await requireTasksWorkspaceAccess();
-  await deleteTask(taskId);
+  await deleteTaskForProfile(profileId, taskId);
   return { success: true };
 }
 

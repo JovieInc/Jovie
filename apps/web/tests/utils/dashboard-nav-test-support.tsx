@@ -8,13 +8,20 @@ import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardData
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
+import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
+
+const DEFAULT_PLAN_GATE = {
+  isLoading: false,
+  isError: false,
+  isPro: true,
+  plan: 'pro',
+  ...ENTITLEMENT_REGISTRY.pro.booleans,
+  ...ENTITLEMENT_REGISTRY.pro.limits,
+};
 
 export const mockUsePathname = vi.fn<() => string>(() => APP_ROUTES.CHAT);
 export const mockUseTaskStatsQuery = vi.fn(() => ({ data: undefined }));
-export const mockUsePlanGate = vi.fn(() => ({
-  canAccessTasksWorkspace: true,
-  isLoading: false,
-}));
+export const mockUsePlanGate = vi.fn(() => ({ ...DEFAULT_PLAN_GATE }));
 export const mockToastInfo = vi.fn();
 
 vi.mock('next/navigation', () => ({
@@ -137,10 +144,7 @@ export function resetDashboardNavTestMocks() {
   mockUseTaskStatsQuery.mockReset();
   mockUseTaskStatsQuery.mockReturnValue({ data: undefined });
   mockUsePlanGate.mockReset();
-  mockUsePlanGate.mockReturnValue({
-    canAccessTasksWorkspace: true,
-    isLoading: false,
-  });
+  mockUsePlanGate.mockReturnValue({ ...DEFAULT_PLAN_GATE });
   mockToastInfo.mockReset();
 }
 

@@ -359,8 +359,13 @@ export function ReleaseSidebar({
 
   // Sidebar tab state
   const [activeTab, setActiveTab] = useState<SidebarTab>('playback');
-  const { canAccessTasksWorkspace, isLoading: isTasksWorkspaceGateLoading } =
-    usePlanGate();
+  const {
+    canAccessTasksWorkspace,
+    isLoading: isTasksWorkspaceGateLoading,
+    isError: isTasksWorkspaceGateError,
+  } = usePlanGate();
+  const isTasksWorkspaceGatePending =
+    isTasksWorkspaceGateLoading || isTasksWorkspaceGateError;
   const [platformRescanCooldownEnd, setPlatformRescanCooldownEnd] = useState(0);
   const [platformRescanRemainingMs, setPlatformRescanRemainingMs] = useState(0);
   const platformRescanTimerRef = useRef<ReturnType<typeof setInterval> | null>(
@@ -724,12 +729,14 @@ export function ReleaseSidebar({
 
               {activeTab === 'tasks' && (
                 <div className='min-h-0' data-testid='release-tasks-card'>
-                  {isTasksWorkspaceGateLoading ? (
+                  {isTasksWorkspaceGatePending ? (
                     <div
                       className='px-3 py-2 text-[12px] text-secondary-token animate-pulse'
                       data-testid='release-tasks-loading-state'
                     >
-                      Loading tasks...
+                      {isTasksWorkspaceGateError
+                        ? 'Unable to verify task access...'
+                        : 'Loading tasks...'}
                     </div>
                   ) : canAccessTasksWorkspace ? (
                     <ReleaseTaskChecklist

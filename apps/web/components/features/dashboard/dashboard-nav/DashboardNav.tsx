@@ -107,8 +107,12 @@ export function DashboardNav(_: DashboardNavProps) {
   const artistName = selectedProfile?.displayName;
   const profileId = selectedProfile?.id ?? '';
   const isDemo = isDemoRoutePath(pathname);
-  const { canAccessTasksWorkspace, isLoading: isPlanGateLoading } =
-    usePlanGate();
+  const {
+    canAccessTasksWorkspace,
+    isLoading: isPlanGateLoading,
+    isError: isPlanGateError,
+  } = usePlanGate();
+  const isTasksWorkspaceGatePending = isPlanGateLoading || isPlanGateError;
   const { data: taskStats } = useTaskStatsQuery(profileId, {
     enabled: !isDemo && canAccessTasksWorkspace,
   });
@@ -127,7 +131,7 @@ export function DashboardNav(_: DashboardNavProps) {
             ? {
                 ...item,
                 badge:
-                  isPlanGateLoading ? undefined : canAccessTasksWorkspace ? (
+                  isTasksWorkspaceGatePending ? undefined : canAccessTasksWorkspace ? (
                     formatTaskBadge(taskStats)
                   ) : (
                     <span className='rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] px-1.5 py-0.5 text-[9px] font-[600] tracking-[0.02em] text-secondary-token'>
@@ -139,7 +143,7 @@ export function DashboardNav(_: DashboardNavProps) {
         ),
       },
     ],
-    [canAccessTasksWorkspace, isPlanGateLoading, taskStats]
+    [canAccessTasksWorkspace, isTasksWorkspaceGatePending, taskStats]
   );
 
   // Profile nav item opens the preview drawer instead of navigating to a separate page.
