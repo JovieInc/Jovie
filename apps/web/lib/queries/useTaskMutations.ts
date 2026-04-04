@@ -151,26 +151,20 @@ function updateTaskStatsForStatusChange(
       ? previousStatusCount + 1
       : stats[nextStatusKey] + 1;
 
+  const resolveCount = (key: keyof TaskStats): number => {
+    if (previousStatusKey === key) return previousStatusCount;
+    if (nextStatusKey === key) return nextStatusCount;
+    return stats[key];
+  };
+
   return {
     ...stats,
     [previousStatusKey]: previousStatusCount,
     [nextStatusKey]: nextStatusCount,
     activeTodoCount:
-      (previousStatusKey === 'backlog'
-        ? previousStatusCount
-        : nextStatusKey === 'backlog'
-          ? nextStatusCount
-          : stats.backlog) +
-      (previousStatusKey === 'todo'
-        ? previousStatusCount
-        : nextStatusKey === 'todo'
-          ? nextStatusCount
-          : stats.todo) +
-      (previousStatusKey === 'inProgress'
-        ? previousStatusCount
-        : nextStatusKey === 'inProgress'
-          ? nextStatusCount
-          : stats.inProgress),
+      resolveCount('backlog') +
+      resolveCount('todo') +
+      resolveCount('inProgress'),
   };
 }
 

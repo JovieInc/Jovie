@@ -18,6 +18,7 @@ import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tasks } from '@/lib/db/schema/tasks';
+import { requireTasksWorkspaceAccess } from '@/lib/entitlements/tasks-gate';
 import type {
   CreateTaskInput,
   TaskCursor,
@@ -299,6 +300,7 @@ async function getOwnedTaskOrThrow(
 }
 
 export async function getTasks(filters?: TaskFilters): Promise<TaskListResult> {
+  await requireTasksWorkspaceAccess();
   const profileId = await requireProfileId();
   const limit = clampLimit(filters?.limit);
 
@@ -354,6 +356,7 @@ export async function getTasks(filters?: TaskFilters): Promise<TaskListResult> {
 }
 
 export async function getTask(taskId: string): Promise<TaskView> {
+  await requireTasksWorkspaceAccess();
   const profileId = await requireProfileId();
 
   const [row] = await db
@@ -405,6 +408,7 @@ export async function getTask(taskId: string): Promise<TaskView> {
 }
 
 export async function createTask(data: CreateTaskInput): Promise<TaskView> {
+  await requireTasksWorkspaceAccess();
   const profileId = await requireProfileId();
   return createTaskForProfile(profileId, data);
 }
@@ -413,20 +417,22 @@ export async function updateTask(
   taskId: string,
   data: UpdateTaskInput
 ): Promise<TaskView> {
+  await requireTasksWorkspaceAccess();
   const profileId = await requireProfileId();
   const existingTask = await getOwnedTaskOrThrow(profileId, taskId);
 
   await assertReleaseAccess(profileId, data.releaseId);
 
   const nextStatus = data.status ?? existingTask.status;
-  const completedAt =
-    data.completedAt !== undefined
-      ? data.completedAt
-      : data.status
-        ? nextStatus === 'done'
-          ? (existingTask.completedAt ?? new Date())
-          : null
-        : existingTask.completedAt;
+  let completedAt: Date | null | undefined;
+  if (data.completedAt !== undefined) {
+    completedAt = data.completedAt;
+  } else if (data.status === undefined) {
+    completedAt = existingTask.completedAt;
+  } else {
+    completedAt =
+      nextStatus === 'done' ? (existingTask.completedAt ?? new Date()) : null;
+  }
 
   const [updated] = await db
     .update(tasks)
@@ -495,6 +501,7 @@ export async function updateTask(
 export async function deleteTask(
   taskId: string
 ): Promise<{ readonly success: true }> {
+  await requireTasksWorkspaceAccess();
   const profileId = await requireProfileId();
   await getOwnedTaskOrThrow(profileId, taskId);
 
@@ -516,6 +523,7 @@ export async function bulkUpdateTasks(
   taskIds: string[],
   data: UpdateTaskInput
 ): Promise<{ readonly success: true }> {
+  await requireTasksWorkspaceAccess();
   if (taskIds.length === 0) {
     return { success: true };
   }
@@ -545,6 +553,7 @@ export async function bulkUpdateTasks(
 }
 
 export async function getTaskStats(): Promise<TaskStats> {
+  await requireTasksWorkspaceAccess();
   const profileId = await requireProfileId();
 
   const rows = await db

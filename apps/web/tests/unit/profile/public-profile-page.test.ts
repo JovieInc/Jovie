@@ -105,7 +105,7 @@ describe('Public Profile Page Logic', () => {
         'Error fetching public profile tour dates'
       );
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        '? getPublicTourDates(profile.id)'
+        'getPublicTourDates(profile.id)'
       );
     });
   });

@@ -12,8 +12,17 @@ import {
 } from './dashboard-route-resolvers';
 
 export type DashboardRouteKind = 'render' | 'redirect' | 'dynamic';
-export type DashboardRouteSurface = 'creator' | 'settings' | 'admin' | 'alias';
-export type DashboardRouteAuthRole = 'user' | 'admin';
+export type DashboardRouteSurface =
+  | 'creator'
+  | 'settings'
+  | 'admin'
+  | 'alias'
+  | 'marketing'
+  | 'public-profile'
+  | 'billing'
+  | 'onboarding'
+  | 'legal';
+export type DashboardRouteAuthRole = 'user' | 'admin' | 'anonymous';
 
 export type DashboardRouteResolver = (page: Page) => Promise<string>;
 
@@ -40,6 +49,10 @@ interface DashboardRouteGroup {
 const CREATOR_DEFAULT_BUDGET_MS = 12_000;
 const SETTINGS_DEFAULT_BUDGET_MS = 12_000;
 const ADMIN_DEFAULT_BUDGET_MS = 15_000;
+const PUBLIC_DEFAULT_BUDGET_MS = 15_000;
+
+const CHAT_CONTENT_SELECTOR =
+  '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], button[aria-label="New thread"], textarea, [contenteditable="true"], main';
 const DASHBOARD_RELEASE_TASKS_ROUTE = `${APP_ROUTES.DASHBOARD_RELEASES}/[releaseId]/tasks`;
 const DASHBOARD_TIPPING_ROUTE = `${APP_ROUTES.DASHBOARD}/tipping`;
 const DASHBOARD_CONTACTS_ROUTE = `${APP_ROUTES.DASHBOARD}/contacts`;
@@ -52,8 +65,7 @@ const creatorRoutes = [
     kind: 'render',
     surface: 'creator',
     authRole: 'user',
-    contentSelector:
-      '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], button[aria-label="New thread"], textarea, [contenteditable="true"], main',
+    contentSelector: CHAT_CONTENT_SELECTOR,
     requiresUserButton: true,
     performanceBudgetMs: 8_000,
   },
@@ -63,8 +75,7 @@ const creatorRoutes = [
     kind: 'render',
     surface: 'creator',
     authRole: 'user',
-    contentSelector:
-      '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], button[aria-label="New thread"], textarea, [contenteditable="true"], main',
+    contentSelector: CHAT_CONTENT_SELECTOR,
     requiresUserButton: true,
     performanceBudgetMs: 8_000,
   },
@@ -74,8 +85,7 @@ const creatorRoutes = [
     kind: 'dynamic',
     surface: 'creator',
     authRole: 'user',
-    contentSelector:
-      '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], button[aria-label="New thread"], textarea, [contenteditable="true"], main',
+    contentSelector: CHAT_CONTENT_SELECTOR,
     requiresUserButton: true,
     performanceBudgetMs: 8_000,
     resolver: resolveChatConversationPath,
@@ -349,6 +359,251 @@ const adminRoutes = [
   })),
 ] as const satisfies readonly DashboardRouteDescriptor[];
 
+const onboardingRoutes = [
+  {
+    path: APP_ROUTES.ONBOARDING,
+    name: 'Onboarding',
+    kind: 'render',
+    surface: 'onboarding',
+    authRole: 'user',
+    contentSelector: 'main',
+    requiresUserButton: true,
+    performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: APP_ROUTES.ONBOARDING_CHECKOUT,
+    name: 'Onboarding Checkout',
+    kind: 'render',
+    surface: 'onboarding',
+    authRole: 'user',
+    contentSelector: 'main',
+    requiresUserButton: true,
+    performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
+  },
+] as const satisfies readonly DashboardRouteDescriptor[];
+
+const billingRoutes = [
+  {
+    path: APP_ROUTES.BILLING,
+    name: 'Billing',
+    kind: 'render',
+    surface: 'billing',
+    authRole: 'user',
+    contentSelector: 'main',
+    requiresUserButton: true,
+    performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: APP_ROUTES.BILLING_SUCCESS,
+    name: 'Billing Success',
+    kind: 'render',
+    surface: 'billing',
+    authRole: 'user',
+    contentSelector: 'main',
+    requiresUserButton: true,
+    performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: APP_ROUTES.BILLING_CANCEL,
+    name: 'Billing Cancel',
+    kind: 'render',
+    surface: 'billing',
+    authRole: 'user',
+    contentSelector: 'main',
+    requiresUserButton: true,
+    performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: APP_ROUTES.BILLING_REMOVE_BRANDING,
+    name: 'Billing Remove Branding',
+    kind: 'render',
+    surface: 'billing',
+    authRole: 'user',
+    contentSelector: 'main',
+    requiresUserButton: true,
+    performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
+  },
+] as const satisfies readonly DashboardRouteDescriptor[];
+
+const marketingRoutes = [
+  {
+    path: APP_ROUTES.HOME,
+    name: 'Homepage',
+    kind: 'render',
+    surface: 'marketing',
+    authRole: 'anonymous',
+    contentSelector: 'h1',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: APP_ROUTES.PRICING,
+    name: 'Pricing',
+    kind: 'render',
+    surface: 'marketing',
+    authRole: 'anonymous',
+    contentSelector: 'h1, h2',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: APP_ROUTES.ABOUT,
+    name: 'About',
+    kind: 'render',
+    surface: 'marketing',
+    authRole: 'anonymous',
+    contentSelector: 'main',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: APP_ROUTES.CHANGELOG,
+    name: 'Changelog',
+    kind: 'render',
+    surface: 'marketing',
+    authRole: 'anonymous',
+    contentSelector: 'main',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: APP_ROUTES.SUPPORT,
+    name: 'Support',
+    kind: 'render',
+    surface: 'marketing',
+    authRole: 'anonymous',
+    contentSelector: 'main',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+] as const satisfies readonly DashboardRouteDescriptor[];
+
+const legalRoutes = [
+  {
+    path: APP_ROUTES.LEGAL_PRIVACY,
+    name: 'Privacy Policy',
+    kind: 'render',
+    surface: 'legal',
+    authRole: 'anonymous',
+    contentSelector: 'main',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: APP_ROUTES.LEGAL_TERMS,
+    name: 'Terms of Service',
+    kind: 'render',
+    surface: 'legal',
+    authRole: 'anonymous',
+    contentSelector: 'main',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+] as const satisfies readonly DashboardRouteDescriptor[];
+
+const publicProfileRoutes = [
+  {
+    path: '/[username]',
+    name: 'Public Profile',
+    kind: 'dynamic',
+    surface: 'public-profile',
+    authRole: 'anonymous',
+    contentSelector: 'main',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: '/[username]/about',
+    name: 'Public Profile About',
+    kind: 'dynamic',
+    surface: 'public-profile',
+    authRole: 'anonymous',
+    contentSelector: 'main',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: '/[username]/listen',
+    name: 'Public Profile Listen',
+    kind: 'dynamic',
+    surface: 'public-profile',
+    authRole: 'anonymous',
+    contentSelector: 'main',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: '/[username]/tour',
+    name: 'Public Profile Tour',
+    kind: 'dynamic',
+    surface: 'public-profile',
+    authRole: 'anonymous',
+    contentSelector: 'main',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: '/[username]/shop',
+    name: 'Public Profile Shop',
+    kind: 'dynamic',
+    surface: 'public-profile',
+    authRole: 'anonymous',
+    contentSelector: 'main',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: '/[username]/subscribe',
+    name: 'Public Profile Subscribe',
+    kind: 'dynamic',
+    surface: 'public-profile',
+    authRole: 'anonymous',
+    contentSelector: 'main',
+    performanceBudgetMs: PUBLIC_DEFAULT_BUDGET_MS,
+  },
+] as const satisfies readonly DashboardRouteDescriptor[];
+
+/**
+ * Routes intentionally excluded from coverage tracking.
+ * These are internal, dev-only, or redirect-only pages.
+ */
+export const EXCLUDED_ROUTES: Record<string, string> = {
+  '/sso-callback': 'Clerk internal redirect',
+  '/sentry-example-page': 'Sentry test page',
+  '/spinner-test': 'Dev utility',
+  '/sandbox': 'Dev sandbox',
+  '/hud': 'Dev HUD',
+  '/ui': 'Component showcase root',
+  '/ui/avatars': 'Component showcase',
+  '/ui/badges': 'Component showcase',
+  '/ui/buttons': 'Component showcase',
+  '/ui/checkboxes': 'Component showcase',
+  '/ui/dialogs': 'Component showcase',
+  '/ui/dropdowns': 'Component showcase',
+  '/ui/inputs': 'Component showcase',
+  '/ui/selects': 'Component showcase',
+  '/ui/switches': 'Component showcase',
+  '/ui/tooltips': 'Component showcase',
+  '/demo': 'Internal demo root',
+  '/demo/audience': 'Internal demo',
+  '/demo/dropdowns': 'Internal demo',
+  '/demo/onboarding': 'Internal demo',
+  '/demo/showcase/:surface': 'Internal demo',
+  '/demo/video': 'Internal demo (marketing)',
+  '/error/user-creation-failed': 'Error page (covered by error.tsx)',
+  '/artist-selection': 'Internal flow',
+  '/artists': 'Internal listing',
+  '/claim/:token': 'One-time claim flow',
+  '/out/:id': 'Redirect-only',
+  '/r/:slug': 'Redirect-only',
+  '/waitlist': 'Legacy',
+  '/unavailable': 'Error state',
+  '/signin': 'Covered by visual-regression.spec.ts',
+  '/signup': 'Covered by visual-regression.spec.ts',
+  '/signin/sso-callback': 'Clerk internal',
+  '/signup/sso-callback': 'Clerk internal',
+  '/account': 'Clerk account page',
+  '/investor-portal': 'Investor portal (admin-managed)',
+  '/investor-portal/:slug': 'Investor portal detail',
+  '/investor-portal/respond': 'Investor portal response',
+  '/:username/contact': 'Profile contact form',
+  '/:username/notifications': 'Profile notifications',
+  '/:username/tip': 'Profile tipping',
+  '/:username/claim': 'Profile claim flow',
+  '/:username/:slug': 'Release page (dynamic)',
+  '/:username/:slug/sounds': 'Release sounds (dynamic)',
+  '/:username/:slug/:trackSlug': 'Track page (dynamic)',
+  '/:username/...slug': 'Catch-all profile route',
+};
+
 const fastHealthPaths = new Set([
   APP_ROUTES.DASHBOARD,
   APP_ROUTES.CHAT,
@@ -393,6 +648,26 @@ export const DASHBOARD_ROUTE_MATRIX = {
   admin: {
     full: adminRoutes,
     fast: selectFastRoutes(adminRoutes, fastAdminPaths),
+  },
+  onboarding: {
+    full: onboardingRoutes,
+    fast: onboardingRoutes,
+  },
+  billing: {
+    full: billingRoutes,
+    fast: billingRoutes,
+  },
+  marketing: {
+    full: marketingRoutes,
+    fast: marketingRoutes,
+  },
+  legal: {
+    full: legalRoutes,
+    fast: legalRoutes,
+  },
+  'public-profile': {
+    full: publicProfileRoutes,
+    fast: publicProfileRoutes,
   },
 } as const satisfies Record<string, DashboardRouteGroup>;
 

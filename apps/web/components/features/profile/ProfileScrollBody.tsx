@@ -1,7 +1,7 @@
 'use client';
 
 import { HandCoins, Mail, MapPin } from 'lucide-react';
-import { type RefObject, useMemo, useState } from 'react';
+import { type RefObject, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { SocialLink } from '@/components/molecules/SocialLink';
 import {
@@ -82,7 +82,7 @@ function ArtistBioSection({
   const metaLine = [location, normalizedGenres.join(' · ')]
     .filter(Boolean)
     .join(' / ');
-  const isLongBio = bio.length > 190 || bio.split('\n').length > 3;
+  const isLongBio = bio.length > 300 || bio.split('\n').length > 5;
 
   if (!bio && !metaLine) {
     return null;
@@ -106,7 +106,7 @@ function ArtistBioSection({
           ) : null}
           <p
             id='profile-about-heading'
-            className={`whitespace-pre-line text-[0.95rem] leading-7 text-secondary-token ${!expanded && isLongBio ? 'line-clamp-4' : ''}`}
+            className={`whitespace-pre-line text-[0.95rem] leading-7 text-secondary-token ${!expanded && isLongBio ? 'line-clamp-6' : ''}`}
           >
             {bio}
           </p>
@@ -149,7 +149,7 @@ function SocialLinksSection({
       aria-labelledby='profile-social-links-heading'
       className='space-y-3'
     >
-      <SectionLabel>Elsewhere</SectionLabel>
+      <SectionLabel>Follow</SectionLabel>
       <div
         id='profile-social-links-heading'
         className='flex flex-wrap items-center gap-2.5'
@@ -247,20 +247,13 @@ function TourSection({
   readonly tourSectionRef: RefObject<HTMLElement | null>;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const sortedDates = useMemo(
-    () =>
-      [...tourDates].sort(
-        (a, b) =>
-          new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
-      ),
-    [tourDates]
-  );
 
-  if (sortedDates.length === 0) {
+  if (tourDates.length === 0) {
     return null;
   }
 
-  const visibleDates = expanded ? sortedDates : sortedDates.slice(0, 4);
+  // Tour dates are pre-sorted server-side by startDate ascending
+  const visibleDates = expanded ? tourDates : tourDates.slice(0, 4);
 
   return (
     <section
@@ -279,7 +272,7 @@ function TourSection({
           />
         ))}
 
-        {sortedDates.length > 4 ? (
+        {tourDates.length > 4 ? (
           <button
             type='button'
             className='inline-flex min-h-11 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] px-4 py-2.5 text-[15px] font-[560] tracking-[-0.015em] text-primary-token shadow-[var(--profile-pearl-shadow)] transition-[background-color,transform] hover:bg-[var(--profile-pearl-bg-hover)] active:scale-[0.985]'
@@ -287,7 +280,7 @@ function TourSection({
           >
             {expanded
               ? 'Show fewer dates'
-              : `Show all ${sortedDates.length} dates`}
+              : `Show all ${tourDates.length} dates`}
           </button>
         ) : null}
       </div>
@@ -410,12 +403,7 @@ export function ProfileScrollBody({
             : 'space-y-7 pt-6 md:space-y-8 md:pt-7'
         }`}
       >
-        <SubscribeSection
-          artist={artist}
-          subscribeTwoStep={subscribeTwoStep}
-          subscribeSectionRef={subscribeSectionRef}
-          subscribeModeActive={subscribeModeActive}
-        />
+        {/* Section order: Featured → Tour → Subscribe → Connect → About → Follow */}
 
         {latestRelease ? (
           <section
@@ -427,7 +415,7 @@ export function ProfileScrollBody({
               <ProfileFeaturedCard
                 artist={artist}
                 latestRelease={latestRelease}
-                tourDates={[]}
+                tourDates={tourDates}
                 dsps={mergedDSPs}
               />
             </div>
@@ -438,6 +426,13 @@ export function ProfileScrollBody({
           artist={artist}
           tourDates={tourDates}
           tourSectionRef={tourSectionRef}
+        />
+
+        <SubscribeSection
+          artist={artist}
+          subscribeTwoStep={subscribeTwoStep}
+          subscribeSectionRef={subscribeSectionRef}
+          subscribeModeActive={subscribeModeActive}
         />
 
         <UtilityRail

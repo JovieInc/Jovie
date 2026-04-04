@@ -305,7 +305,7 @@ export function PublicProfileTemplateV2({
   }, [historyMode]);
 
   const visibleSocialLinks = useMemo(() => {
-    return getHeaderSocialLinks(socialLinks, viewerCountryCode, 2);
+    return getHeaderSocialLinks(socialLinks, viewerCountryCode, 3);
   }, [socialLinks, viewerCountryCode]);
 
   const featuredContent = useMemo(

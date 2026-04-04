@@ -30,7 +30,7 @@ export function ReleaseTaskEmptyState({
         disabled={isLoading}
         className='rounded-md bg-[var(--linear-accent,#5e6ad2)] px-4 py-2 text-[12px] font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-50'
       >
-        {isLoading ? 'Setting up...' : 'Set up campaign tasks'}
+        {isLoading ? 'Generating...' : 'Generate Release Plan'}
       </button>
     </div>
   );

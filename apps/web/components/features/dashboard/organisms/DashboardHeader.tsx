@@ -36,10 +36,7 @@ export function DashboardHeader({
   return (
     <header
       data-testid='dashboard-header'
-      className={cn(
-        'z-20 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
-        className
-      )}
+      className={cn('z-20 bg-(--linear-app-content-surface)', className)}
     >
       {/* Mobile: Large page title with action buttons + profile */}
       <div className='hidden max-sm:flex items-center justify-between px-4 pb-2 pt-3'>

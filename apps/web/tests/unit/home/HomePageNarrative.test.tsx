@@ -43,9 +43,7 @@ describe('HomePageNarrative', () => {
         name: 'Drop more music. Crush every release.',
       })
     ).toBeInTheDocument();
-    expect(
-      screen.getByText('Connected with leading label partners')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Trusted by artists on')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', {
         name: 'Profiles that convert.',
@@ -61,7 +59,7 @@ describe('HomePageNarrative', () => {
     ).toBeGreaterThan(0);
     expect(
       screen.getByRole('heading', {
-        name: 'Context, monitoring, and tasks in one system.',
+        name: 'Your release operating system.',
       })
     ).toBeInTheDocument();
     expect(
