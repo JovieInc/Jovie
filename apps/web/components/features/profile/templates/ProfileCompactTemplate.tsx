@@ -497,19 +497,12 @@ export function ProfileCompactTemplate({
                 {/* Powered by */}
                 <a
                   href={BASE_URL}
-                  className='flex items-center justify-center gap-1.5 pt-1 text-white/20 transition-colors duration-150 hover:text-white/40'
+                  className='flex flex-col items-center gap-0.5 pt-1 text-white/20 transition-colors duration-150 hover:text-white/40'
                 >
-                  <span className='text-[9px] font-[510] uppercase tracking-[0.12em]'>
+                  <span className='text-[8px] font-[510] uppercase tracking-[0.14em]'>
                     Powered by
                   </span>
-                  <BrandLogo
-                    size={12}
-                    tone='white'
-                    rounded={false}
-                    className='opacity-[inherit]'
-                    aria-hidden
-                  />
-                  <span className='text-[11px] font-[590] tracking-[-0.01em]'>
+                  <span className='text-[13px] font-[590] tracking-[-0.01em]'>
                     Jovie
                   </span>
                 </a>
