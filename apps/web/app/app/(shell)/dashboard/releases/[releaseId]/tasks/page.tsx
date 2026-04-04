@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { ReleaseTaskPage } from '@/components/features/dashboard/release-tasks';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { requireProfileId } from '../../../requireProfileId';
 
 interface TasksPageProps {
@@ -28,6 +29,7 @@ export default async function TasksPage({ params }: TasksPageProps) {
 
 async function TasksContent({ releaseId }: Readonly<{ releaseId: string }>) {
   const profileId = await requireProfileId();
+  const entitlements = await getCurrentUserEntitlements();
 
   const [release] = await db
     .select({
@@ -53,6 +55,9 @@ async function TasksContent({ releaseId }: Readonly<{ releaseId: string }>) {
       releaseId={releaseId}
       releaseTitle={release.title ?? 'Release'}
       releaseDate={release.releaseDate}
+      showMetadataAgentPanel={
+        entitlements.isAdmin || entitlements.canAccessMetadataSubmissionAgent
+      }
     />
   );
 }

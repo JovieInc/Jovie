@@ -13,6 +13,7 @@ interface ReleaseTaskPageProps {
   readonly releaseId: string;
   readonly releaseTitle: string;
   readonly releaseDate?: Date | string | null;
+  readonly showMetadataAgentPanel?: boolean;
 }
 
 function getUpNextTasks(tasks: ReleaseTaskView[]): ReleaseTaskView[] {
@@ -40,6 +41,7 @@ export function ReleaseTaskPage({
   releaseId,
   releaseTitle,
   releaseDate,
+  showMetadataAgentPanel = false,
 }: ReleaseTaskPageProps) {
   const { data: tasks } = useReleaseTasksQuery(releaseId);
   const toggle = useTaskToggleMutation(releaseId);
@@ -74,11 +76,13 @@ export function ReleaseTaskPage({
         <span className='text-primary-token'>Tasks</span>
       </nav>
 
-      <MetadataAgentPanel
-        profileId={profileId}
-        releaseId={releaseId}
-        releaseTitle={releaseTitle}
-      />
+      {showMetadataAgentPanel ? (
+        <MetadataAgentPanel
+          profileId={profileId}
+          releaseId={releaseId}
+          releaseTitle={releaseTitle}
+        />
+      ) : null}
 
       {/* Up Next section (only when tasks exist and not all done) */}
       {upNextTasks.length > 0 && !allDone && (
