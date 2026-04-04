@@ -178,6 +178,51 @@ function ensureAuthState(baseUrl) {
   return authStatePath;
 }
 
+function buildWarmupCookieHeader(baseUrl) {
+  const origin = new URL(baseUrl).origin;
+  const testUserId = process.env.E2E_CLERK_USER_ID?.trim();
+
+  if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1' && testUserId) {
+    return [
+      `${TEST_MODE_COOKIE}=${TEST_AUTH_BYPASS_MODE}`,
+      `${TEST_USER_ID_COOKIE}=${testUserId}`,
+    ].join('; ');
+  }
+
+  const authStatePath = resolveAuthStatePath();
+  if (!existsSync(authStatePath)) {
+    return null;
+  }
+
+  const cookies = readStorageStateCookies(authStatePath)
+    .map(cookie => buildCookieForOrigin(cookie, origin))
+    .filter(cookie => cookieMatchesBaseUrl(cookie, baseUrl))
+    .map(cookie => `${cookie.name}=${cookie.value}`);
+
+  return cookies.length > 0 ? cookies.join('; ') : null;
+}
+
+async function warmDashboardRoutes(baseUrl) {
+  const warmUrls = ['/app', '/app/chat', '/app/dashboard/releases'];
+  const cookieHeader = buildWarmupCookieHeader(baseUrl);
+  const headers = cookieHeader ? { Cookie: cookieHeader } : undefined;
+
+  for (let iteration = 0; iteration < 2; iteration += 1) {
+    for (const route of warmUrls) {
+      const response = await fetch(new URL(route, baseUrl), {
+        headers,
+        redirect: 'follow',
+      }).catch(() => null);
+
+      if (!response || !response.ok) {
+        throw new Error(
+          `Failed to warm Lighthouse route ${route} before auditing.`
+        );
+      }
+    }
+  }
+}
+
 async function seedDashboardAuth(browser, { url }) {
   const origin = new URL(url).origin;
   const page = await browser.newPage();
@@ -246,7 +291,7 @@ async function seedDashboardAuth(browser, { url }) {
   }
 }
 
-function main() {
+async function main() {
   const baseUrl = resolveBaseUrl();
   assertCiUsesSyntheticBypass();
   const authStatePath = ensureAuthState(baseUrl);
@@ -269,6 +314,8 @@ function main() {
     delete env.NEXT_PUBLIC_CLERK_PROXY_DISABLED;
   }
 
+  await warmDashboardRoutes(baseUrl);
+
   const result = spawnSync(
     'pnpm',
     [
@@ -277,6 +324,7 @@ function main() {
       'autorun',
       '--config=.lighthouserc.dashboard.pr.json',
       `--collect.url=${baseUrl}/app`,
+      `--collect.url=${baseUrl}/app/chat`,
       `--collect.url=${baseUrl}/app/dashboard/releases`,
       `--healthcheck.chromePath=${chromePath}`,
       `--collect.chromePath=${chromePath}`,
@@ -292,7 +340,7 @@ function main() {
 }
 
 if (require.main === module) {
-  main();
+  void main();
 } else {
   module.exports = seedDashboardAuth;
 }

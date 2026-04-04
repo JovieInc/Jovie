@@ -1,0 +1,1 @@
+/Users/timwhite/conductor/workspaces/jovie/stuttgart/.claude/skills/gstack/plan-ceo-review/SKILL.md
