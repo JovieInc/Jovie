@@ -55,6 +55,7 @@
             "unused-javascript": "warn",
             "color-contrast": "warn",
             "image-delivery-insight": "warn",
+            "document-latency-insight": "warn",
             "categories:performance": [
               "error",
               {
