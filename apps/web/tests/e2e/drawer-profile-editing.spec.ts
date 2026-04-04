@@ -21,13 +21,131 @@ import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { ensureSignedInUser, hasClerkCredentials } from '../helpers/clerk-auth';
 import {
+  assertNoCriticalErrors,
   setupPageMonitoring,
   waitForHydration,
 } from './utils/smoke-test-utils';
 
 const IS_FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+const PROFILE_ALIAS_REDIRECT_BUDGET_MS = process.env.CI ? 3_000 : 5_000;
+const PROFILE_DRAWER_OPEN_BUDGET_MS = process.env.CI ? 1_500 : 3_000;
+const PROFILE_TAB_SETTLE_BUDGET_MS = 1_000;
 const TEST_PRESS_PHOTO_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn8s6sAAAAASUVORK5CYII=';
+
+const PROFILE_TAB_EXPECTATIONS: Record<string, RegExp> = {
+  Social:
+    /no social links yet|instagram|tiktok|youtube|website|venmo|click \+ to add one/i,
+  Music:
+    /spotify|apple music|no music links yet|no artist profiles connected yet|click \+ to add one/i,
+  Earn: /tips|payments|set up tips|no earnings links yet|username/i,
+  About: /press photos|auto-detected from your music connections|bio/i,
+};
+
+async function readBodyText(
+  page: import('@playwright/test').Page
+): Promise<string> {
+  return await page.evaluate(() => document.body.innerText.toLowerCase());
+}
+
+async function openProfileDrawer(
+  page: import('@playwright/test').Page,
+  entry: 'alias' | 'chat'
+): Promise<void> {
+  const target =
+    entry === 'alias'
+      ? APP_ROUTES.DASHBOARD_PROFILE
+      : APP_ROUTES.CHAT_PROFILE_PANEL;
+
+  await page.goto(target, {
+    waitUntil: 'domcontentloaded',
+    timeout: 90_000,
+  });
+  await waitForHydration(page);
+  await expect(page.getByTestId('profile-contact-header-card')).toBeVisible({
+    timeout: 30_000,
+  });
+}
+
+async function measureProfileDrawerOpen(
+  page: import('@playwright/test').Page,
+  entry: 'alias' | 'chat'
+): Promise<number> {
+  if (entry === 'chat') {
+    const startTime = Date.now();
+    await page.goto(APP_ROUTES.CHAT_PROFILE_PANEL, {
+      waitUntil: 'domcontentloaded',
+      timeout: 90_000,
+    });
+    await expect(page.getByTestId('profile-contact-sidebar')).toBeVisible({
+      timeout: PROFILE_DRAWER_OPEN_BUDGET_MS,
+    });
+
+    return Date.now() - startTime;
+  }
+
+  const startTime = Date.now();
+  await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+    waitUntil: 'domcontentloaded',
+    timeout: 90_000,
+  });
+  await expect(page.getByTestId('profile-contact-sidebar')).toBeVisible({
+    timeout: PROFILE_DRAWER_OPEN_BUDGET_MS,
+  });
+
+  return Date.now() - startTime;
+}
+
+async function measureAliasRedirect(
+  page: import('@playwright/test').Page
+): Promise<number> {
+  const startTime = Date.now();
+
+  const navigation = page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+    waitUntil: 'commit',
+    timeout: 90_000,
+  });
+  await expect(page).toHaveURL(/\/app\/chat(?:\?.*panel=profile.*|$)/, {
+    timeout: PROFILE_ALIAS_REDIRECT_BUDGET_MS,
+  });
+  await navigation;
+
+  return Date.now() - startTime;
+}
+
+async function measureDrawerVisibilityFromCurrentState(
+  page: import('@playwright/test').Page
+): Promise<number> {
+  const startTime = Date.now();
+  await expect(page.getByTestId('profile-contact-sidebar')).toBeVisible({
+    timeout: PROFILE_DRAWER_OPEN_BUDGET_MS,
+  });
+  return Date.now() - startTime;
+}
+
+async function assertTabSettlesWithinBudget(
+  page: import('@playwright/test').Page,
+  label: keyof typeof PROFILE_TAB_EXPECTATIONS
+): Promise<number> {
+  const tab = page.getByRole('tab', { name: label });
+  const startTime = Date.now();
+
+  await tab.click();
+  await expect(tab).toHaveAttribute('aria-selected', 'true', {
+    timeout: PROFILE_TAB_SETTLE_BUDGET_MS,
+  });
+  await expect
+    .poll(
+      async () =>
+        PROFILE_TAB_EXPECTATIONS[label].test(await readBodyText(page)),
+      {
+        timeout: PROFILE_TAB_SETTLE_BUDGET_MS,
+      }
+    )
+    .toBe(true);
+
+  return Date.now() - startTime;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tab rendering
@@ -41,14 +159,70 @@ test.describe('Profile drawer — tab rendering', () => {
     await ensureSignedInUser(page);
   });
 
+  test('chat panel route opens the profile drawer without crash', async ({
+    page,
+  }) => {
+    await setupPageMonitoring(page);
+    await openProfileDrawer(page, 'chat');
+
+    for (const label of ['Social', 'Music', 'Earn', 'About']) {
+      await expect(page.getByRole('tab', { name: label })).toBeVisible({
+        timeout: 30_000,
+      });
+    }
+
+    await expect(page).toHaveURL(/\/app\/chat(?:\?.*panel=profile.*|$)/);
+  });
+
+  test('profile drawer entry points meet redirect and open budgets', async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      IS_FAST_ITERATION,
+      'Drawer performance assertions run in the full resilience suite'
+    );
+
+    const { getContext, cleanup } = setupPageMonitoring(page);
+
+    try {
+      const aliasRedirectMs = await measureAliasRedirect(page);
+      expect(aliasRedirectMs).toBeLessThanOrEqual(
+        PROFILE_ALIAS_REDIRECT_BUDGET_MS
+      );
+
+      const aliasDrawerOpenMs =
+        await measureDrawerVisibilityFromCurrentState(page);
+      expect(aliasDrawerOpenMs).toBeLessThanOrEqual(
+        PROFILE_DRAWER_OPEN_BUDGET_MS
+      );
+
+      const chatDrawerOpenMs = await measureProfileDrawerOpen(page, 'chat');
+      expect(chatDrawerOpenMs).toBeLessThanOrEqual(
+        PROFILE_DRAWER_OPEN_BUDGET_MS
+      );
+
+      await testInfo.attach('profile-drawer-perf', {
+        body: JSON.stringify(
+          {
+            aliasRedirectMs,
+            aliasDrawerOpenMs,
+            chatDrawerOpenMs,
+          },
+          null,
+          2
+        ),
+        contentType: 'application/json',
+      });
+
+      await assertNoCriticalErrors(getContext(), testInfo);
+    } finally {
+      cleanup();
+    }
+  });
+
   test('all four tabs render without crash', async ({ page }) => {
     await setupPageMonitoring(page);
-
-    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-      waitUntil: 'domcontentloaded',
-      timeout: 90_000,
-    });
-    await waitForHydration(page);
+    await openProfileDrawer(page, 'alias');
 
     // All four tabs must be visible — if any tab crashes during render the
     // segment control would be absent or replaced by an error boundary.
@@ -67,11 +241,7 @@ test.describe('Profile drawer — tab rendering', () => {
   });
 
   test('Music tab renders DSP content area without crash', async ({ page }) => {
-    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-      waitUntil: 'domcontentloaded',
-      timeout: 90_000,
-    });
-    await waitForHydration(page);
+    await openProfileDrawer(page, 'alias');
 
     await page.getByRole('tab', { name: 'Music' }).click();
     await page.waitForTimeout(500);
@@ -83,11 +253,7 @@ test.describe('Profile drawer — tab rendering', () => {
   });
 
   test('About tab renders bio section without crash', async ({ page }) => {
-    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-      waitUntil: 'domcontentloaded',
-      timeout: 90_000,
-    });
-    await waitForHydration(page);
+    await openProfileDrawer(page, 'alias');
 
     await page.getByRole('tab', { name: 'About' }).click();
     await page.waitForTimeout(500);
@@ -161,47 +327,48 @@ test.describe('Profile drawer — tab rendering', () => {
 
   test('rapid tab switching does not trigger React errors', async ({
     page,
-  }) => {
+  }, testInfo) => {
     test.skip(
       IS_FAST_ITERATION,
       'Rapid switching runs in full resilience suite'
     );
 
-    const reactErrors: string[] = [];
-    page.on('pageerror', err => {
-      const msg = err.message.toLowerCase();
-      if (
-        msg.includes('rendered more hooks') ||
-        msg.includes('invalid hook call') ||
-        msg.includes('hydration failed') ||
-        msg.includes('maximum update depth') ||
-        msg.includes('too many re-renders')
-      ) {
-        reactErrors.push(err.message);
-      }
-    });
+    const { getContext, cleanup } = setupPageMonitoring(page);
 
-    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-      waitUntil: 'domcontentloaded',
-      timeout: 90_000,
-    });
-    await waitForHydration(page);
+    try {
+      await openProfileDrawer(page, 'alias');
 
-    // Click through all tabs 3× rapidly — exercises the tab state machine
-    for (let round = 0; round < 3; round++) {
-      for (const tab of ['Social', 'Music', 'Earn', 'About']) {
-        await page.getByRole('tab', { name: tab }).click();
-        await page.waitForTimeout(120);
+      const settleTimes: Record<string, number[]> = {
+        Social: [],
+        Music: [],
+        Earn: [],
+        About: [],
+      };
+
+      for (let round = 0; round < 3; round++) {
+        for (const tab of ['Social', 'Music', 'Earn', 'About'] as const) {
+          settleTimes[tab].push(await assertTabSettlesWithinBudget(page, tab));
+        }
       }
+
+      await testInfo.attach('profile-drawer-tab-settle-times', {
+        body: JSON.stringify(settleTimes, null, 2),
+        contentType: 'application/json',
+      });
+
+      for (const [label, durations] of Object.entries(settleTimes)) {
+        for (const duration of durations) {
+          expect(
+            duration,
+            `${label} tab exceeded ${PROFILE_TAB_SETTLE_BUDGET_MS}ms settle budget`
+          ).toBeLessThanOrEqual(PROFILE_TAB_SETTLE_BUDGET_MS);
+        }
+      }
+
+      await assertNoCriticalErrors(getContext(), testInfo);
+    } finally {
+      cleanup();
     }
-
-    // Give React a moment to settle
-    await page.waitForTimeout(1_000);
-
-    expect(
-      reactErrors,
-      `React errors during tab switching: ${reactErrors.join('; ')}`
-    ).toHaveLength(0);
   });
 });
 
@@ -227,16 +394,21 @@ test.describe('Profile drawer — enriched link data', () => {
     await waitForHydration(page);
 
     await page.getByRole('tab', { name: 'Music' }).click();
-    await page.waitForTimeout(1_000);
+    await expect
+      .poll(async () => await readBodyText(page), { timeout: 10_000 })
+      .not.toMatch(/loading/i);
 
     // The test user is seeded with a Spotify link in seed-test-data.ts.
     // Verify Spotify is mentioned in the Music tab content area.
-    const body = await page.evaluate(() => document.body.innerText);
+    const body = await readBodyText(page);
     const hasSpotify = body.toLowerCase().includes('spotify');
 
     // If the test DB is not seeded or the enrichment hasn't run yet, skip.
     test.skip(
-      !hasSpotify && body.toLowerCase().includes('no links'),
+      !hasSpotify &&
+        /no links|no music links yet|no artist profiles connected yet/.test(
+          body
+        ),
       'Test DB not seeded with Spotify link for this user — seed first'
     );
 

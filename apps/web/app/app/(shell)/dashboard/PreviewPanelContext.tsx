@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
 } from 'react';
@@ -102,13 +103,14 @@ export function PreviewPanelProvider({
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  // Start closed to match SSR; the effect below opens on large screens after hydration
-  const [isOpen, setIsOpen] = useState(false);
+  // Honor defaultOpen on the initial render so deep-link flows can paint the
+  // drawer immediately. Small screens still collapse after mount below.
+  const [isOpen, setIsOpen] = useState(enabled && defaultOpen);
   const [previewData, setPreviewData] = useState<PreviewPanelData | null>(null);
 
   // Open panel after mount on large screens when defaultOpen is requested.
   // Also close when switching to a small screen.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (defaultOpen && isLargeScreen) {
       setIsOpen(true);
     } else if (!isLargeScreen && isOpen) {

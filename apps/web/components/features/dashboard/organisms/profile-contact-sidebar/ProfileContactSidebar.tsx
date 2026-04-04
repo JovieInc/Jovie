@@ -613,6 +613,7 @@ export function ProfileContactSidebar() {
       <EntitySidebarShell
         isOpen={isOpen}
         ariaLabel='Profile Contact'
+        data-testid='profile-contact-sidebar'
         headerMode='minimal'
         hideMinimalHeaderBar
       >
@@ -673,6 +674,7 @@ export function ProfileContactSidebar() {
     <EntitySidebarShell
       isOpen={isOpen}
       ariaLabel='Profile Contact'
+      data-testid='profile-contact-sidebar'
       headerMode='minimal'
       hideMinimalHeaderBar
       entityHeader={

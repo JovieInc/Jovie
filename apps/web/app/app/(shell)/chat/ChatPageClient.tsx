@@ -3,7 +3,14 @@
 import { Button, SimpleTooltip } from '@jovie/ui';
 import { AlertCircle, Check, Copy, RefreshCw } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { ChatEntityPanelProvider } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { ChatEntityRightPanelHost } from '@/app/app/(shell)/chat/ChatEntityRightPanelHost';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -131,9 +138,10 @@ export function ChatPageClient({
   const isProfileSetupRace =
     hasProfilesButNoSelection && !hasDashboardLoadFailure;
   const canAutoRetry = isProfileSetupRace && autoRetryCount < 3;
-  const enablePreviewPanel = !env.IS_E2E;
-  const fromOnboarding = searchParams.get('from') === 'onboarding';
   const panelParam = searchParams.get('panel');
+  const fromOnboarding = searchParams.get('from') === 'onboarding';
+  const enablePreviewPanel =
+    !env.IS_E2E || panelParam === 'profile' || fromOnboarding;
   // Only hydrate preview panel when explicitly requested via ?panel=profile
   // or coming from onboarding. Otherwise, panel stays closed by default.
   const shouldHydratePreviewPanel =
@@ -151,7 +159,7 @@ export function ChatPageClient({
   const profileId = shouldHydratePreviewPanel ? (activeProfile?.id ?? '') : '';
   const { data: socialLinks } = useDashboardSocialLinksQuery(profileId);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!shouldHydratePreviewPanel || !fromOnboarding) return;
 
     try {
@@ -183,7 +191,7 @@ export function ChatPageClient({
   );
 
   // Hydrate preview panel with profile data and links
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!shouldHydratePreviewPanel || !activeProfile) return;
     const profileSettings = activeProfile.settings as Record<
       string,
@@ -301,7 +309,7 @@ export function ChatPageClient({
   const rawQuery = useMemo(() => searchParams.get('q'), [searchParams]);
 
   // Auto-open the profile drawer when redirected from /dashboard/profile (?panel=profile)
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!enablePreviewPanel) return;
     if (panelParam === 'profile') {
       openPreviewPanel();
