@@ -28,7 +28,6 @@ import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
-import type { PressPhoto } from '@/types/press-photos';
 
 interface PublicProfileTemplateV2Props {
   readonly mode: ProfileMode;
@@ -45,8 +44,6 @@ interface PublicProfileTemplateV2Props {
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly genres?: string[] | null;
-  readonly pressPhotos?: readonly PressPhoto[];
-  readonly allowPhotoDownloads?: boolean;
   readonly photoDownloadSizes?: AvatarSize[];
   readonly tourDates: TourDateViewModel[];
   readonly visitTrackingToken?: string;
@@ -455,11 +452,9 @@ export function PublicProfileTemplateV2({
             contacts={available}
             latestRelease={latestRelease}
             mergedDSPs={mergedDSPs}
-            enableDynamicEngagement={enableDynamicEngagement}
             genres={genres}
             tourDates={tourDates}
             hasTip={Boolean(venmoLink)}
-            primaryActionKind={primaryActionKind}
             subscribeTwoStep={subscribeTwoStep}
             aboutSectionRef={aboutSectionRef}
             subscribeSectionRef={subscribeSectionRef}

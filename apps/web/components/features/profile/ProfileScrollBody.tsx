@@ -23,19 +23,15 @@ type ReleaseSummary = {
   readonly releaseType: string;
 };
 
-type PrimaryActionKind = 'tickets' | 'listen' | 'subscribe';
-
 interface ProfileScrollBodyProps {
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
   readonly latestRelease?: ReleaseSummary | null;
   readonly mergedDSPs: AvailableDSP[];
-  readonly enableDynamicEngagement?: boolean;
   readonly genres?: string[] | null;
   readonly tourDates: TourDateViewModel[];
   readonly hasTip: boolean;
-  readonly primaryActionKind: PrimaryActionKind;
   readonly subscribeTwoStep?: boolean;
   readonly aboutSectionRef: RefObject<HTMLElement | null>;
   readonly subscribeSectionRef: RefObject<HTMLElement | null>;

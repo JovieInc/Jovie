@@ -61,66 +61,64 @@ export function DspPresenceSummary({
   }
 
   return (
-    <>
-      <PageToolbar
-        start={
-          <div className='flex min-w-0 items-center gap-2 text-[11px] text-tertiary-token'>
-            <span>
-              {confirmedCount} matched platform
-              {confirmedCount === 1 ? '' : 's'}
-            </span>
-            {suggestedCount > 0 && (
-              <>
-                <span className='text-quaternary-token'>&middot;</span>
-                <span className='inline-flex items-center gap-1.5'>
-                  <span className='h-1.5 w-1.5 rounded-full bg-amber-500' />
-                  {suggestedCount} pending
-                </span>
-              </>
-            )}
-            {isDiscovering && enrichmentStatus && (
-              <>
-                <span className='text-quaternary-token'>&middot;</span>
-                <span className='inline-flex items-center gap-1.5 text-blue-500'>
-                  <Loader2 className='h-3 w-3 animate-spin' />
-                  {getPhaseLabel(enrichmentStatus.overallPhase)}
-                </span>
-              </>
-            )}
-          </div>
-        }
-        end={
-          <div className='flex items-center gap-1'>
-            {isAdmin && (
-              <PageToolbarActionButton
-                label='Refresh'
-                icon={
-                  isRefreshing || isDiscovering ? (
-                    <Loader2 className='h-3.5 w-3.5 animate-spin' />
-                  ) : (
-                    <RefreshCw className='h-3.5 w-3.5' />
-                  )
-                }
-                onClick={handleRefresh}
-                disabled={!spotifyId || isRefreshing || isDiscovering}
-                iconOnly
-                tooltipLabel={refreshTooltip}
-              />
-            )}
-            <DrawerToggleButton
-              chrome='page-toolbar'
-              ariaLabel='Toggle presence details sidebar'
-            />
+    <PageToolbar
+      start={
+        <div className='flex min-w-0 items-center gap-2 text-[11px] text-tertiary-token'>
+          <span>
+            {confirmedCount} matched platform
+            {confirmedCount === 1 ? '' : 's'}
+          </span>
+          {suggestedCount > 0 && (
+            <>
+              <span className='text-quaternary-token'>&middot;</span>
+              <span className='inline-flex items-center gap-1.5'>
+                <span className='h-1.5 w-1.5 rounded-full bg-amber-500' />
+                {suggestedCount} pending
+              </span>
+            </>
+          )}
+          {isDiscovering && enrichmentStatus && (
+            <>
+              <span className='text-quaternary-token'>&middot;</span>
+              <span className='inline-flex items-center gap-1.5 text-blue-500'>
+                <Loader2 className='h-3 w-3 animate-spin' />
+                {getPhaseLabel(enrichmentStatus.overallPhase)}
+              </span>
+            </>
+          )}
+        </div>
+      }
+      end={
+        <div className='flex items-center gap-1'>
+          {isAdmin && (
             <PageToolbarActionButton
-              label='Add Platform'
-              icon={<Plus className='h-3.5 w-3.5' />}
-              onClick={onAddPlatform}
+              label='Refresh'
+              icon={
+                isRefreshing || isDiscovering ? (
+                  <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                ) : (
+                  <RefreshCw className='h-3.5 w-3.5' />
+                )
+              }
+              onClick={handleRefresh}
+              disabled={!spotifyId || isRefreshing || isDiscovering}
               iconOnly
-              tooltipLabel='Add platform'
+              tooltipLabel={refreshTooltip}
             />
-          </div>
-        }
-      />
-    </>
+          )}
+          <DrawerToggleButton
+            chrome='page-toolbar'
+            ariaLabel='Toggle presence details sidebar'
+          />
+          <PageToolbarActionButton
+            label='Add Platform'
+            icon={<Plus className='h-3.5 w-3.5' />}
+            onClick={onAddPlatform}
+            iconOnly
+            tooltipLabel='Add platform'
+          />
+        </div>
+      }
+    />
   );
 }

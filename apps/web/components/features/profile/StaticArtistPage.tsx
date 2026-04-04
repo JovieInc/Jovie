@@ -247,8 +247,6 @@ export function StaticArtistPage({
         enableDynamicEngagement={enableDynamicEngagement}
         subscribeTwoStep={subscribeTwoStep}
         genres={genres}
-        pressPhotos={pressPhotos}
-        allowPhotoDownloads={allowPhotoDownloads}
         photoDownloadSizes={photoDownloadSizes}
         tourDates={tourDates}
         visitTrackingToken={visitTrackingToken}
