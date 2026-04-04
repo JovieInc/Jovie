@@ -159,7 +159,11 @@ export function ArtistHero({
               type='button'
               onClick={handleShare}
               className={`${heroPearlClassName} inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-4 text-[15px] font-[590] tracking-[-0.015em] text-white/88 transition-[background-color,border-color,color,opacity] hover:bg-white/12 hover:text-white hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]`}
-              aria-label={`Share ${artist.name}'s profile`}
+              aria-label={
+                shareSuccess
+                  ? `Copied ${artist.name}'s profile link`
+                  : `Share ${artist.name}'s profile`
+              }
             >
               {shareSuccess ? (
                 <Check className='h-[17px] w-[17px]' aria-hidden='true' />

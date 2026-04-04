@@ -37,12 +37,15 @@ export function ProfileSkeleton() {
                     className={`h-11 w-11 rounded-full bg-white/[0.06] ${pulse}`}
                   />
                   <div
+                    className={`h-11 w-[76px] rounded-full bg-white/[0.06] ${pulse}`}
+                  />
+                  <div
                     className={`h-11 w-11 rounded-full bg-white/[0.06] ${pulse}`}
                   />
                 </div>
               </div>
 
-              {/* Artist name + Play button */}
+              {/* Artist name + Play button + primary CTA */}
               <div className='mt-auto max-w-[32rem] space-y-4'>
                 <div className='flex items-end justify-between gap-4'>
                   <div className='space-y-2'>
@@ -57,18 +60,59 @@ export function ProfileSkeleton() {
                     className={`h-11 w-[88px] shrink-0 rounded-full bg-white/[0.06] ${pulse}`}
                   />
                 </div>
+                {/* Primary action placeholder (e.g. Get Tickets, Listen) */}
+                <div className='flex flex-wrap items-center gap-3'>
+                  <div
+                    className={`h-12 w-40 rounded-full bg-white/[0.08] ${pulse}`}
+                  />
+                </div>
               </div>
             </div>
           </div>
 
           {/* Scroll body placeholder — matches ProfileScrollBody sections */}
           <div className='flex-1 px-5 pt-6 pb-[max(env(safe-area-inset-bottom),28px)] md:px-7 md:pt-7 md:pb-8 space-y-7'>
+            {/* Featured section placeholder */}
+            <div className='space-y-3'>
+              <div className={`h-4 w-20 rounded bg-white/[0.06] ${pulse}`} />
+              <div className={`${panelClass} px-5 py-5 space-y-3 ${pulse}`}>
+                <div className='flex items-center gap-3'>
+                  <div className='h-14 w-14 shrink-0 rounded-xl bg-white/[0.06]' />
+                  <div className='flex-1 space-y-2'>
+                    <div className='h-4 w-32 rounded bg-white/[0.06]' />
+                    <div className='h-3 w-24 rounded bg-white/[0.06]' />
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Subscribe section placeholder */}
             <div className='space-y-3'>
               <div className={`h-4 w-20 rounded bg-white/[0.06] ${pulse}`} />
               <div className={`${panelClass} px-5 py-5 space-y-3 ${pulse}`}>
                 <div className='h-5 w-48 rounded bg-white/[0.06]' />
                 <div className='h-12 w-full rounded-full bg-white/[0.06]' />
+              </div>
+            </div>
+
+            {/* Tour dates section placeholder */}
+            <div className='space-y-3'>
+              <div className={`h-4 w-24 rounded bg-white/[0.06] ${pulse}`} />
+              <div className={`${panelClass} px-5 py-5 space-y-4 ${pulse}`}>
+                <div className='flex items-center justify-between'>
+                  <div className='space-y-1.5'>
+                    <div className='h-4 w-28 rounded bg-white/[0.06]' />
+                    <div className='h-3 w-40 rounded bg-white/[0.06]' />
+                  </div>
+                  <div className='h-9 w-20 rounded-full bg-white/[0.06]' />
+                </div>
+                <div className='flex items-center justify-between'>
+                  <div className='space-y-1.5'>
+                    <div className='h-4 w-32 rounded bg-white/[0.06]' />
+                    <div className='h-3 w-36 rounded bg-white/[0.06]' />
+                  </div>
+                  <div className='h-9 w-20 rounded-full bg-white/[0.06]' />
+                </div>
               </div>
             </div>
 
@@ -82,7 +126,7 @@ export function ProfileSkeleton() {
               </div>
             </div>
 
-            {/* Social links placeholder */}
+            {/* Connect / social links section placeholder */}
             <div className='space-y-3'>
               <div className={`h-4 w-16 rounded bg-white/[0.06] ${pulse}`} />
               <div className='flex flex-wrap gap-2.5'>

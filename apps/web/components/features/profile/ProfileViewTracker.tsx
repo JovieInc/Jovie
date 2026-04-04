@@ -49,12 +49,27 @@ export function ProfileViewTracker({
       trackViewRef.current.mutate({ handle });
     };
 
+    let idleId: number | null = null;
+    let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
+
     if (typeof globalThis.requestIdleCallback === 'function') {
-      globalThis.requestIdleCallback(doTrack);
+      idleId = globalThis.requestIdleCallback(doTrack, { timeout: 1500 });
     } else {
       // Safari fallback
-      setTimeout(doTrack, 0);
+      timeoutId = globalThis.setTimeout(doTrack, 0);
     }
+
+    return () => {
+      if (
+        idleId !== null &&
+        typeof globalThis.cancelIdleCallback === 'function'
+      ) {
+        globalThis.cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== null) {
+        globalThis.clearTimeout(timeoutId);
+      }
+    };
   }, [handle, artistId, source]);
 
   // This component renders nothing - it's purely for tracking

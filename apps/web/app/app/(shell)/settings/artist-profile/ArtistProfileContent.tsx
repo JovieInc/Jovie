@@ -61,7 +61,7 @@ export function ArtistProfileContent() {
               rel='noopener noreferrer'
               className='inline-flex items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 py-1.5 text-[13px] font-[510] text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
             >
-              View as visitor
+              View as Visitor
               <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />
             </a>
           ) : null
