@@ -734,6 +734,32 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
 
+      - name: Create ephemeral Neon database branch (with retry)
+        id: neon-branch
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: public-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Resolve DATABASE_URL (Neon ephemeral)
+        run: |
+          CANDIDATE="${{ steps.neon-branch.outputs.db_url }}"
+          if [ -z "$CANDIDATE" ]; then
+            echo "No Neon ephemeral DATABASE_URL available."
+            exit 1
+          fi
+          echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+
+      - name: Run migrations (ephemeral Neon)
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
       - name: Download build artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -778,6 +804,9 @@ jobs:
           pnpm exec lhci autorun --config=.lighthouserc.pr.json
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          URL_ENCRYPTION_KEY: lighthouse-public-ci-url-encryption-key
+          AI_GATEWAY_API_KEY: lighthouse-public-ci
 
   ci-lighthouse-dashboard-pr:
     name: Lighthouse (dashboard PR)
