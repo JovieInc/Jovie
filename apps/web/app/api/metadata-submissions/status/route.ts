@@ -28,10 +28,9 @@ function isMissingMetadataSubmissionStorage(
       : '';
 
   return (
-    code === '42P01' ||
-    (message.includes('failed query:') &&
-      message.includes('metadata_submission_')) ||
-    (message.includes('does not exist') &&
+    (code === '42P01' && message.includes('metadata_submission')) ||
+    (message.includes('relation') &&
+      message.includes('does not exist') &&
       message.includes('metadata_submission'))
   );
 }

@@ -5,8 +5,8 @@ import { ReleaseTaskPage } from '@/components/features/dashboard/release-tasks';
 import { ReleasePlanUpgradeInterstitial } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
-import { canAccessTasksWorkspace } from '@/lib/entitlements/tasks-gate';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { canAccessTasksWorkspace } from '@/lib/entitlements/tasks-gate';
 import { requireProfileId } from '../../../requireProfileId';
 
 interface TasksPageProps {

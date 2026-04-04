@@ -89,11 +89,15 @@ describe('GET /api/metadata-submissions/status', () => {
   });
 
   it('degrades cleanly when Drizzle wraps the missing-table error', async () => {
-    hoisted.getMetadataSubmissionStatusMock.mockRejectedValue(
-      new Error(
-        'Failed query: select * from "metadata_submission_requests" where "creator_profile_id" = $1'
-      )
+    const innerError = new Error(
+      'relation "metadata_submission_requests" does not exist'
     );
+    Object.assign(innerError, { code: '42P01' });
+    const wrappedError = new Error(
+      'Failed query: select * from "metadata_submission_requests" where "creator_profile_id" = $1',
+      { cause: innerError }
+    );
+    hoisted.getMetadataSubmissionStatusMock.mockRejectedValue(wrappedError);
 
     const { GET } = await import('@/app/api/metadata-submissions/status/route');
 
@@ -112,5 +116,22 @@ describe('GET /api/metadata-submissions/status', () => {
         'Metadata submission storage is not available in this environment.',
     });
     expect(hoisted.captureErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('does not degrade for 42P01 on an unrelated table', async () => {
+    hoisted.getMetadataSubmissionStatusMock.mockRejectedValue({
+      code: '42P01',
+      message: 'relation "user_entitlements" does not exist',
+    });
+
+    const { GET } = await import('@/app/api/metadata-submissions/status/route');
+    const response = await GET(
+      new Request(
+        'http://localhost/api/metadata-submissions/status?profileId=profile_123&releaseId=release_123'
+      )
+    );
+
+    expect(response.status).toBe(500);
+    expect(hoisted.captureErrorMock).toHaveBeenCalled();
   });
 });

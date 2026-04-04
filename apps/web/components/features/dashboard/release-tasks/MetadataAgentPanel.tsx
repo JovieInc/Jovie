@@ -208,9 +208,17 @@ export function MetadataAgentPanel({
       throw new Error('Unable to refresh metadata submission status.');
     }
 
-    const payload = await response.json();
+    const payload = (await response.json()) as MetadataAgentStatusResponse;
     startTransition(() => {
       setRequests(payload.requests ?? []);
+      const available = payload.storageAvailable !== false;
+      setStorageAvailable(available);
+      if (!available) {
+        setError(
+          payload.error ??
+            'Metadata submission storage is not available in this environment.'
+        );
+      }
     });
   };
 
@@ -428,7 +436,13 @@ export function MetadataAgentPanel({
       ) : null}
 
       {error ? (
-        <div className='mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700'>
+        <div
+          className={`mt-4 rounded-lg border px-3 py-2 text-sm ${
+            !storageAvailable
+              ? 'border-amber-200 bg-amber-50 text-amber-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
           {error}
         </div>
       ) : null}
