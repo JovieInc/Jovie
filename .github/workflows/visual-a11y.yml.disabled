@@ -51,18 +51,18 @@ jobs:
           if [ "${{ steps.a11y-test.outcome }}" == "failure" ]; then
             echo "::warning::⚠️ Accessibility violations detected in Storybook components. Check the test output above for details."
             echo ""
-            echo "## 🔍 A11y Check Results" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ **Accessibility violations detected**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Some components have accessibility issues (contrast, labels, etc.)." >> $GITHUB_STEP_SUMMARY
-            echo "These are logged as warnings - review the job output for details." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "To run locally: \`pnpm --filter web test:a11y\`" >> $GITHUB_STEP_SUMMARY
+            echo "## 🔍 A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "⚠️ **Accessibility violations detected**" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Some components have accessibility issues (contrast, labels, etc.)." >> "$GITHUB_STEP_SUMMARY"
+            echo "These are logged as warnings - review the job output for details." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "To run locally: \`pnpm --filter web test:a11y\`" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "## ✅ A11y Check Results" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "All Storybook components passed accessibility checks." >> $GITHUB_STEP_SUMMARY
+            echo "## ✅ A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "All Storybook components passed accessibility checks." >> "$GITHUB_STEP_SUMMARY"
           fi
 
   playwright-visual:
@@ -116,19 +116,19 @@ jobs:
           if [ "${{ steps.visual-test.outcome }}" == "failure" ]; then
             echo "::warning::⚠️ Visual differences detected. Check the artifacts for diff images."
             echo ""
-            echo "## 🖼️ Visual Regression Results" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ **Visual differences detected**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Some pages have visual changes from the baseline." >> $GITHUB_STEP_SUMMARY
-            echo "Download the artifacts to review diff images." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "If changes are intentional, update snapshots:" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-            echo "pnpm --filter web e2e:visual:update" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "## 🖼️ Visual Regression Results" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "⚠️ **Visual differences detected**" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Some pages have visual changes from the baseline." >> "$GITHUB_STEP_SUMMARY"
+            echo "Download the artifacts to review diff images." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "If changes are intentional, update snapshots:" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`bash" >> "$GITHUB_STEP_SUMMARY"
+            echo "pnpm --filter web e2e:visual:update" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "## ✅ Visual Regression Results" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "All visual tests passed - no unexpected changes detected." >> $GITHUB_STEP_SUMMARY
+            echo "## ✅ Visual Regression Results" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "All visual tests passed - no unexpected changes detected." >> "$GITHUB_STEP_SUMMARY"
           fi
