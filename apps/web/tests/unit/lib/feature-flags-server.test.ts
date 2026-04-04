@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
-import { logger } from '@/lib/utils/logger';
 
 // Mock statsig-node before importing the module under test
 vi.mock('statsig-node', () => ({
@@ -24,10 +23,12 @@ vi.mock('@/lib/env-server', () => ({
 
 describe('Statsig server initialization', () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.restoreAllMocks();
   });
 
   it('warns only once when server secret is missing across multiple checkGate calls', async () => {
+    const { logger } = await import('@/lib/utils/logger');
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
 
     const { checkGate } = await import('@/lib/feature-flags/server');

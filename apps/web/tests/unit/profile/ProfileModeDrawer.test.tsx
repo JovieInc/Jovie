@@ -158,4 +158,26 @@ describe('ProfileModeDrawer', () => {
     expect(screen.getByTestId('profile-mode-drawer-subscribe')).toBeDefined();
     expect(screen.getByTestId('two-step-notifications')).toBeDefined();
   });
+
+  it('renders tour mode inside the shared drawer', async () => {
+    const { ProfileModeDrawer } = await import(
+      '@/features/profile/ProfileModeDrawer'
+    );
+
+    render(
+      <ProfileModeDrawer
+        activeMode='tour'
+        onOpenChange={() => {}}
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={mockContacts}
+        primaryChannel={contact => contact.channels[0]!}
+        dsps={[]}
+      />
+    );
+
+    expect(screen.getByTestId('profile-mode-drawer-tour')).toBeDefined();
+    expect(screen.getByTestId('tour-drawer-content')).toBeDefined();
+    expect(screen.queryByTestId('about-section')).toBeNull();
+  });
 });

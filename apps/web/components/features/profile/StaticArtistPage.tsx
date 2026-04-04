@@ -46,6 +46,7 @@ export function StaticArtistPage({
   photoDownloadSizes = [],
   tourDates = [],
   visitTrackingToken,
+  showSubscriptionConfirmedBanner = false,
   viewerCountryCode,
 }: StaticArtistPageProps) {
   return (
@@ -63,6 +64,7 @@ export function StaticArtistPage({
       photoDownloadSizes={photoDownloadSizes}
       tourDates={tourDates}
       visitTrackingToken={visitTrackingToken}
+      showSubscriptionConfirmedBanner={showSubscriptionConfirmedBanner}
       viewerCountryCode={viewerCountryCode}
     />
   );

@@ -15,16 +15,12 @@ import { signInUser } from '../helpers/clerk-auth';
 import {
   hideTransientUI,
   OUTPUT_DIR,
-  shouldSkipAuth,
   TIMEOUTS,
   waitForSettle,
 } from './helpers';
 
 test.describe('Product Screenshots – Insights Dashboard', () => {
-  test.beforeEach(async ({ page }, testInfo) => {
-    const skipAuth =
-      typeof shouldSkipAuth === 'function' ? shouldSkipAuth(testInfo) : false;
-    if (skipAuth) return;
+  test.beforeEach(async ({ page }) => {
     await signInUser(page);
   });
 

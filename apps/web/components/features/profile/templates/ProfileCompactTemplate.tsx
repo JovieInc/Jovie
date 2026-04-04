@@ -31,6 +31,7 @@ import {
   getProfileMode,
   getProfileModeHref,
 } from '@/features/profile/registry';
+import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
@@ -69,6 +70,7 @@ interface ProfileCompactTemplateProps {
   readonly photoDownloadSizes?: AvatarSize[];
   readonly tourDates?: TourDateViewModel[];
   readonly visitTrackingToken?: string;
+  readonly showSubscriptionConfirmedBanner?: boolean;
   readonly viewerCountryCode?: string | null;
 }
 
@@ -123,11 +125,10 @@ export function ProfileCompactTemplate({
   photoDownloadSizes = [],
   tourDates = [],
   visitTrackingToken,
+  showSubscriptionConfirmedBanner = false,
   viewerCountryCode,
 }: ProfileCompactTemplateProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activeDrawerMode, setActiveDrawerMode] =
-    useState<ProfileDrawerMode | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const mergedDSPs = useMemo(
@@ -180,6 +181,13 @@ export function ProfileCompactTemplate({
     () => socialLinks.some(link => link.platform === 'venmo'),
     [socialLinks]
   );
+  const searchSuffix = useMemo(() => {
+    if (!initialSource) {
+      return '';
+    }
+
+    return `source=${encodeURIComponent(initialSource)}`;
+  }, [initialSource]);
 
   const nextTourDate = useMemo(() => {
     const now = Date.now();
@@ -197,6 +205,8 @@ export function ProfileCompactTemplate({
       }),
     [hasContacts, hasTip, mergedDSPs.length]
   );
+  const [activeDrawerMode, setActiveDrawerMode] =
+    useState<ProfileDrawerMode | null>(() => resolveActiveMode(mode));
 
   useEffect(() => {
     setActiveDrawerMode(resolveActiveMode(mode));
@@ -217,15 +227,20 @@ export function ProfileCompactTemplate({
   useEffect(() => {
     const href =
       activeDrawerMode === null
-        ? getProfileModeHref(artist.handle, 'profile')
-        : getProfileModeHref(artist.handle, activeDrawerMode);
+        ? getProfileModeHref(artist.handle, 'profile', searchSuffix)
+        : getProfileModeHref(artist.handle, activeDrawerMode, searchSuffix);
     const currentHref = `${globalThis.location.pathname}${globalThis.location.search}`;
     if (currentHref === href) {
       return;
     }
 
     globalThis.history.pushState(globalThis.history.state, '', href);
-  }, [activeDrawerMode, artist.handle]);
+  }, [activeDrawerMode, artist.handle, searchSuffix]);
+
+  const ticketlessTourHref = useMemo(
+    () => getProfileModeHref(artist.handle, 'tour', searchSuffix),
+    [artist.handle, searchSuffix]
+  );
 
   const openDrawerMode = useCallback((nextMode: ProfileDrawerMode) => {
     setActiveDrawerMode(nextMode);
@@ -457,7 +472,11 @@ export function ProfileCompactTemplate({
 
               {/* ─── Content ─── */}
               <div className='relative z-10 flex flex-col gap-3 px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3'>
-                {latestRelease ? (
+                {showSubscriptionConfirmedBanner ? (
+                  <SubscriptionConfirmedBanner />
+                ) : null}
+
+                {latestRelease && mergedDSPs.length > 0 ? (
                   <button
                     type='button'
                     onClick={handlePlayClick}
@@ -485,9 +504,7 @@ export function ProfileCompactTemplate({
                   </button>
                 ) : nextTourDate ? (
                   <a
-                    href={
-                      nextTourDate.ticketUrl ?? `/${artist.handle}?mode=tour`
-                    }
+                    href={nextTourDate.ticketUrl ?? ticketlessTourHref}
                     target={nextTourDate.ticketUrl ? '_blank' : undefined}
                     rel={
                       nextTourDate.ticketUrl ? 'noopener noreferrer' : undefined
@@ -638,7 +655,6 @@ export function ProfileCompactTemplate({
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
-          photoDownloadSizes={photoDownloadSizes}
           tourDates={tourDates}
         />
       </div>

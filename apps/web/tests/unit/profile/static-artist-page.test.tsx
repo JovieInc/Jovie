@@ -17,6 +17,9 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
       'data-testid': 'profile-compact-template',
       'data-mode': props.mode,
       'data-artist-name': (props.artist as Artist)?.name,
+      'data-show-subscription-confirmed-banner': String(
+        props.showSubscriptionConfirmedBanner
+      ),
     }),
 }));
 
@@ -76,7 +79,7 @@ describe('StaticArtistPage', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-compact-template')).toBeDefined();
+    expect(screen.getByTestId('profile-compact-template')).toBeInTheDocument();
   });
 
   it('forwards mode prop to compact template', async () => {
@@ -119,5 +122,29 @@ describe('StaticArtistPage', () => {
 
     const template = screen.getByTestId('profile-compact-template');
     expect(template.getAttribute('data-artist-name')).toBe('Test Artist');
+  });
+
+  it('forwards subscription confirmation banner state to compact template', async () => {
+    const { StaticArtistPage } = await import(
+      '@/features/profile/StaticArtistPage'
+    );
+
+    render(
+      <StaticArtistPage
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Profile'
+        showTipButton={false}
+        showBackButton={false}
+        showSubscriptionConfirmedBanner
+      />
+    );
+
+    const template = screen.getByTestId('profile-compact-template');
+    expect(
+      template.getAttribute('data-show-subscription-confirmed-banner')
+    ).toBe('true');
   });
 });

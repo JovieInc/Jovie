@@ -18,7 +18,6 @@ import {
 } from '@/features/profile/utils/venmo';
 import { track } from '@/lib/analytics';
 import type { AvailableDSP } from '@/lib/dsp';
-import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
@@ -43,7 +42,6 @@ interface ProfileModeDrawerProps {
   readonly pressPhotos?: readonly PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
   readonly tourDates?: TourDateViewModel[];
-  readonly photoDownloadSizes?: AvatarSize[];
 }
 
 interface DrawerMeta {
@@ -217,6 +215,7 @@ export function ProfileModeDrawer({
 }: Readonly<ProfileModeDrawerProps>) {
   const venmoLink =
     socialLinks.find(link => link.platform === 'venmo')?.url ?? null;
+  const hasValidVenmoLink = venmoLink !== null && isAllowedVenmoUrl(venmoLink);
   const venmoUsername = extractVenmoUsername(venmoLink);
   const meta = activeMode ? MODE_META[activeMode] : null;
 
@@ -247,7 +246,7 @@ export function ProfileModeDrawer({
 
   const handleTipAmountSelected = useMemo(() => {
     return (amount: number) => {
-      if (!venmoLink || !isAllowedVenmoUrl(venmoLink)) {
+      if (!venmoLink || !hasValidVenmoLink) {
         track('tip_handoff_failed', {
           reason: 'invalid_venmo_url',
           handle: artist.handle,
@@ -280,7 +279,7 @@ export function ProfileModeDrawer({
         );
       }
     };
-  }, [artist.handle, venmoLink, venmoUsername]);
+  }, [artist.handle, hasValidVenmoLink, venmoLink, venmoUsername]);
 
   if (!activeMode || !meta) {
     return null;
@@ -351,7 +350,7 @@ export function ProfileModeDrawer({
 
       {activeMode === 'tip' ? (
         <div data-testid='profile-mode-drawer-tip'>
-          {venmoLink ? (
+          {hasValidVenmoLink ? (
             <TipSelector
               amounts={TIP_AMOUNTS}
               onContinue={handleTipAmountSelected}

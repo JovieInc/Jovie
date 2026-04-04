@@ -15,6 +15,7 @@ type StatsigClient = typeof import('statsig-node').default;
 let statsigInitialized = false;
 let statsigClient: StatsigClient | null = null;
 let statsigImportFailed = false;
+let statsigInitPromise: Promise<void> | null = null;
 // Suppresses the "no secret" warning after the first call within a process lifetime.
 // Resets on cold start; intentional — prevents 48+ duplicate warnings per page render.
 let statsigWarnedNoSecret = false;
@@ -46,33 +47,49 @@ async function getStatsigClient(): Promise<StatsigClient | null> {
  */
 async function initializeStatsig(): Promise<void> {
   if (statsigInitialized || isE2ERuntime) return;
-
-  const serverSecret = env.STATSIG_SERVER_SECRET;
-  if (!serverSecret) {
-    if (!statsigWarnedNoSecret) {
-      logger.warn(
-        '[Statsig] Server secret not configured - feature flags will use defaults'
-      );
-      statsigWarnedNoSecret = true;
-    }
+  if (statsigInitPromise) {
+    await statsigInitPromise;
     return;
   }
 
-  try {
-    const statsig = await getStatsigClient();
-    if (!statsig) {
+  statsigInitPromise = (async () => {
+    const serverSecret = env.STATSIG_SERVER_SECRET;
+    if (!serverSecret) {
+      if (!statsigWarnedNoSecret) {
+        logger.warn(
+          '[Statsig] Server secret not configured - feature flags will use defaults'
+        );
+        statsigWarnedNoSecret = true;
+      }
       return;
     }
 
-    await statsig.initialize(serverSecret, {
-      environment: {
-        tier: env.VERCEL_ENV || env.NODE_ENV || 'development',
-      },
-    });
-    statsigInitialized = true;
-    logger.info('[Statsig] Server SDK initialized', undefined, 'Statsig');
-  } catch (error) {
-    logger.error('[Statsig] Failed to initialize server SDK', error, 'Statsig');
+    try {
+      const statsig = await getStatsigClient();
+      if (!statsig) {
+        return;
+      }
+
+      await statsig.initialize(serverSecret, {
+        environment: {
+          tier: env.VERCEL_ENV || env.NODE_ENV || 'development',
+        },
+      });
+      statsigInitialized = true;
+      logger.info('[Statsig] Server SDK initialized', undefined, 'Statsig');
+    } catch (error) {
+      logger.error(
+        '[Statsig] Failed to initialize server SDK',
+        error,
+        'Statsig'
+      );
+    }
+  })();
+
+  try {
+    await statsigInitPromise;
+  } finally {
+    statsigInitPromise = null;
   }
 }
 
@@ -211,6 +228,9 @@ export async function shutdownStatsig(): Promise<void> {
     if (statsig) {
       await statsig.shutdown();
     }
-    statsigInitialized = false;
   }
+  statsigInitialized = false;
+  statsigClient = null;
+  statsigImportFailed = false;
+  statsigInitPromise = null;
 }
