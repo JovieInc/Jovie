@@ -710,7 +710,12 @@ export async function applyGeneratedAlbumArt(
       } as unknown as Record<string, unknown>,
       updatedAt: new Date(),
     })
-    .where(eq(albumArtGenerationSessions.id, input.sessionId));
+    .where(
+      and(
+        eq(albumArtGenerationSessions.id, input.sessionId),
+        eq(albumArtGenerationSessions.status, 'ready')
+      )
+    );
 
   return { artworkUrl, sizes };
 }
