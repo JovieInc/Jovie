@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+import { useRouter } from 'next/navigation';
 import {
   lazy,
   memo,
@@ -16,20 +18,31 @@ import {
   connectAppleMusicArtist,
   revertReleaseArtwork,
 } from '@/app/app/(shell)/dashboard/releases/actions';
+import { instantiateReleaseTasks } from '@/app/app/(shell)/dashboard/releases/task-actions';
 import { Icon } from '@/components/atoms/Icon';
 import {
   DrawerButton,
   DrawerLoadingSkeleton,
 } from '@/components/molecules/drawer';
+import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/organisms/Dialog';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import { PageShell } from '@/components/organisms/PageShell';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
+import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { captureError } from '@/lib/error-tracking';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
@@ -105,6 +118,12 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const [isAmConnected, setIsAmConnected] = useState(appleMusicConnected);
 
   const [amPaletteOpen, setAmPaletteOpen] = useState(false);
+  const [postCreateRelease, setPostCreateRelease] =
+    useState<ReleaseViewModel | null>(null);
+  const [isPostCreatePlanModalOpen, setIsPostCreatePlanModalOpen] =
+    useState(false);
+  const [isGeneratingReleasePlan, setIsGeneratingReleasePlan] = useState(false);
+  const router = useRouter();
 
   const {
     rows,
@@ -200,16 +219,22 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Smart link gating
   const planGate = usePlanGate();
+  const releasePlanEntitlementOverride =
+    experienceAdapter?.entitlements?.canGenerateReleasePlans;
   const {
     smartLinksLimit,
     isPro,
     canCreateManualReleases,
+    canGenerateReleasePlans,
     canEditSmartLinks,
     canAccessFutureReleases,
   } = {
     ...planGate,
     ...experienceAdapter?.entitlements,
   };
+  const isReleasePlanGateLoading =
+    (planGate.isLoading || planGate.isError) &&
+    releasePlanEntitlementOverride === undefined;
 
   /** Soft cap: show a "request higher limit" banner (not a hard lock) */
   const SMART_LINK_SOFT_CAP = 100;
@@ -377,12 +402,51 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   const handleAddReleaseCreated = useCallback(
     (createdRelease: ReleaseViewModel) => {
-      handleReleaseCreated(createdRelease);
+      handleReleaseCreated(createdRelease, { openEditor: false });
       setAddReleaseOpen(false);
+      closeEditor();
       setEditingTrack(null);
+      setPostCreateRelease(createdRelease);
+      setIsPostCreatePlanModalOpen(true);
     },
-    [handleReleaseCreated]
+    [closeEditor, handleReleaseCreated]
   );
+
+  const closePostCreatePlanModal = useCallback(() => {
+    if (isGeneratingReleasePlan) {
+      return;
+    }
+
+    setIsPostCreatePlanModalOpen(false);
+    setPostCreateRelease(null);
+  }, [isGeneratingReleasePlan]);
+
+  const handleGenerateReleasePlan = useCallback(async () => {
+    if (!postCreateRelease || isGeneratingReleasePlan) {
+      return;
+    }
+
+    setIsGeneratingReleasePlan(true);
+    try {
+      await instantiateReleaseTasks(postCreateRelease.id);
+      const releaseTasksPath = APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
+        '[releaseId]',
+        postCreateRelease.id
+      );
+      setIsPostCreatePlanModalOpen(false);
+      setPostCreateRelease(null);
+      router.push(releaseTasksPath);
+    } catch (error) {
+      captureError('Failed to generate release plan', error, {
+        context: 'release-provider-matrix',
+        releaseId: postCreateRelease.id,
+        action: 'generate-release-plan',
+      });
+      toast.error('Failed to generate the release plan. Try again.');
+    } finally {
+      setIsGeneratingReleasePlan(false);
+    }
+  }, [isGeneratingReleasePlan, postCreateRelease, router]);
 
   // Wrap openEditor to clear add-release state (prevents zombie drawer resurrection)
   const handleOpenEditor = useCallback(
@@ -877,6 +941,61 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           onImportStart={handleImportStart}
         />
       </Suspense>
+
+      <Dialog
+        open={isPostCreatePlanModalOpen && postCreateRelease !== null}
+        onClose={closePostCreatePlanModal}
+        size='sm'
+      >
+        <DialogTitle>
+          {isReleasePlanGateLoading
+            ? 'Release Plan'
+            : canGenerateReleasePlans
+              ? 'Generate Release Plan'
+              : 'Upgrade To Generate A Release Plan'}
+        </DialogTitle>
+        <DialogDescription>
+          {isReleasePlanGateLoading
+            ? 'Checking whether this workspace can generate tasks for the release plan.'
+            : canGenerateReleasePlans
+              ? 'Create the step-by-step tasks for this release and jump straight into the plan.'
+              : 'Upgrade to turn this release into a step-by-step plan with tasks you can assign to Jovie AI.'}
+        </DialogDescription>
+        <DialogBody className='space-y-2'>
+          <p className='text-[13px] text-secondary-token'>
+            {postCreateRelease?.title ?? 'This release'} is ready.
+          </p>
+        </DialogBody>
+        <DialogActions>
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            onClick={closePostCreatePlanModal}
+            disabled={isGeneratingReleasePlan}
+          >
+            Maybe Later
+          </Button>
+          {isReleasePlanGateLoading ? (
+            <Button type='button' size='sm' disabled>
+              Loading...
+            </Button>
+          ) : canGenerateReleasePlans ? (
+            <Button
+              type='button'
+              size='sm'
+              onClick={handleGenerateReleasePlan}
+              disabled={isGeneratingReleasePlan}
+            >
+              {isGeneratingReleasePlan
+                ? 'Generating...'
+                : 'Generate Release Plan'}
+            </Button>
+          ) : (
+            <UpgradeButton size='sm'>Upgrade to Pro</UpgradeButton>
+          )}
+        </DialogActions>
+      </Dialog>
     </>
   );
 });

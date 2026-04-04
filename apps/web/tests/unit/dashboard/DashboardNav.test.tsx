@@ -3,6 +3,7 @@ import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboar
 import { APP_ROUTES } from '@/constants/routes';
 import {
   mockUsePathname,
+  mockUsePlanGate,
   mockUseTaskStatsQuery,
   renderDashboardNav,
   resetDashboardNavTestMocks,
@@ -144,5 +145,30 @@ describe('DashboardNav', () => {
     const { getByText } = renderDashboardNav({ renderFn: fastRender });
 
     expect(getByText('7')).toBeDefined();
+  });
+
+  it('renders the Pro badge when tasks are locked', () => {
+    mockUsePlanGate.mockReturnValueOnce({
+      canAccessTasksWorkspace: false,
+      isLoading: false,
+    });
+
+    const { getByText } = renderDashboardNav({ renderFn: fastRender });
+
+    expect(getByText('Pro')).toBeDefined();
+    expect(mockUseTaskStatsQuery).toHaveBeenCalledWith('', {
+      enabled: false,
+    });
+  });
+
+  it('does not render the Pro badge while task entitlements are loading', () => {
+    mockUsePlanGate.mockReturnValueOnce({
+      canAccessTasksWorkspace: false,
+      isLoading: true,
+    });
+
+    const { queryByText } = renderDashboardNav({ renderFn: fastRender });
+
+    expect(queryByText('Pro')).toBeNull();
   });
 });

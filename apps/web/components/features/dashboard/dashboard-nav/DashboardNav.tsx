@@ -19,6 +19,7 @@ import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { env } from '@/lib/env-client';
 import { useCodeFlag } from '@/lib/feature-flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
+import { usePlanGate } from '@/lib/queries';
 import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   adminNavigationSections,
@@ -106,8 +107,10 @@ export function DashboardNav(_: DashboardNavProps) {
   const artistName = selectedProfile?.displayName;
   const profileId = selectedProfile?.id ?? '';
   const isDemo = isDemoRoutePath(pathname);
+  const { canAccessTasksWorkspace, isLoading: isPlanGateLoading } =
+    usePlanGate();
   const { data: taskStats } = useTaskStatsQuery(profileId, {
-    enabled: !isDemo,
+    enabled: !isDemo && canAccessTasksWorkspace,
   });
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
 
@@ -123,13 +126,20 @@ export function DashboardNav(_: DashboardNavProps) {
           item.id === 'tasks'
             ? {
                 ...item,
-                badge: formatTaskBadge(taskStats),
+                badge:
+                  isPlanGateLoading ? undefined : canAccessTasksWorkspace ? (
+                    formatTaskBadge(taskStats)
+                  ) : (
+                    <span className='rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] px-1.5 py-0.5 text-[9px] font-[600] tracking-[0.02em] text-secondary-token'>
+                      Pro
+                    </span>
+                  ),
               }
             : item
         ),
       },
     ],
-    [taskStats]
+    [canAccessTasksWorkspace, isPlanGateLoading, taskStats]
   );
 
   // Profile nav item opens the preview drawer instead of navigating to a separate page.

@@ -49,7 +49,7 @@ function HeroTaskPanel() {
             <div
               key={task.id}
               data-testid={`homepage-hero-task-card-${index + 1}`}
-              className='flex items-start justify-between gap-4 border-b border-white/6 pb-4 last:border-b-0 last:pb-0'
+              className='flex items-start justify-between gap-2 border-b border-white/6 pb-4 last:border-b-0 last:pb-0'
             >
               <div className='min-w-0'>
                 <div className='flex items-center gap-2'>
@@ -145,16 +145,16 @@ export function HomeHeroSurfaceCluster() {
         </div>
       </div>
 
-      <div className='relative hidden h-[27rem] w-[34.5rem] lg:block'>
-        <div className='absolute left-[1.25rem] top-[3.15rem] z-20 w-[8.4rem] rotate-[-1.5deg]'>
+      <div className='relative hidden h-[27rem] w-[32rem] lg:block'>
+        <div className='absolute left-0 top-[2.5rem] z-20 w-[9rem] rotate-[-1.5deg]'>
           <HeroSmartLinkPanel />
         </div>
 
-        <div className='absolute right-[0.75rem] top-[0.35rem] z-10 w-[19.75rem]'>
+        <div className='absolute right-0 top-0 z-10 w-[19rem]'>
           <HeroProfilePanel />
         </div>
 
-        <div className='absolute bottom-[1.15rem] right-0 z-30 w-[12.25rem]'>
+        <div className='absolute bottom-[0.5rem] right-0 z-30 w-[14rem]'>
           <HeroTaskPanel />
         </div>
       </div>

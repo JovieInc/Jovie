@@ -28,6 +28,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Renamed social links section from "Elsewhere" to "Follow"
 - Hero image sizes tightened from 3-breakpoint to 2-breakpoint for better mobile image optimization
 - Profile skeleton rewritten to match V2 full-bleed hero layout (prevents layout shift on cold loads)
+- Dashboard header no longer shows a shadow line between the header and content area
+- Content shell spacing is now visually consistent on all edges
+- Tasks toolbar sits as a full-width subheader matching the dashboard header height
+- Task list rows have tighter left padding for better density
+- Priority indicators use signal bars that fill proportionally (urgent=4, high=3, medium=2, low=1) instead of uniform colored dots
+- Overdue badge is now hidden on cancelled tasks
+- Playback stats use plain language: "linked" instead of "canonical", "unconfirmed" instead of "fallback", "pending" instead of "unknown", and zero counts are hidden
 
 ### Fixed
 
