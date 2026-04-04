@@ -2,12 +2,17 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { CTAButton } from '@/components/molecules/CTAButton';
 import { useProfileNotifications } from '@/components/organisms/profile-shell';
-import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
+import {
+  AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
+  LISTEN_COOKIE,
+} from '@/constants/app';
 import { SubscriptionFormSkeleton } from '@/features/profile/artist-notifications-cta/shared';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
+import { track } from '@/lib/analytics';
 import type { AvailableDSP } from '@/lib/dsp';
 import {
   type ProfileNextAction,
@@ -73,7 +78,52 @@ type ProfilePrimaryCTAProps = {
 };
 
 const ctaLinkClass =
-  'inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--profile-pearl-primary-bg)] px-8 py-3.5 text-[15px] font-semibold tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-[var(--profile-pearl-shadow)] transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-92 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)';
+  'inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--profile-pearl-primary-bg)] px-8 py-3.5 text-[15px] font-semibold tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-[var(--profile-pearl-shadow)] transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] will-change-transform hover:opacity-92 active:scale-[0.985] active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)';
+
+function readListenCookie(): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie
+    .split(';')
+    .find(c => c.trim().startsWith(`${LISTEN_COOKIE}=`));
+  return match?.split('=')[1] ?? null;
+}
+
+function clearListenCookie() {
+  document.cookie = `${LISTEN_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+  try {
+    localStorage.removeItem(LISTEN_COOKIE);
+  } catch {}
+}
+
+function DspIconPreview({ dsps }: { readonly dsps: AvailableDSP[] }) {
+  const icons = dsps.slice(0, 3);
+  if (icons.length < 2) return null;
+
+  return (
+    <span className='-space-x-1 flex opacity-60' aria-hidden='true'>
+      {icons.map(dsp => {
+        const config = DSP_LOGO_CONFIG[dsp.key as keyof typeof DSP_LOGO_CONFIG];
+        if (!config) return null;
+        return (
+          <span
+            key={dsp.key}
+            className='flex h-5 w-5 items-center justify-center rounded-full'
+            style={{ backgroundColor: `${config.color}33` }}
+          >
+            <svg
+              viewBox='0 0 24 24'
+              fill={config.color}
+              className='h-3 w-3'
+              aria-hidden='true'
+            >
+              <path d={config.iconPath} />
+            </svg>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
 
 export function ProfilePrimaryCTA({
   artist,
@@ -105,6 +155,46 @@ export function ProfilePrimaryCTA({
 
   const isHydratingSubscriptionStatus =
     hydrationStatus === 'checking' && hasStoredContacts;
+
+  const handleListenClick = useCallback(() => {
+    if (!mergedDSPs || mergedDSPs.length === 0) {
+      setDrawerOpen(true);
+      return;
+    }
+
+    const savedKey = readListenCookie();
+    if (savedKey) {
+      const savedDsp = mergedDSPs.find(d => d.key === savedKey);
+      if (savedDsp) {
+        // Open synchronously to avoid popup blocker
+        const win = globalThis.open(
+          savedDsp.url,
+          '_blank',
+          'noopener,noreferrer'
+        );
+        track('listen_click', {
+          handle: artist.handle,
+          linkType: 'listen',
+          platform: savedDsp.key,
+          source: 'direct_preference',
+        });
+        // Attempt deep-link asynchronously
+        import('@/lib/deep-links')
+          .then(({ getDSPDeepLinkConfig, openDeepLink }) => {
+            const config = getDSPDeepLinkConfig(savedDsp.key);
+            if (config && win) {
+              openDeepLink(savedDsp.url, config).catch(() => {});
+            }
+          })
+          .catch(() => {});
+        return;
+      }
+      // Stale cookie, DSP no longer available
+      clearListenCookie();
+    }
+
+    setDrawerOpen(true);
+  }, [mergedDSPs, artist.handle]);
 
   if (
     showCapture &&
@@ -183,19 +273,31 @@ export function ProfilePrimaryCTA({
     );
   }
 
-  // Mobile: open bottom drawer instead of navigating
+  // Mobile: skip-drawer for returning users, or open drawer for first-timers
   if (isMobile && mergedDSPs && mergedDSPs.length > 0) {
+    const hasSavedPreference = Boolean(readListenCookie());
+
     return (
       <div className='space-y-4'>
-        <div className='flex justify-center'>
+        <div className='flex flex-col items-center gap-2'>
           <button
             type='button'
-            onClick={() => setDrawerOpen(true)}
+            onClick={handleListenClick}
             className={cn(ctaLinkClass, 'max-w-sm')}
             aria-label='Open music streaming links'
           >
             Listen now
+            <DspIconPreview dsps={mergedDSPs} />
           </button>
+          {hasSavedPreference ? (
+            <button
+              type='button'
+              onClick={() => setDrawerOpen(true)}
+              className='text-[13px] text-white/40 transition-colors hover:text-white/60'
+            >
+              Change
+            </button>
+          ) : null}
         </div>
         <ListenDrawer
           open={drawerOpen}
@@ -219,6 +321,7 @@ export function ProfilePrimaryCTA({
           aria-label='Open Listen page with music links'
         >
           Listen now
+          {mergedDSPs ? <DspIconPreview dsps={mergedDSPs} /> : null}
         </Link>
       </div>
     </div>

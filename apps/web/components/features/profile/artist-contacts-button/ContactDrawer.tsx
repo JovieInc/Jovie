@@ -1,12 +1,36 @@
 'use client';
 
-import { Badge } from '@jovie/ui';
+import { motion } from 'motion/react';
 import { useCallback, useEffect } from 'react';
 import { track } from '@/lib/analytics';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
 import { ProfileDrawerShell } from '../ProfileDrawerShell';
-import { ChannelIcon } from './ContactIcons';
 import { useArtistContacts } from './useArtistContacts';
+
+const MAX_STAGGER = 6;
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      duration: 0.25,
+      ease: [0.16, 1, 0.3, 1],
+      staggerChildren: 0.04,
+      delayChildren: 0.08,
+    },
+  },
+} as const;
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] },
+  },
+} as const;
 
 interface ContactDrawerProps {
   readonly open: boolean;
@@ -25,6 +49,8 @@ export function ContactDrawer({
   contacts,
   primaryChannel,
 }: ContactDrawerProps) {
+  const prefersReducedMotion = useReducedMotion();
+
   useEffect(() => {
     if (!open) return;
 
@@ -48,79 +74,86 @@ export function ContactDrawer({
     [onOpenChange]
   );
 
+  const MotionContainer = prefersReducedMotion ? 'div' : motion.div;
+  const MotionItem = prefersReducedMotion ? 'div' : motion.div;
+
+  const channelLabels: Record<string, string> = {
+    email: 'Email',
+    sms: 'Text',
+    phone: 'Call',
+  };
+
   return (
     <ProfileDrawerShell
       open={open}
       onOpenChange={handleOpenChange}
-      title={`Contact ${artistName}`}
-      subtitle='Reach the right person without leaving the profile.'
+      title='Get in touch'
       dataTestId='contact-drawer'
     >
-      <div className='space-y-3'>
-        {contacts.map(contact => {
-          const primary = primaryChannel(contact);
-          const primaryHref = getActionHref(primary);
-
-          return (
-            <div
-              key={contact.id}
-              className='flex items-center justify-between gap-4 rounded-[26px] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] px-4 py-4 shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl transition-[background-color,border-color] duration-150 ease-out hover:bg-[var(--profile-pearl-bg-hover)]'
-              data-testid='contact-drawer-item'
-            >
-              {primaryHref ? (
-                <a
-                  href={primaryHref}
-                  className='flex min-w-0 flex-1 flex-col items-start gap-1.5 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
-                  onClick={() => trackAction(primary, contact)}
-                >
-                  <div className='flex flex-wrap items-center gap-2'>
-                    <span className='text-sm font-[590] text-primary-token'>
-                      {contact.roleLabel}
-                    </span>
-                    {contact.territorySummary ? (
-                      <Badge size='sm'>{contact.territorySummary}</Badge>
-                    ) : null}
-                  </div>
-                  {contact.secondaryLabel ? (
-                    <span className='text-xs text-secondary-token'>
-                      {contact.secondaryLabel}
-                    </span>
-                  ) : null}
-                  {contact.primaryContactLabel ? (
-                    <span className='text-xs text-secondary-token/90'>
-                      {contact.primaryContactLabel}
-                    </span>
-                  ) : null}
-                </a>
+      <MotionContainer
+        className='space-y-4'
+        {...(prefersReducedMotion
+          ? {}
+          : {
+              variants: containerVariants,
+              initial: 'hidden',
+              animate: 'visible',
+            })}
+      >
+        {contacts.map((contact, index) => (
+          <MotionItem
+            key={contact.id}
+            {...(prefersReducedMotion
+              ? {}
+              : {
+                  variants: itemVariants,
+                  style:
+                    index >= MAX_STAGGER
+                      ? { transitionDelay: `${MAX_STAGGER * 0.04 + 0.08}s` }
+                      : undefined,
+                })}
+          >
+            <div data-testid='contact-drawer-item'>
+              <div className='flex items-baseline justify-between gap-2'>
+                <span className='text-[13px] font-[510] uppercase tracking-wider text-white'>
+                  {contact.roleLabel}
+                </span>
+                {contact.territorySummary ? (
+                  <span className='text-[13px] text-white/40'>
+                    {contact.territorySummary}
+                  </span>
+                ) : null}
+              </div>
+              {contact.secondaryLabel || contact.primaryContactLabel ? (
+                <p className='mt-1 text-[14px] text-white/50'>
+                  {contact.primaryContactLabel ?? contact.secondaryLabel}
+                </p>
               ) : null}
-              <div className='flex shrink-0 items-center gap-2'>
+              <div className='mt-3 flex gap-2'>
                 {contact.channels.map(channel => {
                   const channelHref = getActionHref(channel);
                   if (!channelHref) return null;
 
-                  const channelLabels: Record<string, string> = {
-                    email: 'Email',
-                    sms: 'Text',
-                  };
-                  const channelLabel = channelLabels[channel.type] ?? 'Call';
+                  const label = channelLabels[channel.type] ?? channel.type;
+
                   return (
                     <a
                       key={`${contact.id}-${channel.type}`}
                       href={channelHref}
-                      className='flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-active)] text-primary-token shadow-[var(--profile-pearl-shadow)] transition-[background-color,border-color] hover:bg-[var(--profile-pearl-bg-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
-                      aria-label={`${channelLabel} ${contact.roleLabel}`}
+                      className='inline-flex min-h-[44px] items-center justify-center rounded-full bg-white/[0.08] px-4 py-2 text-[13px] font-[450] text-white transition-colors active:bg-white/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+                      aria-label={`${label} ${contact.roleLabel}`}
                       onClick={() => trackAction(channel, contact)}
                       data-testid='contact-drawer-channel-action'
                     >
-                      <ChannelIcon type={channel.type} />
+                      {label}
                     </a>
                   );
                 })}
               </div>
             </div>
-          );
-        })}
-      </div>
+          </MotionItem>
+        ))}
+      </MotionContainer>
     </ProfileDrawerShell>
   );
 }
