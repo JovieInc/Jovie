@@ -11,9 +11,11 @@ import {
   type NotificationVerifyEmailOtpPayload,
   subscribeToNotifications,
   type UpdateContentPreferencesPayload,
+  type UpdateSubscriberBirthdayPayload,
   type UpdateSubscriberNamePayload,
   unsubscribeFromNotifications,
   updateContentPreferences,
+  updateSubscriberBirthday,
   updateSubscriberName,
   verifyEmailOtp,
 } from '@/lib/notifications/client';
@@ -161,6 +163,21 @@ export function useUpdateSubscriberNameMutation() {
       updateSubscriberName(input),
     onError: (error, variables) => {
       void captureWarning('Subscriber name update mutation failed', {
+        error,
+        artistId: variables.artistId,
+      });
+    },
+    retry: 1,
+    retryDelay: getRetryDelay,
+  });
+}
+
+export function useUpdateSubscriberBirthdayMutation() {
+  return useMutation({
+    mutationFn: (input: UpdateSubscriberBirthdayPayload) =>
+      updateSubscriberBirthday(input),
+    onError: (error, variables) => {
+      void captureWarning('Subscriber birthday update mutation failed', {
         error,
         artistId: variables.artistId,
       });

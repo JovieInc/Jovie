@@ -22,6 +22,7 @@ import {
 } from '@/components/organisms/profile-shell';
 import { BASE_URL } from '@/constants/app';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
+import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta';
 import type { ProfileMode } from '@/features/profile/contracts';
 import {
   type ProfileDrawerMode,
@@ -547,53 +548,7 @@ export function ProfileCompactTemplate({
                   </button>
                 ) : null}
 
-                <div
-                  className='grid grid-cols-2 gap-2'
-                  data-testid='profile-mode-shortcuts'
-                >
-                  <button
-                    type='button'
-                    onClick={() => openDrawerMode('subscribe')}
-                    className={`flex items-center justify-center gap-2 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-3 text-[12px] font-[560] text-white/84 ${glass.blur} transition-colors duration-150 ${glass.bgHover}`}
-                  >
-                    <Bell className='h-3.5 w-3.5 text-white/52' />
-                    Get Notified
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() => openDrawerMode('about')}
-                    className={`flex items-center justify-center gap-2 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-3 text-[12px] font-[560] text-white/84 ${glass.blur} transition-colors duration-150 ${glass.bgHover}`}
-                  >
-                    <Info className='h-3.5 w-3.5 text-white/52' />
-                    About
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() => openDrawerMode('tour')}
-                    className={`flex items-center justify-center gap-2 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-3 text-[12px] font-[560] text-white/84 ${glass.blur} transition-colors duration-150 ${glass.bgHover}`}
-                  >
-                    <CalendarDays className='h-3.5 w-3.5 text-white/52' />
-                    Tour
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() =>
-                      openDrawerMode(
-                        hasTip ? 'tip' : hasContacts ? 'contact' : 'listen'
-                      )
-                    }
-                    className={`flex items-center justify-center gap-2 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-3 text-[12px] font-[560] text-white/84 ${glass.blur} transition-colors duration-150 ${glass.bgHover}`}
-                  >
-                    {hasTip ? (
-                      <Ticket className='h-3.5 w-3.5 text-white/52' />
-                    ) : hasContacts ? (
-                      <Mail className='h-3.5 w-3.5 text-white/52' />
-                    ) : (
-                      <Play className='h-3.5 w-3.5 fill-current text-white/52' />
-                    )}
-                    {hasTip ? 'Tip' : hasContacts ? 'Contact' : 'Listen'}
-                  </button>
-                </div>
+                <ProfileInlineNotificationsCTA artist={artist} />
 
                 {/* Social icons — flat, no chrome */}
                 {visibleSocialLinks.length > 0 ? (
