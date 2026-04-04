@@ -23,6 +23,7 @@ import { normalizeLogoAssetUrl, resolveUpdatedLogoAssetUrl } from './brand-kit';
 import { buildAlbumArtPrompt } from './prompt-builder';
 import { assertAlbumArtQuota, getRemainingAlbumArtRuns } from './quota';
 import { fetchLogoBuffer, renderAlbumArt } from './renderer';
+import { assertSessionCanApplyToRelease } from './session';
 import { parseAlbumArtTitle } from './title-parser';
 import type {
   AlbumArtGenerationContext,
@@ -607,6 +608,11 @@ export async function applyGeneratedAlbumArt(
   if (!session) {
     throw new Error('Album art session not found or expired');
   }
+
+  assertSessionCanApplyToRelease({
+    sessionReleaseId: session.releaseId,
+    targetReleaseId: input.releaseId,
+  });
 
   const option = session.payload.options.find(
     item => item.id === input.optionId
