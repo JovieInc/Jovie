@@ -40,12 +40,12 @@ export function ProfileDrawerShell({
           <div className='relative z-10 flex items-start justify-between gap-4 px-5 pb-3 pt-3 md:px-6'>
             <div className='flex-1'>
               <div className='mx-auto h-1.5 w-12 rounded-full bg-white/20' />
-              <div className='pt-4 text-center'>
+              <div className='mx-auto max-w-[20rem] pt-4 text-center'>
                 <Drawer.Title className='text-[1.125rem] font-[590] tracking-[-0.03em] text-primary-token'>
                   {title}
                 </Drawer.Title>
                 {subtitle ? (
-                  <p className='mt-1 text-sm text-secondary-token'>
+                  <p className='mt-1 text-[13px] leading-snug text-secondary-token'>
                     {subtitle}
                   </p>
                 ) : null}
