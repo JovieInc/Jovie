@@ -135,7 +135,13 @@ function KeywordDiagnosticRow({
   );
 }
 
-export function LeadPipelineControls() {
+interface LeadPipelineControlsProps {
+  readonly hideMainSwitch?: boolean;
+}
+
+export function LeadPipelineControls({
+  hideMainSwitch = false,
+}: LeadPipelineControlsProps = {}) {
   const queryClient = useQueryClient();
   const [settings, setSettings] = useState<LeadPipelineSettings | null>(null);
   const [lastDiscoveryResult, setLastDiscoveryResult] =
@@ -232,35 +238,39 @@ export function LeadPipelineControls() {
   return (
     <section>
       <ContentSurfaceCard className='overflow-hidden'>
-        <ContentSectionHeader
-          title='Pipeline controls'
-          subtitle='Toggle discovery, qualification, and auto-ingest settings.'
-          actions={
-            <span className='text-[12px] font-[560] text-secondary-token'>
-              {settings.enabled ? 'Active' : 'Paused'}
-            </span>
-          }
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
-          actionsClassName='shrink-0'
-        />
+        {!hideMainSwitch && (
+          <ContentSectionHeader
+            title='Pipeline controls'
+            subtitle='Toggle discovery, qualification, and auto-ingest settings.'
+            actions={
+              <span className='text-[12px] font-[560] text-secondary-token'>
+                {settings.enabled ? 'Active' : 'Paused'}
+              </span>
+            }
+            className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+            actionsClassName='shrink-0'
+          />
+        )}
 
         <div className='divide-y divide-subtle'>
-          <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
-            <div>
-              <p className='text-sm text-primary-token'>Pipeline enabled</p>
-              <p className='text-xs text-secondary-token'>
-                Master switch for the entire lead discovery pipeline.
-              </p>
+          {!hideMainSwitch && (
+            <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
+              <div>
+                <p className='text-sm text-primary-token'>Pipeline enabled</p>
+                <p className='text-xs text-secondary-token'>
+                  Master switch for the entire lead discovery pipeline.
+                </p>
+              </div>
+              <Switch
+                checked={settings.enabled}
+                onCheckedChange={checked =>
+                  setSettings(s => (s ? { ...s, enabled: checked } : s))
+                }
+                aria-label='Toggle pipeline'
+                disabled={saveSettingsMutation.isPending}
+              />
             </div>
-            <Switch
-              checked={settings.enabled}
-              onCheckedChange={checked =>
-                setSettings(s => (s ? { ...s, enabled: checked } : s))
-              }
-              aria-label='Toggle pipeline'
-              disabled={saveSettingsMutation.isPending}
-            />
-          </div>
+          )}
 
           <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
             <div>
