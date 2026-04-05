@@ -7,6 +7,7 @@ interface AppShellFrameProps {
   readonly header?: ReactNode;
   readonly main: ReactNode;
   readonly rightPanel?: ReactNode;
+  readonly audioPlayer?: ReactNode;
   readonly mobileBottomNav?: ReactNode;
   readonly contentClassName?: string;
   readonly containerClassName?: string;
@@ -27,6 +28,7 @@ export const AppShellFrame = memo(function AppShellFrame({
   header,
   main,
   rightPanel,
+  audioPlayer,
   mobileBottomNav,
   contentClassName,
   containerClassName,
@@ -63,6 +65,7 @@ export const AppShellFrame = memo(function AppShellFrame({
           </div>
           {rightPanel}
         </div>
+        {audioPlayer}
       </main>
 
       {mobileBottomNav}
