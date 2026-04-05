@@ -62,6 +62,7 @@ function makeDefaultSettings() {
       maxProviderFailureRate: 0.1,
     },
     queriesUsedToday: 0,
+    autoIngestedToday: 0,
   };
 }
 

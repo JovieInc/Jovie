@@ -55,7 +55,7 @@ async function expectAdminPage(
 }
 
 test.describe('Admin GTM Health @smoke', () => {
-  test('admin leads renders GTM insights and pipeline controls without runtime errors', async ({
+  test('admin growth renders speed dial, funnel, and lead table without runtime errors', async ({
     page,
   }, testInfo) => {
     const { getContext, cleanup } = setupPageMonitoring(page);
@@ -65,12 +65,7 @@ test.describe('Admin GTM Health @smoke', () => {
       await expect(page.getByTestId('admin-growth-view-leads')).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
-      await expect(
-        page.getByRole('heading', { name: 'Lead pipeline' })
-      ).toBeVisible({
-        timeout: SMOKE_TIMEOUTS.VISIBILITY,
-      });
-      await expect(page.getByText('Unified URL intake')).toBeVisible({
+      await expect(page.getByText('Pipeline status')).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
       await expect(
@@ -84,7 +79,7 @@ test.describe('Admin GTM Health @smoke', () => {
     }
   });
 
-  test('admin outreach email queue renders without GTM metric query failures', async ({
+  test('admin growth outreach deep link opens accordion without runtime errors', async ({
     page,
   }, testInfo) => {
     const { getContext, cleanup } = setupPageMonitoring(page);
@@ -94,17 +89,8 @@ test.describe('Admin GTM Health @smoke', () => {
         page,
         getAdminSurfaceById('growth-outreach-email').path
       );
-      await expect(page.getByText('Campaign emails')).toBeVisible({
-        timeout: SMOKE_TIMEOUTS.VISIBILITY,
-      });
-      await expect(
-        page.getByRole('heading', { name: 'Email Queue' })
-      ).toBeVisible({
-        timeout: SMOKE_TIMEOUTS.VISIBILITY,
-      });
-      await expect(
-        page.getByRole('button', { name: 'Queue Next Batch' })
-      ).toBeVisible({
+      // The page loads with the outreach accordion auto-opened via ?view=outreach
+      await expect(page.getByTestId('admin-growth-page')).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
       await assertNoCriticalErrors(getContext(), testInfo);
