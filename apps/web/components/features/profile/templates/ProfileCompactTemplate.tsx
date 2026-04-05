@@ -1,21 +1,8 @@
 'use client';
 
-import {
-  BadgeCheck,
-  Bell,
-  BellOff,
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  Info,
-  Mail,
-  MoreHorizontal,
-  Play,
-  Share2,
-  Ticket,
-} from 'lucide-react';
+import { BadgeCheck, MoreHorizontal, Play } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
@@ -44,16 +31,21 @@ import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
-import {
-  NOTIFICATION_CONTENT_TYPES,
-  type NotificationContentType,
-} from '@/types/notifications';
+import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 
 const ProfileModeDrawer = dynamic(
   () =>
     import('@/features/profile/ProfileModeDrawer').then(mod => ({
       default: mod.ProfileModeDrawer,
+    })),
+  { ssr: false }
+);
+
+const ProfileMenuDrawer = dynamic(
+  () =>
+    import('@/features/profile/ProfileMenuDrawer').then(mod => ({
+      default: mod.ProfileMenuDrawer,
     })),
   { ssr: false }
 );
@@ -155,8 +147,6 @@ export function ProfileCompactTemplate({
   viewerCountryCode,
 }: ProfileCompactTemplateProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [notifSubMenu, setNotifSubMenu] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const mergedDSPs = useMemo(
     () =>
@@ -271,7 +261,6 @@ export function ProfileCompactTemplate({
           notificationsContextValue.setSubscriptionDetails({});
           notificationsContextValue.setState('idle');
           setMenuOpen(false);
-          setNotifSubMenu(false);
           showSuccess('Notifications turned off');
         },
       }
@@ -395,35 +384,6 @@ export function ProfileCompactTemplate({
     setMenuOpen(false);
   }, [artist.handle, artist.name]);
 
-  // Close menu on outside click
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-        setNotifSubMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [menuOpen]);
-
-  // Close menu on escape
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (notifSubMenu) {
-          setNotifSubMenu(false);
-        } else {
-          setMenuOpen(false);
-        }
-      }
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [menuOpen, notifSubMenu]);
-
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div className='profile-viewport relative h-[100dvh] overflow-clip bg-[color:var(--profile-stage-bg)] text-primary-token md:h-auto md:min-h-[100dvh] md:overflow-x-hidden'>
@@ -486,161 +446,15 @@ export function ProfileCompactTemplate({
                   />
 
                   <div className='flex items-center gap-2'>
-                    {/* ─── Dropdown ─── */}
-                    <div ref={menuRef} className='relative'>
-                      <button
-                        type='button'
-                        onClick={() => setMenuOpen(prev => !prev)}
-                        className={`flex h-8 w-8 items-center justify-center rounded-full ${glass.border} bg-black/25 text-white/70 ${glass.blur} transition-colors duration-150 hover:bg-black/40`}
-                        aria-label='More options'
-                        aria-expanded={menuOpen}
-                        aria-haspopup='menu'
-                      >
-                        <MoreHorizontal className='h-[15px] w-[15px]' />
-                      </button>
-
-                      {menuOpen ? (
-                        <div
-                          className={`absolute right-0 top-full z-50 mt-1.5 min-w-[188px] overflow-hidden rounded-[14px] border ${glass.border} bg-black/75 p-1 shadow-[0_12px_40px_rgba(0,0,0,0.5)] ${glass.blur}`}
-                          role='menu'
-                        >
-                          <button
-                            type='button'
-                            role='menuitem'
-                            className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
-                            onClick={handleShare}
-                          >
-                            <Share2 className='h-[14px] w-[14px] text-white/50' />
-                            Share Profile
-                          </button>
-                          <button
-                            type='button'
-                            role='menuitem'
-                            className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
-                            onClick={() => openDrawerMode('about')}
-                          >
-                            <Info className='h-[14px] w-[14px] text-white/50' />
-                            About
-                          </button>
-                          {tourDates.length > 0 ? (
-                            <button
-                              type='button'
-                              role='menuitem'
-                              className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
-                              onClick={() => openDrawerMode('tour')}
-                            >
-                              <CalendarDays className='h-[14px] w-[14px] text-white/50' />
-                              Tour Dates
-                            </button>
-                          ) : null}
-                          {hasTip ? (
-                            <button
-                              type='button'
-                              role='menuitem'
-                              className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
-                              onClick={() => openDrawerMode('tip')}
-                            >
-                              <Ticket className='h-[14px] w-[14px] text-white/50' />
-                              Tip
-                            </button>
-                          ) : null}
-                          {hasContacts ? (
-                            <button
-                              type='button'
-                              role='menuitem'
-                              className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
-                              onClick={() => {
-                                openDrawerMode('contact');
-                              }}
-                            >
-                              <Mail className='h-[14px] w-[14px] text-white/50' />
-                              Contact
-                            </button>
-                          ) : null}
-                          {isSubscribed ? (
-                            <button
-                              type='button'
-                              role='menuitem'
-                              className='flex w-full items-center justify-between gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
-                              onClick={() => setNotifSubMenu(true)}
-                            >
-                              <span className='flex items-center gap-2.5'>
-                                <Bell className='h-[14px] w-[14px] text-white/50' />
-                                Notifications
-                              </span>
-                              <ChevronRight className='h-3 w-3 text-white/40' />
-                            </button>
-                          ) : (
-                            <button
-                              type='button'
-                              role='menuitem'
-                              className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
-                              onClick={() => openDrawerMode('subscribe')}
-                            >
-                              <Bell className='h-[14px] w-[14px] text-white/50' />
-                              Get Notified
-                            </button>
-                          )}
-                        </div>
-                      ) : null}
-
-                      {/* Notification preferences sub-menu */}
-                      {menuOpen && notifSubMenu ? (
-                        <div
-                          className={`absolute right-0 top-full z-50 mt-1.5 min-w-[220px] overflow-hidden rounded-[14px] border ${glass.border} bg-black/75 p-1 shadow-[0_12px_40px_rgba(0,0,0,0.5)] ${glass.blur}`}
-                          role='menu'
-                        >
-                          <button
-                            type='button'
-                            role='menuitem'
-                            className='flex w-full items-center gap-2 rounded-[10px] px-3 py-2 text-left text-[12px] font-[500] text-white/60 transition-colors duration-150 hover:bg-white/[0.08]'
-                            onClick={() => setNotifSubMenu(false)}
-                          >
-                            <ChevronLeft className='h-3 w-3' />
-                            Back
-                          </button>
-                          <div className='mx-2 my-1 h-px bg-white/[0.08]' />
-                          <p className='px-3 py-1.5 text-[11px] font-[560] uppercase tracking-[0.06em] text-white/40'>
-                            Notify me about
-                          </p>
-                          {NOTIFICATION_CONTENT_TYPES.map(pref => (
-                            <button
-                              key={pref.key}
-                              type='button'
-                              role='menuitemcheckbox'
-                              aria-checked={contentPrefs[pref.key]}
-                              className='flex w-full items-center justify-between rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
-                              onClick={e => {
-                                e.stopPropagation();
-                                handleTogglePref(pref.key);
-                              }}
-                            >
-                              <span>{pref.label}</span>
-                              <span
-                                className={`h-3 w-3 rounded-full border transition-colors ${
-                                  contentPrefs[pref.key]
-                                    ? 'border-green-400 bg-green-400'
-                                    : 'border-white/30 bg-transparent'
-                                }`}
-                              />
-                            </button>
-                          ))}
-                          <div className='mx-2 my-1 h-px bg-white/[0.08]' />
-                          <button
-                            type='button'
-                            role='menuitem'
-                            className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-red-400/85 transition-colors duration-150 hover:bg-white/[0.08]'
-                            onClick={handleUnsubscribe}
-                            disabled={unsubMutation.isPending}
-                          >
-                            <BellOff className='h-[14px] w-[14px] text-red-400/50' />
-                            {unsubMutation.isPending
-                              ? 'Turning off…'
-                              : 'Turn off notifications'}
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
+                    <button
+                      type='button'
+                      onClick={() => setMenuOpen(true)}
+                      className={`flex h-8 w-8 items-center justify-center rounded-full ${glass.border} bg-black/25 text-white/70 ${glass.blur} transition-colors duration-150 hover:bg-black/40`}
+                      aria-label='More options'
+                      aria-haspopup='dialog'
+                    >
+                      <MoreHorizontal className='h-[15px] w-[15px]' />
+                    </button>
                   </div>
                 </div>
 
@@ -792,6 +606,25 @@ export function ProfileCompactTemplate({
             </div>
           </main>
         </div>
+
+        <ProfileMenuDrawer
+          open={menuOpen}
+          onOpenChange={setMenuOpen}
+          isSubscribed={isSubscribed}
+          contentPrefs={contentPrefs}
+          onTogglePref={handleTogglePref}
+          onUnsubscribe={handleUnsubscribe}
+          isUnsubscribing={unsubMutation.isPending}
+          onShare={handleShare}
+          onOpenAbout={() => openDrawerMode('about')}
+          onOpenTour={() => openDrawerMode('tour')}
+          onOpenTip={() => openDrawerMode('tip')}
+          onOpenContact={() => openDrawerMode('contact')}
+          onOpenSubscribe={() => openDrawerMode('subscribe')}
+          hasTourDates={tourDates.length > 0}
+          hasTip={hasTip}
+          hasContacts={hasContacts}
+        />
 
         <ProfileModeDrawer
           activeMode={activeDrawerMode}
