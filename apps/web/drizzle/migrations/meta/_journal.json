@@ -173,8 +173,15 @@
     {
       "idx": 24,
       "version": "7",
-      "when": 1775361315784,
+      "when": 1775402990657,
       "tag": "0024_useful_namor",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1775404678166,
+      "tag": "0025_typical_gunslinger",
       "breakpoints": true
     }
   ]

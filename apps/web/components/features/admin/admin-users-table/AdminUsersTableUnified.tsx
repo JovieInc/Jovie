@@ -65,8 +65,6 @@ import {
   createSelectCellRenderer,
   createSelectHeaderRenderer,
   renderCreatedDateCell,
-  renderFunnelCell,
-  renderLifecycleCell,
   renderNameCell,
   renderPlanCell,
   renderProfileCell,
@@ -110,7 +108,7 @@ function AdminUserMobileCard({
             type='checkbox'
             checked={isSelected}
             onChange={() => onToggleSelect(user.id)}
-            className='mt-0.5 h-4 w-4 rounded border-subtle bg-surface-0 text-(--linear-accent) focus:ring-(--linear-border-focus) focus:ring-1'
+            className='mt-0.5 h-4 w-4 rounded border-(--linear-border-strong) bg-surface-0 text-(--linear-accent) focus:ring-(--linear-border-focus) focus:ring-1'
             aria-label={`Select ${user.name ?? user.email ?? 'user'}`}
           />
           <div className='min-w-0'>
@@ -244,6 +242,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         }
       >
         <HeaderSearchAction
+          alwaysOpen
           searchValue={filterTerm}
           onSearchValueChange={setFilterTerm}
           placeholder='Search by email, name, or handle'
@@ -530,14 +529,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         size: 160,
       }),
 
-      // Funnel status column
-      columnHelper.accessor('userStatus', {
-        id: 'funnel',
-        header: 'Funnel',
-        cell: renderFunnelCell,
-        size: 140,
-      }),
-
       // Plan column
       columnHelper.accessor('plan', {
         id: 'plan',
@@ -546,19 +537,11 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         size: 120,
       }),
 
-      // Status column
+      // Status column (combines lifecycle state + deleted detection)
       columnHelper.display({
         id: 'status',
         header: 'Status',
         cell: renderStatusCell,
-        size: 100,
-      }),
-
-      // Lifecycle column
-      columnHelper.display({
-        id: 'lifecycle',
-        header: 'Lifecycle',
-        cell: renderLifecycleCell,
         size: 120,
       }),
 

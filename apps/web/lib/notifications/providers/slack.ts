@@ -238,6 +238,49 @@ export async function notifySlackGrowthRequest(
 }
 
 /**
+ * Send an SMS access request notification to Slack.
+ */
+export async function notifySlackSmsAccessRequest(
+  artistName: string,
+  email: string,
+  profileUrl: string,
+  smsSubscriberCount: number
+): Promise<SlackNotificationResult> {
+  const text = `📱 ${artistName} requested SMS notification access!`;
+  const message: SlackMessage = {
+    text,
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `📱 *${artistName}* requested SMS notification access!`,
+        },
+      },
+      {
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: `📧 ${email}  •  SMS subscribers: *${smsSubscriberCount}*  •  <${profileUrl}|View profile>`,
+          },
+        ],
+      },
+    ],
+  };
+
+  const result = await sendSlackMessage(message);
+  if (result.status === 'sent') {
+    logger.info('[slack] SMS access request notification sent', {
+      artistName,
+      email,
+      smsSubscriberCount,
+    });
+  }
+  return result;
+}
+
+/**
  * Send a waitlist notification to Slack.
  *
  * @param name - The name of the user who joined the waitlist

@@ -31,6 +31,8 @@ export interface ProfileNotificationsContextValue {
   openSubscription: (channel?: NotificationChannel) => void;
   /** Register a callback to focus the subscription input */
   registerInputFocus: (focusFn: (() => void) | null) => void;
+  /** Whether SMS channel is enabled (Pro-only) */
+  smsEnabled: boolean;
 }
 
 export interface ProfileShellProps {
