@@ -1,7 +1,7 @@
 'use client';
 
 import { Input } from '@jovie/ui';
-import { ListPlus, Search, X } from 'lucide-react';
+import { ListPlus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   type FormEvent,
@@ -47,7 +47,6 @@ export function AdminCreatorsPageWrapper(
   const { setHeaderActions } = useSetHeaderActions();
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const basePath = props.basePath ?? APP_ROUTES.ADMIN_CREATORS;
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState(props.search);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -59,8 +58,7 @@ export function AdminCreatorsPageWrapper(
     setBatchModalOpen(true);
   }, []);
 
-  const handleSearchClose = useCallback(() => {
-    setIsSearchOpen(false);
+  const handleSearchClear = useCallback(() => {
     setSearchQuery('');
     if (props.search) {
       router.push(basePath);
@@ -83,65 +81,37 @@ export function AdminCreatorsPageWrapper(
     [basePath, props.pageSize, props.sort, router, searchQuery]
   );
 
-  const handleSearchToggle = useCallback(() => {
-    setIsSearchOpen(open => {
-      const nextOpen = !open;
-      if (nextOpen) {
-        setSearchQuery(props.search);
-        setTimeout(() => searchInputRef.current?.focus(), 0);
-      } else {
-        setSearchQuery('');
-        if (props.search) {
-          router.push(basePath);
-        }
-      }
-      return nextOpen;
-    });
-  }, [basePath, props.search, router]);
-
   // Register custom header actions on mount
   useEffect(() => {
     setHeaderActions(
       <div className='flex items-center gap-1.5'>
-        {isSearchOpen ? (
-          <form
-            onSubmit={handleSearchSubmit}
-            className='flex items-center gap-1'
-          >
-            <Input
-              ref={searchInputRef}
-              name='q'
-              placeholder='Search by handle'
-              value={searchQuery}
-              onChange={event => setSearchQuery(event.target.value)}
-              onKeyDown={event => {
-                if (event.key === 'Escape') {
-                  event.preventDefault();
-                  handleSearchClose();
-                }
-              }}
-              className='h-7 w-[210px] rounded-full border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 text-[12px]'
-              aria-label='Search creators by handle'
-            />
+        <form onSubmit={handleSearchSubmit} className='flex items-center gap-1'>
+          <Input
+            ref={searchInputRef}
+            name='q'
+            placeholder='Search by handle'
+            value={searchQuery}
+            onChange={event => setSearchQuery(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                handleSearchClear();
+              }
+            }}
+            className='h-7 w-[210px] rounded-full border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 text-[12px]'
+            aria-label='Search creators by handle'
+          />
+          {searchQuery.length > 0 ? (
             <AppIconButton
               type='button'
-              onClick={handleSearchClose}
+              onClick={handleSearchClear}
               className='h-7 w-7 border-transparent bg-transparent text-tertiary-token'
-              ariaLabel='Close search'
+              ariaLabel='Clear search'
             >
               <X className='h-3.5 w-3.5' aria-hidden='true' />
             </AppIconButton>
-          </form>
-        ) : (
-          <AppIconButton
-            type='button'
-            onClick={handleSearchToggle}
-            className='h-7 w-7 border-transparent bg-transparent text-secondary-token'
-            ariaLabel='Open search'
-          >
-            <Search className='h-3.5 w-3.5' aria-hidden='true' />
-          </AppIconButton>
-        )}
+          ) : null}
+        </form>
         <BatchIngestButton onClick={handleOpenBatchModal} />
         <IngestProfileDropdown onIngestPending={handleIngestPending} />
 
@@ -161,10 +131,8 @@ export function AdminCreatorsPageWrapper(
     setHeaderActions,
     handleIngestPending,
     handleOpenBatchModal,
-    handleSearchClose,
+    handleSearchClear,
     handleSearchSubmit,
-    handleSearchToggle,
-    isSearchOpen,
     searchQuery,
   ]);
 
