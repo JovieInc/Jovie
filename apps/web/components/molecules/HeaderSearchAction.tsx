@@ -63,6 +63,10 @@ export function HeaderSearchAction({
   const close = () => {
     if (alwaysOpen) {
       onSearchValueChange('');
+      if (action && clearHref && searchValue.length > 0) {
+        router.push(clearHref);
+        return;
+      }
       onClearAction?.();
       return;
     }
