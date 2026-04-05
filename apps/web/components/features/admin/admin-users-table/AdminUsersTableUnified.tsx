@@ -64,8 +64,6 @@ import {
   createSelectCellRenderer,
   createSelectHeaderRenderer,
   renderCreatedDateCell,
-  renderFunnelCell,
-  renderLifecycleCell,
   renderNameCell,
   renderPlanCell,
   renderProfileCell,
@@ -225,6 +223,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         }
       >
         <HeaderSearchAction
+          alwaysOpen
           action={basePath}
           clearHref={mergeHrefSearchParams(basePath, {
             page: 1,
@@ -518,14 +517,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         size: 160,
       }),
 
-      // Funnel status column
-      columnHelper.accessor('userStatus', {
-        id: 'funnel',
-        header: 'Funnel',
-        cell: renderFunnelCell,
-        size: 140,
-      }),
-
       // Plan column
       columnHelper.accessor('plan', {
         id: 'plan',
@@ -534,19 +525,11 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         size: 120,
       }),
 
-      // Status column
+      // Status column (combines lifecycle state + deleted detection)
       columnHelper.display({
         id: 'status',
         header: 'Status',
         cell: renderStatusCell,
-        size: 100,
-      }),
-
-      // Lifecycle column
-      columnHelper.display({
-        id: 'lifecycle',
-        header: 'Lifecycle',
-        cell: renderLifecycleCell,
         size: 120,
       }),
 
