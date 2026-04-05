@@ -60,6 +60,7 @@ interface LeadTableProps {
   readonly refreshKey?: number;
   readonly initialSearch?: string;
   readonly basePath?: string;
+  readonly funnelCounts?: Record<string, number>;
 }
 
 interface ActioningState {
@@ -244,6 +245,7 @@ export function LeadTable({
   refreshKey = 0,
   initialSearch = '',
   basePath = APP_ROUTES.ADMIN_LEADS,
+  funnelCounts,
 }: Readonly<LeadTableProps>) {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
@@ -367,14 +369,20 @@ export function LeadTable({
   return (
     <section className='flex flex-col'>
       <PageToolbar
-        start={STATUS_OPTIONS.map(opt => (
-          <PageToolbarTabButton
-            key={opt.value}
-            label={opt.label}
-            active={statusFilter === opt.value}
-            onClick={() => setStatusFilter(opt.value)}
-          />
-        ))}
+        start={STATUS_OPTIONS.map(opt => {
+          const count =
+            funnelCounts && opt.value ? funnelCounts[opt.value] : undefined;
+          const label =
+            count !== undefined ? `${opt.label} (${count})` : opt.label;
+          return (
+            <PageToolbarTabButton
+              key={opt.value}
+              label={label}
+              active={statusFilter === opt.value}
+              onClick={() => setStatusFilter(opt.value)}
+            />
+          );
+        })}
         end={
           <PageToolbarSearchForm
             compact

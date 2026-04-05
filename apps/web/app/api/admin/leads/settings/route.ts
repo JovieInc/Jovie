@@ -62,6 +62,7 @@ function makeDefaultSettings() {
       maxProviderFailureRate: 0.1,
     },
     queriesUsedToday: 0,
+    autoIngestedToday: 0,
   };
 }
 
@@ -96,6 +97,7 @@ function isMissingLeadPipelineSettingsSchemaError(error: unknown): boolean {
     'column "guardrails_enabled"',
     'column "guardrail_thresholds"',
     'column "auto_ingest_daily_limit"',
+    'column "auto_ingested_today"',
   ].some(pattern => message.includes(pattern));
 }
 
