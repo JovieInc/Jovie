@@ -1,5 +1,10 @@
 export { waitForDeployVerification, waitForPrMerge } from './deploy';
-export { applyLabels, buildPrBody, ensureDraftPr } from './pull-request';
+export {
+  applyLabels,
+  buildPrBody,
+  enableAutoMerge,
+  ensureDraftPr,
+} from './pull-request';
 export {
   assertPreflightClean,
   branchSlug,
