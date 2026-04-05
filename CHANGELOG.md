@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.121] - 2026-04-05
+## [26.4.122] - 2026-04-05
 
 > Audio player now lives in a persistent bottom bar that stays visible across all dashboard and admin pages, even when the sidebar is collapsed or hidden on mobile. Includes dismiss, loading state, and safe-area clearance for notched devices.
 
@@ -23,6 +23,30 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Removed
 
 - `NowPlayingCard` from sidebar (replaced by bottom bar)
+
+## [26.4.121] - 2026-04-05
+
+> Catalog scan moves from a dedicated page into the Presence page as an inline triage section. One click per mismatch instead of four.
+
+### Changed
+
+- Catalog scan is now a collapsible "Catalog Health" section inside the Presence page, not a standalone page
+- Mismatch triage uses card-stack UI with "Mine" / "Not Mine" buttons and 3-second undo window
+- Cards show album art (clickable to Spotify), track name, artist, and album for confident decisions
+- Section auto-expands when unresolved mismatches exist, collapses to a one-liner when clean
+- "Not in catalog" mismatches show as triage cards, "missing from Spotify" items show as an info row
+- Post-triage summary persists with a link to Spotify's content mismatch form
+
+### Added
+
+- Auto-scan triggers on first Spotify match confirmation (no manual scan needed)
+- Bulk dismiss button appears when 10+ mismatches need review
+- Keyboard navigation and screen reader announcements for card triage
+
+### Removed
+
+- Dedicated catalog scan page (now redirects to Presence)
+- "Catalog Scan" sidebar navigation item (5 nav items instead of 6)
 
 ## [26.4.120] - 2026-04-05
 
