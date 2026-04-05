@@ -27,6 +27,7 @@ import {
   type ContextMenuItemType,
   convertContextMenuItems,
   convertToCommonDropdownItems,
+  createMultiFieldFilterFn,
   ExportCSVButton,
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -45,6 +46,7 @@ import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/Dashboard
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { copyToClipboard } from '@/hooks/useClipboard';
+import { useSearchUrlSync } from '@/hooks/useSearchUrlSync';
 import {
   USERS_CSV_FILENAME_PREFIX,
   usersCSVColumns,
@@ -52,7 +54,6 @@ import {
 import type { AdminUserRow } from '@/lib/admin/types';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { QueryErrorBoundary, useAdminUsersInfiniteQuery } from '@/lib/queries';
-import { mergeHrefSearchParams } from '@/lib/utils/merge-href-search-params';
 import { AdminUserDetailDrawer } from './AdminUserDetailDrawer';
 import {
   type BuildAdminUserActionsCallbacks,
@@ -158,19 +159,37 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     basePath = APP_ROUTES.ADMIN_USERS,
   } = props;
   const router = useRouter();
-  const [searchTerm, setSearchTerm] = useState(search);
+  const [filterTerm, setFilterTerm] = useState(search);
 
+  // Sync URL search param on initial load
   useEffect(() => {
-    setSearchTerm(search);
+    setFilterTerm(search);
   }, [search]);
 
+  // Debounced URL sync (no navigation, just replaceState)
+  useSearchUrlSync(filterTerm, basePath);
+
+  // Load all data without server-side search — filter client-side instead
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useAdminUsersInfiniteQuery({
       sort,
-      search,
+      search: '',
       pageSize,
       initialData: { rows: initialUsers, total },
     });
+
+  // Client-side filter searches across name, email, handle, and clerk ID
+  const userFilterFn = useMemo(
+    () =>
+      createMultiFieldFilterFn<AdminUserRow>([
+        r => r.name,
+        r => r.email,
+        r => r.profileUsername,
+        r => r.clerkId,
+        r => r.plan,
+      ]),
+    []
+  );
 
   const users = useMemo(
     () => data?.pages.flatMap(page => page.rows) ?? initialUsers,
@@ -225,23 +244,16 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         }
       >
         <HeaderSearchAction
-          action={basePath}
-          clearHref={mergeHrefSearchParams(basePath, {
-            page: 1,
-            q: null,
-            sort,
-          })}
-          searchValue={searchTerm}
-          onSearchValueChange={setSearchTerm}
+          searchValue={filterTerm}
+          onSearchValueChange={setFilterTerm}
           placeholder='Search by email, name, or handle'
           ariaLabel='Search users by email, name, or handle'
           submitAriaLabel='Search users'
-          hiddenInputs={[{ name: 'sort', value: sort }]}
           tooltipLabel='Search'
         />
       </DashboardHeaderActionGroup>
     ),
-    [basePath, searchTerm, sort]
+    [filterTerm]
   );
 
   useEffect(() => {
@@ -648,7 +660,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                           No users found
                         </div>
                         <div className='text-[12px] text-secondary-token'>
-                          {search
+                          {filterTerm
                             ? 'Try adjusting your search terms or clearing the filter.'
                             : 'Users will appear here once they sign up.'}
                         </div>
@@ -687,6 +699,10 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   columns={columns}
                   rowSelection={rowSelection}
                   isLoading={false}
+                  globalFilter={filterTerm}
+                  onGlobalFilterChange={setFilterTerm}
+                  enableFiltering
+                  globalFilterFn={userFilterFn}
                   emptyState={
                     <ContentSurfaceCard className='mx-4 my-6 flex flex-col items-center gap-3 bg-surface-0 px-4 py-10 text-center'>
                       <Users className='h-6 w-6' />
@@ -695,7 +711,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                           No users found
                         </div>
                         <div className='text-[12px] text-secondary-token'>
-                          {search
+                          {filterTerm
                             ? 'Try adjusting your search terms or clearing the filter.'
                             : 'Users will appear here once they sign up.'}
                         </div>

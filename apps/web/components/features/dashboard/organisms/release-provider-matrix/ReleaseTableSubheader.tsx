@@ -318,7 +318,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             searchValue={searchQuery}
             onSearchValueChange={onSearchQueryChange}
             onClearAction={() => onSearchQueryChange('')}
-            onApply={() => undefined}
             placeholder='Search releases'
             ariaLabel='Search releases'
             submitAriaLabel='Search releases'

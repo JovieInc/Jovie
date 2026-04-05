@@ -60,6 +60,7 @@ import {
   convertContextMenuItems,
   UnifiedTable,
 } from '@/components/organisms/table';
+import { resolveTableNavAction } from '@/components/organisms/table/utils/tableKeyMap';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
@@ -85,7 +86,6 @@ import type {
 } from '@/lib/tasks/types';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
-import { isFormElement } from '@/lib/utils/keyboard';
 import { TaskWorkspaceHeaderBar } from './TaskWorkspaceHeaderBar';
 import {
   getTaskAssigneeVisual,
@@ -1290,14 +1290,13 @@ export function TasksPageClient() {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (isFormElement(event.target)) return;
       if (!selectedTask) return;
 
-      const key = event.key.toLowerCase();
-      if (key === 'j') {
+      const action = resolveTableNavAction(event.key, event.target);
+      if (action === 'next') {
         event.preventDefault();
         selectNextTask();
-      } else if (key === 'k') {
+      } else if (action === 'prev') {
         event.preventDefault();
         selectPreviousTask();
       }

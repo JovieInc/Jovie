@@ -20,6 +20,27 @@ vi.mock('@/lib/queries', async importOriginal => {
   };
 });
 
+// Mock HeaderSearchAction (uses Tooltip which needs provider)
+vi.mock('@/components/molecules/HeaderSearchAction', () => ({
+  HeaderSearchAction: ({
+    searchValue,
+    onSearchValueChange,
+  }: {
+    searchValue: string;
+    onSearchValueChange: (v: string) => void;
+  }) => (
+    <input
+      data-testid='search-input'
+      value={searchValue}
+      onChange={e => onSearchValueChange(e.target.value)}
+    />
+  ),
+}));
+
+vi.mock('@/hooks/useSearchUrlSync', () => ({
+  useSearchUrlSync: () => {},
+}));
+
 // Mock sonner
 vi.mock('sonner', () => ({
   toast: {

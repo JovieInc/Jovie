@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useMemo } from 'react';
+import { resolveTableNavAction } from '@/components/organisms/table/utils/tableKeyMap';
 
 interface UseAdminTableKeyboardNavigationOptions<ItemType> {
   items: ItemType[];
@@ -18,17 +19,12 @@ interface UseAdminTableKeyboardNavigationResult {
   handleKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void;
 }
 
-function isFormElement(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  const tagName = target.tagName;
-  return (
-    tagName === 'INPUT' ||
-    tagName === 'TEXTAREA' ||
-    tagName === 'SELECT' ||
-    tagName === 'BUTTON'
-  );
-}
-
+/**
+ * Container-level keyboard navigation for admin tables with sidebar.
+ *
+ * Uses the shared tableKeyMap for consistent key bindings.
+ * Adds sidebar-aware behaviour (Space toggles, Escape closes).
+ */
 export function useAdminTableKeyboardNavigation<ItemType>(
   options: UseAdminTableKeyboardNavigationOptions<ItemType>
 ): UseAdminTableKeyboardNavigationResult {
@@ -50,98 +46,82 @@ export function useAdminTableKeyboardNavigation<ItemType>(
     [itemIds, selectedId]
   );
 
-  const handleArrowNavigation = useCallback(
-    (event: React.KeyboardEvent<HTMLElement>, key: 'ArrowDown' | 'ArrowUp') => {
-      if (itemIds.length === 0) return;
+  const navigateTo = useCallback(
+    (event: React.KeyboardEvent<HTMLElement>, targetIndex: number) => {
       event.preventDefault();
-
-      const isDown = key === 'ArrowDown';
-      if (selectedIndex === -1) {
-        const targetIndex = isDown ? 0 : itemIds.length - 1;
-        onSelect(itemIds[targetIndex] ?? null);
-        return;
-      }
-
-      const nextIndex = isDown
-        ? Math.min(selectedIndex + 1, itemIds.length - 1)
-        : Math.max(selectedIndex - 1, 0);
-      onSelect(itemIds[nextIndex] ?? null);
-    },
-    [itemIds, onSelect, selectedIndex]
-  );
-
-  const handleSpaceKey = useCallback(
-    (event: React.KeyboardEvent<HTMLElement>) => {
-      if (!selectedId || !onToggleSidebar) return;
-      event.preventDefault();
-      onToggleSidebar();
-    },
-    [onToggleSidebar, selectedId]
-  );
-
-  const handleEnterKey = useCallback(
-    (event: React.KeyboardEvent<HTMLElement>) => {
-      if (!selectedId) return;
-      event.preventDefault();
-      if (onActivate) {
-        onActivate();
-        return;
-      }
-      onToggleSidebar?.();
-    },
-    [onActivate, onToggleSidebar, selectedId]
-  );
-
-  const handleHomeEndNavigation = useCallback(
-    (event: React.KeyboardEvent<HTMLElement>, key: 'Home' | 'End') => {
-      if (itemIds.length === 0) return;
-      event.preventDefault();
-      const targetIndex = key === 'Home' ? 0 : itemIds.length - 1;
       onSelect(itemIds[targetIndex] ?? null);
     },
     [itemIds, onSelect]
   );
 
-  const handleEscapeKey = useCallback(
-    (event: React.KeyboardEvent<HTMLElement>) => {
-      if (!isSidebarOpen || !onCloseSidebar) return;
-      event.preventDefault();
-      onCloseSidebar();
-    },
-    [isSidebarOpen, onCloseSidebar]
-  );
-
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLElement>) => {
-      if (isFormElement(event.target)) return;
+      const action = resolveTableNavAction(event.key, event.target);
+      if (!action) return;
 
-      switch (event.key) {
-        case 'ArrowDown':
-        case 'ArrowUp':
-          handleArrowNavigation(event, event.key);
+      switch (action) {
+        case 'next': {
+          if (itemIds.length === 0) return;
+          const next =
+            selectedIndex === -1
+              ? 0
+              : Math.min(selectedIndex + 1, itemIds.length - 1);
+          navigateTo(event, next);
           break;
-        case ' ':
-        case 'Spacebar':
-          handleSpaceKey(event);
+        }
+
+        case 'prev': {
+          if (itemIds.length === 0) return;
+          const prev =
+            selectedIndex === -1
+              ? itemIds.length - 1
+              : Math.max(selectedIndex - 1, 0);
+          navigateTo(event, prev);
           break;
-        case 'Escape':
-          handleEscapeKey(event);
+        }
+
+        case 'first':
+          if (itemIds.length === 0) return;
+          navigateTo(event, 0);
           break;
-        case 'Enter':
-          handleEnterKey(event);
+
+        case 'last':
+          if (itemIds.length === 0) return;
+          navigateTo(event, itemIds.length - 1);
           break;
-        case 'Home':
-        case 'End':
-          handleHomeEndNavigation(event, event.key);
+
+        case 'activate':
+          if (!selectedId) return;
+          event.preventDefault();
+          if (onActivate) {
+            onActivate();
+          } else {
+            onToggleSidebar?.();
+          }
+          break;
+
+        case 'toggle':
+          if (!selectedId || !onToggleSidebar) return;
+          event.preventDefault();
+          onToggleSidebar();
+          break;
+
+        case 'close':
+          if (!isSidebarOpen || !onCloseSidebar) return;
+          event.preventDefault();
+          onCloseSidebar();
           break;
       }
     },
     [
-      handleArrowNavigation,
-      handleEnterKey,
-      handleEscapeKey,
-      handleHomeEndNavigation,
-      handleSpaceKey,
+      itemIds,
+      navigateTo,
+      selectedId,
+      selectedIndex,
+      onActivate,
+      onToggleSidebar,
+      onCloseSidebar,
+      isSidebarOpen,
     ]
   );
 

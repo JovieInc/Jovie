@@ -3,24 +3,19 @@
 import { Badge } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import {
-  AlertTriangle,
-  Check,
-  ExternalLink,
-  Loader2,
-  Search,
-  X,
-} from 'lucide-react';
+import { AlertTriangle, Check, ExternalLink, Loader2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import {
+  createMultiFieldFilterFn,
   PageToolbar,
-  PageToolbarSearchForm,
   PageToolbarTabButton,
   TableEmptyState,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { useSearchUrlSync } from '@/hooks/useSearchUrlSync';
 import {
   type AdminLead,
   type AdminLeadsSortBy,
@@ -28,7 +23,6 @@ import {
   useLeadsInfiniteQuery,
   useUpdateLeadStatusMutation,
 } from '@/lib/queries';
-import { mergeHrefSearchParams } from '@/lib/utils/merge-href-search-params';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
@@ -40,7 +34,13 @@ const STATUS_OPTIONS = [
   { value: 'rejected', label: 'Rejected' },
 ] as const;
 
-const LEADS_SEARCH_NAVIGATION_DEBOUNCE_MS = 300;
+// Client-side filter searches across handle, display name, and email
+const leadFilterFn = createMultiFieldFilterFn<AdminLead>([
+  r => r.linktreeHandle,
+  r => r.displayName,
+  r => r.contactEmail,
+  r => r.linktreeUrl,
+]);
 
 const STATUS_VARIANT: Record<
   string,
@@ -255,6 +255,9 @@ export function LeadTable({
   const actioningRef = useRef<ActioningState | null>(null);
   actioningRef.current = actioning;
 
+  // Debounced URL sync (no navigation)
+  useSearchUrlSync(search, basePath);
+
   const {
     data,
     isLoading,
@@ -265,7 +268,6 @@ export function LeadTable({
   } = useLeadsInfiniteQuery({
     sortBy,
     status: statusFilter || undefined,
-    search: search || undefined,
   });
 
   const updateLeadStatusMutation = useUpdateLeadStatusMutation();
@@ -286,29 +288,6 @@ export function LeadTable({
   useEffect(() => {
     setSearch(initialSearch);
   }, [initialSearch]);
-
-  useEffect(() => {
-    const nextSearch = search.trim() || null;
-    const currentSearch = initialSearch.trim() || null;
-
-    if (nextSearch === currentSearch) {
-      return;
-    }
-
-    const timeout = globalThis.setTimeout(() => {
-      globalThis.history.replaceState(
-        null,
-        '',
-        mergeHrefSearchParams(basePath, {
-          q: nextSearch,
-        })
-      );
-    }, LEADS_SEARCH_NAVIGATION_DEBOUNCE_MS);
-
-    return () => {
-      globalThis.clearTimeout(timeout);
-    };
-  }, [basePath, initialSearch, search]);
 
   useEffect(() => {
     if (refreshKey > 0) {
@@ -384,16 +363,12 @@ export function LeadTable({
           );
         })}
         end={
-          <PageToolbarSearchForm
-            compact
+          <HeaderSearchAction
             searchValue={search}
             onSearchValueChange={setSearch}
             placeholder='Search handle or name...'
             ariaLabel='Search leads'
             submitAriaLabel='Search leads'
-            submitIcon={<Search className='h-3.5 w-3.5' />}
-            clearIcon={<X className='h-3.5 w-3.5' />}
-            onClearAction={() => setSearch('')}
             tooltipLabel='Search'
           />
         }
@@ -408,6 +383,10 @@ export function LeadTable({
         data={leads}
         columns={columns as ColumnDef<AdminLead, unknown>[]}
         isLoading={isLoading}
+        globalFilter={search}
+        onGlobalFilterChange={setSearch}
+        enableFiltering
+        globalFilterFn={leadFilterFn}
         getRowId={row => row.id}
         hasNextPage={hasNextPage}
         isFetchingNextPage={isFetchingNextPage}

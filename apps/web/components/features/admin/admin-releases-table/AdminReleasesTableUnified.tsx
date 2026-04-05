@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useMemo } from 'react';
 import {
+  createMultiFieldFilterFn,
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   TableEmptyState,
@@ -35,6 +36,7 @@ interface AdminReleasesTableProps {
   readonly total: number;
   readonly search: string;
   readonly sort: AdminReleasesSort;
+  readonly clientFilter?: string;
 }
 
 const columnHelper = createColumnHelper<AdminReleaseRow>();
@@ -293,17 +295,28 @@ function getContextMenuItems(release: AdminReleaseRow) {
   return items;
 }
 
+// Client-side filter searches across title, artist handle, display name, UPC
+const releaseFilterFn = createMultiFieldFilterFn<AdminReleaseRow>([
+  r => r.title,
+  r => r.artistUsername,
+  r => r.artistDisplayName,
+  r => r.upc,
+  r => r.label,
+]);
+
 export function AdminReleasesTableUnified({
   releases: initialReleases,
   pageSize,
   total,
   search,
   sort,
+  clientFilter,
 }: Readonly<AdminReleasesTableProps>) {
+  // Load all data without server-side search — filter client-side instead
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useAdminReleasesInfiniteQuery({
       sort,
-      search,
+      search: '',
       pageSize,
       initialData: { rows: initialReleases, total },
     });
@@ -315,9 +328,9 @@ export function AdminReleasesTableUnified({
 
   const columns = useMemo(() => createColumns(), []);
 
-  const emptyState = search ? (
+  const emptyState = clientFilter ? (
     <TableEmptyState
-      title={`No releases match '${search}'`}
+      title={`No releases match '${clientFilter}'`}
       description='Try a different search.'
     />
   ) : (
@@ -345,6 +358,9 @@ export function AdminReleasesTableUnified({
           getRowId={(row: AdminReleaseRow) => row.id}
           minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
           emptyState={emptyState}
+          globalFilter={clientFilter ?? ''}
+          enableFiltering={clientFilter !== undefined}
+          globalFilterFn={releaseFilterFn}
           getContextMenuItems={(row: AdminReleaseRow) =>
             getContextMenuItems(row)
           }

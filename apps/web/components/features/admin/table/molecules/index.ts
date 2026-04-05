@@ -22,4 +22,3 @@ export {
 
 // Admin-specific components (kept for now)
 export { TableRow, type TableRowProps } from './TableRow';
-export { TableSearchBar, type TableSearchBarProps } from './TableSearchBar';
