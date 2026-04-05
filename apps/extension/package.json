@@ -5,7 +5,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && node scripts/copy-static.mjs",
     "dev": "tsc -p tsconfig.build.json --watch",
-    "test": "vitest run --config vitest.config.mts",
+    "test": "node scripts/vitest-wrapper.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   }
 }
