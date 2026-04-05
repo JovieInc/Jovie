@@ -13,9 +13,9 @@ function BentoCard({ heading, className = '', children }: BentoCardProps) {
     <div
       className={`rounded-2xl border border-white/8 bg-white/[0.03] p-6 transition-colors duration-150 hover:bg-white/[0.05] ${className}`}
     >
-      <p className='text-[15px] font-[560] tracking-[-0.01em] text-white'>
+      <h3 className='text-[15px] font-[560] tracking-[-0.01em] text-white'>
         {heading}
-      </p>
+      </h3>
       {children}
     </div>
   );

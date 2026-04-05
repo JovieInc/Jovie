@@ -29,7 +29,7 @@ function HeroTaskPanel() {
           Release Tasks
         </p>
         <span className='rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-medium text-white/62'>
-          3 Open
+          {HOME_HERO_TASKS.length} Open
         </span>
       </div>
 
