@@ -28,7 +28,7 @@ export default async function ShellLoading() {
   }
 
   if (isReleasesShellRoute(pathname)) {
-    return <ReleaseTableSkeleton />;
+    return <ReleaseTableSkeleton showHeader={false} />;
   }
 
   return (
