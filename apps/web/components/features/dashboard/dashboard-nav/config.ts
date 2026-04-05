@@ -16,7 +16,6 @@ import {
   Music,
   PieChart,
   Radio,
-  ScanSearch,
   Settings,
   ShieldCheck,
   SquarePen,
@@ -83,13 +82,6 @@ export const primaryNavigation: NavItem[] = [
     id: 'presence',
     icon: Radio,
     description: 'See your profiles across streaming platforms',
-  },
-  {
-    name: 'Catalog Scan',
-    href: APP_ROUTES.CATALOG_SCAN,
-    id: 'catalog-scan',
-    icon: ScanSearch,
-    description: 'Detect wrong releases on your streaming profiles',
   },
 ];
 

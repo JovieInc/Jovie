@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.123] - 2026-04-05
+
+### Fixed
+
+- Inline editable fields (ISRC, UPC, Label) no longer shift the layout when entering or exiting edit mode
+
+## [26.4.122] - 2026-04-05
+
+> Audio player now lives in a persistent bottom bar that stays visible across all dashboard and admin pages, even when the sidebar is collapsed or hidden on mobile. Includes dismiss, loading state, and safe-area clearance for notched devices.
+
+### Changed
+
+- Audio player moved from the sidebar to a persistent bottom bar inside the main content area
+- Player stays visible when the sidebar is collapsed or hidden on mobile
+
+### Added
+
+- Dismiss button (X) to clear the audio player
+- Loading state with pulsing indicator and disabled seek bar
+- Safe-area-aware mobile clearance for notched devices
+
+### Removed
+
+- `NowPlayingCard` from sidebar (replaced by bottom bar)
+
+## [26.4.121] - 2026-04-05
+
+> Catalog scan moves from a dedicated page into the Presence page as an inline triage section. One click per mismatch instead of four.
+
+### Changed
+
+- Catalog scan is now a collapsible "Catalog Health" section inside the Presence page, not a standalone page
+- Mismatch triage uses card-stack UI with "Mine" / "Not Mine" buttons and 3-second undo window
+- Cards show album art (clickable to Spotify), track name, artist, and album for confident decisions
+- Section auto-expands when unresolved mismatches exist, collapses to a one-liner when clean
+- "Not in catalog" mismatches show as triage cards, "missing from Spotify" items show as an info row
+- Post-triage summary persists with a link to Spotify's content mismatch form
+
+### Added
+
+- Auto-scan triggers on first Spotify match confirmation (no manual scan needed)
+- Bulk dismiss button appears when 10+ mismatches need review
+- Keyboard navigation and screen reader announcements for card triage
+
+### Removed
+
+- Dedicated catalog scan page (now redirects to Presence)
+- "Catalog Scan" sidebar navigation item (5 nav items instead of 6)
+
 ## [26.4.120] - 2026-04-05
 
 > Faster releases navigation and lighter loading placeholders improve perceived speed across all dashboard tables.
@@ -35,6 +84,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Merged Funnel, Status, and Lifecycle columns into a single Status column on the admin users table (12 to 10 columns)
 - Search fields on admin Users, Creators, and Releases pages are now always visible instead of hidden behind an icon
+
+### Added
+
+- Staggered cascade animation when generating a release plan: category groups fade in sequentially, tasks slide in from left with blur-to-sharp effect
+- Typewriter reveal for AI-generated playlist pitches with animated sparkle icon and blinking cursor
+- Platform tab switching re-triggers typewriter animation for each DSP pitch
 
 ### Fixed
 

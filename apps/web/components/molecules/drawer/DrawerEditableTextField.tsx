@@ -176,7 +176,9 @@ export function DrawerEditableTextField({
             onClick={() => setIsEditing(true)}
             onDoubleClick={() => setIsEditing(true)}
             className={cn(
-              '-mx-1 w-full min-w-0 cursor-text rounded-[8px] px-1 py-0.5 text-left transition-colors hover:bg-surface-0',
+              'flex w-full min-w-0 cursor-text items-center text-left transition-colors h-8 rounded-[8px] px-2.5',
+              inputClassName,
+              'border border-transparent bg-transparent shadow-none hover:bg-surface-0',
               !hasValue && 'text-tertiary-token'
             )}
             aria-label={`Edit ${label}`}

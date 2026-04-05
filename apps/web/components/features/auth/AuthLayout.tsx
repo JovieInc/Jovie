@@ -9,7 +9,7 @@ import {
 } from '@jovie/ui';
 import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
@@ -49,14 +49,12 @@ export function AuthLayout({
   showLogoutButton = false,
   logoutRedirectUrl = '/signin',
 }: Readonly<AuthLayoutProps>) {
-  const [shouldSpinLogo, setShouldSpinLogo] = useState(false);
   const { isKeyboardVisible } = useMobileKeyboard();
   const formRef = useRef<HTMLDivElement>(null);
 
   // Scroll form into view when keyboard appears on mobile
   useEffect(() => {
     if (isKeyboardVisible && formRef.current) {
-      // Slight delay to let keyboard fully appear
       const timer = setTimeout(() => {
         formRef.current?.scrollIntoView({
           behavior: 'smooth',
@@ -67,47 +65,6 @@ export function AuthLayout({
     }
     return undefined;
   }, [isKeyboardVisible]);
-
-  // One-time idle-triggered spin
-  useEffect(() => {
-    if (!logoSpinDelayMs) return undefined;
-
-    let hasSpun = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    const triggerSpin = () => {
-      if (hasSpun) return;
-      hasSpun = true;
-      setShouldSpinLogo(true);
-    };
-
-    const resetTimer = () => {
-      if (hasSpun) return;
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(triggerSpin, logoSpinDelayMs);
-    };
-
-    resetTimer();
-
-    const events: Array<keyof DocumentEventMap> = [
-      'pointerdown',
-      'keydown',
-      'mousemove',
-      'touchstart',
-      'focus',
-    ];
-
-    events.forEach(event =>
-      globalThis.addEventListener(event, resetTimer, { passive: true })
-    );
-
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      events.forEach(event =>
-        globalThis.removeEventListener(event, resetTimer)
-      );
-    };
-  }, [logoSpinDelayMs]);
 
   return (
     <div
@@ -135,9 +92,7 @@ export function AuthLayout({
         aria-hidden='true'
         className='pointer-events-none absolute inset-0 overflow-hidden'
       >
-        <div className='absolute left-1/2 top-[8%] h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-accent/12 blur-[120px] sm:top-[10%] sm:h-[34rem] sm:w-[34rem]' />
-        <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.045),transparent_42%)]' />
-        <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(15,16,17,0.72)_0%,rgba(8,9,10,0.96)_68%)]' />
+        <div className='absolute left-1/2 top-[10%] h-[24rem] w-[24rem] -translate-x-1/2 rounded-full bg-accent/8 blur-[140px] sm:h-[28rem] sm:w-[28rem]' />
       </div>
 
       {/* Skip to main content link for keyboard users */}
@@ -178,7 +133,7 @@ export function AuthLayout({
         {/* Logo container - inside form wrapper so it centers relative to the Clerk card */}
         <div
           className={cn(
-            'mb-6 h-8 w-8 flex items-center justify-center sm:mb-8',
+            'mb-6 h-6 w-6 flex items-center justify-center sm:mb-8',
             'transition-opacity duration-200 ease-out',
             // Hide visually when keyboard visible or showLogo=false, but preserve space
             (isKeyboardVisible || !showLogo) && 'opacity-0 pointer-events-none'
@@ -191,14 +146,8 @@ export function AuthLayout({
             aria-label='Go to homepage'
             tabIndex={isKeyboardVisible || !showLogo ? -1 : undefined}
           >
-            <span
-              className={
-                shouldSpinLogo
-                  ? 'inline-flex animate-[pulse_1.5s_ease-in-out_1] motion-reduce:animate-none'
-                  : 'inline-flex'
-              }
-            >
-              <BrandLogo size={32} tone='auto' />
+            <span className='inline-flex'>
+              <BrandLogo size={24} tone='auto' />
             </span>
           </Link>
         </div>

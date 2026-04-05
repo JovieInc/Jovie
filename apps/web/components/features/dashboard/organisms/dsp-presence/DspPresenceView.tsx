@@ -13,6 +13,7 @@ import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useDspEnrichmentStatusQuery } from '@/lib/queries/useDspEnrichmentStatusQuery';
 import { AddPlatformDialog } from './AddPlatformDialog';
+import { CatalogHealthSection } from './CatalogHealthSection';
 import { DspPresenceEmptyState } from './DspPresenceEmptyState';
 import { DspPresenceSidebar } from './DspPresenceSidebar';
 import { DspPresenceSummary } from './DspPresenceSummary';
@@ -24,9 +25,13 @@ import { DspPresenceTable } from './DspPresenceTable';
 
 interface DspPresenceViewProps {
   readonly data: DspPresenceData;
+  readonly hasUnresolvedMismatches?: boolean;
 }
 
-export function DspPresenceView({ data }: DspPresenceViewProps) {
+export function DspPresenceView({
+  data,
+  hasUnresolvedMismatches = false,
+}: DspPresenceViewProps) {
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [isAddPlatformDialogOpen, setIsAddPlatformDialogOpen] = useState(false);
   const dashboardData = useDashboardData();
@@ -158,6 +163,11 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
             items={data.items}
             selectedMatchId={selectedMatchId}
             onRowSelect={handleRowSelect}
+          />
+          <CatalogHealthSection
+            profileId={profileId}
+            spotifyId={spotifyId}
+            hasUnresolvedMismatches={hasUnresolvedMismatches}
           />
         </div>
       </div>

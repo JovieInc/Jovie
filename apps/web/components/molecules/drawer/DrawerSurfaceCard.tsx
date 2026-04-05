@@ -36,11 +36,9 @@ export function DrawerSurfaceCard({
       data-variant={variant}
       data-surface-variant={variant}
       className={cn(
-        variant === 'card'
-          ? DRAWER_SURFACE_CARD_CLASSNAME
-          : variant === 'quiet'
-            ? DRAWER_SURFACE_QUIET_CARD_CLASSNAME
-            : 'border-0 bg-transparent shadow-none',
+        variant === 'quiet'
+          ? DRAWER_SURFACE_QUIET_CARD_CLASSNAME
+          : 'border-0 bg-transparent shadow-none',
         className
       )}
     >

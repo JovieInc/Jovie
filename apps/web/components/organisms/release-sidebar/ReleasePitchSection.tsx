@@ -1,6 +1,7 @@
 'use client';
 
 import { Check, Copy, Sparkles } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer';
@@ -12,6 +13,33 @@ import {
   type PlatformKey,
 } from '@/lib/services/pitch/types';
 import { cn } from '@/lib/utils';
+
+function useTypewriter(text: string, active: boolean, speed = 12) {
+  const [displayed, setDisplayed] = useState(active ? '' : text);
+  const indexRef = useRef(0);
+
+  useEffect(() => {
+    if (!active) {
+      setDisplayed(text);
+      return;
+    }
+    indexRef.current = 0;
+    setDisplayed('');
+    const interval = setInterval(() => {
+      indexRef.current += 1;
+      if (indexRef.current >= text.length) {
+        setDisplayed(text);
+        clearInterval(interval);
+      } else {
+        setDisplayed(text.slice(0, indexRef.current));
+      }
+    }, speed);
+    return () => clearInterval(interval);
+  }, [text, active, speed]);
+
+  const isTyping = active && displayed.length < text.length;
+  return { displayed, isTyping };
+}
 
 const PLATFORM_CONFIG = [
   {
@@ -96,6 +124,7 @@ export function ReleasePitchSection({
   );
   const [selectedPlatform, setSelectedPlatform] =
     useState<PlatformKey>('spotify');
+  const [isNewGeneration, setIsNewGeneration] = useState(false);
   const tabsRef = useRef<HTMLDivElement>(null);
 
   // Sync with external data
@@ -109,6 +138,7 @@ export function ReleasePitchSection({
     mutate(releaseId, {
       onSuccess: data => {
         setPitches(data);
+        setIsNewGeneration(true);
         onPitchesGenerated?.(data);
         toast.success('Pitches generated');
       },
@@ -146,6 +176,26 @@ export function ReleasePitchSection({
   const tabId = `pitch-tab-${selectedPlatform}`;
   const panelId = `pitch-panel-${selectedPlatform}`;
 
+  const { displayed: typewriterText, isTyping } = useTypewriter(
+    activeText,
+    isNewGeneration && activeText.length > 0
+  );
+
+  // Clear new-generation flag once all platforms have been viewed or typing finishes
+  useEffect(() => {
+    if (
+      isNewGeneration &&
+      !isTyping &&
+      typewriterText === activeText &&
+      activeText.length > 0
+    ) {
+      // Keep flag active so switching tabs also animates
+      // Clear after a generous timeout
+      const timeout = setTimeout(() => setIsNewGeneration(false), 30_000);
+      return () => clearTimeout(timeout);
+    }
+  }, [isNewGeneration, isTyping, typewriterText, activeText]);
+
   return (
     <DrawerSurfaceCard
       className={cn(LINEAR_SURFACE.drawerCardSm, 'space-y-2.5 p-3')}
@@ -153,12 +203,25 @@ export function ReleasePitchSection({
     >
       <div className='flex items-center justify-between'>
         <div className='flex items-center gap-1.5'>
-          <Sparkles className='h-3.5 w-3.5 text-tertiary-token' />
+          {isTyping ? (
+            <motion.div
+              animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.2, 1] }}
+              transition={{
+                duration: 0.6,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }}
+            >
+              <Sparkles className='h-3.5 w-3.5 text-purple-500' />
+            </motion.div>
+          ) : (
+            <Sparkles className='h-3.5 w-3.5 text-tertiary-token' />
+          )}
           <span className='text-[11px] font-medium text-secondary-token'>
             Playlist Pitches
           </span>
         </div>
-        {pitches && activeText && (
+        {pitches && activeText && !isTyping && (
           <CopyButton text={activeText} platform={activeConfig.label} />
         )}
       </div>
@@ -181,7 +244,14 @@ export function ReleasePitchSection({
           >
             {activeText ? (
               <p className='pr-12 text-[12px] leading-relaxed text-primary-token'>
-                {activeText}
+                {typewriterText}
+                {isTyping && (
+                  <motion.span
+                    className='inline-block ml-0.5 w-[2px] h-[14px] bg-purple-500 align-text-bottom'
+                    animate={{ opacity: [1, 0] }}
+                    transition={{ duration: 0.5, repeat: Infinity }}
+                  />
+                )}
               </p>
             ) : (
               <p className='py-2 text-center text-[11px] text-tertiary-token'>
@@ -199,7 +269,7 @@ export function ReleasePitchSection({
         )}
 
         {/* Character count */}
-        {!isPending && pitches && activeText && (
+        {!isPending && pitches && activeText && !isTyping && (
           <span
             className={cn(
               'absolute bottom-2 right-2.5 text-[10px] tabular-nums',

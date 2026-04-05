@@ -42,7 +42,6 @@ import { useCodeFlag } from '@/lib/feature-flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import { ProfileSwitcher } from './ProfileSwitcher';
-import { NowPlayingCard } from './sidebar/NowPlayingCard';
 
 export interface UnifiedSidebarProps {
   readonly section: 'admin' | 'dashboard' | 'settings';
@@ -356,9 +355,6 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
 
       {isInSettings ? null : (
         <div className='mt-auto shrink-0'>
-          <div className='px-2 pb-1'>
-            <NowPlayingCard />
-          </div>
           {isDemoRoute ? null : <SidebarUpgradeBanner />}
           <SidebarInstallBanner />
 
