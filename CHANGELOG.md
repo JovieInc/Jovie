@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.119] - 2026-04-05
+
+### Changed
+
+- Unified all pricing constants into a single source of truth (`lib/config/plan-prices.ts`)
+- Billing, marketing, and upgrade flows now derive prices from one shared file instead of maintaining independent copies
+- Added `toCents()` helper with `Math.round` for safe dollar-to-cent conversion
+
+### Added
+
+- Pricing invariant tests (tier ordering, annual discount, float safety)
+
 ## [26.4.118] - 2026-04-05
 
 > Admin tables cleaned up: fewer redundant badges, visible checkboxes, always-on search. Public profile pages now fit the mobile viewport.
