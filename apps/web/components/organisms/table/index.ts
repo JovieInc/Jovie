@@ -214,11 +214,17 @@ export { useTableState } from './hooks/useTableState';
 // Utilities & Hooks
 // =============================================================================
 
+export { createMultiFieldFilterFn } from './utils/createMultiFieldFilterFn';
 export type {
   SelectionColumnOptions,
   SelectionColumnRenderers,
 } from './utils/createSelectionColumnFactory';
 export { createSelectionColumnFactory } from './utils/createSelectionColumnFactory';
+export {
+  isFormElement,
+  resolveTableNavAction,
+  type TableNavAction,
+} from './utils/tableKeyMap';
 export { useTableGrouping } from './utils/useTableGrouping';
 
 // =============================================================================

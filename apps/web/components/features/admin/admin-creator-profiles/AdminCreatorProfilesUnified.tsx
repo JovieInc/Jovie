@@ -14,6 +14,7 @@ import dynamic from 'next/dynamic';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   convertToCommonDropdownItems,
+  createMultiFieldFilterFn,
   ExportCSVButton,
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -77,7 +78,8 @@ export function AdminCreatorProfilesUnified({
   search,
   sort,
   mode: _mode = 'admin',
-}: Readonly<AdminCreatorProfilesWithSidebarProps>) {
+  clientFilter,
+}: Readonly<AdminCreatorProfilesWithSidebarProps & { clientFilter?: string }>) {
   const { profiles, toggleVerification } =
     useCreatorVerification(initialProfiles);
 
@@ -109,13 +111,26 @@ export function AdminCreatorProfilesUnified({
     clearInviteProfile,
   } = useDialogState();
 
+  // Load all data without server-side search — filter client-side instead
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useAdminCreatorsInfiniteQuery({
       sort,
-      search,
+      search: '',
       pageSize,
       initialData: { rows: profilesWithActions, total },
     });
+
+  // Client-side filter searches across username, display name, and bio
+  const creatorFilterFn = useMemo(
+    () =>
+      createMultiFieldFilterFn<AdminCreatorProfileRow>([
+        r => r.username,
+        r => r.displayName,
+        r => r.bio,
+        r => r.location,
+      ]),
+    []
+  );
 
   const filteredProfiles = useMemo(
     () => data?.pages.flatMap(page => page.rows) ?? profilesWithActions,
@@ -471,6 +486,9 @@ export function AdminCreatorProfilesUnified({
               data={filteredProfiles}
               columns={columns}
               isLoading={false}
+              globalFilter={clientFilter ?? ''}
+              enableFiltering={Boolean(clientFilter !== undefined)}
+              globalFilterFn={creatorFilterFn}
               emptyState={
                 <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
                   <UserCircle2 className='h-6 w-6' />

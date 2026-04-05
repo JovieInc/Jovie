@@ -5,6 +5,14 @@ import { OutreachOverviewPanel } from '@/components/features/admin/outreach/Outr
 import { LeadTable } from '@/features/admin/leads/LeadTable';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
+vi.mock('@/components/molecules/HeaderSearchAction', () => ({
+  HeaderSearchAction: () => <input data-testid='search-input' />,
+}));
+
+vi.mock('@/hooks/useSearchUrlSync', () => ({
+  useSearchUrlSync: () => {},
+}));
+
 vi.mock('sonner', () => ({
   toast: {
     error: vi.fn(),

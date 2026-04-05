@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.124] - 2026-04-05
+
+### Changed
+
+- Table search now filters instantly on the client instead of round-tripping to the server with skeleton loaders
+- All admin tables (users, creators, releases, leads) use the same search pattern: HeaderSearchAction + TanStack Table globalFilter
+- Keyboard navigation (j/k, arrows, Home/End) now shares a single key map across all tables and the tasks view
+- Admin infinite queries keep previous data visible during refetch instead of flashing skeletons
+
+### Removed
+
+- Unused admin TableSearchBar duplicate
+- Server-side search round-trips from admin table search inputs
+
 ## [26.4.123] - 2026-04-05
 
 ### Fixed

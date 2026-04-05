@@ -37,8 +37,13 @@ vi.mock('@/features/admin/table/AdminTableShell', () => ({
   ),
 }));
 
+vi.mock('@/hooks/useSearchUrlSync', () => ({
+  useSearchUrlSync: () => {},
+}));
+
 vi.mock('@/components/organisms/table', () => ({
   convertContextMenuItems: () => [],
+  createMultiFieldFilterFn: () => () => true,
   ExportCSVButton: () => <button type='button'>Export</button>,
   PAGE_TOOLBAR_END_GROUP_CLASS: 'page-toolbar-end-group',
   PAGE_TOOLBAR_META_TEXT_CLASS: 'page-toolbar-meta-text',

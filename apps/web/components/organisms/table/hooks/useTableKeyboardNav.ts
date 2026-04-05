@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { resolveTableNavAction } from '../utils/tableKeyMap';
 
 export interface UseTableKeyboardNavProps {
   readonly rowCount: number;
@@ -17,23 +18,10 @@ export interface UseTableKeyboardNavReturn {
 }
 
 /**
- * Hook for managing keyboard navigation in tables
+ * Alternative keyboard nav hook with internal focus state.
  *
- * Supports:
- * - Arrow Up/Down: Navigate between rows
- * - Spacebar: Toggle row selection (if selectable)
- * - Enter: Activate row (open sidebar/drawer)
- * - Home/End: Jump to first/last row
- * - Escape: Handled by parent (close sidebar)
- *
- * @example
- * ```tsx
- * const { focusedIndex, handleKeyDown } = useTableKeyboardNav({
- *   rowCount: data.length,
- *   onRowActivate: (index) => setSelectedRow(data[index]),
- *   onRowSelect: (index) => toggleRowSelection(data[index].id),
- * });
- * ```
+ * Uses the shared tableKeyMap for consistent key bindings.
+ * Prefer UnifiedTable's built-in keyboard nav where possible.
  */
 export function useTableKeyboardNav({
   rowCount,
@@ -48,46 +36,46 @@ export function useTableKeyboardNav({
     (e: React.KeyboardEvent) => {
       if (!enabled) return;
 
-      switch (e.key) {
-        case 'ArrowDown':
+      const action = resolveTableNavAction(e.key, e.target);
+      if (!action) return;
+
+      switch (action) {
+        case 'next':
           e.preventDefault();
           setFocusedIndex(prev => Math.min(prev + 1, rowCount - 1));
           break;
 
-        case 'ArrowUp':
+        case 'prev':
           e.preventDefault();
           setFocusedIndex(prev => Math.max(prev - 1, 0));
           break;
 
-        case 'Enter':
+        case 'first':
+          e.preventDefault();
+          setFocusedIndex(0);
+          break;
+
+        case 'last':
+          e.preventDefault();
+          setFocusedIndex(rowCount - 1);
+          break;
+
+        case 'activate':
           e.preventDefault();
           if (focusedIndex >= 0 && focusedIndex < rowCount) {
             onRowActivate(focusedIndex);
           }
           break;
 
-        case ' ':
+        case 'toggle':
           e.preventDefault();
           if (onRowSelect && focusedIndex >= 0 && focusedIndex < rowCount) {
             onRowSelect(focusedIndex);
           }
           break;
 
-        case 'Home':
-          e.preventDefault();
-          setFocusedIndex(0);
-          break;
-
-        case 'End':
-          e.preventDefault();
-          setFocusedIndex(rowCount - 1);
-          break;
-
-        case 'Escape':
+        case 'close':
           // Let parent handle closing sidebar/drawer
-          break;
-
-        default:
           break;
       }
     },

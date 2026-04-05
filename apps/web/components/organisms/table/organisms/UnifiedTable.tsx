@@ -3,6 +3,7 @@
 import {
   type ColumnDef,
   type ColumnPinningState,
+  type FilterFn,
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
@@ -214,6 +215,13 @@ export interface UnifiedTableProps<TData> {
   readonly enableFiltering?: boolean;
 
   /**
+   * Custom global filter function for client-side search.
+   * Defaults to TanStack Table's built-in 'includesString'.
+   * Use createMultiFieldFilterFn() to search across non-column fields.
+   */
+  readonly globalFilterFn?: FilterFn<TData>;
+
+  /**
    * Column pinning configuration
    * Pin columns to left or right edges so they're always visible when scrolling
    * @example { left: ['select'], right: ['actions'] }
@@ -351,6 +359,7 @@ export function UnifiedTable<TData>({
   globalFilter,
   onGlobalFilterChange,
   enableFiltering = false,
+  globalFilterFn: globalFilterFnProp,
   columnPinning,
   enablePinning = false,
   columnVisibility,
@@ -441,7 +450,7 @@ export function UnifiedTable<TData>({
     enableRowSelection: !!onRowSelectionChange,
     enableGlobalFilter: enableFiltering,
     enableColumnPinning: enablePinning,
-    globalFilterFn: 'includesString',
+    globalFilterFn: globalFilterFnProp ?? 'includesString',
   });
 
   const { rows } = table.getRowModel();
