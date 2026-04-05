@@ -10,13 +10,13 @@ import type {
 import { DspPresenceView } from '@/features/dashboard/organisms/dsp-presence/DspPresenceView';
 
 const {
-  mockRefresh,
+  mockInvalidateQueries,
   mockSetTableMeta,
   mockUseDashboardData,
   mockUseDspEnrichmentStatusQuery,
   mockUseRegisterRightPanel,
 } = vi.hoisted(() => ({
-  mockRefresh: vi.fn(),
+  mockInvalidateQueries: vi.fn(),
   mockSetTableMeta: vi.fn(),
   mockUseDashboardData: vi.fn(),
   mockUseDspEnrichmentStatusQuery: vi.fn(),
@@ -25,11 +25,15 @@ const {
 
 let latestOnComplete: (() => void) | undefined;
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    refresh: mockRefresh,
-  }),
-}));
+vi.mock('@tanstack/react-query', async () => {
+  const actual = await vi.importActual<object>('@tanstack/react-query');
+  return {
+    ...actual,
+    useQueryClient: () => ({
+      invalidateQueries: mockInvalidateQueries,
+    }),
+  };
+});
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: mockUseDashboardData,
@@ -253,7 +257,7 @@ describe('DspPresenceView', () => {
     expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).toBeNull();
   });
 
-  it('refreshes the route when enrichment completion callback fires', () => {
+  it('invalidates presence cache when enrichment completion callback fires', () => {
     renderView({
       items: [baseItem],
       confirmedCount: 0,
@@ -264,7 +268,7 @@ describe('DspPresenceView', () => {
       latestOnComplete?.();
     });
 
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(mockInvalidateQueries).toHaveBeenCalledTimes(1);
   });
 
   it('opens the add-platform dialog from the empty state CTA', async () => {

@@ -4,11 +4,13 @@ import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { dspCatalogMismatches } from '@/lib/db/schema/dsp-catalog-scan';
 import type { DspMatchConfidenceBreakdown } from '@/lib/db/schema/dsp-enrichment';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import type { DspMatchStatus, DspProviderId } from '@/lib/dsp-enrichment/types';
 import { PROVIDER_DOMAINS } from '@/lib/dsp-registry';
 import { captureError } from '@/lib/error-tracking';
@@ -99,6 +101,22 @@ function buildDspPresenceData(
 export async function loadDspPresenceForProfile(
   profileId: string
 ): Promise<DspPresenceData> {
+  // Verify the caller owns this profile
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+  const [ownedProfile] = await db
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .where(
+      and(eq(creatorProfiles.id, profileId), eq(creatorProfiles.userId, userId))
+    )
+    .limit(1);
+  if (!ownedProfile) {
+    throw new Error('Profile not found');
+  }
+
   const matches = await dashboardQuery(
     () =>
       db

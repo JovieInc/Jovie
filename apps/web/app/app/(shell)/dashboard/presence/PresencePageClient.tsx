@@ -2,6 +2,7 @@
 
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { DspPresenceView } from '@/features/dashboard/organisms/dsp-presence/DspPresenceView';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { useDspPresenceQuery } from '@/lib/queries/useDspPresenceQuery';
 import PresenceLoading from './loading';
 
@@ -20,11 +21,21 @@ export function PresencePageClient() {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
 
-  const { data: presenceData, isLoading } = useDspPresenceQuery(profileId);
+  const {
+    data: presenceData,
+    isLoading,
+    isError,
+  } = useDspPresenceQuery(profileId);
 
   // Only show skeleton on cold load (no cached data at all)
   if (isLoading && !presenceData) {
     return <PresenceLoading />;
+  }
+
+  if (isError) {
+    return (
+      <PageErrorState message='Failed to load presence data. Please refresh the page.' />
+    );
   }
 
   if (!presenceData) return null;
