@@ -1,7 +1,7 @@
 'use client';
 
 import { Input } from '@jovie/ui';
-import { ArrowUp, Check, Mic, X } from 'lucide-react';
+import { ArrowUp, Check, Mic, Sparkles, X } from 'lucide-react';
 import React from 'react';
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -59,11 +59,17 @@ interface UniversalLinkInputUrlModeProps {
   readonly canSubmit?: boolean;
   readonly voiceInputEnabled?: boolean;
   readonly onVoiceInput?: () => void;
-  readonly isVoiceRecording?: boolean;
+  readonly dictationState?:
+    | 'idle'
+    | 'listening'
+    | 'processing'
+    | 'done'
+    | 'permission-error';
   readonly recordingDurationLabel?: string;
   readonly waveformLevels?: number[];
   readonly onCancelVoiceRecording?: () => void;
   readonly onSendVoiceRecording?: () => void;
+  readonly onDismissPermissionError?: () => void;
 }
 
 function VoiceRecordingWaveform({ levels }: { readonly levels: number[] }) {
@@ -101,11 +107,12 @@ export function UniversalLinkInputUrlMode({
   canSubmit = false,
   voiceInputEnabled = false,
   onVoiceInput,
-  isVoiceRecording = false,
+  dictationState = 'idle',
   recordingDurationLabel = '0:00',
   waveformLevels = [0.35, 0.55, 0.75, 0.5, 0.68, 0.4, 0.62],
   onCancelVoiceRecording,
   onSendVoiceRecording,
+  onDismissPermissionError,
 }: UniversalLinkInputUrlModeProps) {
   const brandColor = detectedLink?.platform.color
     ? `#${detectedLink.platform.color}`
@@ -117,134 +124,190 @@ export function UniversalLinkInputUrlMode({
   const iconColor = useWhiteIcon ? '#ffffff' : brandColor;
   const iconBg = isDarkBrand ? 'rgba(255,255,255,0.08)' : `${brandColor}15`;
 
+  const isDictationOpen = dictationState !== 'idle';
+  const keyboardHint = '⌘/Ctrl + Shift + M';
+
   return (
     <div className='relative w-full'>
-      {isVoiceRecording ? (
-        <div className='flex w-full items-center gap-2 rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2 py-1'>
+      <div
+        className={cn(
+          'relative flex w-full items-center gap-2 overflow-hidden bg-(--linear-app-content-surface) px-2 py-1 transition-all',
+          isDropdownOpen
+            ? 'rounded-t-[12px] border-2 border-b-0 border-accent'
+            : 'rounded-[12px] border border-(--linear-app-frame-seam) focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
+          disabled && 'opacity-50'
+        )}
+      >
+        <UniversalLinkInputPlatformSelector
+          onPlatformSelect={onPlatformSelect}
+          onArtistSearchSelect={onArtistSearchSelect}
+          onRestoreFocus={onRestoreFocus}
+          disabled={disabled}
+        />
+
+        <label htmlFor='link-url-input' className='sr-only'>
+          Link URL
+        </label>
+        <Input
+          ref={inputRef as React.RefObject<HTMLInputElement>}
+          id='link-url-input'
+          type='url'
+          inputSize='lg'
+          placeholder={placeholder}
+          value={url}
+          onChange={event => onUrlChange(event.target.value)}
+          onKeyDown={onKeyDown}
+          onPaste={onPaste}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          disabled={disabled}
+          inputMode='url'
+          autoCapitalize='none'
+          autoCorrect='off'
+          autoComplete='off'
+          className='border-0 bg-transparent px-0 pr-2 focus-visible:ring-0 focus-visible:ring-offset-0'
+          aria-describedby={detectedLink ? 'link-detection-status' : undefined}
+          role={comboboxAria?.role}
+          aria-expanded={comboboxAria?.ariaExpanded}
+          aria-controls={comboboxAria?.ariaControls}
+          aria-activedescendant={comboboxAria?.ariaActivedescendant}
+          aria-autocomplete={comboboxAria?.ariaAutocomplete}
+        />
+
+        <div className='flex items-center gap-1 pr-1'>
+          {voiceInputEnabled && (
+            <button
+              type='button'
+              onClick={onVoiceInput}
+              className='flex h-10 w-10 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+              aria-label={
+                dictationState === 'listening'
+                  ? 'Stop voice input'
+                  : 'Start voice input'
+              }
+              aria-pressed={dictationState === 'listening'}
+              aria-keyshortcuts='Control+Shift+M Meta+Shift+M'
+            >
+              <Mic className='h-4 w-4' />
+            </button>
+          )}
+
+          {url && detectedLink && (
+            <div
+              className='flex h-8 w-8 items-center justify-center rounded-lg sm:h-6 sm:w-6 sm:rounded-full'
+              style={{
+                backgroundColor: iconBg,
+                color: iconColor,
+              }}
+              aria-hidden='true'
+            >
+              <SocialIcon
+                platform={detectedLink.platform.icon}
+                className='h-4 w-4 sm:h-3 sm:w-3'
+              />
+            </div>
+          )}
+
+          {url && (
+            <button
+              type='button'
+              onClick={onClear}
+              className='flex h-9 w-9 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+              aria-label='Clear input'
+            >
+              <X className='h-4 w-4' />
+            </button>
+          )}
+
           <button
             type='button'
-            onClick={onCancelVoiceRecording}
-            className='flex h-10 w-10 items-center justify-center rounded-[10px] text-tertiary-token transition-colors hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
-            aria-label='Cancel voice recording'
+            onClick={onSubmit}
+            disabled={disabled || !canSubmit}
+            className='flex h-10 w-10 items-center justify-center rounded-full bg-secondary-token text-primary-inverse transition-all hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-45 active:scale-95'
+            aria-label='Submit'
           >
-            <X className='h-4 w-4' />
-          </button>
-
-          <div className='flex min-w-0 flex-1 items-center justify-center gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2'>
-            <VoiceRecordingWaveform levels={waveformLevels} />
-            <span className='text-sm font-medium tabular-nums text-primary-token'>
-              {recordingDurationLabel}
-            </span>
-          </div>
-
-          <button
-            type='button'
-            onClick={onSendVoiceRecording}
-            className='flex h-10 w-10 items-center justify-center rounded-[10px] bg-secondary-token text-primary-inverse transition-all hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
-            aria-label='Send voice recording'
-          >
-            <Check className='h-4 w-4' />
+            <ArrowUp className='h-4 w-4' />
           </button>
         </div>
-      ) : (
-        <div
-          className={cn(
-            'relative flex w-full items-center gap-2 overflow-hidden bg-(--linear-app-content-surface) px-2 py-1 transition-all',
-            isDropdownOpen
-              ? 'rounded-t-[12px] border-2 border-b-0 border-accent'
-              : 'rounded-[12px] border border-(--linear-app-frame-seam) focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
-            disabled && 'opacity-50'
-          )}
-        >
-          <UniversalLinkInputPlatformSelector
-            onPlatformSelect={onPlatformSelect}
-            onArtistSearchSelect={onArtistSearchSelect}
-            onRestoreFocus={onRestoreFocus}
-            disabled={disabled}
-          />
+      </div>
 
-          <label htmlFor='link-url-input' className='sr-only'>
-            Link URL
-          </label>
-          <Input
-            ref={inputRef as React.RefObject<HTMLInputElement>}
-            id='link-url-input'
-            type='url'
-            inputSize='lg'
-            placeholder={placeholder}
-            value={url}
-            onChange={event => onUrlChange(event.target.value)}
-            onKeyDown={onKeyDown}
-            onPaste={onPaste}
-            onFocus={onFocus}
-            onBlur={onBlur}
-            disabled={disabled}
-            inputMode='url'
-            autoCapitalize='none'
-            autoCorrect='off'
-            autoComplete='off'
-            className='border-0 bg-transparent px-0 pr-2 focus-visible:ring-0 focus-visible:ring-offset-0'
-            aria-describedby={
-              detectedLink ? 'link-detection-status' : undefined
-            }
-            role={comboboxAria?.role}
-            aria-expanded={comboboxAria?.ariaExpanded}
-            aria-controls={comboboxAria?.ariaControls}
-            aria-activedescendant={comboboxAria?.ariaActivedescendant}
-            aria-autocomplete={comboboxAria?.ariaAutocomplete}
-          />
-
-          <div className='flex items-center gap-1 pr-1'>
-            {voiceInputEnabled && (
+      <section
+        className={cn(
+          'overflow-hidden transition-all duration-300 ease-out',
+          isDictationOpen
+            ? 'mt-2 max-h-48 translate-y-0 opacity-100'
+            : 'pointer-events-none max-h-0 -translate-y-1 opacity-0'
+        )}
+        aria-live='polite'
+      >
+        <div className='rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 py-2'>
+          {dictationState === 'listening' ? (
+            <div className='flex items-center gap-2'>
               <button
                 type='button'
-                onClick={onVoiceInput}
-                className='flex h-10 w-10 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
-                aria-label='Start voice input'
-              >
-                <Mic className='h-4 w-4' />
-              </button>
-            )}
-
-            {url && detectedLink && (
-              <div
-                className='flex h-8 w-8 items-center justify-center rounded-lg sm:h-6 sm:w-6 sm:rounded-full'
-                style={{
-                  backgroundColor: iconBg,
-                  color: iconColor,
-                }}
-                aria-hidden='true'
-              >
-                <SocialIcon
-                  platform={detectedLink.platform.icon}
-                  className='h-4 w-4 sm:h-3 sm:w-3'
-                />
-              </div>
-            )}
-
-            {url && (
-              <button
-                type='button'
-                onClick={onClear}
-                className='flex h-9 w-9 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
-                aria-label='Clear input'
+                onClick={onCancelVoiceRecording}
+                className='flex h-9 w-9 items-center justify-center rounded-[10px] text-tertiary-token transition-colors hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+                aria-label='Cancel voice recording'
               >
                 <X className='h-4 w-4' />
               </button>
-            )}
+              <div className='flex min-w-0 flex-1 items-center justify-between gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2'>
+                <div className='flex min-w-0 items-center gap-3'>
+                  <VoiceRecordingWaveform levels={waveformLevels} />
+                  <span className='truncate text-sm text-secondary-token'>
+                    Listening…
+                  </span>
+                </div>
+                <span className='text-sm font-medium tabular-nums text-primary-token'>
+                  {recordingDurationLabel}
+                </span>
+              </div>
+              <button
+                type='button'
+                onClick={onSendVoiceRecording}
+                className='flex h-9 w-9 items-center justify-center rounded-[10px] bg-secondary-token text-primary-inverse transition-all hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+                aria-label='Send voice recording'
+              >
+                <Check className='h-4 w-4' />
+              </button>
+            </div>
+          ) : null}
 
-            <button
-              type='button'
-              onClick={onSubmit}
-              disabled={disabled || !canSubmit}
-              className='flex h-10 w-10 items-center justify-center rounded-full bg-secondary-token text-primary-inverse transition-all hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-45 active:scale-95'
-              aria-label='Submit'
-            >
-              <ArrowUp className='h-4 w-4' />
-            </button>
-          </div>
+          {dictationState === 'processing' ? (
+            <div className='flex items-center gap-3 text-sm text-secondary-token'>
+              <Sparkles className='h-4 w-4 animate-pulse text-accent' />
+              Processing your dictation…
+            </div>
+          ) : null}
+
+          {dictationState === 'done' ? (
+            <div className='flex items-center gap-3 text-sm text-secondary-token'>
+              <Check className='h-4 w-4 text-accent' />
+              Dictation added to the composer.
+            </div>
+          ) : null}
+
+          {dictationState === 'permission-error' ? (
+            <div className='flex items-center justify-between gap-3'>
+              <p className='text-sm text-secondary-token'>
+                We could not access your microphone. Allow microphone access and
+                try again.
+              </p>
+              <button
+                type='button'
+                onClick={onDismissPermissionError}
+                className='rounded-md px-2 py-1 text-sm font-medium text-primary-token transition-colors hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+              >
+                Dismiss
+              </button>
+            </div>
+          ) : null}
+
+          {dictationState === 'listening' ? null : (
+            <p className='pt-2 text-xs text-tertiary-token'>{keyboardHint}</p>
+          )}
         </div>
-      )}
+      </section>
 
       <div id='link-detection-status' className='sr-only' aria-live='polite'>
         {getLinkDetectionStatus(detectedLink, url)}
