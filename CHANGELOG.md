@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.118] - 2026-04-05
+
+### Fixed
+
+- Public profile pages no longer scroll on mobile — viewport locks to screen height, hero image shrinks to fit
+
 ## [26.4.117] - 2026-04-05
 
 > The Growth admin page is now a self-driving pipeline dashboard. Pick a speed, watch the funnel, inspect leads if curious.
