@@ -104,6 +104,21 @@ export function applyLabels(prNumber: number, labels: readonly string[]) {
   );
 }
 
+export function enableAutoMerge(prNumber: number) {
+  assertRepoSuccess(
+    runRepoCommand([
+      'gh',
+      'pr',
+      'merge',
+      String(prNumber),
+      '--auto',
+      '--squash',
+      '--delete-branch',
+    ]),
+    `Failed to enable auto-merge for PR #${prNumber}.`
+  );
+}
+
 export function buildPrBody(params: {
   readonly issueSummary: string;
   readonly evidencePaths: readonly string[];
