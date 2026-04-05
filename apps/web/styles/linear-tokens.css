@@ -432,13 +432,13 @@
   --linear-app-content-surface: var(--linear-bg-surface-0);
   /* primary framed main-pane surface */
   --linear-app-card-shadow: none;
-  --linear-app-shell-border: rgba(255, 255, 255, 0.045);
-  --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.075);
-  --linear-app-frame-seam: rgba(255, 255, 255, 0.05);
+  --linear-app-shell-border: rgba(255, 255, 255, 0.03);
+  --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.055);
+  --linear-app-frame-seam: rgba(255, 255, 255, 0.035);
   --linear-app-shell-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.04), 0 14px 36px rgba(0, 0, 0, 0.24);
+    0 0 0 1px rgba(255, 255, 255, 0.025), 0 14px 36px rgba(0, 0, 0, 0.18);
   --linear-app-sidebar-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.025), 0 12px 28px rgba(0, 0, 0, 0.22);
+    0 0 0 1px rgba(255, 255, 255, 0.02), 0 12px 28px rgba(0, 0, 0, 0.16);
   --linear-app-drawer-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.042), 0 18px 42px rgba(0, 0, 0, 0.3);
   --linear-row-hover: rgba(255, 255, 255, 0.022);

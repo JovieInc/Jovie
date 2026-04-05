@@ -83,8 +83,9 @@ export function ProfileMenuActions({
         <CommonDropdown
           variant='dropdown'
           size='compact'
-          align='start'
+          align='end'
           side='bottom'
+          sideOffset={4}
           items={items}
         />
       </SidebarMenuAction>
