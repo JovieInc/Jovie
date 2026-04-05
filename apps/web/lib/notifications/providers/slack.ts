@@ -262,7 +262,7 @@ export async function notifySlackSmsAccessRequest(
         elements: [
           {
             type: 'mrkdwn',
-            text: `📧 ${email}  •  SMS subscribers: *${smsSubscriberCount}*  •  <${profileUrl}|View profile>`,
+            text: `📧 ${email}  •  SMS subscribers (pending confirmation): *${smsSubscriberCount}*  •  <${profileUrl}|View profile>`,
           },
         ],
       },

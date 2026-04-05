@@ -14,6 +14,9 @@ export function NotificationsPageClient({ artist }: Props) {
     artist,
     socialLinks: [],
     contacts: [],
+    // SMS gated to false here intentionally — this standalone page doesn't have
+    // access to creatorIsPro (resolved server-side in the profile page). Thread
+    // the Pro flag from the server component when SMS sending goes live.
     smsEnabled: false,
   });
 

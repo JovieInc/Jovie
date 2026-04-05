@@ -616,8 +616,10 @@ export const subscribeToNotificationsDomain = async (
       );
     }
 
-    // US-only guard for SMS channel
-    if (channel === 'sms' && country_code && country_code !== 'US') {
+    // US-only guard for SMS channel (use server-resolved countryCode from IP headers,
+    // not client-supplied country_code which can be omitted or spoofed)
+    const effectiveCountry = countryCode ?? country_code ?? null;
+    if (channel === 'sms' && effectiveCountry && effectiveCountry !== 'US') {
       await trackSubscribeError({
         artist_id,
         error_type: 'sms_us_only',
