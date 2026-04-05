@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useInstantiateTasksMutation,
   useTaskToggleMutation,
@@ -71,6 +72,23 @@ export function ReleaseTaskChecklist({
   const instantiate = useInstantiateTasksMutation(releaseId);
   const toggle = useTaskToggleMutation(releaseId);
 
+  // Track whether we just generated tasks (empty → populated transition)
+  const wasEmpty = useRef(true);
+  const [animateEntrance, setAnimateEntrance] = useState(false);
+
+  useEffect(() => {
+    if (tasks && tasks.length > 0 && wasEmpty.current) {
+      wasEmpty.current = false;
+      setAnimateEntrance(true);
+      // Clear animation flag after all tasks have animated in
+      const timeout = setTimeout(() => setAnimateEntrance(false), 3000);
+      return () => clearTimeout(timeout);
+    }
+    if (!tasks || tasks.length === 0) {
+      wasEmpty.current = true;
+    }
+  }, [tasks]);
+
   const groups = useMemo(
     () => (tasks ? groupByCategory(tasks) : new Map()),
     [tasks]
@@ -134,6 +152,8 @@ export function ReleaseTaskChecklist({
     );
   }
 
+  const groupEntries = Array.from(groups.entries());
+
   return (
     <div
       className={cn(
@@ -143,23 +163,30 @@ export function ReleaseTaskChecklist({
       data-testid={isCompact ? undefined : 'release-task-checklist'}
     >
       {/* Progress bar + optional link to full page */}
-      <div className='flex shrink-0 items-center gap-2 px-4 py-2'>
-        <ReleaseTaskProgressBar
-          done={totalDone}
-          total={totalTasks}
-          overdueCount={overdueCount}
-          className='flex-1'
-        />
-        {variant === 'compact' && onNavigateToFullPage && (
-          <button
-            type='button'
-            onClick={onNavigateToFullPage}
-            className='flex-shrink-0 text-[10px] text-[var(--linear-accent,#5e6ad2)] hover:underline'
-          >
-            Open &rarr;
-          </button>
-        )}
-      </div>
+      <AnimatePresence>
+        <motion.div
+          className='flex shrink-0 items-center gap-2 px-4 py-2'
+          initial={animateEntrance ? { opacity: 0, y: -8 } : false}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <ReleaseTaskProgressBar
+            done={totalDone}
+            total={totalTasks}
+            overdueCount={overdueCount}
+            className='flex-1'
+          />
+          {variant === 'compact' && onNavigateToFullPage && (
+            <button
+              type='button'
+              onClick={onNavigateToFullPage}
+              className='flex-shrink-0 text-[10px] text-[var(--linear-accent,#5e6ad2)] hover:underline'
+            >
+              Open &rarr;
+            </button>
+          )}
+        </motion.div>
+      </AnimatePresence>
 
       {/* Category groups */}
       <div
@@ -169,32 +196,67 @@ export function ReleaseTaskChecklist({
         }
         data-scroll-mode={isCompact ? 'internal' : undefined}
       >
-        {Array.from(groups.entries()).map(([category, group]) => (
-          <ReleaseTaskCategoryGroup
-            key={category}
-            category={category}
-            done={group.done}
-            total={group.total}
-            allDone={group.done === group.total}
-          >
-            {group.tasks.map((task: ReleaseTaskView) =>
-              variant === 'compact' ? (
-                <ReleaseTaskCompactRow
-                  key={task.id}
-                  task={task}
-                  onToggle={handleToggle}
-                  onNavigate={onNavigateToTask ?? (() => {})}
-                />
-              ) : (
-                <ReleaseTaskRow
-                  key={task.id}
-                  task={task}
-                  onToggle={handleToggle}
-                />
-              )
-            )}
-          </ReleaseTaskCategoryGroup>
-        ))}
+        {groupEntries.map(([category, group], groupIndex) => {
+          // Each group appears with a base delay proportional to its position
+          const groupDelay = animateEntrance ? groupIndex * 0.15 : 0;
+
+          return (
+            <motion.div
+              key={category}
+              initial={animateEntrance ? { opacity: 0, y: 12 } : false}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: 0.25,
+                delay: groupDelay,
+                ease: 'easeOut',
+              }}
+            >
+              <ReleaseTaskCategoryGroup
+                category={category}
+                done={group.done}
+                total={group.total}
+                allDone={group.done === group.total}
+              >
+                {group.tasks.map((task: ReleaseTaskView, taskIndex: number) => {
+                  const taskDelay = animateEntrance
+                    ? groupDelay + 0.08 + taskIndex * 0.04
+                    : 0;
+
+                  return (
+                    <motion.div
+                      key={task.id}
+                      initial={
+                        animateEntrance
+                          ? { opacity: 0, x: -16, filter: 'blur(4px)' }
+                          : false
+                      }
+                      animate={{
+                        opacity: 1,
+                        x: 0,
+                        filter: 'blur(0px)',
+                      }}
+                      transition={{
+                        duration: 0.25,
+                        delay: taskDelay,
+                        ease: 'easeOut',
+                      }}
+                    >
+                      {variant === 'compact' ? (
+                        <ReleaseTaskCompactRow
+                          task={task}
+                          onToggle={handleToggle}
+                          onNavigate={onNavigateToTask ?? (() => {})}
+                        />
+                      ) : (
+                        <ReleaseTaskRow task={task} onToggle={handleToggle} />
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </ReleaseTaskCategoryGroup>
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );
