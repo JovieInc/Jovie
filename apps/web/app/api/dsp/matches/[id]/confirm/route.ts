@@ -14,8 +14,10 @@ import { getCachedAuth } from '@/lib/auth/cached';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { dspCatalogScans } from '@/lib/db/schema/dsp-catalog-scan';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { processCatalogScanStandalone } from '@/lib/dsp-enrichment/jobs/catalog-scan';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { enqueueDspTrackEnrichmentJob } from '@/lib/ingestion/jobs';
 
@@ -149,6 +151,46 @@ export async function POST(
         await captureWarning(
           'Failed to enqueue track enrichment job after match confirmation',
           enrichmentError,
+          { route: '/api/dsp/matches/[id]/confirm', matchId, profileId }
+        );
+      }
+    }
+
+    // Auto-trigger catalog scan for Spotify matches (first scan only)
+    if (match.providerId === 'spotify' && match.externalArtistId) {
+      try {
+        const [existingScan] = await db
+          .select({ id: dspCatalogScans.id })
+          .from(dspCatalogScans)
+          .where(eq(dspCatalogScans.creatorProfileId, profileId))
+          .limit(1);
+
+        if (!existingScan) {
+          const [newScan] = await db
+            .insert(dspCatalogScans)
+            .values({
+              creatorProfileId: profileId,
+              providerId: 'spotify',
+              externalArtistId: match.externalArtistId,
+              status: 'pending',
+            })
+            .returning({ id: dspCatalogScans.id });
+
+          void processCatalogScanStandalone({
+            creatorProfileId: profileId,
+            spotifyArtistId: match.externalArtistId,
+            scanId: newScan.id,
+          }).catch(scanErr => {
+            console.error(
+              '[catalog-scan] Auto-scan after match confirm failed:',
+              scanErr
+            );
+          });
+        }
+      } catch (autoScanError) {
+        await captureWarning(
+          'Failed to auto-trigger catalog scan after Spotify match confirm',
+          autoScanError,
           { route: '/api/dsp/matches/[id]/confirm', matchId, profileId }
         );
       }
