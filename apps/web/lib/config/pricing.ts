@@ -1,12 +1,13 @@
 import 'server-only';
 
 import { env } from '@/lib/env-server';
+import { PLAN_PRICES, toCents } from './plan-prices';
 
 export const PRICING = {
   pro: {
     monthly: {
       priceId: env.STRIPE_PRICE_PRO_MONTHLY,
-      amount: 2000,
+      amount: toCents(PLAN_PRICES.pro.monthly),
       label: 'Pro',
       entitlementPlan: 'pro',
       billingTier: 'pro',
@@ -14,7 +15,7 @@ export const PRICING = {
     },
     annual: {
       priceId: env.STRIPE_PRICE_PRO_ANNUAL || env.STRIPE_PRICE_PRO_YEARLY,
-      amount: 19200,
+      amount: toCents(PLAN_PRICES.pro.yearly),
       label: 'Pro Annual',
       entitlementPlan: 'pro',
       billingTier: 'pro',
@@ -24,7 +25,7 @@ export const PRICING = {
   max: {
     monthly: {
       priceId: env.STRIPE_PRICE_MAX_MONTHLY || env.STRIPE_PRICE_GROWTH_MONTHLY,
-      amount: 20000,
+      amount: toCents(PLAN_PRICES.max.monthly),
       label: 'Max Monthly',
       entitlementPlan: 'max',
       billingTier: 'max',
@@ -32,7 +33,7 @@ export const PRICING = {
     },
     annual: {
       priceId: env.STRIPE_PRICE_MAX_YEARLY || env.STRIPE_PRICE_GROWTH_YEARLY,
-      amount: 192000,
+      amount: toCents(PLAN_PRICES.max.yearly),
       label: 'Max Annual',
       entitlementPlan: 'max',
       billingTier: 'max',

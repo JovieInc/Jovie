@@ -60,7 +60,7 @@ export const ServerEnvSchema = z.object({
   STRIPE_WEBHOOK_SECRET_TIPS: z.string().optional(),
   TIP_PLATFORM_FEE_PERCENT: z.string().optional(),
 
-  // Stripe price IDs for Pro tier ($20/mo, $192/yr)
+  // Stripe price IDs for Pro tier (amounts in lib/config/plan-prices.ts)
   STRIPE_PRICE_PRO_MONTHLY: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_ANNUAL: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_YEARLY: z.string().startsWith('price_').optional(),
@@ -69,7 +69,7 @@ export const ServerEnvSchema = z.object({
   STRIPE_PRICE_GROWTH_MONTHLY: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_GROWTH_YEARLY: z.string().startsWith('price_').optional(),
 
-  // Stripe price IDs for Max tier ($200/mo, $1,920/yr)
+  // Stripe price IDs for Max tier (amounts in lib/config/plan-prices.ts)
   STRIPE_PRICE_MAX_MONTHLY: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_MAX_YEARLY: z.string().startsWith('price_').optional(),
   INGESTION_CRON_SECRET: z.string().optional(),
