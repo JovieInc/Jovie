@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.118] - 2026-04-05
 
+> Faster releases navigation and lighter loading placeholders improve perceived speed across all dashboard tables.
+
 ### Changed
 
 - Releases page now prefetches on hover so navigation feels instant
