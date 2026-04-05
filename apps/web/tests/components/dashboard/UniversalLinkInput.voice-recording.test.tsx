@@ -100,6 +100,44 @@ describe('UniversalLinkInput voice recording overlay', () => {
       screen.getByRole('button', { name: 'Send voice recording' })
     );
 
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
     expect(onChatSubmit).toHaveBeenCalledWith('[Voice message 0:02]');
+    expect(
+      screen.getByText('Dictation added to the composer.')
+    ).toBeInTheDocument();
+  });
+
+  it('shows permission state when microphone access is denied', async () => {
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockRejectedValue(new Error('denied')),
+      },
+    });
+
+    render(
+      <UniversalLinkInput
+        onAdd={vi.fn()}
+        voiceInputEnabled
+        chatEnabled
+        onChatSubmit={vi.fn()}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Start voice input' })
+      );
+      await Promise.resolve();
+    });
+
+    expect(
+      screen.getByText(
+        'We could not access your microphone. Allow microphone access and try again.'
+      )
+    ).toBeInTheDocument();
   });
 });
