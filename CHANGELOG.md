@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.117] - 2026-04-05
+
+> The Growth admin page is now a self-driving pipeline dashboard. Pick a speed, watch the funnel, inspect leads if curious.
+
+### Changed
+
+- Replaced the 4-tab Growth admin page (Leads/Outreach/Campaigns/Ingest) with a single-screen pipeline dashboard
+- Speed dial (Off/Test/Normal/Fast) replaces 15+ individual pipeline controls with one-click presets
+- Pipeline funnel visualization shows all-time status counts with drop-off percentages and 30-day conversion metrics
+- Lead table filter tabs now display status counts inline (e.g. "Qualified (145)")
+- Tools, advanced settings, and outreach/campaigns are tucked into three collapsible accordion sections
+- Backward-compatible deep links auto-open the corresponding accordion section
+
+### Fixed
+
+- Removed server-only import boundary violation in admin growth page collapsibles
+
 ## [26.4.116] - 2026-04-04
 
 > App shell layout, chat UX, and dark mode visual refinements to close the gap with Linear's polish.
