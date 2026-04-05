@@ -1,12 +1,8 @@
 import { and, eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
-import { APP_ROUTES } from '@/constants/routes';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { chatConversations } from '@/lib/db/schema/chat';
-import { getDashboardData } from '../../dashboard/actions';
-import { checkAppleMusicConnection } from '../../dashboard/releases/actions';
 import { DeferredChatPageClient } from '../DeferredChatPageClient';
 
 interface Props {
@@ -56,26 +52,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+/**
+ * Chat conversation page — zero server-side data dependencies.
+ *
+ * Previously called getDashboardData() + checkAppleMusicConnection() on every
+ * conversation switch, causing unnecessary server work. Now matches the base
+ * chat/page.tsx pattern: ChatPageClient reads isFirstSession from
+ * DashboardDataContext and defaults appleMusicConnected to false (hydrates
+ * client-side). The generateMetadata above handles the title DB query
+ * independently (doesn't block rendering).
+ */
 export default async function ChatConversationPage({ params }: Props) {
-  const dashboardData = await getDashboardData();
-
-  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-    redirect(APP_ROUTES.ONBOARDING);
-  }
-
-  const appleMusicResult = await checkAppleMusicConnection().catch(() => ({
-    connected: false,
-    artistName: null,
-    artistId: null,
-  }));
-
   const { id } = await params;
-  return (
-    <DeferredChatPageClient
-      conversationId={id}
-      isFirstSession={dashboardData.isFirstSession}
-      appleMusicConnected={appleMusicResult.connected}
-      appleMusicArtistName={appleMusicResult.artistName}
-    />
-  );
+  return <DeferredChatPageClient conversationId={id} />;
 }

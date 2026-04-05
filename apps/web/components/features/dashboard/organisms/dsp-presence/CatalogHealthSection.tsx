@@ -10,7 +10,6 @@ import {
   ScanSearch,
   XCircle,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MismatchCard } from './MismatchCard';
 import type { CatalogMismatch, CatalogScan } from './types';
@@ -39,7 +38,6 @@ export function CatalogHealthSection({
   spotifyId,
   hasUnresolvedMismatches,
 }: CatalogHealthSectionProps) {
-  const router = useRouter();
   const [isOpen, setIsOpen] = useState(hasUnresolvedMismatches);
   const [data, setData] = useState<ScanResultsData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -110,7 +108,6 @@ export function CatalogHealthSection({
             } else {
               hasLoadedRef.current = false;
               setIsOpen(true);
-              router.refresh();
               const resultsRes = await fetch(
                 `/api/dsp/catalog-scan/results?profileId=${profileId}`
               );
@@ -127,7 +124,7 @@ export function CatalogHealthSection({
       };
       poll();
     },
-    [profileId, router]
+    [profileId]
   );
 
   const triggerScan = useCallback(async () => {
