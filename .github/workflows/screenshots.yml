@@ -45,6 +45,8 @@ jobs:
       CLERK_SECRET_KEY: sk_test_mock
       NEXT_DISABLE_TOOLBAR: '1'
       NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+      E2E_USE_TEST_AUTH_BYPASS: '1'
+      E2E_CLERK_USER_ID: user_test
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
