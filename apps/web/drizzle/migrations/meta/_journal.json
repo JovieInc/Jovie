@@ -169,6 +169,13 @@
       "when": 1775340180216,
       "tag": "0023_good_zaladane",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1775361315784,
+      "tag": "0024_useful_namor",
+      "breakpoints": true
     }
   ]
 }

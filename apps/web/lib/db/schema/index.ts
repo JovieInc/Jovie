@@ -181,6 +181,19 @@ export {
   type NewDspBioSyncRequest,
   selectDspBioSyncRequestSchema,
 } from './dsp-bio-sync';
+// DSP Catalog Scan (Discography mismatch detection)
+export {
+  type DspCatalogMismatch,
+  type DspCatalogScan,
+  dspCatalogMismatches,
+  dspCatalogScans,
+  insertDspCatalogMismatchSchema,
+  insertDspCatalogScanSchema,
+  type NewDspCatalogMismatch,
+  type NewDspCatalogScan,
+  selectDspCatalogMismatchSchema,
+  selectDspCatalogScanSchema,
+} from './dsp-catalog-scan';
 // DSP Enrichment (Cross-platform matches, enrichment data)
 export {
   type DspArtistMatch,
@@ -233,6 +246,9 @@ export {
   audienceDeviceTypeEnum,
   audienceIntentLevelEnum,
   audienceMemberTypeEnum,
+  catalogMismatchStatusEnum,
+  catalogMismatchTypeEnum,
+  catalogScanStatusEnum,
   chatMessageRoleEnum,
   claimInviteStatusEnum,
   contactChannelEnum,
