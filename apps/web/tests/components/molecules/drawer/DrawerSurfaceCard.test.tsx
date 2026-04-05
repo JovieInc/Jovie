@@ -24,7 +24,7 @@ describe('DrawerSurfaceCard', () => {
     expect(className).toContain('shadow-none');
   });
 
-  it('applies the card styling when variant is card', () => {
+  it('applies flat styling when variant is card (no card-in-card nesting)', () => {
     render(
       <DrawerSurfaceCard testId='surface-card' variant='card'>
         Card
@@ -34,10 +34,9 @@ describe('DrawerSurfaceCard', () => {
     const className =
       screen.getByTestId('surface-card').getAttribute('class') ?? '';
 
-    expect(className).toContain('rounded-xl');
-    expect(className).toContain('border-(--linear-app-shell-border)');
-    expect(className).toContain('bg-surface-1');
-    expect(className).toContain('shadow-[');
+    expect(className).toContain('border-0');
+    expect(className).toContain('bg-transparent');
+    expect(className).toContain('shadow-none');
   });
 
   it('uses the quieter drawer treatment without adding floating shadows', () => {
@@ -53,10 +52,10 @@ describe('DrawerSurfaceCard', () => {
     );
   });
 
-  it('keeps elevated shadows scoped to floating sidebar and drawer surfaces', () => {
-    expect(LINEAR_SURFACE.drawerCard).toContain('shadow-[');
-    expect(LINEAR_SURFACE.drawerCardSm).toContain('shadow-[');
-    expect(LINEAR_SURFACE.sidebarCard).toContain('shadow-[');
+  it('keeps drawer and sidebar cards flat (same tier as content)', () => {
+    expect(LINEAR_SURFACE.drawerCard).toContain('shadow-none');
+    expect(LINEAR_SURFACE.drawerCardSm).toContain('shadow-none');
+    expect(LINEAR_SURFACE.sidebarCard).toContain('shadow-none');
 
     expect(LINEAR_SURFACE.contentContainer).toContain('shadow-none');
     expect(LINEAR_SURFACE.bannerCard).toContain('shadow-none');
@@ -64,14 +63,14 @@ describe('DrawerSurfaceCard', () => {
     expect(LINEAR_SURFACE.popover).toContain('shadow-[var(--shadow-popover)]');
   });
 
-  it('keeps drawer and sidebar cards on a higher elevation tier than main content containers', () => {
-    expect(LINEAR_SURFACE_TIER.drawerCard).toBeGreaterThan(
+  it('drawer and sidebar cards share the same elevation tier as content', () => {
+    expect(LINEAR_SURFACE_TIER.drawerCard).toBe(
       LINEAR_SURFACE_TIER.contentContainer
     );
-    expect(LINEAR_SURFACE_TIER.drawerCardSm).toBeGreaterThan(
+    expect(LINEAR_SURFACE_TIER.drawerCardSm).toBe(
       LINEAR_SURFACE_TIER.contentContainer
     );
-    expect(LINEAR_SURFACE_TIER.sidebarCard).toBeGreaterThan(
+    expect(LINEAR_SURFACE_TIER.sidebarCard).toBe(
       LINEAR_SURFACE_TIER.contentContainer
     );
   });

@@ -60,6 +60,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Merged Funnel, Status, and Lifecycle columns into a single Status column on the admin users table (12 to 10 columns)
 - Search fields on admin Users, Creators, and Releases pages are now always visible instead of hidden behind an icon
 
+### Added
+
+- Staggered cascade animation when generating a release plan: category groups fade in sequentially, tasks slide in from left with blur-to-sharp effect
+- Typewriter reveal for AI-generated playlist pitches with animated sparkle icon and blinking cursor
+- Platform tab switching re-triggers typewriter animation for each DSP pitch
+
 ### Fixed
 
 - Table checkboxes are now visible in their unchecked state (removed override that made borders nearly invisible)
