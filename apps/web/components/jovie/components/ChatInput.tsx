@@ -388,7 +388,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             'overflow-hidden border transition-[border-color,background-color,box-shadow] duration-normal',
             // Light mode: bright shell inset, dark mode: content surface
             'bg-[color-mix(in_oklab,white_94%,var(--linear-app-content-surface))] dark:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
-            'shadow-[0_1px_3px_-1px_rgba(15,23,42,0.08),0_1px_0_rgba(255,255,255,0.4)_inset] dark:shadow-[0_1px_3px_-1px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.04)]',
+            'shadow-[0_2px_8px_-2px_rgba(15,23,42,0.12),0_1px_0_rgba(255,255,255,0.4)_inset] dark:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.04)]',
             borderClass
           )}
           style={reducedMotion ? { borderRadius, boxShadow } : { borderRadius }}
