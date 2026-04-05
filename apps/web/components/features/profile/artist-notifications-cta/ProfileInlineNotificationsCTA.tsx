@@ -130,10 +130,17 @@ export function ProfileInlineNotificationsCTA({
   const isAlreadySubscribed =
     notificationsState === 'success' && hasSubscriptions;
 
-  // If already subscribed on mount, skip to done
+  // Sync step with subscription state
   useEffect(() => {
-    if (isAlreadySubscribed && step === 'cta') {
-      setStep('done');
+    if (isAlreadySubscribed) {
+      if (step === 'cta') {
+        setStep('done');
+      }
+      return;
+    }
+    // Reset to CTA when unsubscribed (e.g. via ellipsis menu)
+    if (step === 'done') {
+      setStep('cta');
     }
   }, [isAlreadySubscribed, step]);
 

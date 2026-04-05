@@ -181,15 +181,16 @@ export function ProfileCompactTemplate({
     return new URLSearchParams(globalThis.location.search).get('source');
   }, []);
 
-  const { notificationsContextValue } = useProfileShell({
-    artist,
-    socialLinks,
-    viewerCountryCode,
-    contacts,
-    visitTrackingToken,
-    modeOverride: mode,
-    sourceOverride: initialSource,
-  });
+  const { notificationsContextValue, notificationsController } =
+    useProfileShell({
+      artist,
+      socialLinks,
+      viewerCountryCode,
+      contacts,
+      visitTrackingToken,
+      modeOverride: mode,
+      sourceOverride: initialSource,
+    });
 
   const isSubscribed = Boolean(
     notificationsContextValue.subscribedChannels.email ||
@@ -197,15 +198,35 @@ export function ProfileCompactTemplate({
   );
   const subscriberEmail =
     notificationsContextValue.subscriptionDetails?.email ?? '';
+  const subscriberPhone =
+    notificationsContextValue.subscriptionDetails?.sms ?? '';
+  const subscribedViaEmail = Boolean(
+    notificationsContextValue.subscribedChannels.email
+  );
 
+  // Hydrate content preferences from server state
+  const serverPrefs = notificationsController.contentPreferences;
   const [contentPrefs, setContentPrefs] = useState<
     Record<NotificationContentType, boolean>
   >({
-    newMusic: true,
-    tourDates: true,
-    merch: true,
-    general: true,
+    newMusic: serverPrefs?.newMusic ?? true,
+    tourDates: serverPrefs?.tourDates ?? true,
+    merch: serverPrefs?.merch ?? true,
+    general: serverPrefs?.general ?? true,
   });
+
+  // Re-sync when server preferences load
+  useEffect(() => {
+    if (serverPrefs) {
+      setContentPrefs({
+        newMusic: serverPrefs.newMusic ?? true,
+        tourDates: serverPrefs.tourDates ?? true,
+        merch: serverPrefs.merch ?? true,
+        general: serverPrefs.general ?? true,
+      });
+    }
+  }, [serverPrefs]);
+
   const prefsMutation = useUpdateContentPreferencesMutation();
   const unsubMutation = useUnsubscribeNotificationsMutation();
   const { success: showSuccess } = useNotifications();
@@ -216,19 +237,24 @@ export function ProfileCompactTemplate({
       setContentPrefs(prev => ({ ...prev, [key]: next }));
       prefsMutation.mutate({
         artistId: artist.id,
-        email: subscriberEmail,
+        email: subscriberEmail || undefined,
+        phone: subscriberPhone || undefined,
         preferences: { [key]: next },
       });
     },
-    [contentPrefs, artist.id, subscriberEmail, prefsMutation]
+    [contentPrefs, artist.id, subscriberEmail, subscriberPhone, prefsMutation]
   );
 
   const handleUnsubscribe = useCallback(() => {
+    const channel = subscribedViaEmail ? 'email' : 'sms';
+    const identifier = subscribedViaEmail
+      ? { email: subscriberEmail }
+      : { phone: subscriberPhone };
     unsubMutation.mutate(
       {
         artistId: artist.id,
-        email: subscriberEmail,
-        channel: 'email',
+        channel,
+        ...identifier,
       },
       {
         onSuccess: () => {
@@ -242,7 +268,9 @@ export function ProfileCompactTemplate({
     );
   }, [
     artist.id,
+    subscribedViaEmail,
     subscriberEmail,
+    subscriberPhone,
     unsubMutation,
     notificationsContextValue,
     showSuccess,

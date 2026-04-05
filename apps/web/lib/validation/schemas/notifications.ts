@@ -136,12 +136,20 @@ export type UpdateSubscriberNameInput = z.infer<
  */
 export const updateSubscriberBirthdaySchema = z.object({
   artist_id: uuidSchema,
-  email: z.string().email(),
+  email: z.string().email().max(254),
   birthday: z
     .string()
     .regex(
       /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/,
       'Birthday must be in MM-DD format'
+    )
+    .refine(
+      value => {
+        const [mm, dd] = value.split('-').map(Number);
+        const maxDay = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mm];
+        return dd <= maxDay;
+      },
+      { message: 'Invalid day for the given month' }
     ),
 });
 

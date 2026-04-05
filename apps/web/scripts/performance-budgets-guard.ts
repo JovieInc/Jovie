@@ -566,7 +566,7 @@ async function measureWarmNavigationRoute(
   };
 }
 
-async function collectBrowserMetrics(page: Page) {
+async function collectBrowserMetrics(page: Page, devMode = false) {
   await page
     .waitForLoadState('networkidle', { timeout: 10_000 })
     .catch(() => undefined);
@@ -574,7 +574,7 @@ async function collectBrowserMetrics(page: Page) {
   await page.mouse.click(8, 8).catch(() => undefined);
   await page.waitForTimeout(200);
 
-  return page.evaluate(() => {
+  return page.evaluate((isDevMode: boolean) => {
     const metrics =
       (
         window as Window & {
@@ -610,9 +610,10 @@ async function collectBrowserMetrics(page: Page) {
 
       // Skip dev-only resources that won't exist in production builds
       if (
-        resourceName.includes('next-devtools') ||
-        resourceName.includes('hmr-client') ||
-        resourceName.includes('react-refresh')
+        isDevMode &&
+        (resourceName.includes('next-devtools') ||
+          resourceName.includes('hmr-client') ||
+          resourceName.includes('react-refresh'))
       ) {
         continue;
       }
@@ -667,7 +668,7 @@ async function collectBrowserMetrics(page: Page) {
         'warm-shell-response': 0,
       },
     };
-  });
+  }, devMode);
 }
 
 function medianSampleByMetric(
@@ -771,7 +772,8 @@ async function measureRouteSample(
   baseUrl: string,
   url: string,
   resolvedPath: string,
-  cookies: readonly AuthCookie[]
+  cookies: readonly AuthCookie[],
+  devMode = false
 ): Promise<GuardSample> {
   const context = await createContext(browser, route, cookies);
   try {
@@ -839,7 +841,7 @@ async function measureRouteSample(
       }
     }
 
-    const browserMetrics = await collectBrowserMetrics(page);
+    const browserMetrics = await collectBrowserMetrics(page, devMode);
     timingValues['cumulative-layout-shift'] =
       browserMetrics.timingValues['cumulative-layout-shift'];
     timingValues['first-contentful-paint'] =
@@ -908,7 +910,7 @@ function createPageResult(
     buildMetricResult(
       budget.metric,
       rawTimings[budget.metric],
-      Math.round(budget.budget * timingFactor),
+      budget.budget * timingFactor,
       budget.metric === 'cumulative-layout-shift' ? '' : 'ms'
     )
   );
@@ -916,7 +918,7 @@ function createPageResult(
     buildMetricResult(
       budget.resourceType,
       rawResourceSizes[budget.resourceType],
-      Math.round(budget.budget * resourceFactor),
+      budget.budget * resourceFactor,
       'KB'
     )
   );
@@ -1049,6 +1051,8 @@ async function resolvePathForRoute(
 }
 
 function isLocalDevUrl(url: string): boolean {
+  // CI always uses strict production budgets, even when testing against localhost
+  if (process.env.CI) return false;
   try {
     const parsed = new URL(url);
     return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
@@ -1092,7 +1096,8 @@ async function measureRoutesAgainstBudgets(
           options.baseUrl,
           url,
           resolvedPath,
-          authCookies
+          authCookies,
+          devMode
         );
         samples.push(sample);
         logInfo(
