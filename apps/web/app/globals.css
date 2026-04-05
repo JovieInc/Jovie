@@ -77,6 +77,23 @@ body:has(.profile-viewport) {
   }
 }
 
+/* Public profile — prevent landscape on mobile via orientation lock hint. */
+@media (max-width: 767px) and (orientation: landscape) {
+  html:has(.profile-viewport) {
+    /* Force portrait dimensions when the device rotates to landscape.
+       The Screen Orientation API is the primary lock; this CSS is a
+       visual fallback for browsers that do not support it. */
+    transform: rotate(-90deg);
+    transform-origin: top left;
+    width: 100dvh;
+    height: 100dvw;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    overflow: clip;
+  }
+}
+
 /* Compact profile — override CTA styles so button ↔ composer is zero-shift */
 .compact-subscribe-section {
   /* Kill heading — not needed in compact */

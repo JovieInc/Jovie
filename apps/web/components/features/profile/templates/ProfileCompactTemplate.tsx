@@ -148,6 +148,23 @@ export function ProfileCompactTemplate({
 }: ProfileCompactTemplateProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // Lock orientation to portrait on mobile
+  useEffect(() => {
+    const orientation = screen?.orientation as
+      | (ScreenOrientation & {
+          lock?: (orientation: string) => Promise<void>;
+          unlock?: () => void;
+        })
+      | undefined;
+    if (!orientation?.lock) return;
+    orientation.lock('portrait').catch(() => {
+      // Not supported or not allowed — ignore silently
+    });
+    return () => {
+      orientation.unlock?.();
+    };
+  }, []);
+
   const mergedDSPs = useMemo(
     () =>
       sortDSPsByGeoPopularity(
