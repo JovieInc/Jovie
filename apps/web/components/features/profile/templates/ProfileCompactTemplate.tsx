@@ -3,7 +3,10 @@
 import {
   BadgeCheck,
   Bell,
+  BellOff,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   Info,
   Mail,
   MoreHorizontal,
@@ -11,6 +14,7 @@ import {
   Share2,
   Ticket,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -23,22 +27,44 @@ import {
 import { BASE_URL } from '@/constants/app';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import type { ProfileMode } from '@/features/profile/contracts';
-import {
-  type ProfileDrawerMode,
-  ProfileModeDrawer,
-} from '@/features/profile/ProfileModeDrawer';
+import type { ProfileDrawerMode } from '@/features/profile/ProfileModeDrawer';
 import {
   getProfileMode,
   getProfileModeHref,
 } from '@/features/profile/registry';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
+import {
+  useUnsubscribeNotificationsMutation,
+  useUpdateContentPreferencesMutation,
+} from '@/lib/queries';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
+import {
+  NOTIFICATION_CONTENT_TYPES,
+  type NotificationContentType,
+} from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
+
+const ProfileModeDrawer = dynamic(
+  () =>
+    import('@/features/profile/ProfileModeDrawer').then(mod => ({
+      default: mod.ProfileModeDrawer,
+    })),
+  { ssr: false }
+);
+
+const ProfileInlineNotificationsCTA = dynamic(
+  () =>
+    import('@/features/profile/artist-notifications-cta').then(mod => ({
+      default: mod.ProfileInlineNotificationsCTA,
+    })),
+  { ssr: false }
+);
 
 /* ─── Design tokens (aligned with DESIGN.md System B dark) ─── */
 const glass = {
@@ -129,6 +155,7 @@ export function ProfileCompactTemplate({
   viewerCountryCode,
 }: ProfileCompactTemplateProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notifSubMenu, setNotifSubMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const mergedDSPs = useMemo(
@@ -154,15 +181,109 @@ export function ProfileCompactTemplate({
     return new URLSearchParams(globalThis.location.search).get('source');
   }, []);
 
-  const { notificationsContextValue } = useProfileShell({
-    artist,
-    socialLinks,
-    viewerCountryCode,
-    contacts,
-    visitTrackingToken,
-    modeOverride: mode,
-    sourceOverride: initialSource,
+  const { notificationsContextValue, notificationsController } =
+    useProfileShell({
+      artist,
+      socialLinks,
+      viewerCountryCode,
+      contacts,
+      visitTrackingToken,
+      modeOverride: mode,
+      sourceOverride: initialSource,
+    });
+
+  const isSubscribed = Boolean(
+    notificationsContextValue.subscribedChannels.email ||
+      notificationsContextValue.subscribedChannels.sms
+  );
+  const subscriberEmail =
+    notificationsContextValue.subscriptionDetails?.email ?? '';
+  const subscriberPhone =
+    notificationsContextValue.subscriptionDetails?.sms ?? '';
+  const subscribedViaEmail = Boolean(
+    notificationsContextValue.subscribedChannels.email
+  );
+
+  // Hydrate content preferences from server state
+  const serverPrefs = notificationsController.contentPreferences;
+  const [contentPrefs, setContentPrefs] = useState<
+    Record<NotificationContentType, boolean>
+  >({
+    newMusic: serverPrefs?.newMusic ?? true,
+    tourDates: serverPrefs?.tourDates ?? true,
+    merch: serverPrefs?.merch ?? true,
+    general: serverPrefs?.general ?? true,
   });
+
+  // Re-sync when server preferences load
+  useEffect(() => {
+    if (serverPrefs) {
+      setContentPrefs({
+        newMusic: serverPrefs.newMusic ?? true,
+        tourDates: serverPrefs.tourDates ?? true,
+        merch: serverPrefs.merch ?? true,
+        general: serverPrefs.general ?? true,
+      });
+    }
+  }, [serverPrefs]);
+
+  const prefsMutation = useUpdateContentPreferencesMutation();
+  const unsubMutation = useUnsubscribeNotificationsMutation();
+  const { success: showSuccess } = useNotifications();
+
+  const handleTogglePref = useCallback(
+    (key: NotificationContentType) => {
+      const prev = contentPrefs[key];
+      const next = !prev;
+      setContentPrefs(state => ({ ...state, [key]: next }));
+      prefsMutation.mutate(
+        {
+          artistId: artist.id,
+          email: subscriberEmail || undefined,
+          phone: subscriberPhone || undefined,
+          preferences: { [key]: next },
+        },
+        {
+          onError: () => {
+            setContentPrefs(state => ({ ...state, [key]: prev }));
+          },
+        }
+      );
+    },
+    [contentPrefs, artist.id, subscriberEmail, subscriberPhone, prefsMutation]
+  );
+
+  const handleUnsubscribe = useCallback(() => {
+    const channel = subscribedViaEmail ? 'email' : 'sms';
+    const identifier = subscribedViaEmail
+      ? { email: subscriberEmail }
+      : { phone: subscriberPhone };
+    unsubMutation.mutate(
+      {
+        artistId: artist.id,
+        channel,
+        ...identifier,
+      },
+      {
+        onSuccess: () => {
+          notificationsContextValue.setSubscribedChannels({});
+          notificationsContextValue.setSubscriptionDetails({});
+          notificationsContextValue.setState('idle');
+          setMenuOpen(false);
+          setNotifSubMenu(false);
+          showSuccess('Notifications turned off');
+        },
+      }
+    );
+  }, [
+    artist.id,
+    subscribedViaEmail,
+    subscriberEmail,
+    subscriberPhone,
+    unsubMutation,
+    notificationsContextValue,
+    showSuccess,
+  ]);
 
   const {
     available: availableContacts,
@@ -279,6 +400,7 @@ export function ProfileCompactTemplate({
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
+        setNotifSubMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -289,11 +411,17 @@ export function ProfileCompactTemplate({
   useEffect(() => {
     if (!menuOpen) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false);
+      if (e.key === 'Escape') {
+        if (notifSubMenu) {
+          setNotifSubMenu(false);
+        } else {
+          setMenuOpen(false);
+        }
+      }
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [menuOpen]);
+  }, [menuOpen, notifSubMenu]);
 
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
@@ -347,7 +475,10 @@ export function ProfileCompactTemplate({
                 <div className='pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-[linear-gradient(to_top,var(--profile-stage-bg)_0%,rgba(5,6,8,0.75)_45%,transparent_100%)]' />
 
                 {/* Top bar */}
-                <div className='relative z-10 flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),20px)]'>
+                <div
+                  className='relative z-10 flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),20px)]'
+                  data-testid='profile-header'
+                >
                   <BrandLogo
                     size={22}
                     tone='white'
@@ -428,14 +559,86 @@ export function ProfileCompactTemplate({
                               Contact
                             </button>
                           ) : null}
+                          {isSubscribed ? (
+                            <button
+                              type='button'
+                              role='menuitem'
+                              className='flex w-full items-center justify-between gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
+                              onClick={() => setNotifSubMenu(true)}
+                            >
+                              <span className='flex items-center gap-2.5'>
+                                <Bell className='h-[14px] w-[14px] text-white/50' />
+                                Notifications
+                              </span>
+                              <ChevronRight className='h-3 w-3 text-white/40' />
+                            </button>
+                          ) : (
+                            <button
+                              type='button'
+                              role='menuitem'
+                              className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
+                              onClick={() => openDrawerMode('subscribe')}
+                            >
+                              <Bell className='h-[14px] w-[14px] text-white/50' />
+                              Get Notified
+                            </button>
+                          )}
+                        </div>
+                      ) : null}
+
+                      {/* Notification preferences sub-menu */}
+                      {menuOpen && notifSubMenu ? (
+                        <div
+                          className={`absolute right-0 top-full z-50 mt-1.5 min-w-[220px] overflow-hidden rounded-[14px] border ${glass.border} bg-black/75 p-1 shadow-[0_12px_40px_rgba(0,0,0,0.5)] ${glass.blur}`}
+                          role='menu'
+                        >
                           <button
                             type='button'
                             role='menuitem'
-                            className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
-                            onClick={() => openDrawerMode('subscribe')}
+                            className='flex w-full items-center gap-2 rounded-[10px] px-3 py-2 text-left text-[12px] font-[500] text-white/60 transition-colors duration-150 hover:bg-white/[0.08]'
+                            onClick={() => setNotifSubMenu(false)}
                           >
-                            <Bell className='h-[14px] w-[14px] text-white/50' />
-                            Get Notified
+                            <ChevronLeft className='h-3 w-3' />
+                            Back
+                          </button>
+                          <div className='mx-2 my-1 h-px bg-white/[0.08]' />
+                          <p className='px-3 py-1.5 text-[11px] font-[560] uppercase tracking-[0.06em] text-white/40'>
+                            Notify me about
+                          </p>
+                          {NOTIFICATION_CONTENT_TYPES.map(pref => (
+                            <button
+                              key={pref.key}
+                              type='button'
+                              role='menuitemcheckbox'
+                              aria-checked={contentPrefs[pref.key]}
+                              className='flex w-full items-center justify-between rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-white/85 transition-colors duration-150 hover:bg-white/[0.08]'
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleTogglePref(pref.key);
+                              }}
+                            >
+                              <span>{pref.label}</span>
+                              <span
+                                className={`h-3 w-3 rounded-full border transition-colors ${
+                                  contentPrefs[pref.key]
+                                    ? 'border-green-400 bg-green-400'
+                                    : 'border-white/30 bg-transparent'
+                                }`}
+                              />
+                            </button>
+                          ))}
+                          <div className='mx-2 my-1 h-px bg-white/[0.08]' />
+                          <button
+                            type='button'
+                            role='menuitem'
+                            className='flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-[450] text-red-400/85 transition-colors duration-150 hover:bg-white/[0.08]'
+                            onClick={handleUnsubscribe}
+                            disabled={unsubMutation.isPending}
+                          >
+                            <BellOff className='h-[14px] w-[14px] text-red-400/50' />
+                            {unsubMutation.isPending
+                              ? 'Turning off…'
+                              : 'Turn off notifications'}
                           </button>
                         </div>
                       ) : null}
@@ -547,53 +750,7 @@ export function ProfileCompactTemplate({
                   </button>
                 ) : null}
 
-                <div
-                  className='grid grid-cols-2 gap-2'
-                  data-testid='profile-mode-shortcuts'
-                >
-                  <button
-                    type='button'
-                    onClick={() => openDrawerMode('subscribe')}
-                    className={`flex items-center justify-center gap-2 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-3 text-[12px] font-[560] text-white/84 ${glass.blur} transition-colors duration-150 ${glass.bgHover}`}
-                  >
-                    <Bell className='h-3.5 w-3.5 text-white/52' />
-                    Get Notified
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() => openDrawerMode('about')}
-                    className={`flex items-center justify-center gap-2 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-3 text-[12px] font-[560] text-white/84 ${glass.blur} transition-colors duration-150 ${glass.bgHover}`}
-                  >
-                    <Info className='h-3.5 w-3.5 text-white/52' />
-                    About
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() => openDrawerMode('tour')}
-                    className={`flex items-center justify-center gap-2 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-3 text-[12px] font-[560] text-white/84 ${glass.blur} transition-colors duration-150 ${glass.bgHover}`}
-                  >
-                    <CalendarDays className='h-3.5 w-3.5 text-white/52' />
-                    Tour
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() =>
-                      openDrawerMode(
-                        hasTip ? 'tip' : hasContacts ? 'contact' : 'listen'
-                      )
-                    }
-                    className={`flex items-center justify-center gap-2 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-3 text-[12px] font-[560] text-white/84 ${glass.blur} transition-colors duration-150 ${glass.bgHover}`}
-                  >
-                    {hasTip ? (
-                      <Ticket className='h-3.5 w-3.5 text-white/52' />
-                    ) : hasContacts ? (
-                      <Mail className='h-3.5 w-3.5 text-white/52' />
-                    ) : (
-                      <Play className='h-3.5 w-3.5 fill-current text-white/52' />
-                    )}
-                    {hasTip ? 'Tip' : hasContacts ? 'Contact' : 'Listen'}
-                  </button>
-                </div>
+                <ProfileInlineNotificationsCTA artist={artist} />
 
                 {/* Social icons — flat, no chrome */}
                 {visibleSocialLinks.length > 0 ? (
