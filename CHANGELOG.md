@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.120] - 2026-04-05
+
+> Faster releases navigation and lighter loading placeholders improve perceived speed across all dashboard tables.
+
+### Changed
+
+- Releases page now prefetches on hover so navigation feels instant
+- Reduced table skeleton from 25 rows to 10 across all dashboard tables (releases, audience, contacts, tour dates)
+- Removed phantom skeleton header card that didn't match the real page layout
+
 ## [26.4.119] - 2026-04-05
 
 ### Changed

@@ -35,7 +35,7 @@ export default async function ReleasesPage() {
 
   return (
     <ReleasesClientBoundary>
-      <Suspense fallback={<ReleaseTableSkeleton />}>
+      <Suspense fallback={<ReleaseTableSkeleton showHeader={false} />}>
         <ReleasesContent userId={userId} />
       </Suspense>
     </ReleasesClientBoundary>
