@@ -40,7 +40,7 @@ export function PersistentAudioBar() {
   return (
     <section
       aria-label='Audio player'
-      className='animate-in fade-in slide-in-from-bottom-2 duration-200 shrink-0 border-t border-subtle bg-surface-0/90 backdrop-blur-xl px-3 py-2 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]'
+      className='animate-in fade-in slide-in-from-bottom-2 duration-200 shrink-0 border-t border-subtle bg-(--linear-app-content-surface) backdrop-blur-xl px-3 py-2 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]'
     >
       <div className='flex items-center gap-3'>
         {/* Artwork */}

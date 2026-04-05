@@ -221,6 +221,8 @@ export function useTrackAudioPlayer() {
   }, []);
 
   const stop = useCallback(() => {
+    // Invalidate any in-flight play() from earlier toggleTrack calls
+    _playToken += 1;
     const audio = getAudio();
     if (audio) {
       audio.pause();
