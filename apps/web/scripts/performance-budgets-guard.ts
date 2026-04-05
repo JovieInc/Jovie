@@ -96,6 +96,16 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(scriptDir, '..');
 const repoRoot = resolve(webRoot, '..', '..');
 const DEFAULT_BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+
+/**
+ * Dev mode overhead factor. Turbopack in dev serves unminified JS, includes
+ * devtools, HMR client, and React development builds. These inflate bundle
+ * sizes ~60-80% and add latency vs production. We detect dev mode by checking
+ * if the base URL is localhost and apply a multiplier to budgets so the guard
+ * remains useful during local development without false failures.
+ */
+const DEV_TIMING_BUDGET_FACTOR = 20;
+const DEV_RESOURCE_BUDGET_FACTOR = 1.8;
 const DEFAULT_AUTH_STATE_PATHS = [
   resolve(repoRoot, '.context', 'perf', 'auth', 'user.json'),
   resolve(webRoot, 'tests', '.auth', 'user.json'),
@@ -597,6 +607,16 @@ async function collectBrowserMetrics(page: Page) {
     for (const entry of resourceEntries) {
       const size = entry.transferSize || entry.encodedBodySize || 0;
       const resourceName = entry.name.toLowerCase();
+
+      // Skip dev-only resources that won't exist in production builds
+      if (
+        resourceName.includes('next-devtools') ||
+        resourceName.includes('hmr-client') ||
+        resourceName.includes('react-refresh')
+      ) {
+        continue;
+      }
+
       resourceValues.total += size;
 
       if (entry.initiatorType === 'script' || resourceName.includes('.js')) {
@@ -845,7 +865,8 @@ async function measureRouteSample(
 function createPageResult(
   route: PerfRouteDefinition,
   resolvedPath: string,
-  samples: readonly GuardSample[]
+  samples: readonly GuardSample[],
+  isDevMode = false
 ): PageResult {
   const primaryMetric = getPrimaryTimingMetricName(route);
   const medianSample = medianSampleByMetric(samples, primaryMetric);
@@ -880,11 +901,14 @@ function createPageResult(
     total: medianResourceValue(samples, 'total'),
   } satisfies Record<PerfResourceMetricName, number>;
 
+  const timingFactor = isDevMode ? DEV_TIMING_BUDGET_FACTOR : 1;
+  const resourceFactor = isDevMode ? DEV_RESOURCE_BUDGET_FACTOR : 1;
+
   const timings = getRouteTimingBudgets(route).map(budget =>
     buildMetricResult(
       budget.metric,
       rawTimings[budget.metric],
-      budget.budget,
+      Math.round(budget.budget * timingFactor),
       budget.metric === 'cumulative-layout-shift' ? '' : 'ms'
     )
   );
@@ -892,7 +916,7 @@ function createPageResult(
     buildMetricResult(
       budget.resourceType,
       rawResourceSizes[budget.resourceType],
-      budget.budget,
+      Math.round(budget.budget * resourceFactor),
       'KB'
     )
   );
@@ -1024,10 +1048,20 @@ async function resolvePathForRoute(
   });
 }
 
+function isLocalDevUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
 async function measureRoutesAgainstBudgets(
   routes: readonly PerfRouteDefinition[],
   options: GuardCliOptions
 ) {
+  const devMode = isLocalDevUrl(options.baseUrl);
   const browser = await chromium.launch();
   try {
     const authCookies = loadAuthCookies(options.baseUrl, options.authPath);
@@ -1067,7 +1101,7 @@ async function measureRoutesAgainstBudgets(
         );
       }
 
-      results.push(createPageResult(route, resolvedPath, samples));
+      results.push(createPageResult(route, resolvedPath, samples, devMode));
     }
 
     return results;

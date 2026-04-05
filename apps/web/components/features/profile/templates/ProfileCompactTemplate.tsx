@@ -14,6 +14,7 @@ import {
   Share2,
   Ticket,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -25,12 +26,8 @@ import {
 } from '@/components/organisms/profile-shell';
 import { BASE_URL } from '@/constants/app';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
-import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta';
 import type { ProfileMode } from '@/features/profile/contracts';
-import {
-  type ProfileDrawerMode,
-  ProfileModeDrawer,
-} from '@/features/profile/ProfileModeDrawer';
+import type { ProfileDrawerMode } from '@/features/profile/ProfileModeDrawer';
 import {
   getProfileMode,
   getProfileModeHref,
@@ -52,6 +49,22 @@ import {
   type NotificationContentType,
 } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
+
+const ProfileModeDrawer = dynamic(
+  () =>
+    import('@/features/profile/ProfileModeDrawer').then(mod => ({
+      default: mod.ProfileModeDrawer,
+    })),
+  { ssr: false }
+);
+
+const ProfileInlineNotificationsCTA = dynamic(
+  () =>
+    import('@/features/profile/artist-notifications-cta').then(mod => ({
+      default: mod.ProfileInlineNotificationsCTA,
+    })),
+  { ssr: false }
+);
 
 /* ─── Design tokens (aligned with DESIGN.md System B dark) ─── */
 const glass = {
