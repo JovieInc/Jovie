@@ -1892,6 +1892,23 @@ body {
   }
 }
 
+/* Onboarding enrichment progress bar */
+
+@keyframes onboarding-indeterminate {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateX(60%);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(200%);
+    opacity: 0.6;
+  }
+}
+
 /* Parallax grid item hover styles */
 
 .grid-item {
