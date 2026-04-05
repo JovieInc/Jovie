@@ -23,7 +23,7 @@ function extractMetaContent(html: string, key: string): string | null {
   ];
 
   for (const pattern of patterns) {
-    const match = html.match(pattern);
+    const match = pattern.exec(html);
     if (match?.[1]) {
       return match[1].trim();
     }
@@ -194,8 +194,8 @@ function extractNumericValueBeforeTrackLabel(html: string): number | null {
 
 function extractUpc(html: string): string | null {
   const match =
-    html.match(/UPC[:\s]+([0-9a-z-]+)/i) ??
-    html.match(/Barcode[:\s]+([0-9a-z-]+)/i);
+    /UPC[:\s]+([0-9a-z-]+)/i.exec(html) ??
+    /Barcode[:\s]+([0-9a-z-]+)/i.exec(html);
   return match?.[1]?.trim() ?? null;
 }
 
@@ -208,7 +208,7 @@ function normalizeComparableValue(
 
   const normalized = value
     .toLowerCase()
-    .replace(/&/g, ' and ')
+    .replaceAll('&', ' and ')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
     .replace(/\s+/g, ' ');

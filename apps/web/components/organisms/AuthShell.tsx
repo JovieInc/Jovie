@@ -15,6 +15,7 @@ import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMob
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
+import { PersistentAudioBar } from './PersistentAudioBar';
 
 export interface AuthShellProps {
   readonly section: 'admin' | 'dashboard' | 'settings';
@@ -64,6 +65,10 @@ function AuthShellInner({
     [showMobileTabs]
   );
 
+  // Memoize audio player — uses hooks internally for state updates,
+  // empty deps prevents AppShellFrame memo from breaking on breadcrumb changes
+  const audioPlayer = useMemo(() => <PersistentAudioBar />, []);
+
   return (
     <AppShellFrame
       sidebar={sidebar}
@@ -83,6 +88,7 @@ function AuthShellInner({
       }
       main={children}
       rightPanel={rightPanel}
+      audioPlayer={audioPlayer}
       mobileBottomNav={mobileBottomNav}
       contentClassName={getContentClassName(showMobileTabs, isTableRoute)}
       isTableRoute={isTableRoute}
