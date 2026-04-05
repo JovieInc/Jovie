@@ -87,6 +87,78 @@ function birthdayDisplayToStorage(display: string): string {
   return display.replace('/', '-');
 }
 
+interface InlineInputStepProps {
+  readonly inputRef: React.RefObject<HTMLInputElement | null>;
+  readonly inputId: string;
+  readonly testId: string;
+  readonly label: string;
+  readonly type?: string;
+  readonly inputMode?: 'text' | 'email' | 'numeric';
+  readonly placeholder: string;
+  readonly value: string;
+  readonly onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  readonly onSubmit: () => void;
+  readonly onKeyDown: React.KeyboardEventHandler<HTMLInputElement>;
+  readonly onFocus: () => void;
+  readonly onBlur: () => void;
+  readonly disabled: boolean;
+  readonly isFocused: boolean;
+  readonly autoComplete?: string;
+  readonly maxLength?: number;
+}
+
+function InlineInputStep({
+  inputRef,
+  inputId,
+  testId,
+  label,
+  type = 'text',
+  inputMode = 'text',
+  placeholder,
+  value,
+  onChange,
+  onSubmit,
+  onKeyDown,
+  onFocus,
+  onBlur,
+  disabled,
+  isFocused,
+  autoComplete,
+  maxLength,
+}: InlineInputStepProps) {
+  return (
+    <SubscriptionPearlComposer
+      dataTestId={`${testId}-composer`}
+      className={isFocused ? subscriptionComposerFocusClassName : ''}
+      action={<CircularSubmitButton onClick={onSubmit} disabled={disabled} />}
+    >
+      <div className='min-w-0'>
+        <label htmlFor={inputId} className='sr-only'>
+          {label}
+        </label>
+        <input
+          ref={inputRef}
+          id={inputId}
+          data-testid={testId}
+          type={type}
+          inputMode={inputMode}
+          className={subscriptionInputClassName}
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          onKeyDown={onKeyDown}
+          disabled={disabled}
+          autoComplete={autoComplete}
+          maxLength={maxLength}
+          style={noFontSynthesisStyle}
+        />
+      </div>
+    </SubscriptionPearlComposer>
+  );
+}
+
 interface ProfileInlineNotificationsCTAProps {
   readonly artist: Artist;
 }
@@ -274,45 +346,28 @@ export function ProfileInlineNotificationsCTA({
             animate={enterVariant.animate}
             exit={getExitVariant(instant)}
           >
-            <SubscriptionPearlComposer
-              dataTestId='inline-email-composer'
-              className={
-                isInputFocused ? subscriptionComposerFocusClassName : ''
-              }
-              action={
-                <CircularSubmitButton
-                  onClick={handleEmailSubmit}
-                  disabled={isSubmitting}
-                />
-              }
-            >
-              <div className='min-w-0'>
-                <label htmlFor={`${inputId}-email`} className='sr-only'>
-                  Email address
-                </label>
-                <input
-                  ref={inputRef}
-                  id={`${inputId}-email`}
-                  data-testid='inline-email-input'
-                  type='email'
-                  inputMode='email'
-                  className={subscriptionInputClassName}
-                  placeholder='your@email.com'
-                  value={emailInput}
-                  onChange={e => handleEmailChange(e.target.value)}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => {
-                    setIsInputFocused(false);
-                    handleFieldBlur();
-                  }}
-                  onKeyDown={handleKeyDown}
-                  disabled={isSubmitting}
-                  autoComplete='email'
-                  maxLength={254}
-                  style={noFontSynthesisStyle}
-                />
-              </div>
-            </SubscriptionPearlComposer>
+            <InlineInputStep
+              inputRef={inputRef}
+              inputId={`${inputId}-email`}
+              testId='inline-email-input'
+              label='Email address'
+              type='email'
+              inputMode='email'
+              placeholder='your@email.com'
+              value={emailInput}
+              onChange={e => handleEmailChange(e.target.value)}
+              onSubmit={handleEmailSubmit}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => {
+                setIsInputFocused(false);
+                handleFieldBlur();
+              }}
+              disabled={isSubmitting}
+              isFocused={isInputFocused}
+              autoComplete='email'
+              maxLength={254}
+            />
             {error && (
               <p className='mt-2 text-center text-[12px] text-red-400'>
                 {error}
@@ -328,43 +383,25 @@ export function ProfileInlineNotificationsCTA({
             animate={enterVariant.animate}
             exit={getExitVariant(instant)}
           >
-            <SubscriptionPearlComposer
-              dataTestId='inline-name-composer'
-              className={
-                isInputFocused ? subscriptionComposerFocusClassName : ''
-              }
-              action={
-                <CircularSubmitButton
-                  onClick={() => {
-                    void handleNameSubmit();
-                  }}
-                  disabled={nameMutation.isPending}
-                />
-              }
-            >
-              <div className='min-w-0'>
-                <label htmlFor={`${inputId}-name`} className='sr-only'>
-                  First name
-                </label>
-                <input
-                  ref={inputRef}
-                  id={`${inputId}-name`}
-                  data-testid='inline-name-input'
-                  type='text'
-                  className={subscriptionInputClassName}
-                  placeholder="What's your name?"
-                  value={nameInput}
-                  onChange={e => setNameInput(e.target.value)}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => setIsInputFocused(false)}
-                  onKeyDown={handleKeyDown}
-                  disabled={nameMutation.isPending}
-                  autoComplete='given-name'
-                  maxLength={100}
-                  style={noFontSynthesisStyle}
-                />
-              </div>
-            </SubscriptionPearlComposer>
+            <InlineInputStep
+              inputRef={inputRef}
+              inputId={`${inputId}-name`}
+              testId='inline-name-input'
+              label='First name'
+              placeholder="What's your name?"
+              value={nameInput}
+              onChange={e => setNameInput(e.target.value)}
+              onSubmit={() => {
+                void handleNameSubmit();
+              }}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+              disabled={nameMutation.isPending}
+              isFocused={isInputFocused}
+              autoComplete='given-name'
+              maxLength={100}
+            />
           </motion.div>
         )}
 
@@ -375,46 +412,28 @@ export function ProfileInlineNotificationsCTA({
             animate={enterVariant.animate}
             exit={getExitVariant(instant)}
           >
-            <SubscriptionPearlComposer
-              dataTestId='inline-birthday-composer'
-              className={
-                isInputFocused ? subscriptionComposerFocusClassName : ''
+            <InlineInputStep
+              inputRef={inputRef}
+              inputId={`${inputId}-birthday`}
+              testId='inline-birthday-input'
+              label='Birthday'
+              inputMode='numeric'
+              placeholder='Birthday (MM/DD)'
+              value={birthdayInput}
+              onChange={e =>
+                setBirthdayInput(formatBirthdayInput(e.target.value))
               }
-              action={
-                <CircularSubmitButton
-                  onClick={() => {
-                    void handleBirthdaySubmit();
-                  }}
-                  disabled={birthdayMutation.isPending}
-                />
-              }
-            >
-              <div className='min-w-0'>
-                <label htmlFor={`${inputId}-birthday`} className='sr-only'>
-                  Birthday
-                </label>
-                <input
-                  ref={inputRef}
-                  id={`${inputId}-birthday`}
-                  data-testid='inline-birthday-input'
-                  type='text'
-                  inputMode='numeric'
-                  className={subscriptionInputClassName}
-                  placeholder='Birthday (MM/DD)'
-                  value={birthdayInput}
-                  onChange={e =>
-                    setBirthdayInput(formatBirthdayInput(e.target.value))
-                  }
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => setIsInputFocused(false)}
-                  onKeyDown={handleKeyDown}
-                  disabled={birthdayMutation.isPending}
-                  autoComplete='bday'
-                  maxLength={5}
-                  style={noFontSynthesisStyle}
-                />
-              </div>
-            </SubscriptionPearlComposer>
+              onSubmit={() => {
+                void handleBirthdaySubmit();
+              }}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+              disabled={birthdayMutation.isPending}
+              isFocused={isInputFocused}
+              autoComplete='bday'
+              maxLength={5}
+            />
           </motion.div>
         )}
 
