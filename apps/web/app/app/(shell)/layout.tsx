@@ -46,7 +46,9 @@ export default async function AppShellLayout({
     if (isChatShellRoute(pathname)) {
       shellFallback = <AppShellSkeleton main={<ChatLoading />} />;
     } else if (isReleasesShellRoute(pathname)) {
-      shellFallback = <AppShellSkeleton main={<ReleaseTableSkeleton />} />;
+      shellFallback = (
+        <AppShellSkeleton main={<ReleaseTableSkeleton showHeader={false} />} />
+      );
     } else {
       shellFallback = <AppShellSkeleton />;
     }

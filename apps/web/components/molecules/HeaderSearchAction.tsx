@@ -30,6 +30,7 @@ export interface HeaderSearchActionProps {
   readonly tooltipLabel?: string;
   readonly className?: string;
   readonly inputClassName?: string;
+  readonly alwaysOpen?: boolean;
 }
 
 export function HeaderSearchAction({
@@ -48,8 +49,9 @@ export function HeaderSearchAction({
   tooltipLabel = 'Search',
   className,
   inputClassName,
+  alwaysOpen = false,
 }: Readonly<HeaderSearchActionProps>) {
-  const [isOpen, setIsOpen] = useState(searchValue.length > 0);
+  const [isOpen, setIsOpen] = useState(alwaysOpen || searchValue.length > 0);
   const router = useRouter();
 
   useEffect(() => {
@@ -59,6 +61,16 @@ export function HeaderSearchAction({
   }, [searchValue]);
 
   const close = () => {
+    if (alwaysOpen) {
+      onSearchValueChange('');
+      if (action && clearHref && searchValue.length > 0) {
+        router.push(clearHref);
+        return;
+      }
+      onClearAction?.();
+      return;
+    }
+
     if (action && clearHref && searchValue.length > 0) {
       router.push(clearHref);
       return;
@@ -69,7 +81,7 @@ export function HeaderSearchAction({
     onClearAction?.();
   };
 
-  if (!isOpen) {
+  if (!isOpen && !alwaysOpen) {
     return (
       <DashboardHeaderActionButton
         ariaLabel={submitAriaLabel}
@@ -116,12 +128,14 @@ export function HeaderSearchAction({
         onEscape={close}
         placeholder={placeholder}
         ariaLabel={ariaLabel}
-        autoFocus
+        autoFocus={!alwaysOpen}
         showClearButton={false}
         className='w-[min(42vw,208px)] sm:w-[min(30vw,240px)] lg:w-[min(26vw,276px)]'
         inputClassName={cn('text-[13px]', inputClassName)}
       />
-      {action && clearHref && searchValue.length > 0 ? (
+      {alwaysOpen && searchValue.length === 0 ? null : action &&
+        clearHref &&
+        searchValue.length > 0 ? (
         <AppIconButton
           asChild
           ariaLabel='Clear search'
@@ -135,8 +149,10 @@ export function HeaderSearchAction({
       ) : (
         <AppIconButton
           type='button'
-          ariaLabel={`Close ${tooltipLabel.toLowerCase()}`}
-          tooltipLabel='Close search'
+          ariaLabel={
+            alwaysOpen ? 'Clear search' : `Close ${tooltipLabel.toLowerCase()}`
+          }
+          tooltipLabel={alwaysOpen ? 'Clear search' : 'Close search'}
           className='border-transparent bg-transparent text-tertiary-token hover:border-transparent hover:bg-surface-1 hover:text-primary-token'
           onClick={close}
         >
