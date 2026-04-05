@@ -18,14 +18,26 @@ export function HomepageLabelLogoMark({
 }: Readonly<HomepageLabelLogoMarkProps>) {
   switch (partner) {
     case 'awal':
-      return <AwalLogo className={cn('h-[15px] w-auto', className)} />;
+      return (
+        <AwalLogo className={cn('h-[28px] w-auto sm:h-[32px]', className)} />
+      );
     case 'orchard':
-      return <TheOrchardLogo className={cn('h-[18px] w-auto', className)} />;
+      return (
+        <TheOrchardLogo
+          className={cn('h-[32px] w-auto sm:h-[38px]', className)}
+        />
+      );
     case 'umg':
       return (
-        <UniversalMusicGroupLogo className={cn('h-[12px] w-auto', className)} />
+        <UniversalMusicGroupLogo
+          className={cn('h-[24px] w-auto sm:h-[28px]', className)}
+        />
       );
     case 'armada':
-      return <ArmadaMusicLogo className={cn('h-[14px] w-auto', className)} />;
+      return (
+        <ArmadaMusicLogo
+          className={cn('h-[26px] w-auto sm:h-[30px]', className)}
+        />
+      );
   }
 }

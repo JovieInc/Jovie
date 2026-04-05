@@ -20,22 +20,14 @@ vi.mock('@/features/home/HomeHeroSurfaceCluster', () => ({
   ),
 }));
 
-vi.mock('@/features/home/ReleaseModeMockCard', () => ({
-  ReleaseModeMockCard: ({ testId }: { testId?: string }) => (
-    <div data-testid={testId ?? 'release-mode-card'}>release card</div>
-  ),
-}));
-
-vi.mock('@/features/home/ReleaseOperatingSystemShowcase', () => ({
-  ReleaseOperatingSystemShowcase: () => (
-    <div data-testid='homepage-release-operating-system-surface'>
-      operating system
-    </div>
+vi.mock('@/features/home/BentoFeatureGrid', () => ({
+  BentoFeatureGrid: () => (
+    <div data-testid='homepage-bento-feature-grid'>bento grid</div>
   ),
 }));
 
 describe('HomePageNarrative', () => {
-  it('renders the shorter homepage narrative in order', () => {
+  it('renders the 6-section homepage narrative in order', () => {
     render(<HomePageNarrative />);
 
     expect(
@@ -54,31 +46,39 @@ describe('HomePageNarrative', () => {
       })
     ).toBeInTheDocument();
     expect(
-      screen.getAllByText('Notify every fan. Every time. Automatically.').length
-    ).toBeGreaterThan(0);
-    expect(
       screen.getByRole('heading', {
-        name: 'Your release operating system.',
+        name: 'You made the song. Now make it hit.',
       })
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', {
-        name: 'AI that knows the context.',
-      })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', {
-        name: 'Your catalog and profile presence, in one view.',
-      })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', {
-        name: 'A promotion plan, generated for every release.',
-      })
-    ).not.toBeInTheDocument();
   });
 
-  it('renders the hero cluster, release pair, and merged operating-system surface', () => {
+  it('renders consolidated 6-section structure without old sections', () => {
+    render(<HomePageNarrative />);
+
+    // Old sections should NOT be present
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Your release operating system.',
+      })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Fans know before you do.',
+      })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Never start from zero.',
+      })
+    ).not.toBeInTheDocument();
+
+    // BentoFeatureGrid should be present
+    expect(
+      screen.getByTestId('homepage-bento-feature-grid')
+    ).toBeInTheDocument();
+  });
+
+  it('renders the hero cluster and release destinations', () => {
     render(<HomePageNarrative />);
 
     expect(
@@ -94,16 +94,33 @@ describe('HomePageNarrative', () => {
       screen.getByTestId('artist-profile-modes-showcase')
     ).toBeInTheDocument();
     expect(
-      screen.getAllByTestId('homepage-release-destination-presave').length
-    ).toBeGreaterThan(0);
-    expect(
-      screen.getAllByTestId('homepage-release-destination-live').length
-    ).toBeGreaterThan(0);
-    expect(
-      screen.getAllByTestId('homepage-release-destination-notification').length
-    ).toBeGreaterThan(0);
-    expect(
-      screen.getByTestId('homepage-release-operating-system-surface')
+      screen.getByTestId('homepage-release-destination-presave')
     ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('homepage-release-destination-live')
+    ).toBeInTheDocument();
+  });
+
+  it('does not render notification pills', () => {
+    render(<HomePageNarrative />);
+
+    // Notification cards were removed in the proof system reframe
+    expect(
+      screen.queryByTestId('homepage-release-destination-notification')
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders release destinations with Before/After labels', () => {
+    render(<HomePageNarrative />);
+
+    expect(screen.getByText('Before launch')).toBeInTheDocument();
+    expect(screen.getByText('After launch')).toBeInTheDocument();
+  });
+
+  it('renders "Get Started" CTA consistently', () => {
+    render(<HomePageNarrative />);
+
+    const ctaButtons = screen.getAllByText('Get Started');
+    expect(ctaButtons.length).toBeGreaterThanOrEqual(2);
   });
 });

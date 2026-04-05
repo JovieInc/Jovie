@@ -1,0 +1,143 @@
+import { BellRing, CheckCircle2, Circle, Sparkles } from 'lucide-react';
+import { Container } from '@/components/site/Container';
+import { FlatlineCurve, MomentumCurve } from '@/features/home/MomentumCurves';
+
+interface BentoCardProps {
+  readonly heading: string;
+  readonly className?: string;
+  readonly children?: React.ReactNode;
+}
+
+function BentoCard({ heading, className = '', children }: BentoCardProps) {
+  return (
+    <div
+      className={`rounded-2xl border border-white/8 bg-white/[0.03] p-6 transition-colors duration-150 hover:bg-white/[0.05] ${className}`}
+    >
+      <p className='text-[15px] font-[560] tracking-[-0.01em] text-white'>
+        {heading}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function GenerateReleasePlanCard() {
+  return (
+    <BentoCard
+      heading='Generate a release plan.'
+      className='col-span-1 sm:col-span-2 min-h-[10rem]'
+    >
+      <div className='mt-4 flex items-center gap-3'>
+        <span className='inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 py-2 text-[12px] font-medium text-white/60'>
+          <Sparkles className='h-3.5 w-3.5' aria-hidden='true' />
+          Generate Release Plan
+        </span>
+        <div className='flex items-center gap-1.5 text-[11px] text-white/30'>
+          <span className='h-1 w-1 rounded-full bg-emerald-400/60' />
+          Brief loaded
+        </div>
+      </div>
+    </BentoCard>
+  );
+}
+
+function TasksTrackCard() {
+  return (
+    <BentoCard heading='Tasks track themselves.' className='min-h-[10rem]'>
+      <div className='mt-4 space-y-2.5'>
+        <div className='flex items-center gap-2'>
+          <CheckCircle2
+            className='h-3.5 w-3.5 text-emerald-400'
+            aria-hidden='true'
+          />
+          <span className='text-[12px] text-white/40 line-through'>
+            Metadata verified
+          </span>
+        </div>
+        <div className='flex items-center gap-2'>
+          <span className='h-3.5 w-3.5 rounded-full border-2 border-sky-400' />
+          <span className='text-[12px] text-white/80'>
+            Upload Canvas to Spotify
+          </span>
+        </div>
+        <div className='flex items-center gap-2'>
+          <Circle className='h-3.5 w-3.5 text-white/20' aria-hidden='true' />
+          <span className='text-[12px] text-white/80'>
+            Pitch to editorial playlists
+          </span>
+        </div>
+      </div>
+    </BentoCard>
+  );
+}
+
+function FansKnowCard() {
+  return (
+    <BentoCard heading='Fans know before you do.' className='min-h-[10rem]'>
+      <div className='mt-4 space-y-2'>
+        <div className='flex items-center gap-2.5'>
+          <div className='flex h-6 w-6 items-center justify-center rounded-full border border-violet-400/20 bg-violet-400/10'>
+            <BellRing className='h-3 w-3 text-violet-300' aria-hidden='true' />
+          </div>
+          <span className='text-[12px] text-white/60'>
+            1,247 fans notified automatically
+          </span>
+        </div>
+        <p className='pl-[34px] text-[11px] text-white/30'>
+          In their timezone.
+        </p>
+      </div>
+    </BentoCard>
+  );
+}
+
+function NeverStartFromZeroCard() {
+  return (
+    <BentoCard heading='Never start from zero.' className='min-h-[10rem]'>
+      <div className='mt-3 space-y-2'>
+        <div className='flex items-center justify-between'>
+          <p className='text-[11px] font-[530] text-white/50'>With Jovie</p>
+          <p className='text-[10px] text-emerald-400/60'>Compounding</p>
+        </div>
+        <div className='h-[3.5rem]'>
+          <MomentumCurve />
+        </div>
+        <div className='flex items-center justify-between'>
+          <p className='text-[11px] font-[530] text-white/25'>Without</p>
+          <p className='text-[10px] text-white/15'>Flatline</p>
+        </div>
+        <div className='h-[2rem]'>
+          <FlatlineCurve />
+        </div>
+      </div>
+    </BentoCard>
+  );
+}
+
+export function BentoFeatureGrid() {
+  return (
+    <section
+      className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-28'
+      aria-labelledby='bento-heading'
+    >
+      <Container size='homepage'>
+        <div className='mx-auto max-w-[1120px]'>
+          <p className='homepage-section-eyebrow'>Command Center</p>
+          <h2
+            id='bento-heading'
+            className='marketing-h2-linear mt-4 text-primary-token'
+          >
+            A command center for your career.
+          </h2>
+
+          <div className='mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2'>
+            <GenerateReleasePlanCard />
+            <TasksTrackCard />
+            <FansKnowCard />
+            <NeverStartFromZeroCard />
+          </div>
+        </div>
+      </Container>
+    </section>
+  );
+}

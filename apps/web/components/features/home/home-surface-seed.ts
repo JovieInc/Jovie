@@ -1,3 +1,57 @@
+/**
+ * Homepage proof asset type. References screenshot scenarios by ID only.
+ * Derive src and viewport from SCREENSHOT_SCENARIOS (single source of truth).
+ */
+export interface HomepageProofAsset {
+  readonly id: string;
+  readonly scenarioId: string;
+  readonly alt: string;
+  readonly kind: 'phone' | 'desktop' | 'crop';
+}
+
+/**
+ * Homepage proof manifest. Every proof slot maps to a registered screenshot scenario.
+ * The manifest-to-registry test validates that all scenarioIds exist.
+ */
+export const HOMEPAGE_PROOF_ASSETS: readonly HomepageProofAsset[] = [
+  {
+    id: 'hero-profile',
+    scenarioId: 'public-profile-mobile',
+    alt: 'Tim White artist profile on Jovie',
+    kind: 'phone',
+  },
+  {
+    id: 'release-presave',
+    scenarioId: 'release-presave-mobile',
+    alt: 'The Deep End presave countdown on Jovie',
+    kind: 'phone',
+  },
+  {
+    id: 'release-live',
+    scenarioId: 'release-landing-mobile',
+    alt: 'Take Me Over live smart link on Jovie',
+    kind: 'phone',
+  },
+  {
+    id: 'bento-tasks',
+    scenarioId: 'release-tasks-desktop',
+    alt: 'Release tasks dashboard in Jovie',
+    kind: 'crop',
+  },
+  {
+    id: 'bento-releases',
+    scenarioId: 'dashboard-releases-sidebar-desktop',
+    alt: 'Releases dashboard with sidebar in Jovie',
+    kind: 'crop',
+  },
+  {
+    id: 'bento-audience',
+    scenarioId: 'dashboard-audience-desktop',
+    alt: 'Audience CRM in Jovie',
+    kind: 'crop',
+  },
+] as const;
+
 export interface HomepageTaskCard {
   readonly id: string;
   readonly title: string;
@@ -58,10 +112,13 @@ export const HOME_HERO_TASKS: readonly HomepageTaskCard[] = [
 ] as const;
 
 export const HOME_RELEASE_DESTINATION_PRESAVE_MOCK: HomepageReleaseMock = {
-  id: 'the-sound-presave',
-  title: 'The Sound',
-  artist: 'Tim White',
-  releaseLabel: 'Drops April 19, 2026',
+  id: 'the-deep-end-presave',
+  title: 'The Deep End',
+  artist: 'Cosmic Gate & Tim White',
+  // Far-future date so presave state never expires on the homepage.
+  // If this date approaches, update it. The Playwright screenshot pipeline
+  // captures this state; a past date would show post-release UI instead.
+  releaseLabel: 'Drops December 31, 2027',
   modeLabel: 'Countdown Presave',
   state: 'presave',
   stateDetail: 'Presave is open',
@@ -94,7 +151,7 @@ export const HOME_RELEASE_DESTINATION_LIVE_MOCK: HomepageReleaseMock = {
 export const HOME_SMARTLINK_RELEASE_MOCK = HOME_RELEASE_DESTINATION_LIVE_MOCK;
 
 export const HOME_RELEASE_AI_CONTEXT = [
-  'Release: Take Me Over',
+  'Release: The Deep End',
   'Catalog: latest release loaded',
   'Profile: Tim White verified',
 ] as const;
