@@ -1,8 +1,9 @@
+import { PLAN_PRICES } from '@/lib/config/plan-prices';
 import type { PricingOption } from '@/lib/queries';
 
 const MONTHLY_INTERVALS = new Set(['month', 'monthly']);
 
-export const FALLBACK_VERIFIED_PRICE_LABEL = '$20/mo';
+export const FALLBACK_VERIFIED_PRICE_LABEL = `$${PLAN_PRICES.pro.monthly}/mo`;
 
 export function getPreferredVerifiedPrice(
   options: PricingOption[]
@@ -18,7 +19,9 @@ export function formatVerifiedPriceLabel(
 ): string {
   if (!option) return FALLBACK_VERIFIED_PRICE_LABEL;
 
-  const amount = Number.isFinite(option.amount) ? option.amount / 100 : 20;
+  const amount = Number.isFinite(option.amount)
+    ? option.amount / 100
+    : PLAN_PRICES.pro.monthly;
   const currency = option.currency?.toUpperCase() || 'USD';
 
   const formatted = new Intl.NumberFormat('en-US', {

@@ -4,10 +4,8 @@
  * This file contains the centralized mapping of Stripe price IDs to internal plan names.
  * Only used on the server side for security.
  *
- * Pricing Tiers:
- * - Free: $0 (no Stripe subscription)
- * - Pro: $20/mo or $192/yr (save 2 months)
- * - Max: $200/mo or $1,920/yr (save 2 months)
+ * Pricing tiers and amounts are defined in lib/config/plan-prices.ts (single source of truth).
+ * Free tier has no Stripe subscription.
  */
 
 import 'server-only';
