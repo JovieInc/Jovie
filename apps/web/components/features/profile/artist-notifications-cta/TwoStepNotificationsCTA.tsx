@@ -23,7 +23,6 @@ import {
   noFontSynthesisStyle,
   SubscriptionFormSkeleton,
   SubscriptionPearlComposer,
-  SubscriptionPendingConfirmation,
   SubscriptionSuccess,
   subscriptionComposerFocusClassName,
   subscriptionDisclaimerClassName,
@@ -140,10 +139,17 @@ interface ChannelInputRowProps {
   readonly inputRef: React.RefObject<HTMLInputElement | null>;
   readonly inputId: string;
   readonly disclaimerId: string;
-  readonly inputConfig: ReturnType<typeof getInputConfig>;
+  readonly inputConfig: {
+    type: string;
+    inputMode: 'text' | 'email' | 'numeric';
+    placeholder: string;
+    autoComplete: string;
+    maxLength: number;
+  };
   readonly inputValue: string;
   readonly handlePhoneChange: (v: string) => void;
   readonly handleEmailChange: (v: string) => void;
+  readonly handleOtpChange: (v: string) => void;
   readonly isInputFocused: boolean;
   readonly setIsInputFocused: (f: boolean) => void;
   readonly handleFieldBlur: () => void;
@@ -170,6 +176,7 @@ function ChannelInputRow({
   inputValue,
   handlePhoneChange,
   handleEmailChange,
+  handleOtpChange,
   isInputFocused,
   setIsInputFocused,
   handleFieldBlur,
@@ -185,7 +192,9 @@ function ChannelInputRow({
   };
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (channel === 'sms') {
+    if (otpStep === 'verify') {
+      handleOtpChange(event.target.value);
+    } else if (channel === 'sms') {
       handlePhoneChange(event.target.value);
     } else {
       handleEmailChange(event.target.value);
@@ -301,6 +310,8 @@ export function TwoStepNotificationsCTA({
     emailInput,
     error,
     otpStep,
+    otpCode,
+    handleOtpChange,
     isSubmitting,
     isCountryOpen,
     setIsCountryOpen,
@@ -410,10 +421,6 @@ export function TwoStepNotificationsCTA({
     return <SubscriptionFormSkeleton />;
   }
 
-  if (notificationsState === 'pending_confirmation') {
-    return <SubscriptionPendingConfirmation />;
-  }
-
   if (isSubscribed) {
     return (
       <SubscriptionSuccess
@@ -432,11 +439,22 @@ export function TwoStepNotificationsCTA({
   const enterVariant = getEnterVariant(instant);
   const shouldShowCountrySelector =
     otpStep === 'input' && channel === 'sms' && phoneInput.length > 0;
-  const inputConfig = getInputConfig(channel);
+  const inputConfig =
+    otpStep === 'verify'
+      ? {
+          type: 'text' as const,
+          inputMode: 'numeric' as const,
+          placeholder: '6-digit code',
+          autoComplete: 'one-time-code',
+          maxLength: 6,
+        }
+      : getInputConfig(channel);
   const inputValue =
-    channel === 'sms'
-      ? formatPhoneDigitsForDisplay(phoneInput, country.dialCode)
-      : emailInput;
+    otpStep === 'verify'
+      ? otpCode
+      : channel === 'sms'
+        ? formatPhoneDigitsForDisplay(phoneInput, country.dialCode)
+        : emailInput;
 
   return (
     <div
@@ -444,7 +462,9 @@ export function TwoStepNotificationsCTA({
       data-testid='subscribe-cta-container'
     >
       <p className={subscriptionHeadingClassName} style={noFontSynthesisStyle}>
-        Never miss a release.
+        {otpStep === 'verify'
+          ? 'Enter verification code.'
+          : 'Never miss a release.'}
       </p>
 
       <AnimatePresence mode='wait' initial={false}>
@@ -482,6 +502,7 @@ export function TwoStepNotificationsCTA({
                 inputValue={inputValue}
                 handlePhoneChange={handlePhoneChange}
                 handleEmailChange={handleEmailChange}
+                handleOtpChange={handleOtpChange}
                 isInputFocused={isInputFocused}
                 setIsInputFocused={setIsInputFocused}
                 handleFieldBlur={handleFieldBlur}
