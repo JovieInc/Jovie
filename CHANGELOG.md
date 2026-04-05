@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.118] - 2026-04-05
+
+### Changed
+
+- Releases page now prefetches on hover so navigation feels instant
+- Reduced table skeleton from 25 rows to 10 across all dashboard tables (releases, audience, contacts, tour dates)
+- Removed phantom skeleton header card that didn't match the real page layout
+
 ## [26.4.117] - 2026-04-05
 
 > The Growth admin page is now a self-driving pipeline dashboard. Pick a speed, watch the funnel, inspect leads if curious.
