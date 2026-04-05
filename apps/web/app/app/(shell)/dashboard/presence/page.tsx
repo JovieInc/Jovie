@@ -51,13 +51,31 @@ async function PresenceContent({ userId }: Readonly<{ userId: string }>) {
       redirect(APP_ROUTES.ONBOARDING);
     }
 
-    const [presenceData, unresolvedCount] = await Promise.all([
+    const [presenceResult, unresolvedCountResult] = await Promise.allSettled([
       loadDspPresenceForProfile(selectedProfile.id),
       getUnresolvedMismatchCount(selectedProfile.id),
     ]);
+
+    if (presenceResult.status !== 'fulfilled') {
+      throw presenceResult.reason;
+    }
+
+    const unresolvedCount =
+      unresolvedCountResult.status === 'fulfilled'
+        ? unresolvedCountResult.value
+        : 0;
+
+    if (unresolvedCountResult.status === 'rejected') {
+      void captureError(
+        'Presence unresolved mismatch count failed',
+        unresolvedCountResult.reason,
+        { route: APP_ROUTES.PRESENCE, profileId: selectedProfile.id }
+      );
+    }
+
     return (
       <DspPresenceView
-        data={presenceData}
+        data={presenceResult.value}
         hasUnresolvedMismatches={unresolvedCount > 0}
       />
     );

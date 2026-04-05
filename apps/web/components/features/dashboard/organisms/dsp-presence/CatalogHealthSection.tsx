@@ -49,6 +49,7 @@ export function CatalogHealthSection({
     CatalogMismatch[] | null
   >(null);
   const [confirmedNotMineCount, setConfirmedNotMineCount] = useState(0);
+  const [bulkDismissConfirming, setBulkDismissConfirming] = useState(false);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasLoadedRef = useRef(false);
 
@@ -60,9 +61,13 @@ export function CatalogHealthSection({
     m => m.status === 'flagged' && m.mismatchType === 'missing_from_dsp'
   );
 
-  // Lazy load data when section opens
+  // Lazy load data when section opens, reset on close so reopening refetches
   useEffect(() => {
-    if (!isOpen || hasLoadedRef.current) return;
+    if (!isOpen) {
+      hasLoadedRef.current = false;
+      return;
+    }
+    if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
     setIsLoading(true);
 
@@ -218,10 +223,10 @@ export function CatalogHealthSection({
   // Determine section header content
   const scan = data?.scan;
   const neverScanned = !scan && !isScanning;
-  const hasResults =
-    scan?.status === 'completed' && unresolvedNotInCatalog.length > 0;
-  const allClear =
-    scan?.status === 'completed' && unresolvedNotInCatalog.length === 0;
+  const hasAnyResults =
+    unresolvedNotInCatalog.length > 0 || missingFromDsp.length > 0;
+  const hasResults = scan?.status === 'completed' && hasAnyResults;
+  const allClear = scan?.status === 'completed' && !hasAnyResults;
   const scanFailed = scan?.status === 'failed' || !!scanError;
 
   const headerText = isScanning
@@ -346,24 +351,42 @@ export function CatalogHealthSection({
                   <RefreshCw className='h-3 w-3' />
                   Re-scan
                 </Button>
-                {unresolvedNotInCatalog.length >= 10 && (
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    className='h-7 text-xs'
-                    onClick={() => {
-                      if (
-                        confirm(
-                          `Dismiss all ${unresolvedNotInCatalog.length} items?`
-                        )
-                      ) {
-                        handleBulkDismiss();
-                      }
-                    }}
-                  >
-                    Dismiss all
-                  </Button>
-                )}
+                {unresolvedNotInCatalog.length >= 10 &&
+                  (bulkDismissConfirming ? (
+                    <div className='flex items-center gap-2'>
+                      <span className='text-xs text-muted-foreground'>
+                        Dismiss {unresolvedNotInCatalog.length} items?
+                      </span>
+                      <Button
+                        variant='destructive'
+                        size='sm'
+                        className='h-7 text-xs'
+                        onClick={() => {
+                          setBulkDismissConfirming(false);
+                          handleBulkDismiss();
+                        }}
+                      >
+                        Yes
+                      </Button>
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        className='h-7 text-xs'
+                        onClick={() => setBulkDismissConfirming(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      className='h-7 text-xs'
+                      onClick={() => setBulkDismissConfirming(true)}
+                    >
+                      Dismiss all
+                    </Button>
+                  ))}
               </div>
 
               {/* Card stack */}

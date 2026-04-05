@@ -23,6 +23,8 @@ export function MismatchCard({
   const [pendingAction, setPendingAction] = useState<MismatchAction | null>(
     null
   );
+  const lastActionRef = useRef<MismatchAction | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(false);
   const [removing, setRemoving] = useState(false);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -40,17 +42,20 @@ export function MismatchCard({
   const handleAction = useCallback(
     (action: MismatchAction) => {
       setError(false);
+      lastActionRef.current = action;
       setPendingAction(action);
 
       undoTimerRef.current = setTimeout(async () => {
+        undoTimerRef.current = null;
+        setIsSubmitting(true);
         const success = await onAction(mismatch.id, action);
         if (success) {
           setRemoving(true);
-          // Allow animation to complete before notifying parent
           setTimeout(() => onRemoved(mismatch.id, action), 300);
         } else {
           setError(true);
           setPendingAction(null);
+          setIsSubmitting(false);
         }
       }, UNDO_DELAY_MS);
     },
@@ -58,15 +63,20 @@ export function MismatchCard({
   );
 
   const handleUndo = useCallback(() => {
+    // Only allow undo if the request hasn't been sent yet
+    if (isSubmitting) return;
     clearTimer();
     setPendingAction(null);
     setError(false);
-  }, [clearTimer]);
+  }, [clearTimer, isSubmitting]);
 
   const handleRetry = useCallback(() => {
     setError(false);
-    handleAction(pendingAction ?? 'dismissed');
-  }, [handleAction, pendingAction]);
+    setIsSubmitting(false);
+    if (lastActionRef.current) {
+      handleAction(lastActionRef.current);
+    }
+  }, [handleAction]);
 
   const spotifyUrl = mismatch.externalTrackId
     ? `https://open.spotify.com/track/${mismatch.externalTrackId}`
@@ -84,7 +94,7 @@ export function MismatchCard({
   }
 
   // Undo pending state
-  if (pendingAction && !error) {
+  if (pendingAction && !error && !isSubmitting) {
     return (
       <div
         className='flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2.5 transition-all'
@@ -105,6 +115,15 @@ export function MismatchCard({
           <Undo2 className='h-3 w-3' />
           Undo
         </Button>
+      </div>
+    );
+  }
+
+  // Submitting state (request in flight, undo no longer possible)
+  if (isSubmitting && !error) {
+    return (
+      <div className='flex items-center gap-3 rounded-md border border-border bg-muted/30 px-3 py-2.5'>
+        <span className='text-xs text-muted-foreground'>Updating...</span>
       </div>
     );
   }

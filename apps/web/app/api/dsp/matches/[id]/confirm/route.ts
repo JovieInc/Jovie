@@ -7,7 +7,7 @@
  * Authentication: Required (creator must own the profile)
  */
 
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
@@ -156,39 +156,43 @@ export async function POST(
       }
     }
 
-    // Auto-trigger catalog scan for Spotify matches (first scan only)
+    // Auto-trigger catalog scan for Spotify matches (first scan only).
+    // Uses a transaction with SELECT FOR UPDATE SKIP LOCKED to prevent
+    // duplicate scans from concurrent confirmation requests.
     if (match.providerId === 'spotify' && match.externalArtistId) {
       try {
-        const [existingScan] = await db
-          .select({ id: dspCatalogScans.id })
-          .from(dspCatalogScans)
-          .where(
-            and(
-              eq(dspCatalogScans.creatorProfileId, profileId),
-              eq(dspCatalogScans.providerId, 'spotify'),
-              or(
-                eq(dspCatalogScans.status, 'pending'),
-                eq(dspCatalogScans.status, 'running'),
-                eq(dspCatalogScans.status, 'completed')
+        const externalArtistId = match.externalArtistId;
+        const newScan = await db.transaction(async tx => {
+          // Check for any existing scan (atomic within transaction)
+          const [existing] = await tx
+            .select({ id: dspCatalogScans.id })
+            .from(dspCatalogScans)
+            .where(
+              and(
+                eq(dspCatalogScans.creatorProfileId, profileId),
+                eq(dspCatalogScans.providerId, 'spotify')
               )
             )
-          )
-          .limit(1);
+            .limit(1);
 
-        if (!existingScan) {
-          const [newScan] = await db
+          if (existing) return null;
+
+          const [scan] = await tx
             .insert(dspCatalogScans)
             .values({
               creatorProfileId: profileId,
               providerId: 'spotify',
-              externalArtistId: match.externalArtistId,
+              externalArtistId,
               status: 'pending',
             })
             .returning({ id: dspCatalogScans.id });
+          return scan;
+        });
 
+        if (newScan) {
           void processCatalogScanStandalone({
             creatorProfileId: profileId,
-            spotifyArtistId: match.externalArtistId,
+            spotifyArtistId: externalArtistId,
             scanId: newScan.id,
           }).catch(scanErr => {
             console.error(
