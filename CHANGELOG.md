@@ -7,19 +7,18 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.120] - 2026-04-05
 
+> Audio player now lives in a persistent bottom bar that stays visible across all dashboard and admin pages, even when the sidebar is collapsed or hidden on mobile. Includes dismiss, loading state, and safe-area clearance for notched devices.
+
 ### Changed
 
 - Audio player moved from the sidebar to a persistent bottom bar inside the main content area
 - Player stays visible when the sidebar is collapsed or hidden on mobile
-- Spotify-style glass background with full-width seek bar, artwork, and track info
 
 ### Added
 
 - Dismiss button (X) to clear the audio player
 - Loading state with pulsing indicator and disabled seek bar
-- `stop()` function on `useTrackAudioPlayer` for programmatic playback dismissal
 - Safe-area-aware mobile clearance for notched devices
-- 10 unit tests covering all player states (idle, playing, paused, loading, dismiss, artwork fallback, preview badge)
 
 ### Removed
 
