@@ -151,6 +151,14 @@ export default function HomePage() {
     <div className='relative min-h-screen'>
       <AuthRedirectHandler />
 
+      {/* Preload the LCP image so browsers discover it before parsing the component tree */}
+      <link
+        rel='preload'
+        as='image'
+        href='/product-screenshots/profile-phone.png'
+        fetchPriority='high'
+      />
+
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
