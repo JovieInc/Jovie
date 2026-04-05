@@ -15,7 +15,7 @@ const FALLBACK_PROFILE_NOTIFICATIONS_CONTEXT: ProfileNotificationsContextValue =
     hydrationStatus: 'done',
     hasStoredContacts: false,
     notificationsEnabled: false,
-    channel: 'sms',
+    channel: 'email',
     setChannel: noop,
     subscribedChannels: {},
     setSubscribedChannels: noop,
@@ -23,6 +23,7 @@ const FALLBACK_PROFILE_NOTIFICATIONS_CONTEXT: ProfileNotificationsContextValue =
     setSubscriptionDetails: noop,
     openSubscription: noop,
     registerInputFocus: noop,
+    smsEnabled: false,
   };
 
 export function useProfileNotifications(): ProfileNotificationsContextValue {

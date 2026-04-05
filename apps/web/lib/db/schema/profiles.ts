@@ -205,6 +205,7 @@ export const creatorProfiles = pgTable(
       .default(false)
       .notNull(),
     nextTaskNumber: integer('next_task_number').default(1).notNull(),
+    smsAccessRequestedAt: timestamp('sms_access_requested_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
