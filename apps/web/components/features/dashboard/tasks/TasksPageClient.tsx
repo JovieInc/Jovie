@@ -1010,24 +1010,32 @@ export function TasksPageClient() {
   const { mutate: updateTask, isPending: isUpdatingTask } = updateTaskMutation;
   const { data: releases = [] } = useReleasesQuery(profileId ?? '');
 
-  const filters = useMemo(
-    () => ({
-      search: deferredSearch.trim() || undefined,
-      status: statusFilter === 'all' ? undefined : statusFilter,
-      priority: priorityFilter === 'all' ? undefined : priorityFilter,
-      assigneeKind: assigneeFilter === 'all' ? undefined : assigneeFilter,
-    }),
-    [assigneeFilter, deferredSearch, priorityFilter, statusFilter]
-  );
+  // Fetch all tasks once — filter client-side for instant search
+  const { data, isLoading, isError, refetch } = useTasksQuery(profileId);
 
-  const { data, isLoading, isError, refetch } = useTasksQuery(
-    profileId,
-    filters
-  );
   const tasks = useMemo(() => {
-    const nextTasks = data?.tasks ?? [];
-    return [...nextTasks].sort(compareTaskCompletionOrder);
-  }, [data?.tasks]);
+    const allTasks = data?.tasks ?? [];
+    const searchLower = deferredSearch.trim().toLowerCase();
+
+    const filtered = allTasks.filter(task => {
+      if (searchLower && !task.title.toLowerCase().includes(searchLower))
+        return false;
+      if (statusFilter !== 'all' && task.status !== statusFilter) return false;
+      if (priorityFilter !== 'all' && task.priority !== priorityFilter)
+        return false;
+      if (assigneeFilter !== 'all' && task.assigneeKind !== assigneeFilter)
+        return false;
+      return true;
+    });
+
+    return [...filtered].sort(compareTaskCompletionOrder);
+  }, [
+    data?.tasks,
+    deferredSearch,
+    statusFilter,
+    priorityFilter,
+    assigneeFilter,
+  ]);
   const mobileScopedTasks = useMemo(
     () => getMobileScopedTasks(tasks, mobileScope),
     [mobileScope, tasks]

@@ -1,28 +1,25 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   getTask,
   getTaskStats,
   getTasks,
 } from '@/app/app/(shell)/dashboard/tasks/task-actions';
 import { queryKeys, STANDARD_CACHE } from '@/lib/queries';
-import type { TaskFilters } from '@/lib/tasks/types';
 
 const TASK_STATS_CACHE = {
   staleTime: 30 * 1000,
   gcTime: 5 * 60 * 1000,
 };
 
-export function useTasksQuery(profileId?: string, filters?: TaskFilters) {
+export function useTasksQuery(profileId?: string) {
   return useQuery({
-    queryKey: queryKeys.tasks.list(
-      profileId,
-      filters as Record<string, unknown> | undefined
-    ),
+    queryKey: queryKeys.tasks.list(profileId),
     // eslint-disable-next-line @jovie/require-abort-signal -- server action, signal not passable
-    queryFn: () => getTasks(filters),
+    queryFn: () => getTasks(),
     ...STANDARD_CACHE,
+    placeholderData: keepPreviousData,
     enabled: Boolean(profileId),
   });
 }
