@@ -1,6 +1,6 @@
 {
-  "id": "7d8ac63b-1ae8-463d-ae1d-034bbc328ff8",
-  "prevId": "7111121f-fcc3-48b9-812a-1d180cf9acaa",
+  "id": "ac9bd975-72d3-49bc-9a89-49ef8f2f0717",
+  "prevId": "7d8ac63b-1ae8-463d-ae1d-034bbc328ff8",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5902,6 +5902,386 @@
         "dsp_bio_sync_requests_creator_profile_id_creator_profiles_id_fk": {
           "name": "dsp_bio_sync_requests_creator_profile_id_creator_profiles_id_fk",
           "tableFrom": "dsp_bio_sync_requests",
+          "tableTo": "creator_profiles",
+          "columnsFrom": ["creator_profile_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.dsp_catalog_mismatches": {
+      "name": "dsp_catalog_mismatches",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "scan_id": {
+          "name": "scan_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creator_profile_id": {
+          "name": "creator_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "isrc": {
+          "name": "isrc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mismatch_type": {
+          "name": "mismatch_type",
+          "type": "catalog_mismatch_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "external_track_id": {
+          "name": "external_track_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_track_name": {
+          "name": "external_track_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_album_name": {
+          "name": "external_album_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_album_id": {
+          "name": "external_album_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_artwork_url": {
+          "name": "external_artwork_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_artist_names": {
+          "name": "external_artist_names",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "catalog_mismatch_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'flagged'"
+        },
+        "dismissed_at": {
+          "name": "dismissed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dismissed_reason": {
+          "name": "dismissed_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dedup_key": {
+          "name": "dedup_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "dsp_catalog_mismatches_dedup_idx": {
+          "name": "dsp_catalog_mismatches_dedup_idx",
+          "columns": [
+            {
+              "expression": "dedup_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dsp_catalog_mismatches_creator_idx": {
+          "name": "dsp_catalog_mismatches_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dsp_catalog_mismatches_scan_idx": {
+          "name": "dsp_catalog_mismatches_scan_idx",
+          "columns": [
+            {
+              "expression": "scan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dsp_catalog_mismatches_status_idx": {
+          "name": "dsp_catalog_mismatches_status_idx",
+          "columns": [
+            {
+              "expression": "creator_profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "dsp_catalog_mismatches_scan_id_dsp_catalog_scans_id_fk": {
+          "name": "dsp_catalog_mismatches_scan_id_dsp_catalog_scans_id_fk",
+          "tableFrom": "dsp_catalog_mismatches",
+          "tableTo": "dsp_catalog_scans",
+          "columnsFrom": ["scan_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "dsp_catalog_mismatches_creator_profile_id_creator_profiles_id_fk": {
+          "name": "dsp_catalog_mismatches_creator_profile_id_creator_profiles_id_fk",
+          "tableFrom": "dsp_catalog_mismatches",
+          "tableTo": "creator_profiles",
+          "columnsFrom": ["creator_profile_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.dsp_catalog_scans": {
+      "name": "dsp_catalog_scans",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "creator_profile_id": {
+          "name": "creator_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "external_artist_id": {
+          "name": "external_artist_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "catalog_scan_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "catalog_isrc_count": {
+          "name": "catalog_isrc_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "dsp_isrc_count": {
+          "name": "dsp_isrc_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "matched_count": {
+          "name": "matched_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "unmatched_count": {
+          "name": "unmatched_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "missing_count": {
+          "name": "missing_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "coverage_pct": {
+          "name": "coverage_pct",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "albums_scanned": {
+          "name": "albums_scanned",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "tracks_scanned": {
+          "name": "tracks_scanned",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "dsp_catalog_scans_creator_idx": {
+          "name": "dsp_catalog_scans_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dsp_catalog_scans_status_idx": {
+          "name": "dsp_catalog_scans_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "dsp_catalog_scans_creator_profile_id_creator_profiles_id_fk": {
+          "name": "dsp_catalog_scans_creator_profile_id_creator_profiles_id_fk",
+          "tableFrom": "dsp_catalog_scans",
           "tableTo": "creator_profiles",
           "columnsFrom": ["creator_profile_id"],
           "columnsTo": ["id"],
@@ -15681,6 +16061,21 @@
       "name": "audience_member_type",
       "schema": "public",
       "values": ["anonymous", "email", "sms", "spotify", "customer"]
+    },
+    "public.catalog_mismatch_status": {
+      "name": "catalog_mismatch_status",
+      "schema": "public",
+      "values": ["flagged", "confirmed_mismatch", "dismissed"]
+    },
+    "public.catalog_mismatch_type": {
+      "name": "catalog_mismatch_type",
+      "schema": "public",
+      "values": ["not_in_catalog", "missing_from_dsp"]
+    },
+    "public.catalog_scan_status": {
+      "name": "catalog_scan_status",
+      "schema": "public",
+      "values": ["pending", "running", "completed", "failed"]
     },
     "public.chat_message_role": {
       "name": "chat_message_role",

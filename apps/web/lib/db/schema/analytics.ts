@@ -252,6 +252,7 @@ export const notificationSubscriptions = pgTable(
     ipAddress: text('ip_address'),
     source: text('source'),
     name: text('name'),
+    birthday: text('birthday'), // "MM-DD" format (month-day only, for birthday greetings)
     // Fan notification preferences for granular control
     preferences: jsonb('preferences')
       .$type<FanNotificationPreferences>()
