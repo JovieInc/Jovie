@@ -14,7 +14,12 @@ for (let index = 0; index < rawArgs.length; index += 1) {
     continue;
   }
 
-  if (arg === '--config' || arg.startsWith('--config=')) {
+  if (arg === '--config') {
+    index += 1;
+    continue;
+  }
+
+  if (arg.startsWith('--config=')) {
     continue;
   }
 
