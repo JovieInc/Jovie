@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { env } from '@/lib/env-client';
 import { ONBOARDING_STEPS } from './types';
@@ -28,6 +28,18 @@ export function useStepNavigation(
   const [currentStepIndex, setCurrentStepIndex] = useState(initialStepIndex);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clean up transition timer on unmount to prevent state updates on
+  // an unmounted component (e.g. fast navigation away from onboarding).
+  useEffect(() => {
+    return () => {
+      if (transitionTimerRef.current) {
+        clearTimeout(transitionTimerRef.current);
+      }
+    };
+  }, []);
+
   const goToNextStep = useCallback(() => {
     if (isTransitioning) return;
     if (currentStepIndex >= ONBOARDING_STEPS.length - 1) return;
@@ -36,7 +48,8 @@ export function useStepNavigation(
       return;
     }
     setIsTransitioning(true);
-    setTimeout(() => {
+    transitionTimerRef.current = setTimeout(() => {
+      transitionTimerRef.current = null;
       setCurrentStepIndex(prev => prev + 1);
       setIsTransitioning(false);
     }, 250);
@@ -50,7 +63,8 @@ export function useStepNavigation(
       return;
     }
     setIsTransitioning(true);
-    setTimeout(() => {
+    transitionTimerRef.current = setTimeout(() => {
+      transitionTimerRef.current = null;
       setCurrentStepIndex(prev => prev - 1);
       setIsTransitioning(false);
     }, 250);

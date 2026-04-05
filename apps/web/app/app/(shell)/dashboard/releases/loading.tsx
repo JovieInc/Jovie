@@ -16,5 +16,5 @@ export function ReleaseTableSkeleton(
  * Automatically used as Suspense fallback during route navigation.
  */
 export default function ReleasesLoading() {
-  return <ReleaseTableSkeleton />;
+  return <ReleaseTableSkeleton showHeader={false} />;
 }

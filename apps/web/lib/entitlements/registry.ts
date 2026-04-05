@@ -3,7 +3,11 @@
  *
  * All consumers (server.ts, usePlanGate, pricing page, rate-limit config) derive from this.
  * NO `import 'server-only'` — this must be client-importable.
+ *
+ * Pricing amounts are derived from plan-prices.ts (the canonical source).
  */
+
+import { PLAN_PRICES } from '@/lib/config/plan-prices';
 
 // ---------------------------------------------------------------------------
 // Plan IDs
@@ -214,7 +218,10 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       displayName: 'Pro',
       tagline: 'The serious artist toolkit.',
       features: PRO_FEATURES,
-      price: { monthly: 20, yearly: 192 },
+      price: {
+        monthly: PLAN_PRICES.pro.monthly,
+        yearly: PLAN_PRICES.pro.yearly,
+      },
     },
   },
   max: {
@@ -269,7 +276,10 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
         'White-label / custom domain',
         'A/B testing',
       ],
-      price: { monthly: 200, yearly: 1920 },
+      price: {
+        monthly: PLAN_PRICES.max.monthly,
+        yearly: PLAN_PRICES.max.yearly,
+      },
     },
   },
 } as const;

@@ -248,7 +248,7 @@ function AuthShellWrapperInner({
           {children}
         </div>
         <div className='absolute inset-0 z-10'>
-          <ReleaseTablePendingShell />
+          <ReleaseTablePendingShell showHeader={false} />
         </div>
       </div>
     ) : (

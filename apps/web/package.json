@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.4.116",
+  "version": "26.4.120",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -40,6 +40,7 @@
     "test:budgets": "tsx scripts/performance-budgets-guard.ts",
     "test:lighthouse:pr": "BASE_URL=${BASE_URL:-http://localhost:3000} lhci autorun --config=.lighthouserc.pr.json --collect.url=$BASE_URL/ --collect.url=$BASE_URL/tim",
     "test:lighthouse:dashboard:pr": "node scripts/lighthouse-dashboard-auth.cjs",
+    "test:lighthouse:onboarding:pr": "LIGHTHOUSE_CONFIG=.lighthouserc.onboarding.pr.json LIGHTHOUSE_DASHBOARD_URLS=/onboarding node scripts/lighthouse-dashboard-auth.cjs",
     "test:flaky": "tsx scripts/flaky-test-detector.ts",
     "test:e2e": "playwright test",
     "test:e2e:fast": "node scripts/run-playwright-fast.mjs",

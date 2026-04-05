@@ -48,8 +48,8 @@ export const TABLE_MIN_WIDTHS = {
  * Using a single generous count avoids layout shift when real data lands.
  */
 export const SKELETON_ROW_COUNT = {
-  /** Desktop table rows (44px each → 25 rows covers ~1100px) */
-  TABLE: 25,
+  /** Desktop table rows — 10 rows fills standard viewport without skeleton overload */
+  TABLE: 10,
   /** Mobile card rows (taller cards → fewer needed) */
   MOBILE: 16,
 } as const;

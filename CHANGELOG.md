@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.120] - 2026-04-05
+
+> Faster releases navigation and lighter loading placeholders improve perceived speed across all dashboard tables.
+
+### Changed
+
+- Releases page now prefetches on hover so navigation feels instant
+- Reduced table skeleton from 25 rows to 10 across all dashboard tables (releases, audience, contacts, tour dates)
+- Removed phantom skeleton header card that didn't match the real page layout
+
+## [26.4.119] - 2026-04-05
+
+### Changed
+
+- Unified all pricing constants into a single source of truth (`lib/config/plan-prices.ts`)
+- Billing, marketing, and upgrade flows now derive prices from one shared file instead of maintaining independent copies
+- Added `toCents()` helper with `Math.round` for safe dollar-to-cent conversion
+
+### Added
+
+- Pricing invariant tests (tier ordering, annual discount, float safety)
+
+## [26.4.118] - 2026-04-05
+
+> Admin tables cleaned up: fewer redundant badges, visible checkboxes, always-on search. Public profile pages now fit the mobile viewport.
+
+### Changed
+
+- Merged Funnel, Status, and Lifecycle columns into a single Status column on the admin users table (12 to 10 columns)
+- Search fields on admin Users, Creators, and Releases pages are now always visible instead of hidden behind an icon
+
+### Fixed
+
+- Table checkboxes are now visible in their unchecked state (removed override that made borders nearly invisible)
+- Public profile pages no longer scroll on mobile — viewport locks to screen height, hero image shrinks to fit
+
 ## [26.4.117] - 2026-04-05
 
 > The Growth admin page is now a self-driving pipeline dashboard. Pick a speed, watch the funnel, inspect leads if curious.

@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingFormWrapper } from '@/features/dashboard/organisms/OnboardingFormWrapper';
 
@@ -20,7 +20,7 @@ describe('OnboardingFormWrapper', () => {
     globalThis.sessionStorage.clear();
   });
 
-  it('hydrates pending claim handles after mount instead of during the first render', async () => {
+  it('resolves pending claim handles synchronously on first render', () => {
     globalThis.sessionStorage.setItem(
       'pendingClaim',
       JSON.stringify({ handle: 'claimedhandle', ts: Date.now() })
@@ -28,16 +28,11 @@ describe('OnboardingFormWrapper', () => {
 
     render(<OnboardingFormWrapper userId='user_123' />);
 
+    // The handle is resolved eagerly in the useState initializer to avoid
+    // a key-change remount that would cause visible layout shift.
+    expect(formPropsSpy).toHaveBeenCalledTimes(1);
     expect(formPropsSpy.mock.calls[0]?.[0]).toMatchObject({
-      initialHandle: '',
-    });
-
-    await waitFor(() => {
-      expect(formPropsSpy).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          initialHandle: 'claimedhandle',
-        })
-      );
+      initialHandle: 'claimedhandle',
     });
 
     expect(globalThis.sessionStorage.getItem('pendingClaim')).toBeNull();

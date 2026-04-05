@@ -5,18 +5,10 @@ import type { Row, Table } from '@tanstack/react-table';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
-import { alignment } from '../table.styles';
-
 /**
  * Checkbox state types
  */
 export type CheckboxState = 'checked' | 'unchecked' | 'indeterminate' | boolean;
-
-// Shared checkbox styling for consistent appearance (uses design tokens)
-const CHECKBOX_STYLES = cn(
-  alignment.checkboxSize,
-  'rounded-sm border border-subtle bg-surface-0 text-secondary-token transition-all duration-100 ease-out data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-white data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-white'
-);
 
 // Legacy props (backwards compatibility)
 export interface TableCheckboxCellLegacyProps {
@@ -84,7 +76,6 @@ function TanStackHeaderCheckbox({
         checked={normalizedState === 'checked'}
         indeterminate={normalizedState === 'indeterminate'}
         onCheckedChange={onToggleSelectAll}
-        className={CHECKBOX_STYLES}
       />
     </div>
   );
@@ -130,7 +121,6 @@ function TanStackRowCheckbox({
           }
           checked={isChecked}
           onCheckedChange={onToggleSelect}
-          className={CHECKBOX_STYLES}
         />
       </div>
     </div>

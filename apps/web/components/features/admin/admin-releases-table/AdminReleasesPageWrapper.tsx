@@ -53,6 +53,7 @@ export function AdminReleasesPageWrapper(
     setHeaderActions(
       <div className='flex items-center gap-1.5'>
         <HeaderSearchAction
+          alwaysOpen
           searchValue={searchQuery}
           onSearchValueChange={setSearchQuery}
           placeholder='Search releases or artists'

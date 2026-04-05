@@ -206,7 +206,7 @@ export function DashboardNav(_: DashboardNavProps) {
           item={item}
           isActive={isActive}
           shortcut={shortcut}
-          prefetch={isReleasesItem ? false : undefined}
+          prefetch={undefined}
           actions={isProfileItem ? profileActions : null}
           onClick={onClick}
           preventNavigation={demoUnavailable}
@@ -214,9 +214,7 @@ export function DashboardNav(_: DashboardNavProps) {
           onNavigate={
             isReleasesItem ? () => showPendingShell('releases') : undefined
           }
-          onPrefetch={
-            isReleasesItem ? undefined : () => handlePrefetch(item.id)
-          }
+          onPrefetch={() => handlePrefetch(item.id)}
         />
       );
     },
