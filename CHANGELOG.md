@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.116] - 2026-04-04
+## [26.4.119] - 2026-04-05
 
 ### Changed
 
@@ -16,6 +16,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Added
 
 - Pricing invariant tests (tier ordering, annual discount, float safety)
+
+## [26.4.118] - 2026-04-05
+
+> Public profile pages now fit the mobile viewport without scrolling. The hero image scales to fill remaining space while content stays pinned.
+
+### Fixed
+
+- Public profile pages no longer scroll on mobile — viewport locks to screen height, hero image shrinks to fit
 
 ## [26.4.117] - 2026-04-05
 
