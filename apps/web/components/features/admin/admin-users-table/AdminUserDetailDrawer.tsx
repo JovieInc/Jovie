@@ -170,7 +170,7 @@ export function AdminUserDetailDrawer({
                     {user.plan}
                   </Badge>
                   {user.deletedAt ? (
-                    <Badge size='sm' variant='warning'>
+                    <Badge size='sm' variant='destructive'>
                       Deleted
                     </Badge>
                   ) : (
