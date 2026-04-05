@@ -71,7 +71,8 @@ body:has(.profile-viewport) {
   body:has(.profile-viewport) {
     height: auto;
     min-height: 100%;
-    overflow: visible;
+    overflow-x: clip;
+    overflow-y: auto;
     overscroll-behavior: auto;
   }
 }

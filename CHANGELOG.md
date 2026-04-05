@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.118] - 2026-04-05
 
+> Public profile pages now fit the mobile viewport without scrolling. The hero image scales to fill remaining space while content stays pinned.
+
 ### Fixed
 
 - Public profile pages no longer scroll on mobile — viewport locks to screen height, hero image shrinks to fit
