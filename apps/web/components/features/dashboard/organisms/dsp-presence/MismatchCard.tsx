@@ -10,7 +10,7 @@ type MismatchAction = 'confirmed_mismatch' | 'dismissed';
 interface MismatchCardProps {
   readonly mismatch: CatalogMismatch;
   readonly onAction: (id: string, status: MismatchAction) => Promise<boolean>;
-  readonly onRemoved: (id: string) => void;
+  readonly onRemoved: (id: string, action: MismatchAction) => void;
 }
 
 const UNDO_DELAY_MS = 3000;
@@ -47,7 +47,7 @@ export function MismatchCard({
         if (success) {
           setRemoving(true);
           // Allow animation to complete before notifying parent
-          setTimeout(() => onRemoved(mismatch.id), 300);
+          setTimeout(() => onRemoved(mismatch.id, action), 300);
         } else {
           setError(true);
           setPendingAction(null);

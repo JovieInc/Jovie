@@ -20,8 +20,8 @@ const baseMismatch: CatalogMismatch = {
   dismissedAt: null,
   dismissedReason: null,
   dedupKey: 'profile-1:USRC12345678:spotify',
-  createdAt: new Date(),
-  updatedAt: new Date(),
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
 };
 
 describe('MismatchCard', () => {
@@ -209,7 +209,7 @@ describe('MismatchCard', () => {
     vi.advanceTimersByTime(300);
 
     await waitFor(() => {
-      expect(mockOnRemoved).toHaveBeenCalledWith('mismatch-1');
+      expect(mockOnRemoved).toHaveBeenCalledWith('mismatch-1', 'dismissed');
     });
   });
 

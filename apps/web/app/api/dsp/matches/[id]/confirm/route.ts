@@ -7,7 +7,7 @@
  * Authentication: Required (creator must own the profile)
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
@@ -162,7 +162,17 @@ export async function POST(
         const [existingScan] = await db
           .select({ id: dspCatalogScans.id })
           .from(dspCatalogScans)
-          .where(eq(dspCatalogScans.creatorProfileId, profileId))
+          .where(
+            and(
+              eq(dspCatalogScans.creatorProfileId, profileId),
+              eq(dspCatalogScans.providerId, 'spotify'),
+              or(
+                eq(dspCatalogScans.status, 'pending'),
+                eq(dspCatalogScans.status, 'running'),
+                eq(dspCatalogScans.status, 'completed')
+              )
+            )
+          )
           .limit(1);
 
         if (!existingScan) {

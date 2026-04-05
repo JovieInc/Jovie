@@ -87,7 +87,14 @@ export function CatalogHealthSection({
 
   const pollScanStatus = useCallback(
     (scanId: string) => {
+      let attempts = 0;
+      const MAX_ATTEMPTS = 60; // ~2 min at 2s cadence
       const poll = async () => {
+        if (attempts++ >= MAX_ATTEMPTS) {
+          setIsScanning(false);
+          setScanError('Scan timed out. Please retry.');
+          return;
+        }
         try {
           const res = await fetch(
             `/api/dsp/catalog-scan/status?scanId=${scanId}`
@@ -172,10 +179,15 @@ export function CatalogHealthSection({
     []
   );
 
-  const handleCardRemoved = useCallback((id: string) => {
-    setConfirmedNotMineCount(prev => prev + 1);
-    setLocalMismatches(prev => (prev ? prev.filter(m => m.id !== id) : prev));
-  }, []);
+  const handleCardRemoved = useCallback(
+    (id: string, action: 'confirmed_mismatch' | 'dismissed') => {
+      if (action === 'confirmed_mismatch') {
+        setConfirmedNotMineCount(prev => prev + 1);
+      }
+      setLocalMismatches(prev => (prev ? prev.filter(m => m.id !== id) : prev));
+    },
+    []
+  );
 
   const handleBulkDismiss = useCallback(async () => {
     const ids = unresolvedNotInCatalog.map(m => m.id);
@@ -188,15 +200,14 @@ export function CatalogHealthSection({
         })
       )
     );
-    const succeeded = results.filter(r => r.status === 'fulfilled').length;
-    if (succeeded > 0) {
+    const succeededIds = ids.filter(
+      (_, i) =>
+        results[i].status === 'fulfilled' &&
+        (results[i] as PromiseFulfilledResult<Response>).value.ok
+    );
+    if (succeededIds.length > 0) {
       setLocalMismatches(prev =>
-        prev
-          ? prev.filter(
-              m =>
-                !(m.status === 'flagged' && m.mismatchType === 'not_in_catalog')
-            )
-          : prev
+        prev ? prev.filter(m => !succeededIds.includes(m.id)) : prev
       );
     }
   }, [unresolvedNotInCatalog]);

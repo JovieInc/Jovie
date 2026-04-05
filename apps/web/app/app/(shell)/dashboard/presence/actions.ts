@@ -153,7 +153,8 @@ export async function getUnresolvedMismatchCount(
         .where(
           and(
             eq(dspCatalogMismatches.creatorProfileId, profileId),
-            eq(dspCatalogMismatches.status, 'flagged')
+            eq(dspCatalogMismatches.status, 'flagged'),
+            eq(dspCatalogMismatches.mismatchType, 'not_in_catalog')
           )
         ),
     'loadDspPresence:unresolvedMismatchCount'
