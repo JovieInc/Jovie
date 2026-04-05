@@ -388,6 +388,7 @@ export {
   useSubscribeNotificationsMutation,
   useUnsubscribeNotificationsMutation,
   useUpdateContentPreferencesMutation,
+  useUpdateSubscriberBirthdayMutation,
   useUpdateSubscriberNameMutation,
   useVerifyEmailOtpMutation,
 } from './useNotificationStatusQuery';

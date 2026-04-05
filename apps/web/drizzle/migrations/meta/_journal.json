@@ -162,6 +162,13 @@
       "when": 1774998129788,
       "tag": "0022_ordinary_romulus",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1775340180216,
+      "tag": "0023_good_zaladane",
+      "breakpoints": true
     }
   ]
 }
