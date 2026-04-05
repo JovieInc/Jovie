@@ -220,6 +220,26 @@ export function useTrackAudioPlayer() {
     audio.currentTime = Math.max(0, Math.min(time, audio.duration));
   }, []);
 
+  const stop = useCallback(() => {
+    const audio = getAudio();
+    if (audio) {
+      audio.pause();
+      audio.src = '';
+    }
+    setState({
+      activeTrackId: null,
+      isPlaying: false,
+      playbackStatus: 'idle',
+      lastErrorReason: null,
+      currentTime: 0,
+      duration: 0,
+      trackTitle: null,
+      releaseTitle: null,
+      artistName: null,
+      artworkUrl: null,
+    });
+  }, []);
+
   const onError = useCallback(
     (cb: (reason: PlaybackState['lastErrorReason']) => void) => {
       errorListeners.add(cb);
@@ -234,6 +254,7 @@ export function useTrackAudioPlayer() {
     playbackState,
     toggleTrack,
     seek,
+    stop,
     onError,
   };
 }
