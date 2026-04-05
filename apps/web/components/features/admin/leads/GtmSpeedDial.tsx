@@ -2,7 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
@@ -29,9 +29,9 @@ const SPEED_PRESETS: Record<Speed, Partial<LeadPipelineSettings>> = {
     enabled: false,
     discoveryEnabled: false,
     autoIngestEnabled: false,
-    dailySendCap: 0,
-    maxPerHour: 0,
-    dailyQueryBudget: 0,
+    dailySendCap: 1,
+    maxPerHour: 1,
+    dailyQueryBudget: 1,
   },
   test: {
     enabled: true,
@@ -105,6 +105,13 @@ export function GtmSpeedDial() {
     null
   );
 
+  // Clear optimistic state once fresh data arrives from the refetch
+  useEffect(() => {
+    if (settingsQuery.data?.settings) {
+      setOptimisticSpeed(null);
+    }
+  }, [settingsQuery.data]);
+
   const settings = settingsQuery.data?.settings;
 
   if (settingsQuery.isLoading || !settings) {
@@ -130,8 +137,6 @@ export function GtmSpeedDial() {
     } catch {
       setOptimisticSpeed(null);
       toast.error('Failed to update pipeline speed');
-    } finally {
-      setOptimisticSpeed(null);
     }
   }
 
@@ -149,6 +154,7 @@ export function GtmSpeedDial() {
             type='button'
             onClick={() => void applySpeed(speed)}
             disabled={mutation.isPending}
+            aria-pressed={currentSpeed === speed}
             className={cn(
               'rounded-[10px] px-3.5 py-1.5 text-[13px] font-[510] transition-colors',
               currentSpeed === speed

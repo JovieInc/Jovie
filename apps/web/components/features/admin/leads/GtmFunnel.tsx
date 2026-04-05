@@ -1,7 +1,9 @@
 import { ChevronRight } from 'lucide-react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { getLeadFunnelReport } from '@/lib/leads/reporting';
-import { getLeadFunnelCounts, type LeadFunnelCounts } from './LeadPipelineKpis';
+import type { LeadFunnelCounts } from './LeadPipelineKpis';
+
+export type { LeadFunnelCounts } from './LeadPipelineKpis';
 
 function FunnelStage({
   label,
@@ -83,11 +85,12 @@ export function GtmFunnelSkeleton() {
   );
 }
 
-export async function GtmFunnel() {
-  const [counts, report] = await Promise.all([
-    getLeadFunnelCounts(),
-    getLeadFunnelReport(),
-  ]);
+interface GtmFunnelProps {
+  readonly counts: LeadFunnelCounts;
+}
+
+export async function GtmFunnel({ counts }: GtmFunnelProps) {
+  const report = await getLeadFunnelReport();
 
   const discovered = counts.discovered ?? 0;
   const qualified = counts.qualified ?? 0;
@@ -102,7 +105,10 @@ export async function GtmFunnel() {
   const { summary } = report;
 
   return (
-    <ContentSurfaceCard className='overflow-hidden px-(--linear-app-content-padding-x) py-4'>
+    <ContentSurfaceCard
+      className='overflow-hidden px-(--linear-app-content-padding-x) py-4'
+      data-testid='gtm-pipeline-status'
+    >
       {/* Pipeline status (all time) */}
       <p className='mb-2 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
         Pipeline status
@@ -126,7 +132,7 @@ export async function GtmFunnel() {
         />
       </div>
 
-      {/* Conversion (this week) */}
+      {/* Conversion (last 30 days) */}
       {summary.contacted > 0 && (
         <div className='mt-4 border-t border-subtle pt-3'>
           <p className='mb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
@@ -150,5 +156,3 @@ export async function GtmFunnel() {
     </ContentSurfaceCard>
   );
 }
-
-export type { LeadFunnelCounts };

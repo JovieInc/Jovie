@@ -46,7 +46,7 @@ export default async function AdminGrowthPage({
         <GtmSpeedDial />
       </Suspense>
       <Suspense fallback={<GtmFunnelSkeleton />}>
-        <GtmFunnel />
+        <GtmFunnel counts={counts} />
       </Suspense>
       <LeadTable
         funnelCounts={counts}

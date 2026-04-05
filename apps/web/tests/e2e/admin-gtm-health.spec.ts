@@ -65,7 +65,7 @@ test.describe('Admin GTM Health @smoke', () => {
       await expect(page.getByTestId('admin-growth-view-leads')).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
-      await expect(page.getByText('Pipeline status')).toBeVisible({
+      await expect(page.getByTestId('gtm-pipeline-status')).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
       await expect(

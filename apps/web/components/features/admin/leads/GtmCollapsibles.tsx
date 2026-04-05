@@ -1,10 +1,51 @@
 'use client';
 
 import { ChevronRight } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { type ReactNode, useCallback, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AnimatedAccordion } from '@/components/organisms/AnimatedAccordion';
 import { cn } from '@/lib/utils';
+
+const OutreachOverviewPanel = dynamic(
+  () =>
+    import('@/components/features/admin/outreach/OutreachOverviewPanel').then(
+      m => m.OutreachOverviewPanel
+    ),
+  { ssr: false }
+);
+
+const InviteCampaignManager = dynamic(
+  () =>
+    import('@/components/features/admin/campaigns/InviteCampaignManager').then(
+      m => m.InviteCampaignManager
+    ),
+  { ssr: false }
+);
+
+const UnifiedUrlIntake = dynamic(
+  () =>
+    import('@/features/admin/leads/UnifiedUrlIntake').then(
+      m => m.UnifiedUrlIntake
+    ),
+  { ssr: false }
+);
+
+const LeadKeywordsManager = dynamic(
+  () =>
+    import('@/features/admin/leads/LeadKeywordsManager').then(
+      m => m.LeadKeywordsManager
+    ),
+  { ssr: false }
+);
+
+const LeadPipelineControls = dynamic(
+  () =>
+    import('@/features/admin/leads/LeadPipelineControls').then(
+      m => m.LeadPipelineControls
+    ),
+  { ssr: false }
+);
 
 interface AccordionSectionProps {
   readonly title: string;
@@ -24,6 +65,7 @@ function AccordionSection({
       <button
         type='button'
         onClick={onToggle}
+        aria-expanded={isOpen}
         className='flex w-full items-center gap-2 px-(--linear-app-content-padding-x) py-3 text-left'
       >
         <ChevronRight
@@ -38,26 +80,6 @@ function AccordionSection({
       </button>
       <AnimatedAccordion isOpen={isOpen}>{children}</AnimatedAccordion>
     </ContentSurfaceCard>
-  );
-}
-
-// Lazy wrappers for secondary panels (only load when opened)
-function LazyOutreachCampaignsInsights({
-  hasOpened,
-}: Readonly<{ hasOpened: boolean }>) {
-  if (!hasOpened) return null;
-
-  // Import inline to avoid loading until needed
-  const OutreachOverviewPanel =
-    require('@/components/features/admin/outreach/OutreachOverviewPanel').OutreachOverviewPanel;
-  const InviteCampaignManager =
-    require('@/components/features/admin/campaigns/InviteCampaignManager').InviteCampaignManager;
-
-  return (
-    <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
-      <OutreachOverviewPanel />
-      <InviteCampaignManager />
-    </div>
   );
 }
 
@@ -115,7 +137,12 @@ export function GtmCollapsibles({ initialOpen }: GtmCollapsiblesProps) {
         isOpen={openSections.has(0)}
         onToggle={() => toggle(0)}
       >
-        {everOpened.has(0) && <ToolsContent />}
+        {everOpened.has(0) && (
+          <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+            <UnifiedUrlIntake />
+            <LeadKeywordsManager />
+          </div>
+        )}
       </AccordionSection>
 
       <AccordionSection
@@ -123,7 +150,15 @@ export function GtmCollapsibles({ initialOpen }: GtmCollapsiblesProps) {
         isOpen={openSections.has(1)}
         onToggle={() => toggle(1)}
       >
-        {everOpened.has(1) && <AdvancedSettingsContent />}
+        {everOpened.has(1) && (
+          <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+            <p className='mb-3 text-[12px] font-[450] text-secondary-token'>
+              These values are set automatically by the speed dial. Override
+              here if needed.
+            </p>
+            <LeadPipelineControls hideMainSwitch />
+          </div>
+        )}
       </AccordionSection>
 
       <AccordionSection
@@ -131,37 +166,13 @@ export function GtmCollapsibles({ initialOpen }: GtmCollapsiblesProps) {
         isOpen={openSections.has(2)}
         onToggle={() => toggle(2)}
       >
-        <LazyOutreachCampaignsInsights hasOpened={everOpened.has(2)} />
+        {everOpened.has(2) && (
+          <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+            <OutreachOverviewPanel />
+            <InviteCampaignManager />
+          </div>
+        )}
       </AccordionSection>
-    </div>
-  );
-}
-
-function ToolsContent() {
-  const UnifiedUrlIntake =
-    require('@/features/admin/leads/UnifiedUrlIntake').UnifiedUrlIntake;
-  const LeadKeywordsManager =
-    require('@/features/admin/leads/LeadKeywordsManager').LeadKeywordsManager;
-
-  return (
-    <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
-      <UnifiedUrlIntake />
-      <LeadKeywordsManager />
-    </div>
-  );
-}
-
-function AdvancedSettingsContent() {
-  const LeadPipelineControls =
-    require('@/features/admin/leads/LeadPipelineControls').LeadPipelineControls;
-
-  return (
-    <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
-      <p className='mb-3 text-[12px] font-[450] text-secondary-token'>
-        These values are set automatically by the speed dial. Override here if
-        needed.
-      </p>
-      <LeadPipelineControls hideMainSwitch />
     </div>
   );
 }

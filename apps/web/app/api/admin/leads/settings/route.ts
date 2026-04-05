@@ -97,6 +97,7 @@ function isMissingLeadPipelineSettingsSchemaError(error: unknown): boolean {
     'column "guardrails_enabled"',
     'column "guardrail_thresholds"',
     'column "auto_ingest_daily_limit"',
+    'column "auto_ingested_today"',
   ].some(pattern => message.includes(pattern));
 }
 

@@ -2,7 +2,7 @@ import { count, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
-import { captureWarning } from '@/lib/error-tracking';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 
 export type LeadFunnelCounts = Record<string, number>;
 
@@ -24,19 +24,27 @@ function isMissingLeadPipelineSettingsSchemaError(error: unknown): boolean {
 
 /** Single GROUP BY query for all lead status counts. */
 export async function getLeadFunnelCounts(): Promise<LeadFunnelCounts> {
-  const rows = await db
-    .select({
-      status: leads.status,
-      count: count(),
-    })
-    .from(leads)
-    .groupBy(leads.status);
+  try {
+    const rows = await db
+      .select({
+        status: leads.status,
+        count: count(),
+      })
+      .from(leads)
+      .groupBy(leads.status);
 
-  const counts: LeadFunnelCounts = {};
-  for (const row of rows) {
-    counts[row.status] = row.count;
+    const counts: LeadFunnelCounts = {};
+    for (const row of rows) {
+      counts[row.status] = row.count;
+    }
+    return counts;
+  } catch (error) {
+    await captureError(
+      '[admin/leads/kpis] Failed to fetch funnel counts',
+      error
+    );
+    return {};
   }
-  return counts;
 }
 
 export interface PipelineSettingsSummary {
