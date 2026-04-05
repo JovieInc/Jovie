@@ -370,6 +370,7 @@ export function ArtistNotificationsCTA({
     openSubscription,
     registerInputFocus,
     hydrationStatus,
+    smsEnabled,
   } = useSubscriptionForm({ artist });
 
   const inputId = useId();
@@ -475,13 +476,13 @@ export function ArtistNotificationsCTA({
               onOpenChange={setIsCountryOpen}
               onSelect={setCountry}
             />
-          ) : (
+          ) : smsEnabled ? (
             <ChannelToggle
               channel={channel}
               isSubmitting={isSubmitting}
               onChannelChange={handleChannelChange}
             />
-          )
+          ) : undefined
         }
         action={
           <button

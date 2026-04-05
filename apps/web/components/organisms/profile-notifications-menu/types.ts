@@ -26,6 +26,7 @@ export interface ProfileNotificationsMenuProps {
   readonly subscribedChannels: NotificationSubscriptionState;
   readonly subscriptionDetails: NotificationContactValues;
   readonly triggerRef?: React.RefObject<HTMLButtonElement | null>;
+  readonly smsEnabled?: boolean;
 }
 
 export interface UseNotificationConfirmReturn {

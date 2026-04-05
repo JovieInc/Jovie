@@ -14,6 +14,7 @@ export function NotificationsPageClient({ artist }: Props) {
     artist,
     socialLinks: [],
     contacts: [],
+    smsEnabled: false,
   });
 
   return (
