@@ -1,0 +1,1 @@
+/Users/timwhite/conductor/workspaces/jovie/singapore/.claude/skills/gstack/design-shotgun/SKILL.md

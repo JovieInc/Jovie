@@ -937,7 +937,8 @@ function getGeoFromRequest(req: NextRequest): {
     geo?: { city?: string | null; region?: string | null };
   };
 
-  const cityFromHeader = req.headers.get('x-vercel-ip-city')?.trim() ?? null;
+  const rawCity = req.headers.get('x-vercel-ip-city')?.trim() ?? null;
+  const cityFromHeader = rawCity ? decodeURIComponent(rawCity) : null;
   const regionFromHeader =
     req.headers.get('x-vercel-ip-country-region')?.trim() ?? null;
 
