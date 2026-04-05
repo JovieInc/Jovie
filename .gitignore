@@ -92,3 +92,4 @@ logs/security/
 output/
 .audit/
 .gstack/
+.claude/skills/gstack/.factory/
