@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.122] - 2026-04-05
+
+### Fixed
+
+- Inline editable fields (ISRC, UPC, Label) no longer shift the layout when entering or exiting edit mode
+
 ## [26.4.121] - 2026-04-05
 
 > Catalog scan moves from a dedicated page into the Presence page as an inline triage section. One click per mismatch instead of four.
