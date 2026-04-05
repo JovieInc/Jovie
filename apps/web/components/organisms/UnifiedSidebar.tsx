@@ -169,7 +169,7 @@ function SettingsNavigation({
       </div>
       <div>
         <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-          Workspace
+          Artist
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />
       </div>
@@ -212,18 +212,18 @@ function SidebarHeaderNav({
             <div className='flex w-full items-center gap-2'>
               <Link
                 href={APP_ROUTES.DASHBOARD}
-                aria-label='Back to app'
+                aria-label='Back to App'
                 className={cn(
-                  'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[10px] px-2.5 text-app tracking-tight text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
+                  'inline-flex h-6 shrink-0 items-center gap-1 rounded-[8px] px-2 text-[12px] text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
                   'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
                 )}
               >
                 <ArrowLeft
-                  className='size-3 text-sidebar-item-icon'
+                  className='size-3.5 text-sidebar-item-icon'
                   aria-hidden='true'
                 />
                 <span className='truncate group-data-[collapsible=icon]:hidden'>
-                  Back to app
+                  Back to App
                 </span>
               </Link>
             </div>

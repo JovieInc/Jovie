@@ -20,6 +20,7 @@ import { DashboardLinksDemo } from '@/features/home/demo/DashboardLinksDemo';
 import { DemoAuthShell } from './DemoAuthShell';
 import { DemoClientProviders } from './DemoClientProviders';
 import { DemoReleaseLandingSurface } from './DemoReleaseLandingSurface';
+import { DemoReleasePresaveSurface } from './DemoReleasePresaveSurface';
 import { DemoReleasesExperience } from './DemoReleasesExperience';
 import { DemoReleaseTasksSurface } from './DemoReleaseTasksSurface';
 import { DemoSettingsPanel } from './DemoSettingsPanel';
@@ -227,6 +228,8 @@ export function DemoShowcaseSurface({
       );
     case 'release-landing':
       return <DemoReleaseLandingSurface />;
+    case 'release-presave':
+      return <DemoReleasePresaveSurface />;
     case 'release-tasks':
       return <DemoReleaseTasksSurface />;
     case 'onboarding-handle':
