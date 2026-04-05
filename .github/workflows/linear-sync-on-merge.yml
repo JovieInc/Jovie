@@ -56,13 +56,10 @@ jobs:
           ISSUE_DATA=$(curl -sS https://api.linear.app/graphql \
             -H "Authorization: ${LINEAR_API_KEY}" \
             -H 'Content-Type: application/json' \
-            -d "$(cat <<JSON
-          {
-            \"query\": \"query IssueDoneState($issueId: String!) { issue(id: $issueId) { team { states { nodes { id name type } } } } }\",
-            \"variables\": { \"issueId\": \"${ISSUE_ID}\" }
-          }
-          JSON
-          )")
+            -d "$(jq -cn --arg issueId "$ISSUE_ID" '{
+              query: "query IssueDoneState($issueId: String!) { issue(id: $issueId) { team { states { nodes { id name type } } } } }",
+              variables: { issueId: $issueId }
+            }')")
 
           DONE_STATE_ID=$(echo "$ISSUE_DATA" | jq -r '
             .data.issue.team.states.nodes
@@ -74,25 +71,22 @@ jobs:
             curl -sS https://api.linear.app/graphql \
               -H "Authorization: ${LINEAR_API_KEY}" \
               -H 'Content-Type: application/json' \
-              -d "$(cat <<JSON
-            {
-              \"query\": \"mutation SetIssueDone($issueId: String!, $stateId: String!) { issueUpdate(id: $issueId, input: { stateId: $stateId }) { success } }\",
-              \"variables\": { \"issueId\": \"${ISSUE_ID}\", \"stateId\": \"${DONE_STATE_ID}\" }
-            }
-            JSON
-            )" > /dev/null
+              -d "$(jq -cn \
+                --arg issueId "$ISSUE_ID" \
+                --arg stateId "$DONE_STATE_ID" \
+                '{
+                  query: "mutation SetIssueDone($issueId: String!, $stateId: String!) { issueUpdate(id: $issueId, input: { stateId: $stateId }) { success } }",
+                  variables: { issueId: $issueId, stateId: $stateId }
+                }')" > /dev/null
           fi
 
           curl -sS https://api.linear.app/graphql \
             -H "Authorization: ${LINEAR_API_KEY}" \
             -H 'Content-Type: application/json' \
-            -d "$(cat <<JSON
-          {
-            \"query\": \"mutation AddDoneComment($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }\",
-            \"variables\": {
-              \"issueId\": \"${ISSUE_ID}\",
-              \"body\": \"PR merged for ${ISSUE_IDENTIFIER}: ${PR_URL} (merge SHA: ${MERGE_SHA})\"
-            }
-          }
-          JSON
-          )" > /dev/null
+            -d "$(jq -cn \
+              --arg issueId "$ISSUE_ID" \
+              --arg body "PR merged for ${ISSUE_IDENTIFIER}: ${PR_URL} (merge SHA: ${MERGE_SHA})" \
+              '{
+                query: "mutation AddDoneComment($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }",
+                variables: { issueId: $issueId, body: $body }
+              }')" > /dev/null

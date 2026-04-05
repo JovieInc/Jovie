@@ -48,7 +48,6 @@ interface ProfileFeaturedCardProps {
   readonly latestRelease?: ReleaseSummary | null;
   readonly tourDates: readonly TourDateViewModel[];
   readonly dsps: AvailableDSP[];
-  readonly enableDynamicEngagement?: boolean;
 }
 
 export function ProfileFeaturedCard({

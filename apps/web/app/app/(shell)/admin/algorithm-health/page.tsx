@@ -5,7 +5,7 @@ import { ALGORITHM_HEALTH_E2E_REPORT } from './fixture';
 
 interface AlgorithmHealthPageProps {
   readonly searchParams: Promise<{
-    fixture?: string | string[] | undefined;
+    fixture?: string | string[];
   }>;
 }
 

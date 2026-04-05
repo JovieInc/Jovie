@@ -118,11 +118,7 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  apps/extension:
-    dependencies:
-      '@jovie/extension-contracts':
-        specifier: workspace:*
-        version: link:../../packages/extension-contracts
+  apps/extension: {}
 
   apps/should-i-make:
     dependencies:

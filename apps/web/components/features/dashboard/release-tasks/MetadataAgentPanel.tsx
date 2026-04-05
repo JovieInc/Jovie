@@ -46,6 +46,13 @@ interface MetadataAgentRequest {
   readonly targets: MetadataAgentTarget[];
 }
 
+interface MetadataAgentStatusResponse {
+  readonly success?: boolean;
+  readonly requests?: MetadataAgentRequest[];
+  readonly storageAvailable?: boolean;
+  readonly error?: string;
+}
+
 interface MetadataAgentPanelProps {
   readonly profileId: string;
   readonly releaseId: string;
@@ -81,6 +88,7 @@ export function MetadataAgentPanel({
 }: MetadataAgentPanelProps) {
   const [providers, setProviders] = useState<MetadataAgentProvider[]>([]);
   const [requests, setRequests] = useState<MetadataAgentRequest[]>([]);
+  const [storageAvailable, setStorageAvailable] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionState, setActionState] = useState<ActionState>('idle');
   const [isPending, startTransition] = useTransition();
@@ -91,6 +99,7 @@ export function MetadataAgentPanel({
     async function loadPanelData() {
       setActionState('loading');
       setError(null);
+      setStorageAvailable(true);
 
       try {
         const [providersResponse, statusResponse] = await Promise.all([
@@ -113,10 +122,13 @@ export function MetadataAgentPanel({
           throw new Error('Unable to load metadata agent state.');
         }
 
-        const [providersPayload, statusPayload] = await Promise.all([
+        const [providersPayload, statusPayload] = (await Promise.all([
           providersResponse.json(),
           statusResponse.json(),
-        ]);
+        ])) as [
+          { providers?: MetadataAgentProvider[] },
+          MetadataAgentStatusResponse,
+        ];
 
         if (cancelled) {
           return;
@@ -124,6 +136,13 @@ export function MetadataAgentPanel({
 
         setProviders(providersPayload.providers ?? []);
         setRequests(statusPayload.requests ?? []);
+        setStorageAvailable(statusPayload.storageAvailable !== false);
+        if (statusPayload.storageAvailable === false) {
+          setError(
+            statusPayload.error ??
+              'Metadata submission storage is not available in this environment.'
+          );
+        }
         setActionState('idle');
       } catch (loadError) {
         if (cancelled) {
@@ -189,9 +208,17 @@ export function MetadataAgentPanel({
       throw new Error('Unable to refresh metadata submission status.');
     }
 
-    const payload = await response.json();
+    const payload = (await response.json()) as MetadataAgentStatusResponse;
     startTransition(() => {
       setRequests(payload.requests ?? []);
+      const available = payload.storageAvailable !== false;
+      setStorageAvailable(available);
+      if (!available) {
+        setError(
+          payload.error ??
+            'Metadata submission storage is not available in this environment.'
+        );
+      }
     });
   };
 
@@ -289,9 +316,11 @@ export function MetadataAgentPanel({
         </div>
 
         <div className='rounded-full border border-(--linear-app-frame-seam) px-3 py-1 text-xs font-medium text-secondary-token'>
-          {latestRequest
-            ? `Current Status: ${formatStatusLabel(latestRequest.status)}`
-            : 'Current Status: Not Started'}
+          {storageAvailable
+            ? latestRequest
+              ? `Current Status: ${formatStatusLabel(latestRequest.status)}`
+              : 'Current Status: Not Started'
+            : 'Current Status: Unavailable'}
         </div>
       </div>
 
@@ -328,16 +357,20 @@ export function MetadataAgentPanel({
             Review
           </p>
           <p className='mt-2 text-sm text-primary-token'>
-            {hasBlockingFields
-              ? `${latestRequest?.missingFields.length ?? 0} blockers`
-              : latestRequest
-                ? 'Package prepared'
-                : 'Package not prepared'}
+            {!storageAvailable
+              ? 'Unavailable In This Environment'
+              : hasBlockingFields
+                ? `${latestRequest?.missingFields.length ?? 0} blockers`
+                : latestRequest
+                  ? 'Package prepared'
+                  : 'Package not prepared'}
           </p>
           <p className='mt-1 text-xs text-secondary-token'>
-            {hasBlockingFields
-              ? 'Fill the missing fields before Jovie can queue the submission.'
-              : 'Prepare the release sheet, images, and bio bundle before send approval.'}
+            {!storageAvailable
+              ? 'Apply the metadata submission tables before running the agent in this environment.'
+              : hasBlockingFields
+                ? 'Fill the missing fields before Jovie can queue the submission.'
+                : 'Prepare the release sheet, images, and bio bundle before send approval.'}
           </p>
         </div>
 
@@ -346,57 +379,70 @@ export function MetadataAgentPanel({
             Tracking
           </p>
           <p className='mt-2 text-sm text-primary-token'>
-            {latestRequest?.targets.length
-              ? `${latestRequest.targets.length} live targets`
-              : 'No live targets yet'}
+            {storageAvailable
+              ? latestRequest?.targets.length
+                ? `${latestRequest.targets.length} live targets`
+                : 'No live targets yet'
+              : 'Tracking unavailable'}
           </p>
           <p className='mt-1 text-xs text-secondary-token'>
-            Monitor live pages, target discovery, and correction-worthy drift.
+            {storageAvailable
+              ? 'Monitor live pages, target discovery, and correction-worthy drift.'
+              : 'The tracking store is not provisioned on this database yet.'}
           </p>
         </div>
       </div>
 
-      <div className='mt-4 flex flex-wrap gap-2'>
-        <button
-          type='button'
-          onClick={() => {
-            void handlePrepare();
-          }}
-          disabled={actionState === 'loading' || isPending}
-          className='rounded-md bg-[var(--linear-accent,#5e6ad2)] px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60'
-        >
-          {latestRequest ? 'Rebuild Package' : 'Prepare Package'}
-        </button>
-
-        {latestRequest?.status === 'awaiting_approval' && !hasBlockingFields ? (
+      {storageAvailable ? (
+        <div className='mt-4 flex flex-wrap gap-2'>
           <button
             type='button'
             onClick={() => {
-              void handleApproveSend();
+              void handlePrepare();
             }}
             disabled={actionState === 'loading' || isPending}
-            className='rounded-md border border-(--linear-app-frame-seam) px-3 py-2 text-sm font-medium text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
+            className='rounded-md bg-[var(--linear-accent,#5e6ad2)] px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60'
           >
-            Approve And Send
+            {latestRequest ? 'Rebuild Package' : 'Prepare Package'}
           </button>
-        ) : null}
 
-        {latestRequest && openIssues.length > 0 ? (
-          <button
-            type='button'
-            onClick={() => {
-              void handleDraftCorrection();
-            }}
-            disabled={actionState === 'loading' || isPending}
-            className='rounded-md border border-(--linear-app-frame-seam) px-3 py-2 text-sm font-medium text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
-          >
-            Draft Correction
-          </button>
-        ) : null}
-      </div>
+          {latestRequest?.status === 'awaiting_approval' &&
+          !hasBlockingFields ? (
+            <button
+              type='button'
+              onClick={() => {
+                void handleApproveSend();
+              }}
+              disabled={actionState === 'loading' || isPending}
+              className='rounded-md border border-(--linear-app-frame-seam) px-3 py-2 text-sm font-medium text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
+            >
+              Approve And Send
+            </button>
+          ) : null}
+
+          {latestRequest && openIssues.length > 0 ? (
+            <button
+              type='button'
+              onClick={() => {
+                void handleDraftCorrection();
+              }}
+              disabled={actionState === 'loading' || isPending}
+              className='rounded-md border border-(--linear-app-frame-seam) px-3 py-2 text-sm font-medium text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
+            >
+              Draft Correction
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {error ? (
-        <div className='mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700'>
+        <div
+          className={`mt-4 rounded-lg border px-3 py-2 text-sm ${
+            !storageAvailable
+              ? 'border-amber-200 bg-amber-50 text-amber-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
           {error}
         </div>
       ) : null}

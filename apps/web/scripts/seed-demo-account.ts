@@ -1343,7 +1343,7 @@ async function seedDemoAudience(profileId: string): Promise<string[]> {
   const deviceTypes = ['mobile', 'desktop', 'tablet', 'unknown'] as const;
   const audienceRows = [];
 
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < 400; i++) {
     // Type distribution: 40% anonymous, 25% email, 15% spotify, 10% customer, 10% sms
     let memberType: (typeof memberTypes)[number];
     const tr = Math.random();
@@ -1394,9 +1394,28 @@ async function seedDemoAudience(profileId: string): Promise<string[]> {
       geoCity: city,
       geoCountry: country,
       deviceType: deviceTypes[Math.floor(Math.random() * deviceTypes.length)],
-      referrerHistory: [
-        { source: 'instagram', timestamp: firstSeen.toISOString() },
-      ],
+      referrerHistory: (() => {
+        const referrerSources = [
+          'https://instagram.com',
+          'https://tiktok.com',
+          'https://twitter.com',
+          'https://youtube.com',
+          'https://google.com',
+          'https://facebook.com',
+        ];
+        const entryCount = Math.min(visits, 3 + Math.floor(Math.random() * 3));
+        const spanMs = Math.max(lastSeen.getTime() - firstSeen.getTime(), 0);
+        const offsets = Array.from(
+          { length: entryCount },
+          () => Math.random() * spanMs
+        ).sort((a, b) => a - b);
+        return offsets.map(offset => ({
+          url: referrerSources[
+            Math.floor(Math.random() * referrerSources.length)
+          ],
+          timestamp: new Date(firstSeen.getTime() + offset).toISOString(),
+        }));
+      })(),
       latestActions: [
         { action: 'profile_view', timestamp: lastSeen.toISOString() },
       ],
@@ -1548,9 +1567,9 @@ async function seedDemoClicks(profileId: string, linkIds: string[]) {
 
   const clickRows = [];
 
-  for (let i = 0; i < 520; i++) {
+  for (let i = 0; i < 800; i++) {
     const clickDate = hockeyStickDate(90);
-    const dayOfWeek = clickDate.getDay();
+    const dayOfWeek = clickDate.getUTCDay();
     // Weekday-weighted: skip ~33% of weekend clicks
     if ((dayOfWeek === 0 || dayOfWeek === 6) && Math.random() < 0.33) continue;
 
@@ -1622,7 +1641,7 @@ async function seedDemoProfileViews(profileId: string) {
   for (let daysAgo = 0; daysAgo < 90; daysAgo++) {
     const date = new Date(now);
     date.setDate(date.getDate() - daysAgo);
-    const dayOfWeek = date.getDay();
+    const dayOfWeek = date.getUTCDay();
 
     // Hockey-stick: start ~15-25, grow to ~80-120
     const progress = (90 - daysAgo) / 90; // 0 = oldest, 1 = today

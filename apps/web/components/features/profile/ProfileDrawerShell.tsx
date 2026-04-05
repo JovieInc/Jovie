@@ -10,7 +10,9 @@ interface ProfileDrawerShellProps {
   readonly title: string;
   readonly subtitle?: string;
   readonly children: React.ReactNode;
+  /** @deprecated Prefer uniform styling. Only use for edge cases. */
   readonly contentClassName?: string;
+  /** @deprecated Prefer uniform styling. Only use for edge cases. */
   readonly bodyClassName?: string;
   readonly dataTestId?: string;
 }
@@ -29,45 +31,57 @@ export function ProfileDrawerShell({
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>
         <Drawer.Overlay className={DRAWER_OVERLAY_CLASS} />
-        <Drawer.Content
-          className={`fixed inset-x-0 bottom-0 z-50 flex max-h-[88vh] w-full max-w-full flex-col overflow-hidden rounded-t-[32px] border-t border-[color:var(--profile-panel-border)] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[var(--profile-drawer-shadow)] backdrop-blur-2xl ${contentClassName ?? ''}`}
-          data-testid={dataTestId}
-          aria-describedby={undefined}
-        >
-          <div className='pointer-events-none absolute inset-0 rounded-t-[32px] bg-[var(--profile-drawer-highlight)]' />
-          <div className='pointer-events-none absolute inset-x-0 top-0 h-px bg-white/16' />
+        {/* Centering wrapper: full-width on mobile, constrained on desktop */}
+        <div className='fixed inset-x-0 bottom-0 z-50 flex justify-center'>
+          <Drawer.Content
+            className={`flex max-h-[86dvh] w-full flex-col overflow-hidden rounded-t-[24px] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:max-w-[430px] md:rounded-t-[20px] ${contentClassName ?? ''}`}
+            data-testid={dataTestId}
+            aria-describedby={undefined}
+          >
+            {/* Highlight line */}
+            <div className='pointer-events-none absolute inset-x-0 top-0 h-px bg-white/[0.1]' />
 
-          <div className='relative z-10 flex items-start justify-between gap-4 px-5 pb-3 pt-3 md:px-6'>
-            <div className='flex-1'>
-              <div className='mx-auto h-1.5 w-12 rounded-full bg-white/20' />
-              <div className='pt-4 text-center'>
-                <Drawer.Title className='text-[1.125rem] font-[590] tracking-[-0.03em] text-primary-token'>
+            {/* Header */}
+            <div className='relative z-10 flex shrink-0 items-center px-5 pb-4 pt-3'>
+              {/* Drag handle */}
+              <div className='absolute inset-x-0 top-3 flex justify-center'>
+                <div className='h-[5px] w-9 rounded-full bg-white/[0.16]' />
+              </div>
+
+              {/* Title block — centered */}
+              <div className='min-w-0 flex-1 pt-5 text-center'>
+                <Drawer.Title className='text-[15px] font-[590] tracking-[-0.01em] text-primary-token'>
                   {title}
                 </Drawer.Title>
                 {subtitle ? (
-                  <p className='mt-1 text-sm text-secondary-token'>
+                  <p className='mx-auto mt-0.5 max-w-[22rem] text-[12px] leading-[1.4] text-white/45'>
                     {subtitle}
                   </p>
                 ) : null}
               </div>
+
+              {/* Close */}
+              <button
+                type='button'
+                onClick={() => onOpenChange(false)}
+                className='absolute right-4 top-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.06] text-white/50 transition-colors duration-150 hover:bg-white/[0.1] hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+                aria-label='Close'
+              >
+                <X className='h-3.5 w-3.5' />
+              </button>
             </div>
 
-            <button
-              type='button'
-              onClick={() => onOpenChange(false)}
-              className='mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] text-secondary-token shadow-[var(--profile-pearl-shadow)] transition-[background-color,border-color,color] hover:bg-[var(--profile-pearl-bg-hover)] hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
-              aria-label='Close'
-            >
-              <X className='h-4 w-4' />
-            </button>
-          </div>
+            {/* Separator */}
+            <div className='mx-5 h-px bg-white/[0.06]' />
 
-          <div
-            className={`relative z-10 overflow-y-auto overscroll-contain rounded-t-[28px] bg-[color:var(--profile-drawer-bg)] px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] md:px-6 ${bodyClassName ?? ''}`}
-          >
-            {children}
-          </div>
-        </Drawer.Content>
+            {/* Body */}
+            <div
+              className={`relative z-10 overflow-y-auto overscroll-contain px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-4 ${bodyClassName ?? ''}`}
+            >
+              {children}
+            </div>
+          </Drawer.Content>
+        </div>
       </Drawer.Portal>
     </Drawer.Root>
   );
