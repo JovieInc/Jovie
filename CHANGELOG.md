@@ -19,7 +19,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.118] - 2026-04-05
 
-> Public profile pages now fit the mobile viewport without scrolling. The hero image scales to fill remaining space while content stays pinned.
+> Admin tables cleaned up: fewer redundant badges, visible checkboxes, always-on search. Public profile pages now fit the mobile viewport.
+
+### Changed
+
+- Merged Funnel, Status, and Lifecycle columns into a single Status column on the admin users table (12 to 10 columns)
+- Search fields on admin Users, Creators, and Releases pages are now always visible instead of hidden behind an icon
 
 ### Added
 
@@ -29,6 +34,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Table checkboxes are now visible in their unchecked state (removed override that made borders nearly invisible)
 - Public profile pages no longer scroll on mobile — viewport locks to screen height, hero image shrinks to fit
 
 ## [26.4.117] - 2026-04-05
