@@ -18,6 +18,7 @@ function isMissingLeadPipelineSettingsSchemaError(error: unknown): boolean {
       'column "guardrails_enabled"',
       'column "guardrail_thresholds"',
       'column "auto_ingest_daily_limit"',
+      'column "auto_ingested_today"',
     ].some(pattern => message.includes(pattern))
   );
 }
@@ -33,7 +34,14 @@ export async function getLeadFunnelCounts(): Promise<LeadFunnelCounts> {
       .from(leads)
       .groupBy(leads.status);
 
-    const counts: LeadFunnelCounts = {};
+    const counts: LeadFunnelCounts = {
+      discovered: 0,
+      qualified: 0,
+      disqualified: 0,
+      approved: 0,
+      ingested: 0,
+      rejected: 0,
+    };
     for (const row of rows) {
       counts[row.status] = row.count;
     }

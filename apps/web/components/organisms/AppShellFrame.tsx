@@ -36,8 +36,8 @@ export const AppShellFrame = memo(function AppShellFrame({
     <div
       className={cn(
         'flex h-full w-full overflow-hidden bg-(--linear-bg-page)',
-        /* PWA safe area: pad top for notch/Dynamic Island in standalone mode */
-        'pt-[env(safe-area-inset-top)]',
+        /* PWA safe area: pad top for notch/Dynamic Island in standalone mode (mobile only) */
+        'max-lg:pt-[env(safe-area-inset-top)]',
         'lg:gap-[var(--linear-app-shell-gap)] lg:p-[var(--linear-app-shell-gap)]',
         containerClassName
       )}
@@ -52,7 +52,7 @@ export const AppShellFrame = memo(function AppShellFrame({
         <div className='flex flex-1 min-h-0 min-w-0 overflow-hidden lg:gap-[var(--linear-app-shell-gap)]'>
           <div
             className={cn(
-              'flex-1 min-h-0 min-w-0 pb-[var(--dev-toolbar-height,0px)]',
+              'flex flex-1 min-h-0 min-w-0 flex-col pb-[var(--dev-toolbar-height,0px)]',
               isTableRoute
                 ? 'overflow-hidden overflow-x-auto overscroll-contain'
                 : 'overflow-y-auto overflow-x-hidden overscroll-contain',

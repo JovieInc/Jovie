@@ -2,7 +2,7 @@
 
 import { ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { type ReactNode, useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AnimatedAccordion } from '@/components/organisms/AnimatedAccordion';
 import { cn } from '@/lib/utils';
@@ -112,6 +112,25 @@ export function GtmCollapsibles({ initialOpen }: GtmCollapsiblesProps) {
     if (defaultIndex !== null) initial.add(defaultIndex);
     return initial;
   });
+
+  // Resync when initialOpen changes via same-page navigation
+  useEffect(() => {
+    if (defaultIndex === null) return;
+
+    setOpenSections(prev => {
+      if (prev.has(defaultIndex)) return prev;
+      const next = new Set(prev);
+      next.add(defaultIndex);
+      return next;
+    });
+
+    setEverOpened(prev => {
+      if (prev.has(defaultIndex)) return prev;
+      const next = new Set(prev);
+      next.add(defaultIndex);
+      return next;
+    });
+  }, [defaultIndex]);
 
   const toggle = useCallback((index: number) => {
     setOpenSections(prev => {

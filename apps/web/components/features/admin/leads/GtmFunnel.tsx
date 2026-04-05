@@ -59,7 +59,10 @@ function formatRate(numerator: number, denominator: number): string {
 
 function EmptyFunnel() {
   return (
-    <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-6'>
+    <ContentSurfaceCard
+      className='px-(--linear-app-content-padding-x) py-6'
+      data-testid='gtm-pipeline-status'
+    >
       <p className='text-center text-[13px] font-[450] text-secondary-token'>
         Pipeline hasn&apos;t run yet. Select a speed above to start.
       </p>

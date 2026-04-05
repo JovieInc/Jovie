@@ -114,8 +114,18 @@ export function GtmSpeedDial() {
 
   const settings = settingsQuery.data?.settings;
 
-  if (settingsQuery.isLoading || !settings) {
+  if (settingsQuery.isLoading) {
     return <SpeedDialSkeleton />;
+  }
+
+  if (settingsQuery.isError || !settings) {
+    return (
+      <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-4'>
+        <p className='text-[12px] font-[450] text-destructive'>
+          Failed to load pipeline settings.
+        </p>
+      </ContentSurfaceCard>
+    );
   }
 
   const currentSpeed = optimisticSpeed ?? detectSpeed(settings);
