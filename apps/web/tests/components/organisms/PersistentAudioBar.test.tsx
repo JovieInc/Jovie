@@ -8,10 +8,10 @@ const stop = vi.fn();
 const seek = vi.fn();
 const onError = vi.fn().mockReturnValue(() => {});
 
-let mockPlaybackState = {
+const basePlaybackState = {
   activeTrackId: null as string | null,
   isPlaying: false,
-  playbackStatus: 'idle' as string,
+  playbackStatus: 'idle' as 'idle' | 'loading' | 'playing' | 'paused' | 'error',
   lastErrorReason: null as
     | 'play_rejected'
     | 'media_error'
@@ -24,6 +24,9 @@ let mockPlaybackState = {
   artistName: null as string | null,
   artworkUrl: null as string | null,
 };
+
+type MockPlaybackState = typeof basePlaybackState;
+let mockPlaybackState: MockPlaybackState = { ...basePlaybackState };
 
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
@@ -70,24 +73,27 @@ const { PersistentAudioBar } = await import(
   '@/components/organisms/PersistentAudioBar'
 );
 
+/** Helper to set active playback state with sensible defaults */
+function setPlaying(overrides: Partial<MockPlaybackState> = {}) {
+  mockPlaybackState = {
+    ...basePlaybackState,
+    activeTrackId: 'track-1',
+    isPlaying: true,
+    playbackStatus: 'playing',
+    currentTime: 10,
+    duration: 30,
+    trackTitle: 'Midnight Drive',
+    ...overrides,
+  };
+}
+
 describe('PersistentAudioBar', () => {
   beforeEach(() => {
     toggleTrack.mockClear();
     stop.mockClear();
     seek.mockClear();
     onError.mockClear().mockReturnValue(() => {});
-    mockPlaybackState = {
-      activeTrackId: null,
-      isPlaying: false,
-      playbackStatus: 'idle',
-      lastErrorReason: null,
-      currentTime: 0,
-      duration: 0,
-      trackTitle: null,
-      releaseTitle: null,
-      artistName: null,
-      artworkUrl: null,
-    };
+    mockPlaybackState = { ...basePlaybackState };
   });
 
   it('renders nothing when no track is active', () => {
@@ -96,17 +102,12 @@ describe('PersistentAudioBar', () => {
   });
 
   it('renders bar with track info when a track is active', () => {
-    mockPlaybackState = {
-      activeTrackId: 'track-1',
-      isPlaying: true,
-      playbackStatus: 'playing',
+    setPlaying({
       currentTime: 14,
-      duration: 30,
-      trackTitle: 'Midnight Drive',
       releaseTitle: 'Night Vibes',
       artistName: 'DJ Cool',
       artworkUrl: 'https://cdn.example.com/art.jpg',
-    };
+    });
 
     render(<PersistentAudioBar />);
 
@@ -125,17 +126,7 @@ describe('PersistentAudioBar', () => {
   });
 
   it('shows play button when paused', () => {
-    mockPlaybackState = {
-      activeTrackId: 'track-1',
-      isPlaying: false,
-      playbackStatus: 'paused',
-      currentTime: 0,
-      duration: 30,
-      trackTitle: 'Midnight Drive',
-      releaseTitle: null,
-      artistName: null,
-      artworkUrl: null,
-    };
+    setPlaying({ isPlaying: false, playbackStatus: 'paused', currentTime: 0 });
 
     render(<PersistentAudioBar />);
 
@@ -146,17 +137,7 @@ describe('PersistentAudioBar', () => {
 
   it('calls toggleTrack when play/pause is clicked', async () => {
     const user = userEvent.setup();
-    mockPlaybackState = {
-      activeTrackId: 'track-1',
-      isPlaying: true,
-      playbackStatus: 'playing',
-      currentTime: 10,
-      duration: 30,
-      trackTitle: 'Midnight Drive',
-      releaseTitle: null,
-      artistName: null,
-      artworkUrl: null,
-    };
+    setPlaying();
 
     render(<PersistentAudioBar />);
 
@@ -170,17 +151,7 @@ describe('PersistentAudioBar', () => {
 
   it('calls stop when dismiss button is clicked', async () => {
     const user = userEvent.setup();
-    mockPlaybackState = {
-      activeTrackId: 'track-1',
-      isPlaying: true,
-      playbackStatus: 'playing',
-      currentTime: 10,
-      duration: 30,
-      trackTitle: 'Midnight Drive',
-      releaseTitle: null,
-      artistName: null,
-      artworkUrl: null,
-    };
+    setPlaying();
 
     render(<PersistentAudioBar />);
 
@@ -190,17 +161,12 @@ describe('PersistentAudioBar', () => {
   });
 
   it('shows loading state with disabled seek bar', () => {
-    mockPlaybackState = {
-      activeTrackId: 'track-1',
+    setPlaying({
       isPlaying: false,
       playbackStatus: 'loading',
       currentTime: 0,
       duration: 0,
-      trackTitle: 'Midnight Drive',
-      releaseTitle: null,
-      artistName: null,
-      artworkUrl: null,
-    };
+    });
 
     render(<PersistentAudioBar />);
 
@@ -211,17 +177,14 @@ describe('PersistentAudioBar', () => {
   });
 
   it('falls back to placeholder when artwork image errors', () => {
-    mockPlaybackState = {
-      activeTrackId: 'track-1',
+    setPlaying({
       isPlaying: false,
       playbackStatus: 'paused',
       currentTime: 0,
       duration: 0,
       trackTitle: 'Test Track',
-      releaseTitle: null,
-      artistName: null,
       artworkUrl: 'https://cdn.example.com/broken.jpg',
-    };
+    });
 
     render(<PersistentAudioBar />);
 
@@ -234,17 +197,13 @@ describe('PersistentAudioBar', () => {
   });
 
   it('renders placeholder when artworkUrl is null', () => {
-    mockPlaybackState = {
-      activeTrackId: 'track-1',
+    setPlaying({
       isPlaying: false,
       playbackStatus: 'paused',
       currentTime: 0,
       duration: 0,
       trackTitle: 'Test Track',
-      releaseTitle: null,
-      artistName: null,
-      artworkUrl: null,
-    };
+    });
 
     render(<PersistentAudioBar />);
 
@@ -252,17 +211,7 @@ describe('PersistentAudioBar', () => {
   });
 
   it('shows Preview badge for short tracks', () => {
-    mockPlaybackState = {
-      activeTrackId: 'track-1',
-      isPlaying: true,
-      playbackStatus: 'playing',
-      currentTime: 10,
-      duration: 30,
-      trackTitle: 'Short Preview',
-      releaseTitle: null,
-      artistName: null,
-      artworkUrl: null,
-    };
+    setPlaying({ trackTitle: 'Short Preview' });
 
     render(<PersistentAudioBar />);
 
@@ -270,17 +219,12 @@ describe('PersistentAudioBar', () => {
   });
 
   it('uses section element with aria-label', () => {
-    mockPlaybackState = {
-      activeTrackId: 'track-1',
+    setPlaying({
       isPlaying: false,
       playbackStatus: 'paused',
       currentTime: 0,
-      duration: 30,
       trackTitle: 'Test',
-      releaseTitle: null,
-      artistName: null,
-      artworkUrl: null,
-    };
+    });
 
     render(<PersistentAudioBar />);
 

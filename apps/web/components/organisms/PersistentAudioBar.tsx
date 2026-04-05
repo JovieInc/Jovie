@@ -45,6 +45,18 @@ export function PersistentAudioBar() {
       : null;
   const isPreview = playbackState.duration > 0 && playbackState.duration < 45;
 
+  let playButtonLabel = 'Resume playback';
+  let playButtonIcon = <Play className='h-3 w-3' />;
+  if (isLoading) {
+    playButtonLabel = 'Loading track';
+    playButtonIcon = (
+      <div className='h-3 w-3 animate-pulse rounded-full bg-current' />
+    );
+  } else if (playbackState.isPlaying) {
+    playButtonLabel = 'Pause playback';
+    playButtonIcon = <Pause className='h-3 w-3' />;
+  }
+
   return (
     <section
       aria-label='Audio player'
@@ -110,34 +122,22 @@ export function PersistentAudioBar() {
           ) : null}
         </div>
 
-        {/* Play/pause button — 28px visible, 44px touch target */}
+        {/* Play/pause button — 28px visible, 44px touch target via before pseudo-element */}
         <button
           type='button'
           onClick={handleToggle}
           disabled={isLoading}
-          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-150 hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) disabled:opacity-50 p-2 -m-1'
-          aria-label={
-            isLoading
-              ? 'Loading track'
-              : playbackState.isPlaying
-                ? 'Pause playback'
-                : 'Resume playback'
-          }
+          className='relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-150 hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) disabled:opacity-50 before:absolute before:-inset-2 before:content-[""]'
+          aria-label={playButtonLabel}
         >
-          {isLoading ? (
-            <div className='h-3 w-3 animate-pulse rounded-full bg-current' />
-          ) : playbackState.isPlaying ? (
-            <Pause className='h-3 w-3' />
-          ) : (
-            <Play className='h-3 w-3' />
-          )}
+          {playButtonIcon}
         </button>
 
-        {/* Dismiss button */}
+        {/* Dismiss button — 24px visible, 44px touch target via before pseudo-element */}
         <button
           type='button'
           onClick={stop}
-          className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-quaternary-token transition-colors duration-150 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) p-1 -m-0.5'
+          className='relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-quaternary-token transition-colors duration-150 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) before:absolute before:-inset-2.5 before:content-[""]'
           aria-label='Dismiss player'
         >
           <X className='h-3.5 w-3.5' />
