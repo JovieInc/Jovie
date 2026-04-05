@@ -190,6 +190,7 @@ export function ProfileCompactTemplate({
       visitTrackingToken,
       modeOverride: mode,
       sourceOverride: initialSource,
+      smsEnabled: enableDynamicEngagement,
     });
 
   const isSubscribed = Boolean(

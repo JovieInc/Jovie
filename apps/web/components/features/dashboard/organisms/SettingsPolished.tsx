@@ -25,6 +25,7 @@ import { SettingsBrandingSection } from '@/features/dashboard/organisms/Settings
 import { SettingsContactsSection } from '@/features/dashboard/organisms/SettingsContactsSection';
 import { SettingsPaymentsSection } from '@/features/dashboard/organisms/SettingsPaymentsSection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
+import { SettingsSmsAccessSection } from '@/features/dashboard/organisms/SettingsSmsAccessSection';
 import { SettingsTouringSection } from '@/features/dashboard/organisms/SettingsTouringSection';
 import { SettingsArtistProfileSection } from '@/features/dashboard/organisms/settings-artist-profile-section';
 import { publicEnv } from '@/lib/env-public';
@@ -304,6 +305,12 @@ export function SettingsPolished({
         render: () => (
           <div className='space-y-4'>
             <SettingsAudienceSection />
+            {isPro && (
+              <SettingsSmsAccessSection
+                smsSubscriberCount={0}
+                alreadyRequested={false}
+              />
+            )}
             <SettingsAdPixelsSection isPro={isPro} />
           </div>
         ),

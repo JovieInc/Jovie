@@ -432,7 +432,7 @@ function buildUpsertConfig(
   const set =
     channel === 'email'
       ? { ...emailVerifyFields, ipAddress, source }
-      : { confirmedAt: new Date(), ipAddress, source };
+      : { ipAddress, source };
 
   return { target, set };
 }
@@ -519,7 +519,7 @@ function buildSubscriptionValues(params: {
     ipAddress,
     source,
     preferences: defaultPreferences,
-    confirmedAt: shouldVerifyEmail ? null : new Date(),
+    confirmedAt: channel === 'sms' || shouldVerifyEmail ? null : new Date(),
     emailOtpHash: emailOtp?.otpHash,
     emailOtpExpiresAt: emailOtp?.otpExpiresAt,
     emailOtpLastSentAt: emailOtp ? new Date() : null,
@@ -603,6 +603,30 @@ export const subscribeToNotificationsDomain = async (
       country_code,
       city
     );
+
+    // Pro-gate SMS subscriptions (backend enforcement)
+    if (channel === 'sms' && !creatorIsPro) {
+      await trackSubscribeError({
+        artist_id,
+        error_type: 'sms_requires_pro',
+        source,
+      });
+      return buildSubscribeValidationError(
+        'SMS notifications are only available for Pro creators.'
+      );
+    }
+
+    // US-only guard for SMS channel
+    if (channel === 'sms' && country_code && country_code !== 'US') {
+      await trackSubscribeError({
+        artist_id,
+        error_type: 'sms_us_only',
+        source,
+      });
+      return buildSubscribeValidationError(
+        'SMS notifications are currently available in the US only.'
+      );
+    }
 
     const normalizedEmail =
       channel === 'email' ? (normalizeSubscriptionEmail(email) ?? null) : null;

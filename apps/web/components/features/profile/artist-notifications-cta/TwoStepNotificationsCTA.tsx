@@ -151,6 +151,7 @@ interface ChannelInputRowProps {
   readonly otpStep: string;
   readonly handleVerifyOtp: () => Promise<void>;
   readonly handleSubscribe: () => Promise<void>;
+  readonly smsEnabled: boolean;
 }
 
 function ChannelInputRow({
@@ -176,6 +177,7 @@ function ChannelInputRow({
   otpStep,
   handleVerifyOtp,
   handleSubscribe,
+  smsEnabled,
 }: ChannelInputRowProps) {
   const handleSubmit = () => {
     const action = otpStep === 'verify' ? handleVerifyOtp() : handleSubscribe();
@@ -201,7 +203,7 @@ function ChannelInputRow({
             onOpenChange={setIsCountryOpen}
             onSelect={setCountry}
           />
-        ) : (
+        ) : smsEnabled ? (
           <button
             type='button'
             className='flex h-12 items-center justify-center rounded-full px-3 text-primary-token/68 transition-colors hover:text-primary-token focus-visible:outline-none'
@@ -217,7 +219,7 @@ function ChannelInputRow({
               <Mail className='w-4 h-4' aria-hidden='true' />
             )}
           </button>
-        )
+        ) : undefined
       }
       action={
         <button
@@ -315,6 +317,7 @@ export function TwoStepNotificationsCTA({
     notificationsEnabled,
     openSubscription,
     hydrationStatus,
+    smsEnabled,
   } = useSubscriptionForm({ artist });
 
   const [step, setStep] = useState<Step>(startExpanded ? 'input' : 'button');
@@ -486,6 +489,7 @@ export function TwoStepNotificationsCTA({
                 otpStep={otpStep}
                 handleVerifyOtp={handleVerifyOtp}
                 handleSubscribe={handleSubscribe}
+                smsEnabled={smsEnabled}
               />
 
               <div className='relative min-h-5'>

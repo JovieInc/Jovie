@@ -89,6 +89,7 @@ export function ProfileShell({
     viewerCountryCode,
     contacts,
     visitTrackingToken,
+    smsEnabled: false,
   });
 
   const isMobile = useBreakpointDown('md');
@@ -135,6 +136,7 @@ export function ProfileShell({
     menuTriggerRef,
     openSubscription,
     state: notificationsState,
+    smsEnabled,
     subscribedChannels,
     subscriptionDetails,
   } = notificationsController;
@@ -161,6 +163,7 @@ export function ProfileShell({
           subscribedChannels={subscribedChannels}
           subscriptionDetails={subscriptionDetails}
           triggerRef={menuTriggerRef}
+          smsEnabled={smsEnabled}
         />
       );
     }

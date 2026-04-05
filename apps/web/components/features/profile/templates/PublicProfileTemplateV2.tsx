@@ -154,6 +154,7 @@ export function PublicProfileTemplateV2({
     visitTrackingToken,
     modeOverride: historyMode,
     sourceOverride: initialSource,
+    smsEnabled: enableDynamicEngagement,
   });
 
   const scrollToTourSection = useCallback(() => {
