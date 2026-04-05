@@ -50,18 +50,31 @@ body:has(.linear-marketing) {
   overscroll-behavior: auto;
 }
 
-/* Public profile pages use document scrolling (same as marketing). */
+/* Public profile pages — lock viewport on mobile, allow scroll on desktop. */
 html:has(.profile-viewport) {
-  height: auto;
-  min-height: 100%;
-  overflow-y: auto;
-  overscroll-behavior: auto;
+  height: 100dvh;
+  overflow: clip;
+  overscroll-behavior: none;
 }
 body:has(.profile-viewport) {
-  height: auto;
-  min-height: 100%;
-  overflow: visible;
-  overscroll-behavior: auto;
+  height: 100dvh;
+  overflow: clip;
+  overscroll-behavior: none;
+}
+@media (min-width: 768px) {
+  html:has(.profile-viewport) {
+    height: auto;
+    min-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: auto;
+  }
+  body:has(.profile-viewport) {
+    height: auto;
+    min-height: 100%;
+    overflow-x: clip;
+    overflow-y: auto;
+    overscroll-behavior: auto;
+  }
 }
 
 /* Compact profile — override CTA styles so button ↔ composer is zero-shift */
@@ -1889,6 +1902,23 @@ body {
   .jv-available {
     box-shadow: none;
     animation: jv-available-fade 900ms ease-out 1;
+  }
+}
+
+/* Onboarding enrichment progress bar */
+
+@keyframes onboarding-indeterminate {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateX(60%);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(200%);
+    opacity: 0.6;
   }
 }
 
