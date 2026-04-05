@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.116] - 2026-04-04
+
+### Changed
+
+- Unified all pricing constants into a single source of truth (`lib/config/plan-prices.ts`)
+- Billing, marketing, and upgrade flows now derive prices from one shared file instead of maintaining independent copies
+- Added `toCents()` helper with `Math.round` for safe dollar-to-cent conversion
+
+### Added
+
+- Pricing invariant tests (tier ordering, annual discount, float safety)
+
 ## [26.4.117] - 2026-04-05
 
 > The Growth admin page is now a self-driving pipeline dashboard. Pick a speed, watch the funnel, inspect leads if curious.
