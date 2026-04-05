@@ -63,6 +63,7 @@ export function ReleaseNotificationsProvider({
       setSubscriptionDetails,
       openSubscription,
       registerInputFocus,
+      smsEnabled: false,
     }),
     [
       channel,

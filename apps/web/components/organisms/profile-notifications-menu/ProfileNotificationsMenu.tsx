@@ -54,6 +54,7 @@ export function ProfileNotificationsMenu({
   subscribedChannels,
   subscriptionDetails,
   triggerRef,
+  smsEnabled = false,
 }: ProfileNotificationsMenuProps) {
   const {
     confirmChannel,
@@ -247,7 +248,7 @@ export function ProfileNotificationsMenu({
             How you get notified
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {renderChannelMenuItem('sms', 'SMS')}
+          {smsEnabled && renderChannelMenuItem('sms', 'Text')}
           {renderChannelMenuItem('email', 'Email')}
           <DropdownMenuSeparator />
           <DropdownMenuItem
