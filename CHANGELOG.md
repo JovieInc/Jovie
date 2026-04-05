@@ -13,10 +13,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Replaced fabricated homepage proof with canonical product screenshots from deterministic demo surfaces
 - Implemented Variant F Spotlight Depth hero: dominant profile phone in front, blurred release card behind for depth, atmospheric blue-violet glow, task panel anchored bottom-right
-- Simplified release destinations to mobile-only "Before launch" / "After launch" side-by-side layout
+- Simplified release destinations to mobile-only "Before Launch" / "After Launch" side-by-side layout
 - Enforced hero headline as exactly two lines via structural markup instead of CSS text-wrap hacks
 - Updated page metadata and JSON-LD schemas to reflect "release operating system" positioning
 - Increased trust bar logo opacity from 45% to 55% for better legibility
+- Unified all pricing constants into a single source of truth (`lib/config/plan-prices.ts`)
+- Billing, marketing, and upgrade flows now derive prices from one shared file instead of maintaining independent copies
+- Added `toCents()` helper with `Math.round` for safe dollar-to-cent conversion
 
 ### Added
 
@@ -25,10 +28,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Mobile release screenshot scenarios (`release-presave-mobile`, `release-landing-mobile`) in the screenshot registry
 - `release-presave` showcase surface ID for the demo system
 - Proof manifest-to-registry validation test ensuring all proof assets reference valid scenarios
+- Pricing invariant tests (tier ordering, annual discount, float safety)
 
 ### Removed
 
-- Hero notification pill (fabricated "1,247 fans notified" element)
+- Hero notification pill
 - Desktop screenshots from the release destinations section
 - Release destinations notification card overlay
 
