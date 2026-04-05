@@ -1,11 +1,12 @@
 'use server';
 
-import { and, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
+import { dspCatalogMismatches } from '@/lib/db/schema/dsp-catalog-scan';
 import type { DspMatchConfidenceBreakdown } from '@/lib/db/schema/dsp-enrichment';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import type { DspMatchStatus, DspProviderId } from '@/lib/dsp-enrichment/types';
@@ -135,6 +136,30 @@ export async function loadDspPresence(): Promise<DspPresenceData> {
   }
 
   return loadDspPresenceForProfile(profile.id);
+}
+
+// ============================================================================
+// Catalog Health — lightweight count for smart-collapse default
+// ============================================================================
+
+export async function getUnresolvedMismatchCount(
+  profileId: string
+): Promise<number> {
+  const [result] = await dashboardQuery(
+    () =>
+      db
+        .select({ count: drizzleSql<number>`count(*)::int` })
+        .from(dspCatalogMismatches)
+        .where(
+          and(
+            eq(dspCatalogMismatches.creatorProfileId, profileId),
+            eq(dspCatalogMismatches.status, 'flagged'),
+            eq(dspCatalogMismatches.mismatchType, 'not_in_catalog')
+          )
+        ),
+    'loadDspPresence:unresolvedMismatchCount'
+  );
+  return result?.count ?? 0;
 }
 
 // ============================================================================
