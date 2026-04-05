@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.124] - 2026-04-05
+
+### Changed
+
+- Table search now filters instantly on the client instead of round-tripping to the server with skeleton loaders
+- All admin tables (users, creators, releases, leads) use the same search pattern: HeaderSearchAction + TanStack Table globalFilter
+- Keyboard navigation (j/k, arrows, Home/End) now shares a single key map across all tables and the tasks view
+- Admin infinite queries keep previous data visible during refetch instead of flashing skeletons
+
+### Removed
+
+- Unused admin TableSearchBar duplicate
+- Server-side search round-trips from admin table search inputs
+
 ## [26.4.123] - 2026-04-05
 
 ### Fixed
@@ -66,15 +80,32 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.119] - 2026-04-05
 
+> Homepage proof is now real. Every screenshot comes from the actual product, reproduced by the Playwright pipeline. The hero uses a Spotlight Depth layout with a dominant profile phone and atmospheric glow.
+
 ### Changed
 
+- Replaced fabricated homepage proof with canonical product screenshots from deterministic demo surfaces
+- Implemented Variant F Spotlight Depth hero: dominant profile phone in front, blurred release card behind for depth, atmospheric blue-violet glow, task panel anchored bottom-right
+- Simplified release destinations to mobile-only "Before Launch" / "After Launch" side-by-side layout
+- Enforced hero headline as exactly two lines via structural markup instead of CSS text-wrap hacks
+- Updated page metadata and JSON-LD schemas to reflect "release operating system" positioning
+- Increased trust bar logo opacity from 45% to 55% for better legibility
 - Unified all pricing constants into a single source of truth (`lib/config/plan-prices.ts`)
 - Billing, marketing, and upgrade flows now derive prices from one shared file instead of maintaining independent copies
 - Added `toCents()` helper with `Math.round` for safe dollar-to-cent conversion
 
 ### Added
 
-- Pricing invariant tests (tier ordering, annual discount, float safety)
+- Evergreen presave demo surface for homepage proof screenshots
+- [internal] Homepage proof manifest system with registry validation
+- [internal] Mobile release screenshot scenarios in the pipeline
+- [internal] Pricing invariant tests (tier ordering, annual discount, float safety)
+
+### Removed
+
+- Hero notification pill
+- Desktop screenshots from the release destinations section
+- Release destinations notification card overlay
 
 ## [26.4.118] - 2026-04-05
 

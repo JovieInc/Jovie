@@ -150,6 +150,18 @@ function PlatformSuggestionItem({
 }
 
 const randomWaveformLevel = () => 0.3 + Math.random() * 0.7; // NOSONAR (S2245) - Non-security use: audio waveform visual bar height randomization
+const WAVEFORM_BAND_COUNT = 20;
+const MIN_WAVEFORM_LEVEL = 0.08;
+const PROCESSING_DELAY_MS = 900;
+const DONE_DELAY_MS = 700;
+const SHORTCUT_MICROPHONE_KEY = 'm';
+
+type DictationState =
+  | 'idle'
+  | 'listening'
+  | 'processing'
+  | 'done'
+  | 'permission-error';
 
 export const UniversalLinkInput = forwardRef<
   UniversalLinkInputRef,
@@ -236,32 +248,116 @@ export const UniversalLinkInput = forwardRef<
     }));
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const analyserRef = useRef<AnalyserNode | null>(null);
+    const animationFrameRef = useRef<number | null>(null);
+    const frequencyDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+    const processingTimerRef = useRef<ReturnType<
+      typeof globalThis.setTimeout
+    > | null>(null);
+    const doneTimerRef = useRef<ReturnType<
+      typeof globalThis.setTimeout
+    > | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const recordingTimerRef = useRef<ReturnType<
       typeof globalThis.setInterval
     > | null>(null);
-    const waveformTimerRef = useRef<ReturnType<
-      typeof globalThis.setInterval
-    > | null>(null);
-    const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+    const [dictationState, setDictationState] =
+      useState<DictationState>('idle');
     const [recordingDurationSeconds, setRecordingDurationSeconds] = useState(0);
-    const [waveformLevels, setWaveformLevels] = useState<number[]>([
-      0.35, 0.55, 0.75, 0.5, 0.68, 0.4, 0.62,
-    ]);
+    const [waveformLevels, setWaveformLevels] = useState<number[]>(
+      Array.from({ length: WAVEFORM_BAND_COUNT }, randomWaveformLevel)
+    );
 
     const clearRecordingTimers = useCallback(() => {
       if (recordingTimerRef.current !== null) {
         globalThis.clearInterval(recordingTimerRef.current);
         recordingTimerRef.current = null;
       }
-      if (waveformTimerRef.current !== null) {
-        globalThis.clearInterval(waveformTimerRef.current);
-        waveformTimerRef.current = null;
+      if (animationFrameRef.current !== null) {
+        globalThis.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
+      if (processingTimerRef.current !== null) {
+        globalThis.clearTimeout(processingTimerRef.current);
+        processingTimerRef.current = null;
+      }
+      if (doneTimerRef.current !== null) {
+        globalThis.clearTimeout(doneTimerRef.current);
+        doneTimerRef.current = null;
+      }
+    }, []);
+
+    const stopWaveformAnalyzer = useCallback(() => {
+      analyserRef.current = null;
+      frequencyDataRef.current = null;
+      if (audioContextRef.current !== null) {
+        void audioContextRef.current.close();
+      }
+      audioContextRef.current = null;
+      if (animationFrameRef.current !== null) {
+        globalThis.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    }, []);
+
+    const startWaveformAnalyzer = useCallback((stream: MediaStream) => {
+      if (globalThis.AudioContext === undefined) {
+        animationFrameRef.current = globalThis.requestAnimationFrame(() => {
+          setWaveformLevels(
+            Array.from({ length: WAVEFORM_BAND_COUNT }, randomWaveformLevel)
+          );
+        });
+        return;
+      }
+
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.75;
+      source.connect(analyser);
+      const frequencyData = new Uint8Array(analyser.frequencyBinCount);
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+      frequencyDataRef.current = frequencyData;
+
+      const animate = () => {
+        const activeAnalyser = analyserRef.current;
+        const activeFrequencyData = frequencyDataRef.current;
+        if (!activeAnalyser || !activeFrequencyData) {
+          return;
+        }
+
+        activeAnalyser.getByteFrequencyData(activeFrequencyData);
+        const bands = Array.from(
+          { length: WAVEFORM_BAND_COUNT },
+          (_, index) => {
+            const start = Math.floor(
+              (index / WAVEFORM_BAND_COUNT) * activeFrequencyData.length
+            );
+            const end = Math.floor(
+              ((index + 1) / WAVEFORM_BAND_COUNT) * activeFrequencyData.length
+            );
+            const range = activeFrequencyData.slice(
+              start,
+              Math.max(end, start + 1)
+            );
+            const total = range.reduce((sum, value) => sum + value, 0);
+            const average = total / range.length / 255;
+            return Math.max(MIN_WAVEFORM_LEVEL, average);
+          }
+        );
+        setWaveformLevels(bands);
+        animationFrameRef.current = globalThis.requestAnimationFrame(animate);
+      };
+
+      animationFrameRef.current = globalThis.requestAnimationFrame(animate);
     }, []);
 
     const stopRecordingSession = useCallback(() => {
       clearRecordingTimers();
+      stopWaveformAnalyzer();
       const recorder = mediaRecorderRef.current;
       if (recorder && recorder.state !== 'inactive') {
         recorder.stop();
@@ -272,8 +368,7 @@ export const UniversalLinkInput = forwardRef<
       }
       streamRef.current = null;
       mediaRecorderRef.current = null;
-      setIsVoiceRecording(false);
-    }, [clearRecordingTimers]);
+    }, [clearRecordingTimers, stopWaveformAnalyzer]);
 
     useEffect(() => {
       return () => {
@@ -285,6 +380,14 @@ export const UniversalLinkInput = forwardRef<
       if (!voiceInputEnabled) return;
       if (globalThis.window === undefined) return;
       if (!navigator.mediaDevices?.getUserMedia) return;
+      if (dictationState === 'processing') return;
+      if (dictationState === 'listening') {
+        stopRecordingSession();
+        setDictationState('idle');
+        setRecordingDurationSeconds(0);
+        return;
+      }
+      setDictationState('idle');
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -304,17 +407,20 @@ export const UniversalLinkInput = forwardRef<
 
         recorder.start();
         setRecordingDurationSeconds(0);
-        setIsVoiceRecording(true);
+        setDictationState('listening');
         recordingTimerRef.current = globalThis.setInterval(() => {
           setRecordingDurationSeconds(current => current + 1);
         }, 1000);
-        waveformTimerRef.current = globalThis.setInterval(() => {
-          setWaveformLevels(current => current.map(randomWaveformLevel));
-        }, 200);
+        startWaveformAnalyzer(stream);
       } catch {
-        // Ignore permission errors until voice feature is enabled.
+        setDictationState('permission-error');
       }
-    }, [voiceInputEnabled]);
+    }, [
+      dictationState,
+      startWaveformAnalyzer,
+      stopRecordingSession,
+      voiceInputEnabled,
+    ]);
 
     const recordingDurationLabel = useMemo(() => {
       const minutes = Math.floor(recordingDurationSeconds / 60);
@@ -325,15 +431,50 @@ export const UniversalLinkInput = forwardRef<
     const handleCancelVoiceRecording = useCallback(() => {
       stopRecordingSession();
       setRecordingDurationSeconds(0);
+      setWaveformLevels(
+        Array.from({ length: WAVEFORM_BAND_COUNT }, () => 0.12)
+      );
+      setDictationState('idle');
     }, [stopRecordingSession]);
 
     const handleSendVoiceRecording = useCallback(() => {
       stopRecordingSession();
-      setRecordingDurationSeconds(0);
-      if (onChatSubmit) {
-        onChatSubmit(`[Voice message ${recordingDurationLabel}]`);
-      }
+      const durationSnapshot = recordingDurationLabel;
+      setDictationState('processing');
+      processingTimerRef.current = globalThis.setTimeout(() => {
+        if (onChatSubmit) {
+          onChatSubmit(`[Voice message ${durationSnapshot}]`);
+        }
+        setDictationState('done');
+        setRecordingDurationSeconds(0);
+        doneTimerRef.current = globalThis.setTimeout(() => {
+          setDictationState('idle');
+          setWaveformLevels(
+            Array.from({ length: WAVEFORM_BAND_COUNT }, randomWaveformLevel)
+          );
+        }, DONE_DELAY_MS);
+      }, PROCESSING_DELAY_MS);
     }, [onChatSubmit, recordingDurationLabel, stopRecordingSession]);
+
+    const handleDismissPermissionError = useCallback(() => {
+      setDictationState('idle');
+    }, []);
+
+    useEffect(() => {
+      if (!voiceInputEnabled) return;
+
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (!(event.metaKey || event.ctrlKey) || !event.shiftKey) return;
+        if (event.key.toLowerCase() !== SHORTCUT_MICROPHONE_KEY) return;
+        event.preventDefault();
+        void handleVoiceInput();
+      };
+
+      globalThis.window.addEventListener('keydown', onKeyDown);
+      return () => {
+        globalThis.window.removeEventListener('keydown', onKeyDown);
+      };
+    }, [handleVoiceInput, voiceInputEnabled]);
 
     const canSubmit = useMemo(() => {
       const trimmed = url.trim();
@@ -421,11 +562,12 @@ export const UniversalLinkInput = forwardRef<
           canSubmit={canSubmit}
           voiceInputEnabled={voiceInputEnabled}
           onVoiceInput={handleVoiceInput}
-          isVoiceRecording={isVoiceRecording}
+          dictationState={dictationState}
           recordingDurationLabel={recordingDurationLabel}
           waveformLevels={waveformLevels}
           onCancelVoiceRecording={handleCancelVoiceRecording}
           onSendVoiceRecording={handleSendVoiceRecording}
+          onDismissPermissionError={handleDismissPermissionError}
           isDropdownOpen={shouldShowAutosuggest}
           onFocus={() => {
             const trimmed = url.trim();

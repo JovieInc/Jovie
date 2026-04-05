@@ -1,17 +1,12 @@
-import { BellRing, CheckCircle2, Circle } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
 import { APP_ROUTES } from '@/constants/routes';
 import { ArtistProfileModesShowcase } from '@/features/home/ArtistProfileModesShowcase';
+import { BentoFeatureGrid } from '@/features/home/BentoFeatureGrid';
 import { HomeHeroSurfaceCluster } from '@/features/home/HomeHeroSurfaceCluster';
 import { HomepageLabelLogoMark } from '@/features/home/HomepageLabelLogoMark';
-import {
-  HOME_RELEASE_DESTINATION_LIVE_MOCK,
-  HOME_RELEASE_DESTINATION_PRESAVE_MOCK,
-  type HomepageLabelPartner,
-} from '@/features/home/home-surface-seed';
-import { ReleaseModeMockCard } from '@/features/home/ReleaseModeMockCard';
-import { ReleaseOperatingSystemShowcase } from '@/features/home/ReleaseOperatingSystemShowcase';
+import { type HomepageLabelPartner } from '@/features/home/home-surface-seed';
 
 const TRUST_LABELS: readonly HomepageLabelPartner[] = [
   'orchard',
@@ -53,7 +48,7 @@ function HomeHero() {
 
       <Container size='homepage'>
         <div className='mx-auto max-w-[1120px]'>
-          <div className='grid items-center gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]'>
+          <div className='grid items-center gap-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-8'>
             <div>
               <p className='homepage-section-eyebrow'>
                 The release system for independent artists
@@ -62,8 +57,8 @@ function HomeHero() {
                 id='home-hero-heading'
                 className='marketing-h1-linear mt-5 text-primary-token'
               >
-                Drop more music.
-                <br className='hidden xl:inline' /> Crush every release.
+                <span className='block'>Drop more music.</span>
+                <span className='block'>Crush every release.</span>
               </h1>
               <p className='mt-5 max-w-[33rem] text-[17px] leading-[1.7] text-secondary-token sm:text-[18px]'>
                 One system to make every release count, every time.
@@ -74,7 +69,7 @@ function HomeHero() {
                   href={APP_ROUTES.SIGNUP}
                   className='btn-linear-signup focus-ring-themed inline-flex h-10 items-center px-4'
                 >
-                  Start Free
+                  Get Started
                 </Link>
                 <Link
                   href={APP_ROUTES.DEMO}
@@ -99,12 +94,12 @@ function HomeTrustBar() {
   return (
     <section className='bg-page py-8 sm:py-10'>
       <Container size='homepage'>
-        <div className='mx-auto flex max-w-[1120px] items-center justify-center gap-x-10 sm:gap-x-14 lg:gap-x-20'>
+        <div className='mx-auto flex max-w-[1120px] items-center justify-center gap-x-8 sm:gap-x-10 lg:gap-x-14'>
           {TRUST_LABELS.map(partner => (
             <HomepageLabelLogoMark
               key={partner}
               partner={partner}
-              className='text-primary-token opacity-[0.38]'
+              className='text-primary-token opacity-[0.55]'
             />
           ))}
         </div>
@@ -115,9 +110,9 @@ function HomeTrustBar() {
 
 function ArtistProfileSection() {
   return (
-    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
+    <section className='border-b border-subtle bg-page py-16 sm:py-20 lg:py-24'>
       <Container size='homepage'>
-        <div className='mx-auto grid max-w-[1120px] gap-12 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:items-center'>
+        <div className='mx-auto grid max-w-[1120px] gap-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:items-center lg:gap-10'>
           <div className='max-w-[34rem]'>
             <SectionHeader
               eyebrow='Artist Profiles'
@@ -142,388 +137,51 @@ function ReleaseDestinationsSection() {
     <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
       <Container size='homepage'>
         <div className='mx-auto max-w-[1120px]'>
-          <div className='grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:items-end'>
-            <SectionHeader
-              eyebrow='Release Destinations'
-              title='Every release gets a clean destination.'
-              body='Presave before launch. Go live on the same surface when the record drops.'
-            />
+          <SectionHeader
+            eyebrow='Release Destinations'
+            title='Every release gets a clean destination.'
+            body='Presave before launch. Go live on the same surface when the record drops.'
+          />
 
-            <div className='border-t border-subtle pt-7'>
-              <div className='flex flex-wrap items-center gap-x-6 gap-y-3 text-sm'>
-                <span className='font-[560] text-primary-token'>
-                  Presave first
-                </span>
-                <span className='text-tertiary-token'>
-                  Countdown until launch.
-                </span>
-                <span
-                  aria-hidden='true'
-                  className='hidden h-1 w-1 rounded-full bg-white/18 sm:block'
-                />
-                <span className='font-[560] text-primary-token'>Go live</span>
-                <span className='text-tertiary-token'>
-                  Open the release fast.
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div data-testid='homepage-release-destinations-surface'>
-            <div className='mt-10 space-y-4 lg:hidden'>
-              <ReleaseModeMockCard
-                release={HOME_RELEASE_DESTINATION_PRESAVE_MOCK}
-                variant='comparison'
-                testId='homepage-release-destination-presave'
-              />
+          <div
+            data-testid='homepage-release-destinations-surface'
+            className='mt-12 grid gap-8 sm:grid-cols-2 sm:gap-6 lg:gap-10'
+          >
+            <div className='text-center'>
+              <p className='mb-4 text-[13px] font-[560] text-secondary-token'>
+                Before Launch
+              </p>
               <div
-                data-testid='homepage-release-destination-notification'
-                className='rounded-[1.15rem] border border-white/10 bg-[linear-gradient(180deg,rgba(18,20,28,0.96),rgba(10,12,18,0.94))] px-4 py-3 shadow-[0_24px_70px_rgba(0,0,0,0.24)]'
+                data-testid='homepage-release-destination-presave'
+                className='mx-auto max-w-[18rem] overflow-hidden rounded-[1.35rem] border border-white/10 shadow-[0_24px_70px_rgba(0,0,0,0.24)]'
               >
-                <div className='flex items-center gap-3'>
-                  <div className='flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04]'>
-                    <BellRing
-                      className='h-4 w-4 text-white/62'
-                      aria-hidden='true'
-                    />
-                  </div>
-                  <div>
-                    <p className='text-[10px] font-medium tracking-[0.02em] text-white/42'>
-                      Release Notifications
-                    </p>
-                    <p className='mt-1 text-[13px] font-[560] text-white'>
-                      Notify every fan. Every time. Automatically.
-                    </p>
-                  </div>
-                </div>
+                <Image
+                  src='/product-screenshots/release-deep-end-phone.png'
+                  alt='The Deep End by Cosmic Gate and Tim White — presave countdown'
+                  width={390}
+                  height={844}
+                  sizes='(max-width: 288px) 100vw, 288px'
+                  className='w-full'
+                />
               </div>
-              <ReleaseModeMockCard
-                release={HOME_RELEASE_DESTINATION_LIVE_MOCK}
-                variant='comparison'
-                testId='homepage-release-destination-live'
-              />
             </div>
 
-            <div className='relative mt-14 hidden min-h-[36rem] lg:block'>
-              <div className='absolute left-0 top-0 z-20 w-[22rem] rotate-[-2deg]'>
-                <ReleaseModeMockCard
-                  release={HOME_RELEASE_DESTINATION_PRESAVE_MOCK}
-                  variant='comparison'
-                  testId='homepage-release-destination-presave'
-                />
-              </div>
-
-              <div className='absolute right-0 top-8 z-10 w-[22rem] rotate-[1.5deg]'>
-                <ReleaseModeMockCard
-                  release={HOME_RELEASE_DESTINATION_LIVE_MOCK}
-                  variant='comparison'
-                  testId='homepage-release-destination-live'
-                />
-              </div>
-
+            <div className='text-center'>
+              <p className='mb-4 text-[13px] font-[560] text-secondary-token'>
+                After Launch
+              </p>
               <div
-                data-testid='homepage-release-destination-notification'
-                className='absolute bottom-5 left-1/2 z-30 w-[28rem] -translate-x-1/2 rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(18,20,28,0.96),rgba(10,12,18,0.94))] px-5 py-3 shadow-[0_24px_70px_rgba(0,0,0,0.28)]'
+                data-testid='homepage-release-destination-live'
+                className='mx-auto max-w-[18rem] overflow-hidden rounded-[1.35rem] border border-white/10 shadow-[0_24px_70px_rgba(0,0,0,0.24)]'
               >
-                <div className='flex items-center justify-center gap-3'>
-                  <div className='flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04]'>
-                    <BellRing
-                      className='h-4 w-4 text-white/62'
-                      aria-hidden='true'
-                    />
-                  </div>
-                  <p className='text-[13px] font-[560] tracking-[-0.01em] text-white'>
-                    Notify every fan. Every time. Automatically.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Container>
-    </section>
-  );
-}
-
-function ReleaseOperatingSystemSection() {
-  return (
-    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
-      <Container size='homepage'>
-        <div className='mx-auto max-w-[1120px]'>
-          <div className='grid gap-12 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-end'>
-            <SectionHeader
-              eyebrow='Release Operating System'
-              title='Your release operating system.'
-              body='Jovie knows the release, watches the rollout, and keeps the work attached to it.'
-            />
-
-            <div className='border-t border-subtle pt-7 text-sm'>
-              <span className='font-[560] text-primary-token'>
-                One working view
-              </span>
-              <span className='ml-3 text-tertiary-token'>
-                Brief, coverage, and launch work stay together.
-              </span>
-            </div>
-          </div>
-
-          <div className='mt-12 lg:mt-14'>
-            <ReleaseOperatingSystemShowcase />
-          </div>
-        </div>
-      </Container>
-    </section>
-  );
-}
-
-function AutomatedMomentumSection() {
-  return (
-    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
-      <Container size='homepage'>
-        <div className='mx-auto max-w-[1120px]'>
-          <div className='grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center'>
-            <div className='space-y-3'>
-              <div className='rounded-2xl bg-white/[0.04] px-5 py-4'>
-                <div className='flex items-center gap-3'>
-                  <span className='h-2 w-2 rounded-full bg-violet-400' />
-                  <p className='text-[14px] font-[530] text-white'>
-                    &ldquo;The Sound&rdquo; drops in 48 hours
-                  </p>
-                </div>
-                <p className='mt-1 pl-5 text-[12px] text-white/40'>
-                  1,247 fans notified automatically
-                </p>
-              </div>
-
-              <div className='rounded-2xl bg-white/[0.04] px-5 py-4'>
-                <div className='flex items-center gap-3'>
-                  <span className='h-2 w-2 rounded-full bg-emerald-400' />
-                  <p className='text-[14px] font-[530] text-white'>
-                    Now streaming everywhere
-                  </p>
-                </div>
-                <p className='mt-1 pl-5 text-[12px] text-white/40'>
-                  Smart link live. Fans redirected by timezone.
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <p className='homepage-section-eyebrow'>Automated</p>
-              <h2 className='marketing-h2-linear mt-4 text-primary-token'>
-                Fans know before you do.
-              </h2>
-              <p className='mt-4 max-w-[28rem] text-[15px] leading-[1.7] text-secondary-token'>
-                Presave fans get notified the second it drops. In their
-                timezone.
-              </p>
-            </div>
-          </div>
-        </div>
-      </Container>
-    </section>
-  );
-}
-
-function CommandCenterSection() {
-  return (
-    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
-      <Container size='homepage'>
-        <div className='mx-auto max-w-[1120px]'>
-          <div className='grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:items-start'>
-            <div>
-              <p className='homepage-section-eyebrow'>Task & Playbook</p>
-              <h2 className='marketing-h2-linear mt-4 text-primary-token'>
-                A command center for your career.
-              </h2>
-              <p className='mt-5 max-w-[28rem] text-[15px] leading-[1.7] text-secondary-token'>
-                Jovie generates a release playbook from your brief. Tasks track
-                themselves.
-              </p>
-            </div>
-
-            <div className='rounded-2xl bg-white/[0.04] p-5'>
-              <div className='flex items-center justify-between pb-4'>
-                <p className='text-[11px] font-medium text-white/40'>
-                  Release playbook
-                </p>
-                <span className='rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[11px] font-medium text-white/60'>
-                  Generate Release Plan
-                </span>
-              </div>
-
-              <div className='space-y-0'>
-                <div className='flex items-center justify-between border-t border-white/6 py-3'>
-                  <div className='flex items-center gap-3'>
-                    <CheckCircle2 className='h-3.5 w-3.5 text-emerald-400' />
-                    <span className='text-[13px] text-white/40 line-through'>
-                      Metadata verified
-                    </span>
-                  </div>
-                  <span className='text-[11px] text-white/25'>
-                    ISRC and UPC synced
-                  </span>
-                </div>
-
-                <div className='relative flex items-center justify-between border-t border-white/6 py-3'>
-                  <div className='flex items-center gap-3'>
-                    <span className='h-3.5 w-3.5 rounded-full border-2 border-sky-400' />
-                    <span className='text-[13px] text-white/80'>
-                      Upload Canvas to Spotify
-                    </span>
-                  </div>
-                  <div className='flex items-center gap-2'>
-                    <span className='rounded-full border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 text-[9px] font-medium text-sky-300/80'>
-                      In progress
-                    </span>
-                  </div>
-                </div>
-
-                <div className='flex items-center justify-between border-t border-white/6 py-3'>
-                  <div className='flex items-center gap-3'>
-                    <Circle className='h-3.5 w-3.5 text-white/20' />
-                    <span className='text-[13px] text-white/80'>
-                      Pitch to editorial playlists
-                    </span>
-                  </div>
-                  <span className='text-[11px] text-white/25'>
-                    Due in 3 days
-                  </span>
-                </div>
-
-                <div className='relative flex items-center justify-between border-t border-white/6 py-3'>
-                  <div className='flex items-center gap-3'>
-                    <CheckCircle2 className='h-3.5 w-3.5 text-emerald-400' />
-                    <span className='text-[13px] text-white/40 line-through'>
-                      Schedule launch day posts
-                    </span>
-                  </div>
-                  <span className='rounded-full border border-violet-400/20 bg-violet-400/10 px-2 py-0.5 text-[9px] font-medium text-violet-300/80'>
-                    Automated by Jovie
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Container>
-    </section>
-  );
-}
-
-function MomentumCurve() {
-  return (
-    <svg viewBox='0 0 400 120' className='h-full w-full' aria-hidden='true'>
-      <line
-        x1='0'
-        y1='119'
-        x2='400'
-        y2='119'
-        stroke='rgba(255,255,255,0.06)'
-        strokeWidth='1'
-      />
-      <path
-        d='M 0 100 C 60 95, 100 70, 140 58 S 220 30, 280 20 S 360 10, 400 6'
-        fill='none'
-        stroke='rgba(113,112,255,0.5)'
-        strokeWidth='2'
-      />
-      <path
-        d='M 0 100 C 60 95, 100 70, 140 58 S 220 30, 280 20 S 360 10, 400 6'
-        fill='url(#momentum-fill)'
-        opacity='0.15'
-      />
-      <defs>
-        <linearGradient id='momentum-fill' x1='0' y1='0' x2='0' y2='1'>
-          <stop offset='0%' stopColor='rgb(113,112,255)' />
-          <stop offset='100%' stopColor='transparent' />
-        </linearGradient>
-      </defs>
-      {[
-        { x: 60, y: 96, label: 'Release 1' },
-        { x: 140, y: 58, label: 'Release 2' },
-        { x: 230, y: 28, label: 'Release 3' },
-        { x: 320, y: 14, label: 'Release 4' },
-      ].map(dot => (
-        <g key={dot.label}>
-          <circle cx={dot.x} cy={dot.y} r='4' fill='rgb(113,112,255)' />
-          <circle cx={dot.x} cy={dot.y} r='8' fill='rgba(113,112,255,0.2)' />
-        </g>
-      ))}
-    </svg>
-  );
-}
-
-function FlatlineCurve() {
-  return (
-    <svg viewBox='0 0 400 120' className='h-full w-full' aria-hidden='true'>
-      <line
-        x1='0'
-        y1='119'
-        x2='400'
-        y2='119'
-        stroke='rgba(255,255,255,0.06)'
-        strokeWidth='1'
-      />
-      <path
-        d='M 0 70 Q 30 65, 60 72 T 120 68 T 180 74 T 240 70 T 300 73 T 360 69 T 400 72'
-        fill='none'
-        stroke='rgba(255,255,255,0.15)'
-        strokeWidth='1.5'
-        strokeDasharray='4 3'
-      />
-      {[60, 140, 230, 320].map(x => (
-        <circle
-          key={x}
-          cx={x}
-          cy={70 + (x % 3) * 2 - 2}
-          r='3'
-          fill='rgba(255,255,255,0.12)'
-        />
-      ))}
-    </svg>
-  );
-}
-
-function WorkflowSection() {
-  return (
-    <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
-      <Container size='homepage'>
-        <div className='mx-auto max-w-[1120px]'>
-          <div className='grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:items-center'>
-            <div>
-              <p className='homepage-section-eyebrow'>Full Release Lifecycle</p>
-              <h2 className='marketing-h2-linear mt-4 text-primary-token'>
-                Never start from zero.
-              </h2>
-              <p className='mt-5 max-w-[28rem] text-[15px] leading-[1.7] text-secondary-token'>
-                Every release picks up where the last one left off.
-              </p>
-            </div>
-
-            <div className='space-y-4'>
-              <div className='rounded-2xl bg-white/[0.04] p-5'>
-                <div className='flex items-center justify-between'>
-                  <p className='text-[12px] font-[530] text-white/70'>
-                    With Jovie
-                  </p>
-                  <p className='text-[10px] text-emerald-400/60'>Compounding</p>
-                </div>
-                <div className='mt-3 h-[5.5rem]'>
-                  <MomentumCurve />
-                </div>
-              </div>
-
-              <div className='rounded-2xl bg-white/[0.03] p-5'>
-                <div className='flex items-center justify-between'>
-                  <p className='text-[12px] font-[530] text-white/30'>
-                    Without
-                  </p>
-                  <p className='text-[10px] text-white/15'>Flatline</p>
-                </div>
-                <div className='mt-3 h-[3.5rem]'>
-                  <FlatlineCurve />
-                </div>
+                <Image
+                  src='/product-screenshots/release-take-me-over-phone.png'
+                  alt='Take Me Over by Tim White — live smart link with streaming platforms'
+                  width={390}
+                  height={844}
+                  sizes='(max-width: 288px) 100vw, 288px'
+                  className='w-full'
+                />
               </div>
             </div>
           </div>
@@ -543,17 +201,16 @@ function FinalCallToAction() {
             <br />
             Now make it hit.
           </h2>
-          <p className='mx-auto mt-6 max-w-[28rem] text-[17px] leading-[1.7] text-secondary-token sm:text-[18px]'>
-            No credit card required.
-          </p>
-
           <div className='mt-10'>
             <Link
               href={APP_ROUTES.SIGNUP}
               className='btn-linear-signup focus-ring-themed inline-flex h-12 items-center px-6 text-[15px]'
             >
-              Start Free
+              Get Started
             </Link>
+            <p className='mt-3 text-[13px] text-tertiary-token'>
+              No credit card required.
+            </p>
           </div>
         </div>
       </Container>
@@ -568,10 +225,7 @@ export function HomePageNarrative() {
       <HomeTrustBar />
       <ArtistProfileSection />
       <ReleaseDestinationsSection />
-      <AutomatedMomentumSection />
-      <ReleaseOperatingSystemSection />
-      <CommandCenterSection />
-      <WorkflowSection />
+      <BentoFeatureGrid />
       <FinalCallToAction />
     </>
   );
