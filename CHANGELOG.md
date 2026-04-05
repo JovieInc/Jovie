@@ -7,11 +7,17 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.118] - 2026-04-05
 
+> Public profile pages now fit the mobile viewport without scrolling. The hero image scales to fill remaining space while content stays pinned.
+
 ### Added
 
 - Staggered cascade animation when generating a release plan: category groups fade in sequentially, tasks slide in from left with blur-to-sharp effect
 - Typewriter reveal for AI-generated playlist pitches with animated sparkle icon and blinking cursor
 - Platform tab switching re-triggers typewriter animation for each DSP pitch
+
+### Fixed
+
+- Public profile pages no longer scroll on mobile — viewport locks to screen height, hero image shrinks to fit
 
 ## [26.4.117] - 2026-04-05
 

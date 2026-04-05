@@ -73,14 +73,23 @@ export function ReleaseTaskChecklist({
   const toggle = useTaskToggleMutation(releaseId);
 
   // Track whether we just generated tasks (empty → populated transition)
-  const wasEmpty = useRef(true);
+  const wasEmpty = useRef(!tasks || tasks.length === 0);
   const [animateEntrance, setAnimateEntrance] = useState(false);
+  const prevReleaseId = useRef(releaseId);
+
+  // Reset animation tracking when switching releases
+  useEffect(() => {
+    if (prevReleaseId.current !== releaseId) {
+      prevReleaseId.current = releaseId;
+      wasEmpty.current = true;
+      setAnimateEntrance(false);
+    }
+  }, [releaseId]);
 
   useEffect(() => {
     if (tasks && tasks.length > 0 && wasEmpty.current) {
       wasEmpty.current = false;
       setAnimateEntrance(true);
-      // Clear animation flag after all tasks have animated in
       const timeout = setTimeout(() => setAnimateEntrance(false), 3000);
       return () => clearTimeout(timeout);
     }
@@ -231,7 +240,7 @@ export function ReleaseTaskChecklist({
                       animate={{
                         opacity: 1,
                         x: 0,
-                        filter: 'blur(0px)',
+                        ...(animateEntrance && { filter: 'blur(0px)' }),
                       }}
                       transition={{
                         duration: 0.25,
