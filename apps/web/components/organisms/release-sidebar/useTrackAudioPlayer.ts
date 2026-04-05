@@ -144,7 +144,12 @@ function bindAudioEvents(el: HTMLAudioElement): void {
     });
   });
   el.addEventListener('error', () => {
-    handlePlaybackFailure(el, 'media_error');
+    // Guard: only handle errors when a track is actively loaded.
+    // The audio element can fire stale error events (e.g., after tab
+    // backgrounding/resuming) even when src is already cleared.
+    if (state.activeTrackId) {
+      handlePlaybackFailure(el, 'media_error');
+    }
   });
 }
 
@@ -220,6 +225,28 @@ export function useTrackAudioPlayer() {
     audio.currentTime = Math.max(0, Math.min(time, audio.duration));
   }, []);
 
+  const stop = useCallback(() => {
+    // Invalidate any in-flight play() from earlier toggleTrack calls
+    _playToken += 1;
+    const audio = getAudio();
+    if (audio) {
+      audio.pause();
+      audio.src = '';
+    }
+    setState({
+      activeTrackId: null,
+      isPlaying: false,
+      playbackStatus: 'idle',
+      lastErrorReason: null,
+      currentTime: 0,
+      duration: 0,
+      trackTitle: null,
+      releaseTitle: null,
+      artistName: null,
+      artworkUrl: null,
+    });
+  }, []);
+
   const onError = useCallback(
     (cb: (reason: PlaybackState['lastErrorReason']) => void) => {
       errorListeners.add(cb);
@@ -234,6 +261,7 @@ export function useTrackAudioPlayer() {
     playbackState,
     toggleTrack,
     seek,
+    stop,
     onError,
   };
 }
