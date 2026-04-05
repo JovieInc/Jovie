@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.119] - 2026-04-05
+
+> Homepage proof is now real. Every screenshot comes from the actual product, reproduced by the Playwright pipeline. The hero uses a Spotlight Depth layout with a dominant profile phone and atmospheric glow.
+
+### Changed
+
+- Replaced fabricated homepage proof with canonical product screenshots from deterministic demo surfaces
+- Implemented Variant F Spotlight Depth hero: dominant profile phone in front, blurred release card behind for depth, atmospheric blue-violet glow, task panel anchored bottom-right
+- Simplified release destinations to mobile-only "Before launch" / "After launch" side-by-side layout
+- Enforced hero headline as exactly two lines via structural markup instead of CSS text-wrap hacks
+- Updated page metadata and JSON-LD schemas to reflect "release operating system" positioning
+- Increased trust bar logo opacity from 45% to 55% for better legibility
+
+### Added
+
+- Homepage proof manifest system mapping every proof slot to a registered screenshot scenario
+- `DemoReleasePresaveSurface` component with far-future date fixture for evergreen presave state
+- Mobile release screenshot scenarios (`release-presave-mobile`, `release-landing-mobile`) in the screenshot registry
+- `release-presave` showcase surface ID for the demo system
+- Proof manifest-to-registry validation test ensuring all proof assets reference valid scenarios
+
+### Removed
+
+- Hero notification pill (fabricated "1,247 fans notified" element)
+- Desktop screenshots from the release destinations section
+- Release destinations notification card overlay
+
 ## [26.4.118] - 2026-04-05
 
 > Public profile pages now fit the mobile viewport without scrolling. The hero image scales to fill remaining space while content stays pinned.
