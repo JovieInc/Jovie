@@ -449,7 +449,7 @@ export function ProfileInlineNotificationsCTA({
               value={nameInput}
               onChange={e => setNameInput(e.target.value)}
               onSubmit={() => {
-                void handleNameSubmit();
+                handleNameSubmit().catch(console.error);
               }}
               onKeyDown={handleKeyDown}
               onFocus={() => setIsInputFocused(true)}
@@ -481,7 +481,7 @@ export function ProfileInlineNotificationsCTA({
                 setBirthdayInput(formatBirthdayInput(e.target.value))
               }
               onSubmit={() => {
-                void handleBirthdaySubmit();
+                handleBirthdaySubmit().catch(console.error);
               }}
               onKeyDown={handleKeyDown}
               onFocus={() => setIsInputFocused(true)}

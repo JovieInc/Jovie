@@ -372,7 +372,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       borderClass =
         'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20';
     } else if (isExpanded) {
-      borderClass = 'border-black/8 bg-surface-0 dark:border-white/[0.09]';
+      borderClass = 'border-black/8 dark:border-white/[0.09]';
     }
 
     return (
@@ -386,9 +386,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           }
           className={cn(
             'overflow-hidden border transition-[border-color,background-color,box-shadow] duration-normal',
-            // Light mode: bright shell inset, dark mode: content surface
-            'bg-[color-mix(in_oklab,white_94%,var(--linear-app-content-surface))] dark:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
-            'shadow-[0_6px_18px_-16px_rgba(15,23,42,0.38),0_1px_0_rgba(255,255,255,0.4)_inset] dark:shadow-[0_8px_18px_-14px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.05)]',
+            // Always one elevation above the content surface
+            'bg-surface-1',
+            'shadow-[0_2px_8px_-2px_rgba(15,23,42,0.12),0_1px_0_rgba(255,255,255,0.4)_inset] dark:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.04)]',
             borderClass
           )}
           style={reducedMotion ? { borderRadius, boxShadow } : { borderRadius }}

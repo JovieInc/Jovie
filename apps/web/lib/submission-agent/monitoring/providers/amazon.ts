@@ -6,12 +6,10 @@ import type {
 } from '../../types';
 
 function extractMetaContent(html: string, key: string): string | null {
-  const match = html.match(
-    new RegExp(
-      `<meta[^>]+(?:property|name)=["']${key}["'][^>]+content=["']([^"']+)["'][^>]*>`,
-      'i'
-    )
-  );
+  const match = new RegExp(
+    `<meta[^>]+(?:property|name)=["']${key}["'][^>]+content=["']([^"']+)["'][^>]*>`,
+    'i'
+  ).exec(html);
   return match?.[1]?.trim() ?? null;
 }
 

@@ -65,5 +65,6 @@ describe('JovieLogo', () => {
   it('has no a11y violations', async () => {
     const { container } = render(<JovieLogo />);
     await expectNoA11yViolations(container);
+    expect(container).toBeTruthy();
   });
 });

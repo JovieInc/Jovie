@@ -33,20 +33,20 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
   const aiAccent = getAccentCssVars('purple');
 
   return (
-    <div className='flex items-center gap-3 px-4 py-2 min-h-[44px] group hover:bg-surface-1 rounded transition-colors'>
+    <div className='flex items-center gap-2 px-4 py-1 min-h-[32px] group hover:bg-surface-1 rounded transition-colors'>
       {/* Checkbox */}
       <input
         type='checkbox'
         checked={isDone}
         disabled={isAi}
         onChange={() => onToggle(task.id, !isDone)}
-        className='h-4 w-4 flex-shrink-0 rounded accent-[var(--linear-accent,#5e6ad2)] cursor-pointer disabled:cursor-default disabled:opacity-60'
+        className='h-3.5 w-3.5 flex-shrink-0 rounded accent-[var(--linear-accent,#5e6ad2)] cursor-pointer disabled:cursor-default disabled:opacity-60'
         aria-label={`Mark "${task.title}" as ${isDone ? 'incomplete' : 'complete'}`}
       />
 
       {/* Title */}
       <span
-        className={`flex-1 text-[11.5px] transition-colors ${
+        className={`flex-1 text-[11.5px] truncate transition-colors ${
           isDone
             ? 'text-tertiary-token line-through opacity-60'
             : 'text-primary-token'
@@ -58,7 +58,7 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
             className='ml-1.5 text-[10px] font-medium'
             style={{ color: aiAccent.solid }}
           >
-            Automatic with Pro
+            Auto
           </span>
         )}
       </span>
@@ -80,7 +80,7 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
       {/* Priority */}
       {priority.dots && (
         <span
-          className='flex-shrink-0 w-8 text-right text-[10px]'
+          className='flex-shrink-0 w-6 text-right text-[10px]'
           style={priorityAccent ? { color: priorityAccent.solid } : undefined}
           title={task.priority}
         >
