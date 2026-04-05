@@ -36,7 +36,6 @@ export const APP_ROUTES = {
   CHAT_PROFILE_PANEL: '/app/chat?panel=profile',
   INSIGHTS: '/app/insights',
   PRESENCE: '/app/presence',
-  CATALOG_SCAN: '/app/dashboard/catalog-scan',
 
   // Settings
   SETTINGS: '/app/settings',
