@@ -60,6 +60,7 @@ interface UseSubscriptionFormReturn {
   openSubscription: () => void;
   registerInputFocus: (focusFn: (() => void) | null) => void;
   hydrationStatus: 'idle' | 'checking' | 'done';
+  smsEnabled: boolean;
 }
 
 export function useSubscriptionForm({
@@ -77,6 +78,7 @@ export function useSubscriptionForm({
     setSubscriptionDetails,
     openSubscription,
     registerInputFocus,
+    smsEnabled,
   } = useProfileNotifications();
 
   const [country, setCountry] = useState<CountryOption>(COUNTRY_OPTIONS[0]);
@@ -415,5 +417,6 @@ export function useSubscriptionForm({
     openSubscription,
     registerInputFocus,
     hydrationStatus,
+    smsEnabled,
   };
 }

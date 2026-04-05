@@ -72,6 +72,7 @@ export function useProfileShell({
   visitTrackingToken,
   modeOverride,
   sourceOverride,
+  smsEnabled = false,
 }: Pick<
   ProfileShellProps,
   | 'artist'
@@ -82,6 +83,7 @@ export function useProfileShell({
 > & {
   modeOverride?: ProfileMode;
   sourceOverride?: string | null;
+  smsEnabled?: boolean;
 }): UseProfileShellReturn {
   const [isTipNavigating, setIsTipNavigating] = useState(false);
   const { success: showSuccess, error: showError } = useNotifications();
@@ -122,6 +124,7 @@ export function useProfileShell({
     artistHandle: artist.handle,
     artistId: artist.id,
     notificationsEnabled,
+    smsEnabled,
     onError: showError,
     onSuccess: showSuccess,
   });
@@ -184,6 +187,7 @@ export function useProfileShell({
       setSubscriptionDetails,
       openSubscription,
       registerInputFocus,
+      smsEnabled,
     }),
     [
       channel,
@@ -197,6 +201,7 @@ export function useProfileShell({
       setNotificationsState,
       setSubscribedChannels,
       setSubscriptionDetails,
+      smsEnabled,
       subscribedChannels,
       subscriptionDetails,
     ]
