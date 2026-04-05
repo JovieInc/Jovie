@@ -52,8 +52,6 @@ function LazyOutreachCampaignsInsights({
     require('@/components/features/admin/outreach/OutreachOverviewPanel').OutreachOverviewPanel;
   const InviteCampaignManager =
     require('@/components/features/admin/campaigns/InviteCampaignManager').InviteCampaignManager;
-  const _LeadGtmInsights =
-    require('@/components/features/admin/leads/LeadGtmInsights').LeadGtmInsights;
 
   return (
     <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
