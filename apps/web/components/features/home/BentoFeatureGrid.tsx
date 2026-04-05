@@ -80,7 +80,7 @@ function FansKnowCard() {
             <BellRing className='h-3 w-3 text-violet-300' aria-hidden='true' />
           </div>
           <span className='text-[12px] text-white/60'>
-            1,247 fans notified automatically
+            Fans notified automatically
           </span>
         </div>
         <p className='pl-[34px] text-[11px] text-white/30'>

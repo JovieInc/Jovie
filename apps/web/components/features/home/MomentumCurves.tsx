@@ -17,11 +17,11 @@ export function MomentumCurve() {
       />
       <path
         d='M 0 105 C 80 102, 160 98, 220 92 S 300 70, 340 40 S 370 12, 400 4'
-        fill='url(#momentum-fill)'
+        fill='url(#momentum-fill-bento)'
         opacity='0.15'
       />
       <defs>
-        <linearGradient id='momentum-fill' x1='0' y1='0' x2='0' y2='1'>
+        <linearGradient id='momentum-fill-bento' x1='0' y1='0' x2='0' y2='1'>
           <stop offset='0%' stopColor='rgb(113,112,255)' />
           <stop offset='100%' stopColor='transparent' />
         </linearGradient>

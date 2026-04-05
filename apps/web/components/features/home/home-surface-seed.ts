@@ -115,10 +115,8 @@ export const HOME_RELEASE_DESTINATION_PRESAVE_MOCK: HomepageReleaseMock = {
   id: 'the-deep-end-presave',
   title: 'The Deep End',
   artist: 'Cosmic Gate & Tim White',
-  // Far-future date so presave state never expires on the homepage.
-  // If this date approaches, update it. The Playwright screenshot pipeline
-  // captures this state; a past date would show post-release UI instead.
-  releaseLabel: 'Drops December 31, 2027',
+  // Far-future date so presave state does not expire in demo/proof surfaces.
+  releaseLabel: 'Drops December 31, 2099',
   modeLabel: 'Countdown Presave',
   state: 'presave',
   stateDetail: 'Presave is open',

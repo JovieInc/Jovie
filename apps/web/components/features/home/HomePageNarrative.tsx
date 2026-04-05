@@ -149,7 +149,7 @@ function ReleaseDestinationsSection() {
           >
             <div className='text-center'>
               <p className='mb-4 text-[13px] font-[560] text-secondary-token'>
-                Before launch
+                Before Launch
               </p>
               <div
                 data-testid='homepage-release-destination-presave'
@@ -160,6 +160,7 @@ function ReleaseDestinationsSection() {
                   alt='The Deep End by Cosmic Gate and Tim White — presave countdown'
                   width={390}
                   height={844}
+                  sizes='(max-width: 288px) 100vw, 288px'
                   className='w-full'
                 />
               </div>
@@ -167,7 +168,7 @@ function ReleaseDestinationsSection() {
 
             <div className='text-center'>
               <p className='mb-4 text-[13px] font-[560] text-secondary-token'>
-                After launch
+                After Launch
               </p>
               <div
                 data-testid='homepage-release-destination-live'
@@ -178,6 +179,7 @@ function ReleaseDestinationsSection() {
                   alt='Take Me Over by Tim White — live smart link with streaming platforms'
                   width={390}
                   height={844}
+                  sizes='(max-width: 288px) 100vw, 288px'
                   className='w-full'
                 />
               </div>

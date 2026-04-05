@@ -113,8 +113,8 @@ describe('HomePageNarrative', () => {
   it('renders release destinations with Before/After labels', () => {
     render(<HomePageNarrative />);
 
-    expect(screen.getByText('Before launch')).toBeInTheDocument();
-    expect(screen.getByText('After launch')).toBeInTheDocument();
+    expect(screen.getByText('Before Launch')).toBeInTheDocument();
+    expect(screen.getByText('After Launch')).toBeInTheDocument();
   });
 
   it('renders "Get Started" CTA consistently', () => {

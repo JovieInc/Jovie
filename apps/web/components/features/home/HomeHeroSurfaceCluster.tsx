@@ -152,7 +152,7 @@ export function HomeHeroSurfaceCluster() {
         />
 
         {/* Back layer: release card, blurred for depth */}
-        <div className='absolute -left-4 top-2 w-[13rem] rotate-[-3deg] opacity-60 blur-[4px]'>
+        <div className='absolute -left-4 top-2 w-[13rem] rotate-[-3deg] opacity-60 blur-sm'>
           <HeroSmartLinkPanel />
         </div>
 

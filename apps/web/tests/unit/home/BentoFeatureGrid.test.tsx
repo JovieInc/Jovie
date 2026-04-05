@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { BentoFeatureGrid } from '@/features/home/BentoFeatureGrid';
 
 describe('BentoFeatureGrid', () => {
-  it('renders 5 bento cards with correct headings', () => {
+  it('renders the command-center heading and bento card copy', () => {
     render(<BentoFeatureGrid />);
 
     expect(

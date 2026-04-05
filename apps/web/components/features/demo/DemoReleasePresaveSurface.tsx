@@ -4,7 +4,7 @@ import { DemoClientProviders } from './DemoClientProviders';
 
 /**
  * Demo surface for a presave/unreleased release state.
- * Uses a far-future date (2027-12-31) so the countdown never expires on the homepage.
+ * Uses a far-future date so the countdown does not expire in demo/proof surfaces.
  * Backed by UnreleasedReleaseHero with canonical Tim White data.
  */
 export function DemoReleasePresaveSurface() {
@@ -17,7 +17,7 @@ export function DemoReleasePresaveSurface() {
             slug: 'the-deep-end',
             title: 'The Deep End',
             artworkUrl: null,
-            releaseDate: new Date('2027-12-31T00:00:00Z'),
+            releaseDate: new Date('2099-12-31T00:00:00Z'),
             trackId: null,
             hasSpotify: true,
             hasAppleMusic: true,
