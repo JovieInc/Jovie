@@ -170,7 +170,7 @@ export function DrawerEditableTextField({
             )}
           />
         ) : null}
-        {editable && !isEditing ? (
+        {editable && !isEditing && (
           <button
             type='button'
             onClick={() => setIsEditing(true)}
@@ -194,7 +194,8 @@ export function DrawerEditableTextField({
               {displayValue}
             </span>
           </button>
-        ) : !editable ? (
+        )}
+        {!editable && (
           <span
             className={cn(
               'block min-w-0 w-full truncate text-[13px] text-primary-token',
@@ -207,7 +208,7 @@ export function DrawerEditableTextField({
           >
             {displayValue}
           </span>
-        ) : null}
+        )}
       </div>
 
       {actionSlotIds.length > 0 ? (

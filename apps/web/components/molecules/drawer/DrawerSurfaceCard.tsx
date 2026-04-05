@@ -17,6 +17,15 @@ export interface DrawerSurfaceCardProps {
   readonly 'aria-busy'?: boolean;
 }
 
+const VARIANT_CLASSNAMES: Record<
+  NonNullable<DrawerSurfaceCardProps['variant']>,
+  string
+> = {
+  card: DRAWER_SURFACE_CARD_CLASSNAME,
+  quiet: DRAWER_SURFACE_QUIET_CARD_CLASSNAME,
+  flat: 'border-0 bg-transparent shadow-none',
+};
+
 export function DrawerSurfaceCard({
   children,
   as: Component = 'div',
@@ -35,14 +44,7 @@ export function DrawerSurfaceCard({
       data-testid={testId}
       data-variant={variant}
       data-surface-variant={variant}
-      className={cn(
-        variant === 'card'
-          ? DRAWER_SURFACE_CARD_CLASSNAME
-          : variant === 'quiet'
-            ? DRAWER_SURFACE_QUIET_CARD_CLASSNAME
-            : 'border-0 bg-transparent shadow-none',
-        className
-      )}
+      className={cn(VARIANT_CLASSNAMES[variant], className)}
     >
       {children}
     </Component>

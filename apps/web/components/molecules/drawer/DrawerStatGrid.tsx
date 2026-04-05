@@ -10,6 +10,20 @@ export interface DrawerStatGridProps {
   readonly variant?: 'card' | 'flush' | 'quiet';
 }
 
+const SURFACE_VARIANT: Record<
+  NonNullable<DrawerStatGridProps['variant']>,
+  'card' | 'quiet' | 'flat'
+> = { card: 'card', quiet: 'quiet', flush: 'flat' };
+
+const PADDING_CLASSNAMES: Record<
+  NonNullable<DrawerStatGridProps['variant']>,
+  string
+> = {
+  card: 'p-3',
+  quiet: 'p-2.5',
+  flush: 'rounded-none border-x-0 border-y-0 bg-transparent p-0 shadow-none',
+};
+
 export function DrawerStatGrid({
   children,
   className,
@@ -17,16 +31,10 @@ export function DrawerStatGrid({
 }: DrawerStatGridProps) {
   return (
     <DrawerSurfaceCard
-      variant={
-        variant === 'card' ? 'card' : variant === 'quiet' ? 'quiet' : 'flat'
-      }
+      variant={SURFACE_VARIANT[variant]}
       className={cn(
         'grid grid-cols-2 divide-x divide-subtle',
-        variant === 'card'
-          ? 'p-3'
-          : variant === 'quiet'
-            ? 'p-2.5'
-            : 'rounded-none border-x-0 border-y-0 bg-transparent p-0 shadow-none',
+        PADDING_CLASSNAMES[variant],
         className
       )}
     >
