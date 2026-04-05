@@ -98,6 +98,22 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       captureSelector: '[data-testid="demo-showcase-release-tasks"]',
       publicExportPath: 'release-tasks-active.png',
     },
+    {
+      id: 'release-presave-mobile',
+      title: 'Release Presave Mobile',
+      route: '/demo/showcase/release-presave',
+      waitFor: '[data-testid="demo-showcase-release-presave"]',
+      viewport: 'mobile',
+      publicExportPath: 'release-deep-end-phone.png',
+    },
+    {
+      id: 'release-landing-mobile',
+      title: 'Release Landing Mobile',
+      route: '/demo/showcase/release-landing',
+      waitFor: '[data-testid="demo-showcase-release-landing"]',
+      viewport: 'mobile',
+      publicExportPath: 'release-take-me-over-phone.png',
+    },
   ]),
   ...defineScenarios('dashboard', ADMIN_MARKETING_AND_INVESTOR, [
     {

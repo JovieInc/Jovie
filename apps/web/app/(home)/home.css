@@ -50,6 +50,11 @@
     color: var(--linear-text-tertiary);
   }
 
+  /* Override text-wrap: balance for hero H1 to prevent 3-line wraps at mid-range viewports */
+  #home-hero-heading {
+    text-wrap: unset;
+  }
+
   .hero-glow {
     background:
       radial-gradient(
@@ -61,6 +66,21 @@
         ellipse 36% 26% at 78% 12%,
         oklch(24% 0.03 250 / 0.18),
         transparent 72%
+      );
+  }
+
+  /* Atmospheric glow behind the hero phone cluster (Variant F: Spotlight Depth) */
+  .hero-cluster-glow {
+    background:
+      radial-gradient(
+        ellipse 70% 60% at 50% 40%,
+        oklch(28% 0.06 268 / 0.28),
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 50% 45% at 40% 35%,
+        oklch(22% 0.05 290 / 0.18),
+        transparent 65%
       );
   }
 
@@ -112,7 +132,8 @@
 }
 
 @media (prefers-contrast: more) {
-  .hero-glow {
+  .hero-glow,
+  .hero-cluster-glow {
     display: none;
   }
 }

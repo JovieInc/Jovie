@@ -66,6 +66,7 @@
 | `/api/admin/roles` | GET, POST | `admin` | Role management |
 | `/api/admin/screenshots/[filename]` | GET | `admin` | Serve screenshot file |
 | `/api/admin/users` | GET | `admin` | List users |
+| `/api/admin/test-user/set-plan` | POST | `admin` | Deprecated admin namespace endpoint (returns 410; use `/api/dev/test-user/set-plan`) |
 | `/api/admin/waitlist` | GET, POST | `admin` | Waitlist management |
 
 ### Apple Music
@@ -202,6 +203,7 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/dev/clear-session` | POST | `auth` | Clear dev session |
+| `/api/dev/test-user/set-plan` | POST | `auth` | Test-user-only plan switching for E2E in non-production |
 | `/api/dev/unwaitlist` | POST | `auth` | Remove from waitlist in dev |
 
 ### DSP
