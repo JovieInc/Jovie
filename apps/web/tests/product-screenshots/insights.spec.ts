@@ -11,7 +11,6 @@
  */
 
 import { test } from '@playwright/test';
-import { signInUser } from '../helpers/clerk-auth';
 import {
   hideTransientUI,
   OUTPUT_DIR,
@@ -20,21 +19,17 @@ import {
 } from './helpers';
 
 test.describe('Product Screenshots – Insights Dashboard', () => {
-  test.beforeEach(async ({ page }) => {
-    await signInUser(page);
-  });
-
   test('insights dashboard – full view', async ({ page }) => {
     test.setTimeout(120_000);
 
-    await page.goto('/app/dashboard/insights', {
+    await page.goto('/demo/showcase/analytics', {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
     });
 
-    // Wait for the insights panel itself, not incidental headings elsewhere.
+    // Use demo showcase route so screenshots remain auth-free in CI.
     await page
-      .locator('[data-testid="insights-panel"]')
+      .locator('[data-testid="demo-showcase-analytics"]')
       .waitFor({ state: 'visible', timeout: TIMEOUTS.CONTENT_VISIBLE });
 
     await waitForSettle(page);
