@@ -425,7 +425,7 @@ export function ProfileCompactTemplate({
 
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
-      <div className='profile-viewport relative min-h-[100dvh] overflow-x-hidden bg-[color:var(--profile-stage-bg)] text-primary-token'>
+      <div className='profile-viewport relative h-[100dvh] overflow-clip bg-[color:var(--profile-stage-bg)] text-primary-token md:h-auto md:min-h-[100dvh] md:overflow-x-hidden'>
         {/* ─── Ambient background ─── */}
         <div className='absolute inset-0' aria-hidden='true'>
           <div className='absolute inset-[-10%]'>
@@ -443,19 +443,16 @@ export function ProfileCompactTemplate({
         </div>
 
         {/* ─── Card container ─── */}
-        <div className='relative mx-auto flex min-h-[100dvh] w-full max-w-[680px] items-stretch justify-center md:items-center md:px-6 md:py-8'>
+        <div className='relative mx-auto flex h-[100dvh] w-full max-w-[680px] items-stretch justify-center md:h-auto md:min-h-[100dvh] md:items-center md:px-6 md:py-8'>
           <main className='relative flex w-full items-stretch md:items-center'>
             <div
-              className='relative flex w-full max-w-[430px] flex-col bg-[color:var(--profile-content-bg)] md:mx-auto md:min-h-[min(920px,calc(100dvh-64px))] md:overflow-hidden md:rounded-[30px] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
+              className='relative flex h-full w-full max-w-[430px] flex-col overflow-clip bg-[color:var(--profile-content-bg)] md:h-auto md:mx-auto md:min-h-[min(920px,calc(100dvh-64px))] md:overflow-hidden md:rounded-[30px] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
               data-testid='profile-compact-shell'
             >
               <div className='pointer-events-none absolute inset-0 bg-[var(--profile-panel-gradient)]' />
 
               {/* ─── Hero ─── */}
-              <header
-                className='relative w-full'
-                style={{ aspectRatio: '4 / 5' }}
-              >
+              <header className='relative w-full min-h-0 flex-1 md:flex-none md:aspect-[4/5]'>
                 <div className='absolute inset-0'>
                   <ImageWithFallback
                     src={heroImageUrl ?? artist.image_url}
@@ -674,7 +671,7 @@ export function ProfileCompactTemplate({
               </header>
 
               {/* ─── Content ─── */}
-              <div className='relative z-10 flex flex-col gap-3 px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3'>
+              <div className='relative z-10 flex shrink-0 flex-col gap-3 px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3'>
                 {showSubscriptionConfirmedBanner ? (
                   <SubscriptionConfirmedBanner />
                 ) : null}
