@@ -101,6 +101,7 @@ function HeroProfilePanel() {
         glowTone='violet'
         imageClassName='object-cover'
         className='shadow-[0_34px_90px_rgba(0,0,0,0.5)]'
+        priority
       />
     </div>
   );
