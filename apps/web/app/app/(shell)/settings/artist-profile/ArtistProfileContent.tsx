@@ -3,7 +3,7 @@
 import { ExternalLink, PanelRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
+import { ProfileSettingsLoading } from '@/components/molecules/SettingsLoadingSkeleton';
 import { SettingsBrandingSection } from '@/features/dashboard/organisms/SettingsBrandingSection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 import { SettingsTipsSection } from '@/features/dashboard/organisms/SettingsTipsSection';
@@ -42,24 +42,22 @@ export function ArtistProfileContent() {
   const { artist, setArtist, isPro, avatarQuality } = useSettingsContext();
 
   if (!artist) {
-    return (
-      <SettingsErrorState message='Unable to load your profile settings. Please refresh the page.' />
-    );
+    return <ProfileSettingsLoading />;
   }
 
   return (
     <>
       <SettingsSection
         id='artist-profile'
-        title='Artist Profile'
-        description='Photo, name, username, and branding.'
+        title='Artist'
+        description='Photo, name, username, and brand details fans see.'
         headerAction={
           artist.handle ? (
             <a
               href={`/${artist.handle}`}
               target='_blank'
               rel='noopener noreferrer'
-              className='inline-flex items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 py-1.5 text-[13px] font-[510] text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
+              className='inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 text-[12px] font-[510] text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
             >
               View as Visitor
               <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />
