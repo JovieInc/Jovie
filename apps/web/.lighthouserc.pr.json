@@ -21,6 +21,8 @@
             "mainthread-work-breakdown": "warn",
             "render-blocking-resources": "off",
             "render-blocking-insight": "off",
+            "lcp-discovery-insight": "warn",
+            "lcp-lazy-loaded": "warn",
             "legacy-javascript-insight": "warn",
             "unused-javascript": "warn",
             "color-contrast": "warn",

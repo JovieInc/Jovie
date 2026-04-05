@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
     absolute: `${APP_NAME} | Drop More Music. Run Every Release.`,
   };
   const description =
-    'Profiles, smart links, release AI, catalog monitoring, and task planning for independent artists, all in one system.';
+    'The release operating system for independent artists. Plan, launch, and track every release with artist profiles, smart links, release plans, catalog monitoring, and automated fan notifications.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -41,6 +41,8 @@ export async function generateMetadata(): Promise<Metadata> {
     'fan conversion',
     'smart links',
     'pre-save links',
+    'release management',
+    'release operating system',
   ];
 
   return {
@@ -130,17 +132,17 @@ export async function generateMetadata(): Promise<Metadata> {
 const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'Profiles, smart links, release AI, catalog monitoring, and task planning for independent artists, all in one system.',
+    'The release operating system for independent artists. Plan, launch, and track every release in one system.',
 });
 
 const SOFTWARE_SCHEMA = buildSoftwareSchema(
-  'Run every release with artist profiles, smart links, release AI, catalog monitoring, and task planning built for independent musicians.'
+  'The release operating system for independent musicians. Artist profiles, smart links, release plans, catalog monitoring, and automated fan notifications.'
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: 'Jovie Technology Inc.',
   description:
-    'Jovie is the release platform for independent musicians, combining artist profiles, smart links, release AI, monitoring, and task planning.',
+    'Jovie is the release operating system for independent musicians, combining artist profiles, smart links, release plans, monitoring, and task automation.',
   sameAs: ['https://instagram.com/meetjovie'],
 });
 
