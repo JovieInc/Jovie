@@ -52,7 +52,7 @@ export async function loadCatalogScanData(): Promise<CatalogScanPageData> {
     )
     .limit(1);
 
-  // Get latest completed scan
+  // Get latest completed or failed scan (so UI can show error state)
   const [latestScan] = await db
     .select()
     .from(dspCatalogScans)
@@ -60,23 +60,27 @@ export async function loadCatalogScanData(): Promise<CatalogScanPageData> {
       and(
         eq(dspCatalogScans.creatorProfileId, profile.id),
         eq(dspCatalogScans.providerId, 'spotify'),
-        eq(dspCatalogScans.status, 'completed')
+        or(
+          eq(dspCatalogScans.status, 'completed'),
+          eq(dspCatalogScans.status, 'failed')
+        )
       )
     )
     .orderBy(desc(dspCatalogScans.completedAt))
     .limit(1);
 
-  // Get all mismatches for this profile
-  const mismatches = latestScan
-    ? await db
-        .select()
-        .from(dspCatalogMismatches)
-        .where(eq(dspCatalogMismatches.creatorProfileId, profile.id))
-        .orderBy(
-          dspCatalogMismatches.status,
-          desc(dspCatalogMismatches.updatedAt)
-        )
-    : [];
+  // Only fetch mismatches for completed scans (failed scans have none)
+  const mismatches =
+    latestScan?.status === 'completed'
+      ? await db
+          .select()
+          .from(dspCatalogMismatches)
+          .where(eq(dspCatalogMismatches.creatorProfileId, profile.id))
+          .orderBy(
+            dspCatalogMismatches.status,
+            desc(dspCatalogMismatches.updatedAt)
+          )
+      : [];
 
   return {
     profileId: profile.id,
