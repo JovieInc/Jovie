@@ -7,7 +7,7 @@ import type { Artist } from '@/types/db';
 
 export interface SettingsProfileSectionProps {
   readonly artist: Artist;
-  readonly avatarQuality: AvatarQuality;
+  readonly avatarQuality?: AvatarQuality;
   readonly onArtistUpdate?: (updatedArtist: Artist) => void;
   readonly onRefresh: () => void;
 }

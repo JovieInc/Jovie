@@ -101,7 +101,7 @@ export function SettingsProfileSection({
             />
           </div>
         </div>
-        {avatarQuality.status === 'low' ? (
+        {avatarQuality?.status === 'low' ? (
           <div className='pb-2 sm:pl-[calc(var(--profile-label-column-width)+1.25rem)]'>
             <div className='flex items-start gap-3 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[12px] text-secondary-token'>
               <AlertCircle

@@ -53,7 +53,6 @@ export function ListenDrawer({
       onOpenChange={handleOpenChange}
       title='Listen everywhere'
       subtitle={`Pick the platform that already fits how you listen to ${artist.name}.`}
-      bodyClassName='pb-[calc(2rem+env(safe-area-inset-bottom))]'
     >
       <div className='flex justify-center'>
         <StaticListenInterface
