@@ -230,6 +230,25 @@ export const socialSuggestionStatusEnum = pgEnum('social_suggestion_status', [
   'expired',
 ]);
 
+// DSP Catalog Scan Enums
+export const catalogScanStatusEnum = pgEnum('catalog_scan_status', [
+  'pending',
+  'running',
+  'completed',
+  'failed',
+]);
+
+export const catalogMismatchTypeEnum = pgEnum('catalog_mismatch_type', [
+  'not_in_catalog',
+  'missing_from_dsp',
+]);
+
+export const catalogMismatchStatusEnum = pgEnum('catalog_mismatch_status', [
+  'flagged',
+  'confirmed_mismatch',
+  'dismissed',
+]);
+
 export const outreachStatusEnum = pgEnum('outreach_status', [
   'pending',
   'dm_generated',
