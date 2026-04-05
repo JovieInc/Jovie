@@ -139,13 +139,102 @@ jobs:
       - name: Install Playwright (Chromium only)
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
+      - name: Seed nightly QA data
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.test_filter == '' }}
+        run: |
+          cd apps/web
+          pnpm exec tsx tests/seed-test-data.ts
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+
+      - name: Start route QA bypass server
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.test_filter == '' }}
+        run: |
+          cd apps/web
+          pnpm run dev:local:playwright > "$RUNNER_TEMP/nightly-qa-web.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/nightly-qa-web.pid"
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:3100/api/dev/test-auth/session >/dev/null; then
+              echo "Nightly QA bypass server is ready."
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/nightly-qa-web.log"
+          exit 1
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          PORT: '3100'
+          BASE_URL: http://127.0.0.1:3100
+          NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_FAST_ONBOARDING: '1'
+          E2E_TEST_AUTH_PERSONA: creator
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_DISABLE_TOOLBAR: '1'
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+
+      - name: Run nightly route QA breadth pass
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.test_filter == '' }}
+        run: |
+          cd apps/web
+          pnpm run qa:routes
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          ROUTE_QA_BASE_URL: http://127.0.0.1:3100
+          ROUTE_QA_OUTPUT_DIR: nightly-route-qa
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+
+      - name: Run full surface chaos sweep
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.test_filter == '' }}
+        run: |
+          cd apps/web
+          pnpm playwright test tests/e2e/nightly/full-surface-chaos.spec.ts --config=playwright.config.nightly.ts --project=chromium
+          if [ -f test-results/nightly-results.json ]; then
+            cp test-results/nightly-results.json test-results/full-surface-chaos-report.json
+          fi
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          BASE_URL: http://127.0.0.1:3100
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_FAST_ONBOARDING: '1'
+          E2E_TEST_AUTH_PERSONA: creator
+          E2E_SKIP_SEED: '1'
+          E2E_SKIP_WARMUP: '1'
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+
+      - name: Stop route QA bypass server
+        if: ${{ always() && (github.event_name == 'schedule' || github.event.inputs.test_filter == '') }}
+        run: |
+          if [ -f "$RUNNER_TEMP/nightly-qa-web.pid" ]; then
+            pid="$(cat "$RUNNER_TEMP/nightly-qa-web.pid")"
+            kill "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+          fi
+
       - name: Run nightly E2E tests
         run: |
           cd apps/web
           if [ -n "${{ github.event.inputs.test_filter }}" ]; then
             pnpm playwright test "${{ github.event.inputs.test_filter }}" --config=playwright.config.nightly.ts --project=chromium --reporter=line
           else
-            pnpm playwright test --config=playwright.config.nightly.ts --project=chromium --reporter=line
+            pnpm playwright test --config=playwright.config.nightly.ts --project=chromium --reporter=line --grep-invert=@full-surface-chaos
           fi
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
@@ -170,6 +259,24 @@ jobs:
         with:
           name: nightly-e2e-results-${{ github.run_id }}
           path: apps/web/test-results/
+          retention-days: 7
+
+      - name: Upload route QA ledger
+        if: ${{ always() && (github.event_name == 'schedule' || github.event.inputs.test_filter == '') }}
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: nightly-route-qa-${{ github.run_id }}
+          path: apps/web/test-results/route-qa/nightly-route-qa/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload full surface chaos report
+        if: ${{ always() && (github.event_name == 'schedule' || github.event.inputs.test_filter == '') }}
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: full-surface-chaos-${{ github.run_id }}
+          path: apps/web/test-results/full-surface-chaos-report.json
+          if-no-files-found: ignore
           retention-days: 7
 
       - name: Cleanup Clerk E2E test users
