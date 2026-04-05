@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.118] - 2026-04-05
+
+### Added
+
+- Staggered cascade animation when generating a release plan: category groups fade in sequentially, tasks slide in from left with blur-to-sharp effect
+- Typewriter reveal for AI-generated playlist pitches with animated sparkle icon and blinking cursor
+- Platform tab switching re-triggers typewriter animation for each DSP pitch
+
 ## [26.4.117] - 2026-04-05
 
 > The Growth admin page is now a self-driving pipeline dashboard. Pick a speed, watch the funnel, inspect leads if curious.

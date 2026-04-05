@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, motion } from 'motion/react';
+import { motion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useInstantiateTasksMutation,
@@ -163,30 +163,28 @@ export function ReleaseTaskChecklist({
       data-testid={isCompact ? undefined : 'release-task-checklist'}
     >
       {/* Progress bar + optional link to full page */}
-      <AnimatePresence>
-        <motion.div
-          className='flex shrink-0 items-center gap-2 px-4 py-2'
-          initial={animateEntrance ? { opacity: 0, y: -8 } : false}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <ReleaseTaskProgressBar
-            done={totalDone}
-            total={totalTasks}
-            overdueCount={overdueCount}
-            className='flex-1'
-          />
-          {variant === 'compact' && onNavigateToFullPage && (
-            <button
-              type='button'
-              onClick={onNavigateToFullPage}
-              className='flex-shrink-0 text-[10px] text-[var(--linear-accent,#5e6ad2)] hover:underline'
-            >
-              Open &rarr;
-            </button>
-          )}
-        </motion.div>
-      </AnimatePresence>
+      <motion.div
+        className='flex shrink-0 items-center gap-2 px-4 py-2'
+        initial={animateEntrance ? { opacity: 0, y: -8 } : false}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <ReleaseTaskProgressBar
+          done={totalDone}
+          total={totalTasks}
+          overdueCount={overdueCount}
+          className='flex-1'
+        />
+        {variant === 'compact' && onNavigateToFullPage && (
+          <button
+            type='button'
+            onClick={onNavigateToFullPage}
+            className='flex-shrink-0 text-[10px] text-[var(--linear-accent,#5e6ad2)] hover:underline'
+          >
+            Open &rarr;
+          </button>
+        )}
+      </motion.div>
 
       {/* Category groups */}
       <div
