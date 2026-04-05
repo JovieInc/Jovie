@@ -182,40 +182,22 @@ export function renderProfileCell({
 }
 
 /**
- * Renders the funnel status cell showing user lifecycle state
- */
-export function renderFunnelCell({ row }: CellContext<AdminUserRow, string>) {
-  const status = row.original.userStatus;
-  const label = status.replaceAll('_', ' ');
-  let variant: 'success' | 'warning' | 'secondary';
-  if (status === 'active') {
-    variant = 'success';
-  } else if (status === 'banned' || status === 'suspended') {
-    variant = 'warning';
-  } else {
-    variant = 'secondary';
-  }
-  return (
-    <Badge size='sm' variant={variant}>
-      {label}
-    </Badge>
-  );
-}
-
-/**
- * Renders the status badge cell
+ * Renders the unified status badge cell.
+ * Combines lifecycle state + deleted detection into a single column.
  */
 export function renderStatusCell({ row }: CellContext<AdminUserRow, unknown>) {
   const user = row.original;
-  return user.deletedAt ? (
-    <Badge size='sm' variant='warning'>
-      Deleted
-    </Badge>
-  ) : (
-    <Badge size='sm' variant='success'>
-      <span className='flex items-center gap-1.5'>
-        <span className='h-1.5 w-1.5 shrink-0 rounded-full bg-success' /> Active
-      </span>
+  if (user.deletedAt) {
+    return (
+      <Badge size='sm' variant='destructive'>
+        Deleted
+      </Badge>
+    );
+  }
+  const status = user.userStatus;
+  return (
+    <Badge size='sm' variant={LIFECYCLE_BADGE_VARIANT[status] ?? 'secondary'}>
+      {LIFECYCLE_LABEL[status] ?? status}
     </Badge>
   );
 }
@@ -242,20 +224,6 @@ const LIFECYCLE_LABEL: Record<string, string> = {
   suspended: 'Suspended',
   banned: 'Banned',
 };
-
-/**
- * Renders the user lifecycle status badge
- */
-export function renderLifecycleCell({
-  row,
-}: CellContext<AdminUserRow, unknown>) {
-  const status = row.original.userStatus;
-  return (
-    <Badge size='sm' variant={LIFECYCLE_BADGE_VARIANT[status] ?? 'secondary'}>
-      {LIFECYCLE_LABEL[status] ?? status}
-    </Badge>
-  );
-}
 
 /**
  * Renders the outbound suppression status

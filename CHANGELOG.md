@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.120] - 2026-04-05
+
+> Faster releases navigation and lighter loading placeholders improve perceived speed across all dashboard tables.
+
+### Changed
+
+- Releases page now prefetches on hover so navigation feels instant
+- Reduced table skeleton from 25 rows to 10 across all dashboard tables (releases, audience, contacts, tour dates)
+- Removed phantom skeleton header card that didn't match the real page layout
+
 ## [26.4.119] - 2026-04-05
 
 ### Changed
@@ -19,10 +29,16 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.118] - 2026-04-05
 
-> Public profile pages now fit the mobile viewport without scrolling. The hero image scales to fill remaining space while content stays pinned.
+> Admin tables cleaned up: fewer redundant badges, visible checkboxes, always-on search. Public profile pages now fit the mobile viewport.
+
+### Changed
+
+- Merged Funnel, Status, and Lifecycle columns into a single Status column on the admin users table (12 to 10 columns)
+- Search fields on admin Users, Creators, and Releases pages are now always visible instead of hidden behind an icon
 
 ### Fixed
 
+- Table checkboxes are now visible in their unchecked state (removed override that made borders nearly invisible)
 - Public profile pages no longer scroll on mobile — viewport locks to screen height, hero image shrinks to fit
 
 ## [26.4.117] - 2026-04-05
