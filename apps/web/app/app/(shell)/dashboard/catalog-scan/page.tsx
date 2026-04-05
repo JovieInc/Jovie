@@ -1,7 +1,6 @@
-import { CatalogScanView } from '@/components/features/dashboard/organisms/catalog-scan/CatalogScanView';
-import { loadCatalogScanData } from './actions';
+import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 
-export default async function CatalogScanPage() {
-  const data = await loadCatalogScanData();
-  return <CatalogScanView data={data} />;
+export default function CatalogScanPage() {
+  redirect(APP_ROUTES.PRESENCE);
 }

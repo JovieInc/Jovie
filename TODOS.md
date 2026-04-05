@@ -1,5 +1,23 @@
 # TODOs
 
+## Resolved mismatch history view in Catalog Health section
+
+**What:** Add a way to see past confirmed ("Not Mine") and dismissed ("Mine") mismatches in the Catalog Health section on the Presence page.
+
+**Why:** After triage, artists filing Spotify corrections need to reference which tracks they confirmed as not theirs. Currently the cards disappear after action and there's no way to see resolved items without re-scanning.
+
+**Pros:** Completes the triage-to-resolution workflow. Artists don't lose their review work.
+
+**Cons:** Adds UI complexity to a clean triage-and-done section.
+
+**Context:** The data already exists in `dsp_catalog_mismatches` with status `confirmed_mismatch` or `dismissed`. The query is trivial. The UI question is whether to show resolved items inline (a "Show resolved" toggle) or behind a separate link. The post-triage summary card already links to Spotify's content mismatch form, so this is about reference, not action.
+
+**Effort:** S (human ~4h / CC ~15 min)
+**Priority:** P2
+**Depends on:** Catalog scan UX fold-into-presence PR landing first.
+
+---
+
 ## Extension performance budgets and regression checks
 
 **What:** Add explicit performance budgets and regression checks for the Chrome extension, including shell render stability, preload latency, layout-shift prevention, and common interaction latency thresholds.

@@ -7,7 +7,10 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardShellData } from '../actions';
-import { loadDspPresenceForProfile } from './actions';
+import {
+  getUnresolvedMismatchCount,
+  loadDspPresenceForProfile,
+} from './actions';
 import PresenceLoading from './loading';
 
 export const runtime = 'nodejs';
@@ -48,8 +51,16 @@ async function PresenceContent({ userId }: Readonly<{ userId: string }>) {
       redirect(APP_ROUTES.ONBOARDING);
     }
 
-    const presenceData = await loadDspPresenceForProfile(selectedProfile.id);
-    return <DspPresenceView data={presenceData} />;
+    const [presenceData, unresolvedCount] = await Promise.all([
+      loadDspPresenceForProfile(selectedProfile.id),
+      getUnresolvedMismatchCount(selectedProfile.id),
+    ]);
+    return (
+      <DspPresenceView
+        data={presenceData}
+        hasUnresolvedMismatches={unresolvedCount > 0}
+      />
+    );
   } catch (error) {
     throwIfRedirect(error);
     void captureError('Presence page failed', error, {
