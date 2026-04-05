@@ -7,7 +7,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.118] - 2026-04-05
 
-> Admin tables cleaned up: fewer redundant badges, visible checkboxes, always-on search.
+> Admin tables cleaned up: fewer redundant badges, visible checkboxes, always-on search. Public profile pages now fit the mobile viewport.
 
 ### Changed
 
@@ -17,6 +17,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - Table checkboxes are now visible in their unchecked state (removed override that made borders nearly invisible)
+- Public profile pages no longer scroll on mobile — viewport locks to screen height, hero image shrinks to fit
 
 ## [26.4.117] - 2026-04-05
 

@@ -50,18 +50,31 @@ body:has(.linear-marketing) {
   overscroll-behavior: auto;
 }
 
-/* Public profile pages use document scrolling (same as marketing). */
+/* Public profile pages — lock viewport on mobile, allow scroll on desktop. */
 html:has(.profile-viewport) {
-  height: auto;
-  min-height: 100%;
-  overflow-y: auto;
-  overscroll-behavior: auto;
+  height: 100dvh;
+  overflow: clip;
+  overscroll-behavior: none;
 }
 body:has(.profile-viewport) {
-  height: auto;
-  min-height: 100%;
-  overflow: visible;
-  overscroll-behavior: auto;
+  height: 100dvh;
+  overflow: clip;
+  overscroll-behavior: none;
+}
+@media (min-width: 768px) {
+  html:has(.profile-viewport) {
+    height: auto;
+    min-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: auto;
+  }
+  body:has(.profile-viewport) {
+    height: auto;
+    min-height: 100%;
+    overflow-x: clip;
+    overflow-y: auto;
+    overscroll-behavior: auto;
+  }
 }
 
 /* Compact profile — override CTA styles so button ↔ composer is zero-shift */

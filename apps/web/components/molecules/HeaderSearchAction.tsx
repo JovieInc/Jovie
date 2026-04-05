@@ -124,7 +124,7 @@ export function HeaderSearchAction({
         onEscape={close}
         placeholder={placeholder}
         ariaLabel={ariaLabel}
-        autoFocus
+        autoFocus={!alwaysOpen}
         showClearButton={false}
         className='w-[min(42vw,208px)] sm:w-[min(30vw,240px)] lg:w-[min(26vw,276px)]'
         inputClassName={cn('text-[13px]', inputClassName)}
