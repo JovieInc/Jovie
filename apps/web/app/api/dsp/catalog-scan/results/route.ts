@@ -3,10 +3,12 @@ import { NextResponse } from 'next/server';
 
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import {
   dspCatalogMismatches,
   dspCatalogScans,
 } from '@/lib/db/schema/dsp-catalog-scan';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 export async function GET(request: Request) {
   const { userId } = await getCachedAuth();
@@ -21,6 +23,21 @@ export async function GET(request: Request) {
     return NextResponse.json(
       { error: 'profileId is required' },
       { status: 400 }
+    );
+  }
+
+  // Verify profile ownership
+  const [profile] = await db
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(and(eq(creatorProfiles.id, profileId), eq(users.clerkId, userId)))
+    .limit(1);
+
+  if (!profile) {
+    return NextResponse.json(
+      { error: 'Profile not found or not authorized' },
+      { status: 403 }
     );
   }
 

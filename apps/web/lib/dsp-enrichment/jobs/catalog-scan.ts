@@ -92,20 +92,56 @@ export async function processCatalogScan(
     const albumIds = albums.map(a => a.id);
     const fullAlbums = await getSpotifyAlbums(albumIds);
 
-    // Step 3: Collect all track IDs from album track listings
-    const trackIds: string[] = [];
+    if (fullAlbums.length === 0) {
+      return await failScan(
+        tx,
+        scanId,
+        'No album details returned from Spotify. Retry later.',
+        { catalogIsrcCount: 0 }
+      );
+    }
+
+    // Step 3: Collect all track IDs from album track listings (deduplicated)
+    const trackIdSet = new Set<string>();
     for (const album of fullAlbums) {
       if (album.tracks?.items) {
         for (const track of album.tracks.items) {
-          trackIds.push(track.id);
+          trackIdSet.add(track.id);
         }
       }
     }
+    const trackIds = [...trackIdSet];
 
     // Step 4: Fetch full track details with ISRCs in batches of 50
     const fullTracks = await getSpotifyTracks(trackIds);
 
-    // Step 5: Build Spotify ISRC set (normalized)
+    if (fullTracks.length === 0) {
+      return await failScan(
+        tx,
+        scanId,
+        'No track details returned from Spotify. Retry later.',
+        { catalogIsrcCount: 0 }
+      );
+    }
+
+    // Step 5: Build track-to-album lookup map (O(1) instead of O(n) find)
+    const trackToAlbum = new Map<
+      string,
+      { name: string; id: string; artworkUrl: string | undefined }
+    >();
+    for (const album of fullAlbums) {
+      if (album.tracks?.items) {
+        for (const track of album.tracks.items) {
+          trackToAlbum.set(track.id, {
+            name: album.name,
+            id: album.id,
+            artworkUrl: album.images?.[0]?.url,
+          });
+        }
+      }
+    }
+
+    // Step 6: Build Spotify ISRC set (normalized)
     const spotifyIsrcMap = new Map<
       string,
       {
@@ -125,17 +161,14 @@ export async function processCatalogScan(
       const normalized = normalizeIsrc(isrc);
       if (spotifyIsrcMap.has(normalized)) continue; // dedupe
 
-      // Find the album this track belongs to
-      const album = fullAlbums.find(a =>
-        a.tracks?.items?.some(t => t.id === track.id)
-      );
+      const album = trackToAlbum.get(track.id);
 
       spotifyIsrcMap.set(normalized, {
         trackId: track.id,
         trackName: track.name,
         albumName: album?.name ?? 'Unknown Album',
         albumId: album?.id ?? '',
-        artworkUrl: album?.images?.[0]?.url,
+        artworkUrl: album?.artworkUrl,
         artistNames: track.artists?.map(a => a.name).join(', ') ?? '',
       });
     }
@@ -242,6 +275,7 @@ export async function processCatalogScan(
               externalAlbumId: drizzleSql`EXCLUDED.external_album_id`,
               externalArtworkUrl: drizzleSql`EXCLUDED.external_artwork_url`,
               externalArtistNames: drizzleSql`EXCLUDED.external_artist_names`,
+              mismatchType: drizzleSql`EXCLUDED.mismatch_type`,
               updatedAt: new Date(),
               // Preserve existing status (don't overwrite dismissed items)
             },

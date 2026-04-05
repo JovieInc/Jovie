@@ -10,7 +10,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   CatalogScanPageData,
   DspCatalogMismatch,
@@ -30,10 +30,15 @@ export function CatalogScanView({
     data.pendingScan?.id ?? null
   );
   const [activeFilter, setActiveFilter] = useState<FilterTab>('needs_review');
-  const [selectedMismatch, setSelectedMismatch] =
-    useState<DspCatalogMismatch | null>(null);
+  const [selectedMismatchId, setSelectedMismatchId] = useState<string | null>(
+    null
+  );
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { profileId, spotifyId, latestScan, mismatches } = data;
+
+  const selectedMismatch =
+    mismatches.find(m => m.id === selectedMismatchId) ?? null;
 
   // Poll for scan completion
   const pollScanStatus = useCallback(
@@ -51,9 +56,9 @@ export function CatalogScanView({
             router.refresh();
             return;
           }
-          setTimeout(poll, 2000);
+          pollTimerRef.current = setTimeout(poll, 2000);
         } catch {
-          setTimeout(poll, 3000);
+          pollTimerRef.current = setTimeout(poll, 3000);
         }
       };
       poll();
@@ -84,11 +89,15 @@ export function CatalogScanView({
   }, [spotifyId, profileId, isScanning, pollScanStatus]);
 
   // Start polling if we loaded with a pending scan
-  useState(() => {
+  useEffect(() => {
     if (data.pendingScan?.id) {
       pollScanStatus(data.pendingScan.id);
     }
-  });
+    return () => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const updateMismatchStatus = useCallback(
     async (
@@ -341,9 +350,11 @@ export function CatalogScanView({
               <MismatchRow
                 key={m.id}
                 mismatch={m}
-                isSelected={selectedMismatch?.id === m.id}
+                isSelected={selectedMismatchId === m.id}
                 onClick={() =>
-                  setSelectedMismatch(selectedMismatch?.id === m.id ? null : m)
+                  setSelectedMismatchId(
+                    selectedMismatchId === m.id ? null : m.id
+                  )
                 }
               />
             ))
@@ -352,11 +363,11 @@ export function CatalogScanView({
 
         {/* Sidebar */}
         {selectedMismatch && (
-          <div className='hidden lg:block w-[340px] flex-shrink-0'>
+          <div className='w-full lg:w-[340px] flex-shrink-0'>
             <MismatchSidebar
               mismatch={selectedMismatch}
               onUpdateStatus={updateMismatchStatus}
-              onClose={() => setSelectedMismatch(null)}
+              onClose={() => setSelectedMismatchId(null)}
             />
           </div>
         )}

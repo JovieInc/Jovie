@@ -77,8 +77,8 @@ export async function PATCH(
   if (status === 'dismissed') {
     updateData.dismissedAt = new Date();
     updateData.dismissedReason = reason ?? null;
-  } else if (status === 'flagged') {
-    // Resetting to flagged clears dismiss data
+  } else {
+    // Any non-dismissed state clears dismiss data
     updateData.dismissedAt = null;
     updateData.dismissedReason = null;
   }

@@ -1,4 +1,4 @@
-import { and, eq, or } from 'drizzle-orm';
+import { and, desc, eq, or } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
         eq(dspCatalogScans.status, 'completed')
       )
     )
-    .orderBy(dspCatalogScans.createdAt)
+    .orderBy(desc(dspCatalogScans.completedAt))
     .limit(1);
 
   if (recentScan?.completedAt && recentScan.completedAt > oneHourAgo) {
