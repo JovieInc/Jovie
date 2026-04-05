@@ -76,12 +76,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- Homepage proof manifest system mapping every proof slot to a registered screenshot scenario
-- `DemoReleasePresaveSurface` component with far-future date fixture for evergreen presave state
-- Mobile release screenshot scenarios (`release-presave-mobile`, `release-landing-mobile`) in the screenshot registry
-- `release-presave` showcase surface ID for the demo system
-- Proof manifest-to-registry validation test ensuring all proof assets reference valid scenarios
-- Pricing invariant tests (tier ordering, annual discount, float safety)
+- Evergreen presave demo surface for homepage proof screenshots
+- [internal] Homepage proof manifest system with registry validation
+- [internal] Mobile release screenshot scenarios in the pipeline
+- [internal] Pricing invariant tests (tier ordering, annual discount, float safety)
 
 ### Removed
 

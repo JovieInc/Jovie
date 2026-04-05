@@ -21,6 +21,33 @@ const TASK_STATUS_STYLES = {
   },
 } as const;
 
+function StatusIcon({
+  icon,
+  className,
+}: Readonly<{ icon: 'check' | 'ring' | 'circle'; className: string }>) {
+  if (icon === 'check') {
+    return (
+      <CheckCircle2
+        className={`h-3.5 w-3.5 shrink-0 ${className}`}
+        aria-hidden='true'
+      />
+    );
+  }
+  if (icon === 'ring') {
+    return (
+      <span
+        className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 ${className}`}
+      />
+    );
+  }
+  return (
+    <Circle
+      className={`h-3.5 w-3.5 shrink-0 ${className}`}
+      aria-hidden='true'
+    />
+  );
+}
+
 function HeroTaskPanel() {
   return (
     <div className='space-y-2'>
@@ -48,21 +75,10 @@ function HeroTaskPanel() {
             />
             <div className='relative flex items-center justify-between gap-2'>
               <div className='flex items-center gap-2 min-w-0'>
-                {statusStyle.icon === 'check' ? (
-                  <CheckCircle2
-                    className={`h-3.5 w-3.5 shrink-0 ${statusStyle.iconClassName}`}
-                    aria-hidden='true'
-                  />
-                ) : statusStyle.icon === 'ring' ? (
-                  <span
-                    className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 ${statusStyle.iconClassName}`}
-                  />
-                ) : (
-                  <Circle
-                    className={`h-3.5 w-3.5 shrink-0 ${statusStyle.iconClassName}`}
-                    aria-hidden='true'
-                  />
-                )}
+                <StatusIcon
+                  icon={statusStyle.icon}
+                  className={statusStyle.iconClassName}
+                />
                 <p className='text-[12px] font-[560] leading-5 tracking-[-0.01em] text-white truncate'>
                   {task.title}
                 </p>
