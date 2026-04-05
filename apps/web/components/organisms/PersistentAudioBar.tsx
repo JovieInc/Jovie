@@ -3,14 +3,22 @@
 import { Pause, Play, X } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { formatDuration } from '@/lib/utils/formatDuration';
 
 export function PersistentAudioBar() {
-  const { playbackState, toggleTrack, seek, stop } = useTrackAudioPlayer();
+  const { playbackState, toggleTrack, seek, stop, onError } =
+    useTrackAudioPlayer();
   const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    return onError(() => {
+      toast.error('Preview unavailable');
+    });
+  }, [onError]);
 
   useEffect(() => {
     setImgError(false);
@@ -94,12 +102,12 @@ export function PersistentAudioBar() {
           />
           <span className='text-[10px] tabular-nums text-quaternary-token shrink-0 w-8'>
             {durationFormatted}
-            {isPreview ? (
-              <span className='ml-1 text-[9px] text-tertiary-token'>
-                Preview
-              </span>
-            ) : null}
           </span>
+          {isPreview ? (
+            <span className='text-[9px] text-tertiary-token shrink-0'>
+              Preview
+            </span>
+          ) : null}
         </div>
 
         {/* Play/pause button — 28px visible, 44px touch target */}

@@ -6,11 +6,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
 const stop = vi.fn();
 const seek = vi.fn();
+const onError = vi.fn().mockReturnValue(() => {});
 
 let mockPlaybackState = {
   activeTrackId: null as string | null,
   isPlaying: false,
   playbackStatus: 'idle' as string,
+  lastErrorReason: null as
+    | 'play_rejected'
+    | 'media_error'
+    | 'missing_source'
+    | null,
   currentTime: 0,
   duration: 0,
   trackTitle: null as string | null,
@@ -25,6 +31,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
     toggleTrack,
     seek,
     stop,
+    onError,
   }),
 }));
 
@@ -38,6 +45,10 @@ vi.mock('@/components/atoms/SeekBar', () => ({
   SeekBar: (props: { disabled?: boolean }) => (
     <input type='range' data-testid='seek-bar' disabled={props.disabled} />
   ),
+}));
+
+vi.mock('sonner', () => ({
+  toast: { error: vi.fn() },
 }));
 
 vi.mock('next/image', () => ({
@@ -64,10 +75,12 @@ describe('PersistentAudioBar', () => {
     toggleTrack.mockClear();
     stop.mockClear();
     seek.mockClear();
+    onError.mockClear().mockReturnValue(() => {});
     mockPlaybackState = {
       activeTrackId: null,
       isPlaying: false,
       playbackStatus: 'idle',
+      lastErrorReason: null,
       currentTime: 0,
       duration: 0,
       trackTitle: null,
