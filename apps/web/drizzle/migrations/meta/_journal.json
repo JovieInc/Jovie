@@ -169,6 +169,13 @@
       "when": 1775243593825,
       "tag": "0023_lazy_slyde",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1775361567000,
+      "tag": "0024_ordinary_romulus",
+      "breakpoints": true
     }
   ]
 }
