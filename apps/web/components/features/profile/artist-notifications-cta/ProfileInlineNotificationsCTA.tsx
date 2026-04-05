@@ -21,7 +21,7 @@ import {
 } from './shared';
 import { useSubscriptionForm } from './useSubscriptionForm';
 
-type Step = 'cta' | 'email' | 'name' | 'birthday' | 'done';
+type Step = 'cta' | 'email' | 'otp' | 'name' | 'birthday' | 'done';
 
 const EASE_FADE: [number, number, number, number] = [0.32, 0, 0.67, 1];
 
@@ -174,6 +174,9 @@ export function ProfileInlineNotificationsCTA({
     handleEmailChange,
     handleFieldBlur,
     handleSubscribe,
+    handleVerifyOtp,
+    otpCode,
+    handleOtpChange,
     notificationsState,
     notificationsEnabled,
     openSubscription,
@@ -216,9 +219,19 @@ export function ProfileInlineNotificationsCTA({
     }
   }, [isAlreadySubscribed, step]);
 
-  // Watch for subscription success to advance from email → name
+  // Watch for subscription state to advance the flow
   useEffect(() => {
+    if (step === 'email' && notificationsState === 'pending_confirmation') {
+      // Email OTP required — show verification input
+      setStep('otp');
+    }
     if (step === 'email' && notificationsState === 'success') {
+      // Immediate success (no OTP needed) — advance to name
+      subscribedEmailRef.current = emailInput.trim();
+      setStep('name');
+    }
+    if (step === 'otp' && notificationsState === 'success') {
+      // OTP verified — advance to name
       subscribedEmailRef.current = emailInput.trim();
       setStep('name');
     }
@@ -254,6 +267,10 @@ export function ProfileInlineNotificationsCTA({
   const handleEmailSubmit = useCallback(() => {
     handleSubscribe().catch(() => {});
   }, [handleSubscribe]);
+
+  const handleOtpSubmit = useCallback(() => {
+    handleVerifyOtp().catch(() => {});
+  }, [handleVerifyOtp]);
 
   const handleNameSubmit = useCallback(async () => {
     const trimmed = nameInput.trim();
@@ -305,10 +322,17 @@ export function ProfileInlineNotificationsCTA({
       if (event.key !== 'Enter') return;
       event.preventDefault();
       if (step === 'email') handleEmailSubmit();
+      else if (step === 'otp') handleOtpSubmit();
       else if (step === 'name') handleNameSubmit().catch(() => {});
       else if (step === 'birthday') handleBirthdaySubmit().catch(() => {});
     },
-    [step, handleEmailSubmit, handleNameSubmit, handleBirthdaySubmit]
+    [
+      step,
+      handleEmailSubmit,
+      handleOtpSubmit,
+      handleNameSubmit,
+      handleBirthdaySubmit,
+    ]
   );
 
   if (hydrationStatus === 'checking') {
@@ -367,6 +391,39 @@ export function ProfileInlineNotificationsCTA({
               isFocused={isInputFocused}
               autoComplete='email'
               maxLength={254}
+            />
+            {error && (
+              <p className='mt-2 text-center text-[12px] text-red-400'>
+                {error}
+              </p>
+            )}
+          </motion.div>
+        )}
+
+        {step === 'otp' && (
+          <motion.div
+            key='inline-otp'
+            initial={enterVariant.initial}
+            animate={enterVariant.animate}
+            exit={getExitVariant(instant)}
+          >
+            <InlineInputStep
+              inputRef={inputRef}
+              inputId={`${inputId}-otp`}
+              testId='inline-otp-input'
+              label='Verification code'
+              inputMode='numeric'
+              placeholder='6-digit code'
+              value={otpCode}
+              onChange={e => handleOtpChange(e.target.value)}
+              onSubmit={handleOtpSubmit}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+              disabled={isSubmitting}
+              isFocused={isInputFocused}
+              autoComplete='one-time-code'
+              maxLength={6}
             />
             {error && (
               <p className='mt-2 text-center text-[12px] text-red-400'>
