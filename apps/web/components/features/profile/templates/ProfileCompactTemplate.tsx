@@ -233,14 +233,22 @@ export function ProfileCompactTemplate({
 
   const handleTogglePref = useCallback(
     (key: NotificationContentType) => {
-      const next = !contentPrefs[key];
-      setContentPrefs(prev => ({ ...prev, [key]: next }));
-      prefsMutation.mutate({
-        artistId: artist.id,
-        email: subscriberEmail || undefined,
-        phone: subscriberPhone || undefined,
-        preferences: { [key]: next },
-      });
+      const prev = contentPrefs[key];
+      const next = !prev;
+      setContentPrefs(state => ({ ...state, [key]: next }));
+      prefsMutation.mutate(
+        {
+          artistId: artist.id,
+          email: subscriberEmail || undefined,
+          phone: subscriberPhone || undefined,
+          preferences: { [key]: next },
+        },
+        {
+          onError: () => {
+            setContentPrefs(state => ({ ...state, [key]: prev }));
+          },
+        }
+      );
     },
     [contentPrefs, artist.id, subscriberEmail, subscriberPhone, prefsMutation]
   );
@@ -259,6 +267,7 @@ export function ProfileCompactTemplate({
       {
         onSuccess: () => {
           notificationsContextValue.setSubscribedChannels({});
+          notificationsContextValue.setSubscriptionDetails({});
           notificationsContextValue.setState('idle');
           setMenuOpen(false);
           setNotifSubMenu(false);

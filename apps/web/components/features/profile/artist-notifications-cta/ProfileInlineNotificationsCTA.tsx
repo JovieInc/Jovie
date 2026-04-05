@@ -305,8 +305,8 @@ export function ProfileInlineNotificationsCTA({
       if (event.key !== 'Enter') return;
       event.preventDefault();
       if (step === 'email') handleEmailSubmit();
-      else if (step === 'name') void handleNameSubmit();
-      else if (step === 'birthday') void handleBirthdaySubmit();
+      else if (step === 'name') handleNameSubmit().catch(() => {});
+      else if (step === 'birthday') handleBirthdaySubmit().catch(() => {});
     },
     [step, handleEmailSubmit, handleNameSubmit, handleBirthdaySubmit]
   );
