@@ -153,6 +153,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: /^statsig-node$/,
+        replacement: path.resolve(__dirname, 'tests/__stubs__/statsig-node.js'),
+      },
+      {
         find: /^@\/app\/app\//,
         replacement: `${path.resolve(__dirname, './app/app')}/`,
       },

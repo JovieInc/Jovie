@@ -903,6 +903,7 @@ Thanks to @osc, @Explorer1092, @Qike-Li, @francoisaubert1, @itstimwhite, @yinanl
 - **Browse no longer navigates to dangerous URLs.** `goto`, `diff`, and `newtab` now block `file://`, `javascript:`, `data:` schemes and cloud metadata endpoints (`169.254.169.254`, `metadata.google.internal`). Localhost and private IPs are still allowed for local QA testing. (Closes #17)
 - **Setup script tells you what's missing.** Running `./setup` without `bun` installed now shows a clear error with install instructions instead of a cryptic "command not found." (Closes #147)
 - **`/debug` renamed to `/investigate`.** Claude Code has a built-in `/debug` command that shadowed the gstack skill. The systematic root-cause debugging workflow now lives at `/investigate`. (Closes #190)
+- **Shell injection surface removed.** All skill templates now use `source <(gstack-slug)` instead of `eval $(gstack-slug)`. Same behavior, no `eval`. (Closes #133)
 - **Shell injection surface reduced.** gstack-slug output is now sanitized to `[a-zA-Z0-9._-]` only, making both `eval` and `source` callers safe. (Closes #133)
 - **25 new security tests.** URL validation (16 tests) and path traversal validation (14 tests) now have dedicated unit test suites covering scheme blocking, metadata IP blocking, directory escapes, and prefix collision edge cases.
 

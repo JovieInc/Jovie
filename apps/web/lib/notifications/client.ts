@@ -235,3 +235,24 @@ export const updateSubscriberName = async (
     undefined,
     'PATCH'
   );
+
+export type UpdateSubscriberBirthdayPayload = {
+  artistId: string;
+  email: string;
+  birthday: string; // "MM-DD" format
+};
+
+export const updateSubscriberBirthday = async (
+  payload: UpdateSubscriberBirthdayPayload
+): Promise<{ success: true }> =>
+  requestNotifications<{ success: true }>(
+    '/api/notifications/update-birthday',
+    {
+      artist_id: payload.artistId,
+      email: payload.email,
+      birthday: payload.birthday,
+    },
+    NOTIFICATION_COPY.errors.generic,
+    undefined,
+    'PATCH'
+  );

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { AppShellFrame } from './AppShellFrame';
 
 const NAV_ITEMS = [
@@ -16,7 +17,11 @@ const NAV_ITEMS_2 = [
   { key: 'nav-docs', width: '50%' },
 ];
 
-export function AppShellSkeleton() {
+export function AppShellSkeleton({
+  main: mainOverride,
+}: {
+  readonly main?: ReactNode;
+} = {}) {
   return (
     <AppShellFrame
       sidebar={
@@ -72,35 +77,37 @@ export function AppShellSkeleton() {
         </header>
       }
       main={
-        <div className='mx-auto flex h-full w-full max-w-5xl p-4 sm:p-6'>
-          <div className='w-full space-y-4 p-1 sm:p-2'>
-            <div className='flex items-center justify-between'>
-              <div className='space-y-2'>
-                <div className='skeleton h-6 w-52 rounded-md' />
-                <div className='skeleton h-4 w-72 rounded' />
-              </div>
-              <div className='skeleton h-9 w-28 rounded-md' />
-            </div>
-
-            <div className='space-y-2 rounded-xl bg-surface-0 p-2.5'>
-              <div className='grid grid-cols-[minmax(0,1.4fr)_110px_68px] gap-3 border-b border-subtle/60 pb-2'>
-                <div className='skeleton h-3 w-24 rounded' />
-                <div className='skeleton h-3 w-16 rounded' />
-                <div className='skeleton h-3 w-12 rounded' />
-              </div>
-              {[1, 2, 3, 4, 5].map(row => (
-                <div
-                  key={`app-shell-row-${row}`}
-                  className='grid grid-cols-[minmax(0,1.4fr)_110px_68px] items-center gap-3 py-1'
-                >
-                  <div className='skeleton h-4 w-full rounded' />
-                  <div className='skeleton h-4 w-20 rounded' />
-                  <div className='skeleton h-4 w-12 rounded' />
+        mainOverride ?? (
+          <div className='mx-auto flex h-full w-full max-w-5xl p-4 sm:p-6'>
+            <div className='w-full space-y-4 p-1 sm:p-2'>
+              <div className='flex items-center justify-between'>
+                <div className='space-y-2'>
+                  <div className='skeleton h-6 w-52 rounded-md' />
+                  <div className='skeleton h-4 w-72 rounded' />
                 </div>
-              ))}
+                <div className='skeleton h-9 w-28 rounded-md' />
+              </div>
+
+              <div className='space-y-2 rounded-xl bg-surface-0 p-2.5'>
+                <div className='grid grid-cols-[minmax(0,1.4fr)_110px_68px] gap-3 border-b border-subtle/60 pb-2'>
+                  <div className='skeleton h-3 w-24 rounded' />
+                  <div className='skeleton h-3 w-16 rounded' />
+                  <div className='skeleton h-3 w-12 rounded' />
+                </div>
+                {[1, 2, 3, 4, 5].map(row => (
+                  <div
+                    key={`app-shell-row-${row}`}
+                    className='grid grid-cols-[minmax(0,1.4fr)_110px_68px] items-center gap-3 py-1'
+                  >
+                    <div className='skeleton h-4 w-full rounded' />
+                    <div className='skeleton h-4 w-20 rounded' />
+                    <div className='skeleton h-4 w-12 rounded' />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )
       }
     />
   );

@@ -2,3 +2,23 @@ self-hosted-runner:
   labels:
     - ubicloud-standard-2
     - ubicloud-standard-8
+
+# Suppress noisy shellcheck codes that are style/info, not bugs.
+# SC2028: echo may not expand escape sequences (info)
+# SC2034: variable appears unused (false positive with GITHUB_OUTPUT)
+# SC2086: double quote to prevent globbing (info, intentional in CI scripts)
+# SC2126: grep -c instead of grep|wc (style)
+# SC2129: use { } >> file (style)
+# SC2001: use ${var//} instead of sed (style)
+# SC2016: expressions don't expand in single quotes (info, intentional)
+# SC2329: function never invoked (info, invoked indirectly)
+shellcheck:
+  exclude:
+    - SC2028
+    - SC2034
+    - SC2086
+    - SC2126
+    - SC2129
+    - SC2001
+    - SC2016
+    - SC2329

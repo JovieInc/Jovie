@@ -73,7 +73,7 @@ export async function DashboardShellContent({
   const sidebarDefaultOpen = sidebarCookie?.value !== 'false';
 
   const shellContents = (
-    <>
+    <div className='animate-shell-in h-full'>
       {/* ENG-004: Show environment issues to admins in non-production */}
       <OperatorBanner isAdmin={dashboardData.isAdmin} />
       <ImpersonationBannerWrapper />
@@ -87,7 +87,7 @@ export async function DashboardShellContent({
           {children}
         </AuthShellWrapper>
       </DashboardDataProvider>
-    </>
+    </div>
   );
 
   if (useEssentialShell) {

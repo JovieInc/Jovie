@@ -33,6 +33,7 @@ export interface LeadPipelineSettings {
     maxProviderFailureRate: number;
   };
   queriesUsedToday: number;
+  autoIngestedToday: number;
 }
 
 export interface AdminLead {
