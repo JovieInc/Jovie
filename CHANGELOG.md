@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.116] - 2026-04-04
+
+> App shell layout, chat UX, and dark mode visual refinements to close the gap with Linear's polish.
+
+### Fixed
+
+- App shell missing top gap on desktop (CSS cascade: base `pt-[env()]` overriding `lg:p-[var()]`)
+- Sidebar profile dropdown clipping at the content border junction
+- Chat thread constrained to narrow column instead of using full content width
+
+### Changed
+
+- Empty state vertically centered with input as optical anchor (no layout shift when suggestions change)
+- Suggestions container narrowed to `max-w-md` for visual hierarchy below the input
+- Dark mode shell borders and shadows reduced for subtler elevation (closer to Linear)
+- [internal] Sidebar `overflow-hidden` changed to `overflow-clip` to prevent positioned element clipping
+- [internal] Scroll container in AppShellFrame now `flex flex-col` for proper height propagation
+- [internal] Skeleton loading shell matches AppShellFrame desktop padding
+
 ## [26.4.115] - 2026-04-04
 
 > Added workflow linting to CI so broken GitHub Actions YAML gets caught before it hits production.
