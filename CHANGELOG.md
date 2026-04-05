@@ -20,9 +20,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Empty state vertically centered with input as optical anchor (no layout shift when suggestions change)
 - Suggestions container narrowed to `max-w-md` for visual hierarchy below the input
 - Dark mode shell borders and shadows reduced for subtler elevation (closer to Linear)
-- Sidebar `overflow-hidden` changed to `overflow-clip` to prevent positioned element clipping
-- Scroll container in AppShellFrame now `flex flex-col` for proper height propagation
-- Skeleton loading shell matches AppShellFrame desktop padding
+- [internal] Sidebar `overflow-hidden` changed to `overflow-clip` to prevent positioned element clipping
+- [internal] Scroll container in AppShellFrame now `flex flex-col` for proper height propagation
+- [internal] Skeleton loading shell matches AppShellFrame desktop padding
 
 ## [26.4.115] - 2026-04-04
 
