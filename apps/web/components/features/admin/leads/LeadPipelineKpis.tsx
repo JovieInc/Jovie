@@ -1,12 +1,10 @@
-import { avg, count, eq } from 'drizzle-orm';
-import { BarChart2, CheckCircle, Search, Users } from 'lucide-react';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { KpiItem } from '@/features/admin/KpiItem';
+import { count, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
-import { captureWarning } from '@/lib/error-tracking';
+import { captureError, captureWarning } from '@/lib/error-tracking';
+
+export type LeadFunnelCounts = Record<string, number>;
 
 function isMissingLeadPipelineSettingsSchemaError(error: unknown): boolean {
   const message = getDeepErrorMessage(error).toLowerCase();
@@ -20,109 +18,73 @@ function isMissingLeadPipelineSettingsSchemaError(error: unknown): boolean {
       'column "guardrails_enabled"',
       'column "guardrail_thresholds"',
       'column "auto_ingest_daily_limit"',
+      'column "auto_ingested_today"',
     ].some(pattern => message.includes(pattern))
   );
 }
 
-async function getLeadKpis() {
-  const [totalRow] = await db.select({ count: count() }).from(leads);
+/** Single GROUP BY query for all lead status counts. */
+export async function getLeadFunnelCounts(): Promise<LeadFunnelCounts> {
+  try {
+    const rows = await db
+      .select({
+        status: leads.status,
+        count: count(),
+      })
+      .from(leads)
+      .groupBy(leads.status);
 
-  const [qualifiedRow] = await db
-    .select({ count: count() })
-    .from(leads)
-    .where(eq(leads.status, 'qualified'));
+    const counts: LeadFunnelCounts = {
+      discovered: 0,
+      qualified: 0,
+      disqualified: 0,
+      approved: 0,
+      ingested: 0,
+      rejected: 0,
+    };
+    for (const row of rows) {
+      counts[row.status] = row.count;
+    }
+    return counts;
+  } catch (error) {
+    await captureError(
+      '[admin/leads/kpis] Failed to fetch funnel counts',
+      error
+    );
+    return {};
+  }
+}
 
-  const [discoveredRow] = await db
-    .select({ count: count() })
-    .from(leads)
-    .where(eq(leads.status, 'discovered'));
+export interface PipelineSettingsSummary {
+  queriesUsedToday: number;
+  dailyQueryBudget: number;
+  pipelineEnabled: boolean;
+}
 
-  const [ingestedRow] = await db
-    .select({ count: count() })
-    .from(leads)
-    .where(eq(leads.status, 'ingested'));
-
-  const [avgScoreRow] = await db
-    .select({ avg: avg(leads.fitScore) })
-    .from(leads)
-    .where(eq(leads.status, 'qualified'));
-
-  let settings = null;
+export async function getPipelineSettingsSummary(): Promise<PipelineSettingsSummary> {
   try {
     const [settingsRow] = await db
       .select()
       .from(leadPipelineSettings)
       .where(eq(leadPipelineSettings.id, 1))
       .limit(1);
-    settings = settingsRow;
+    return {
+      queriesUsedToday: settingsRow?.queriesUsedToday ?? 0,
+      dailyQueryBudget: settingsRow?.dailyQueryBudget ?? 100,
+      pipelineEnabled: settingsRow?.enabled ?? false,
+    };
   } catch (error) {
     if (isMissingLeadPipelineSettingsSchemaError(error)) {
       await captureWarning(
-        '[admin/leads/kpis] lead pipeline settings schema missing; using KPI defaults',
+        '[admin/leads/kpis] lead pipeline settings schema missing; using defaults',
         error
       );
-    } else {
-      throw error;
+      return {
+        queriesUsedToday: 0,
+        dailyQueryBudget: 100,
+        pipelineEnabled: false,
+      };
     }
+    throw error;
   }
-
-  return {
-    total: totalRow?.count ?? 0,
-    qualified: qualifiedRow?.count ?? 0,
-    discovered: discoveredRow?.count ?? 0,
-    ingested: ingestedRow?.count ?? 0,
-    avgFitScore: avgScoreRow?.avg ? Math.round(Number(avgScoreRow.avg)) : 0,
-    queriesUsedToday: settings?.queriesUsedToday ?? 0,
-    dailyQueryBudget: settings?.dailyQueryBudget ?? 100,
-    pipelineEnabled: settings?.enabled ?? false,
-  };
-}
-
-export async function LeadPipelineKpis() {
-  const kpis = await getLeadKpis();
-
-  return (
-    <section>
-      <ContentSurfaceCard className='overflow-hidden p-0'>
-        <ContentSectionHeader
-          title='Lead pipeline'
-          subtitle='Discovery volume, qualification depth, and automation health'
-          className='px-(--linear-app-header-padding-x) py-3'
-        />
-        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-4'>
-          <KpiItem
-            title='TOTAL LEADS'
-            value={String(kpis.total)}
-            metadata={
-              <span>
-                {kpis.discovered} discovered, {kpis.ingested} ingested
-              </span>
-            }
-            icon={Users}
-          />
-          <KpiItem
-            title='QUALIFIED'
-            value={String(kpis.qualified)}
-            metadata={<span>Ready for review</span>}
-            icon={CheckCircle}
-            iconClassName='text-success'
-          />
-          <KpiItem
-            title='QUERIES TODAY'
-            value={`${kpis.queriesUsedToday} / ${kpis.dailyQueryBudget}`}
-            metadata={
-              <span>Pipeline {kpis.pipelineEnabled ? 'active' : 'paused'}</span>
-            }
-            icon={Search}
-          />
-          <KpiItem
-            title='AVG FIT SCORE'
-            value={String(kpis.avgFitScore)}
-            metadata={<span>Across qualified leads</span>}
-            icon={BarChart2}
-          />
-        </div>
-      </ContentSurfaceCard>
-    </section>
-  );
 }
