@@ -1,6 +1,6 @@
 'use client';
 
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { PAGINATED_CACHE } from './cache-strategies';
 import { queryKeys } from './keys';
 import type { AdminLead } from './useAdminLeadsPrimitives';
@@ -171,6 +171,7 @@ export function useAdminUsersInfiniteQuery({
     initialData: initialData
       ? { pages: [initialData], pageParams: [1] }
       : undefined,
+    placeholderData: keepPreviousData,
     ...PAGINATED_CACHE,
   });
 }
@@ -216,6 +217,7 @@ export function useAdminCreatorsInfiniteQuery({
     initialData: initialData
       ? { pages: [initialData], pageParams: [1] }
       : undefined,
+    placeholderData: keepPreviousData,
     ...PAGINATED_CACHE,
   });
 }
@@ -264,6 +266,7 @@ export function useAdminReleasesInfiniteQuery({
     initialData: initialData
       ? { pages: [initialData], pageParams: [1] }
       : undefined,
+    placeholderData: keepPreviousData,
     ...PAGINATED_CACHE,
   });
 }
@@ -303,6 +306,7 @@ export function useAdminWaitlistInfiniteQuery({
     initialData: initialData
       ? { pages: [initialData], pageParams: [1] }
       : undefined,
+    placeholderData: keepPreviousData,
     ...PAGINATED_CACHE,
   });
 }
@@ -342,6 +346,7 @@ export function useLeadsInfiniteQuery({
       return loaded < lastPage.total ? allPages.length + 1 : undefined;
     },
     initialPageParam: 1,
+    placeholderData: keepPreviousData,
     ...PAGINATED_CACHE,
   });
 }

@@ -1,11 +1,11 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
+import { useSearchUrlSync } from '@/hooks/useSearchUrlSync';
 import type { AdminReleaseRow, AdminReleasesSort } from '@/lib/admin/types';
 import { AdminReleasesTableUnified } from './AdminReleasesTableUnified';
 
@@ -21,31 +21,11 @@ interface AdminReleasesPageWrapperProps {
 export function AdminReleasesPageWrapper(
   props: Readonly<AdminReleasesPageWrapperProps>
 ) {
-  const router = useRouter();
   const basePath = props.basePath ?? APP_ROUTES.ADMIN_RELEASES;
   const [searchQuery, setSearchQuery] = useState(props.search);
 
-  const handleSearchApply = useCallback(() => {
-    const params = new URLSearchParams();
-    params.set('sort', props.sort);
-    params.set('pageSize', String(props.pageSize));
-    params.set('page', '1');
-
-    const query = searchQuery.trim();
-    if (query.length > 0) {
-      params.set('q', query);
-    }
-
-    const queryString = params.toString();
-    router.push(queryString ? `${basePath}?${queryString}` : basePath);
-  }, [basePath, props.pageSize, props.sort, router, searchQuery]);
-
-  const handleSearchClear = useCallback(() => {
-    setSearchQuery('');
-    if (props.search) {
-      router.push(basePath);
-    }
-  }, [basePath, props.search, router]);
+  // Debounced URL sync (no navigation)
+  useSearchUrlSync(searchQuery, basePath);
 
   const { setHeaderActions } = useSetHeaderActions();
 
@@ -59,8 +39,7 @@ export function AdminReleasesPageWrapper(
           placeholder='Search releases or artists'
           ariaLabel='Search releases or artists'
           submitAriaLabel='Search releases'
-          onApply={handleSearchApply}
-          onClearAction={handleSearchClear}
+          tooltipLabel='Search'
         />
 
         <div
@@ -75,7 +54,7 @@ export function AdminReleasesPageWrapper(
     return () => {
       setHeaderActions(null);
     };
-  }, [setHeaderActions, handleSearchApply, handleSearchClear, searchQuery]);
+  }, [setHeaderActions, searchQuery]);
 
   return (
     <AdminReleasesTableUnified
@@ -84,6 +63,7 @@ export function AdminReleasesPageWrapper(
       total={props.total}
       search={props.search}
       sort={props.sort}
+      clientFilter={searchQuery}
     />
   );
 }
