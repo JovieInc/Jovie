@@ -144,7 +144,12 @@ function bindAudioEvents(el: HTMLAudioElement): void {
     });
   });
   el.addEventListener('error', () => {
-    handlePlaybackFailure(el, 'media_error');
+    // Guard: only handle errors when a track is actively loaded.
+    // The audio element can fire stale error events (e.g., after tab
+    // backgrounding/resuming) even when src is already cleared.
+    if (state.activeTrackId) {
+      handlePlaybackFailure(el, 'media_error');
+    }
   });
 }
 

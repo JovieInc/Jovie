@@ -16,7 +16,7 @@ export function PersistentAudioBar() {
 
   useEffect(() => {
     return onError(() => {
-      toast.error('Preview unavailable');
+      toast.error('Preview unavailable', { id: 'audio-preview-error' });
     });
   }, [onError]);
 
