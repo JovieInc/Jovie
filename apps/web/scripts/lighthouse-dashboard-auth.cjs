@@ -215,6 +215,13 @@ async function seedDashboardAuth(browser, { url }) {
           timeout: 60_000,
         }),
       ]).catch(() => undefined);
+    } else if (pathname.startsWith('/onboarding')) {
+      await page
+        .waitForSelector(
+          '[data-testid="onboarding-form-wrapper"], [data-testid="onboarding-experience-shell"]',
+          { timeout: 30_000 }
+        )
+        .catch(() => undefined);
     } else if (pathname.startsWith('/app')) {
       await page
         .waitForSelector('main', { timeout: 30_000 })
@@ -342,7 +349,7 @@ function main() {
       'exec',
       'lhci',
       'autorun',
-      '--config=.lighthouserc.dashboard.pr.json',
+      `--config=${process.env.LIGHTHOUSE_CONFIG || '.lighthouserc.dashboard.pr.json'}`,
       `--healthcheck.chromePath=${chromePath}`,
       `--collect.chromePath=${chromePath}`,
       ...collectUrls.map(url => `--collect.url=${url}`),

@@ -59,30 +59,29 @@ export function OnboardingFormWrapper({
   existingBio = null,
   existingGenres = null,
 }: OnboardingFormWrapperProps) {
-  const [resolvedHandle, setResolvedHandle] = useState(initialHandle);
+  // Resolve the handle synchronously on first render to avoid a key-change
+  // remount that causes a visible layout shift.  sessionStorage is available
+  // during the initial client render (CSR after server HTML hydration), so
+  // reading it eagerly is safe and keeps the form key stable.
+  const [resolvedHandle] = useState(() => {
+    if (initialHandle) return initialHandle;
+    return readPendingClaimHandle() || initialHandle;
+  });
 
-  // Defer sessionStorage reads until after mount to keep the first client render
-  // aligned with the server HTML and avoid hydration-only hook-order errors.
+  // Clean up the consumed pendingClaim entry in an effect (not in the
+  // useState initializer) to avoid a side effect during render, which
+  // React StrictMode would execute twice.
   useEffect(() => {
-    if (initialHandle) {
-      setResolvedHandle(initialHandle);
-      return;
+    if (resolvedHandle && resolvedHandle !== initialHandle) {
+      try {
+        globalThis.sessionStorage?.removeItem('pendingClaim');
+      } catch {
+        // sessionStorage may be unavailable in restricted contexts
+      }
     }
+  }, [resolvedHandle, initialHandle]);
 
-    const pendingHandle = readPendingClaimHandle();
-    if (!pendingHandle) {
-      return;
-    }
-
-    setResolvedHandle(pendingHandle);
-
-    try {
-      globalThis.sessionStorage?.removeItem('pendingClaim');
-    } catch {
-      // sessionStorage may be unavailable in restricted contexts
-    }
-  }, [initialHandle]);
-
+  // Stable key — never changes after mount, preventing full-form CLS.
   const formKey = resolvedHandle || '__empty__';
 
   return (
