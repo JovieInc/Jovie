@@ -7,6 +7,7 @@ import {
   runCodexFix,
   selectQueuedIssues,
 } from './overnight-qa/controller-helpers';
+import { runLiveController } from './overnight-qa/controller-live';
 import { assertPreflightClean, branchSlug } from './overnight-qa/git-github';
 import {
   appendRunEvent,
@@ -143,14 +144,15 @@ async function main() {
     return;
   }
 
-  throw new Error(
-    'Live overnight QA controller loop lands in the next stacked PR.'
-  );
+  await runLiveController({ options, paths, runDir, state });
 }
 
 const invokedPath = process.argv[1];
 if (invokedPath && import.meta.url === pathToFileURL(invokedPath).href) {
-  await main();
+  void main().catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+  });
 }
 
 export {
