@@ -50,7 +50,7 @@ export function SmartLinkArtworkCard({
   return (
     <div
       className={cn(
-        'relative aspect-square w-full overflow-hidden rounded-lg bg-surface-1/30 shadow-2xl ring-1 ring-white/[0.08]',
+        'relative aspect-square w-full overflow-hidden rounded-2xl bg-surface-1/30 shadow-2xl ring-1 ring-white/[0.08]',
         className
       )}
     >

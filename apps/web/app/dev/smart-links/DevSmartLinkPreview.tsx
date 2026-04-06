@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
+import { SoundsLandingPage } from '@/app/[username]/[slug]/sounds/SoundsLandingPage';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { UnreleasedReleaseHero } from '@/features/release/UnreleasedReleaseHero';
 
@@ -86,7 +87,7 @@ const RELEASED_PROPS = {
       ],
     },
   ],
-  soundsUrl: null,
+  soundsUrl: '/lunavega/midnight-drive/sounds',
 };
 
 const futureDate = new Date();
@@ -111,12 +112,47 @@ const PRESAVE_PROPS = {
   },
 };
 
+const SOUNDS_PROPS = {
+  release: {
+    title: 'Midnight Drive',
+    artworkUrl: MOCK_ARTWORK,
+  },
+  artist: {
+    name: 'Luna Vega',
+    handle: 'lunavega',
+  },
+  videoProviders: [
+    {
+      key: 'tiktok_sound' as const,
+      label: 'TikTok',
+      cta: 'Use on TikTok',
+      accent: '#000000',
+      url: 'https://tiktok.com',
+    },
+    {
+      key: 'instagram_reels' as const,
+      label: 'Instagram Reels',
+      cta: 'Use on Instagram',
+      accent: '#E1306C',
+      url: 'https://instagram.com',
+    },
+    {
+      key: 'youtube_shorts' as const,
+      label: 'YouTube Shorts',
+      cta: 'Use on YouTube',
+      accent: '#FF0000',
+      url: 'https://youtube.com',
+    },
+  ],
+  smartLinkPath: '/lunavega/midnight-drive',
+};
+
 export function DevSmartLinkPreview() {
   const [queryClient] = useState(() => new QueryClient());
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className='flex min-h-screen items-start justify-center gap-10 bg-neutral-950 p-8'>
+      <div className='flex min-h-screen items-start justify-center gap-6 bg-neutral-950 p-6'>
         <div className='flex flex-col items-center gap-3'>
           <h2 className='text-sm font-medium text-white/50'>
             Released (Smart Link)
@@ -132,6 +168,13 @@ export function DevSmartLinkPreview() {
           </h2>
           <div className='h-[844px] w-[390px] overflow-hidden rounded-[40px] ring-1 ring-white/10'>
             <UnreleasedReleaseHero {...PRESAVE_PROPS} />
+          </div>
+        </div>
+
+        <div className='flex flex-col items-center gap-3'>
+          <h2 className='text-sm font-medium text-white/50'>Use This Sound</h2>
+          <div className='h-[844px] w-[390px] overflow-hidden rounded-[40px] ring-1 ring-white/10'>
+            <SoundsLandingPage {...SOUNDS_PROPS} />
           </div>
         </div>
       </div>

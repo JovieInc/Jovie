@@ -3,17 +3,20 @@
 /**
  * UnreleasedReleaseHero Component
  *
- * Displays a hero section for unreleased content with a unified presave card
- * containing countdown timer, platform pre-save buttons, and notify-me CTA.
+ * Uses the same visual shell as artist profiles: full-width artwork hero,
+ * menu button top-right, content area below with notification signup.
  */
 
+import { MoreHorizontal, Share2 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useState } from 'react';
-import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta';
-import {
-  SmartLinkArtworkCard,
-  SmartLinkPageFrame,
-} from '@/features/release/SmartLinkPagePrimitives';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { Icon } from '@/components/atoms/Icon';
+import { DrawerContainerProvider } from '@/features/profile/DrawerContainerContext';
+import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
+import { SmartLinkPoweredByFooter } from '@/features/release/SmartLinkPagePrimitives';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { Artist } from '@/types/db';
 import { PreSaveActions } from './PreSaveActions';
 import { ReleaseNotificationsProvider } from './ReleaseNotificationsProvider';
@@ -37,9 +40,10 @@ interface UnreleasedReleaseHeroProps {
   };
 }
 
-/**
- * Map artist props to full Artist type required by ArtistNotificationsCTA.
- */
+const menuItemClass =
+  'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-150 active:bg-white/[0.06]';
+const menuIconClass = 'h-[16px] w-[16px] text-white/40';
+
 function mapToArtistType(artist: UnreleasedReleaseHeroProps['artist']): Artist {
   return {
     id: artist.id,
@@ -61,57 +65,154 @@ export function UnreleasedReleaseHero({
   artist,
 }: UnreleasedReleaseHeroProps) {
   const artistData = mapToArtistType(artist);
-  const [showNotify, setShowNotify] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [cardElement, setCardElement] = useState<HTMLDivElement | null>(null);
+  const isDesktop = useMediaQuery('(min-width: 768px)');
 
-  const handleNotifyMe = useCallback(() => {
-    setShowNotify(true);
-  }, []);
+  const handleShare = useCallback(async () => {
+    setMenuOpen(false);
+    try {
+      await navigator.share?.({
+        title: `${release.title} — ${artist.name}`,
+        url: globalThis.location.href,
+      });
+    } catch {
+      // User cancelled or share not available
+    }
+  }, [release.title, artist.name]);
 
   return (
     <ReleaseNotificationsProvider artist={artistData}>
-      <SmartLinkPageFrame centered glowClassName='size-[30rem]'>
-        <SmartLinkArtworkCard
-          title={release.title}
-          artworkUrl={release.artworkUrl}
-          className='shadow-black/40'
-        />
+      <DrawerContainerProvider value={isDesktop ? cardElement : null}>
+        <div className='profile-viewport relative h-[100dvh] overflow-clip bg-base text-primary-token md:h-auto md:min-h-[100dvh] md:overflow-x-hidden'>
+          {/* Ambient background — blurred artwork */}
+          {release.artworkUrl ? (
+            <div className='absolute inset-0' aria-hidden='true'>
+              <div className='absolute inset-[-10%]'>
+                <Image
+                  src={release.artworkUrl}
+                  alt=''
+                  fill
+                  sizes='100vw'
+                  className='scale-[1.05] object-cover opacity-28 blur-[84px] saturate-[0.88]'
+                />
+              </div>
+              <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_26%),linear-gradient(180deg,rgba(6,8,13,0.34)_0%,rgba(7,8,10,0.82)_42%,rgba(8,9,10,0.98)_100%)]' />
+            </div>
+          ) : null}
 
-        {/* Release Info */}
-        <div className='mt-4 text-center'>
-          <h1 className='text-lg font-semibold leading-snug tracking-tight'>
-            {release.title}
-          </h1>
-          <Link
-            href={`/${artist.handle}`}
-            className='text-muted-foreground hover:text-foreground mt-1 block text-sm transition-colors'
-          >
-            {artist.name}
-          </Link>
-        </div>
+          {/* Card container — same sizing as profile */}
+          <div className='relative mx-auto flex h-[100dvh] w-full max-w-[680px] items-stretch justify-center md:h-auto md:min-h-[100dvh] md:items-center md:px-6 md:py-8'>
+            <main className='relative flex w-full items-stretch md:items-center'>
+              <div
+                ref={setCardElement}
+                className='relative flex h-full w-full max-w-[430px] flex-col overflow-clip bg-[color:var(--profile-content-bg)] md:h-auto md:mx-auto md:min-h-[min(920px,calc(100dvh-64px))] md:overflow-hidden md:rounded-[30px] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
+              >
+                <div className='pointer-events-none absolute inset-0 bg-[var(--profile-panel-gradient)]' />
 
-        {/* Unified presave card: countdown + actions */}
-        <PreSaveActions
-          releaseId={release.id}
-          trackId={release.trackId}
-          username={artist.handle}
-          slug={release.slug}
-          hasSpotify={release.hasSpotify}
-          hasAppleMusic={release.hasAppleMusic}
-          releaseDate={release.releaseDate}
-          onNotifyMe={handleNotifyMe}
-        />
+                {/* Hero — full-width artwork */}
+                <header className='relative w-full min-h-0 flex-1 md:flex-none md:aspect-square'>
+                  <div className='absolute inset-0'>
+                    {release.artworkUrl ? (
+                      <Image
+                        src={release.artworkUrl}
+                        alt={`${release.title} artwork`}
+                        fill
+                        priority
+                        sizes='(max-width: 767px) 100vw, 430px'
+                        className='object-cover object-center'
+                      />
+                    ) : (
+                      <div className='flex h-full w-full items-center justify-center bg-surface-2'>
+                        <Icon
+                          name='Disc3'
+                          className='text-muted-foreground h-16 w-16'
+                          aria-hidden='true'
+                        />
+                      </div>
+                    )}
+                  </div>
 
-        {/* Notification form — revealed when "Notify Me" is tapped */}
-        {showNotify && (
-          <div className='mt-3'>
-            <ArtistNotificationsCTA
-              artist={artistData}
-              variant='button'
-              autoOpen
-            />
+                  {/* Top vignette */}
+                  <div className='pointer-events-none absolute inset-x-0 top-0 h-[36%] bg-[linear-gradient(to_bottom,rgba(0,0,0,0.45)_0%,rgba(0,0,0,0.15)_55%,transparent_100%)]' />
+                  {/* Bottom gradient */}
+                  <div className='pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-[linear-gradient(to_top,var(--profile-stage-bg,rgba(8,9,10,1))_0%,rgba(5,6,8,0.75)_45%,transparent_100%)]' />
+
+                  {/* Top bar */}
+                  <div className='relative z-10 flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),20px)]'>
+                    <BrandLogo
+                      size={22}
+                      tone='white'
+                      rounded={false}
+                      className='opacity-45 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
+                    />
+                    <button
+                      type='button'
+                      onClick={() => setMenuOpen(true)}
+                      className='flex h-8 w-8 items-center justify-center rounded-full border-white/[0.08] bg-black/25 text-white/70 backdrop-blur-2xl transition-colors duration-150 hover:bg-black/40'
+                      aria-label='More options'
+                      aria-haspopup='dialog'
+                    >
+                      <MoreHorizontal className='h-[15px] w-[15px]' />
+                    </button>
+                  </div>
+
+                  {/* Title over artwork */}
+                  <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
+                    <h1 className='text-[28px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
+                      {release.title}
+                    </h1>
+                    <Link
+                      href={`/${artist.handle}`}
+                      className='mt-1 block text-[14px] font-[450] text-white/70 transition-colors hover:text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'
+                    >
+                      {artist.name}
+                    </Link>
+                  </div>
+                </header>
+
+                {/* Content — countdown + notification signup */}
+                <div className='relative z-10 flex shrink-0 flex-col gap-3 px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3'>
+                  <PreSaveActions
+                    releaseId={release.id}
+                    trackId={release.trackId}
+                    username={artist.handle}
+                    slug={release.slug}
+                    hasSpotify={release.hasSpotify}
+                    hasAppleMusic={release.hasAppleMusic}
+                    releaseDate={release.releaseDate}
+                    artistData={artistData}
+                  />
+
+                  {/* Powered by */}
+                  <SmartLinkPoweredByFooter />
+                </div>
+              </div>
+            </main>
           </div>
-        )}
-      </SmartLinkPageFrame>
+
+          {/* Menu drawer */}
+          <ProfileDrawerShell
+            open={menuOpen}
+            onOpenChange={setMenuOpen}
+            title='Menu'
+          >
+            <div className='flex flex-col gap-0.5' role='menu'>
+              <button
+                type='button'
+                role='menuitem'
+                className={menuItemClass}
+                onClick={() => {
+                  void handleShare();
+                }}
+              >
+                <Share2 className={menuIconClass} />
+                Share
+              </button>
+            </div>
+          </ProfileDrawerShell>
+        </div>
+      </DrawerContainerProvider>
     </ReleaseNotificationsProvider>
   );
 }

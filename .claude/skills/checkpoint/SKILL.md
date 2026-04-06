@@ -1,1 +1,1 @@
-/Users/timwhite/conductor/workspaces/jovie/singapore/.claude/skills/gstack/checkpoint/SKILL.md
+/Users/timwhite/conductor/workspaces/jovie/taipei/.claude/skills/gstack/checkpoint/SKILL.md

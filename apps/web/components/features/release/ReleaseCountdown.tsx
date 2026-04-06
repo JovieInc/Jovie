@@ -84,20 +84,15 @@ export function ReleaseCountdown({
   }
 
   if (compact) {
+    const parts: string[] = [];
+    if (timeLeft.days > 0) parts.push(`${timeLeft.days}d`);
+    parts.push(`${timeLeft.hours}h`);
+    parts.push(`${timeLeft.minutes}m`);
+
     return (
-      <p className='text-center text-xs text-white/50'>
-        <span className='uppercase tracking-widest'>Drops in</span>{' '}
-        {timeLeft.days > 0 && (
-          <span className='font-semibold tabular-nums text-white'>
-            {timeLeft.days}d{' '}
-          </span>
-        )}
-        <span className='font-semibold tabular-nums text-white'>
-          {timeLeft.hours}h{' '}
-        </span>
-        <span className='font-semibold tabular-nums text-white'>
-          {timeLeft.minutes}m
-        </span>
+      <p className='text-[13px] font-[510] leading-[1.15] text-white/88'>
+        <span className='text-[11px] font-[450] text-white/45'>Drops in </span>
+        <span className='tabular-nums'>{parts.join(' ')}</span>
       </p>
     );
   }

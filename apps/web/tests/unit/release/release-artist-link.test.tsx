@@ -31,6 +31,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/features/profile/artist-notifications-cta', () => ({
   ArtistNotificationsCTA: () => null,
+  ProfileInlineNotificationsCTA: () => null,
 }));
 
 // Mock heavy sub-trees to prevent module resolution hangs
@@ -275,14 +276,11 @@ describe('release artist links', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /view credits/i }));
+    // Open the menu drawer, then click Credits
+    fireEvent.click(screen.getByRole('button', { name: /more options/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /credits/i }));
 
     expect(screen.getByText('Credits')).toBeInTheDocument();
-    expect(
-      screen.getByText('View all credited collaborators for this release')
-    ).toBeInTheDocument();
-    expect(screen.getByText('Producer')).toBeInTheDocument();
-    expect(screen.getByTestId('credits-scroll-container')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Producer One' })).toHaveAttribute(
       'href',
       '/producer-one'

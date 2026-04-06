@@ -1,1 +1,1 @@
-/Users/timwhite/conductor/workspaces/jovie/singapore/.claude/skills/gstack/land-and-deploy/SKILL.md
+/Users/timwhite/conductor/workspaces/jovie/taipei/.claude/skills/gstack/land-and-deploy/SKILL.md

@@ -33,7 +33,7 @@ export const subscriptionComposerFocusClassName =
   'border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-hover)] shadow-[0_10px_24px_rgba(15,17,24,0.08)] dark:bg-[var(--profile-pearl-bg-hover)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.22)]';
 
 export const subscriptionInputClassName =
-  'h-12 w-full bg-transparent px-2 text-[17px] font-[560] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 transition-[color,opacity] duration-200 focus-visible:outline-none focus-visible:ring-0';
+  'h-12 w-full bg-transparent px-2 text-[15px] font-[560] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 transition-[color,opacity] duration-200 focus-visible:outline-none focus-visible:ring-0';
 
 export const subscriptionPrimaryActionClassName =
   'inline-flex h-12 shrink-0 items-center justify-center rounded-full border border-transparent bg-[var(--profile-pearl-primary-bg)] px-5 text-[15px] font-semibold tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-none transition-[background-color,color,opacity] duration-200 ease-out hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
@@ -69,7 +69,7 @@ export function SubscriptionPearlComposer({
     <div
       className={cn(
         subscriptionComposerSurfaceClassName,
-        stacked ? 'rounded-[2rem] p-3' : 'px-1.5 py-1.5',
+        stacked ? 'rounded-[2rem] p-3' : 'px-1',
         className
       )}
       data-testid={dataTestId}

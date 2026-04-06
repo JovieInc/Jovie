@@ -1,10 +1,11 @@
 'use client';
 
-import { Bell } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
+import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import { useApplePreSaveMutation } from '@/lib/queries';
+import type { Artist } from '@/types/db';
 import { ReleaseCountdown } from './ReleaseCountdown';
 
 interface PreSaveActionsProps {
@@ -15,7 +16,7 @@ interface PreSaveActionsProps {
   readonly hasSpotify: boolean;
   readonly hasAppleMusic: boolean;
   readonly releaseDate: Date;
-  readonly onNotifyMe?: () => void;
+  readonly artistData: Artist;
 }
 
 export function PreSaveActions({
@@ -26,10 +27,13 @@ export function PreSaveActions({
   hasSpotify,
   hasAppleMusic,
   releaseDate,
-  onNotifyMe,
+  artistData,
 }: PreSaveActionsProps) {
   const applePreSave = useApplePreSaveMutation();
   const [appleSaved, setAppleSaved] = useState(false);
+
+  // TODO: Re-enable platform presaves once email signup flow is solid
+  const enablePlatformPresaves = false;
 
   const spotifyHref = useMemo(() => {
     const params = new URLSearchParams({
@@ -76,15 +80,36 @@ export function PreSaveActions({
   const spotifyConfig = DSP_LOGO_CONFIG.spotify;
   const appleConfig = DSP_LOGO_CONFIG.apple_music;
 
+  const releaseDateObj = new Date(releaseDate);
+  const monthLabel = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+  }).format(releaseDateObj);
+  const dayLabel = new Intl.DateTimeFormat('en-US', { day: 'numeric' }).format(
+    releaseDateObj
+  );
+
   return (
-    <div className='mt-5 space-y-2'>
-      {/* Countdown header */}
-      <div className='rounded-2xl bg-surface-1/50 px-4 py-3 ring-1 ring-inset ring-white/[0.08]'>
-        <ReleaseCountdown releaseDate={releaseDate} compact />
+    <div className='space-y-3'>
+      {/* Countdown card — matches latest release / tour date card */}
+      <div className='flex w-full items-center gap-2.5 rounded-[14px] border border-white/[0.08] bg-white/[0.05] px-3 py-2.5 backdrop-blur-2xl'>
+        <div className='flex shrink-0 flex-col items-center leading-none'>
+          <span className='text-[10px] font-[590] uppercase tracking-[0.1em] text-white/45'>
+            {monthLabel}
+          </span>
+          <span className='text-[18px] font-[680] tracking-[-0.04em] text-white/90'>
+            {dayLabel}
+          </span>
+        </div>
+        <div className='min-w-0 flex-1'>
+          <ReleaseCountdown releaseDate={releaseDate} compact />
+        </div>
       </div>
 
-      {/* Action rows — same style as release page DSP buttons */}
-      {hasSpotify ? (
+      {/* Inline notification signup — same component as artist profiles */}
+      <ProfileInlineNotificationsCTA artist={artistData} />
+
+      {/* Platform presaves — flagged off for now */}
+      {enablePlatformPresaves && hasSpotify ? (
         <SmartLinkProviderButton
           label='Spotify'
           iconPath={spotifyConfig?.iconPath}
@@ -92,7 +117,7 @@ export function PreSaveActions({
         />
       ) : null}
 
-      {hasAppleMusic ? (
+      {enablePlatformPresaves && hasAppleMusic ? (
         <SmartLinkProviderButton
           label={
             appleSaved || applePreSave.isSuccess
@@ -101,14 +126,6 @@ export function PreSaveActions({
           }
           iconPath={appleConfig?.iconPath}
           onClick={handleApplePreAdd}
-        />
-      ) : null}
-
-      {onNotifyMe ? (
-        <SmartLinkProviderButton
-          label='Notify Me'
-          icon={<Bell className='h-5 w-5 shrink-0 text-muted-foreground' />}
-          onClick={onNotifyMe}
         />
       ) : null}
     </div>

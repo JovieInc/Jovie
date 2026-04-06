@@ -1,10 +1,10 @@
 'use client';
 
+import { Switch } from '@jovie/ui';
 import {
   Bell,
   BellOff,
   CalendarDays,
-  ChevronLeft,
   ChevronRight,
   Info,
   Mail,
@@ -87,6 +87,7 @@ export function ProfileMenuDrawer({
       subtitle={
         view === 'notifications' ? 'Choose what you hear about.' : undefined
       }
+      onBack={view === 'notifications' ? () => setView('menu') : undefined}
       dataTestId='profile-menu-drawer'
     >
       {view === 'menu' ? (
@@ -176,45 +177,26 @@ export function ProfileMenuDrawer({
         </div>
       ) : (
         <div className='flex flex-col gap-1'>
-          {/* Back button */}
-          <button
-            type='button'
-            className='mb-2 flex items-center gap-1.5 rounded-[10px] px-2 py-1.5 text-[12px] font-[500] text-white/50 transition-colors duration-150 active:bg-white/[0.06]'
-            onClick={() => setView('menu')}
-          >
-            <ChevronLeft className='h-3.5 w-3.5' />
-            Back
-          </button>
-
-          <div className='mx-1 mb-2 h-px bg-white/[0.06]' />
-
-          <p className='px-4 pb-2 text-[11px] font-[560] uppercase tracking-[0.06em] text-white/35'>
-            Notify me about
-          </p>
-
           {NOTIFICATION_CONTENT_TYPES.map(pref => (
-            <button
+            <div
               key={pref.key}
-              type='button'
-              role='menuitemcheckbox'
-              aria-checked={contentPrefs[pref.key]}
-              className='flex w-full items-center justify-between rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-150 active:bg-white/[0.06]'
-              onClick={() => onTogglePref(pref.key)}
+              className='flex w-full items-center justify-between rounded-[14px] px-4 py-3 text-left'
             >
               <div className='flex flex-col gap-0.5'>
-                <span>{pref.label}</span>
+                <span className='text-[14px] font-[470] text-white/88'>
+                  {pref.label}
+                </span>
                 <span className='text-[11px] font-[400] text-white/40'>
                   {pref.description}
                 </span>
               </div>
-              <span
-                className={`h-4 w-4 rounded-full border-2 transition-colors ${
-                  contentPrefs[pref.key]
-                    ? 'border-green-400 bg-green-400'
-                    : 'border-white/25 bg-transparent'
-                }`}
+              <Switch
+                checked={contentPrefs[pref.key]}
+                onCheckedChange={() => onTogglePref(pref.key)}
+                aria-label={pref.label}
+                className='data-[state=checked]:bg-green-500 data-[state=checked]:hover:bg-green-600 data-[state=unchecked]:bg-white/[0.16] data-[state=unchecked]:hover:bg-white/[0.22]'
               />
-            </button>
+            </div>
           ))}
 
           <div className='mx-1 my-1 h-px bg-white/[0.06]' />
