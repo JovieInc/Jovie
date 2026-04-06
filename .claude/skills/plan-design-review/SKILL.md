@@ -1,1 +1,1 @@
-/Users/timwhite/conductor/workspaces/jovie/gwangju/.claude/skills/gstack/plan-design-review/SKILL.md
+/Users/timwhite/conductor/workspaces/jovie/singapore/.claude/skills/gstack/plan-design-review/SKILL.md
