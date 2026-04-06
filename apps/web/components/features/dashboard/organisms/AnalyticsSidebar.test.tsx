@@ -46,7 +46,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     tabs?: ReactNode;
     testId?: string;
   }) => (
-    <div data-testid={testId}>
+    <div data-testid={testId} data-surface-variant='card'>
       {tabs}
       {children}
     </div>
