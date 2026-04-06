@@ -238,8 +238,11 @@ export async function POST(request: NextRequest) {
       rawReferrer && isInternalTrafficReferrer(rawReferrer)
         ? undefined
         : rawReferrer;
-    const resolvedGeoCity =
+    const rawGeoCity =
       geoCity ?? request.headers.get('x-vercel-ip-city') ?? undefined;
+    const resolvedGeoCity = rawGeoCity
+      ? decodeURIComponent(rawGeoCity)
+      : undefined;
     const resolvedGeoCountry =
       geoCountry ??
       request.headers.get('x-vercel-ip-country') ??

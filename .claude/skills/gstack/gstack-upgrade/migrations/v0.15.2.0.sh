@@ -13,29 +13,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-INSTALL_DIR="${GSTACK_INSTALL_DIR:-$SCRIPT_DIR}"
-SKILLS_DIR="${GSTACK_SKILLS_DIR:-}"
-HOST_CONTEXT="${GSTACK_HOST_CONTEXT:-unknown}"
 
-if [ "$HOST_CONTEXT" != "claude" ] || [ -z "$SKILLS_DIR" ]; then
-  echo "  [v0.15.2.0] Skipping Claude relink; no Claude install context provided."
-  exit 0
-fi
-
-if [ -x "$INSTALL_DIR/bin/gstack-relink" ]; then
+if [ -x "$SCRIPT_DIR/bin/gstack-relink" ]; then
   echo "  [v0.15.2.0] Fixing skill directory structure..."
-  set +e
-  relink_output="$(
-    GSTACK_INSTALL_DIR="$INSTALL_DIR" \
-    GSTACK_SKILLS_DIR="$SKILLS_DIR" \
-    "$INSTALL_DIR/bin/gstack-relink" 2>&1
-  )"
-  relink_exit=$?
-  set -e
-
-  if [ $relink_exit -ne 0 ]; then
-    printf "  [v0.15.2.0] Warning: relink failed (exit %s). %s\n" "$relink_exit" "$relink_output" >&2
-  elif [ -n "$relink_output" ]; then
-    printf '%s\n' "$relink_output"
-  fi
+  "$SCRIPT_DIR/bin/gstack-relink" 2>/dev/null || true
 fi

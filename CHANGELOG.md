@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.125] - 2026-04-05
+
+### Fixed
+
+- Audience city names now display properly instead of URL-encoded (`Los Angeles` not `Los%20Angeles`)
+- DSP presence page shows all platform names instead of "View on undefined" for 14 previously missing providers (FLO, Gaana, KKBOX, LINE MUSIC, NetEase, QQ Music, and more)
+
+### Changed
+
+- Upgraded gstack tooling to v0.15.11.0
+
 ## [26.4.124] - 2026-04-05
 
 ### Changed
