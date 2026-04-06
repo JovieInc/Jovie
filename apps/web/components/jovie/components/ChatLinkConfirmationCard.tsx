@@ -4,7 +4,6 @@ import { Check, Loader2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useConfirmChatLinkMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -143,12 +142,7 @@ export function ChatLinkConfirmationCard({
   return (
     <ContentSurfaceCard className='border-accent/20 bg-[color-mix(in_oklab,var(--linear-accent)_8%,var(--linear-app-content-surface))] p-4'>
       <div className='flex items-center gap-3'>
-        <span
-          className={cn(
-            LINEAR_SURFACE.drawerCardSm,
-            'flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border-accent/20 bg-[color-mix(in_oklab,var(--linear-accent)_10%,var(--linear-app-content-surface))]'
-          )}
-        >
+        <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border border-accent/20 bg-[color-mix(in_oklab,var(--linear-accent)_10%,var(--linear-app-content-surface))]'>
           <SocialIcon
             platform={normalizeSocialPlatform(platform.icon)}
             className='h-5 w-5 shrink-0'

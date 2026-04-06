@@ -126,7 +126,7 @@ export function RightDrawer({
         className={cn(
           'fixed inset-0 z-50 flex flex-col',
           'overflow-hidden',
-          'border-l border-(--linear-app-frame-seam) bg-surface-0',
+          'border-l border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
           'shadow-[var(--linear-app-drawer-shadow)]',
           'pb-[env(safe-area-inset-bottom)]',
           'transition-transform duration-300 ease-out',
@@ -153,9 +153,10 @@ export function RightDrawer({
           ? 'transition-[width,opacity] duration-300 ease-out'
           : 'transition-none',
         'overflow-hidden',
+        'border-l border-(--linear-app-frame-seam)',
         isOpen
-          ? 'visible opacity-100 bg-surface-0'
-          : 'opacity-0 pointer-events-none invisible bg-transparent',
+          ? 'visible opacity-100'
+          : 'opacity-0 pointer-events-none invisible',
         className
       )}
       style={{ width: isOpen ? width : 0, maxWidth: '100vw' }}

@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.126] - 2026-04-05
+
+### Changed
+
+- Unified surface elevation to a strict 3-tier model matching Linear.app (page bg → content card → drawer cards)
+- Drawer cards now show proper Tier 2 chrome (border ring + shadow-card + 10px radius) in both light and dark mode
+- Right drawer is transparent on desktop (inherits from main content area), uses content surface on mobile overlay
+- Removed all `color-mix()` surface background formulas from drawer and shell components
+- Removed `surfaceTone` quiet variant — all drawer content uses consistent Tier 2 card treatment
+- Fixed dark mode surface-1 token value in DESIGN.md (#1c1c1f → #17171a to match linear-tokens.css)
+
+### Removed
+
+- `PAGE_SHELL_SURFACE_CLASSNAMES` (6 unused color-mix surface variants)
+- `DRAWER_SURFACE_QUIET_CARD_CLASSNAME` export
+- `quiet` variant from DrawerSurfaceCard
+
 ## [26.4.125] - 2026-04-05
 
 ### Fixed

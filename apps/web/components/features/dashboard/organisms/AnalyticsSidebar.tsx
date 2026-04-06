@@ -257,9 +257,8 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
       data-testid='analytics-sidebar'
       headerMode='minimal'
       hideMinimalHeaderBar
-      surfaceTone='quiet'
       entityHeader={
-        <DrawerSurfaceCard variant='quiet' className='overflow-hidden'>
+        <DrawerSurfaceCard variant='card' className='overflow-hidden'>
           <div className='relative p-3.5'>
             <div className='absolute right-2.5 top-2.5'>
               <DrawerHeaderActions
@@ -300,7 +299,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
         <FunnelCard stages={stages} loading={loading} />
 
         {/* Engagement — compact 2-col, secondary to the funnel */}
-        <DrawerStatGrid variant='quiet'>
+        <DrawerStatGrid variant='card'>
           <div className='px-3 py-2'>
             <StatTile
               label='Link Clicks'
@@ -324,7 +323,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
         </DrawerStatGrid>
         <DrawerTabbedCard
           testId='analytics-sidebar-tabbed-card'
-          surfaceVariant='quiet'
+          surfaceVariant='card'
           tabs={
             <DrawerTabs
               value={activeTab}

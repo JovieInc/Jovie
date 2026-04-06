@@ -67,7 +67,6 @@ vi.mock('@/components/molecules/drawer', () => ({
     entityHeader,
     tabs,
     footer,
-    surfaceTone,
   }: {
     children?: React.ReactNode;
     isEmpty?: boolean;
@@ -75,13 +74,12 @@ vi.mock('@/components/molecules/drawer', () => ({
     entityHeader?: React.ReactNode;
     tabs?: React.ReactNode;
     footer?: React.ReactNode;
-    surfaceTone?: 'default' | 'quiet';
     [key: string]: unknown;
   }) =>
     isEmpty ? (
       <p data-testid='empty-state'>{emptyMessage}</p>
     ) : (
-      <div data-testid='right-drawer' data-surface-tone={surfaceTone}>
+      <div data-testid='right-drawer'>
         {entityHeader}
         {tabs}
         {children}
@@ -115,7 +113,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     children?: React.ReactNode;
     className?: string;
     testId?: string;
-    variant?: 'card' | 'flat' | 'quiet';
+    variant?: 'card' | 'flat';
   }) => (
     <div
       className={className}
@@ -203,7 +201,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     children?: React.ReactNode;
     tabs?: React.ReactNode;
     testId?: string;
-    surfaceVariant?: 'card' | 'quiet';
+    surfaceVariant?: 'card';
   }) => (
     <div data-testid={testId} data-surface-variant={surfaceVariant}>
       {tabs}
@@ -473,20 +471,16 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.getByTestId('release-header-card')).toBeInTheDocument();
   });
 
-  it('opts into the quiet right-rail surface contract', () => {
+  it('opts into the card surface variant contract', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    expect(screen.getByTestId('right-drawer')).toHaveAttribute(
-      'data-surface-tone',
-      'quiet'
-    );
     expect(screen.getByTestId('release-header-card')).toHaveAttribute(
       'data-surface-variant',
-      'quiet'
+      'card'
     );
     expect(screen.getByTestId('release-tabbed-card')).toHaveAttribute(
       'data-surface-variant',
-      'quiet'
+      'card'
     );
   });
 

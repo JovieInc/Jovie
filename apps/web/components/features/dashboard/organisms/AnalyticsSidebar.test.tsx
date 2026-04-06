@@ -28,14 +28,14 @@ vi.mock('@/components/molecules/drawer', () => ({
     variant,
   }: {
     children?: ReactNode;
-    variant?: 'card' | 'flush' | 'quiet';
+    variant?: 'card' | 'flush';
   }) => <div data-surface-variant={variant}>{children}</div>,
   DrawerSurfaceCard: ({
     children,
     variant,
   }: {
     children?: ReactNode;
-    variant?: 'card' | 'flat' | 'quiet';
+    variant?: 'card' | 'flat';
   }) => <div data-surface-variant={variant}>{children}</div>,
   DrawerTabbedCard: ({
     children,
@@ -46,7 +46,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     children?: ReactNode;
     tabs?: ReactNode;
     testId?: string;
-    surfaceVariant?: 'card' | 'quiet';
+    surfaceVariant?: 'card';
   }) => (
     <div data-testid={testId} data-surface-variant={surfaceVariant}>
       {tabs}
@@ -79,15 +79,13 @@ vi.mock('@/components/molecules/drawer', () => ({
   EntitySidebarShell: ({
     children,
     entityHeader,
-    surfaceTone,
     'data-testid': testId,
   }: {
     children?: ReactNode;
     entityHeader?: ReactNode;
-    surfaceTone?: 'default' | 'quiet';
     'data-testid'?: string;
   }) => (
-    <div data-testid={testId} data-surface-tone={surfaceTone}>
+    <div data-testid={testId}>
       {entityHeader}
       {children}
     </div>
@@ -131,16 +129,12 @@ vi.mock('@/components/atoms/AppSegmentControl', () => ({
 }));
 
 describe('AnalyticsSidebar', () => {
-  it('opts into the quiet right-rail surface contract', () => {
+  it('renders the sidebar with card surface variant', () => {
     render(<AnalyticsSidebar isOpen onClose={vi.fn()} />);
 
-    expect(screen.getByTestId('analytics-sidebar')).toHaveAttribute(
-      'data-surface-tone',
-      'quiet'
-    );
     expect(screen.getByTestId('analytics-sidebar-tabbed-card')).toHaveAttribute(
       'data-surface-variant',
-      'quiet'
+      'card'
     );
     expect(screen.getByText('Audience funnel')).toBeInTheDocument();
     expect(screen.getByText('Link Clicks')).toBeInTheDocument();
