@@ -135,7 +135,7 @@ export function MismatchCard({
   return (
     <li className='list-none group flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5 transition-all hover:bg-accent/50'>
       {/* Artwork — clickable to Spotify */}
-      {spotifyUrl ? (
+      {spotifyUrl && (
         <a
           href={spotifyUrl}
           target='_blank'
@@ -154,14 +154,16 @@ export function MismatchCard({
             <div className='h-8 w-8 rounded bg-muted' />
           )}
         </a>
-      ) : mismatch.externalArtworkUrl ? (
+      )}
+      {!spotifyUrl && mismatch.externalArtworkUrl && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={mismatch.externalArtworkUrl}
           alt=''
           className='h-8 w-8 flex-shrink-0 rounded object-cover'
         />
-      ) : (
+      )}
+      {!spotifyUrl && !mismatch.externalArtworkUrl && (
         <div className='h-8 w-8 flex-shrink-0 rounded bg-muted' />
       )}
 
