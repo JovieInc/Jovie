@@ -65,6 +65,11 @@ const FOOTER_COLUMNS = [
   },
 ] as const;
 
+const PROFILE_LEGAL_LINKS = [
+  { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
+  { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms' },
+];
+
 import {
   CONTAINER_SIZES,
   FOOTER_LINK_CLASS_NAME,
@@ -117,7 +122,7 @@ export function Footer({
           <FooterNavigation
             variant={config.colorVariant}
             ariaLabel='Legal'
-            links={[]}
+            links={PROFILE_LEGAL_LINKS}
             className='gap-2 text-[10px] leading-4'
             linkClassName='text-[10px] leading-4 opacity-60 hover:opacity-100'
           />
@@ -127,7 +132,7 @@ export function Footer({
           <FooterNavigation
             variant={config.colorVariant}
             ariaLabel='Legal'
-            links={[]}
+            links={PROFILE_LEGAL_LINKS}
             className='gap-2 text-[10px] leading-4'
             linkClassName='text-[10px] leading-4 opacity-60 hover:opacity-100'
           />
