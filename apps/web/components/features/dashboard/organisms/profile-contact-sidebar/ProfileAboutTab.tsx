@@ -535,13 +535,21 @@ function PressPhotosSection({
         </div>
       )}
 
-      {!canUpload && pressPhotos.length >= MAX_PRESS_PHOTOS && (
-        <p className='text-[11px] text-tertiary-token'>
-          {remainingSlots === 0
-            ? 'Remove a photo to upload another.'
-            : `${remainingSlots} upload slot${remainingSlots > 1 ? 's' : ''} remaining.`}
-        </p>
-      )}
+      {!canUpload &&
+        pressPhotos.length >= MAX_PRESS_PHOTOS &&
+        remainingSlots === 0 && (
+          <p className='text-[11px] text-tertiary-token'>
+            Remove a photo to upload another.
+          </p>
+        )}
+      {!canUpload &&
+        pressPhotos.length >= MAX_PRESS_PHOTOS &&
+        remainingSlots > 0 && (
+          <p className='text-[11px] text-tertiary-token'>
+            {remainingSlots} upload {remainingSlots === 1 ? 'slot' : 'slots'}{' '}
+            remaining.
+          </p>
+        )}
 
       {uploadError && <p className='text-[11px] text-danger'>{uploadError}</p>}
 
