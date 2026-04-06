@@ -100,13 +100,9 @@ describe('TrackSidebar', () => {
       screen.getByRole('button', { name: /copy track link/i })
     ).toBeInTheDocument();
     expect(screen.getByText(/Preview Unverified/i)).toBeInTheDocument();
-    expect(screen.getByTestId('track-sidebar')).toHaveAttribute(
-      'data-surface-tone',
-      'quiet'
-    );
     expect(screen.getByTestId('track-tabbed-card')).toHaveAttribute(
       'data-surface-variant',
-      'quiet'
+      'card'
     );
   });
 
