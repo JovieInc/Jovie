@@ -19,25 +19,30 @@ export function SettingsSmsAccessSection({
 
   const hasRequested = alreadyRequested || isSuccess;
 
+  let statusPill: React.ReactNode = null;
+  if (isPending) {
+    statusPill = (
+      <SettingsStatusPill
+        status={{ saving: true, success: null, error: null }}
+      />
+    );
+  } else if (isError) {
+    statusPill = (
+      <SettingsStatusPill
+        status={{
+          saving: false,
+          success: null,
+          error: error?.message ?? 'Request failed',
+        }}
+      />
+    );
+  }
+
   return (
     <SettingsPanel
       title='SMS Notifications'
       description='Let fans opt in to text alerts when you release new music.'
-      actions={
-        isPending ? (
-          <SettingsStatusPill
-            status={{ saving: true, success: null, error: null }}
-          />
-        ) : isError ? (
-          <SettingsStatusPill
-            status={{
-              saving: false,
-              success: null,
-              error: error?.message ?? 'Request failed',
-            }}
-          />
-        ) : null
-      }
+      actions={statusPill}
     >
       <div className='px-4 py-4 sm:px-5'>
         <div className='flex items-start gap-3'>
