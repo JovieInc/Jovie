@@ -37,7 +37,7 @@ We do not place any marketing cookies on your device. However, when you accept m
 
 You can manage your cookie preferences at any time by:
 
-1. Clicking "Cookie settings" in the footer of any page
+1. Clicking "Manage" in the cookie consent bar at the bottom of any page
 2. Using your browser settings to block or delete cookies
 
 Note that disabling certain cookies may affect your experience on Jovie.
