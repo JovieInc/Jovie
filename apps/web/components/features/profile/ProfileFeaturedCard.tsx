@@ -1,5 +1,3 @@
-'use client';
-
 import { CalendarDays, MapPin, Play, Ticket } from 'lucide-react';
 import Link from 'next/link';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
