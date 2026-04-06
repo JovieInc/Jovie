@@ -1,1 +1,1 @@
-/Users/timwhite/conductor/workspaces/jovie/singapore/.claude/skills/gstack/plan-devex-review/SKILL.md
+/Users/timwhite/conductor/workspaces/jovie/cape-town/.claude/skills/gstack/plan-devex-review/SKILL.md
