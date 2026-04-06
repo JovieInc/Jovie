@@ -31,6 +31,18 @@ import {
 
 export const revalidate = 300;
 
+function msToIsoDuration(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  let duration = 'PT';
+  if (hours > 0) duration += `${hours}H`;
+  if (minutes > 0) duration += `${minutes}M`;
+  if (seconds > 0 || duration === 'PT') duration += `${seconds}S`;
+  return duration;
+}
+
 interface PageProps {
   readonly params: Promise<{
     username: string;
@@ -164,13 +176,30 @@ export default async function TrackDeepLinkPage({
   const trackUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}/${trackSlug}`;
   const releaseUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}`;
 
-  // MusicRecording structured data with inAlbum reference
-  const musicSchema = {
-    '@context': 'https://schema.org',
+  // Build ListenAction for provider links
+  const listenActions = track.providerLinks
+    .filter(link => link.url)
+    .slice(0, 5)
+    .map(link => ({
+      '@type': 'ListenAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: link.url,
+        actionPlatform: 'https://schema.org/DesktopWebPlatform',
+      },
+    }));
+
+  const durationMs = track.durationMs ?? null;
+  const isrc = track.isrc ?? null;
+  const trackNumber = track.trackNumber ?? null;
+
+  // MusicRecording structured data with enhanced fields
+  const musicSchema: Record<string, unknown> = {
     '@type': 'MusicRecording',
     '@id': `${trackUrl}#track`,
     name: track.title,
     url: trackUrl,
+    isAccessibleForFree: true,
     ...(track.artworkUrl && {
       image: generateArtworkImageObject(track.artworkUrl, {
         title: track.title,
@@ -181,6 +210,12 @@ export default async function TrackDeepLinkPage({
     ...(track.releaseDate && {
       datePublished: toISOStringOrNull(track.releaseDate)?.split('T')[0],
     }),
+    ...(durationMs &&
+      durationMs > 0 && {
+        duration: msToIsoDuration(durationMs),
+      }),
+    ...(isrc && { isrcCode: isrc }),
+    ...(trackNumber != null && { position: trackNumber }),
     byArtist: {
       '@type': 'MusicGroup',
       '@id': `${BASE_URL}/${creator.usernameNormalized}#musicgroup`,
@@ -189,14 +224,15 @@ export default async function TrackDeepLinkPage({
     },
     inAlbum: {
       '@type': 'MusicAlbum',
+      '@id': `${releaseUrl}#release`,
       name: releaseContent.title,
       url: releaseUrl,
     },
     sameAs: track.providerLinks.map(link => link.url),
+    ...(listenActions.length > 0 && { potentialAction: listenActions }),
   };
 
   const breadcrumbSchema = {
-    '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: BASE_URL },
@@ -221,20 +257,18 @@ export default async function TrackDeepLinkPage({
     ],
   };
 
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@graph': [musicSchema, breadcrumbSchema],
+  };
+
   return (
     <>
       <script
         type='application/ld+json'
         // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data, safe-serialized
         dangerouslySetInnerHTML={{
-          __html: safeJsonLdStringify(musicSchema),
-        }}
-      />
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data, safe-serialized
-        dangerouslySetInnerHTML={{
-          __html: safeJsonLdStringify(breadcrumbSchema),
+          __html: safeJsonLdStringify(structuredData),
         }}
       />
 
@@ -320,24 +354,62 @@ export async function generateMetadata({
   const defaultImage = `${BASE_URL}/og/default.png`;
   const ogImageUrl = track.artworkUrl ?? defaultImage;
 
+  const keywords = [
+    track.title,
+    artistName,
+    `${artistName} ${track.title}`,
+    `${track.title} lyrics`,
+    `${track.title} stream`,
+    `${artistName} music`,
+    'stream music',
+    'music links',
+  ];
+
+  const trackDurationMs = track.durationMs ?? null;
+
   return {
     title,
     description,
+    keywords,
+    authors: [{ name: artistName }],
+    creator: artistName,
     metadataBase: new URL(BASE_URL),
     alternates: { canonical: canonicalUrl },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-video-preview': -1,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
     openGraph: {
       type: 'music.song',
       title,
       description,
       url: canonicalUrl,
       siteName: 'Jovie',
+      locale: 'en_US',
       images: ogImageUrl ? [{ url: ogImageUrl }] : [],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
+      creator: '@jovieapp',
+      site: '@jovieapp',
       images: ogImageUrl ? [{ url: ogImageUrl }] : [],
+    },
+    other: {
+      'music:musician': `${BASE_URL}/${creator.usernameNormalized}`,
+      'music:album': `${BASE_URL}/${creator.usernameNormalized}/${slug}`,
+      ...(trackDurationMs &&
+        trackDurationMs > 0 && {
+          'music:duration': String(Math.floor(trackDurationMs / 1000)),
+        }),
     },
   };
 }

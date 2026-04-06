@@ -39,6 +39,8 @@ import {
   getContentBySlug,
   getCreatorByUsername,
   getCreatorPlan,
+  getReleaseTrackList,
+  type SmartLinkCreditGroup,
 } from './_lib/data';
 
 // Use ISR with 5-minute revalidation for smart link pages
@@ -52,8 +54,33 @@ const RELEASE_TYPE_SCHEMA_MAP: Record<string, string> = {
   compilation: 'https://schema.org/CompilationAlbum',
 };
 
+/** Credit role to schema.org property mapping */
+const CREDIT_ROLE_SCHEMA_MAP: Record<string, string> = {
+  producer: 'producer',
+  co_producer: 'producer',
+  composer: 'composer',
+  lyricist: 'lyricist',
+  featured_artist: 'contributor',
+};
+
 /**
- * Generate JSON-LD structured data for music content SEO.
+ * Convert milliseconds to ISO 8601 duration (e.g., PT3M45S).
+ */
+function msToIsoDuration(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  let duration = 'PT';
+  if (hours > 0) duration += `${hours}H`;
+  if (minutes > 0) duration += `${minutes}M`;
+  if (seconds > 0 || duration === 'PT') duration += `${seconds}S`;
+  return duration;
+}
+
+/**
+ * Generate a single @graph JSON-LD for music content SEO.
+ * Includes MusicAlbum/MusicRecording + BreadcrumbList + credits + track list.
  */
 function generateMusicStructuredData(
   content: {
@@ -66,12 +93,19 @@ function generateMusicStructuredData(
     artworkSizes?: Record<string, string> | null;
     releaseType?: string | null;
     totalTracks?: number | null;
+    credits?: SmartLinkCreditGroup[] | null;
   },
   creator: {
     displayName: string | null;
     username: string;
     usernameNormalized: string;
-  }
+  },
+  trackList?: Array<{
+    title: string;
+    slug: string;
+    trackNumber: number;
+    durationMs: number | null;
+  }> | null
 ) {
   const artistName = creator.displayName ?? creator.username;
   const contentUrl = `${BASE_URL}/${creator.usernameNormalized}/${content.slug}`;
@@ -106,12 +140,74 @@ function generateMusicStructuredData(
         : primaryImage;
   }
 
-  const musicSchema = {
-    '@context': 'https://schema.org',
+  // Build ListenAction for provider links
+  const listenActions = content.providerLinks
+    .filter(link => link.url)
+    .slice(0, 5)
+    .map(link => ({
+      '@type': 'ListenAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: link.url,
+        actionPlatform: 'https://schema.org/DesktopWebPlatform',
+      },
+      name: `Listen on ${PROVIDER_CONFIG[link.providerId as ProviderKey]?.label || link.providerId}`,
+    }));
+
+  // Map credits to schema.org Person references
+  const creditProps: Record<string, unknown[]> = {};
+  if (content.credits) {
+    for (const group of content.credits) {
+      const schemaProp = CREDIT_ROLE_SCHEMA_MAP[group.role];
+      if (!schemaProp) continue;
+      if (!creditProps[schemaProp]) creditProps[schemaProp] = [];
+      for (const entry of group.entries) {
+        creditProps[schemaProp].push({
+          '@type': 'Person',
+          name: entry.name,
+          ...(entry.handle && {
+            url: `${BASE_URL}/${entry.handle}`,
+          }),
+        });
+      }
+    }
+  }
+
+  // Flatten single-element credit arrays
+  const flatCredits: Record<string, unknown> = {};
+  for (const [prop, people] of Object.entries(creditProps)) {
+    flatCredits[prop] = people.length === 1 ? people[0] : people;
+  }
+
+  // Build track list for albums
+  let trackListSchema: Record<string, unknown> | undefined;
+  if (content.type === 'release' && trackList && trackList.length > 0) {
+    trackListSchema = {
+      '@type': 'ItemList',
+      numberOfItems: trackList.length,
+      itemListElement: trackList.map(t => ({
+        '@type': 'ListItem',
+        position: t.trackNumber,
+        item: {
+          '@type': 'MusicRecording',
+          name: t.title,
+          url: `${contentUrl}/${t.slug}`,
+          ...(t.durationMs &&
+            t.durationMs > 0 && {
+              duration: msToIsoDuration(t.durationMs),
+            }),
+          byArtist: { '@id': `${artistUrl}#musicgroup` },
+        },
+      })),
+    };
+  }
+
+  const musicSchema: Record<string, unknown> = {
     '@type': schemaType,
     '@id': `${contentUrl}#${content.type}`,
     name: content.title,
     url: contentUrl,
+    isAccessibleForFree: true,
     ...(imageValue && { image: imageValue }),
     ...(content.releaseDate && {
       datePublished: toDateOnlySafe(content.releaseDate),
@@ -133,10 +229,12 @@ function generateMusicStructuredData(
       content.totalTracks > 0 && {
         numTracks: content.totalTracks,
       }),
+    ...flatCredits,
+    ...(trackListSchema && { track: trackListSchema }),
+    ...(listenActions.length > 0 && { potentialAction: listenActions }),
   };
 
   const breadcrumbSchema = {
-    '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
       {
@@ -160,7 +258,10 @@ function generateMusicStructuredData(
     ],
   };
 
-  return { musicSchema, breadcrumbSchema };
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [musicSchema, breadcrumbSchema],
+  };
 }
 
 interface PageProps {
@@ -342,8 +443,14 @@ export default async function ContentSmartLinkPage({
     ? `/${creator.usernameNormalized}/${content.slug}/sounds`
     : null;
 
+  // Fetch track list for release structured data (parallel, non-blocking)
+  const trackList =
+    content.type === 'release' && content.totalTracks && content.totalTracks > 0
+      ? await getReleaseTrackList(content.id).catch(() => null)
+      : null;
+
   // Generate structured data for SEO
-  const { musicSchema, breadcrumbSchema } = generateMusicStructuredData(
+  const structuredData = generateMusicStructuredData(
     {
       type: content.type,
       title: content.title,
@@ -354,8 +461,10 @@ export default async function ContentSmartLinkPage({
       artworkSizes: content.artworkSizes,
       releaseType: content.releaseType,
       totalTracks: content.totalTracks,
+      credits: content.credits,
     },
-    creator
+    creator,
+    trackList
   );
 
   const isUnreleased =
@@ -374,14 +483,7 @@ export default async function ContentSmartLinkPage({
         type='application/ld+json'
         // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data, safe-serialized
         dangerouslySetInnerHTML={{
-          __html: safeJsonLdStringify(musicSchema),
-        }}
-      />
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data, safe-serialized
-        dangerouslySetInnerHTML={{
-          __html: safeJsonLdStringify(breadcrumbSchema),
+          __html: safeJsonLdStringify(structuredData),
         }}
       />
 
@@ -712,7 +814,7 @@ export async function generateMetadata({
       ],
     },
     other: {
-      'music:musician': artistName,
+      'music:musician': `${BASE_URL}/${creator.usernameNormalized}`,
       'music:release_type': content.releaseType ?? content.type,
       ...(content.releaseDate && {
         'music:release_date': toDateOnlySafe(content.releaseDate),

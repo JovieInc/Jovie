@@ -199,6 +199,12 @@ export interface ContentData {
   /** Parent release title — present for tracks, shown as "from [Release]" link */
   releaseTitle?: string | null;
   credits?: SmartLinkCreditGroup[];
+  /** Track duration in milliseconds (from discog_recordings) */
+  durationMs?: number | null;
+  /** ISRC code (from discog_recordings) */
+  isrc?: string | null;
+  /** Track position within the release (from discog_release_tracks) */
+  trackNumber?: number | null;
   creator: {
     id: string;
     displayName: string | null;
@@ -593,6 +599,7 @@ export const getTrackBySlugInRelease = cache(
         recordingId: discogReleaseTracks.recordingId,
         title: discogReleaseTracks.title,
         slug: discogReleaseTracks.slug,
+        trackNumber: discogReleaseTracks.trackNumber,
       })
       .from(discogReleaseTracks)
       .where(
@@ -611,6 +618,8 @@ export const getTrackBySlugInRelease = cache(
             title: discogRecordings.title,
             previewUrl: discogRecordings.previewUrl,
             previewMetadata: discogRecordings.metadata,
+            durationMs: discogRecordings.durationMs,
+            isrc: discogRecordings.isrc,
           })
           .from(discogRecordings)
           .where(eq(discogRecordings.id, releaseTrack.recordingId))
@@ -654,6 +663,9 @@ export const getTrackBySlugInRelease = cache(
         releaseId,
         releaseSlug: releaseData?.slug ?? null,
         releaseTitle: releaseData?.title ?? null,
+        durationMs: recording?.durationMs ?? null,
+        isrc: recording?.isrc ?? null,
+        trackNumber: releaseTrack.trackNumber,
       };
     }
 
@@ -719,6 +731,45 @@ export const getTrackBySlugInRelease = cache(
     }
 
     return null;
+  }
+);
+
+/**
+ * Fetch the track list for a release (for MusicAlbum structured data).
+ * Returns track title, slug, trackNumber, and durationMs.
+ */
+export const getReleaseTrackList = cache(
+  async (
+    releaseId: string
+  ): Promise<
+    Array<{
+      title: string;
+      slug: string;
+      trackNumber: number;
+      durationMs: number | null;
+    }>
+  > => {
+    const rows = await db
+      .select({
+        title: discogReleaseTracks.title,
+        slug: discogReleaseTracks.slug,
+        trackNumber: discogReleaseTracks.trackNumber,
+        durationMs: discogRecordings.durationMs,
+      })
+      .from(discogReleaseTracks)
+      .innerJoin(
+        discogRecordings,
+        eq(discogReleaseTracks.recordingId, discogRecordings.id)
+      )
+      .where(eq(discogReleaseTracks.releaseId, releaseId))
+      .orderBy(discogReleaseTracks.discNumber, discogReleaseTracks.trackNumber);
+
+    return rows.map(row => ({
+      title: row.title ?? '',
+      slug: row.slug ?? '',
+      trackNumber: row.trackNumber,
+      durationMs: row.durationMs,
+    }));
   }
 );
 
