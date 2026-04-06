@@ -150,6 +150,7 @@ function CrossfadeBlock({
           className='transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
           style={{
             opacity: i === activeIndex ? 1 : 0,
+            pointerEvents: i === activeIndex ? 'auto' : 'none',
             gridArea: '1 / 1',
           }}
         >
