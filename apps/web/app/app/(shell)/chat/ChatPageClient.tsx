@@ -34,8 +34,6 @@ import { getHometownFromSettings } from '@/types/db';
 interface ChatPageClientProps {
   readonly conversationId?: string;
   readonly isFirstSession?: boolean;
-  readonly appleMusicConnected?: boolean;
-  readonly appleMusicArtistName?: string | null;
 }
 
 const WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS = [1500, 3000, 5000] as const;
@@ -88,8 +86,6 @@ function ChatTitleBadge({ title }: { readonly title: string }) {
 export function ChatPageClient({
   conversationId,
   isFirstSession = false,
-  appleMusicConnected = false,
-  appleMusicArtistName = null,
 }: ChatPageClientProps) {
   const {
     selectedProfile,
@@ -210,19 +206,13 @@ export function ChatPageClient({
             (profileSettings?.spotifyArtistName as string | null) ?? null,
         },
         appleMusic: {
-          connected: appleMusicConnected,
-          artistName: appleMusicArtistName,
+          connected: Boolean(activeProfile.appleMusicId),
+          artistName:
+            (profileSettings?.appleMusicArtistName as string | null) ?? null,
         },
       },
     });
-  }, [
-    activeProfile,
-    previewLinks,
-    setPreviewData,
-    appleMusicConnected,
-    appleMusicArtistName,
-    shouldHydratePreviewPanel,
-  ]);
+  }, [activeProfile, previewLinks, setPreviewData, shouldHydratePreviewPanel]);
 
   const { copy: copySessionId, isSuccess: sessionIdCopied } = useClipboard({
     onSuccess: () => notifications.success('Session ID copied'),

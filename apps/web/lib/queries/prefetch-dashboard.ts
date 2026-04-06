@@ -1,5 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { loadDspPresenceForProfile } from '@/app/app/(shell)/dashboard/presence/actions';
 import { loadReleaseMatrix } from '@/app/app/(shell)/dashboard/releases/actions';
+import { getTasks } from '@/app/app/(shell)/dashboard/tasks/task-actions';
 import { FREQUENT_CACHE } from './cache-strategies';
 import { createQueryFn, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
@@ -44,12 +46,8 @@ export function prefetchForRoute(
       break;
     case 'presence':
       queryClient.prefetchQuery({
-        queryKey: queryKeys.dspEnrichment.matches(profileId),
-        queryFn: ({ signal }) =>
-          fetchWithTimeout<unknown>(
-            `/api/dsp/matches?profileId=${encodeURIComponent(profileId)}`,
-            { signal }
-          ),
+        queryKey: queryKeys.dspEnrichment.presence(profileId),
+        queryFn: () => loadDspPresenceForProfile(profileId),
         staleTime,
       });
       break;
@@ -57,6 +55,13 @@ export function prefetchForRoute(
       queryClient.prefetchQuery({
         queryKey: queryKeys.earnings.stats(),
         queryFn: fetchEarnings,
+        staleTime,
+      });
+      break;
+    case 'tasks':
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.tasks.list(profileId),
+        queryFn: () => getTasks(),
         staleTime,
       });
       break;

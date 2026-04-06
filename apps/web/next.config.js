@@ -422,6 +422,14 @@ const nextConfig = {
     // cacheComponents: true requires additional configuration, disabled for now
     // Turbopack filesystem cache for faster dev server startup
     turbopackFileSystemCacheForDev: true,
+    // Cache client-side RSC responses to prevent skeleton flashes on navigation.
+    // Next.js 15+ defaults dynamic routes to 0s (always re-fetch), which causes
+    // unnecessary skeleton loaders on every page switch. Mutations that need
+    // immediate RSC refresh can still use router.refresh() selectively.
+    staleTimes: {
+      dynamic: 30, // Cache dynamic RSC responses for 30s
+      static: 300, // Cache static RSC responses for 5 min
+    },
     // Disable optimizeCss to avoid critters dependency issues
     // optimizeCss: true,
     optimizePackageImports: [

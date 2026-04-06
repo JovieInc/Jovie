@@ -10,8 +10,22 @@ const { dashboardQueryMock, getDashboardDataMock } = vi.hoisted(() => ({
   getDashboardDataMock: vi.fn(),
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {},
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: vi.fn().mockResolvedValue({ userId: 'user-abc' }),
+}));
+
+// Mock DB with chainable select for the ownership check
+vi.mock('@/lib/db', () => {
+  const chain: Record<string, unknown> = {};
+  chain.select = vi.fn().mockReturnValue(chain);
+  chain.from = vi.fn().mockReturnValue(chain);
+  chain.where = vi.fn().mockReturnValue(chain);
+  chain.limit = vi.fn().mockResolvedValue([{ id: 'profile-123' }]);
+  return { db: chain };
+});
+
+vi.mock('@/lib/db/schema/profiles', () => ({
+  creatorProfiles: { id: 'id', userId: 'userId' },
 }));
 
 vi.mock('@/lib/db/query-timeout', () => ({

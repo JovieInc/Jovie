@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import type {
@@ -11,6 +11,7 @@ import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { PageShell } from '@/components/organisms/PageShell';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
+import { queryKeys } from '@/lib/queries/keys';
 import { useDspEnrichmentStatusQuery } from '@/lib/queries/useDspEnrichmentStatusQuery';
 import { AddPlatformDialog } from './AddPlatformDialog';
 import { CatalogHealthSection } from './CatalogHealthSection';
@@ -35,16 +36,18 @@ export function DspPresenceView({
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [isAddPlatformDialogOpen, setIsAddPlatformDialogOpen] = useState(false);
   const dashboardData = useDashboardData();
-  const router = useRouter();
+  const queryClient = useQueryClient();
 
   const profileId = dashboardData.selectedProfile?.id ?? '';
   const isAdmin = dashboardData.isAdmin;
   const spotifyId = dashboardData.selectedProfile?.spotifyId ?? null;
 
-  // Poll enrichment status and auto-refresh when discovery completes
+  // Poll enrichment status and invalidate matches cache when discovery completes
   const onDiscoveryComplete = useCallback(() => {
-    router.refresh();
-  }, [router]);
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.dspEnrichment.presence(profileId),
+    });
+  }, [queryClient, profileId]);
 
   const { data: enrichmentStatus } = useDspEnrichmentStatusQuery({
     profileId,
