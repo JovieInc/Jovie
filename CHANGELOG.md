@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.126] - 2026-04-06
+
+### Added
+
+- Hero-style OG images for artist profiles, featuring the artist's actual photo with dark gradient overlay, Jovie branding, and genre tags
+- ProfilePage structured data wrapping MusicGroup for better Google rich results
+- MusicEvent JSON-LD for tour dates (capped at 10) with venue, ticket, and status data for Google Events
+- ListenAction on profiles, releases, and tracks linking to streaming platform URLs
+- Track list schema on release pages (MusicAlbum.track ItemList) for Google track listings
+- Duration (ISO 8601), ISRC codes, and track position in MusicRecording schemas
+- Credits (producer, composer, lyricist) in MusicAlbum structured data
+- Profile avatar images in sitemap entries for Google Image Search
+- Single @graph JSON-LD arrays across all public page types
+- Enhanced meta tags: og:profile:username, geo.placename, music:album, music:duration
+
+### Changed
+
+- Consolidated dual OG image system (file convention replaces /api/og/ route)
+- Profile, release, and track pages now use single @graph JSON-LD instead of separate script tags
+- Track page metadata enriched to match release page quality (keywords, robots, authors)
+
+### Removed
+
+- Dead /api/og/[artistSlug] route (replaced by opengraph-image.tsx file convention)
+- Unused og-image.ts helper and its tests
+
 ## [26.4.125] - 2026-04-05
 
 ### Fixed
