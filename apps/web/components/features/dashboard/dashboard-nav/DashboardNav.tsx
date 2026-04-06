@@ -126,14 +126,16 @@ export function DashboardNav(_: DashboardNavProps) {
           item.id === 'tasks'
             ? {
                 ...item,
-                badge:
-                  isPlanGateLoading ? undefined : canAccessTasksWorkspace ? (
-                    formatTaskBadge(taskStats)
-                  ) : (
+                badge: (() => {
+                  if (isPlanGateLoading) return undefined;
+                  if (canAccessTasksWorkspace)
+                    return formatTaskBadge(taskStats);
+                  return (
                     <span className='rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] px-1.5 py-0.5 text-[9px] font-[600] tracking-[0.02em] text-secondary-token'>
                       Pro
                     </span>
-                  ),
+                  );
+                })(),
               }
             : item
         ),

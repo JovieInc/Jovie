@@ -292,7 +292,7 @@ export const UniversalLinkInput = forwardRef<
       analyserRef.current = null;
       frequencyDataRef.current = null;
       if (audioContextRef.current !== null) {
-        void audioContextRef.current.close();
+        audioContextRef.current.close().catch(() => {});
       }
       audioContextRef.current = null;
       if (animationFrameRef.current !== null) {
@@ -322,6 +322,18 @@ export const UniversalLinkInput = forwardRef<
       analyserRef.current = analyser;
       frequencyDataRef.current = frequencyData;
 
+      const computeBands = (data: Uint8Array) =>
+        Array.from({ length: WAVEFORM_BAND_COUNT }, (_, index) => {
+          const start = Math.floor((index / WAVEFORM_BAND_COUNT) * data.length);
+          const end = Math.floor(
+            ((index + 1) / WAVEFORM_BAND_COUNT) * data.length
+          );
+          const range = data.slice(start, Math.max(end, start + 1));
+          const total = range.reduce((sum, value) => sum + value, 0);
+          const average = total / range.length / 255;
+          return Math.max(MIN_WAVEFORM_LEVEL, average);
+        });
+
       const animate = () => {
         const activeAnalyser = analyserRef.current;
         const activeFrequencyData = frequencyDataRef.current;
@@ -330,25 +342,7 @@ export const UniversalLinkInput = forwardRef<
         }
 
         activeAnalyser.getByteFrequencyData(activeFrequencyData);
-        const bands = Array.from(
-          { length: WAVEFORM_BAND_COUNT },
-          (_, index) => {
-            const start = Math.floor(
-              (index / WAVEFORM_BAND_COUNT) * activeFrequencyData.length
-            );
-            const end = Math.floor(
-              ((index + 1) / WAVEFORM_BAND_COUNT) * activeFrequencyData.length
-            );
-            const range = activeFrequencyData.slice(
-              start,
-              Math.max(end, start + 1)
-            );
-            const total = range.reduce((sum, value) => sum + value, 0);
-            const average = total / range.length / 255;
-            return Math.max(MIN_WAVEFORM_LEVEL, average);
-          }
-        );
-        setWaveformLevels(bands);
+        setWaveformLevels(computeBands(activeFrequencyData));
         animationFrameRef.current = globalThis.requestAnimationFrame(animate);
       };
 
@@ -467,7 +461,7 @@ export const UniversalLinkInput = forwardRef<
         if (!(event.metaKey || event.ctrlKey) || !event.shiftKey) return;
         if (event.key.toLowerCase() !== SHORTCUT_MICROPHONE_KEY) return;
         event.preventDefault();
-        void handleVoiceInput();
+        handleVoiceInput().catch(() => {});
       };
 
       globalThis.window.addEventListener('keydown', onKeyDown);
