@@ -38,11 +38,16 @@ function getTimeLeft(targetDate: Date): TimeLeft {
 
 interface ReleaseCountdownProps {
   readonly releaseDate: Date;
+  /** Compact inline mode: "Drops in 14d 3h 22m" on one line */
+  readonly compact?: boolean;
 }
 
 const UPDATE_INTERVAL_MS = 60_000;
 
-export function ReleaseCountdown({ releaseDate }: ReleaseCountdownProps) {
+export function ReleaseCountdown({
+  releaseDate,
+  compact = false,
+}: ReleaseCountdownProps) {
   const router = useRouter();
   // Initialize with null to avoid hydration mismatch (server/client time differences)
   const [timeLeft, setTimeLeft] = useState<TimeLeft | null>(null);
@@ -76,6 +81,25 @@ export function ReleaseCountdown({ releaseDate }: ReleaseCountdownProps) {
   // Don't render until mounted or if release has passed
   if (!timeLeft || timeLeft.total <= 0) {
     return null;
+  }
+
+  if (compact) {
+    return (
+      <p className='text-center text-xs text-white/50'>
+        <span className='uppercase tracking-widest'>Drops in</span>{' '}
+        {timeLeft.days > 0 && (
+          <span className='font-semibold tabular-nums text-white'>
+            {timeLeft.days}d{' '}
+          </span>
+        )}
+        <span className='font-semibold tabular-nums text-white'>
+          {timeLeft.hours}h{' '}
+        </span>
+        <span className='font-semibold tabular-nums text-white'>
+          {timeLeft.minutes}m
+        </span>
+      </p>
+    );
   }
 
   return (

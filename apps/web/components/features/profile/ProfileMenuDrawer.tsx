@@ -30,6 +30,7 @@ interface ProfileMenuDrawerProps {
   readonly onOpenTip: () => void;
   readonly onOpenContact: () => void;
   readonly onOpenSubscribe: () => void;
+  readonly hasAbout: boolean;
   readonly hasTourDates: boolean;
   readonly hasTip: boolean;
   readonly hasContacts: boolean;
@@ -53,6 +54,7 @@ export function ProfileMenuDrawer({
   onOpenTip,
   onOpenContact,
   onOpenSubscribe,
+  hasAbout,
   hasTourDates,
   hasTip,
   hasContacts,
@@ -99,15 +101,17 @@ export function ProfileMenuDrawer({
             Share Profile
           </button>
 
-          <button
-            type='button'
-            role='menuitem'
-            className={menuItemClass}
-            onClick={() => handleAction(onOpenAbout)}
-          >
-            <Info className={iconClass} />
-            About
-          </button>
+          {hasAbout ? (
+            <button
+              type='button'
+              role='menuitem'
+              className={menuItemClass}
+              onClick={() => handleAction(onOpenAbout)}
+            >
+              <Info className={iconClass} />
+              About
+            </button>
+          ) : null}
 
           {hasTourDates ? (
             <button

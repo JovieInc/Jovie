@@ -139,7 +139,7 @@ function ReleaseDestinationsSection() {
         <div className='mx-auto max-w-[1120px]'>
           <SectionHeader
             eyebrow='Release Destinations'
-            title='Every release gets a clean destination.'
+            title='Share every release. Reach every fan. Automatically.'
             body='Presave before launch. Go live on the same surface when the record drops.'
           />
 

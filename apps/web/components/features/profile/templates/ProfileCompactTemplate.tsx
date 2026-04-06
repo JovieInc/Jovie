@@ -309,6 +309,14 @@ export function ProfileCompactTemplate({
     () => socialLinks.some(link => link.platform === 'venmo'),
     [socialLinks]
   );
+  const hasAbout = Boolean(
+    artist.tagline ||
+      artist.location ||
+      artist.hometown ||
+      artist.active_since_year ||
+      (genres && genres.length > 0) ||
+      (allowPhotoDownloads && pressPhotos.length > 0)
+  );
   const searchSuffix = useMemo(() => {
     if (!initialSource) {
       return '';
@@ -638,6 +646,7 @@ export function ProfileCompactTemplate({
           onOpenTip={() => openDrawerMode('tip')}
           onOpenContact={() => openDrawerMode('contact')}
           onOpenSubscribe={() => openDrawerMode('subscribe')}
+          hasAbout={hasAbout}
           hasTourDates={tourDates.length > 0}
           hasTip={hasTip}
           hasContacts={hasContacts}

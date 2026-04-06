@@ -118,7 +118,7 @@ function SmartLinkClaimBanner({
   const signupUrl = `${APP_ROUTES.SIGNUP}?handle=${encodeURIComponent(username)}&redirect_url=${encodedRedirect}`;
 
   return (
-    <div className='mt-4 rounded-xl bg-surface-1/55 p-3 text-left ring-1 ring-inset ring-white/10 backdrop-blur-sm'>
+    <div className='mt-4 rounded-2xl bg-surface-1/55 p-3 text-left ring-1 ring-inset ring-white/10 backdrop-blur-sm'>
       <div className='flex items-start justify-between gap-3'>
         <div>
           <p className='text-foreground text-xs font-medium'>
@@ -441,7 +441,7 @@ export function ReleaseLandingPage({
         </div>
 
         {fallbackProviders.length > 0 ? (
-          <details className='mt-3 rounded-xl bg-surface-1/35 p-3 ring-1 ring-inset ring-white/[0.08]'>
+          <details className='mt-3 rounded-2xl bg-surface-1/35 p-3 ring-1 ring-inset ring-white/[0.08]'>
             <summary className='cursor-pointer list-none text-left text-xs text-white/70'>
               More ways to verify
             </summary>
@@ -465,7 +465,7 @@ export function ReleaseLandingPage({
         ) : null}
 
         {unverifiedProviders.length > 0 ? (
-          <details className='mt-3 rounded-xl bg-surface-1/35 p-3 ring-1 ring-inset ring-white/[0.08]'>
+          <details className='mt-3 rounded-2xl bg-surface-1/35 p-3 ring-1 ring-inset ring-white/[0.08]'>
             <summary className='cursor-pointer list-none text-left text-xs text-white/70'>
               Unverified DSPs
             </summary>
@@ -492,7 +492,7 @@ export function ReleaseLandingPage({
           <div className='pt-1'>
             <Link
               href={appendUTMParamsToUrl(soundsUrl, utmParams)}
-              className='group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/10 to-violet-500/10 px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-100 hover:from-pink-500/20 hover:to-violet-500/20'
+              className='group flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink-500/10 to-violet-500/10 px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-100 hover:from-pink-500/20 hover:to-violet-500/20'
             >
               <Icon
                 name='Sparkles'
@@ -508,7 +508,7 @@ export function ReleaseLandingPage({
 
         {/* Empty state if no providers */}
         {clickableProviders.length === 0 && (
-          <div className='rounded-xl bg-surface-1/40 p-5 text-center ring-1 ring-inset ring-white/[0.08]'>
+          <div className='rounded-2xl bg-surface-1/40 p-5 text-center ring-1 ring-inset ring-white/[0.08]'>
             <Icon
               name='Music'
               className='text-muted-foreground mx-auto h-8 w-8'
