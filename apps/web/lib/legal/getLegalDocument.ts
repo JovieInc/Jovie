@@ -15,6 +15,10 @@ const LEGAL_DOCS = {
     title: 'Cookie Policy',
     file: path.join('legal', 'cookies.md'),
   },
+  dmca: {
+    title: 'DMCA Policy',
+    file: path.join('legal', 'dmca.md'),
+  },
 } as const;
 
 export type LegalDocumentSlug = keyof typeof LEGAL_DOCS;
