@@ -123,9 +123,8 @@ function TableFilterSection<T extends string>({
               key={option.id}
               label={option.label}
               icon={
-                option.leadingVisual ? (
-                  option.leadingVisual
-                ) : option.iconName ? (
+                option.leadingVisual ??
+                (option.iconName ? (
                   <Icon
                     name={option.iconName}
                     className={cn(
@@ -133,7 +132,7 @@ function TableFilterSection<T extends string>({
                       option.iconClassName
                     )}
                   />
-                ) : undefined
+                ) : undefined)
               }
               count={option.count}
               checked={category.selectedIds.includes(option.id)}
