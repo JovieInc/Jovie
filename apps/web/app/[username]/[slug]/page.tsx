@@ -32,7 +32,11 @@ import type { ProviderKey } from '@/lib/discography/types';
 import { isVideoProviderKey } from '@/lib/discography/video-providers';
 import { generateArtworkImageObject } from '@/lib/images/seo';
 import { trackServerEvent } from '@/lib/server-analytics';
-import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
+import {
+  msToIsoDuration,
+  toDateOnlySafe,
+  toISOStringOrNull,
+} from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
 import {
@@ -62,21 +66,6 @@ const CREDIT_ROLE_SCHEMA_MAP: Record<string, string> = {
   lyricist: 'lyricist',
   featured_artist: 'contributor',
 };
-
-/**
- * Convert milliseconds to ISO 8601 duration (e.g., PT3M45S).
- */
-function msToIsoDuration(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  let duration = 'PT';
-  if (hours > 0) duration += `${hours}H`;
-  if (minutes > 0) duration += `${minutes}M`;
-  if (seconds > 0 || duration === 'PT') duration += `${seconds}S`;
-  return duration;
-}
 
 /**
  * Generate a single @graph JSON-LD for music content SEO.
@@ -443,7 +432,7 @@ export default async function ContentSmartLinkPage({
     ? `/${creator.usernameNormalized}/${content.slug}/sounds`
     : null;
 
-  // Fetch track list for release structured data (parallel, non-blocking)
+  // Fetch track list for release structured data (errors silently ignored)
   const trackList =
     content.type === 'release' && content.totalTracks && content.totalTracks > 0
       ? await getReleaseTrackList(content.id).catch(() => null)

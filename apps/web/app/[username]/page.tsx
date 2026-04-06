@@ -48,21 +48,6 @@ import type { PressPhoto } from '@/types/press-photos';
 const MAX_EVENT_SCHEMAS = 10;
 
 /**
- * Convert milliseconds to ISO 8601 duration (e.g., PT3M45S).
- */
-export function msToIsoDuration(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  let duration = 'PT';
-  if (hours > 0) duration += `${hours}H`;
-  if (minutes > 0) duration += `${minutes}M`;
-  if (seconds > 0 || duration === 'PT') duration += `${seconds}S`;
-  return duration;
-}
-
-/**
  * Map ticketStatus enum to schema.org Event properties.
  */
 function mapTicketStatus(status: string): {
@@ -236,11 +221,6 @@ function generateProfileStructuredData(
       performer: { '@id': `${profileUrl}#musicgroup` },
       eventStatus,
       eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
-      organizer: {
-        '@type': 'Organization',
-        name: 'Jovie',
-        url: BASE_URL,
-      },
     };
 
     if (td.ticketUrl && availability) {
@@ -729,7 +709,10 @@ function buildProfileDescription(
     return `${bioSnippet}${suffix}${genreSuffix}. Stream on Spotify, Apple Music & more on Jovie.`;
   }
 
-  return `${locationPrefix}${genreText}artist. Stream ${artistName}'s music on Spotify, Apple Music & more on Jovie.`;
+  const descriptor = `${locationPrefix}${genreText}`.trim();
+  return descriptor
+    ? `${descriptor} artist. Stream ${artistName}'s music on Spotify, Apple Music & more on Jovie.`
+    : `Stream ${artistName}'s music on Spotify, Apple Music & more on Jovie.`;
 }
 
 function buildProfileMetadata(
@@ -793,15 +776,11 @@ function buildProfileMetadata(
       site: '@jovieapp',
     },
     other: {
-      'music:musician': artistName,
-      'og:profile:username': profile.username,
-      ...(genres &&
-        genres.length > 0 && {
-          'music:genre': genres.slice(0, 3).join(', '),
-        }),
+      // Note: OG-namespace tags (music:*, profile:*) require property= semantics
+      // which metadata.other cannot provide (it renders name=). These signals are
+      // covered by JSON-LD structured data instead. Only non-OG tags go here.
       ...(profile.is_verified && { 'profile:verified': 'true' }),
       ...(profile.location && { 'geo.placename': profile.location }),
-      ...(latestRelease?.title && { 'music:song': latestRelease.title }),
     },
   };
 }

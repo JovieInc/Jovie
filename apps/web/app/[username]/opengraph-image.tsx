@@ -3,6 +3,7 @@ import { BASE_URL } from '@/constants/app';
 import { getProfileWithLinks } from '@/lib/services/profile';
 
 export const runtime = 'edge';
+export const revalidate = 900; // 15 min — matches previous Cache-Control max-age
 
 export const alt = 'Jovie artist profile';
 export const size = {
@@ -26,6 +27,12 @@ async function toDataUrl(imageUrl: string): Promise<string | null> {
 
     const contentType = response.headers.get('content-type') ?? '';
     if (!contentType.startsWith('image/')) return null;
+
+    // Limit to 2MB to avoid memory pressure in edge runtime
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > 2 * 1024 * 1024) {
+      return null;
+    }
 
     const arrayBuffer = await response.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);

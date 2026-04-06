@@ -19,7 +19,7 @@ import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
 import { generateArtworkImageObject } from '@/lib/images/seo';
 import { trackServerEvent } from '@/lib/server-analytics';
-import { toISOStringOrNull } from '@/lib/utils/date';
+import { msToIsoDuration, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
 import {
@@ -30,18 +30,6 @@ import {
 } from '../_lib/data';
 
 export const revalidate = 300;
-
-function msToIsoDuration(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  let duration = 'PT';
-  if (hours > 0) duration += `${hours}H`;
-  if (minutes > 0) duration += `${minutes}M`;
-  if (seconds > 0 || duration === 'PT') duration += `${seconds}S`;
-  return duration;
-}
 
 interface PageProps {
   readonly params: Promise<{
