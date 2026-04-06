@@ -110,33 +110,37 @@ function renderToolCard(
     );
   }
 
-  if (toolInvocation.toolName === 'generateReleasePitch') {
-    if (toolInvocation.state === 'call') {
-      return <ChatPitchCard state='loading' />;
-    }
+  if (
+    toolInvocation.toolName === 'generateReleasePitch' &&
+    toolInvocation.state === 'call'
+  ) {
+    return <ChatPitchCard state='loading' />;
+  }
 
-    if (toolInvocation.state === 'result') {
-      const result = toolInvocation.result as {
-        success: boolean;
-        releaseTitle?: string;
-        pitches?: {
-          spotify: string;
-          appleMusic: string;
-          amazon: string;
-          generic: string;
-        };
-        error?: string;
+  if (
+    toolInvocation.toolName === 'generateReleasePitch' &&
+    toolInvocation.state === 'result'
+  ) {
+    const result = toolInvocation.result as {
+      success: boolean;
+      releaseTitle?: string;
+      pitches?: {
+        spotify: string;
+        appleMusic: string;
+        amazon: string;
+        generic: string;
       };
+      error?: string;
+    };
 
-      return (
-        <ChatPitchCard
-          state={result.success ? 'success' : 'error'}
-          releaseTitle={result.releaseTitle}
-          pitches={result.pitches}
-          error={result.error}
-        />
-      );
-    }
+    return (
+      <ChatPitchCard
+        state={result.success ? 'success' : 'error'}
+        releaseTitle={result.releaseTitle}
+        pitches={result.pitches}
+        error={result.error}
+      />
+    );
   }
 
   return null;
