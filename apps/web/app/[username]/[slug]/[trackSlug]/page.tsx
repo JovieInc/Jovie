@@ -11,6 +11,7 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { BASE_URL } from '@/constants/app';
+import { buildListenActions } from '@/lib/constants/schemas';
 import {
   derivePreviewState,
   getProviderConfidence,
@@ -164,18 +165,7 @@ export default async function TrackDeepLinkPage({
   const trackUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}/${trackSlug}`;
   const releaseUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}`;
 
-  // Build ListenAction for provider links
-  const listenActions = track.providerLinks
-    .filter(link => link.url)
-    .slice(0, 5)
-    .map(link => ({
-      '@type': 'ListenAction',
-      target: {
-        '@type': 'EntryPoint',
-        urlTemplate: link.url,
-        actionPlatform: 'https://schema.org/DesktopWebPlatform',
-      },
-    }));
+  const listenActions = buildListenActions(track.providerLinks);
 
   const durationMs = track.durationMs ?? null;
   const isrc = track.isrc ?? null;
@@ -252,13 +242,9 @@ export default async function TrackDeepLinkPage({
 
   return (
     <>
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data, safe-serialized
-        dangerouslySetInnerHTML={{
-          __html: safeJsonLdStringify(structuredData),
-        }}
-      />
+      <script type='application/ld+json'>
+        {safeJsonLdStringify(structuredData)}
+      </script>
 
       <ReleaseLandingPage
         release={{

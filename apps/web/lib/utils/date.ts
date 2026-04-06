@@ -51,6 +51,9 @@ export function toISOStringOrFallback(
  * Convert milliseconds to ISO 8601 duration (e.g., PT3M45S).
  */
 export function msToIsoDuration(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) {
+    return 'PT0S';
+  }
   const totalSeconds = Math.floor(ms / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);

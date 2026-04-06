@@ -21,6 +21,7 @@ async function toDataUrl(imageUrl: string): Promise<string | null> {
     const response = await fetch(imageUrl, {
       headers: { Accept: 'image/*' },
       cache: 'force-cache',
+      signal: AbortSignal.timeout(3000),
     });
 
     if (!response.ok) return null;

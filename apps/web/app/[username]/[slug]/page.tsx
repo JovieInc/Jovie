@@ -19,6 +19,7 @@ import {
   ScheduledReleasePage,
   UnreleasedReleaseHero,
 } from '@/features/release';
+import { buildListenActions } from '@/lib/constants/schemas';
 import {
   derivePreviewState,
   getProviderConfidence,
@@ -129,19 +130,10 @@ function generateMusicStructuredData(
         : primaryImage;
   }
 
-  // Build ListenAction for provider links
-  const listenActions = content.providerLinks
-    .filter(link => link.url)
-    .slice(0, 5)
-    .map(link => ({
-      '@type': 'ListenAction',
-      target: {
-        '@type': 'EntryPoint',
-        urlTemplate: link.url,
-        actionPlatform: 'https://schema.org/DesktopWebPlatform',
-      },
-      name: `Listen on ${PROVIDER_CONFIG[link.providerId as ProviderKey]?.label || link.providerId}`,
-    }));
+  const listenActions = buildListenActions(
+    content.providerLinks,
+    PROVIDER_CONFIG as Record<string, { label: string }>
+  );
 
   // Map credits to schema.org Person references
   const creditProps: Record<string, unknown[]> = {};
@@ -174,9 +166,9 @@ function generateMusicStructuredData(
     trackListSchema = {
       '@type': 'ItemList',
       numberOfItems: trackList.length,
-      itemListElement: trackList.map(t => ({
+      itemListElement: trackList.map((t, index) => ({
         '@type': 'ListItem',
-        position: t.trackNumber,
+        position: index + 1,
         item: {
           '@type': 'MusicRecording',
           name: t.title,
@@ -468,13 +460,9 @@ export default async function ContentSmartLinkPage({
 
   return (
     <>
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data, safe-serialized
-        dangerouslySetInnerHTML={{
-          __html: safeJsonLdStringify(structuredData),
-        }}
-      />
+      <script type='application/ld+json'>
+        {safeJsonLdStringify(structuredData)}
+      </script>
 
       {/* Client-side auto-redirect to preferred DSP (preserves ISR caching) */}
       {!isUnreleased && noredirect !== '1' && (

@@ -208,6 +208,30 @@ export function buildPersonSchema(overrides: {
   });
 }
 
+/**
+ * Build ListenAction entries for provider links.
+ * Shared across release and track pages to avoid duplication.
+ */
+export function buildListenActions(
+  providerLinks: Array<{ providerId: string; url: string }>,
+  providerLabels?: Record<string, { label: string }>
+): Array<Record<string, unknown>> {
+  return providerLinks
+    .filter(link => link.url)
+    .slice(0, 5)
+    .map(link => ({
+      '@type': 'ListenAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: link.url,
+        actionPlatform: 'https://schema.org/DesktopWebPlatform',
+      },
+      ...(providerLabels?.[link.providerId]?.label && {
+        name: `Listen on ${providerLabels[link.providerId].label}`,
+      }),
+    }));
+}
+
 /** Build a BreadcrumbList schema */
 export function buildBreadcrumbSchema(
   items: Array<{ name: string; url: string }>

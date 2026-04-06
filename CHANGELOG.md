@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.126] - 2026-04-06
 
+> World-class SEO for public profiles, releases, and tracks. Hero-style OG images with artist photos, single @graph JSON-LD with ProfilePage/MusicGroup/MusicEvent/MusicAlbum/MusicRecording schemas, and Google Events integration for tour dates.
+
 ### Added
 
 - Hero-style OG images for artist profiles, featuring the artist's actual photo with dark gradient overlay, Jovie branding, and genre tags

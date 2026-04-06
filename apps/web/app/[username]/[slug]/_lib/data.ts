@@ -764,12 +764,14 @@ export const getReleaseTrackList = cache(
       .where(eq(discogReleaseTracks.releaseId, releaseId))
       .orderBy(discogReleaseTracks.discNumber, discogReleaseTracks.trackNumber);
 
-    return rows.map(row => ({
-      title: row.title ?? '',
-      slug: row.slug ?? '',
-      trackNumber: row.trackNumber,
-      durationMs: row.durationMs,
-    }));
+    return rows
+      .filter(row => row.slug)
+      .map(row => ({
+        title: row.title ?? '',
+        slug: row.slug!,
+        trackNumber: row.trackNumber,
+        durationMs: row.durationMs,
+      }));
   }
 );
 
