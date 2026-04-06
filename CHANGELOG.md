@@ -18,6 +18,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.124] - 2026-04-05
 
+> Admin table search now filters instantly on the client, eliminating server round-trips and skeleton loaders. Keyboard navigation is unified across all tables via a single shared key map.
+
 ### Changed
 
 - Table search now filters instantly on the client instead of round-tripping to the server with skeleton loaders
