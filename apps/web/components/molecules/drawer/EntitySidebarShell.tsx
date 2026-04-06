@@ -129,7 +129,7 @@ export function EntitySidebarShell({
     isMinimalHeader && !isEmpty && entityHeader ? (
       <DrawerSurfaceCard
         testId='entity-sidebar-entity-header'
-        variant='card'
+        variant='flat'
         className='overflow-hidden lg:mx-0 lg:mt-0'
       >
         {entityHeader}
