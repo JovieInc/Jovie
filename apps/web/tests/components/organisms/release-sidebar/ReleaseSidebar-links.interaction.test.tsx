@@ -196,14 +196,12 @@ vi.mock('@/components/molecules/drawer', () => ({
     children,
     tabs,
     testId,
-    surfaceVariant,
   }: {
     children?: React.ReactNode;
     tabs?: React.ReactNode;
     testId?: string;
-    surfaceVariant?: 'card';
   }) => (
-    <div data-testid={testId} data-surface-variant={surfaceVariant}>
+    <div data-testid={testId}>
       {tabs}
       {children}
     </div>
@@ -478,10 +476,8 @@ describe('ReleaseSidebar Links tab', () => {
       'data-surface-variant',
       'card'
     );
-    expect(screen.getByTestId('release-tabbed-card')).toHaveAttribute(
-      'data-surface-variant',
-      'card'
-    );
+    // DrawerTabbedCard always renders as card variant (no configurable prop)
+    expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
   });
 
   it('preserves active tab when release changes', async () => {

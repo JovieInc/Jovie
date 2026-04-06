@@ -375,7 +375,6 @@ export function TrackSidebar({
       {track ? (
         <DrawerTabbedCard
           testId='track-tabbed-card'
-          surfaceVariant='card'
           tabs={
             <DrawerTabs
               value={activeTab}
@@ -389,7 +388,7 @@ export function TrackSidebar({
           contentClassName='pt-2'
         >
           {activeTab === 'playback' ? (
-            <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+            <DrawerSurfaceCard variant='flat' className='overflow-hidden'>
               <div className='space-y-3 p-2.5'>
                 <div className='flex items-start gap-2.5'>
                   <DrawerMediaThumb

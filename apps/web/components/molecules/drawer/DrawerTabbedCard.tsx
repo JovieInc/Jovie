@@ -12,7 +12,6 @@ export interface DrawerTabbedCardProps {
   readonly tabsContainerClassName?: string;
   readonly contentClassName?: string;
   readonly testId?: string;
-  readonly surfaceVariant?: 'card';
 }
 
 export function DrawerTabbedCard({
@@ -23,11 +22,10 @@ export function DrawerTabbedCard({
   tabsContainerClassName,
   contentClassName,
   testId,
-  surfaceVariant = 'card',
 }: DrawerTabbedCardProps) {
   return (
     <DrawerSurfaceCard
-      variant={surfaceVariant}
+      variant='card'
       className={cn(
         'flex h-full min-h-0 flex-col overflow-hidden',
         'p-2.5',

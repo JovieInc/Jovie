@@ -302,7 +302,6 @@ export function DemoAnalyticsSidebar({
         {/* Ranked lists */}
         <DrawerTabbedCard
           testId='demo-analytics-tabbed-card'
-          surfaceVariant='card'
           tabs={
             <DrawerTabs
               value={activeTab}

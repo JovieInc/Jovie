@@ -265,7 +265,7 @@ function ReleaseSettingsCard({
 }) {
   return (
     <DrawerSurfaceCard
-      variant='card'
+      variant='flat'
       className='overflow-hidden'
       testId='release-settings-card'
     >
@@ -645,7 +645,6 @@ export function ReleaseSidebar({
           <div className='min-h-0 flex-1'>
             <DrawerTabbedCard
               testId='release-tabbed-card'
-              surfaceVariant='card'
               tabs={
                 <DrawerTabs
                   value={activeTab}

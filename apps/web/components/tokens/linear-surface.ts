@@ -22,8 +22,8 @@ export const LINEAR_SURFACE = {
   drawerCard: 'rounded-[10px] border border-subtle bg-surface-1 shadow-card',
   drawerCardSm: 'rounded-[10px] border border-subtle bg-surface-1 shadow-card',
   sidebarCard: 'rounded-[10px] border border-subtle bg-surface-1 shadow-card',
-  bannerCard: 'rounded-xl border border-subtle bg-surface-1 shadow-none',
-  dialogCard: 'rounded-xl border border-subtle bg-surface-1 shadow-none',
+  bannerCard: 'rounded-xl border border-subtle bg-surface-1 shadow-card',
+  dialogCard: 'rounded-xl border border-subtle bg-surface-1 shadow-card',
 
   // Tier 3 — floating UI (popovers, dropdowns)
   popover:

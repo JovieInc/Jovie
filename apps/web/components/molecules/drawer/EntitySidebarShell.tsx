@@ -150,7 +150,7 @@ export function EntitySidebarShell({
             variant='card'
             className='overflow-hidden lg:rounded-[18px]'
           >
-            <div className='border-b border-transparent bg-transparent'>
+            <div className='border-b border-transparent bg-transparent backdrop-blur-[12px]'>
               {showMinimalHeaderBar ? (
                 <DrawerHeader
                   title={resolvedHeaderTitle}

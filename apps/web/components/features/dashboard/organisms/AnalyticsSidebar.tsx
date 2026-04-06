@@ -323,7 +323,6 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
         </DrawerStatGrid>
         <DrawerTabbedCard
           testId='analytics-sidebar-tabbed-card'
-          surfaceVariant='card'
           tabs={
             <DrawerTabs
               value={activeTab}
