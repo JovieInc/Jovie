@@ -330,7 +330,6 @@ export function TrackSidebar({
       title={track?.title ?? 'No track selected'}
       onClose={onClose}
       headerMode='minimal'
-      surfaceTone='quiet'
       headerActions={
         <DrawerHeaderActions
           primaryActions={[]}
@@ -376,7 +375,6 @@ export function TrackSidebar({
       {track ? (
         <DrawerTabbedCard
           testId='track-tabbed-card'
-          surfaceVariant='quiet'
           tabs={
             <DrawerTabs
               value={activeTab}
@@ -390,7 +388,7 @@ export function TrackSidebar({
           contentClassName='pt-2'
         >
           {activeTab === 'playback' ? (
-            <DrawerSurfaceCard variant='quiet' className='overflow-hidden'>
+            <DrawerSurfaceCard variant='flat' className='overflow-hidden'>
               <div className='space-y-3 p-2.5'>
                 <div className='flex items-start gap-2.5'>
                   <DrawerMediaThumb
