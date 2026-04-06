@@ -104,17 +104,15 @@ export function SettingsTipsSection() {
         title='Tips'
         description='Let fans support you directly from your profile.'
       >
-        {isLoading || !summary ? (
-          isError ? (
-            <ErrorState
-              onRetry={() => {
-                refetch();
-              }}
-            />
-          ) : (
-            <LoadingState />
-          )
-        ) : (
+        {isError && (
+          <ErrorState
+            onRetry={() => {
+              refetch();
+            }}
+          />
+        )}
+        {!isError && (isLoading || !summary) && <LoadingState />}
+        {!isError && !isLoading && summary && (
           <ProfileTipsSurface
             summary={summary}
             variant='settings'

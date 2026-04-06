@@ -329,9 +329,10 @@ export function calculateFitScore(input: FitScoreInput): FitScoreResult {
 
   // 8. Alternative DSP presence (+10) - helps non-Spotify profiles score higher
   // Only awarded if no Spotify to avoid double-counting
-  const alternativePlatforms: string[] = [];
-  if (input.hasAppleMusicId) alternativePlatforms.push('apple_music');
-  if (input.hasSoundCloudId) alternativePlatforms.push('soundcloud');
+  const alternativePlatforms = [
+    input.hasAppleMusicId && 'apple_music',
+    input.hasSoundCloudId && 'soundcloud',
+  ].filter(Boolean) as string[];
 
   if (!input.hasSpotifyId && alternativePlatforms.length > 0) {
     breakdown.hasAlternativeDsp = SCORE_WEIGHTS.HAS_ALTERNATIVE_DSP;
@@ -363,9 +364,9 @@ export function calculateFitScore(input: FitScoreInput): FitScoreResult {
   // 12. SoundCloud Pro subscription (+10) - music-specific paid signal, stronger than social verification
   if (input.hasSoundCloudPro) {
     breakdown.soundcloudPro = SCORE_WEIGHTS.SOUNDCLOUD_PRO;
-    if (input.soundCloudProTier) {
-      breakdown.meta!.soundcloudProTier = input.soundCloudProTier;
-    }
+  }
+  if (input.hasSoundCloudPro && input.soundCloudProTier) {
+    breakdown.meta!.soundcloudProTier = input.soundCloudProTier;
   }
 
   // 13. Has tracking pixels on link-in-bio (+5) - signals active ad spend
