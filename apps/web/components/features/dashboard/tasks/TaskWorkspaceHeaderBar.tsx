@@ -60,7 +60,7 @@ export function TaskWorkspaceHeaderBar({
       className='flex h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)] items-center justify-between gap-3 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-app-header'
     >
       <div className='min-w-0 flex-1'>
-        {mode === 'search' ? (
+        {mode === 'search' && (
           <AppSearchField
             value={search}
             onChange={onSearchChange}
@@ -71,7 +71,8 @@ export function TaskWorkspaceHeaderBar({
             className='h-8 max-w-[28rem] bg-transparent'
             inputClassName='text-[12px]'
           />
-        ) : mode === 'create' ? (
+        )}
+        {mode === 'create' && (
           <form
             id={createFormId}
             onSubmit={onSubmitCreate}
@@ -86,7 +87,8 @@ export function TaskWorkspaceHeaderBar({
               className='h-8 max-w-[32rem] min-w-0'
             />
           </form>
-        ) : (
+        )}
+        {mode !== 'search' && mode !== 'create' && (
           <div className='flex h-full items-center pl-1.5'>
             <span className='text-[10.5px] font-[560] text-tertiary-token'>
               {taskCount === 1 ? '1 Task' : `${taskCount} Tasks`}
