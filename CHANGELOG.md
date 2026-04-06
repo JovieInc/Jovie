@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.126] - 2026-04-05
+
+### Changed
+
+- Dashboard pages (Presence, Releases) now render instantly from cache on navigation instead of showing skeleton loaders every time
+- Chat page no longer makes two extra server calls per conversation switch (dashboard data + Apple Music check removed)
+- Confirm/reject actions on DSP matches refresh the presence list via cache invalidation instead of full page reload
+
+### Fixed
+
+- Apple Music connection status now shows correctly in the chat preview panel (was always showing disconnected)
+- Error states properly display when dashboard data or query data fails to load
+
+### Added
+
+- Profile ownership verification on DSP presence data queries (security hardening)
+- Server-side prefetch for tasks route on nav hover
+
 ## [26.4.125] - 2026-04-05
 
 ### Fixed
