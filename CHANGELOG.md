@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.126] - 2026-04-06
+
+### Fixed
+
+- Presence page now shows error state when dashboard data fails to load instead of a blank screen
+- Releases page now shows error state when query fails instead of a blank screen
+
 ## [26.4.125] - 2026-04-05
 
 ### Fixed
