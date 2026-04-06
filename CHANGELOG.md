@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.129] - 2026-04-06
+
+> Tighten Lighthouse and Playwright performance budgets for public profiles and onboarding to Gmail-rule targets. Convert 2 presentational components to server components for reduced JS bundle.
+
+### Changed
+
+- Profile route Lighthouse budgets tightened: FCP 800ms, LCP 1500ms, TBT 100ms, CLS 0.05, perf score 0.95 (as `warn`, promote to `error` after stability)
+- Onboarding route Lighthouse budgets tightened: FCP 1000ms, LCP 1500ms, TBT 200ms, CLS 0.05, perf score 0.90
+- Profile Playwright budgets tightened in both `performance-budgets.config.js` and `performance-route-manifest.ts`
+- Lighthouse CI now runs 3 passes (was 1) for more stable measurements
+- Added `/tim` profile page to Lighthouse CI URL collection
+
+### Fixed
+
+- `ProfileFeaturedCard` and `ProfileViewportShell` converted from client to server components (reduced profile JS bundle)
+
 ## [26.4.128] - 2026-04-06
 
 > Remove visual borders from sidebar edge, right drawer seam, and audience filter pill group for a cleaner dashboard layout.

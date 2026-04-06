@@ -41,13 +41,13 @@ module.exports = {
     {
       path: '/[username]',
       timings: [
-        // Dynamic profile page - has database queries but should be cached
-        { metric: 'first-contentful-paint', budget: 3000 },
-        { metric: 'largest-contentful-paint', budget: 3500 },
-        { metric: 'cumulative-layout-shift', budget: 0.1 },
+        // Gmail rule targets: 100ms perceived, 500ms hard budget
+        { metric: 'first-contentful-paint', budget: 800 },
+        { metric: 'largest-contentful-paint', budget: 1500 },
+        { metric: 'cumulative-layout-shift', budget: 0.05 },
         { metric: 'first-input-delay', budget: 100 },
-        // Higher TTFB budget for dynamic pages (DB queries on cache miss)
-        { metric: 'time-to-first-byte', budget: 2500 },
+        // Real-world TTFB is 80-150ms with Redis cache; budget includes Playwright overhead
+        { metric: 'time-to-first-byte', budget: 200 },
       ],
       resourceSizes: [
         { resourceType: 'script', budget: 1050 },

@@ -229,11 +229,12 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
-      { metric: 'first-contentful-paint', budget: 3000 },
-      { metric: 'largest-contentful-paint', budget: 3500 },
-      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      // Gmail rule targets: 100ms perceived, 500ms hard budget
+      { metric: 'first-contentful-paint', budget: 800 },
+      { metric: 'largest-contentful-paint', budget: 1500 },
+      { metric: 'cumulative-layout-shift', budget: 0.05 },
       { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 2500 },
+      { metric: 'time-to-first-byte', budget: 200 },
     ],
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
     priority: 1,
