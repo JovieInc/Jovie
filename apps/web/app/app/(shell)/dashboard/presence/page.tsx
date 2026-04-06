@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { captureError } from '@/lib/error-tracking';
 import { queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
@@ -26,7 +28,18 @@ export default async function PresencePage() {
 
   const dashboardData = await getDashboardShellData(userId);
 
-  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
+  if (dashboardData.dashboardLoadError) {
+    void captureError(
+      'Dashboard data load failed on presence page',
+      dashboardData.dashboardLoadError,
+      { route: APP_ROUTES.PRESENCE }
+    );
+    return (
+      <PageErrorState message='Failed to load presence data. Please refresh the page.' />
+    );
+  }
+
+  if (dashboardData.needsOnboarding) {
     redirect(APP_ROUTES.ONBOARDING);
   }
 

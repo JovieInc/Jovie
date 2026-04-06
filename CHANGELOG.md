@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.126] - 2026-04-05
+## [26.4.126] - 2026-04-06
 
 ### Changed
 
@@ -15,6 +15,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Removed all `color-mix()` surface background formulas from drawer and shell components
 - Removed `surfaceTone` quiet variant — all drawer content uses consistent Tier 2 card treatment
 - Fixed dark mode surface-1 token value in DESIGN.md (#1c1c1f → #17171a to match linear-tokens.css)
+
+### Fixed
+
+- Presence page now shows error state when dashboard data fails to load instead of a blank screen
+- Releases page now shows error state when query fails instead of a blank screen
 
 ### Removed
 
@@ -34,6 +39,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Upgraded gstack tooling to v0.15.11.0
 
 ## [26.4.124] - 2026-04-05
+
+> Admin table search now filters instantly on the client, eliminating server round-trips and skeleton loaders. Keyboard navigation is unified across all tables via a single shared key map.
 
 ### Changed
 
