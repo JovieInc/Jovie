@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.128] - 2026-04-06
+
+> Remove visual borders from sidebar edge, right drawer seam, and audience filter pill group for a cleaner dashboard layout.
+
+### Fixed
+
+- Sidebar no longer shows a visible right border against the main content area
+- Right drawer entity card no longer has a left border line
+- Audience filter pills (All/Identified/Anonymous) no longer wrapped in a bordered container
+
 ## [26.4.127] - 2026-04-06
 
 > Unified drawer and shell surfaces into a strict three-tier elevation model for consistent visual hierarchy. Right-drawer behavior now matches desktop/mobile layering expectations. Surface token docs corrected for dark mode parity.
