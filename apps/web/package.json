@@ -158,7 +158,7 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sentry/nextjs": "^10.46.0",
-    "@tanstack/react-pacer": "^0.21.0",
+    "@tanstack/react-pacer": "^0.21.1",
     "@tanstack/react-query": "^5.95.2",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.23",
