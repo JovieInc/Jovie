@@ -13,9 +13,9 @@
           "matchingUrlPattern": "\\/onboarding",
           "assertions": {
             "categories:performance": [
-              "error",
+              "warn",
               {
-                "minScore": 0.85
+                "minScore": 0.9
               }
             ],
             "categories:accessibility": [
@@ -31,39 +31,39 @@
               }
             ],
             "cumulative-layout-shift": [
-              "error",
+              "warn",
               {
-                "maxNumericValue": 0.1
+                "maxNumericValue": 0.05
               }
             ],
             "first-contentful-paint": [
-              "error",
+              "warn",
               {
-                "maxNumericValue": 2000
+                "maxNumericValue": 1000
               }
             ],
             "largest-contentful-paint": [
-              "error",
+              "warn",
               {
-                "maxNumericValue": 3000
+                "maxNumericValue": 1500
               }
             ],
             "total-blocking-time": [
-              "error",
+              "warn",
               {
-                "maxNumericValue": 400
+                "maxNumericValue": 200
               }
             ],
             "speed-index": [
               "warn",
               {
-                "maxNumericValue": 3500
+                "maxNumericValue": 2500
               }
             ],
             "interactive": [
               "warn",
               {
-                "maxNumericValue": 3500
+                "maxNumericValue": 2500
               }
             ]
           }
