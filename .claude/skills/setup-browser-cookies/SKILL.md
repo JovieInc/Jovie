@@ -1,1 +1,1 @@
-/Users/timwhite/conductor/workspaces/jovie/singapore/.claude/skills/gstack/setup-browser-cookies/SKILL.md
+/Users/timwhite/conductor/workspaces/jovie/gwangju/.claude/skills/gstack/setup-browser-cookies/SKILL.md

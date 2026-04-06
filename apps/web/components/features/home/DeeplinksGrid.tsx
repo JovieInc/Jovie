@@ -136,16 +136,16 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
 
 function CrossfadeBlock({
   activeIndex,
-  children,
+  items,
 }: {
   readonly activeIndex: number;
-  readonly children: React.ReactNode[];
+  readonly items: readonly { id: string; content: React.ReactNode }[];
 }) {
   return (
     <div className='grid'>
-      {children.map((child, i) => (
+      {items.map((item, i) => (
         <div
-          key={`${i}-${activeIndex}`}
+          key={item.id}
           aria-hidden={i !== activeIndex}
           className='transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
           style={{
@@ -153,7 +153,7 @@ function CrossfadeBlock({
             gridArea: '1 / 1',
           }}
         >
-          {child}
+          {item.content}
         </div>
       ))}
     </div>
@@ -221,27 +221,27 @@ export function DeeplinksGrid() {
 
   const headlines = useMemo(
     () =>
-      MODES.map(mode => (
-        <h3
-          key={mode.id}
-          className='text-xl font-[590] leading-snug tracking-[-0.012em] text-secondary-token'
-        >
-          {mode.headline}
-        </h3>
-      )),
+      MODES.map(mode => ({
+        id: mode.id,
+        content: (
+          <h3 className='text-xl font-[590] leading-snug tracking-[-0.012em] text-secondary-token'>
+            {mode.headline}
+          </h3>
+        ),
+      })),
     []
   );
 
   const descriptions = useMemo(
     () =>
-      MODES.map(mode => (
-        <p
-          key={mode.id}
-          className='max-w-[400px] marketing-lead-linear text-secondary-token'
-        >
-          {mode.description}
-        </p>
-      )),
+      MODES.map(mode => ({
+        id: mode.id,
+        content: (
+          <p className='max-w-[400px] marketing-lead-linear text-secondary-token'>
+            {mode.description}
+          </p>
+        ),
+      })),
     []
   );
 
@@ -285,13 +285,12 @@ export function DeeplinksGrid() {
                     The right action for every fan.
                   </h2>
 
-                  <CrossfadeBlock activeIndex={activeIndex}>
-                    {headlines}
-                  </CrossfadeBlock>
+                  <CrossfadeBlock activeIndex={activeIndex} items={headlines} />
 
-                  <CrossfadeBlock activeIndex={activeIndex}>
-                    {descriptions}
-                  </CrossfadeBlock>
+                  <CrossfadeBlock
+                    activeIndex={activeIndex}
+                    items={descriptions}
+                  />
 
                   <div className='flex flex-wrap gap-2'>
                     {MODES.map((mode, i) => (
