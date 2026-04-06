@@ -178,6 +178,8 @@ export const queryKeys = {
         profileId,
         status ?? 'all',
       ] as const,
+    presence: (profileId: string) =>
+      [...queryKeys.dspEnrichment.all, 'presence', profileId] as const,
     matchDetail: (matchId: string) =>
       [...queryKeys.dspEnrichment.all, 'match', matchId] as const,
     status: (profileId: string) =>

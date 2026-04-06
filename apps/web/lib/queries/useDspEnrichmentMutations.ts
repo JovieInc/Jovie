@@ -217,6 +217,11 @@ export function useConfirmDspMatchMutation() {
         ],
       });
 
+      // Invalidate the presence view cache (includes match list)
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.dspEnrichment.presence(variables.profileId),
+      });
+
       // Invalidate enrichment status (new job started)
       queryClient.invalidateQueries({
         queryKey: queryKeys.dspEnrichment.status(variables.profileId),
@@ -267,6 +272,11 @@ export function useRejectDspMatchMutation() {
           'matches',
           variables.profileId,
         ],
+      });
+
+      // Invalidate the presence view cache (includes match list)
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.dspEnrichment.presence(variables.profileId),
       });
     },
 
