@@ -18,13 +18,18 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Credits (producer, composer, lyricist) in MusicAlbum structured data
 - Profile avatar images in sitemap entries for Google Image Search
 - Single @graph JSON-LD arrays across all public page types
-- Enhanced meta tags: og:profile:username, geo.placename, music:album, music:duration
+- Enhanced meta tags: geo.placename, music:album, music:duration
 
 ### Changed
 
 - Consolidated dual OG image system (file convention replaces /api/og/ route)
 - Profile, release, and track pages now use single @graph JSON-LD instead of separate script tags
 - Track page metadata enriched to match release page quality (keywords, robots, authors)
+
+### Fixed
+
+- Presence page now shows error state when dashboard data fails to load instead of a blank screen
+- Releases page now shows error state when query fails instead of a blank screen
 
 ### Removed
 
@@ -43,6 +48,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Upgraded gstack tooling to v0.15.11.0
 
 ## [26.4.124] - 2026-04-05
+
+> Admin table search now filters instantly on the client, eliminating server round-trips and skeleton loaders. Keyboard navigation is unified across all tables via a single shared key map.
 
 ### Changed
 

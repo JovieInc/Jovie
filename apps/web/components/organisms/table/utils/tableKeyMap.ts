@@ -24,22 +24,25 @@ export type TableNavAction =
  * Maps a keyboard event key to a table navigation action.
  * Returns null if the key should be ignored.
  *
- * j/k return null when target is a form element so they
- * don't conflict with typing in search inputs.
+ * All navigation keys return null when target is a form element
+ * so they don't conflict with typing in search inputs.
+ * Escape is always available for closing drawers/panels.
  */
 export function resolveTableNavAction(
   key: string,
   target: EventTarget | null
 ): TableNavAction {
+  if (key === 'Escape') return 'close';
+
+  if (isFormElement(target)) return null;
+
   switch (key) {
     case 'ArrowDown':
+    case 'j':
       return 'next';
     case 'ArrowUp':
-      return 'prev';
-    case 'j':
-      return isFormElement(target) ? null : 'next';
     case 'k':
-      return isFormElement(target) ? null : 'prev';
+      return 'prev';
     case 'Home':
       return 'first';
     case 'End':
@@ -49,8 +52,6 @@ export function resolveTableNavAction(
     case ' ':
     case 'Spacebar':
       return 'toggle';
-    case 'Escape':
-      return 'close';
     default:
       return null;
   }

@@ -2,6 +2,7 @@
 
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { ReleasesExperience } from '@/features/dashboard/organisms/release-provider-matrix';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { primaryProviderKeys, providerConfig } from './config';
 import { ReleaseTableSkeleton } from './loading';
@@ -19,7 +20,7 @@ export function ReleasesPageClient() {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
 
-  const { data: releases, isLoading } = useReleasesQuery(profileId);
+  const { data: releases, isLoading, isError } = useReleasesQuery(profileId);
 
   const settings =
     (selectedProfile?.settings as Record<string, unknown> | null) ?? {};
@@ -42,6 +43,12 @@ export function ReleasesPageClient() {
   // Only show skeleton on cold load (no cached data at all)
   if (isLoading && !releases) {
     return <ReleaseTableSkeleton showHeader={false} />;
+  }
+
+  if (isError) {
+    return (
+      <PageErrorState message='Failed to load releases data. Please refresh the page.' />
+    );
   }
 
   return (

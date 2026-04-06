@@ -15,14 +15,15 @@ export function useSearchUrlSync(
   basePath: string,
   debounceMs = DEFAULT_DEBOUNCE_MS
 ): void {
-  const initialRef = useRef(search);
+  const hasMountedRef = useRef(false);
 
   useEffect(() => {
-    const trimmed = search.trim() || null;
-    const initial = initialRef.current.trim() || null;
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return; // Skip initial render — URL already reflects server state
+    }
 
-    // Don't update URL if it matches the initial value from server
-    if (trimmed === initial) return;
+    const trimmed = search.trim() || null;
 
     const timeout = globalThis.setTimeout(() => {
       globalThis.history.replaceState(
