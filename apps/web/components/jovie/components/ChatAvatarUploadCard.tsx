@@ -3,7 +3,6 @@
 import { Check, ImagePlus, Loader2, RotateCw, X } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { validateAvatarFile } from '@/lib/avatar/validation';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
@@ -161,12 +160,7 @@ export function ChatAvatarUploadCard() {
               </>
             ) : (
               <>
-                <span
-                  className={cn(
-                    LINEAR_SURFACE.drawerCardSm,
-                    'flex h-10 w-10 items-center justify-center rounded-[8px]'
-                  )}
-                >
+                <span className='flex h-10 w-10 items-center justify-center rounded-[8px] border border-subtle bg-surface-1'>
                   <ImagePlus
                     className={cn(
                       'h-5 w-5',
