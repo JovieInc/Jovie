@@ -98,25 +98,23 @@ export function Footer({
   const shouldHideBranding = artistSettings?.hide_branding ?? hideBranding;
   const maxWidthClass = CONTAINER_SIZES[containerSize];
 
-  if (variant === 'profile' && shouldHideBranding) {
-    return null;
-  }
-
   const variantConfigs = getVariantConfigs(maxWidthClass, containerSize);
   const config = variantConfigs[variant];
 
   if (variant === 'profile') {
     return (
       <footer className={`${config.containerClass} ${className}`}>
-        <div className='flex flex-col items-center justify-center space-y-1.5 pb-2'>
-          <FooterBranding
-            artistHandle={artistHandle}
-            variant={config.colorVariant}
-            size='sm'
-            showCTA={false}
-            mark='text'
-          />
-        </div>
+        {!shouldHideBranding && (
+          <div className='flex flex-col items-center justify-center space-y-1.5 pb-2'>
+            <FooterBranding
+              artistHandle={artistHandle}
+              variant={config.colorVariant}
+              size='sm'
+              showCTA={false}
+              mark='text'
+            />
+          </div>
+        )}
 
         <div className='md:hidden absolute bottom-2 right-4'>
           <FooterNavigation
