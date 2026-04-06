@@ -8,8 +8,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-05T20:48:45.568Z",
-    "gitSha": "683ceed556278abd59a90a8dd8b7173ea7a59a46",
+    "capturedAt": "2026-04-06T18:11:05.066Z",
+    "gitSha": "eac1bb2eb5851e690f5213f8e6b87712469dc789",
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -49,8 +49,8 @@
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-05T20:49:37.256Z",
-    "gitSha": "683ceed556278abd59a90a8dd8b7173ea7a59a46",
+    "capturedAt": "2026-04-06T18:11:56.854Z",
+    "gitSha": "eac1bb2eb5851e690f5213f8e6b87712469dc789",
     "imagePath": "release-presave-mobile.png",
     "publicExportPath": "release-deep-end-phone.png"
   },
@@ -119,8 +119,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-04-05T20:51:20.542Z",
-    "gitSha": "683ceed556278abd59a90a8dd8b7173ea7a59a46",
+    "capturedAt": "2026-04-06T18:13:39.918Z",
+    "gitSha": "eac1bb2eb5851e690f5213f8e6b87712469dc789",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
