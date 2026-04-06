@@ -55,7 +55,7 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
       <div
         className={cn(
           DRAWER_TABS_RAIL_CLASSNAME,
-          'w-max min-w-full rounded-full border border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-transparent p-0.5'
+          'w-max min-w-full rounded-full bg-transparent'
         )}
       >
         {VIEW_OPTIONS.map(({ value, icon }) => (

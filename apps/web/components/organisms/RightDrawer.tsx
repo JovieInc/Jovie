@@ -153,7 +153,6 @@ export function RightDrawer({
           ? 'transition-[width,opacity] duration-300 ease-out'
           : 'transition-none',
         'overflow-hidden',
-        'border-l border-(--linear-app-frame-seam)',
         isOpen
           ? 'visible opacity-100'
           : 'opacity-0 pointer-events-none invisible',
