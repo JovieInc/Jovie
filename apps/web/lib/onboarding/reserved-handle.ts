@@ -55,26 +55,23 @@ export async function reserveOnboardingHandle(name: string): Promise<string> {
   const bases = buildHandleCandidates(name);
 
   // Build all candidates up front, then check availability in a single query
-  const allCandidates: string[] = [];
-  const candidateOrder: string[] = [];
+  const candidates: string[] = [];
 
   for (const base of bases) {
-    allCandidates.push(base);
-    candidateOrder.push(base);
+    candidates.push(base);
     for (let suffix = 1; suffix <= MAX_SUFFIX_ATTEMPTS; suffix++) {
       const candidate = `${base}${suffix}`;
       if (validateUsername(candidate).isValid) {
-        allCandidates.push(candidate);
-        candidateOrder.push(candidate);
+        candidates.push(candidate);
       }
     }
   }
 
   // Single batch query instead of up to 30+ sequential queries
-  const taken = await findTakenHandles(allCandidates);
+  const taken = await findTakenHandles(candidates);
 
   // Return the first available candidate in priority order
-  for (const candidate of candidateOrder) {
+  for (const candidate of candidates) {
     if (!taken.has(candidate)) {
       return candidate;
     }

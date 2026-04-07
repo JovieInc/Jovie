@@ -124,8 +124,9 @@ export default async function OnboardingPage({
     user?.username ||
     spotifySuggestedHandle;
 
-  // Use early reservation, or re-reserve with profile display name if it changed
-  let reservedHandle = earlyReservedHandle;
+  // Discard the early reservation if a providedHandle is now available (e.g. from
+  // existingProfile.username) — otherwise isReservedHandle would incorrectly be true.
+  let reservedHandle = !providedHandle ? earlyReservedHandle : null;
   if (
     !providedHandle &&
     !reservedHandle &&
