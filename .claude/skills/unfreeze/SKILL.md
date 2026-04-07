@@ -1,1 +1,1 @@
-/Users/timwhite/conductor/workspaces/jovie/taipei/.claude/skills/gstack/unfreeze/SKILL.md
+/Users/timwhite/conductor/workspaces/jovie/tacoma/.claude/skills/gstack/unfreeze/SKILL.md

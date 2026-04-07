@@ -1,1 +1,1 @@
-/Users/timwhite/conductor/workspaces/jovie/taipei/.claude/skills/gstack/office-hours/SKILL.md
+/Users/timwhite/conductor/workspaces/jovie/tacoma/.claude/skills/gstack/office-hours/SKILL.md

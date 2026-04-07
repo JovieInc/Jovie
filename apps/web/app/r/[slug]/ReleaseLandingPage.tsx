@@ -86,6 +86,8 @@ interface ReleaseLandingPageProps
       readonly profileId: string;
       readonly username: string;
     } | null;
+    /** URL to the promo download gate page, shown when promo files exist */
+    readonly downloadUrl?: string | null;
   }> {}
 
 function SmartLinkClaimBanner({
@@ -220,6 +222,7 @@ export function ReleaseLandingPage({
   utmParams = {},
   parentRelease = null,
   claimBanner = null,
+  downloadUrl = null,
 }: Readonly<ReleaseLandingPageProps>) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [creditsOpen, setCreditsOpen] = useState(false);
