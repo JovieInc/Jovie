@@ -48,6 +48,7 @@
         },
         {
           "matchingUrlPattern": "http://localhost:3000/legal/.*",
+          "preset": "lighthouse:no-pwa",
           "assertions": {
             "errors-in-console": "warn",
             "interactive": ["error", { "maxNumericValue": 5000 }],
