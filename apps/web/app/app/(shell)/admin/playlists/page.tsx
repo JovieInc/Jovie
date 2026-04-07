@@ -41,10 +41,18 @@ async function approvePlaylist(formData: FormData) {
     .map(t => t.spotifyTrackId)
     .filter((id): id is string => id != null);
 
-  // Generate cover art
+  // Generate cover art using LLM-generated queries from the pipeline
+  const promptData = playlist.llmPrompt
+    ? (JSON.parse(playlist.llmPrompt) as {
+        unsplashQuery?: string;
+        coverTextWords?: string;
+      })
+    : {};
   const coverArt = await generateCoverArt({
-    unsplashQuery: playlist.theme ?? playlist.title,
-    coverText: playlist.title.split(' ').slice(0, 4).join(' '),
+    unsplashQuery: promptData.unsplashQuery ?? playlist.theme ?? playlist.title,
+    coverText:
+      promptData.coverTextWords ??
+      playlist.title.split(' ').slice(0, 4).join(' '),
   });
 
   // Publish to Spotify

@@ -219,12 +219,14 @@ export async function generateCoverArt(options: {
     .toBuffer();
 
   // Step 5: Compress for Spotify (must be <256KB as base64)
-  let spotifyBuffer = fullRes;
-  let quality = 80;
+  let spotifyBuffer: Buffer | null = null;
+  let smallestBuffer: Buffer | null = null;
+  let smallestSize = Infinity;
 
-  while (quality > 20) {
+  for (let quality = 80; quality >= 20; quality -= 10) {
+    const size = quality >= 60 ? 640 : quality >= 40 ? 480 : 320;
     const compressed = await sharp(processed)
-      .resize(640, 640) // Smaller for Spotify
+      .resize(size, size)
       .composite([
         {
           input: createTextOverlay(coverText),
@@ -236,12 +238,20 @@ export async function generateCoverArt(options: {
 
     const base64Size = Math.ceil((compressed.length * 4) / 3);
 
+    if (base64Size < smallestSize) {
+      smallestSize = base64Size;
+      smallestBuffer = compressed;
+    }
+
     if (base64Size <= SPOTIFY_MAX_BASE64_BYTES) {
       spotifyBuffer = compressed;
       break;
     }
+  }
 
-    quality -= 10;
+  // Use the smallest version we generated (even if over limit, Spotify may still accept it)
+  if (!spotifyBuffer) {
+    spotifyBuffer = smallestBuffer ?? fullRes;
   }
 
   const spotifyBase64 = spotifyBuffer.toString('base64');

@@ -8,6 +8,7 @@
 
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
+import { desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
@@ -78,7 +79,7 @@ export async function generatePlaylistConcept(options?: {
   const existingPlaylists = await db
     .select({ title: joviePlaylists.title })
     .from(joviePlaylists)
-    .orderBy(joviePlaylists.createdAt)
+    .orderBy(desc(joviePlaylists.createdAt))
     .limit(50);
 
   const previousTitles = existingPlaylists.map(p => p.title);

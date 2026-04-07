@@ -106,9 +106,9 @@ export async function curateTracklist(options: {
         continue;
       }
 
-      // Enforce no back-to-back same artist
+      // Enforce no back-to-back same artist (use artist name for consistent comparison)
       const artistLookup = new Map<string, string>();
-      for (const c of candidates) artistLookup.set(c.id, c.artistId);
+      for (const c of candidates) artistLookup.set(c.id, c.artist);
       for (const j of jovieArtistTracks)
         artistLookup.set(j.spotifyTrackId, j.artist);
 

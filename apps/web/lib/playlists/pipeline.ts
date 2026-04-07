@@ -144,6 +144,8 @@ export async function generatePlaylist(): Promise<PipelineResult> {
           genreTags: concept.genreTags,
           candidateCount: candidates.length,
           jovieArtistCount: jovieArtistTracks.length,
+          unsplashQuery: concept.unsplashQuery,
+          coverTextWords: concept.coverTextWords,
         }),
         llmModel: 'haiku+sonnet',
         status: 'pending',
