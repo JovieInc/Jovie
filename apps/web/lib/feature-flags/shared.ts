@@ -93,6 +93,9 @@ export const FEATURE_FLAGS = {
 
   /** Filter and display toolbar buttons on the releases page. */
   SHOW_RELEASE_TOOLBAR_EXTRAS: false,
+
+  /** Playlist engine: cron generation, public pages, admin queue. */
+  PLAYLIST_ENGINE: false,
 } as const;
 
 export type CodeFlagName = keyof typeof FEATURE_FLAGS;
@@ -125,4 +128,5 @@ export const CODE_FLAG_KEYS = {
   SHOW_FEATURE_SHOWCASE: 'code:SHOW_FEATURE_SHOWCASE',
   SHOW_FINAL_CTA: 'code:SHOW_FINAL_CTA',
   SHOW_RELEASE_TOOLBAR_EXTRAS: 'code:SHOW_RELEASE_TOOLBAR_EXTRAS',
+  PLAYLIST_ENGINE: 'code:PLAYLIST_ENGINE',
 } as const satisfies Record<CodeFlagName, string>;

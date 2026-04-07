@@ -1,0 +1,235 @@
+import { desc, eq } from 'drizzle-orm';
+import type { Metadata } from 'next';
+import { revalidatePath } from 'next/cache';
+import { AdminWorkspacePage } from '@/components/features/admin/layout/AdminWorkspacePage';
+import { APP_ROUTES } from '@/constants/routes';
+import { db } from '@/lib/db';
+import { joviePlaylists, joviePlaylistTracks } from '@/lib/db/schema/playlists';
+import { generateCoverArt } from '@/lib/playlists/generate-cover';
+import { publishToSpotify } from '@/lib/playlists/publish-spotify';
+import { getJovieSpotifyUserId } from '@/lib/spotify/jovie-account';
+
+export const metadata: Metadata = { title: 'Playlists — Admin' };
+export const runtime = 'nodejs';
+
+// ============================================================================
+// Server Actions
+// ============================================================================
+
+async function approvePlaylist(formData: FormData) {
+  'use server';
+
+  const playlistId = formData.get('playlistId') as string;
+  if (!playlistId) return;
+
+  // Get the playlist and its tracks
+  const [playlist] = await db
+    .select()
+    .from(joviePlaylists)
+    .where(eq(joviePlaylists.id, playlistId))
+    .limit(1);
+
+  if (!playlist || playlist.status !== 'pending') return;
+
+  const tracks = await db
+    .select()
+    .from(joviePlaylistTracks)
+    .where(eq(joviePlaylistTracks.playlistId, playlistId))
+    .orderBy(joviePlaylistTracks.position);
+
+  const trackIds = tracks
+    .map(t => t.spotifyTrackId)
+    .filter((id): id is string => id != null);
+
+  // Generate cover art
+  const coverArt = await generateCoverArt({
+    unsplashQuery: playlist.theme ?? playlist.title,
+    coverText: playlist.title.split(' ').slice(0, 4).join(' '),
+  });
+
+  // Publish to Spotify
+  const result = await publishToSpotify({
+    title: playlist.title,
+    description: playlist.description ?? '',
+    trackIds,
+    coverBase64: coverArt.spotifyBase64,
+    slug: playlist.slug,
+  });
+
+  // Get Spotify user ID for audit trail
+  const spotifyUserId = await getJovieSpotifyUserId();
+
+  // Update playlist status
+  await db
+    .update(joviePlaylists)
+    .set({
+      status: 'published',
+      statusChangedAt: new Date(),
+      publishedAt: new Date(),
+      spotifyPlaylistId: result.spotifyPlaylistId,
+      curatorSpotifyUserId: spotifyUserId,
+      trackCount: result.tracksAdded,
+      updatedAt: new Date(),
+    })
+    .where(eq(joviePlaylists.id, playlistId));
+
+  revalidatePath('/playlists');
+  revalidatePath(`/playlists/${playlist.slug}`);
+  revalidatePath(APP_ROUTES.ADMIN_PLAYLISTS);
+}
+
+async function rejectPlaylist(formData: FormData) {
+  'use server';
+
+  const playlistId = formData.get('playlistId') as string;
+  const note = formData.get('note') as string;
+  if (!playlistId) return;
+
+  await db
+    .update(joviePlaylists)
+    .set({
+      status: 'rejected',
+      statusChangedAt: new Date(),
+      rejectionNote: note || null,
+      updatedAt: new Date(),
+    })
+    .where(eq(joviePlaylists.id, playlistId));
+
+  revalidatePath(APP_ROUTES.ADMIN_PLAYLISTS);
+}
+
+// ============================================================================
+// Data
+// ============================================================================
+
+async function getPlaylists(status: string) {
+  return db
+    .select({
+      id: joviePlaylists.id,
+      title: joviePlaylists.title,
+      slug: joviePlaylists.slug,
+      status: joviePlaylists.status,
+      trackCount: joviePlaylists.trackCount,
+      genreTags: joviePlaylists.genreTags,
+      createdAt: joviePlaylists.createdAt,
+      publishedAt: joviePlaylists.publishedAt,
+      spotifyPlaylistId: joviePlaylists.spotifyPlaylistId,
+    })
+    .from(joviePlaylists)
+    .where(
+      eq(joviePlaylists.status, status as 'pending' | 'published' | 'rejected')
+    )
+    .orderBy(desc(joviePlaylists.createdAt))
+    .limit(50);
+}
+
+// ============================================================================
+// Page
+// ============================================================================
+
+type PlaylistTab = 'pending' | 'published' | 'rejected';
+
+const TAB_OPTIONS = [
+  { value: 'pending' as const, label: 'Pending' },
+  { value: 'published' as const, label: 'Published' },
+  { value: 'rejected' as const, label: 'Rejected' },
+] as const;
+
+export default async function AdminPlaylistsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { tab = 'pending' } = await searchParams;
+  const currentTab = (
+    ['pending', 'published', 'rejected'].includes(tab) ? tab : 'pending'
+  ) as PlaylistTab;
+  const playlists = await getPlaylists(currentTab);
+
+  return (
+    <AdminWorkspacePage
+      title='Playlists'
+      description='Review and approve auto-generated playlists.'
+      primaryParam='tab'
+      primaryValue={currentTab}
+      primaryOptions={TAB_OPTIONS}
+      testId='admin-playlists'
+    >
+      {/* Playlist list */}
+      {playlists.length === 0 ? (
+        <div className='py-16 text-center text-[13px] text-white/40'>
+          {tab === 'pending'
+            ? 'No pending playlists. Next one generates at 6:00 AM UTC.'
+            : `No ${tab} playlists.`}
+        </div>
+      ) : (
+        <div className='space-y-3'>
+          {playlists.map(playlist => (
+            <div
+              key={playlist.id}
+              className='rounded-lg border border-white/[0.06] bg-white/[0.02] p-4'
+            >
+              <div className='flex items-start justify-between'>
+                <div>
+                  <h3 className='text-[15px] font-[510] text-white'>
+                    {playlist.title}
+                  </h3>
+                  <p className='mt-1 text-[13px] text-white/40'>
+                    {playlist.trackCount} tracks
+                    {playlist.genreTags?.length
+                      ? ` \u2022 ${playlist.genreTags.join(', ')}`
+                      : ''}
+                    {' \u2022 '}
+                    {new Date(playlist.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+
+                {tab === 'pending' && (
+                  <div className='flex gap-2'>
+                    <form action={approvePlaylist}>
+                      <input
+                        type='hidden'
+                        name='playlistId'
+                        value={playlist.id}
+                      />
+                      <button
+                        type='submit'
+                        className='rounded-md bg-[#1DB954] px-3 py-1.5 text-[13px] font-[510] text-white hover:opacity-90'
+                      >
+                        Approve
+                      </button>
+                    </form>
+                    <form action={rejectPlaylist}>
+                      <input
+                        type='hidden'
+                        name='playlistId'
+                        value={playlist.id}
+                      />
+                      <button
+                        type='submit'
+                        className='rounded-md bg-white/5 px-3 py-1.5 text-[13px] font-[450] text-white/60 hover:bg-white/10'
+                      >
+                        Reject
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                {tab === 'published' && playlist.spotifyPlaylistId && (
+                  <a
+                    href={`https://open.spotify.com/playlist/${playlist.spotifyPlaylistId}`}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='text-[13px] text-[#1DB954] hover:underline'
+                  >
+                    View on Spotify
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </AdminWorkspacePage>
+  );
+}
