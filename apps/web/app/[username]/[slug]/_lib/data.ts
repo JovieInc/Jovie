@@ -236,6 +236,7 @@ export interface CachedContentData {
   totalTracks?: number | null;
   previewUrl?: string | null;
   previewMetadata?: Record<string, unknown> | null;
+  isrc?: string | null;
   releaseId?: string | null;
   releaseSlug?: string | null;
   releaseTitle?: string | null;
@@ -341,6 +342,7 @@ const fetchContentBySlug = async (
         .select({
           previewUrl: discogRecordings.previewUrl,
           previewMetadata: discogRecordings.metadata,
+          isrc: discogRecordings.isrc,
         })
         .from(discogRecordings)
         .innerJoin(
@@ -379,6 +381,7 @@ const fetchContentBySlug = async (
       releaseId: release.id,
       previewUrl: previewRow?.previewUrl ?? null,
       previewMetadata: previewRow?.previewMetadata ?? null,
+      isrc: previewRow?.isrc ?? null,
       credits,
     };
   }
@@ -391,6 +394,7 @@ const fetchContentBySlug = async (
       slug: discogRecordings.slug,
       previewUrl: discogRecordings.previewUrl,
       previewMetadata: discogRecordings.metadata,
+      isrc: discogRecordings.isrc,
     })
     .from(discogRecordings)
     .where(
@@ -464,6 +468,7 @@ const fetchContentBySlug = async (
       providerLinks: links,
       previewUrl: recording.previewUrl,
       previewMetadata: recording.previewMetadata ?? null,
+      isrc: recording.isrc,
       releaseId: releaseId ?? null,
       releaseSlug: releaseData?.slug ?? null,
       releaseTitle: releaseData?.title ?? null,
@@ -528,6 +533,7 @@ const fetchContentBySlug = async (
       providerLinks: links,
       previewUrl: track.previewUrl,
       previewMetadata: null,
+      isrc: null,
       releaseId: track.releaseId,
       releaseSlug: releaseData?.slug ?? null,
       releaseTitle: releaseData?.title ?? null,
@@ -724,6 +730,7 @@ export const getTrackBySlugInRelease = cache(
         providerLinks: links,
         previewUrl: legacyTrack.previewUrl,
         previewMetadata: null,
+        isrc: null,
         releaseId,
         releaseSlug: releaseData?.slug ?? null,
         releaseTitle: releaseData?.title ?? null,

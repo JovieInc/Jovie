@@ -210,6 +210,7 @@ export default async function TrackDeepLinkPage({
           artworkUrl: track.artworkUrl,
           releaseDate: toISOStringOrNull(track.releaseDate),
           previewUrl: track.previewUrl ?? null,
+          isrc: track.isrc ?? null,
           previewVerification: previewState.previewVerification,
           previewSource: previewState.previewSource,
         }}

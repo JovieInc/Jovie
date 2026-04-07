@@ -319,6 +319,7 @@ function TrackPlaybackRow({
     id: string;
     title: string;
     audioUrl: string;
+    isrc?: string | null;
     releaseTitle?: string;
     artistName?: string;
     artworkUrl?: string | null;
@@ -349,6 +350,7 @@ function TrackPlaybackRow({
       id: track.id,
       title: track.title,
       audioUrl: playableUrl,
+      isrc: track.isrc,
       releaseTitle: release.title,
       artistName: release.artistNames?.[0],
       artworkUrl: release.artworkUrl,
@@ -362,6 +364,7 @@ function TrackPlaybackRow({
     release.artworkUrl,
     release.title,
     track.id,
+    track.isrc,
     track.title,
   ]);
 
