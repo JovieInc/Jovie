@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.131] - 2026-04-07
+## [26.4.132] - 2026-04-07
 
 > Higher resolution profile photos on artist pages and sharper hero images on retina displays.
 
@@ -17,6 +17,22 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Profile photo size mappings updated: large=1024px, medium=512px
 - Next.js image optimizer now serves 1024px breakpoint
 - Profile refresh now re-fetches unlocked DSP-sourced avatars through the higher-quality pipeline
+
+## [26.4.131] - 2026-04-06
+
+> Fix broken legal page anchor links, inaccurate cookie policy text, and add Lighthouse CI budgets for all legal pages.
+
+### Fixed
+
+- In-page anchor links on Terms page now scroll to the correct section (removed remark-html double sanitization that prefixed heading IDs with `user-content-`)
+- Cookie Policy no longer references a non-existent "Cookie settings" footer link (updated to match the actual "Manage" button in the consent bar)
+
+### Added
+
+- Cookie Policy link in the site footer alongside Privacy and Terms
+- Blocking Lighthouse CI budgets for all three legal pages (performance, accessibility, SEO)
+- Legal page path patterns trigger Lighthouse CI on content changes
+- Regression tests for markdown heading ID and anchor link resolution
 
 ## [26.4.130] - 2026-04-06
 

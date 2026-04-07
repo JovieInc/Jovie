@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import DOMPurify from 'isomorphic-dompurify';
+import { useCallback, useMemo, useState } from 'react';
 import { InvestorThemeToggle } from './InvestorThemeToggle';
 
 interface TocEntry {
@@ -26,6 +27,7 @@ export function MemoContent({
   toc,
 }: MemoContentProps) {
   const [isLight, setIsLight] = useState(false);
+  const sanitizedHtml = useMemo(() => DOMPurify.sanitize(html), [html]);
 
   const handleToggle = useCallback((light: boolean) => {
     setIsLight(light);
@@ -67,8 +69,8 @@ export function MemoContent({
               color: isLight ? '#1a1a1a' : 'var(--color-text-secondary-token)',
               fontFeatureSettings: 'var(--font-features)',
             }}
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown HTML rendered server-side from trusted repo content
-            dangerouslySetInnerHTML={{ __html: html }}
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitized with DOMPurify
+            dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
           />
 
           {/* TOC sidebar — desktop only */}
