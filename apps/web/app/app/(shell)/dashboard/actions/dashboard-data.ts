@@ -15,9 +15,9 @@ import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { resolveUserState } from '@/lib/auth/gate';
-import { withDbSessionTx } from '@/lib/auth/session';
+import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
-import { type DbOrTransaction } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
@@ -765,9 +765,13 @@ async function fetchDashboardShellWithSession(
   clerkUserId: string
 ): Promise<CoreData> {
   try {
-    return await withDbSessionTx(
-      async (tx, sessionUserId) =>
-        fetchDashboardBaseWithSession(tx, sessionUserId, {
+    // Use withDbSession (no transaction) instead of withDbSessionTx.
+    // The shell path only reads user + profiles — no writes, no atomicity needed.
+    // This skips BEGIN/COMMIT overhead (~50-150ms on cold Neon connections) while
+    // still setting the RLS session variable via connection-scoped set_config.
+    return await withDbSession(
+      async sessionUserId =>
+        fetchDashboardBaseWithSession(db, sessionUserId, {
           includeSettings: false,
         }),
       { clerkUserId }
