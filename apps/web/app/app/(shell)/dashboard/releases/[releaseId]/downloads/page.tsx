@@ -219,7 +219,7 @@ export default function PromoDownloadsPage() {
           {files.map(file => (
             <div
               key={file.id}
-              className='flex items-center gap-3 rounded-lg bg-surface-1/40 px-3 py-2.5 ring-1 ring-inset ring-white/[0.06]'
+              className='flex items-center gap-3 rounded-lg bg-surface-1 px-3 py-2.5 ring-1 ring-inset ring-white/[0.06]'
             >
               <div className='min-w-0 flex-1'>
                 <p className='text-foreground truncate text-sm font-medium'>
@@ -260,7 +260,7 @@ export default function PromoDownloadsPage() {
         </div>
       ) : (
         loaded && (
-          <div className='rounded-xl bg-surface-1/30 p-8 text-center'>
+          <div className='rounded-xl bg-surface-1 p-8 text-center'>
             <Icon
               name='Music'
               className='text-muted-foreground mx-auto h-10 w-10'
