@@ -1,5 +1,3 @@
-'use client';
-
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 
 interface ProfileViewportShellProps {
