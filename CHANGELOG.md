@@ -109,6 +109,27 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Removed `surfaceTone` quiet variant — all drawer content uses consistent Tier 2 card treatment
 - [internal] Fixed dark mode surface-1 token value in DESIGN.md (#1c1c1f → #17171a to match linear-tokens.css)
 
+> World-class SEO for public profiles, releases, and tracks. Hero-style OG images with artist photos, single @graph JSON-LD with ProfilePage/MusicGroup/MusicEvent/MusicAlbum/MusicRecording schemas, and Google Events integration for tour dates.
+
+### Added
+
+- Hero-style OG images for artist profiles, featuring the artist's actual photo with dark gradient overlay, Jovie branding, and genre tags
+- ProfilePage structured data wrapping MusicGroup for better Google rich results
+- MusicEvent JSON-LD for tour dates (capped at 10) with venue, ticket, and status data for Google Events
+- ListenAction on profiles, releases, and tracks linking to streaming platform URLs
+- Track list schema on release pages (MusicAlbum.track ItemList) for Google track listings
+- Duration (ISO 8601), ISRC codes, and track position in MusicRecording schemas
+- Credits (producer, composer, lyricist) in MusicAlbum structured data
+- Profile avatar images in sitemap entries for Google Image Search
+- Single @graph JSON-LD arrays across all public page types
+- Enhanced meta tags: geo.placename, music:album, music:duration
+
+### Changed
+
+- Consolidated dual OG image system (file convention replaces /api/og/ route)
+- Profile, release, and track pages now use single @graph JSON-LD instead of separate script tags
+- Track page metadata enriched to match release page quality (keywords, robots, authors)
+
 ### Fixed
 
 - Presence page now shows error state when dashboard data fails to load instead of a blank screen
@@ -116,9 +137,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Removed
 
-- [internal] `PAGE_SHELL_SURFACE_CLASSNAMES` (6 unused color-mix surface variants)
-- [internal] `DRAWER_SURFACE_QUIET_CARD_CLASSNAME` export
-- [internal] `quiet` variant from DrawerSurfaceCard
+- Dead /api/og/[artistSlug] route (replaced by opengraph-image.tsx file convention)
+- Unused og-image.ts helper and its tests
 
 ## [26.4.125] - 2026-04-05
 

@@ -193,14 +193,18 @@ export interface ContentData {
   totalTracks?: number | null;
   previewUrl?: string | null;
   previewMetadata?: Record<string, unknown> | null;
-  /** ISRC code for the preview track — used to refresh expired Deezer preview URLs */
-  isrc?: string | null;
   releaseId?: string | null;
   /** Parent release slug — present for tracks, used for nested deep link URLs */
   releaseSlug?: string | null;
   /** Parent release title — present for tracks, shown as "from [Release]" link */
   releaseTitle?: string | null;
   credits?: SmartLinkCreditGroup[];
+  /** Track duration in milliseconds (from discog_recordings) */
+  durationMs?: number | null;
+  /** ISRC code (from discog_recordings) */
+  isrc?: string | null;
+  /** Track position within the release (from discog_release_tracks) */
+  trackNumber?: number | null;
   creator: {
     id: string;
     displayName: string | null;
@@ -601,6 +605,7 @@ export const getTrackBySlugInRelease = cache(
         recordingId: discogReleaseTracks.recordingId,
         title: discogReleaseTracks.title,
         slug: discogReleaseTracks.slug,
+        trackNumber: discogReleaseTracks.trackNumber,
       })
       .from(discogReleaseTracks)
       .where(
@@ -619,6 +624,7 @@ export const getTrackBySlugInRelease = cache(
             title: discogRecordings.title,
             previewUrl: discogRecordings.previewUrl,
             previewMetadata: discogRecordings.metadata,
+            durationMs: discogRecordings.durationMs,
             isrc: discogRecordings.isrc,
           })
           .from(discogRecordings)
@@ -660,10 +666,12 @@ export const getTrackBySlugInRelease = cache(
         providerLinks: links,
         previewUrl: recording?.previewUrl ?? null,
         previewMetadata: recording?.previewMetadata ?? null,
-        isrc: recording?.isrc ?? null,
         releaseId,
         releaseSlug: releaseData?.slug ?? null,
         releaseTitle: releaseData?.title ?? null,
+        durationMs: recording?.durationMs ?? null,
+        isrc: recording?.isrc ?? null,
+        trackNumber: releaseTrack.trackNumber,
       };
     }
 
@@ -730,6 +738,48 @@ export const getTrackBySlugInRelease = cache(
     }
 
     return null;
+  }
+);
+
+/**
+ * Fetch the track list for a release (for MusicAlbum structured data).
+ * Returns track title, slug, trackNumber, and durationMs.
+ */
+export const getReleaseTrackList = cache(
+  async (
+    releaseId: string
+  ): Promise<
+    Array<{
+      title: string;
+      slug: string;
+      trackNumber: number;
+      durationMs: number | null;
+    }>
+  > => {
+    const rows = await db
+      .select({
+        releaseTrackTitle: discogReleaseTracks.title,
+        recordingTitle: discogRecordings.title,
+        slug: discogReleaseTracks.slug,
+        trackNumber: discogReleaseTracks.trackNumber,
+        durationMs: discogRecordings.durationMs,
+      })
+      .from(discogReleaseTracks)
+      .innerJoin(
+        discogRecordings,
+        eq(discogReleaseTracks.recordingId, discogRecordings.id)
+      )
+      .where(eq(discogReleaseTracks.releaseId, releaseId))
+      .orderBy(discogReleaseTracks.discNumber, discogReleaseTracks.trackNumber);
+
+    return rows
+      .filter(row => row.slug)
+      .map(row => ({
+        title: row.releaseTrackTitle ?? row.recordingTitle ?? '',
+        slug: row.slug!,
+        trackNumber: row.trackNumber,
+        durationMs: row.durationMs,
+      }));
   }
 );
 

@@ -195,15 +195,7 @@ test.describe('MusicFetch avatar field — bug fix verification', () => {
     // The seeded profile has an avatarUrl set directly, so this test
     // verifies the field is populated AND rendered on the public profile.
 
-    const response = await page.request
-      .get(`/api/og/${TEST_PROFILE_HANDLE}`)
-      .catch(() => null);
-    if (!response) {
-      test.skip(true, 'OG endpoint not available');
-      return;
-    }
-
-    // Even if we can't call the API, verify the public profile renders an image
+    // Verify the public profile renders an image (OG image uses file convention)
     const profileResponse = await smokeNavigateWithRetry(
       page,
       `/${TEST_PROFILE_HANDLE}`,
