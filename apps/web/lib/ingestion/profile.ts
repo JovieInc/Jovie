@@ -27,7 +27,7 @@ export async function applyProfileEnrichment(
 
   if (!input.avatarLockedByUser && input.extractedAvatarUrl) {
     const trimmed = input.extractedAvatarUrl.trim();
-    if (trimmed && !input.currentAvatarUrl) {
+    if (trimmed) {
       updates.avatarUrl = trimmed;
     }
   }

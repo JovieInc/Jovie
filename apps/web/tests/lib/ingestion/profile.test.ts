@@ -38,18 +38,37 @@ describe('applyProfileEnrichment', () => {
     expect(where).toHaveBeenCalledTimes(1);
   });
 
-  it('does not overwrite existing fields', async () => {
+  it('does not overwrite existing display name', async () => {
     const { tx, update } = createTxMock();
+
+    await applyProfileEnrichment(tx as never, {
+      profileId: 'profile-1',
+      currentDisplayName: 'Existing Name',
+      currentAvatarUrl: null,
+      extractedDisplayName: 'New Artist Name',
+      extractedAvatarUrl: null,
+    });
+
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('refreshes unlocked avatar even when one already exists', async () => {
+    const { tx, update, set } = createTxMock();
 
     await applyProfileEnrichment(tx as never, {
       profileId: 'profile-1',
       currentDisplayName: 'Existing Name',
       currentAvatarUrl: 'https://existing.example/avatar.jpg',
       extractedDisplayName: 'New Artist Name',
-      extractedAvatarUrl: 'https://cdn.example.com/avatar.jpg',
+      extractedAvatarUrl: 'https://cdn.example.com/better-avatar.jpg',
     });
 
-    expect(update).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalled();
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        avatarUrl: 'https://cdn.example.com/better-avatar.jpg',
+      })
+    );
   });
 
   it('respects lock flags', async () => {

@@ -132,14 +132,14 @@ export async function copyAvatarToBlob(
 
     const optimized = await baseImage
       .resize({
-        width: 512,
-        height: 512,
+        width: 1536,
+        height: 1536,
         fit: 'cover',
         position: 'centre',
         withoutEnlargement: true,
       })
       .toColourspace('srgb')
-      .avif({ quality: 65, effort: 4 })
+      .avif({ quality: 80, effort: 4 })
       .toBuffer();
 
     const path = `avatars/ingestion/${handle}/${buildSeoFilename({

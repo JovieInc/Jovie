@@ -19,9 +19,11 @@ export interface AvatarProcessingContext {
  * Determines if avatar should be copied from extraction.
  * Avatar is copied only if:
  * - Extraction has an avatar URL
- * - Profile doesn't have an avatar yet
  * - Avatar is not locked by user
  * - Profile has a username
+ *
+ * Existing unlocked avatars are re-fetched to pick up higher-quality
+ * versions from the updated processing pipeline.
  *
  * @param profile - Profile context
  * @param extractionAvatarUrl - Avatar URL from extraction
@@ -33,7 +35,6 @@ export function shouldCopyAvatar(
 ): boolean {
   return !!(
     extractionAvatarUrl &&
-    !profile.avatarUrl &&
     !profile.avatarLockedByUser &&
     profile.usernameNormalized
   );

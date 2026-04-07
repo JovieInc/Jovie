@@ -53,7 +53,7 @@ describe('applyProfileEnrichment', () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  it('does not set avatarUrl when current avatar already exists', async () => {
+  it('refreshes unlocked avatar when a new extracted URL is available', async () => {
     const where = vi.fn().mockResolvedValue(undefined);
     const set = vi.fn((payload: Record<string, unknown>) => {
       void payload;
@@ -67,9 +67,14 @@ describe('applyProfileEnrichment', () => {
       profileId: 'profile_1',
       avatarLockedByUser: false,
       currentAvatarUrl: 'https://example.com/existing.png',
-      extractedAvatarUrl: 'https://example.com/avatar.png',
+      extractedAvatarUrl: 'https://example.com/better-avatar.png',
     });
 
-    expect(update).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith(creatorProfiles);
+    const payload = set.mock.calls[0]?.[0];
+    expect(payload).toMatchObject({
+      avatarUrl: 'https://example.com/better-avatar.png',
+      updatedAt: expect.any(Date),
+    });
   });
 });

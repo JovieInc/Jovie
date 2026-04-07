@@ -272,7 +272,7 @@ async function updateAvatarIfNeeded(
   existingProfile: { avatarUrl: string | null; avatarLockedByUser: boolean },
   updates: Record<string, unknown>
 ): Promise<boolean> {
-  if (existingProfile.avatarLockedByUser || existingProfile.avatarUrl) {
+  if (existingProfile.avatarLockedByUser) {
     return false;
   }
 
