@@ -73,6 +73,21 @@ describe('applyProfileEnrichment', () => {
     expect(payload).not.toHaveProperty('displayName');
   });
 
+  it('does not overwrite blob-hosted avatar with external URL', async () => {
+    const { tx, update } = createTxMock();
+
+    await applyProfileEnrichment(tx as never, {
+      profileId: 'profile-1',
+      currentDisplayName: 'Existing Name',
+      currentAvatarUrl:
+        'https://abc.blob.vercel-storage.com/avatars/ingestion/handle/avatar.avif',
+      extractedDisplayName: 'New Artist Name',
+      extractedAvatarUrl: 'https://i.scdn.co/image/abc123',
+    });
+
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it('respects lock flags', async () => {
     const { tx, update } = createTxMock();
 
