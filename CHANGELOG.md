@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.132] - 2026-04-07
+
+> Higher resolution profile photos on artist pages and sharper hero images on retina displays.
+
+### Changed
+
+- Ingestion pipeline preserves full Spotify image resolution (was downscaling 640px to 512px)
+- Avatar AVIF quality raised from 65-70 to 80 across upload and ingestion pipelines
+- Added 1024px avatar download size for retina hero display
+- Profile photo size mappings updated: large=1024px, medium=512px
+- Next.js image optimizer now serves 1024px breakpoint
+- Profile refresh now re-fetches unlocked DSP-sourced avatars through the higher-quality pipeline
+
 ## [26.4.131] - 2026-04-06
 
 > Fix broken legal page anchor links, inaccurate cookie policy text, and add Lighthouse CI budgets for all legal pages.
@@ -20,6 +33,41 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Blocking Lighthouse CI budgets for all three legal pages (performance, accessibility, SEO)
 - Legal page path patterns trigger Lighthouse CI on content changes
 - Regression tests for markdown heading ID and anchor link resolution
+
+## [26.4.128] - 2026-04-06
+
+> Unified design system across release smart links, presave pages, sounds pages, and artist profiles.
+
+### Added
+
+- Unified profile drawer: single persistent drawer with animated crossfade between menu, about, listen, contact, tip, tour, subscribe, and notification views
+- Credits drawer using shared ProfileDrawerShell with sentence case labels
+- "Use this sound" menu item on release pages (links to sounds page)
+- Dev preview page at `/dev/smart-links` showing all 3 page types side-by-side with stress test data (20 DSPs, long titles)
+- Submit button animation: arrow fades to spinner on email submit, input text fades out simultaneously
+- Inline notification reveal from menu: "Turn on notifications" closes drawer and focuses the email input on the page
+
+### Changed
+
+- Release, presave, and sounds pages now use the same profile card shell (ambient background, card container, top bar, drawers)
+- DSP buttons are pill-shaped (rounded-full) across all smart link pages
+- Provider list is flat (removed "More ways to verify" collapsible sections)
+- Notification preference toggles use Apple-style green switches instead of dots
+- About section flattened (removed card wrapper, borders, shadows)
+- Contact channel icons are flat by default with hover circle (no permanent border/bg)
+- Drawer headers left-aligned with optional back button matching close button style
+- Drawer body has min-height to prevent shrinking between views
+- Countdown display: large prominent numbers with faded uppercase D/H/M units
+- Hero artwork uses fixed aspect-[4/3] on mobile so content area scrolls
+- Content area scrolls independently, "Powered by Jovie" footer pinned at bottom
+- Homepage section heading updated
+- Homepage footer flattened (transparent, dimmer text, no border)
+- Notification input text size matches button (15px)
+
+### Fixed
+
+- About button hidden in profile menu when no about content exists
+- Zero layout shift between notification button and email input states
 
 ## [26.4.130] - 2026-04-06
 
@@ -74,6 +122,27 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Removed `surfaceTone` quiet variant — all drawer content uses consistent Tier 2 card treatment
 - [internal] Fixed dark mode surface-1 token value in DESIGN.md (#1c1c1f → #17171a to match linear-tokens.css)
 
+> World-class SEO for public profiles, releases, and tracks. Hero-style OG images with artist photos, single @graph JSON-LD with ProfilePage/MusicGroup/MusicEvent/MusicAlbum/MusicRecording schemas, and Google Events integration for tour dates.
+
+### Added
+
+- Hero-style OG images for artist profiles, featuring the artist's actual photo with dark gradient overlay, Jovie branding, and genre tags
+- ProfilePage structured data wrapping MusicGroup for better Google rich results
+- MusicEvent JSON-LD for tour dates (capped at 10) with venue, ticket, and status data for Google Events
+- ListenAction on profiles, releases, and tracks linking to streaming platform URLs
+- Track list schema on release pages (MusicAlbum.track ItemList) for Google track listings
+- Duration (ISO 8601), ISRC codes, and track position in MusicRecording schemas
+- Credits (producer, composer, lyricist) in MusicAlbum structured data
+- Profile avatar images in sitemap entries for Google Image Search
+- Single @graph JSON-LD arrays across all public page types
+- Enhanced meta tags: geo.placename, music:album, music:duration
+
+### Changed
+
+- Consolidated dual OG image system (file convention replaces /api/og/ route)
+- Profile, release, and track pages now use single @graph JSON-LD instead of separate script tags
+- Track page metadata enriched to match release page quality (keywords, robots, authors)
+
 ### Fixed
 
 - Presence page now shows error state when dashboard data fails to load instead of a blank screen
@@ -81,9 +150,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Removed
 
-- [internal] `PAGE_SHELL_SURFACE_CLASSNAMES` (6 unused color-mix surface variants)
-- [internal] `DRAWER_SURFACE_QUIET_CARD_CLASSNAME` export
-- [internal] `quiet` variant from DrawerSurfaceCard
+- Dead /api/og/[artistSlug] route (replaced by opengraph-image.tsx file convention)
+- Unused og-image.ts helper and its tests
 
 ## [26.4.125] - 2026-04-05
 

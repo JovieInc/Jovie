@@ -647,11 +647,11 @@ export async function seedScreenshotData() {
   await db
     .update(creatorProfiles)
     .set({
-      displayName: 'Tim White',
-      bio: 'Independent electronic artist building momentum with every release.',
+      displayName: 'Calvin Harris',
+      bio: 'Festival-headlining DJ building momentum with every release.',
     })
     .where(eq(creatorProfiles.id, profile.id));
-  console.log('  ✓ Updated profile display name to "Tim White"\n');
+  console.log('  ✓ Updated profile display name to "Calvin Harris"\n');
 
   // Ensure all required providers exist
   console.log('  Ensuring providers exist...');

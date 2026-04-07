@@ -20,6 +20,11 @@ import { Redis } from '@upstash/redis';
 import { eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
+import {
+  type DemoPersonaRelease,
+  type DemoPersonaTourDate,
+  INTERNAL_DJ_DEMO_PERSONA,
+} from '@/lib/demo-personas';
 import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
 
 const {
@@ -57,24 +62,14 @@ const {
 // Constants
 // ---------------------------------------------------------------------------
 
-const DEMO_USERNAME = 'timwhite';
-const DEMO_DISPLAY_NAME = 'Tim White';
+const DEMO_USERNAME = INTERNAL_DJ_DEMO_PERSONA.profile.handle;
+const DEMO_DISPLAY_NAME = INTERNAL_DJ_DEMO_PERSONA.profile.displayName;
 const DEMO_EMAIL = 'demo@jov.ie';
 const DEMO_REFERRED_EMAILS = Array.from(
   { length: 3 },
   (_, index) => `demo.referred.${index}@example.com`
 );
-
-// Hardcoded fallback data from Tim's real profile
-const FALLBACK_PROFILE = {
-  avatarUrl:
-    'https://egojgbuon2z2yahy.public.blob.vercel-storage.com/avatars/users/user_38SPgR24re2YSaXT2hVoFtvvlVy/tim-white-profie-pic-e2f4672b-3555-4a63-9fe6-f0d5362218f6.avif',
-  spotifyId: '4Uwpa6zW3zzCSQvooQNksm',
-  spotifyUrl: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
-  genres: ['electronic', 'indie pop', 'synth pop'],
-  location: 'San Francisco, CA',
-  bio: 'Producer, songwriter, and artist building at the intersection of music and technology. Creating sounds that blur the line between organic and electronic.',
-};
+const DEMO_PROFILE = INTERNAL_DJ_DEMO_PERSONA.profile;
 
 const FAN_NAMES = [
   'Sarah M.',
@@ -200,14 +195,6 @@ function pickCity(country: string): string {
   return cities[Math.floor(Math.random() * cities.length)];
 }
 
-/** Generate a future (or past) date offset by months from today */
-function dateMonthsFromNow(months: number): Date {
-  const d = new Date();
-  d.setMonth(d.getMonth() + months);
-  d.setHours(20, 0, 0, 0);
-  return d;
-}
-
 // ---------------------------------------------------------------------------
 // DB setup
 // ---------------------------------------------------------------------------
@@ -230,430 +217,18 @@ const sql = neon(DATABASE_URL);
 const db = drizzle(sql, { schema });
 
 // ---------------------------------------------------------------------------
-// Tour dates (copied from seed-test-data.ts)
+// Tour dates sourced from the internal Calvin Harris demo persona.
 // ---------------------------------------------------------------------------
 
-interface TestTourDate {
-  externalId: string;
-  title: string | null;
-  venueName: string;
-  city: string;
-  region: string | null;
-  country: string;
-  provider: 'bandsintown' | 'songkick' | 'manual';
-  ticketStatus: 'available' | 'sold_out' | 'cancelled';
-  ticketUrl: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  timezone: string | null;
-  monthsFromNow: number;
-  startTime: string | null;
-}
-
-const TEST_TOUR_DATES: TestTourDate[] = [
-  {
-    externalId: 'seed-wiltern-la',
-    title: 'Summer Tour 2026',
-    venueName: 'The Wiltern',
-    city: 'Los Angeles',
-    region: 'CA',
-    country: 'USA',
-    provider: 'manual',
-    ticketStatus: 'available',
-    ticketUrl: 'https://www.ticketmaster.com/event/abc123',
-    latitude: 34.05,
-    longitude: -118.24,
-    timezone: 'America/Los_Angeles',
-    monthsFromNow: 3,
-    startTime: '8:00 PM',
-  },
-  {
-    externalId: 'seed-brooklyn-steel-nyc',
-    title: null,
-    venueName: 'Brooklyn Steel',
-    city: 'New York',
-    region: 'NY',
-    country: 'USA',
-    provider: 'bandsintown',
-    ticketStatus: 'available',
-    ticketUrl: 'https://www.axs.com/events/xyz456',
-    latitude: 40.71,
-    longitude: -74.01,
-    timezone: 'America/New_York',
-    monthsFromNow: 4,
-    startTime: '7:30 PM',
-  },
-  {
-    externalId: 'seed-o2-brixton-london',
-    title: 'UK Headline',
-    venueName: 'O2 Academy Brixton',
-    city: 'London',
-    region: null,
-    country: 'UK',
-    provider: 'manual',
-    ticketStatus: 'available',
-    ticketUrl: 'https://www.eventbrite.com/e/123456',
-    latitude: 51.51,
-    longitude: -0.13,
-    timezone: 'Europe/London',
-    monthsFromNow: 5,
-    startTime: '7:00 PM',
-  },
-  {
-    externalId: 'seed-columbiahalle-berlin',
-    title: null,
-    venueName: 'Columbiahalle',
-    city: 'Berlin',
-    region: null,
-    country: 'Germany',
-    provider: 'bandsintown',
-    ticketStatus: 'sold_out',
-    ticketUrl: 'https://dice.fm/event/abc-berlin',
-    latitude: 52.52,
-    longitude: 13.4,
-    timezone: 'Europe/Berlin',
-    monthsFromNow: 5,
-    startTime: '8:00 PM',
-  },
-  {
-    externalId: 'seed-zepp-divercity-tokyo',
-    title: 'Asia Tour',
-    venueName: 'Zepp DiverCity',
-    city: 'Tokyo',
-    region: null,
-    country: 'Japan',
-    provider: 'manual',
-    ticketStatus: 'available',
-    ticketUrl: 'https://seatgeek.com/event/456',
-    latitude: 35.68,
-    longitude: 139.69,
-    timezone: 'Asia/Tokyo',
-    monthsFromNow: 7,
-    startTime: '7:00 PM',
-  },
-  {
-    externalId: 'seed-enmore-sydney',
-    title: null,
-    venueName: 'Enmore Theatre',
-    city: 'Sydney',
-    region: 'NSW',
-    country: 'Australia',
-    provider: 'manual',
-    ticketStatus: 'cancelled',
-    ticketUrl: 'https://www.stubhub.com/event/789',
-    latitude: -33.87,
-    longitude: 151.21,
-    timezone: 'Australia/Sydney',
-    monthsFromNow: 8,
-    startTime: '8:00 PM',
-  },
-  {
-    externalId: 'seed-ryman-nashville',
-    title: null,
-    venueName: 'Ryman Auditorium',
-    city: 'Nashville',
-    region: 'TN',
-    country: 'USA',
-    provider: 'manual',
-    ticketStatus: 'available',
-    ticketUrl: 'https://www.bandsintown.com/e/abc-nashville',
-    latitude: 36.16,
-    longitude: -86.78,
-    timezone: 'America/Chicago',
-    monthsFromNow: 4,
-    startTime: '7:00 PM',
-  },
-  {
-    externalId: 'seed-fillmore-sf',
-    title: 'Summer Tour 2026',
-    venueName: 'The Fillmore',
-    city: 'San Francisco',
-    region: 'CA',
-    country: 'USA',
-    provider: 'manual',
-    ticketStatus: 'available',
-    ticketUrl: 'https://www.ticketmaster.com/event/def456',
-    latitude: 37.77,
-    longitude: -122.42,
-    timezone: 'America/Los_Angeles',
-    monthsFromNow: 3,
-    startTime: '8:00 PM',
-  },
-  {
-    externalId: 'seed-acl-live-austin',
-    title: null,
-    venueName: 'ACL Live',
-    city: 'Austin',
-    region: 'TX',
-    country: 'USA',
-    provider: 'bandsintown',
-    ticketStatus: 'available',
-    ticketUrl: 'https://www.axs.com/events/ghi789',
-    latitude: null,
-    longitude: null,
-    timezone: 'America/Chicago',
-    monthsFromNow: 6,
-    startTime: '7:30 PM',
-  },
-  {
-    externalId: 'seed-crystal-ballroom-portland',
-    title: null,
-    venueName: 'Crystal Ballroom',
-    city: 'Portland',
-    region: 'OR',
-    country: 'USA',
-    provider: 'manual',
-    ticketStatus: 'available',
-    ticketUrl: null,
-    latitude: 45.52,
-    longitude: -122.68,
-    timezone: 'America/Los_Angeles',
-    monthsFromNow: 5,
-    startTime: '8:00 PM',
-  },
-  {
-    externalId: 'seed-metro-chicago',
-    title: null,
-    venueName: 'Metro Chicago',
-    city: 'Chicago',
-    region: 'IL',
-    country: 'USA',
-    provider: 'manual',
-    ticketStatus: 'sold_out',
-    ticketUrl: 'https://www.ticketmaster.com/event/past123',
-    latitude: 41.88,
-    longitude: -87.63,
-    timezone: 'America/Chicago',
-    monthsFromNow: -1,
-    startTime: '9:00 PM',
-  },
-  {
-    externalId: 'seed-olympia-paris',
-    title: 'Europe Farewell',
-    venueName: "L'Olympia",
-    city: 'Paris',
-    region: null,
-    country: 'France',
-    provider: 'manual',
-    ticketStatus: 'available',
-    ticketUrl: 'https://dice.fm/event/future-paris',
-    latitude: 48.86,
-    longitude: 2.35,
-    timezone: 'Europe/Paris',
-    monthsFromNow: 12,
-    startTime: '8:30 PM',
-  },
-];
+const TEST_TOUR_DATES: readonly DemoPersonaTourDate[] =
+  INTERNAL_DJ_DEMO_PERSONA.tourDates;
 
 // ---------------------------------------------------------------------------
 // Release data (copied from seed-test-data.ts)
 // ---------------------------------------------------------------------------
 
-interface TestTrack {
-  title: string;
-  slug: string;
-  trackNumber: number;
-  discNumber: number;
-  durationMs: number;
-  isrc?: string;
-  isExplicit?: boolean;
-}
-
-interface TestRelease {
-  title: string;
-  slug: string;
-  releaseType: 'single' | 'album' | 'ep' | 'compilation';
-  releaseDate: Date;
-  artworkUrl: string;
-  spotifyUrl: string;
-  totalTracks: number;
-  upc?: string;
-  label?: string;
-  tracks?: TestTrack[];
-}
-
-function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '');
-}
-
-let isrcCounter = 200;
-function generateIsrc(): string {
-  return `USAT2${String(isrcCounter++).padStart(7, '0')}`;
-}
-
-function generateTrackTitle(index: number): string {
-  const adjectives = [
-    'Electric',
-    'Fading',
-    'Golden',
-    'Hidden',
-    'Infinite',
-    'Lucid',
-    'Midnight',
-    'Neon',
-    'Phantom',
-    'Quiet',
-    'Rising',
-    'Silver',
-    'Twilight',
-    'Ultraviolet',
-    'Velvet',
-    'Wandering',
-    'Xenon',
-    'Yearning',
-    'Azure',
-    'Burning',
-    'Crystal',
-    'Drifting',
-    'Eternal',
-    'Frozen',
-  ];
-  const nouns = [
-    'Skyline',
-    'Echoes',
-    'Horizon',
-    'Waves',
-    'Dream',
-    'Light',
-    'Shadow',
-    'Pulse',
-    'Signal',
-    'Storm',
-    'Vision',
-    'Flame',
-    'Rain',
-    'Coast',
-    'Bridge',
-    'Mirror',
-    'River',
-    'Garden',
-    'Ocean',
-    'Forest',
-    'Mountain',
-    'Desert',
-    'Valley',
-    'Dawn',
-  ];
-  return `${adjectives[index % adjectives.length]} ${nouns[index % nouns.length]}`;
-}
-
-function generateTracks(count: number, discCount = 1): TestTrack[] {
-  const tracksPerDisc = Math.ceil(count / discCount);
-  const tracks: TestTrack[] = [];
-  for (let i = 0; i < count; i++) {
-    const title = generateTrackTitle(i);
-    tracks.push({
-      title,
-      slug: slugify(title),
-      trackNumber: (i % tracksPerDisc) + 1,
-      discNumber: Math.floor(i / tracksPerDisc) + 1,
-      durationMs: 120000 + Math.floor(Math.random() * 240000),
-      isrc: generateIsrc(),
-      isExplicit: Math.random() < 0.1,
-    });
-  }
-  return tracks;
-}
-
-const TEST_RELEASES: TestRelease[] = [
-  {
-    title: 'Neon Skyline',
-    slug: 'neon-skyline',
-    releaseType: 'single',
-    releaseDate: new Date('2024-01-15'),
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d00001e02ff9ca10b55ce82ae553c8228',
-    spotifyUrl: 'https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv',
-    totalTracks: 1,
-    upc: '191061000001',
-    label: 'Neon Records',
-    tracks: [
-      {
-        title: 'Neon Skyline',
-        slug: 'neon-skyline',
-        trackNumber: 1,
-        discNumber: 1,
-        durationMs: 214000,
-        isrc: 'USAT20000001',
-      },
-    ],
-  },
-  {
-    title: 'Midnight Drive',
-    slug: 'midnight-drive',
-    releaseType: 'album',
-    releaseDate: new Date('2023-11-20'),
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d00001e02e8b066f70c206551210d902b',
-    spotifyUrl: 'https://open.spotify.com/album/6JJh8nj3ZPYoEXZwLhRJ7U',
-    totalTracks: 10,
-    upc: '191061000002',
-    label: 'Midnight Music',
-    tracks: generateTracks(10),
-  },
-  {
-    title: 'Fading Signals',
-    slug: 'fading-signals',
-    releaseType: 'ep',
-    releaseDate: new Date('2024-03-01'),
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d00001e02ff9ca10b55ce82ae553c8228',
-    spotifyUrl: 'https://open.spotify.com/album/3LH4d3cOWNNsVw41Gqt2xx',
-    totalTracks: 5,
-    upc: '191061000003',
-    tracks: generateTracks(5),
-  },
-  {
-    title: 'The Complete Sessions',
-    slug: 'the-complete-sessions',
-    releaseType: 'album',
-    releaseDate: new Date('2022-06-15'),
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d00001e02e8b066f70c206551210d902b',
-    spotifyUrl: 'https://open.spotify.com/album/9XX4d3cOWNNsVw41Gqt2yy',
-    totalTracks: 55,
-    upc: '191061000004',
-    label: 'Anthology Records',
-    tracks: generateTracks(55, 3),
-  },
-  {
-    title: 'Best of 2023',
-    slug: 'best-of-2023',
-    releaseType: 'compilation',
-    releaseDate: new Date('2023-12-31'),
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d00001e02ff9ca10b55ce82ae553c8228',
-    spotifyUrl: 'https://open.spotify.com/album/7ZZ4d3cOWNNsVw41Gqt2zz',
-    totalTracks: 20,
-    upc: '191061000005',
-    label: 'Various Artists',
-    tracks: generateTracks(20),
-  },
-  {
-    title: 'Raw Energy',
-    slug: 'raw-energy',
-    releaseType: 'single',
-    releaseDate: new Date('2024-06-01'),
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d00001e02e8b066f70c206551210d902b',
-    spotifyUrl: 'https://open.spotify.com/album/1AA4d3cOWNNsVw41Gqt2ww',
-    totalTracks: 1,
-    tracks: [
-      {
-        title: 'Raw Energy',
-        slug: 'raw-energy',
-        trackNumber: 1,
-        discNumber: 1,
-        durationMs: 198000,
-        isrc: 'USAT20000099',
-        isExplicit: true,
-      },
-    ],
-  },
-];
+const TEST_RELEASES: readonly DemoPersonaRelease[] =
+  INTERNAL_DJ_DEMO_PERSONA.releases;
 
 // ---------------------------------------------------------------------------
 // Seed functions
@@ -703,7 +278,7 @@ async function seedDemoUser(): Promise<string> {
 async function seedDemoProfile(userId: string): Promise<string> {
   console.log('  Seeding demo profile...');
 
-  // Safety: check if 'timwhite' username exists and belongs to someone else
+  // Safety: check if the internal demo handle exists and belongs to someone else
   const [existingProfile] = await db
     .select({ id: creatorProfiles.id, userId: creatorProfiles.userId })
     .from(creatorProfiles)
@@ -721,27 +296,11 @@ async function seedDemoProfile(userId: string): Promise<string> {
     process.exit(1);
   }
 
-  // Try to clone data from Tim's real /tim profile
-  let avatarUrl = FALLBACK_PROFILE.avatarUrl;
-  let spotifyId = FALLBACK_PROFILE.spotifyId;
-  let spotifyUrl = FALLBACK_PROFILE.spotifyUrl;
-  let profileGenres = FALLBACK_PROFILE.genres;
-  let location = FALLBACK_PROFILE.location;
-
-  const [timProfile] = await db
-    .select()
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.usernameNormalized, 'tim'))
-    .limit(1);
-
-  if (timProfile) {
-    console.log('    Found /tim profile, cloning Spotify data');
-    avatarUrl = timProfile.avatarUrl ?? avatarUrl;
-    spotifyId = timProfile.spotifyId ?? spotifyId;
-    spotifyUrl = timProfile.spotifyUrl ?? spotifyUrl;
-    profileGenres = timProfile.genres ?? profileGenres;
-    location = timProfile.location ?? location;
-  }
+  const avatarUrl = DEMO_PROFILE.avatarSrc;
+  const spotifyId = DEMO_PROFILE.spotifyArtistId;
+  const spotifyUrl = DEMO_PROFILE.spotifyUrl;
+  const profileGenres = [...DEMO_PROFILE.genres];
+  const location = DEMO_PROFILE.location;
 
   let spotifyIdForProfile = spotifyId;
   let spotifyUrlForProfile = spotifyUrl;
@@ -770,8 +329,8 @@ async function seedDemoProfile(userId: string): Promise<string> {
     username: DEMO_USERNAME,
     usernameNormalized: DEMO_USERNAME.toLowerCase(),
     displayName: DEMO_DISPLAY_NAME,
-    bio: FALLBACK_PROFILE.bio,
-    avatarUrl: '/images/avatars/tim-white.jpg', // Use static fallback — prevents wrong Spotify image
+    bio: DEMO_PROFILE.bio,
+    avatarUrl,
     spotifyId: spotifyIdForProfile,
     spotifyUrl: spotifyUrlForProfile,
     genres: profileGenres,
@@ -779,14 +338,14 @@ async function seedDemoProfile(userId: string): Promise<string> {
     creatorType: 'artist' as const,
     isPublic: true,
     isVerified: true,
-    isFeatured: true,
-    isClaimed: true,
-    avatarLockedByUser: true, // Lock avatar to prevent enrichment overwriting with wrong Tim White
+    isFeatured: DEMO_PROFILE.isFeaturedByDefault,
+    isClaimed: DEMO_PROFILE.isClaimedByDefault,
+    avatarLockedByUser: true,
     ingestionStatus: 'idle' as const,
-    stripeAccountId: 'acct_demo_timwhite',
+    stripeAccountId: 'acct_demo_calvin',
     stripeOnboardingComplete: true,
     stripePayoutsEnabled: true,
-    venmoHandle: 'timwhite',
+    venmoHandle: DEMO_PROFILE.venmoHandle,
     onboardingCompletedAt: new Date(),
     updatedAt: new Date(),
   };
@@ -937,149 +496,64 @@ async function seedDemoContacts(profileId: string): Promise<string[]> {
 async function seedDemoReleases(profileId: string): Promise<string[]> {
   console.log('  Seeding releases...');
 
-  // Try to clone from Tim's real /tim profile
-  const [timProfile] = await db
-    .select({ id: creatorProfiles.id })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.usernameNormalized, 'tim'))
-    .limit(1);
+  const seededReleaseIds: string[] = [];
 
-  const clonedReleaseIds: string[] = [];
+  for (const release of TEST_RELEASES) {
+    const [created] = await db
+      .insert(discogReleases)
+      .values({
+        creatorProfileId: profileId,
+        title: release.title,
+        slug: `demo-${release.slug}`,
+        releaseType: release.releaseType,
+        releaseDate: new Date(release.releaseDate),
+        artworkUrl: release.artworkUrl,
+        totalTracks: release.totalTracks,
+        upc: release.upc ? `DEMO${release.upc}` : undefined,
+        label: release.label ?? undefined,
+        sourceType: 'manual',
+      })
+      .returning({ id: discogReleases.id });
+    seededReleaseIds.push(created.id);
 
-  if (timProfile) {
-    const timReleases = await db
-      .select()
-      .from(discogReleases)
-      .where(eq(discogReleases.creatorProfileId, timProfile.id));
+    const providerRows = Object.entries(release.providerUrls).map(
+      ([providerId, url], index) => ({
+        providerId,
+        ownerType: 'release' as const,
+        releaseId: created.id,
+        url,
+        isPrimary: index === 0,
+        sourceType: 'manual' as const,
+      })
+    );
 
-    for (const release of timReleases) {
-      const [created] = await db
-        .insert(discogReleases)
-        .values({
-          creatorProfileId: profileId,
-          title: release.title,
-          slug: release.slug,
-          releaseType: release.releaseType,
-          releaseDate: release.releaseDate,
-          artworkUrl: release.artworkUrl,
-          totalTracks: release.totalTracks,
-          upc: release.upc ? `DEMO${release.upc}` : undefined,
-          label: release.label,
-          sourceType: 'manual',
-        })
-        .returning({ id: discogReleases.id });
-      clonedReleaseIds.push(created.id);
-
-      // Clone tracks
-      const timTracks = await db
-        .select()
-        .from(discogTracks)
-        .where(eq(discogTracks.releaseId, release.id));
-
-      if (timTracks.length > 0) {
-        await db
-          .insert(discogTracks)
-          .values(
-            timTracks.map(t => ({
-              releaseId: created.id,
-              creatorProfileId: profileId,
-              title: t.title,
-              slug: t.slug,
-              trackNumber: t.trackNumber,
-              discNumber: t.discNumber,
-              durationMs: t.durationMs,
-              isrc: t.isrc ? `DEMO${t.isrc}` : null,
-              isExplicit: t.isExplicit,
-              sourceType: 'manual' as const,
-            }))
-          )
-          .onConflictDoNothing();
-      }
-
-      // Clone provider links
-      const timProviderLinks = await db
-        .select()
-        .from(providerLinks)
-        .where(eq(providerLinks.releaseId, release.id));
-
-      for (const pl of timProviderLinks) {
-        await db
-          .insert(providerLinks)
-          .values({
-            providerId: pl.providerId,
-            ownerType: pl.ownerType,
-            releaseId: created.id,
-            url: pl.url,
-            isPrimary: pl.isPrimary,
-            sourceType: 'manual',
-          })
-          .onConflictDoNothing();
-      }
+    if (providerRows.length > 0) {
+      await db.insert(providerLinks).values(providerRows).onConflictDoNothing();
     }
 
-    console.log(`    Cloned ${timReleases.length} releases from /tim profile`);
-  }
-
-  // Supplement with TEST_RELEASES if we have fewer than 3
-  if (clonedReleaseIds.length < 3) {
-    console.log('    Supplementing with test releases...');
-    for (const release of TEST_RELEASES) {
-      const [created] = await db
-        .insert(discogReleases)
-        .values({
-          creatorProfileId: profileId,
-          title: release.title,
-          slug: `demo-${release.slug}`,
-          releaseType: release.releaseType,
-          releaseDate: release.releaseDate,
-          artworkUrl: release.artworkUrl,
-          totalTracks: release.totalTracks,
-          upc: release.upc ? `DEMO${release.upc}` : undefined,
-          label: release.label,
-          sourceType: 'manual',
-        })
-        .returning({ id: discogReleases.id });
-      clonedReleaseIds.push(created.id);
-
-      // Add Spotify provider link
+    if (release.tracks && release.tracks.length > 0) {
       await db
-        .insert(providerLinks)
-        .values({
-          providerId: 'spotify',
-          ownerType: 'release',
-          releaseId: created.id,
-          url: release.spotifyUrl,
-          isPrimary: true,
-          sourceType: 'manual',
-        })
+        .insert(discogTracks)
+        .values(
+          release.tracks.map(track => ({
+            releaseId: created.id,
+            creatorProfileId: profileId,
+            title: track.title,
+            slug: track.slug,
+            trackNumber: track.trackNumber,
+            discNumber: track.discNumber,
+            durationMs: track.durationMs,
+            isrc: track.isrc,
+            isExplicit: Boolean(track.isExplicit),
+            sourceType: 'manual' as const,
+          }))
+        )
         .onConflictDoNothing();
-
-      // Seed tracks
-      if (release.tracks && release.tracks.length > 0) {
-        await db
-          .insert(discogTracks)
-          .values(
-            release.tracks.map(t => ({
-              releaseId: created.id,
-              creatorProfileId: profileId,
-              title: t.title,
-              slug: t.slug,
-              trackNumber: t.trackNumber,
-              discNumber: t.discNumber,
-              durationMs: t.durationMs,
-              isrc: t.isrc ?? null,
-              isExplicit: t.isExplicit ?? false,
-              sourceType: 'manual' as const,
-            }))
-          )
-          .onConflictDoNothing();
-      }
     }
-    console.log(`    Created ${TEST_RELEASES.length} supplemental releases`);
   }
 
-  console.log(`    Total releases: ${clonedReleaseIds.length}`);
-  return clonedReleaseIds;
+  console.log(`    Created ${seededReleaseIds.length} demo releases`);
+  return seededReleaseIds;
 }
 
 async function seedDemoReleaseTasks(
@@ -1137,64 +611,10 @@ async function seedDemoReleaseTasks(
 async function seedDemoSocialLinks(profileId: string): Promise<string[]> {
   console.log('  Seeding social links...');
 
-  const links = [
-    {
-      platform: 'spotify',
-      platformType: 'music_streaming',
-      url: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
-      displayText: 'Listen on Spotify',
-      sortOrder: 1,
-      clicks: 50 + Math.floor(Math.random() * 450),
-    },
-    {
-      platform: 'apple_music',
-      platformType: 'music_streaming',
-      url: 'https://music.apple.com/us/artist/tim-white/1234567890',
-      displayText: 'Listen on Apple Music',
-      sortOrder: 2,
-      clicks: 50 + Math.floor(Math.random() * 450),
-    },
-    {
-      platform: 'instagram',
-      platformType: 'social',
-      url: 'https://instagram.com/timwhitemusic',
-      displayText: 'Instagram',
-      sortOrder: 3,
-      clicks: 50 + Math.floor(Math.random() * 450),
-    },
-    {
-      platform: 'tiktok',
-      platformType: 'social',
-      url: 'https://tiktok.com/@timwhitemusic',
-      displayText: 'TikTok',
-      sortOrder: 4,
-      clicks: 50 + Math.floor(Math.random() * 450),
-    },
-    {
-      platform: 'youtube',
-      platformType: 'video',
-      url: 'https://youtube.com/@timwhitemusic',
-      displayText: 'YouTube',
-      sortOrder: 5,
-      clicks: 50 + Math.floor(Math.random() * 450),
-    },
-    {
-      platform: 'twitter',
-      platformType: 'social',
-      url: 'https://x.com/timwhitemusic',
-      displayText: 'X / Twitter',
-      sortOrder: 6,
-      clicks: 50 + Math.floor(Math.random() * 450),
-    },
-    {
-      platform: 'venmo',
-      platformType: 'payment',
-      url: 'https://venmo.com/timwhite',
-      displayText: 'Tip on Venmo',
-      sortOrder: 7,
-      clicks: 50 + Math.floor(Math.random() * 450),
-    },
-  ];
+  const links = INTERNAL_DJ_DEMO_PERSONA.socialLinks.map(link => ({
+    ...link,
+    clicks: 50 + Math.floor(Math.random() * 450),
+  }));
 
   const ids: string[] = [];
   for (const link of links) {
@@ -1239,7 +659,7 @@ async function seedDemoTourDates(profileId: string) {
         latitude: td.latitude,
         longitude: td.longitude,
         timezone: td.timezone,
-        startDate: dateMonthsFromNow(td.monthsFromNow),
+        startDate: new Date(td.startDate),
         startTime: td.startTime,
       })
       .onConflictDoNothing();
@@ -1697,7 +1117,7 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
         fromEmail: 'alex.rivera@outsidelands.example.com',
         fromName: 'Alex Rivera',
         bodyText:
-          "Hi Tim,\n\nHope this message finds you well. I'm Alex Rivera, Talent Buyer at Another Planet Entertainment. We're putting together the 2026 Outside Lands lineup and we'd love to have you on the Sutro stage.\n\nWe're looking at August 7-9 and can offer a $15,000 guarantee for a 45-minute set. The festival typically draws 75,000+ attendees daily and your sound would be a perfect fit for the Sutro crowd.\n\nWould love to discuss details with your team. Are you available for a quick call this week?\n\nBest,\nAlex Rivera\nTalent Buyer, Another Planet Entertainment",
+          "Hi Calvin,\n\nHope this message finds you well. I'm Alex Rivera, Talent Buyer at Another Planet Entertainment. We're putting together the 2026 Outside Lands lineup and we'd love to have you on the Sutro stage.\n\nWe're looking at August 7-9 and can offer a $15,000 guarantee for a 45-minute set. The festival typically draws 75,000+ attendees daily and your sound would be a perfect fit for the Sutro crowd.\n\nWould love to discuss details with your team. Are you available for a quick call this week?\n\nBest,\nAlex Rivera\nTalent Buyer, Another Planet Entertainment",
       },
     },
     {
@@ -1717,11 +1137,11 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
         fromEmail: 'jessica.nguyen@pitchfork.example.com',
         fromName: 'Jessica Nguyen',
         bodyText:
-          "Hi Tim,\n\nI'm Jessica Nguyen, a staff writer at Pitchfork. I'm working on a feature about artists who are redefining the boundary between electronic and acoustic music, and your work keeps coming up in my research.\n\nWould you be open to a 30-minute interview? I'd love to talk about your creative process, particularly how you approach production on tracks like \"Fading Signals.\"\n\nWe're looking to publish in the April issue. Happy to work around your schedule.\n\nThanks,\nJessica",
+          "Hi Calvin,\n\nI'm Jessica Nguyen, a staff writer at Pitchfork. I'm working on a feature about artists who are redefining the boundary between electronic and acoustic music, and your work keeps coming up in my research.\n\nWould you be open to a 30-minute interview? I'd love to talk about your creative process, particularly how you approach production on tracks like \"Blessings featuring Clementine Douglas.\"\n\nWe're looking to publish in the April issue. Happy to work around your schedule.\n\nThanks,\nJessica",
       },
     },
     {
-      subject: 'Sennheiser x Tim White — Creator Partnership',
+      subject: 'Sennheiser x Calvin Harris — Creator Partnership',
       category: 'brand_partnership' as const,
       priority: 'high' as const,
       status: 'pending_review' as const,
@@ -1737,7 +1157,7 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
         fromEmail: 'partnerships@sennheiser.example.com',
         fromName: 'David Park',
         bodyText:
-          "Hi Tim,\n\nDavid Park here from Sennheiser's Creator Partnerships team. We've been following your work and think there's a natural fit between your artistry and the Momentum line.\n\nWe're exploring a creator partnership that would include:\n- Product endorsement (Momentum 4 Wireless)\n- 3 social content pieces over 6 months\n- Studio session content featuring the gear\n- Affiliate compensation on sales through your link\n\nWould love to set up a call to discuss terms and creative direction. Are you interested?\n\nBest,\nDavid Park\nCreator Partnerships, Sennheiser",
+          "Hi Calvin,\n\nDavid Park here from Sennheiser's Creator Partnerships team. We've been following your work and think there's a natural fit between your artistry and the Momentum line.\n\nWe're exploring a creator partnership that would include:\n- Product endorsement (Momentum 4 Wireless)\n- 3 social content pieces over 6 months\n- Studio session content featuring the gear\n- Affiliate compensation on sales through your link\n\nWould love to set up a call to discuss terms and creative direction. Are you interested?\n\nBest,\nDavid Park\nCreator Partnerships, Sennheiser",
       },
     },
     {
@@ -1753,7 +1173,7 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
         fromEmail: 'sarah.m@gmail.com',
         fromName: 'Sarah M.',
         bodyText:
-          'Dear Tim,\n\nI know you probably get a lot of messages like this, but I had to write. Your album Midnight Drive came into my life at exactly the right time. I was going through a divorce and your music was the only thing that made the long nights bearable.\n\n"Electric Skyline" in particular — that bridge where everything opens up — it just hits different when you\'re starting over. I\'ve listened to it probably 500 times.\n\nI just wanted to say thank you. Your art matters more than you know.\n\nWith gratitude,\nSarah',
+          'Dear Calvin,\n\nI know you probably get a lot of messages like this, but I had to write. Your album 96 Months came into my life at exactly the right time. I was going through a divorce and your music was the only thing that made the long nights bearable.\n\n"Miracle" in particular — that drop where everything opens up — it just hits different when you\'re starting over. I\'ve listened to it probably 500 times.\n\nI just wanted to say thank you. Your art matters more than you know.\n\nWith gratitude,\nSarah',
       },
     },
     {
@@ -1772,7 +1192,7 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
         fromEmail: 'beats@producerx.example.com',
         fromName: 'DJ Lumina',
         bodyText:
-          "Hey Tim!\n\nBig fan of your work, especially the production on Fading Signals. I'm DJ Lumina — I produce electronic/ambient stuff and I think our styles would mesh really well.\n\nI've got a beat that I've been sitting on that has your name written all over it. It's got this ethereal synth pad foundation with a driving rhythm section that I think you'd vibe with.\n\nHere's a demo: https://soundcloud.com/djlumina/collab-demo-private\n\nWould love to hear your thoughts. No pressure at all.\n\nPeace,\nLumina",
+          "Hey Calvin!\n\nBig fan of your work, especially the production on Desire with Sam Smith. I'm DJ Lumina — I produce electronic/ambient stuff and I think our styles would mesh really well.\n\nI've got a beat that I've been sitting on that has your name written all over it. It's got this ethereal synth pad foundation with a driving rhythm section that I think you'd vibe with.\n\nHere's a demo: https://soundcloud.com/djlumina/collab-demo-private\n\nWould love to hear your thoughts. No pressure at all.\n\nPeace,\nLumina",
       },
     },
     {
@@ -1794,7 +1214,7 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
         fromEmail: 'events@thefillmore.example.com',
         fromName: 'The Fillmore Events',
         bodyText:
-          "Hi Tim,\n\nWe'd love to offer you a headlining slot at The Fillmore in October 2026. Based on your growing Bay Area following and the success of your last show here, we think a proper headline would be electric.\n\nWe're looking at October 15th. The Fillmore capacity is 1,150 and we're confident we can sell it out based on your trajectory.\n\nPlease have your booking team reach out to discuss terms.\n\nBest,\nThe Fillmore Events Team",
+          "Hi Calvin,\n\nWe'd love to offer you a headlining slot at The Fillmore in October 2026. Based on your growing Bay Area following and the success of your last run here, we think a proper headline would be electric.\n\nWe're looking at October 15th. The Fillmore capacity is 1,150 and we're confident we can sell it out based on your trajectory.\n\nPlease have your booking team reach out to discuss terms.\n\nBest,\nThe Fillmore Events Team",
       },
     },
     {
@@ -1828,7 +1248,7 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
         fromEmail: 'talent@redlightmgmt.example.com',
         fromName: 'Chris Walsh',
         bodyText:
-          'Hi Tim,\n\nChris Walsh here from Red Light Management. I\'ve been watching your career with great interest — particularly the organic audience growth and the quality of your fanbase engagement.\n\nRed Light represents artists across electronic, indie, and pop, and I think we could be a great fit for where you\'re headed. We specialize in artist development at your stage — bridging the gap between "emerging" and "established."\n\nWould love to grab a coffee or hop on a call to introduce ourselves properly. No commitment, just a conversation.\n\nBest,\nChris Walsh\nRed Light Management',
+          'Hi Calvin,\n\nChris Walsh here from Red Light Management. I\'ve been watching your career with great interest — particularly the organic audience growth and the quality of your fanbase engagement.\n\nRed Light represents artists across electronic, indie, and pop, and I think we could be a great fit for where you\'re headed. We specialize in artist development at your stage — bridging the gap between "emerging" and "established."\n\nWould love to grab a coffee or hop on a call to introduce ourselves properly. No commitment, just a conversation.\n\nBest,\nChris Walsh\nRed Light Management',
       },
     },
   ];
@@ -2306,47 +1726,47 @@ async function seedDemoDspMatches(profileId: string) {
   const matches = [
     {
       providerId: 'spotify',
-      externalArtistId: '4Uwpa6zW3zzCSQvooQNksm',
-      externalArtistName: 'Tim White',
-      externalArtistUrl:
-        'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
+      externalArtistId: DEMO_PROFILE.spotifyArtistId ?? 'calvin-harris',
+      externalArtistName: DEMO_DISPLAY_NAME,
+      externalArtistUrl: DEMO_PROFILE.spotifyUrl ?? 'https://open.spotify.com',
       confidenceScore: '0.9800',
       status: 'confirmed' as const,
       confirmedAt: new Date(),
     },
     {
       providerId: 'apple_music',
-      externalArtistId: '1234567890',
-      externalArtistName: 'Tim White',
+      externalArtistId: 'calvin-harris-apple',
+      externalArtistName: DEMO_DISPLAY_NAME,
       externalArtistUrl:
-        'https://music.apple.com/us/artist/tim-white/1234567890',
+        DEMO_PROFILE.appleMusicUrl ??
+        'https://music.apple.com/us/search?term=Calvin%20Harris',
       confidenceScore: '0.9500',
       status: 'confirmed' as const,
       confirmedAt: new Date(),
     },
     {
       providerId: 'youtube_music',
-      externalArtistId: 'UCxxxxxxxxxxxxxxxx',
-      externalArtistName: 'Tim White',
-      externalArtistUrl: 'https://music.youtube.com/channel/UCxxxxxxxxxxxxxxxx',
+      externalArtistId: 'UCcalvinharrisofficial',
+      externalArtistName: DEMO_DISPLAY_NAME,
+      externalArtistUrl: 'https://music.youtube.com/search?q=Calvin+Harris',
       confidenceScore: '0.9200',
       status: 'confirmed' as const,
       confirmedAt: new Date(),
     },
     {
       providerId: 'deezer',
-      externalArtistId: '99887766',
-      externalArtistName: 'Tim White',
-      externalArtistUrl: 'https://www.deezer.com/artist/99887766',
+      externalArtistId: 'calvin-harris-deezer',
+      externalArtistName: DEMO_DISPLAY_NAME,
+      externalArtistUrl: 'https://www.deezer.com/search/Calvin%20Harris',
       confidenceScore: '0.8800',
       status: 'confirmed' as const,
       confirmedAt: new Date(),
     },
     {
       providerId: 'tidal',
-      externalArtistId: '55443322',
-      externalArtistName: 'Tim White',
-      externalArtistUrl: 'https://tidal.com/artist/55443322',
+      externalArtistId: 'calvin-harris-tidal',
+      externalArtistName: DEMO_DISPLAY_NAME,
+      externalArtistUrl: 'https://listen.tidal.com/search?q=Calvin%20Harris',
       confidenceScore: '0.8200',
       status: 'suggested' as const,
       confirmedAt: null,

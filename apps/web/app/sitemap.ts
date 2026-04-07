@@ -14,7 +14,11 @@ import { env } from '@/lib/env-server';
 export const revalidate = 3600;
 
 type SitemapCatalog = {
-  profiles: Array<{ username: string; updatedAt: Date | null }>;
+  profiles: Array<{
+    username: string;
+    updatedAt: Date | null;
+    avatarUrl: string | null;
+  }>;
   releases: Array<{
     username: string;
     slug: string;
@@ -40,6 +44,7 @@ const getSitemapCatalog = unstable_cache(
           .select({
             username: creatorProfiles.username,
             updatedAt: creatorProfiles.updatedAt,
+            avatarUrl: creatorProfiles.avatarUrl,
           })
           .from(creatorProfiles)
           .where(eq(creatorProfiles.isPublic, true)),
@@ -231,6 +236,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: profile.updatedAt ?? now,
     changeFrequency: 'weekly',
     priority: 0.8,
+    ...(profile.avatarUrl ? { images: [profile.avatarUrl] } : {}),
   }));
 
   const releasePages: MetadataRoute.Sitemap = catalog.releases.map(release => ({

@@ -29,7 +29,7 @@ export default async function ReleasesPage() {
     );
   }
 
-  // Get shell data to check onboarding and extract profile ID for prefetch
+  // Shell data is cached from the shell layout (same request) — resolves instantly.
   const dashboardData = await getDashboardShellData(userId);
 
   if (dashboardData.dashboardLoadError) {
@@ -47,9 +47,9 @@ export default async function ReleasesPage() {
     redirect(APP_ROUTES.ONBOARDING);
   }
 
+  // Prefetch release matrix into TanStack cache — must await to guarantee
+  // the data is included in getDehydratedState() (no loading skeleton).
   const profileId = dashboardData.selectedProfile?.id;
-
-  // Prefetch release matrix into TanStack cache for instant client render
   if (profileId) {
     const queryClient = getQueryClient();
     await queryClient.prefetchQuery({

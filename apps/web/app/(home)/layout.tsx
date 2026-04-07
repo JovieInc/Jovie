@@ -21,21 +21,21 @@ export default function HomeLayout({
       </main>
       <footer className='home-legal-bar'>
         <nav
-          className='mx-auto flex w-full max-w-[var(--linear-content-max)] items-center justify-center gap-4 px-5 py-3 text-[12px] tracking-[-0.01em] sm:px-6 lg:px-0'
+          className='mx-auto flex w-full max-w-[var(--linear-content-max)] items-center justify-center gap-3 px-5 pb-6 pt-3 text-[11px] tracking-[-0.01em] sm:px-6 lg:px-0'
           aria-label='Legal'
         >
           <Link
             href={APP_ROUTES.LEGAL_PRIVACY}
-            className='home-legal-link focus-ring-themed rounded-md px-2 py-1'
+            className='home-legal-link focus-ring-themed rounded-md px-1.5 py-0.5'
           >
             Privacy
           </Link>
-          <span aria-hidden='true' className='text-quaternary-token'>
-            /
+          <span aria-hidden='true' className='text-quaternary-token/40'>
+            ·
           </span>
           <Link
             href={APP_ROUTES.LEGAL_TERMS}
-            className='home-legal-link focus-ring-themed rounded-md px-2 py-1'
+            className='home-legal-link focus-ring-themed rounded-md px-1.5 py-0.5'
           >
             Terms
           </Link>

@@ -17,6 +17,10 @@ import {
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
+import {
+  buildBreadcrumbObject,
+  buildListenActions,
+} from '@/lib/constants/schemas';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for types
 import type {
@@ -25,7 +29,6 @@ import type {
 } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
-import { getProfileOgImageUrl } from '@/lib/profile/og-image';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { isDspPlatform } from '@/lib/services/social-links/types';
@@ -46,18 +49,49 @@ import {
 } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
 
+/** Max MusicEvent schemas to emit (Google shows ~5 in rich results). */
+const MAX_EVENT_SCHEMAS = 10;
+
 /**
- * Generate JSON-LD structured data for artist profile SEO.
- * Implements schema.org MusicGroup and BreadcrumbList schemas.
+ * Map ticketStatus enum to schema.org Event properties.
+ */
+function mapTicketStatus(status: string): {
+  eventStatus: string;
+  availability: string | null;
+} {
+  switch (status) {
+    case 'cancelled':
+      return {
+        eventStatus: 'https://schema.org/EventCancelled',
+        availability: null,
+      };
+    case 'sold_out':
+      return {
+        eventStatus: 'https://schema.org/EventScheduled',
+        availability: 'https://schema.org/SoldOut',
+      };
+    default:
+      return {
+        eventStatus: 'https://schema.org/EventScheduled',
+        availability: 'https://schema.org/InStock',
+      };
+  }
+}
+
+/**
+ * Generate a single @graph JSON-LD object for artist profile SEO.
+ * Includes ProfilePage, MusicGroup, BreadcrumbList, and MusicEvent schemas.
  */
 function generateProfileStructuredData(
   profile: CreatorProfile,
   genres: string[] | null,
-  links: LegacySocialLink[]
+  links: LegacySocialLink[],
+  tourDates: TourDateViewModel[]
 ) {
   const artistName = profile.display_name || profile.username;
-  const profileUrl = `${BASE_URL}/${profile.username}`;
-  const imageUrl = profile.avatar_url || `${BASE_URL}/og/default.png`;
+  const normalizedUsername =
+    profile.username_normalized || profile.username.toLowerCase();
+  const profileUrl = `${BASE_URL}/${normalizedUsername}`;
 
   // Extract social profile URLs for sameAs
   const socialUrls = links
@@ -73,24 +107,66 @@ function generateProfileStructuredData(
     )
     .map(link => link.url);
 
-  // Add DSP profile URLs if available
   if (profile.spotify_url) socialUrls.push(profile.spotify_url);
   if (profile.apple_music_url) socialUrls.push(profile.apple_music_url);
   if (profile.youtube_url) socialUrls.push(profile.youtube_url);
-
-  // Remove duplicates
   const uniqueSocialUrls = [...new Set(socialUrls)];
 
-  const musicGroupSchema = {
-    '@context': 'https://schema.org',
+  // Build ListenAction from all DSP links (profile columns + social links table)
+  const DSP_PLATFORMS: Record<string, string> = {
+    spotify: 'Spotify',
+    apple_music: 'Apple Music',
+    youtube: 'YouTube',
+    soundcloud: 'SoundCloud',
+    deezer: 'Deezer',
+    tidal: 'Tidal',
+  };
+  const dspUrls = new Map<string, { url: string; name: string }>();
+  // Profile columns first (highest priority)
+  if (profile.spotify_url)
+    dspUrls.set('spotify', { url: profile.spotify_url, name: 'Spotify' });
+  if (profile.apple_music_url)
+    dspUrls.set('apple_music', {
+      url: profile.apple_music_url,
+      name: 'Apple Music',
+    });
+  if (profile.youtube_url)
+    dspUrls.set('youtube', { url: profile.youtube_url, name: 'YouTube' });
+  // Social links table (fill gaps)
+  for (const link of links) {
+    const platform = link.platform?.toLowerCase() ?? '';
+    if (DSP_PLATFORMS[platform] && link.url && !dspUrls.has(platform)) {
+      dspUrls.set(platform, { url: link.url, name: DSP_PLATFORMS[platform] });
+    }
+  }
+  const listenActions = buildListenActions(
+    [...dspUrls.entries()].map(([id, d]) => ({ providerId: id, url: d.url }))
+  );
+
+  const musicGroupSchema: Record<string, unknown> = {
     '@type': 'MusicGroup',
     '@id': `${profileUrl}#musicgroup`,
     name: artistName,
     description: profile.bio || `Music by ${artistName}`,
     url: profileUrl,
-    image: imageUrl,
     sameAs: uniqueSocialUrls,
     genre: genres && genres.length > 0 ? genres : ['Music'],
+    ...(profile.avatar_url && {
+      image: {
+        '@type': 'ImageObject',
+        url: profile.avatar_url,
+        name: `${artistName} profile photo`,
+      },
+    }),
+    ...(profile.location && {
+      location: {
+        '@type': 'Place',
+        name: profile.location,
+      },
+    }),
+    ...(profile.active_since_year && {
+      foundingDate: String(profile.active_since_year),
+    }),
     ...(profile.is_verified && {
       additionalProperty: {
         '@type': 'PropertyValue',
@@ -98,28 +174,81 @@ function generateProfileStructuredData(
         value: true,
       },
     }),
+    ...(listenActions.length > 0 && { potentialAction: listenActions }),
   };
 
-  const breadcrumbSchema = {
+  const profilePageSchema: Record<string, unknown> = {
+    '@type': 'ProfilePage',
+    '@id': `${profileUrl}#profilepage`,
+    mainEntity: { '@id': `${profileUrl}#musicgroup` },
+    url: profileUrl,
+    name: `${artistName} | Jovie`,
+    ...(profile.created_at && { dateCreated: profile.created_at }),
+    ...(profile.updated_at && { dateModified: profile.updated_at }),
+  };
+
+  const breadcrumbSchema = buildBreadcrumbObject([
+    { name: 'Home', url: BASE_URL },
+    { name: artistName, url: profileUrl },
+  ]);
+
+  // MusicEvent schemas for upcoming tour dates (capped at MAX_EVENT_SCHEMAS)
+  const eventSchemas = tourDates.slice(0, MAX_EVENT_SCHEMAS).map(td => {
+    const { eventStatus, availability } = mapTicketStatus(td.ticketStatus);
+    const eventName = td.title || `${artistName} at ${td.venueName}`;
+
+    const locationParts: Record<string, unknown> = {
+      '@type': 'Place',
+      name: td.venueName,
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: td.city,
+        ...(td.region && { addressRegion: td.region }),
+        addressCountry: td.country,
+      },
+    };
+
+    if (td.latitude != null && td.longitude != null) {
+      locationParts.geo = {
+        '@type': 'GeoCoordinates',
+        latitude: td.latitude,
+        longitude: td.longitude,
+      };
+    }
+
+    const event: Record<string, unknown> = {
+      '@type': 'MusicEvent',
+      '@id': `${profileUrl}#event-${td.id}`,
+      name: eventName,
+      startDate: td.startDate,
+      location: locationParts,
+      performer: { '@id': `${profileUrl}#musicgroup` },
+      eventStatus,
+      eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    };
+
+    if (td.ticketUrl && availability) {
+      event.offers = {
+        '@type': 'Offer',
+        url: td.ticketUrl,
+        availability,
+      };
+    }
+
+    return event;
+  });
+
+  const graph = [
+    profilePageSchema,
+    musicGroupSchema,
+    breadcrumbSchema,
+    ...eventSchemas,
+  ];
+
+  return {
     '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      {
-        '@type': 'ListItem',
-        position: 1,
-        name: 'Home',
-        item: BASE_URL,
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: artistName,
-        item: profileUrl,
-      },
-    ],
+    '@graph': graph,
   };
-
-  return { musicGroupSchema, breadcrumbSchema };
 }
 
 function calculateProfileCompletion(result: {
@@ -498,13 +627,6 @@ export default async function ArtistPage({
     profile.avatar_url
   );
 
-  // Generate structured data for SEO
-  const { musicGroupSchema, breadcrumbSchema } = generateProfileStructuredData(
-    profile,
-    genres,
-    links
-  );
-
   // Await tour dates (started above, non-blocking — errors resolve to empty)
   // Sort server-side so the client doesn't need a useMemo sort
   const tourDates = (
@@ -513,14 +635,19 @@ export default async function ArtistPage({
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
 
+  // Generate structured data for SEO (after tour dates resolve)
+  const structuredData = generateProfileStructuredData(
+    profile,
+    genres,
+    links,
+    tourDates
+  );
+
   return (
     <>
-      {/* JSON-LD Structured Data for SEO — rendered inline for crawler visibility */}
+      {/* JSON-LD Structured Data for SEO — single @graph for all schemas */}
       <script type='application/ld+json'>
-        {safeJsonLdStringify(musicGroupSchema)}
-      </script>
-      <script type='application/ld+json'>
-        {safeJsonLdStringify(breadcrumbSchema)}
+        {safeJsonLdStringify(structuredData)}
       </script>
 
       {isPublicNoAuthSmoke ? null : (
@@ -571,23 +698,37 @@ function buildProfileDescription(
   artistName: string,
   genres: string[] | null
 ): string {
+  const locationPrefix = profile.location ? `${profile.location}-based ` : '';
+  const genreText =
+    genres && genres.length > 0 ? `${genres.slice(0, 3).join(', ')} ` : '';
   const bioSnippet = profile.bio
     ? profile.bio.slice(0, 155).trim()
     : `Discover ${artistName}'s music`;
-  const genreText =
-    genres && genres.length > 0
-      ? `. ${genres.slice(0, 3).join(', ')} artist`
-      : '';
 
-  return `${bioSnippet}${profile.bio && profile.bio.length > 155 ? '...' : ''}${genreText}. Stream on Spotify, Apple Music & more on Jovie.`;
+  if (profile.bio) {
+    const suffix = profile.bio.length > 155 ? '...' : '';
+    const genreSuffix =
+      genres && genres.length > 0
+        ? `. ${genres.slice(0, 3).join(', ')} artist`
+        : '';
+    return `${bioSnippet}${suffix}${genreSuffix}. Stream on Spotify, Apple Music & more on Jovie.`;
+  }
+
+  const descriptor = `${locationPrefix}${genreText}`.trim();
+  return descriptor
+    ? `${descriptor} artist. Stream ${artistName}'s music on Spotify, Apple Music & more on Jovie.`
+    : `Stream ${artistName}'s music on Spotify, Apple Music & more on Jovie.`;
 }
 
 function buildProfileMetadata(
   profile: CreatorProfile,
-  genres: string[] | null
+  genres: string[] | null,
+  latestRelease?: DiscogRelease | null
 ): Metadata {
   const artistName = profile.display_name || profile.username;
-  const profileUrl = `${BASE_URL}/${profile.username}`;
+  const normalizedUsername =
+    profile.username_normalized || profile.username.toLowerCase();
+  const profileUrl = `${BASE_URL}/${normalizedUsername}`;
   const title = artistName;
   const socialTitle = `${artistName} | Jovie`;
   const description = buildProfileDescription(profile, artistName, genres);
@@ -633,14 +774,6 @@ function buildProfileMetadata(
       url: profileUrl,
       siteName: 'Jovie',
       locale: 'en_US',
-      images: [
-        {
-          url: getProfileOgImageUrl(profile.username),
-          width: 1200,
-          height: 630,
-          alt: `${artistName} profile card`,
-        },
-      ],
     },
     twitter: {
       card: 'summary_large_image',
@@ -648,20 +781,13 @@ function buildProfileMetadata(
       description,
       creator: '@jovieapp',
       site: '@jovieapp',
-      images: [
-        {
-          url: getProfileOgImageUrl(profile.username),
-          alt: `${artistName} profile card`,
-        },
-      ],
     },
     other: {
-      'music:musician': artistName,
-      ...(genres &&
-        genres.length > 0 && {
-          'music:genre': genres.slice(0, 3).join(', '),
-        }),
+      // Note: OG-namespace tags (music:*, profile:*) require property= semantics
+      // which metadata.other cannot provide (it renders name=). These signals are
+      // covered by JSON-LD structured data instead. Only non-OG tags go here.
       ...(profile.is_verified && { 'profile:verified': 'true' }),
+      ...(profile.location && { 'geo.placename': profile.location }),
     },
   };
 }
@@ -670,7 +796,7 @@ function buildProfileMetadata(
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
   const profileResult = await getProfileAndLinks(username);
-  const { profile, genres, status } = profileResult;
+  const { profile, genres, latestRelease, status } = profileResult;
 
   if (status === 'error') {
     return {
@@ -683,5 +809,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return PROFILE_NOT_FOUND_METADATA;
   }
 
-  return buildProfileMetadata(profile, genres);
+  return buildProfileMetadata(profile, genres, latestRelease);
 }

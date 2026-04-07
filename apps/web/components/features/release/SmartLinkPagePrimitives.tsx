@@ -23,6 +23,8 @@ interface SmartLinkPageFrameProps {
   readonly children: React.ReactNode;
   readonly glowClassName?: string;
   readonly mainId?: string;
+  /** When true, vertically centers content instead of using fixed-height scrollable layout */
+  readonly centered?: boolean;
 }
 
 export function SmartLinkAmbientGlow({
@@ -48,7 +50,7 @@ export function SmartLinkArtworkCard({
   return (
     <div
       className={cn(
-        'relative aspect-square w-full overflow-hidden rounded-lg bg-surface-1/30 shadow-2xl ring-1 ring-white/[0.08]',
+        'relative aspect-square w-full overflow-hidden rounded-2xl bg-surface-1/30 shadow-2xl ring-1 ring-white/[0.08]',
         className
       )}
     >
@@ -110,18 +112,34 @@ export function SmartLinkPageFrame({
   children,
   glowClassName,
   mainId,
+  centered = false,
 }: Readonly<SmartLinkPageFrameProps>) {
   return (
-    <div className='h-dvh bg-base text-foreground'>
+    <div
+      className={cn(
+        'bg-base text-foreground',
+        centered ? 'min-h-dvh' : 'h-dvh'
+      )}
+    >
       <SmartLinkAmbientGlow className={glowClassName} />
 
       <main
         id={mainId}
-        className='relative z-10 flex h-full flex-col items-center px-6 pt-10'
+        className={cn(
+          'relative z-10 flex flex-col items-center px-6',
+          centered ? 'min-h-dvh' : 'h-full pt-10'
+        )}
       >
-        <div className='flex min-h-0 w-full max-w-[17rem] flex-1 flex-col'>
+        {centered && <div className='min-h-6 flex-1' />}
+        <div
+          className={cn(
+            'w-full max-w-[17rem]',
+            !centered && 'flex min-h-0 flex-1 flex-col'
+          )}
+        >
           {children}
         </div>
+        {centered && <div className='min-h-6 flex-1' />}
         <SmartLinkPoweredByFooter />
       </main>
     </div>

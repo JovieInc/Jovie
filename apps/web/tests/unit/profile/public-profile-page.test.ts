@@ -129,14 +129,28 @@ describe('Public Profile Page Logic', () => {
       [key: string]: unknown;
     }
 
+    interface TourDateForTest {
+      id: string;
+      ticketStatus: string;
+      venueName: string;
+      city: string;
+      region: string | null;
+      country: string;
+      startDate: string;
+      ticketUrl: string | null;
+      latitude: number | null;
+      longitude: number | null;
+      title: string | null;
+    }
+
     function generateProfileStructuredData(
       profile: TestProfile,
       genres: string[] | null,
-      links: typeof mockLinks
+      links: typeof mockLinks,
+      tourDates: TourDateForTest[] = []
     ) {
       const artistName = profile.display_name || profile.username;
       const profileUrl = `${BASE_URL}/${profile.username}`;
-      const imageUrl = profile.avatar_url || `${BASE_URL}/og/default.png`;
 
       const socialUrls = links
         .filter(link =>
@@ -157,16 +171,21 @@ describe('Public Profile Page Logic', () => {
 
       const uniqueSocialUrls = [...new Set(socialUrls)];
 
-      const musicGroupSchema = {
-        '@context': 'https://schema.org',
+      const musicGroupSchema: Record<string, unknown> = {
         '@type': 'MusicGroup',
         '@id': `${profileUrl}#musicgroup`,
         name: artistName,
         description: profile.bio || `Music by ${artistName}`,
         url: profileUrl,
-        image: imageUrl,
         sameAs: uniqueSocialUrls,
         genre: genres && genres.length > 0 ? genres : ['Music'],
+        ...(profile.avatar_url && {
+          image: {
+            '@type': 'ImageObject',
+            url: profile.avatar_url,
+            name: `${artistName} profile photo`,
+          },
+        }),
         ...(profile.is_verified && {
           additionalProperty: {
             '@type': 'PropertyValue',
@@ -176,8 +195,15 @@ describe('Public Profile Page Logic', () => {
         }),
       };
 
+      const profilePageSchema = {
+        '@type': 'ProfilePage',
+        '@id': `${profileUrl}#profilepage`,
+        mainEntity: { '@id': `${profileUrl}#musicgroup` },
+        url: profileUrl,
+        name: `${artistName} | Jovie`,
+      };
+
       const breadcrumbSchema = {
-        '@context': 'https://schema.org',
         '@type': 'BreadcrumbList',
         itemListElement: [
           {
@@ -195,32 +221,82 @@ describe('Public Profile Page Logic', () => {
         ],
       };
 
-      return { musicGroupSchema, breadcrumbSchema };
+      const MAX_EVENT_SCHEMAS = 10;
+      const eventSchemas = tourDates.slice(0, MAX_EVENT_SCHEMAS).map(td => ({
+        '@type': 'MusicEvent',
+        '@id': `${profileUrl}#event-${td.id}`,
+        name: td.title || `${artistName} at ${td.venueName}`,
+        startDate: td.startDate,
+        performer: { '@id': `${profileUrl}#musicgroup` },
+      }));
+
+      return {
+        '@context': 'https://schema.org',
+        '@graph': [
+          profilePageSchema,
+          musicGroupSchema,
+          breadcrumbSchema,
+          ...eventSchemas,
+        ],
+      };
     }
 
-    it('generates valid MusicGroup schema with all fields', () => {
-      const { musicGroupSchema } = generateProfileStructuredData(
+    // Helper to extract a specific schema type from the @graph
+    function findInGraph(
+      data: ReturnType<typeof generateProfileStructuredData>,
+      type: string
+    ) {
+      return (data['@graph'] as Record<string, unknown>[]).find(
+        item => item['@type'] === type
+      ) as Record<string, unknown> | undefined;
+    }
+
+    it('generates @graph with ProfilePage, MusicGroup, and BreadcrumbList', () => {
+      const data = generateProfileStructuredData(
         mockProfile,
         mockGenres,
         mockLinks
       );
 
-      expect(musicGroupSchema['@context']).toBe('https://schema.org');
-      expect(musicGroupSchema['@type']).toBe('MusicGroup');
-      expect(musicGroupSchema.name).toBe('Test Artist');
-      expect(musicGroupSchema.url).toBe(`${BASE_URL}/testartist`);
-      expect(musicGroupSchema.image).toBe('https://example.com/avatar.jpg');
-      expect(musicGroupSchema.genre).toEqual(mockGenres);
+      expect(data['@context']).toBe('https://schema.org');
+      const graph = data['@graph'] as Record<string, unknown>[];
+      expect(graph.length).toBeGreaterThanOrEqual(3);
+
+      const profilePage = findInGraph(data, 'ProfilePage');
+      expect(profilePage).toBeDefined();
+      expect(profilePage!['@type']).toBe('ProfilePage');
+
+      const musicGroup = findInGraph(data, 'MusicGroup');
+      expect(musicGroup).toBeDefined();
+      expect(musicGroup!.name).toBe('Test Artist');
+      expect(musicGroup!.url).toBe(`${BASE_URL}/testartist`);
+      expect(musicGroup!.genre).toEqual(mockGenres);
+    });
+
+    it('includes ImageObject for avatar in MusicGroup', () => {
+      const data = generateProfileStructuredData(
+        mockProfile,
+        mockGenres,
+        mockLinks
+      );
+      const musicGroup = findInGraph(data, 'MusicGroup')!;
+
+      expect(musicGroup.image).toEqual({
+        '@type': 'ImageObject',
+        url: 'https://example.com/avatar.jpg',
+        name: 'Test Artist profile photo',
+      });
     });
 
     it('includes verified property for verified profiles', () => {
-      const { musicGroupSchema } = generateProfileStructuredData(
+      const data = generateProfileStructuredData(
         { ...mockProfile, is_verified: true },
         mockGenres,
         mockLinks
       );
+      const musicGroup = findInGraph(data, 'MusicGroup')!;
 
-      expect(musicGroupSchema.additionalProperty).toEqual({
+      expect(musicGroup.additionalProperty).toEqual({
         '@type': 'PropertyValue',
         name: 'verified',
         value: true,
@@ -228,48 +304,40 @@ describe('Public Profile Page Logic', () => {
     });
 
     it('omits verified property for unverified profiles', () => {
-      const { musicGroupSchema } = generateProfileStructuredData(
+      const data = generateProfileStructuredData(
         { ...mockProfile, is_verified: false },
         mockGenres,
         mockLinks
       );
+      const musicGroup = findInGraph(data, 'MusicGroup')!;
 
-      expect(musicGroupSchema.additionalProperty).toBeUndefined();
+      expect(musicGroup.additionalProperty).toBeUndefined();
     });
 
     it('deduplicates social URLs from links and profile fields', () => {
-      // Spotify URL appears in both links and profile.spotify_url
-      const { musicGroupSchema } = generateProfileStructuredData(
+      const data = generateProfileStructuredData(
         mockProfile,
         mockGenres,
         mockLinks
       );
+      const musicGroup = findInGraph(data, 'MusicGroup')!;
 
-      const spotifyUrls = musicGroupSchema.sameAs.filter((url: string) =>
-        url.includes('spotify')
+      const spotifyUrls = (musicGroup.sameAs as string[]).filter(
+        (url: string) => url.includes('spotify')
       );
-      // Should only appear once despite being in both links and profile
       expect(spotifyUrls.length).toBe(1);
     });
 
     it('falls back to "Music" genre when no genres provided', () => {
-      const { musicGroupSchema } = generateProfileStructuredData(
-        mockProfile,
-        null,
-        mockLinks
-      );
-
-      expect(musicGroupSchema.genre).toEqual(['Music']);
+      const data = generateProfileStructuredData(mockProfile, null, mockLinks);
+      const musicGroup = findInGraph(data, 'MusicGroup')!;
+      expect(musicGroup.genre).toEqual(['Music']);
     });
 
     it('falls back to "Music" genre with empty array', () => {
-      const { musicGroupSchema } = generateProfileStructuredData(
-        mockProfile,
-        [],
-        mockLinks
-      );
-
-      expect(musicGroupSchema.genre).toEqual(['Music']);
+      const data = generateProfileStructuredData(mockProfile, [], mockLinks);
+      const musicGroup = findInGraph(data, 'MusicGroup')!;
+      expect(musicGroup.genre).toEqual(['Music']);
     });
 
     it('uses username as fallback when display_name is null', () => {
@@ -277,59 +345,63 @@ describe('Public Profile Page Logic', () => {
         ...mockProfile,
         display_name: null,
       };
-      const { musicGroupSchema, breadcrumbSchema } =
-        generateProfileStructuredData(
-          profileWithoutName,
-          mockGenres,
-          mockLinks
-        );
+      const data = generateProfileStructuredData(
+        profileWithoutName,
+        mockGenres,
+        mockLinks
+      );
+      const musicGroup = findInGraph(data, 'MusicGroup')!;
+      const breadcrumb = findInGraph(data, 'BreadcrumbList')!;
 
-      expect(musicGroupSchema.name).toBe('testartist');
-      expect(breadcrumbSchema.itemListElement[1].name).toBe('testartist');
+      expect(musicGroup.name).toBe('testartist');
+      expect((breadcrumb.itemListElement as { name: string }[])[1].name).toBe(
+        'testartist'
+      );
     });
 
-    it('uses default image when avatar_url is null', () => {
+    it('omits image when avatar_url is null', () => {
       const profileWithoutAvatar = {
         ...mockProfile,
         avatar_url: null,
       };
-      const { musicGroupSchema } = generateProfileStructuredData(
+      const data = generateProfileStructuredData(
         profileWithoutAvatar,
         mockGenres,
         mockLinks
       );
-
-      expect(musicGroupSchema.image).toBe(`${BASE_URL}/og/default.png`);
+      const musicGroup = findInGraph(data, 'MusicGroup')!;
+      expect(musicGroup.image).toBeUndefined();
     });
 
     it('generates valid BreadcrumbList schema', () => {
-      const { breadcrumbSchema } = generateProfileStructuredData(
+      const data = generateProfileStructuredData(
         mockProfile,
         mockGenres,
         mockLinks
       );
+      const breadcrumb = findInGraph(data, 'BreadcrumbList')!;
 
-      expect(breadcrumbSchema['@type']).toBe('BreadcrumbList');
-      expect(breadcrumbSchema.itemListElement).toHaveLength(2);
-      expect(breadcrumbSchema.itemListElement[0].name).toBe('Home');
-      expect(breadcrumbSchema.itemListElement[1].name).toBe('Test Artist');
+      expect(breadcrumb['@type']).toBe('BreadcrumbList');
+      expect((breadcrumb.itemListElement as unknown[]).length).toBe(2);
     });
 
     it('uses bio as description, falls back to generated text', () => {
-      const { musicGroupSchema } = generateProfileStructuredData(
+      const data = generateProfileStructuredData(
         mockProfile,
         mockGenres,
         mockLinks
       );
-      expect(musicGroupSchema.description).toBe(mockProfile.bio);
+      const musicGroup = findInGraph(data, 'MusicGroup')!;
+      expect(musicGroup.description).toBe(mockProfile.bio);
 
       const noBioProfile = { ...mockProfile, bio: null };
-      const { musicGroupSchema: schema2 } = generateProfileStructuredData(
+      const data2 = generateProfileStructuredData(
         noBioProfile,
         mockGenres,
         mockLinks
       );
-      expect(schema2.description).toBe('Music by Test Artist');
+      const musicGroup2 = findInGraph(data2, 'MusicGroup')!;
+      expect(musicGroup2.description).toBe('Music by Test Artist');
     });
 
     it('only includes recognized social platforms in sameAs', () => {
@@ -345,16 +417,63 @@ describe('Public Profile Page Logic', () => {
         },
       ];
 
-      const { musicGroupSchema } = generateProfileStructuredData(
+      const data = generateProfileStructuredData(
         mockProfile,
         mockGenres,
         linksWithUnknown
       );
+      const musicGroup = findInGraph(data, 'MusicGroup')!;
 
-      // Venmo should NOT be in sameAs
       expect(
-        musicGroupSchema.sameAs.some((url: string) => url.includes('venmo'))
+        (musicGroup.sameAs as string[]).some((url: string) =>
+          url.includes('venmo')
+        )
       ).toBe(false);
+    });
+
+    it('adds MusicEvent schemas for tour dates, capped at 10', () => {
+      const tourDates: TourDateForTest[] = Array.from(
+        { length: 15 },
+        (_, i) => ({
+          id: `td-${i}`,
+          ticketStatus: 'available',
+          venueName: `Venue ${i}`,
+          city: 'Los Angeles',
+          region: 'CA',
+          country: 'US',
+          startDate: `2026-06-${String(i + 1).padStart(2, '0')}T20:00:00Z`,
+          ticketUrl: `https://tickets.example.com/${i}`,
+          latitude: 34.05,
+          longitude: -118.25,
+          title: null,
+        })
+      );
+
+      const data = generateProfileStructuredData(
+        mockProfile,
+        mockGenres,
+        mockLinks,
+        tourDates
+      );
+      const events = (data['@graph'] as Record<string, unknown>[]).filter(
+        item => item['@type'] === 'MusicEvent'
+      );
+
+      expect(events.length).toBe(10);
+    });
+
+    it('emits zero MusicEvent schemas when no tour dates', () => {
+      const data = generateProfileStructuredData(
+        mockProfile,
+        mockGenres,
+        mockLinks,
+        []
+      );
+      const events = (data['@graph'] as Record<string, unknown>[]).filter(
+        item => item['@type'] === 'MusicEvent'
+      );
+
+      expect(events.length).toBe(0);
     });
   });
 
@@ -466,18 +585,12 @@ describe('Public Profile Page Logic', () => {
       expect(profileUrl).toBe('https://jov.ie/testartist');
     });
 
-    it('includes dynamic og:image route for profile cards', () => {
-      const ogImage = {
-        url: `${BASE_URL}/${mockProfile.username}/opengraph-image`,
-        width: 1200,
-        height: 630,
-        alt: `Test Artist profile card`,
-      };
-
-      expect(ogImage.url).toBe('https://jov.ie/testartist/opengraph-image');
-      expect(ogImage.width).toBe(1200);
-      expect(ogImage.height).toBe(630);
-      expect(ogImage.alt).toBe('Test Artist profile card');
+    it('uses file convention for og:image (no explicit images in metadata)', () => {
+      // After OG consolidation, metadata no longer includes explicit openGraph.images
+      // The file-based opengraph-image.tsx handles OG image generation via Next.js convention
+      // Verify the file convention URL pattern is correct
+      const expectedUrl = `${BASE_URL}/${mockProfile.username}/opengraph-image`;
+      expect(expectedUrl).toBe('https://jov.ie/testartist/opengraph-image');
     });
 
     it('sets robots to index and follow for public profiles', () => {

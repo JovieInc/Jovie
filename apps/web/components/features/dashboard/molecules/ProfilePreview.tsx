@@ -38,9 +38,7 @@ export function ProfilePreview({
     image_url: avatarUrl || undefined,
     tagline: 'This is a preview of how your profile will appear to visitors',
     theme: {},
-    settings: {
-      hide_branding: false,
-    },
+    settings: {},
     spotify_url: undefined,
     apple_music_url: undefined,
     youtube_url: undefined,

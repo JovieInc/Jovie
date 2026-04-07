@@ -1,6 +1,6 @@
 import { buildDemoProfile } from '@/features/demo/mock-dashboard-data';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
-import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
+import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import { DemoClientProviders } from './DemoClientProviders';
 
@@ -10,8 +10,12 @@ const DEMO_PUBLIC_ARTIST: Artist = {
   owner_user_id: DEMO_PUBLIC_PROFILE.userId ?? 'demo-user-001',
   handle: DEMO_PUBLIC_PROFILE.username,
   spotify_id:
-    DEMO_PUBLIC_PROFILE.spotifyId ?? TIM_WHITE_PROFILE.spotifyArtistId,
-  name: DEMO_PUBLIC_PROFILE.displayName ?? 'Tim White',
+    DEMO_PUBLIC_PROFILE.spotifyId ??
+    INTERNAL_DJ_DEMO_PERSONA.profile.spotifyArtistId ??
+    '',
+  name:
+    DEMO_PUBLIC_PROFILE.displayName ??
+    INTERNAL_DJ_DEMO_PERSONA.profile.displayName,
   image_url: DEMO_PUBLIC_PROFILE.avatarUrl ?? undefined,
   tagline: DEMO_PUBLIC_PROFILE.bio ?? undefined,
   theme: DEMO_PUBLIC_PROFILE.theme ?? {},
@@ -43,7 +47,10 @@ const DEMO_PUBLIC_SOCIAL_LINKS: readonly LegacySocialLink[] = [
     id: 'demo-social-spotify',
     artist_id: DEMO_PUBLIC_ARTIST.id,
     platform: 'spotify',
-    url: DEMO_PUBLIC_ARTIST.spotify_url ?? TIM_WHITE_PROFILE.spotifyUrl,
+    url:
+      DEMO_PUBLIC_ARTIST.spotify_url ??
+      INTERNAL_DJ_DEMO_PERSONA.profile.spotifyUrl ??
+      'https://open.spotify.com',
     clicks: 1432,
     created_at: DEMO_PUBLIC_ARTIST.created_at,
   },
@@ -51,7 +58,7 @@ const DEMO_PUBLIC_SOCIAL_LINKS: readonly LegacySocialLink[] = [
     id: 'demo-social-instagram',
     artist_id: DEMO_PUBLIC_ARTIST.id,
     platform: 'instagram',
-    url: 'https://instagram.com/timwhitemusic',
+    url: 'https://instagram.com/calvinharris',
     clicks: 824,
     created_at: DEMO_PUBLIC_ARTIST.created_at,
   },
@@ -59,7 +66,7 @@ const DEMO_PUBLIC_SOCIAL_LINKS: readonly LegacySocialLink[] = [
     id: 'demo-social-youtube',
     artist_id: DEMO_PUBLIC_ARTIST.id,
     platform: 'youtube',
-    url: 'https://youtube.com/@timwhitemusic',
+    url: 'https://www.youtube.com/@CalvinHarris',
     clicks: 512,
     created_at: DEMO_PUBLIC_ARTIST.created_at,
   },
@@ -74,7 +81,7 @@ export function DemoPublicProfileSurface() {
           artist={DEMO_PUBLIC_ARTIST}
           socialLinks={[...DEMO_PUBLIC_SOCIAL_LINKS]}
           contacts={[]}
-          subtitle='Electronic artist and producer'
+          subtitle='Festival headliner, producer, and catalog powerhouse'
           showTipButton
           showBackButton={false}
           showFooter

@@ -182,12 +182,14 @@ describe('DemoReleasesExperience', () => {
 
     // Release titles should appear in the list
     expect(
-      within(releasesMatrix).getAllByText(hasTextContent('Take Me Over')).length
+      within(releasesMatrix).getAllByText(
+        hasTextContent('Blessings featuring Clementine Douglas')
+      ).length
     ).toBeGreaterThan(0);
 
     // Click a release row to open the detail drawer
     const releaseTitle = within(releasesMatrix).getAllByText(
-      hasTextContent('Take Me Over')
+      hasTextContent('Blessings featuring Clementine Douglas')
     )[0];
     fireEvent.click(
       releaseTitle.closest('tr') ?? releaseTitle.closest('td') ?? releaseTitle
@@ -196,7 +198,9 @@ describe('DemoReleasesExperience', () => {
     // Selecting a row should surface the release details alongside the table.
     await waitFor(() => {
       expect(
-        screen.getAllByText(hasTextContent('Take Me Over')).length
+        screen.getAllByText(
+          hasTextContent('Blessings featuring Clementine Douglas')
+        ).length
       ).toBeGreaterThan(1);
     });
   });
@@ -217,7 +221,9 @@ describe('DemoReleasesExperience', () => {
 
     // The table should contain mock release titles
     expect(
-      within(releasesMatrix).getAllByText(hasTextContent('Take Me Over')).length
+      within(releasesMatrix).getAllByText(
+        hasTextContent('Blessings featuring Clementine Douglas')
+      ).length
     ).toBeGreaterThan(0);
   });
 });
