@@ -2,7 +2,12 @@
   "ci": {
     "collect": {
       "numberOfRuns": 1,
-      "url": ["http://localhost:3000/"]
+      "url": [
+        "http://localhost:3000/",
+        "http://localhost:3000/legal/privacy",
+        "http://localhost:3000/legal/terms",
+        "http://localhost:3000/legal/cookies"
+      ]
     },
     "assert": {
       "assertMatrix": [
@@ -37,6 +42,31 @@
             "is-crawlable": "off",
             "forced-reflow-insight": "warn",
             "network-dependency-tree-insight": "off",
+            "target-size": "warn",
+            "digest-mismatch": "off"
+          }
+        },
+        {
+          "matchingUrlPattern": "http://localhost:3000/legal/.*",
+          "preset": "lighthouse:no-pwa",
+          "assertions": {
+            "errors-in-console": "warn",
+            "interactive": ["error", { "maxNumericValue": 2000 }],
+            "first-contentful-paint": ["error", { "maxNumericValue": 1500 }],
+            "largest-contentful-paint": ["error", { "maxNumericValue": 2500 }],
+            "cumulative-layout-shift": ["error", { "maxNumericValue": 0.05 }],
+            "total-blocking-time": ["error", { "maxNumericValue": 500 }],
+            "speed-index": ["error", { "maxNumericValue": 2500 }],
+            "render-blocking-resources": "off",
+            "render-blocking-insight": "off",
+            "unused-javascript": "warn",
+            "color-contrast": "error",
+            "dom-size": "warn",
+            "categories:performance": ["error", { "minScore": 0.9 }],
+            "categories:accessibility": ["error", { "minScore": 0.95 }],
+            "categories:best-practices": ["error", { "minScore": 0.9 }],
+            "categories:seo": ["error", { "minScore": 0.9 }],
+            "is-crawlable": "error",
             "target-size": "warn",
             "digest-mismatch": "off"
           }
