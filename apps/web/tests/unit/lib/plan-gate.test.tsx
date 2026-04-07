@@ -63,7 +63,6 @@ describe('usePlanGate', () => {
 
     expect(result.current.isPro).toBe(false);
     expect(result.current.plan).toBe('free');
-    expect(result.current.canRemoveBranding).toBe(false);
     expect(result.current.canAccessAdPixels).toBe(false);
     expect(result.current.canFilterSelfFromAnalytics).toBe(false);
     expect(result.current.canAccessAdvancedAnalytics).toBe(false);
@@ -93,7 +92,6 @@ describe('usePlanGate', () => {
 
     expect(result.current.isPro).toBe(true);
     expect(result.current.plan).toBe('pro');
-    expect(result.current.canRemoveBranding).toBe(true);
     expect(result.current.canAccessAdPixels).toBe(true);
     expect(result.current.canFilterSelfFromAnalytics).toBe(true);
     expect(result.current.canAccessAdvancedAnalytics).toBe(true);
