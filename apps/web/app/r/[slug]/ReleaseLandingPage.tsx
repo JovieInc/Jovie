@@ -231,7 +231,7 @@ export function ReleaseLandingPage({
   );
   // All providers rendered as a flat list — no canonical/fallback distinction for fans
   const sizes = buildArtworkSizes(artworkSizes, release.artworkUrl);
-  const hasCredits = credits && credits.some(group => group.entries.length > 0);
+  const hasCredits = credits?.some(group => group.entries.length > 0);
   const hasPreview = Boolean(release.previewUrl);
   const shouldShowPreview =
     hasPreview &&

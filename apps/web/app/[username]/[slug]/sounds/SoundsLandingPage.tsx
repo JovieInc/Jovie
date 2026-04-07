@@ -90,56 +90,53 @@ export function SoundsLandingPage({
   );
 
   return (
-    <>
-      <SmartLinkShell
-        artworkUrl={release.artworkUrl}
-        artworkAlt={`${release.title} artwork`}
-        onMenuOpen={() => setMenuOpen(true)}
-        heroOverlay={
-          <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
-            <h1 className='text-[28px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
-              {release.title}
-            </h1>
-            {artist.handle ? (
-              <Link
-                href={`/${artist.handle}`}
-                className='mt-1 block text-[14px] font-[450] text-white/70 transition-colors hover:text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'
-              >
-                {artist.name}
-              </Link>
-            ) : (
-              <p className='mt-1 text-[14px] font-[450] text-white/70 [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
-                {artist.name}
-              </p>
-            )}
-          </div>
-        }
-      >
-        {/* Content — video platform buttons (scrollable) */}
-        <div className='relative z-10 flex min-h-0 flex-1 flex-col px-5 pt-3'>
-          <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
-            <div className='space-y-2'>
-              {videoProviders.map(provider => {
-                const logoConfig = VIDEO_LOGO_CONFIG[provider.key];
-                return (
-                  <SmartLinkProviderButton
-                    key={provider.key}
-                    href={appendUTMParamsToUrl(provider.url, utmParams)}
-                    onClick={() => handleProviderClick(provider.key)}
-                    label={logoConfig?.name ?? provider.label}
-                    iconPath={logoConfig?.iconPath}
-                  />
-                );
-              })}
-            </div>
-          </div>
-
-          <div className='shrink-0 pb-[max(env(safe-area-inset-bottom),8px)]'>
-            <SmartLinkPoweredByFooter />
+    <SmartLinkShell
+      artworkUrl={release.artworkUrl}
+      artworkAlt={`${release.title} artwork`}
+      onMenuOpen={() => setMenuOpen(true)}
+      heroOverlay={
+        <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
+          <h1 className='text-[28px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
+            {release.title}
+          </h1>
+          {artist.handle ? (
+            <Link
+              href={`/${artist.handle}`}
+              className='mt-1 block text-[14px] font-[450] text-white/70 transition-colors hover:text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'
+            >
+              {artist.name}
+            </Link>
+          ) : (
+            <p className='mt-1 text-[14px] font-[450] text-white/70 [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
+              {artist.name}
+            </p>
+          )}
+        </div>
+      }
+    >
+      {/* Content — video platform buttons (scrollable) */}
+      <div className='relative z-10 flex min-h-0 flex-1 flex-col px-5 pt-3'>
+        <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
+          <div className='space-y-2'>
+            {videoProviders.map(provider => {
+              const logoConfig = VIDEO_LOGO_CONFIG[provider.key];
+              return (
+                <SmartLinkProviderButton
+                  key={provider.key}
+                  href={appendUTMParamsToUrl(provider.url, utmParams)}
+                  onClick={() => handleProviderClick(provider.key)}
+                  label={logoConfig?.name ?? provider.label}
+                  iconPath={logoConfig?.iconPath}
+                />
+              );
+            })}
           </div>
         </div>
-      </SmartLinkShell>
 
+        <div className='shrink-0 pb-[max(env(safe-area-inset-bottom),8px)]'>
+          <SmartLinkPoweredByFooter />
+        </div>
+      </div>
       {/* Menu drawer */}
       <ProfileDrawerShell
         open={menuOpen}
@@ -167,6 +164,6 @@ export function SoundsLandingPage({
           </Link>
         </div>
       </ProfileDrawerShell>
-    </>
+    </SmartLinkShell>
   );
 }
