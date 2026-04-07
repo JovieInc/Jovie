@@ -35,7 +35,6 @@ const profilePlaceSchema = z
  */
 export const settingsSchema = z
   .object({
-    hide_branding: z.boolean().optional(),
     marketing_emails: z.boolean().optional(),
     exclude_self_from_analytics: z.boolean().optional(),
     require_double_opt_in: z.boolean().optional(),
