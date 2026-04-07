@@ -42,6 +42,13 @@ export function MarketingFooter() {
           >
             Terms
           </Link>
+          <Link
+            href={APP_ROUTES.LEGAL_COOKIES}
+            className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
+            style={{ color: 'var(--linear-text-tertiary)' }}
+          >
+            Cookies
+          </Link>
         </div>
       </div>
     </footer>
