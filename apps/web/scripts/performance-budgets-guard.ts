@@ -291,15 +291,24 @@ function resolveAuthStatePath(authPath?: string) {
 }
 
 function loadAuthCookies(baseUrl: string, authPath?: string) {
+  const domain = new URL(baseUrl).hostname;
+
+  // E2E test auth bypass: inject synthetic bypass cookies so the middleware
+  // skips Clerk auth entirely. This allows perf measurement of authenticated
+  // routes without a real Clerk session.
+  const testAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+  const testUserId = process.env.E2E_CLERK_USER_ID?.trim();
+  if (testAuthBypass && testUserId) {
+    return [
+      { domain, name: '__e2e_test_mode', path: '/', value: 'bypass-auth' },
+      { domain, name: '__e2e_test_user_id', path: '/', value: testUserId },
+    ] satisfies readonly AuthCookie[];
+  }
+
   const cookieValue = process.env.CLERK_SESSION_COOKIE?.trim();
   if (cookieValue) {
     return [
-      {
-        domain: new URL(baseUrl).hostname,
-        name: '__session',
-        path: '/',
-        value: cookieValue,
-      },
+      { domain, name: '__session', path: '/', value: cookieValue },
     ] satisfies readonly AuthCookie[];
   }
 
