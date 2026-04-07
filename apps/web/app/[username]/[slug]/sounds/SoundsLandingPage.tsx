@@ -146,10 +146,9 @@ export function SoundsLandingPage({
         onOpenChange={setMenuOpen}
         title='Menu'
       >
-        <div className='flex flex-col gap-0.5' role='menu'>
+        <div className='flex flex-col gap-0.5'>
           <button
             type='button'
-            role='menuitem'
             className={SMART_LINK_MENU_ITEM_CLASS}
             onClick={() => {
               handleShare();
@@ -160,7 +159,6 @@ export function SoundsLandingPage({
           </button>
           <Link
             href={appendUTMParamsToUrl(smartLinkPath, utmParams)}
-            role='menuitem'
             className={SMART_LINK_MENU_ITEM_CLASS}
             onClick={() => setMenuOpen(false)}
           >

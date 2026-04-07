@@ -28,9 +28,13 @@ vi.mock('next/image', () => ({
 
 vi.mock('vaul', () => ({
   Drawer: {
-    Root: ({ children }: { children: React.ReactNode }) => (
-      <div>{children}</div>
-    ),
+    Root: ({
+      children,
+      open,
+    }: {
+      children: React.ReactNode;
+      open?: boolean;
+    }) => (open ? <div>{children}</div> : null),
     Portal: ({ children }: { children: React.ReactNode }) => (
       <div>{children}</div>
     ),
@@ -155,12 +159,14 @@ describe('SoundsLandingPage', () => {
   it('shows listen link in menu drawer', () => {
     render(<SoundsLandingPage {...defaultProps} />);
 
+    // Menu not visible before click
+    expect(screen.queryByText('Listen')).not.toBeInTheDocument();
+
     // Open menu
     fireEvent.click(screen.getByRole('button', { name: /more options/i }));
 
     // Listen link in menu
-    const listenLink = screen.getByRole('menuitem', { name: /listen/i });
-    expect(listenLink).toBeInTheDocument();
+    expect(screen.getByText('Listen')).toBeInTheDocument();
   });
 
   it('preserves UTM params on menu listen link', () => {
@@ -172,8 +178,8 @@ describe('SoundsLandingPage', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /more options/i }));
-    const listenLink = screen.getByRole('menuitem', { name: /listen/i });
-    const href = listenLink.getAttribute('href') ?? '';
+    const listenLink = screen.getByText('Listen').closest('a');
+    const href = listenLink?.getAttribute('href') ?? '';
     expect(href).toContain('utm_source=tiktok');
     expect(href).toContain('utm_medium=sound');
   });

@@ -115,7 +115,7 @@ function SmartLinkClaimBanner({
   const signupUrl = `${APP_ROUTES.SIGNUP}?handle=${encodeURIComponent(username)}&redirect_url=${encodedRedirect}`;
 
   return (
-    <div className='rounded-2xl bg-surface-1/55 p-3 text-left ring-1 ring-inset ring-white/10 backdrop-blur-sm'>
+    <div className='rounded-2xl bg-surface-1 p-3 text-left ring-1 ring-inset ring-white/10 backdrop-blur-sm'>
       <div className='flex items-start justify-between gap-3'>
         <div>
           <p className='text-foreground text-xs font-medium'>
@@ -335,7 +335,7 @@ export function ReleaseLandingPage({
           </div>
 
           {clickableProviders.length === 0 && (
-            <div className='rounded-2xl bg-surface-1/40 p-5 text-center ring-1 ring-inset ring-white/[0.08]'>
+            <div className='rounded-2xl bg-surface-1 p-5 text-center ring-1 ring-inset ring-white/[0.08]'>
               <Icon
                 name='Music'
                 className='text-muted-foreground mx-auto h-8 w-8'
@@ -360,10 +360,9 @@ export function ReleaseLandingPage({
         onOpenChange={setMenuOpen}
         title='Menu'
       >
-        <div className='flex flex-col gap-0.5' role='menu'>
+        <div className='flex flex-col gap-0.5'>
           <button
             type='button'
-            role='menuitem'
             className={SMART_LINK_MENU_ITEM_CLASS}
             onClick={() => {
               handleShare();
@@ -375,7 +374,6 @@ export function ReleaseLandingPage({
           {hasCredits ? (
             <button
               type='button'
-              role='menuitem'
               className={SMART_LINK_MENU_ITEM_CLASS}
               onClick={() => {
                 setMenuOpen(false);
@@ -389,7 +387,6 @@ export function ReleaseLandingPage({
           {soundsUrl ? (
             <Link
               href={appendUTMParamsToUrl(soundsUrl, utmParams)}
-              role='menuitem'
               className={SMART_LINK_MENU_ITEM_CLASS}
               onClick={() => setMenuOpen(false)}
             >

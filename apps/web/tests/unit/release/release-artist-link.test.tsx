@@ -278,7 +278,7 @@ describe('release artist links', () => {
 
     // Open the menu drawer, then click Credits
     fireEvent.click(screen.getByRole('button', { name: /more options/i }));
-    fireEvent.click(screen.getByRole('menuitem', { name: /credits/i }));
+    fireEvent.click(screen.getByRole('button', { name: /credits/i }));
 
     expect(screen.getByText('Credits')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Producer One' })).toHaveAttribute(
