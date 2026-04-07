@@ -183,6 +183,13 @@
       "when": 1775404678166,
       "tag": "0025_typical_gunslinger",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1775537740815,
+      "tag": "0026_first_magdalene",
+      "breakpoints": true
     }
   ]
 }
