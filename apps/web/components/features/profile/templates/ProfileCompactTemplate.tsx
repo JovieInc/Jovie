@@ -340,6 +340,9 @@ export function ProfileCompactTemplate({
     if (resolved) {
       setDrawerView(resolved);
       setDrawerOpen(true);
+    } else {
+      setDrawerView('menu');
+      setDrawerOpen(false);
     }
   }, [mode, resolveInitialView]);
 
