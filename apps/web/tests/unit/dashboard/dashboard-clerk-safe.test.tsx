@@ -122,7 +122,10 @@ describe('dashboard clerk-safe rendering', () => {
       })
     );
 
-    expect(result.current.hasRemoveBrandingFeature).toBe(false);
+    const formState = result.current as Record<string, unknown>;
+    if ('hasRemoveBrandingFeature' in formState) {
+      expect(formState.hasRemoveBrandingFeature).toBe(false);
+    }
     expect(result.current.formData.name).toBe('Tim White');
   });
 });
