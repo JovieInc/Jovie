@@ -10,7 +10,7 @@ vi.mock('@/components/organisms/RightDrawer', () => ({
 
 describe('EntitySidebarShell', () => {
   it('keeps header, identity area, and tabs together in a sticky top rail', () => {
-    const { container } = render(
+    render(
       <EntitySidebarShell
         isOpen
         ariaLabel='Details drawer'
@@ -22,7 +22,10 @@ describe('EntitySidebarShell', () => {
       </EntitySidebarShell>
     );
 
-    const stickyRailCard = container.querySelector('[class*="backdrop-blur"]');
+    // The first DrawerSurfaceCard with variant='card' is the sticky header rail
+    const stickyRailCard = screen
+      .getByTestId('right-drawer')
+      .querySelector('[data-variant="card"]');
     expect(stickyRailCard).toBeInTheDocument();
     expect(stickyRailCard).toContainElement(
       screen.getByText('Release details')

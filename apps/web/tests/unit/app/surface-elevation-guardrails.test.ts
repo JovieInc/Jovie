@@ -283,7 +283,7 @@ describe('surface elevation guardrails', () => {
     expect(sidebar).not.toContain(
       'group-data-[variant=sidebar]:lg:shadow-[var(--linear-app-sidebar-shadow)]'
     );
-    expect(rightDrawer).toContain('bg-surface-0');
+    expect(rightDrawer).toContain('border-l border-(--linear-app-frame-seam)');
     // Mobile overlay retains shadow; desktop drawer is flat so elevation
     // comes from DrawerSurfaceCard cards inside the shell, not the outer aside.
     expect(rightDrawer).toContain('shadow-[var(--linear-app-drawer-shadow)]');

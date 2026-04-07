@@ -47,7 +47,8 @@ describe('RightDrawer', () => {
 
     expect(aside).toHaveAttribute('aria-hidden', 'false');
     expect(aside).toHaveStyle({ width: '360px' });
-    expect(aside).toHaveClass('bg-surface-0');
+    expect(aside).not.toHaveClass('border-l');
+    expect(aside).not.toHaveClass('bg-surface-0');
     expect(aside).not.toHaveClass('lg:border');
     expect(aside).not.toHaveClass('shadow-[var(--linear-app-drawer-shadow)]');
   });
@@ -145,7 +146,7 @@ describe('RightDrawer', () => {
       'fixed',
       'inset-0',
       'translate-x-full',
-      'bg-surface-0'
+      'bg-(--linear-app-content-surface)'
     );
 
     rerender(
@@ -166,8 +167,7 @@ describe('RightDrawer', () => {
     const desktopAside = screen.getByLabelText('Responsive drawer');
     expect(desktopAside).toHaveClass(
       'transition-[width,opacity]',
-      'opacity-100',
-      'bg-surface-0'
+      'opacity-100'
     );
     expect(desktopAside).not.toHaveClass('lg:border');
     expect(desktopAside).not.toHaveClass(

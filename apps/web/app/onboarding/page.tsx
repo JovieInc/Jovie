@@ -79,33 +79,44 @@ export default async function OnboardingPage({
   const userEmail = authResult.context.email ?? clerkIdentity.email ?? null;
   const userId = authResult.clerkUserId;
 
-  // Try to get existing profile data if available (user might be partially onboarded)
-  // This is optional - if it fails, we just don't pre-fill
-  let existingProfile = null;
-  if (!shouldSkipDashboardPrefetch) {
-    try {
-      const dashboardData = await getDashboardData();
-      existingProfile = dashboardData.selectedProfile;
-    } catch (error) {
-      // Capture database/connection errors to Sentry (but not "no profile" errors)
-      const errorMessage = extractErrorMessage(error, 'Unknown error');
-      if (
-        errorMessage.includes('database') ||
-        errorMessage.includes('connection') ||
-        errorMessage.includes('timeout')
-      ) {
-        Sentry.captureException(error, {
-          tags: { context: 'onboarding_profile_load' },
-          extra: { clerkUserId: authResult.clerkUserId },
+  // Run profile prefetch and handle reservation in parallel (they're independent)
+  const spotifySuggestedHandle = clerkIdentity.spotifyUsername ?? '';
+
+  const profilePrefetchPromise = shouldSkipDashboardPrefetch
+    ? Promise.resolve(null)
+    : getDashboardData()
+        .then(d => d.selectedProfile)
+        .catch((error: unknown) => {
+          const errorMessage = extractErrorMessage(error, 'Unknown error');
+          if (
+            errorMessage.includes('database') ||
+            errorMessage.includes('connection') ||
+            errorMessage.includes('timeout')
+          ) {
+            Sentry.captureException(error, {
+              tags: { context: 'onboarding_profile_load' },
+              extra: { clerkUserId: authResult.clerkUserId },
+            });
+          }
+          return null;
         });
-      }
-    }
-  }
+
+  // Start handle reservation early with what we know now (display name from Clerk)
+  const earlyDisplayName = clerkIdentity.displayName || '';
+  const earlyProvidedHandle =
+    resolvedSearchParams?.handle || user?.username || spotifySuggestedHandle;
+  const handleReservationPromise = !earlyProvidedHandle
+    ? reserveOnboardingHandle(earlyDisplayName)
+    : Promise.resolve(null);
+
+  // Await both in parallel
+  const [existingProfile, earlyReservedHandle] = await Promise.all([
+    profilePrefetchPromise,
+    handleReservationPromise,
+  ]);
 
   const initialDisplayName =
     existingProfile?.displayName || clerkIdentity.displayName || '';
-
-  const spotifySuggestedHandle = clerkIdentity.spotifyUsername ?? '';
 
   const providedHandle =
     resolvedSearchParams?.handle ||
@@ -113,10 +124,16 @@ export default async function OnboardingPage({
     user?.username ||
     spotifySuggestedHandle;
 
-  const shouldReserveHandle = !providedHandle;
-  const reservedHandle = shouldReserveHandle
-    ? await reserveOnboardingHandle(initialDisplayName)
-    : null;
+  // Discard the early reservation if a providedHandle is now available (e.g. from
+  // existingProfile.username) — otherwise isReservedHandle would incorrectly be true.
+  let reservedHandle = !providedHandle ? earlyReservedHandle : null;
+  if (
+    !providedHandle &&
+    !reservedHandle &&
+    initialDisplayName !== earlyDisplayName
+  ) {
+    reservedHandle = await reserveOnboardingHandle(initialDisplayName);
+  }
 
   const initialHandle = providedHandle || reservedHandle || '';
 

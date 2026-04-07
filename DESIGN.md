@@ -204,7 +204,7 @@ Three input variables generate the entire palette:
 |-------|-------|-----|-------|
 | `--color-bg-base` | `#08090a` | — | Sidebar, page background |
 | `--color-bg-surface-0` | `#0f1011` | — | Primary app surface |
-| `--color-bg-surface-1` | `#1c1c1f` | — | Cards, panels |
+| `--color-bg-surface-1` | `#17171a` | — | Cards, panels |
 | `--color-bg-surface-2` | `#23252a` | — | Inputs, elevated |
 | `--color-bg-surface-3` | `#2a2c32` | — | Modals, tooltips |
 | Text primary | `lch(100% 0 282)` | `#ffffff` | Headings |

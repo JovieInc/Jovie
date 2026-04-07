@@ -152,7 +152,7 @@ function ReleaseEntityHeader({
 
   return (
     <DrawerSurfaceCard
-      variant='quiet'
+      variant='card'
       className={RELEASE_SIDEBAR_CARD_CLASSNAME}
       testId='release-header-card'
     >
@@ -265,7 +265,7 @@ function ReleaseSettingsCard({
 }) {
   return (
     <DrawerSurfaceCard
-      variant='quiet'
+      variant='flat'
       className='overflow-hidden'
       testId='release-settings-card'
     >
@@ -603,7 +603,6 @@ export function ReleaseSidebar({
       data-testid='release-sidebar'
       headerMode='minimal'
       hideMinimalHeaderBar
-      surfaceTone='quiet'
       entityHeader={
         release ? (
           <ReleaseEntityHeader
@@ -646,7 +645,6 @@ export function ReleaseSidebar({
           <div className='min-h-0 flex-1'>
             <DrawerTabbedCard
               testId='release-tabbed-card'
-              surfaceVariant='quiet'
               tabs={
                 <DrawerTabs
                   value={activeTab}

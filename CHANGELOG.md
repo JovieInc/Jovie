@@ -5,7 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.126] - 2026-04-06
+## [26.4.130] - 2026-04-06
+
+> Add standalone DMCA policy page and legal links on public artist profiles.
+
+### Added
+
+- Standalone DMCA policy page at `/legal/dmca` with takedown procedure, counter-notice process, and designated agent
+- Privacy and Terms links now appear in the footer of all public artist profiles
+
+### Fixed
+
+- Profile footer no longer disappears entirely when artist hides branding, legal links always render
+- ProfileFooter now renders on public profile pages (was missing from the compact template)
+
+## [26.4.129] - 2026-04-06
+
+> Tighten Lighthouse and Playwright performance budgets for public profiles and onboarding to Gmail-rule targets. Convert 2 presentational components to server components for reduced JS bundle.
+
+### Changed
+
+- Profile route Lighthouse budgets tightened: FCP 800ms, LCP 1500ms, TBT 100ms, CLS 0.05, perf score 0.95 (as `warn`, promote to `error` after stability)
+- Onboarding route Lighthouse budgets tightened: FCP 1000ms, LCP 1500ms, TBT 200ms, CLS 0.05, perf score 0.90
+- Profile Playwright budgets tightened in both `performance-budgets.config.js` and `performance-route-manifest.ts`
+- Lighthouse CI now runs 3 passes (was 1) for more stable measurements
+- Added `/tim` profile page to Lighthouse CI URL collection
+
+### Fixed
+
+- `ProfileFeaturedCard` and `ProfileViewportShell` converted from client to server components (reduced profile JS bundle)
+
+## [26.4.128] - 2026-04-06
+
+> Remove visual borders from sidebar edge, right drawer seam, and audience filter pill group for a cleaner dashboard layout.
+
+### Fixed
+
+- Sidebar no longer shows a visible right border against the main content area
+- Right drawer entity card no longer has a left border line
+- Audience filter pills (All/Identified/Anonymous) no longer wrapped in a bordered container
+
+## [26.4.127] - 2026-04-06
+
+> Unified drawer and shell surfaces into a strict three-tier elevation model for consistent visual hierarchy. Right-drawer behavior now matches desktop/mobile layering expectations. Surface token docs corrected for dark mode parity.
+
+### Changed
+
+- [internal] Unified surface elevation to a strict 3-tier model matching Linear.app (page bg → content card → drawer cards)
+- [internal] Drawer cards now show proper Tier 2 chrome (border ring + shadow-card + 10px radius) in both light and dark mode
+- [internal] Right drawer is transparent on desktop (inherits from main content area), uses content surface on mobile overlay
+- [internal] Removed all `color-mix()` surface background formulas from drawer and shell components
+- [internal] Removed `surfaceTone` quiet variant — all drawer content uses consistent Tier 2 card treatment
+- [internal] Fixed dark mode surface-1 token value in DESIGN.md (#1c1c1f → #17171a to match linear-tokens.css)
 
 > World-class SEO for public profiles, releases, and tracks. Hero-style OG images with artist photos, single @graph JSON-LD with ProfilePage/MusicGroup/MusicEvent/MusicAlbum/MusicRecording schemas, and Google Events integration for tour dates.
 

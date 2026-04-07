@@ -1,1 +1,1 @@
-/Users/timwhite/conductor/workspaces/jovie/singapore/.claude/skills/gstack/codex/SKILL.md
+/Users/timwhite/conductor/workspaces/jovie/istanbul-v1/.claude/skills/gstack/codex/SKILL.md
