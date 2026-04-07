@@ -349,6 +349,22 @@ export function ReleaseLandingPage({
               </p>
             </div>
           )}
+
+          {downloadUrl && (
+            <Link
+              href={downloadUrl}
+              className='mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-white/[0.08] px-4 py-3 ring-1 ring-inset ring-white/[0.12] transition-colors duration-100 hover:bg-white/[0.14]'
+            >
+              <Icon
+                name='Download'
+                className='text-foreground/70 h-4 w-4'
+                aria-hidden='true'
+              />
+              <span className='text-foreground/85 text-sm font-semibold'>
+                Download
+              </span>
+            </Link>
+          )}
         </div>
 
         {/* Footer — always pinned at bottom */}

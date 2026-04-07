@@ -12,7 +12,7 @@ import {
   Ticket,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { TipSelector } from '@/components/molecules/TipSelector';
@@ -271,8 +271,8 @@ export function ProfileUnifiedDrawer({
   const hasValidVenmoLink = venmoLink !== null && isAllowedVenmoUrl(venmoLink);
   const venmoUsername = extractVenmoUsername(venmoLink);
 
-  const handleTipAmountSelected = useMemo(() => {
-    return (amount: number) => {
+  const handleTipAmountSelected = useCallback(
+    (amount: number) => {
       if (!venmoLink || !hasValidVenmoLink) {
         toast.error('Unable to open Venmo. The payment link is not valid.');
         return;
@@ -290,8 +290,9 @@ export function ProfileUnifiedDrawer({
           'Venmo could not be opened. Please allow pop-ups and try again.'
         );
       }
-    };
-  }, [hasValidVenmoLink, venmoLink, venmoUsername]);
+    },
+    [hasValidVenmoLink, venmoLink, venmoUsername]
+  );
 
   const isSubView = view !== 'menu';
 

@@ -673,7 +673,13 @@ export function ProfileCompactTemplate({
           allowPhotoDownloads={allowPhotoDownloads}
           tourDates={tourDates}
           onRevealNotifications={() => {
-            revealNotificationsRef.current?.();
+            if (revealNotificationsRef.current) {
+              revealNotificationsRef.current();
+            } else {
+              // Fallback: open subscribe view in drawer if inline CTA isn't rendered
+              setDrawerView('subscribe');
+              setDrawerOpen(true);
+            }
           }}
         />
       </div>
