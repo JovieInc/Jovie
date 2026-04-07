@@ -26,13 +26,13 @@ vi.mock('lucide-react', () => ({
 const multipleSizes: AvatarSize[] = [
   {
     key: 'medium',
-    label: 'Medium (400 x 400)',
-    url: '/_next/image?url=https%3A%2F%2Fcdn.jov.ie%2Favatar-original.png&w=400&q=90',
+    label: 'Medium (512 x 512)',
+    url: '/_next/image?url=https%3A%2F%2Fcdn.jov.ie%2Favatar-original.png&w=512&q=90',
   },
   {
     key: 'large',
-    label: 'Large (1000 x 1000)',
-    url: '/_next/image?url=https%3A%2F%2Fcdn.jov.ie%2Favatar-original.png&w=1000&q=90',
+    label: 'Large (1024 x 1024)',
+    url: '/_next/image?url=https%3A%2F%2Fcdn.jov.ie%2Favatar-original.png&w=1024&q=90',
   },
   {
     key: 'original',
@@ -78,10 +78,10 @@ describe('ProfilePhotoContextMenu', () => {
       await screen.findByText('Download Profile Photo')
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('menuitem', { name: 'Medium (400 x 400)' })
+      screen.getByRole('menuitem', { name: 'Medium (512 x 512)' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('menuitem', { name: 'Large (1000 x 1000)' })
+      screen.getByRole('menuitem', { name: 'Large (1024 x 1024)' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('menuitem', { name: 'Original' })

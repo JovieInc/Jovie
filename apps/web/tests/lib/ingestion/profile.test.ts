@@ -38,15 +38,51 @@ describe('applyProfileEnrichment', () => {
     expect(where).toHaveBeenCalledTimes(1);
   });
 
-  it('does not overwrite existing fields', async () => {
+  it('does not overwrite existing display name', async () => {
     const { tx, update } = createTxMock();
+
+    await applyProfileEnrichment(tx as never, {
+      profileId: 'profile-1',
+      currentDisplayName: 'Existing Name',
+      currentAvatarUrl: null,
+      extractedDisplayName: 'New Artist Name',
+      extractedAvatarUrl: null,
+    });
+
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('refreshes unlocked avatar even when one already exists', async () => {
+    const { tx, update, set } = createTxMock();
 
     await applyProfileEnrichment(tx as never, {
       profileId: 'profile-1',
       currentDisplayName: 'Existing Name',
       currentAvatarUrl: 'https://existing.example/avatar.jpg',
       extractedDisplayName: 'New Artist Name',
-      extractedAvatarUrl: 'https://cdn.example.com/avatar.jpg',
+      extractedAvatarUrl: 'https://cdn.example.com/better-avatar.jpg',
+    });
+
+    expect(update).toHaveBeenCalledWith(creatorProfiles);
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        avatarUrl: 'https://cdn.example.com/better-avatar.jpg',
+      })
+    );
+    const payload = set.mock.calls[0]?.[0];
+    expect(payload).not.toHaveProperty('displayName');
+  });
+
+  it('does not overwrite blob-hosted avatar with external URL', async () => {
+    const { tx, update } = createTxMock();
+
+    await applyProfileEnrichment(tx as never, {
+      profileId: 'profile-1',
+      currentDisplayName: 'Existing Name',
+      currentAvatarUrl:
+        'https://abc.blob.vercel-storage.com/avatars/ingestion/handle/avatar.avif',
+      extractedDisplayName: 'New Artist Name',
+      extractedAvatarUrl: 'https://i.scdn.co/image/abc123',
     });
 
     expect(update).not.toHaveBeenCalled();

@@ -102,7 +102,6 @@ export function buildProfileIdentityFields(
     name: artist.name,
     tagline: artist.tagline ?? '',
     imageUrl: artist.image_url ?? '',
-    hideBranding: Boolean(artist.settings?.hide_branding),
     location: artist.location ?? '',
     hometown: artist.hometown ?? '',
     careerHighlights: artist.career_highlights ?? '',
