@@ -1,5 +1,6 @@
 'use client';
 
+import DOMPurify from 'isomorphic-dompurify';
 import {
   ChevronLeft,
   ChevronRight,
@@ -159,8 +160,8 @@ export function DeckViewer({ slides }: DeckViewerProps) {
         </h2>
         <div
           className='investor-prose max-h-[calc(100%-3.5rem)] overflow-y-auto text-[length:var(--text-sm)] leading-[var(--leading-relaxed)] text-[var(--color-text-secondary-token)] sm:text-[length:var(--text-base)]'
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown HTML rendered server-side from trusted repo content
-          dangerouslySetInnerHTML={{ __html: slide.html }}
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitized with DOMPurify
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(slide.html) }}
         />
       </div>
 

@@ -45,7 +45,7 @@ export async function getMarkdownDocument(
 export async function createMarkdownDocument(
   raw: string
 ): Promise<MarkdownDocument> {
-  const processor = remark().use(remarkHtml);
+  const processor = remark().use(remarkHtml, { sanitize: false });
   const ast = processor.parse(raw);
 
   const toc: TocEntry[] = [];

@@ -3,7 +3,13 @@
     "collect": {
       "numberOfRuns": 1,
       "staticDistDir": ".next",
-      "url": ["http://localhost:3000/", "http://localhost:3000/tim"]
+      "url": [
+        "http://localhost:3000/",
+        "http://localhost:3000/tim",
+        "http://localhost:3000/legal/privacy",
+        "http://localhost:3000/legal/terms",
+        "http://localhost:3000/legal/cookies"
+      ]
     },
     "assert": {
       "assertMatrix": [

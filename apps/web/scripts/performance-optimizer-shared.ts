@@ -179,19 +179,31 @@ async function startServer(baseUrl: string, artifactDir: string) {
   writeFileSync(logPath, '');
   const { hostname, port } = getBaseUrlServerConfig(baseUrl);
 
-  const child = spawn(
-    'doppler',
-    ['run', '--', 'pnpm', '--filter', 'web', 'start'],
-    {
-      cwd: repoRoot,
-      env: {
-        ...process.env,
-        HOSTNAME: hostname,
-        PORT: String(port),
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }
+  // Use standalone server if available (production build output), fall back to next start.
+  // The standalone server is the correct target for perf measurement since it matches
+  // production behavior. "next start" warns it doesn't work with output: standalone.
+  const standaloneServerPath = resolve(
+    repoRoot,
+    'apps/web/.next/standalone/apps/web/server.js'
   );
+  const useStandalone = existsSync(standaloneServerPath);
+  const cmd = useStandalone ? 'doppler' : 'doppler';
+  const args = useStandalone
+    ? ['run', '--', 'node', standaloneServerPath]
+    : ['run', '--', 'pnpm', '--filter', 'web', 'start'];
+
+  const child = spawn(cmd, args, {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      HOSTNAME: hostname,
+      PORT: String(port),
+      // Enable test auth bypass so authenticated routes can be measured
+      // without real Clerk sessions. The budget-guard injects bypass cookies.
+      E2E_USE_TEST_AUTH_BYPASS: '1',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 
   const append = (chunk: Buffer | string) => {
     writeFileSync(logPath, String(chunk), { flag: 'a' });
@@ -319,13 +331,26 @@ function measureDashboardSample(
   route?: string,
   routeId?: string
 ) {
-  const env: NodeJS.ProcessEnv = { ...process.env, BASE_URL: baseUrl };
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    BASE_URL: baseUrl,
+    // Ensure bypass is available to the budget-guard subprocess
+    E2E_USE_TEST_AUTH_BYPASS: '1',
+  };
   const resolvedAuthPath = resolveAuthPath(authPath);
   const requiresAuth = requiresDashboardAuth(route, routeId);
 
-  if (requiresAuth && !process.env.CLERK_SESSION_COOKIE && !resolvedAuthPath) {
+  const hasTestBypass =
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
+    Boolean(process.env.E2E_CLERK_USER_ID?.trim());
+  if (
+    requiresAuth &&
+    !hasTestBypass &&
+    !process.env.CLERK_SESSION_COOKIE &&
+    !resolvedAuthPath
+  ) {
     throw new Error(
-      'Dashboard mode requires CLERK_SESSION_COOKIE or --auth-path pointing to a Clerk storage state file.'
+      'Dashboard mode requires CLERK_SESSION_COOKIE, --auth-path, or E2E_USE_TEST_AUTH_BYPASS=1 with E2E_CLERK_USER_ID.'
     );
   }
   if (resolvedAuthPath) {
