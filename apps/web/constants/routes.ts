@@ -107,6 +107,7 @@ export const APP_ROUTES = {
   LEGAL_PRIVACY: '/legal/privacy',
   LEGAL_TERMS: '/legal/terms',
   LEGAL_COOKIES: '/legal/cookies',
+  LEGAL_DMCA: '/legal/dmca',
 
   // Auth & Onboarding
   SIGNIN: '/signin',
