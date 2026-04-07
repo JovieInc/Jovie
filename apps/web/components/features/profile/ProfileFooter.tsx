@@ -6,11 +6,5 @@ interface ProfileFooterProps {
 }
 
 export function ProfileFooter({ artist }: ProfileFooterProps) {
-  return (
-    <Footer
-      variant='profile'
-      artistHandle={artist.handle}
-      artistSettings={artist.settings}
-    />
-  );
+  return <Footer variant='profile' artistHandle={artist.handle} />;
 }
