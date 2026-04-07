@@ -1,5 +1,5 @@
 {
-  "id": "4377be76-f996-454e-a7c0-7d9610fbc5f4",
+  "id": "3eedfdb3-0c41-451b-ab43-d9f2d64b2ac6",
   "prevId": "b2a924e4-38c0-4892-ba64-ca3cb1a54033",
   "version": "7",
   "dialect": "postgresql",
@@ -8200,395 +8200,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.jovie_playlist_tracks": {
-      "name": "jovie_playlist_tracks",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "playlist_id": {
-          "name": "playlist_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "spotify_track_id": {
-          "name": "spotify_track_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "youtube_video_id": {
-          "name": "youtube_video_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "position": {
-          "name": "position",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "artist_name": {
-          "name": "artist_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "track_name": {
-          "name": "track_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "spotify_artist_id": {
-          "name": "spotify_artist_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "jovie_profile_id": {
-          "name": "jovie_profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_jovie_artist": {
-          "name": "is_jovie_artist",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "added_at": {
-          "name": "added_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "jovie_playlist_tracks_playlist_idx": {
-          "name": "jovie_playlist_tracks_playlist_idx",
-          "columns": [
-            {
-              "expression": "playlist_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "jovie_playlist_tracks_spotify_artist_idx": {
-          "name": "jovie_playlist_tracks_spotify_artist_idx",
-          "columns": [
-            {
-              "expression": "spotify_artist_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "jovie_playlist_tracks_playlist_id_jovie_playlists_id_fk": {
-          "name": "jovie_playlist_tracks_playlist_id_jovie_playlists_id_fk",
-          "tableFrom": "jovie_playlist_tracks",
-          "tableTo": "jovie_playlists",
-          "columnsFrom": ["playlist_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "jovie_playlist_tracks_jovie_profile_id_creator_profiles_id_fk": {
-          "name": "jovie_playlist_tracks_jovie_profile_id_creator_profiles_id_fk",
-          "tableFrom": "jovie_playlist_tracks",
-          "tableTo": "creator_profiles",
-          "columnsFrom": ["jovie_profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.jovie_playlists": {
-      "name": "jovie_playlists",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "spotify_playlist_id": {
-          "name": "spotify_playlist_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "youtube_playlist_id": {
-          "name": "youtube_playlist_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "curator_spotify_user_id": {
-          "name": "curator_spotify_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "curator_profile_id": {
-          "name": "curator_profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "slug": {
-          "name": "slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "theme": {
-          "name": "theme",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "genre_tags": {
-          "name": "genre_tags",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'{}'"
-        },
-        "mood_tags": {
-          "name": "mood_tags",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'{}'"
-        },
-        "track_count": {
-          "name": "track_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "cover_image_url": {
-          "name": "cover_image_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cover_image_full_url": {
-          "name": "cover_image_full_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "editorial_note": {
-          "name": "editorial_note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "llm_prompt": {
-          "name": "llm_prompt",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "llm_model": {
-          "name": "llm_model",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "playlist_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'draft'"
-        },
-        "status_changed_at": {
-          "name": "status_changed_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "rejection_note": {
-          "name": "rejection_note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "published_at": {
-          "name": "published_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "jovie_playlists_slug_idx": {
-          "name": "jovie_playlists_slug_idx",
-          "columns": [
-            {
-              "expression": "slug",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "jovie_playlists_status_idx": {
-          "name": "jovie_playlists_status_idx",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "jovie_playlists_published_at_idx": {
-          "name": "jovie_playlists_published_at_idx",
-          "columns": [
-            {
-              "expression": "published_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "jovie_playlists_genre_tags_idx": {
-          "name": "jovie_playlists_genre_tags_idx",
-          "columns": [
-            {
-              "expression": "\"genre_tags\"",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "gin",
-          "with": {}
-        },
-        "jovie_playlists_mood_tags_idx": {
-          "name": "jovie_playlists_mood_tags_idx",
-          "columns": [
-            {
-              "expression": "\"mood_tags\"",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "gin",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "jovie_playlists_curator_profile_id_creator_profiles_id_fk": {
-          "name": "jovie_playlists_curator_profile_id_creator_profiles_id_fk",
-          "tableFrom": "jovie_playlists",
-          "tableTo": "creator_profiles",
-          "columnsFrom": ["curator_profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "jovie_playlists_spotify_playlist_id_unique": {
-          "name": "jovie_playlists_spotify_playlist_id_unique",
-          "nullsNotDistinct": false,
-          "columns": ["spotify_playlist_id"]
-        },
-        "jovie_playlists_slug_unique": {
-          "name": "jovie_playlists_slug_unique",
-          "nullsNotDistinct": false,
-          "columns": ["slug"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.lead_funnel_events": {
       "name": "lead_funnel_events",
       "schema": "",
@@ -11591,6 +11202,314 @@
           "columnsFrom": ["ingestion_owner_user_id"],
           "columnsTo": ["id"],
           "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.promo_download_events": {
+      "name": "promo_download_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "promo_download_id": {
+          "name": "promo_download_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creator_profile_id": {
+          "name": "creator_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "country": {
+          "name": "country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "city": {
+          "name": "city",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "downloaded_at": {
+          "name": "downloaded_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "promo_download_events_promo_download_id_downloaded_at_idx": {
+          "name": "promo_download_events_promo_download_id_downloaded_at_idx",
+          "columns": [
+            {
+              "expression": "promo_download_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "downloaded_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "promo_download_events_email_idx": {
+          "name": "promo_download_events_email_idx",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "promo_download_events_promo_download_id_promo_downloads_id_fk": {
+          "name": "promo_download_events_promo_download_id_promo_downloads_id_fk",
+          "tableFrom": "promo_download_events",
+          "tableTo": "promo_downloads",
+          "columnsFrom": ["promo_download_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "promo_download_events_creator_profile_id_creator_profiles_id_fk": {
+          "name": "promo_download_events_creator_profile_id_creator_profiles_id_fk",
+          "tableFrom": "promo_download_events",
+          "tableTo": "creator_profiles",
+          "columnsFrom": ["creator_profile_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.promo_downloads": {
+      "name": "promo_downloads",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "creator_profile_id": {
+          "name": "creator_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "release_id": {
+          "name": "release_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_url": {
+          "name": "file_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_name": {
+          "name": "file_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_size_bytes": {
+          "name": "file_size_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_mime_type": {
+          "name": "file_mime_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "artwork_url": {
+          "name": "artwork_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "promo_downloads_release_id_slug_unique": {
+          "name": "promo_downloads_release_id_slug_unique",
+          "columns": [
+            {
+              "expression": "release_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "promo_downloads_release_id_is_active_position_idx": {
+          "name": "promo_downloads_release_id_is_active_position_idx",
+          "columns": [
+            {
+              "expression": "release_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "is_active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "promo_downloads_creator_profile_id_creator_profiles_id_fk": {
+          "name": "promo_downloads_creator_profile_id_creator_profiles_id_fk",
+          "tableFrom": "promo_downloads",
+          "tableTo": "creator_profiles",
+          "columnsFrom": ["creator_profile_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "promo_downloads_release_id_discog_releases_id_fk": {
+          "name": "promo_downloads_release_id_discog_releases_id_fk",
+          "tableFrom": "promo_downloads",
+          "tableTo": "discog_releases",
+          "columnsFrom": ["release_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -16803,18 +16722,6 @@
       "name": "pixel_forward_status",
       "schema": "public",
       "values": ["pending", "sent", "failed"]
-    },
-    "public.playlist_status": {
-      "name": "playlist_status",
-      "schema": "public",
-      "values": [
-        "draft",
-        "pending",
-        "approved",
-        "published",
-        "archived",
-        "rejected"
-      ]
     },
     "public.profile_claim_role": {
       "name": "profile_claim_role",

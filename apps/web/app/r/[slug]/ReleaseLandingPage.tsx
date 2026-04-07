@@ -89,6 +89,8 @@ interface ReleaseLandingPageProps
       readonly profileId: string;
       readonly username: string;
     } | null;
+    /** URL to the promo download gate page, shown when promo files exist */
+    readonly downloadUrl?: string | null;
   }> {}
 
 function SmartLinkClaimBanner({
@@ -293,6 +295,7 @@ export function ReleaseLandingPage({
   utmParams = {},
   parentRelease = null,
   claimBanner = null,
+  downloadUrl = null,
 }: Readonly<ReleaseLandingPageProps>) {
   const formattedDate = release.releaseDate
     ? new Date(release.releaseDate).toLocaleDateString('en-US', {
@@ -392,6 +395,23 @@ export function ReleaseLandingPage({
             <p className='text-muted-foreground/50 mt-1 text-2xs'>
               {inlineCredits}
             </p>
+          )}
+
+          {/* Promo download CTA — visually distinct from streaming links */}
+          {downloadUrl && (
+            <Link
+              href={downloadUrl}
+              className='group mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-white/[0.08] px-4 py-2.5 ring-1 ring-inset ring-white/[0.12] transition-colors duration-100 hover:bg-white/[0.14]'
+            >
+              <Icon
+                name='Download'
+                className='text-foreground/70 group-hover:text-foreground h-4 w-4 transition-colors'
+                aria-hidden='true'
+              />
+              <span className='text-foreground/85 group-hover:text-foreground text-sm font-semibold transition-colors'>
+                Download
+              </span>
+            </Link>
           )}
 
           {claimBanner && (

@@ -60,7 +60,6 @@ export {
   type NewIngestAuditLog,
   selectIngestAuditLogSchema,
 } from './audit';
-
 // Auth & Users
 export {
   insertUserSchema,
@@ -72,7 +71,6 @@ export {
   userSettings,
   users,
 } from './auth';
-
 // Billing (Stripe, Audit)
 export {
   type BillingAuditLog,
@@ -86,7 +84,6 @@ export {
   selectStripeWebhookEventSchema,
   stripeWebhookEvents,
 } from './billing';
-
 // Chat (Conversations, Messages, Audit)
 export {
   type ChatAuditLog,
@@ -105,7 +102,6 @@ export {
   selectChatConversationSchema,
   selectChatMessageSchema,
 } from './chat';
-
 // Content (Providers, Releases, Recordings, Tracks)
 export {
   type Artist,
@@ -171,7 +167,6 @@ export {
   type TrackArtist,
   trackArtists,
 } from './content';
-
 // DSP Bio Sync (Bio update pushes to DSPs)
 export {
   type DspBioSyncMetadata,
@@ -566,6 +561,19 @@ export {
   type UserProfileClaim,
   userProfileClaims,
 } from './profiles';
+// Promo Downloads
+export {
+  insertPromoDownloadEventSchema,
+  insertPromoDownloadSchema,
+  type NewPromoDownload,
+  type NewPromoDownloadEvent,
+  type PromoDownload,
+  type PromoDownloadEvent,
+  promoDownloadEvents,
+  promoDownloads,
+  selectPromoDownloadEventSchema,
+  selectPromoDownloadSchema,
+} from './promo-downloads';
 // Referral Program (Codes, Referrals, Commissions)
 export {
   insertReferralCodeSchema,
