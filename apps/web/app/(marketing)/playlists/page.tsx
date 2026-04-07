@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
+import { env } from '@/lib/env-server';
 
 export const revalidate = 300;
 
@@ -23,6 +24,7 @@ export const metadata: Metadata = {
 };
 
 async function getPublishedPlaylists() {
+  if (!env.DATABASE_URL) return [];
   return db
     .select({
       slug: joviePlaylists.slug,
