@@ -80,7 +80,7 @@ export async function optimizeImageToAvif(file: File): Promise<{
       withoutEnlargement: true,
     })
     .toColourspace('srgb')
-    .avif({ quality: 65, effort: 4 })
+    .avif({ quality: AVATAR_AVIF_QUALITY, effort: 4 })
     .toBuffer({ resolveWithObject: true });
 
   return {
