@@ -219,20 +219,28 @@ async function startServer(
   const logPath = resolve(artifactDir, 'server.log');
   writeFileSync(logPath, '');
 
-  const child = spawn(
-    'doppler',
-    ['run', '--', 'pnpm', '--filter', 'web', 'start'],
-    {
-      cwd: repoRoot,
-      env: {
-        ...process.env,
-        ...extraEnv,
-        HOSTNAME: hostname,
-        PORT: String(port),
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }
+  // Use standalone server if available (matches production), fall back to next start
+  const standaloneServerPath = resolve(
+    repoRoot,
+    'apps/web/.next/standalone/apps/web/server.js'
   );
+  const useStandalone = existsSync(standaloneServerPath);
+  const args = useStandalone
+    ? ['run', '--', 'node', standaloneServerPath]
+    : ['run', '--', 'pnpm', '--filter', 'web', 'start'];
+
+  const child = spawn('doppler', args, {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      ...extraEnv,
+      HOSTNAME: hostname,
+      PORT: String(port),
+      // Enable test auth bypass for authenticated route measurement
+      E2E_USE_TEST_AUTH_BYPASS: '1',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 
   const appendOutput = (chunk: Buffer | string) => {
     writeFileSync(logPath, String(chunk), { flag: 'a' });
@@ -744,9 +752,15 @@ async function captureBaselineSummary(
       ? resolve(repoRoot, cliOptions.authPath)
       : undefined;
 
+    // Skip auth bootstrap when E2E bypass is available — the budget-guard
+    // injects bypass cookies directly from E2E_CLERK_USER_ID.
+    const hasTestBypass =
+      process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
+      Boolean(process.env.E2E_CLERK_USER_ID?.trim());
     if (
       requiresAuth(routes) &&
       !authPath &&
+      !hasTestBypass &&
       !process.env.CLERK_SESSION_COOKIE
     ) {
       try {
@@ -766,11 +780,10 @@ async function captureBaselineSummary(
           )}\nRetrying with loopback test-auth bypass enabled.\n`
         );
         await stopServer(server.child);
-        server = await startServer(artifactDir, cliOptions.baseUrl, port, {
-          E2E_USE_TEST_AUTH_BYPASS: '1',
-          NEXT_PUBLIC_CLERK_MOCK: '1',
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
-        });
+        // Restart with bypass enabled (already set by default in startServer).
+        // Do NOT set NEXT_PUBLIC_CLERK_MOCK — it causes Clerk key mismatch
+        // when the build used real Clerk keys.
+        server = await startServer(artifactDir, cliOptions.baseUrl, port);
         authPath = bootstrapAuthState(server.baseUrl, cliOptions.authPath);
       }
     }
@@ -817,6 +830,15 @@ function createIterationRecord(
 }
 
 export async function runEndUserPerfLoop(cliOptions: PerfLoopCliOptions) {
+  // Enable test auth bypass when E2E_CLERK_USER_ID is available from Doppler.
+  // This lets the budget-guard inject bypass cookies and the server skip Clerk auth.
+  if (
+    process.env.E2E_CLERK_USER_ID?.trim() &&
+    !process.env.E2E_USE_TEST_AUTH_BYPASS
+  ) {
+    process.env.E2E_USE_TEST_AUTH_BYPASS = '1';
+  }
+
   const artifactDir = resolveArtifactDir(cliOptions);
   const { baselinePath, measurementsDir, promptPath, routesDir, statePath } =
     resolveEndUserStatePaths(artifactDir);
