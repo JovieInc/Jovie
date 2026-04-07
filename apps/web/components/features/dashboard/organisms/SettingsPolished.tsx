@@ -21,7 +21,6 @@ import { SettingsAdPixelsSection } from '@/features/dashboard/organisms/Settings
 import { SettingsAnalyticsSection } from '@/features/dashboard/organisms/SettingsAnalyticsSection';
 import { SettingsAudienceSection } from '@/features/dashboard/organisms/SettingsAudienceSection';
 import { SettingsBillingSection } from '@/features/dashboard/organisms/SettingsBillingSection';
-import { SettingsBrandingSection } from '@/features/dashboard/organisms/SettingsBrandingSection';
 import { SettingsContactsSection } from '@/features/dashboard/organisms/SettingsContactsSection';
 import { SettingsPaymentsSection } from '@/features/dashboard/organisms/SettingsPaymentsSection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
@@ -256,18 +255,13 @@ export function SettingsPolished({
       {
         id: 'artist-profile',
         title: 'Artist Profile',
-        description: 'Photo, display name, username, and branding.',
+        description: 'Photo, display name, username, and profile details.',
         render: () => (
           <div className='space-y-4'>
             <SettingsArtistProfileSection
               artist={artist}
               onArtistUpdate={onArtistUpdate}
               onRefresh={() => router.refresh()}
-            />
-            <SettingsBrandingSection
-              artist={artist}
-              onArtistUpdate={onArtistUpdate}
-              isPro={isPro}
             />
           </div>
         ),

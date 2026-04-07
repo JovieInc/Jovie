@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildProfileIdentityFields } from '@/features/profile/view-models';
-import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useProfileMutation } from '@/lib/queries';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import type { ProfileFormData, UseProfileFormReturn } from './types';
@@ -16,7 +15,6 @@ export function useProfileForm({
   artist,
   onUpdate,
 }: UseProfileFormOptions): UseProfileFormReturn {
-  const { has } = useAuthSafe();
   const formRef = useRef<HTMLFormElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -25,15 +23,12 @@ export function useProfileForm({
     Record<string, string>
   >({});
 
-  const hasRemoveBrandingFeature =
-    has?.({ feature: 'remove_branding' }) ?? false;
   const identityFields = buildProfileIdentityFields(artist);
 
   const [formData, setFormData] = useState<ProfileFormData>({
     name: identityFields.name,
     tagline: identityFields.tagline,
     imageUrl: identityFields.imageUrl,
-    hideBranding: identityFields.hideBranding,
   });
 
   // TanStack Query mutation for profile updates
@@ -101,16 +96,11 @@ export function useProfileForm({
       return;
     }
 
-    const settingsUpdates = hasRemoveBrandingFeature
-      ? { hide_branding: formData.hideBranding }
-      : undefined;
-
     await updateProfile({
       updates: {
         displayName: formData.name,
         bio: formData.tagline,
         avatarUrl: formData.imageUrl || undefined,
-        ...(settingsUpdates ? { settings: settingsUpdates } : {}),
       },
     });
   };
@@ -142,7 +132,6 @@ export function useProfileForm({
     success: isSuccess,
     formSubmitted,
     validationErrors,
-    hasRemoveBrandingFeature,
     formData,
     formErrors,
     setFormData,

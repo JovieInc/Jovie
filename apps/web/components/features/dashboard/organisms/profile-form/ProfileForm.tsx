@@ -16,7 +16,6 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
     success,
     formSubmitted,
     validationErrors,
-    hasRemoveBrandingFeature,
     formData,
     formErrors,
     setFormData,
@@ -92,54 +91,6 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
           }
         />
       </FormField>
-
-      {/* Branding Toggle - only show if user has the feature */}
-      {hasRemoveBrandingFeature && (
-        <FormField
-          label='Branding'
-          helpText='Control whether Jovie branding appears on your profile'
-          id='branding-toggle'
-        >
-          <ContentSurfaceCard className='flex items-center justify-between bg-surface-0 px-4 py-3.5'>
-            <div className='flex flex-col'>
-              <span className='text-[13px] font-[510] text-primary-token'>
-                Show Jovie branding
-              </span>
-              <span className='text-[11px] text-secondary-token'>
-                Display Jovie branding on your profile
-              </span>
-            </div>
-            <button
-              type='button'
-              onClick={() =>
-                setFormData({
-                  ...formData,
-                  hideBranding: !formData.hideBranding,
-                })
-              }
-              className={`relative inline-flex h-6 w-11 items-center rounded-full border border-subtle p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus) ${
-                formData.hideBranding
-                  ? 'bg-surface-0'
-                  : 'bg-(--linear-border-focus)'
-              }`}
-              disabled={loading}
-              aria-pressed={!formData.hideBranding}
-              aria-label={
-                formData.hideBranding
-                  ? 'Enable Jovie branding'
-                  : 'Disable Jovie branding'
-              }
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-surface-1 transition-transform ${
-                  formData.hideBranding ? 'translate-x-1' : 'translate-x-6'
-                }`}
-                aria-hidden='true'
-              />
-            </button>
-          </ContentSurfaceCard>
-        </FormField>
-      )}
 
       <Button
         type='submit'
