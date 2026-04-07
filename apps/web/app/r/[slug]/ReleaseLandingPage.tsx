@@ -305,6 +305,7 @@ export function ReleaseLandingPage({
                 artistName={artist.name}
                 artworkUrl={release.artworkUrl}
                 previewUrl={release.previewUrl ?? null}
+                isrc={release.isrc}
                 previewVerification={release.previewVerification}
                 previewSource={release.previewSource}
               />
