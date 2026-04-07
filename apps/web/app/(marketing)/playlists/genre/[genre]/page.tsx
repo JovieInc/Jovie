@@ -1,10 +1,10 @@
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import Link from 'next/link';
 import { BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
+import { PlaylistGrid } from '../../_components/PlaylistGrid';
 
 export const revalidate = 300;
 
@@ -74,49 +74,17 @@ export default async function GenreHubPage({
         {decoded.charAt(0).toUpperCase() + decoded.slice(1)} Playlists
       </h1>
 
-      {playlists.length === 0 ? (
-        <div className='mt-16 text-center'>
-          <p className='text-[15px] text-white/40'>
+      <PlaylistGrid
+        playlists={playlists}
+        emptyMessage={
+          <>
             No {decoded} playlists yet.{' '}
             <Link href='/playlists' className='text-white/60 hover:text-white'>
               Browse all
             </Link>
-          </p>
-        </div>
-      ) : (
-        <div className='mt-12 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4'>
-          {playlists.map(playlist => (
-            <Link
-              key={playlist.slug}
-              href={`/playlists/${playlist.slug}`}
-              className='group'
-            >
-              <div className='aspect-square overflow-hidden rounded-md bg-white/5'>
-                {playlist.coverImageUrl ? (
-                  <Image
-                    src={playlist.coverImageUrl}
-                    alt={playlist.title}
-                    className='h-full w-full object-cover transition-transform duration-200 group-hover:scale-105'
-                    width={400}
-                    height={400}
-                    unoptimized
-                  />
-                ) : (
-                  <div className='flex h-full items-center justify-center text-white/20'>
-                    <span className='text-[13px]'>No cover</span>
-                  </div>
-                )}
-              </div>
-              <h2 className='mt-2 text-[13px] font-[450] leading-[1.3] text-white/80 group-hover:text-white'>
-                {playlist.title}
-              </h2>
-              <p className='text-[11px] text-white/40'>
-                {playlist.trackCount} tracks
-              </p>
-            </Link>
-          ))}
-        </div>
-      )}
+          </>
+        }
+      />
     </div>
   );
 }
