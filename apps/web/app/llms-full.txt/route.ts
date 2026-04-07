@@ -95,7 +95,7 @@ AI that knows your actual career data:
 ## Pricing
 
 - **Free tier**: Create a profile, add releases, collect fans — no credit card required
-- **Pro tier**: Advanced analytics, remove branding, export contacts, priority support
+- **Pro tier**: Advanced analytics, release notifications, export contacts, priority support
 - **Growth tier**: Team features, advanced audience tools (coming soon)
 
 ## Key URLs
