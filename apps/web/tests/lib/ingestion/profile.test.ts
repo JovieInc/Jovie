@@ -63,12 +63,14 @@ describe('applyProfileEnrichment', () => {
       extractedAvatarUrl: 'https://cdn.example.com/better-avatar.jpg',
     });
 
-    expect(update).toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith(creatorProfiles);
     expect(set).toHaveBeenCalledWith(
       expect.objectContaining({
         avatarUrl: 'https://cdn.example.com/better-avatar.jpg',
       })
     );
+    const payload = set.mock.calls[0]?.[0];
+    expect(payload).not.toHaveProperty('displayName');
   });
 
   it('respects lock flags', async () => {
