@@ -47,7 +47,7 @@ async function toDataUrl(imageUrl: string): Promise<string | null> {
   }
 }
 
-function fallbackImage(username: string) {
+function gradientCard(headline: string, subtitle: string) {
   return new ImageResponse(
     <div
       style={{
@@ -95,7 +95,7 @@ function fallbackImage(username: string) {
             lineHeight: 1,
           }}
         >
-          jov.ie/{username}
+          {headline}
         </div>
         <div
           style={{
@@ -104,7 +104,7 @@ function fallbackImage(username: string) {
             color: 'rgba(255,255,255,0.82)',
           }}
         >
-          Artist growth, simplified
+          {subtitle}
         </div>
       </div>
     </div>,
@@ -231,71 +231,6 @@ function heroImage(
   );
 }
 
-function brandedFallback(name: string) {
-  return new ImageResponse(
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        position: 'relative',
-        background:
-          'linear-gradient(138deg, #151033 0%, #22184a 45%, #2f1f68 100%)',
-        color: '#ffffff',
-        fontFamily: 'Inter, sans-serif',
-      }}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element -- Satori requires standard img */}
-      <img
-        src={`${BASE_URL}/Jovie-logo.png`}
-        alt='Jovie'
-        width={240}
-        height={64}
-        style={{
-          position: 'absolute',
-          top: 42,
-          left: 54,
-          objectFit: 'contain',
-        }}
-      />
-      <div
-        style={{
-          marginTop: 'auto',
-          marginBottom: 64,
-          marginLeft: 54,
-          marginRight: 54,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
-          maxWidth: 880,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            fontSize: 74,
-            fontWeight: 700,
-            letterSpacing: -2,
-            lineHeight: 1,
-          }}
-        >
-          {truncateName(name)}
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            fontSize: 30,
-            color: 'rgba(255,255,255,0.82)',
-          }}
-        >
-          Artist profile on Jovie
-        </div>
-      </div>
-    </div>,
-    { ...size }
-  );
-}
-
 export default async function Image({
   params,
 }: {
@@ -317,24 +252,30 @@ export default async function Image({
       ),
     ]);
   } catch {
-    return fallbackImage(normalizedUsername);
+    return gradientCard(
+      `jov.ie/${normalizedUsername}`,
+      'Artist growth, simplified'
+    );
   }
 
   if (!profileResult?.isPublic) {
-    return fallbackImage(normalizedUsername);
+    return gradientCard(
+      `jov.ie/${normalizedUsername}`,
+      'Artist growth, simplified'
+    );
   }
 
   const artistName = profileResult.displayName || username;
   const genres = profileResult.genres?.slice(0, 3) ?? [];
 
   if (!profileResult.avatarUrl) {
-    return brandedFallback(artistName);
+    return gradientCard(truncateName(artistName), 'Artist profile on Jovie');
   }
 
   const photoDataUrl = await toDataUrl(profileResult.avatarUrl);
 
   if (!photoDataUrl) {
-    return brandedFallback(artistName);
+    return gradientCard(truncateName(artistName), 'Artist profile on Jovie');
   }
 
   return heroImage(artistName, photoDataUrl, genres, normalizedUsername);
