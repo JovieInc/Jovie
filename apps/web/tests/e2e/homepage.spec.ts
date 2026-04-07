@@ -67,7 +67,7 @@ test.describe('Homepage', () => {
     ).toBeVisible();
     await expect(
       page.getByRole('heading', {
-        name: 'Every release gets a clean destination.',
+        name: 'Share every release. Reach every fan. Automatically.',
       })
     ).toBeVisible();
     await expect(

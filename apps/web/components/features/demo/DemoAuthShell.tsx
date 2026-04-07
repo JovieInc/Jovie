@@ -83,7 +83,7 @@ async function noopPersist() {}
 
 interface DemoAuthShellProps {
   readonly children: React.ReactNode;
-  /** Pre-built DashboardData from a DB-fetched FeaturedCreator. Falls back to Tim White. */
+  /** Pre-built DashboardData from a DB-fetched FeaturedCreator. Falls back to the internal demo persona. */
   readonly dashboardData?: DashboardData;
 }
 

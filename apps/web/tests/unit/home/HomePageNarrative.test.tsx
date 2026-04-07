@@ -42,7 +42,7 @@ describe('HomePageNarrative', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', {
-        name: 'Every release gets a clean destination.',
+        name: 'Share every release. Reach every fan. Automatically.',
       })
     ).toBeInTheDocument();
     expect(

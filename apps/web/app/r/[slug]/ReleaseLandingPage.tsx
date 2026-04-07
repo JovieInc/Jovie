@@ -3,28 +3,32 @@
 /**
  * ReleaseLandingPage Component
  *
- * A public-facing landing page for release smart links.
- * Shows release artwork, title, artist info, and streaming platform buttons.
- * Includes right-click context menu on artwork for downloading at multiple sizes.
+ * Uses the same visual shell as artist profiles: full-width artwork hero,
+ * menu button top-right, streaming platform buttons below.
  */
 
+import { Share2, Sparkles, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
 import { APP_ROUTES } from '@/constants/routes';
+import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from '@/features/release/AlbumArtworkContextMenu';
-import { ReleaseCreditsDialog } from '@/features/release/ReleaseCreditsDialog';
+import { ReleaseCreditsDrawer } from '@/features/release/ReleaseCreditsDrawer';
 import { SmartLinkAudioPreview } from '@/features/release/SmartLinkAudioPreview';
-import {
-  SmartLinkArtworkCard,
-  SmartLinkPageFrame,
-} from '@/features/release/SmartLinkPagePrimitives';
+import { SmartLinkPoweredByFooter } from '@/features/release/SmartLinkPagePrimitives';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
+import {
+  SMART_LINK_MENU_ICON_CLASS,
+  SMART_LINK_MENU_ITEM_CLASS,
+  SmartLinkShell,
+  useSmartLinkShare,
+} from '@/features/release/SmartLinkShell';
 import type {
   PreviewSource,
   PreviewVerification,
@@ -66,30 +70,25 @@ interface ReleaseLandingPageProps
     readonly featuredArtists?: FeaturedArtist[];
     readonly providers: Provider[];
     readonly credits?: SmartLinkCreditGroup[];
-    /** Pre-generated artwork sizes for download context menu */
     readonly artworkSizes?: Record<string, string> | null;
-    /** Whether the artist allows artwork downloads on public pages */
     readonly allowDownloads?: boolean;
-    /** URL to the /sounds page, shown when video provider links exist */
     readonly soundsUrl?: string | null;
-    /** Optional tracking context for smartlink click analytics */
     readonly tracking?: {
       readonly contentType: 'release' | 'track';
       readonly contentId: string;
       readonly smartLinkSlug?: string | null;
     };
-    /** UTM params captured from incoming request and passed to outbound links */
     readonly utmParams?: PartialUTMParams;
-    /** Optional parent release info for track deep link pages */
     readonly parentRelease?: {
       readonly title: string;
       readonly url: string;
     } | null;
-    /** Optional profile-claim CTA details for unclaimed creators */
     readonly claimBanner?: {
       readonly profileId: string;
       readonly username: string;
     } | null;
+    /** URL to the promo download gate page, shown when promo files exist */
+    readonly downloadUrl?: string | null;
   }> {}
 
 function SmartLinkClaimBanner({
@@ -119,15 +118,14 @@ function SmartLinkClaimBanner({
   const signupUrl = `${APP_ROUTES.SIGNUP}?handle=${encodeURIComponent(username)}&redirect_url=${encodedRedirect}`;
 
   return (
-    <div className='mt-4 rounded-xl bg-surface-1/55 p-3 text-left ring-1 ring-inset ring-white/10 backdrop-blur-sm'>
+    <div className='rounded-2xl bg-surface-1 p-3 text-left ring-1 ring-inset ring-white/10 backdrop-blur-sm'>
       <div className='flex items-start justify-between gap-3'>
         <div>
           <p className='text-foreground text-xs font-medium'>
             Is this your music?
           </p>
           <p className='text-muted-foreground mt-1 text-2xs leading-relaxed'>
-            Claim this profile to unlock SmartLink analytics and manage your
-            releases.
+            Claim this profile to unlock analytics and manage your releases.
           </p>
           <Link
             href={signupUrl}
@@ -137,7 +135,6 @@ function SmartLinkClaimBanner({
             <Icon name='ArrowRight' className='h-3 w-3' aria-hidden='true' />
           </Link>
         </div>
-
         <button
           type='button'
           onClick={handleDismiss}
@@ -151,78 +148,6 @@ function SmartLinkClaimBanner({
   );
 }
 
-/**
- * Build an inline credit summary from credit groups.
- * Shows "Produced by X · Written by Y" for the most interesting roles.
- */
-function buildInlineCredits(
-  credits: SmartLinkCreditGroup[] | undefined
-): string | null {
-  if (!credits || credits.length === 0) return null;
-
-  const parts: string[] = [];
-
-  const producer = credits.find(g => g.role === 'producer');
-  if (producer?.entries[0]) {
-    parts.push(`Produced by ${producer.entries[0].name}`);
-  }
-
-  const names = new Set<string>();
-  const addEntries = (group: SmartLinkCreditGroup | undefined) => {
-    for (const entry of group?.entries ?? []) {
-      names.add(entry.name);
-    }
-  };
-
-  addEntries(credits.find(g => g.role === 'composer'));
-  addEntries(credits.find(g => g.role === 'lyricist'));
-
-  if (names.size > 0) {
-    parts.push(`Written by ${Array.from(names).join(', ')}`);
-  }
-
-  return parts.length > 0 ? parts.join(' · ') : null;
-}
-
-function partitionProviders(providers: Array<Provider & { url: string }>): {
-  canonicalProviders: Array<Provider & { url: string }>;
-  fallbackProviders: Array<Provider & { url: string }>;
-  unverifiedProviders: Array<Provider & { url: string }>;
-} {
-  return providers.reduce(
-    (groups, provider) => {
-      if (provider.confidence === 'search_fallback') {
-        groups.fallbackProviders.push(provider);
-        return groups;
-      }
-
-      if (
-        provider.confidence === 'canonical' ||
-        provider.confidence === 'manual_override'
-      ) {
-        groups.canonicalProviders.push(provider);
-        return groups;
-      }
-
-      groups.unverifiedProviders.push(provider);
-      return groups;
-    },
-    {
-      canonicalProviders: [],
-      fallbackProviders: [],
-      unverifiedProviders: [],
-    } as {
-      canonicalProviders: Array<Provider & { url: string }>;
-      fallbackProviders: Array<Provider & { url: string }>;
-      unverifiedProviders: Array<Provider & { url: string }>;
-    }
-  );
-}
-
-/**
- * Render the artist line with featured artists.
- * "Tim White feat. Erica Gibson" with profile links on each name.
- */
 function SmartLinkArtistLine({
   artist,
   featuredArtists,
@@ -242,38 +167,42 @@ function SmartLinkArtistLine({
   const primaryName = artist.handle ? (
     <Link
       href={`/${artist.handle}`}
-      className='text-muted-foreground hover:text-foreground transition-colors'
+      className='text-white/70 transition-colors hover:text-white/90'
     >
       {artist.name}
     </Link>
   ) : (
-    <span className='text-muted-foreground'>{artist.name}</span>
+    <span className='text-white/70'>{artist.name}</span>
   );
 
   if (!hasFeatured) {
-    return <p className='mt-1 text-sm'>{primaryName}</p>;
+    return (
+      <p className='mt-1 text-[14px] font-[450] [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
+        {primaryName}
+      </p>
+    );
   }
 
   return (
-    <p className='mt-1 text-sm'>
+    <p className='mt-1 text-[14px] font-[450] [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
       {primaryName}
-      <span className='text-muted-foreground/60'> feat. </span>
+      <span className='text-white/40'> feat. </span>
       {featuredArtists.map((fa, i) => (
         <span key={getFeaturedArtistKey(fa.name, fa.handle)}>
           {i > 0 && (
-            <span className='text-muted-foreground/60'>
+            <span className='text-white/40'>
               {i === featuredArtists.length - 1 ? ' & ' : ', '}
             </span>
           )}
           {fa.handle ? (
             <Link
               href={`/${fa.handle}`}
-              className='text-muted-foreground hover:text-foreground transition-colors'
+              className='text-white/70 transition-colors hover:text-white/90'
             >
               {fa.name}
             </Link>
           ) : (
-            <span className='text-muted-foreground'>{fa.name}</span>
+            <span className='text-white/70'>{fa.name}</span>
           )}
         </span>
       ))}
@@ -294,21 +223,16 @@ export function ReleaseLandingPage({
   utmParams = {},
   parentRelease = null,
   claimBanner = null,
+  downloadUrl = null,
 }: Readonly<ReleaseLandingPageProps>) {
-  const formattedDate = release.releaseDate
-    ? new Date(release.releaseDate).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      })
-    : null;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [creditsOpen, setCreditsOpen] = useState(false);
   const clickableProviders = providers.filter(
     (provider): provider is Provider & { url: string } => Boolean(provider.url)
   );
-  const { canonicalProviders, fallbackProviders, unverifiedProviders } =
-    partitionProviders(clickableProviders);
+  // All providers rendered as a flat list — no canonical/fallback distinction for fans
   const sizes = buildArtworkSizes(artworkSizes, release.artworkUrl);
-  const inlineCredits = buildInlineCredits(credits);
+  const hasCredits = credits?.some(group => group.entries.length > 0);
   const hasPreview = Boolean(release.previewUrl);
   const shouldShowPreview =
     hasPreview &&
@@ -320,213 +244,184 @@ export function ReleaseLandingPage({
     (providerKey: ProviderKey) => {
       if (!artist.handle || !tracking?.contentId || !tracking?.contentType)
         return;
-      const payload = {
-        handle: artist.handle,
-        linkType: 'listen',
-        target: providerKey,
-        source: 'link',
-        context: {
-          contentType: tracking.contentType,
-          contentId: tracking.contentId,
-          provider: providerKey,
-          smartLinkSlug: tracking.smartLinkSlug ?? undefined,
+      postJsonBeacon(
+        '/api/track',
+        {
+          handle: artist.handle,
+          linkType: 'listen',
+          target: providerKey,
+          source: 'link',
+          context: {
+            contentType: tracking.contentType,
+            contentId: tracking.contentId,
+            provider: providerKey,
+            smartLinkSlug: tracking.smartLinkSlug ?? undefined,
+          },
         },
-      };
-
-      postJsonBeacon('/api/track', payload, () => {
-        // Ignore tracking errors
-      });
+        () => {}
+      );
     },
     [artist.handle, tracking]
   );
 
+  const handleShare = useSmartLinkShare(release.title, artist.name, () =>
+    setMenuOpen(false)
+  );
+
   return (
-    <SmartLinkPageFrame glowClassName='size-[30rem]'>
-      {/* Artwork + Info — pinned at top, never scrolls */}
-      <div className='shrink-0'>
-        {/* Release Artwork */}
-        {allowDownloads ? (
-          <AlbumArtworkContextMenu
-            title={release.title}
-            sizes={sizes}
-            allowDownloads={allowDownloads}
-          >
-            <SmartLinkArtworkCard
-              title={release.title}
-              artworkUrl={release.artworkUrl}
-              className='shadow-black/40'
+    <SmartLinkShell
+      artworkUrl={release.artworkUrl}
+      artworkAlt={`${release.title} artwork`}
+      onMenuOpen={() => setMenuOpen(true)}
+      artworkWrapper={
+        allowDownloads
+          ? img => (
+              <AlbumArtworkContextMenu
+                title={release.title}
+                sizes={sizes}
+                allowDownloads={allowDownloads}
+              >
+                <div className='relative h-full w-full'>{img}</div>
+              </AlbumArtworkContextMenu>
+            )
+          : undefined
+      }
+      heroOverlay={
+        <div className='absolute inset-x-0 bottom-5 z-10 flex items-end justify-between px-5'>
+          <div className='min-w-0 flex-1'>
+            <h1 className='text-[28px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
+              {release.title}
+            </h1>
+            <SmartLinkArtistLine
+              artist={artist}
+              featuredArtists={featuredArtists}
             />
-          </AlbumArtworkContextMenu>
-        ) : (
-          <SmartLinkArtworkCard
-            title={release.title}
-            artworkUrl={release.artworkUrl}
-            className='shadow-black/40'
-          />
-        )}
-
-        {/* Release Info */}
-        <div className='mt-4 text-center'>
-          <h1 className='text-lg font-semibold leading-snug tracking-tight'>
-            {release.title}
-          </h1>
-          {parentRelease && (
-            <Link
-              href={appendUTMParamsToUrl(parentRelease.url, utmParams)}
-              className='text-muted-foreground hover:text-foreground mt-0.5 block text-xs transition-colors'
-            >
-              from {parentRelease.title}
-            </Link>
-          )}
-          <SmartLinkArtistLine
-            artist={artist}
-            featuredArtists={featuredArtists}
-          />
-          {formattedDate && (
-            <p className='text-muted-foreground/70 mt-0.5 text-2xs tracking-wide'>
-              {formattedDate}
-            </p>
-          )}
-
-          {/* Inline credit summary */}
-          {inlineCredits && (
-            <p className='text-muted-foreground/50 mt-1 text-2xs'>
-              {inlineCredits}
-            </p>
-          )}
-
+          </div>
+          {shouldShowPreview ? (
+            <div className='mb-1 ml-3 shrink-0'>
+              <SmartLinkAudioPreview
+                contentId={tracking?.contentId ?? release.title}
+                title={release.title}
+                artistName={artist.name}
+                artworkUrl={release.artworkUrl}
+                previewUrl={release.previewUrl ?? null}
+                previewVerification={release.previewVerification}
+                previewSource={release.previewSource}
+              />
+            </div>
+          ) : null}
+        </div>
+      }
+    >
+      {/* Content — streaming buttons (scrollable) */}
+      <div className='relative z-10 flex min-h-0 flex-1 flex-col px-5 pt-3'>
+        <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
           {claimBanner && (
             <SmartLinkClaimBanner
               profileId={claimBanner.profileId}
               username={claimBanner.username}
             />
           )}
-        </div>
 
-        {shouldShowPreview && (
-          <div className='mt-3'>
-            <SmartLinkAudioPreview
-              contentId={tracking?.contentId ?? release.title}
-              title={release.title}
-              artistName={artist.name}
-              artworkUrl={release.artworkUrl}
-              previewUrl={release.previewUrl ?? null}
-              isrc={release.isrc}
-              previewVerification={release.previewVerification}
-              previewSource={release.previewSource}
-            />
-          </div>
-        )}
-        {release.previewVerification === 'unknown' ? (
-          <p className='mt-3 text-center text-xs text-white/55'>
-            Preview unavailable. Verify on streaming platforms.
-          </p>
-        ) : null}
-      </div>
-
-      {/* Streaming Platform Buttons — scrolls independently when overflowing */}
-      <div className='mt-4 min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
-        <div className='space-y-2 py-1'>
-          {canonicalProviders.map(provider => {
-            const logoConfig = DSP_LOGO_CONFIG[provider.key];
-
-            return (
-              <SmartLinkProviderButton
-                key={provider.key}
-                href={appendUTMParamsToUrl(provider.url, utmParams)}
-                onClick={() => handleProviderClick(provider.key)}
-                label={logoConfig?.name ?? provider.label}
-                iconPath={logoConfig?.iconPath}
+          {shouldShowPreview && (
+            <div className='mt-3'>
+              <SmartLinkAudioPreview
+                contentId={tracking?.contentId ?? release.title}
+                title={release.title}
+                artistName={artist.name}
+                artworkUrl={release.artworkUrl}
+                previewUrl={release.previewUrl ?? null}
+                isrc={release.isrc}
+                previewVerification={release.previewVerification}
+                previewSource={release.previewSource}
               />
-            );
-          })}
-        </div>
-
-        {fallbackProviders.length > 0 ? (
-          <details className='mt-3 rounded-xl bg-surface-1/35 p-3 ring-1 ring-inset ring-white/[0.08]'>
-            <summary className='cursor-pointer list-none text-left text-xs text-white/70'>
-              More ways to verify
-            </summary>
-            <div className='mt-3 space-y-2'>
-              <p className='text-[10px] text-white/45'>Search fallback</p>
-              {fallbackProviders.map(provider => {
-                const logoConfig = DSP_LOGO_CONFIG[provider.key];
-
-                return (
-                  <SmartLinkProviderButton
-                    key={`fallback-${provider.key}`}
-                    href={appendUTMParamsToUrl(provider.url, utmParams)}
-                    onClick={() => handleProviderClick(provider.key)}
-                    label={logoConfig?.name ?? provider.label}
-                    iconPath={logoConfig?.iconPath}
-                  />
-                );
-              })}
             </div>
-          </details>
-        ) : null}
+          )}
 
-        {unverifiedProviders.length > 0 ? (
-          <details className='mt-3 rounded-xl bg-surface-1/35 p-3 ring-1 ring-inset ring-white/[0.08]'>
-            <summary className='cursor-pointer list-none text-left text-xs text-white/70'>
-              Unverified DSPs
-            </summary>
-            <div className='mt-3 space-y-2'>
-              {unverifiedProviders.map(provider => {
-                const logoConfig = DSP_LOGO_CONFIG[provider.key];
+          <div className='space-y-2'>
+            {clickableProviders.map(provider => {
+              const logoConfig = DSP_LOGO_CONFIG[provider.key];
+              return (
+                <SmartLinkProviderButton
+                  key={provider.key}
+                  href={appendUTMParamsToUrl(provider.url, utmParams)}
+                  onClick={() => handleProviderClick(provider.key)}
+                  label={logoConfig?.name ?? provider.label}
+                  iconPath={logoConfig?.iconPath}
+                />
+              );
+            })}
+          </div>
 
-                return (
-                  <SmartLinkProviderButton
-                    key={`unverified-${provider.key}`}
-                    href={appendUTMParamsToUrl(provider.url, utmParams)}
-                    onClick={() => handleProviderClick(provider.key)}
-                    label={logoConfig?.name ?? provider.label}
-                    iconPath={logoConfig?.iconPath}
-                  />
-                );
-              })}
-            </div>
-          </details>
-        ) : null}
-
-        {/* "Use this sound" CTA for short-form video platforms */}
-        {soundsUrl && (
-          <div className='pt-1'>
-            <Link
-              href={appendUTMParamsToUrl(soundsUrl, utmParams)}
-              className='group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/10 to-violet-500/10 px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-100 hover:from-pink-500/20 hover:to-violet-500/20'
-            >
+          {clickableProviders.length === 0 && (
+            <div className='rounded-2xl bg-surface-1 p-5 text-center ring-1 ring-inset ring-white/[0.08]'>
               <Icon
-                name='Sparkles'
-                className='text-muted-foreground h-4 w-4 transition-colors group-hover:text-foreground/90'
+                name='Music'
+                className='text-muted-foreground mx-auto h-8 w-8'
                 aria-hidden='true'
               />
-              <span className='text-foreground/85 group-hover:text-foreground text-sm font-semibold transition-colors'>
-                Use this sound
-              </span>
-            </Link>
-          </div>
-        )}
+              <p className='text-muted-foreground mt-2 text-sm'>
+                No streaming links available yet.
+              </p>
+            </div>
+          )}
+        </div>
 
-        {/* Empty state if no providers */}
-        {clickableProviders.length === 0 && (
-          <div className='rounded-xl bg-surface-1/40 p-5 text-center ring-1 ring-inset ring-white/[0.08]'>
-            <Icon
-              name='Music'
-              className='text-muted-foreground mx-auto h-8 w-8'
-              aria-hidden='true'
-            />
-            <p className='text-muted-foreground mt-2 text-sm'>
-              No streaming links available yet.
-            </p>
-          </div>
-        )}
-
-        {/* View all credits — less prominent, after streaming links */}
-        <div className='mt-3 flex justify-center'>
-          <ReleaseCreditsDialog credits={credits} />
+        {/* Footer — always pinned at bottom */}
+        <div className='shrink-0 pb-[max(env(safe-area-inset-bottom),8px)]'>
+          <SmartLinkPoweredByFooter />
         </div>
       </div>
-    </SmartLinkPageFrame>
+
+      {/* Menu drawer */}
+      <ProfileDrawerShell
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        title='Menu'
+      >
+        <div className='flex flex-col gap-0.5'>
+          <button
+            type='button'
+            className={SMART_LINK_MENU_ITEM_CLASS}
+            onClick={() => {
+              handleShare();
+            }}
+          >
+            <Share2 className={SMART_LINK_MENU_ICON_CLASS} />
+            Share
+          </button>
+          {hasCredits ? (
+            <button
+              type='button'
+              className={SMART_LINK_MENU_ITEM_CLASS}
+              onClick={() => {
+                setMenuOpen(false);
+                setCreditsOpen(true);
+              }}
+            >
+              <Users className={SMART_LINK_MENU_ICON_CLASS} />
+              Credits
+            </button>
+          ) : null}
+          {soundsUrl ? (
+            <Link
+              href={appendUTMParamsToUrl(soundsUrl, utmParams)}
+              className={SMART_LINK_MENU_ITEM_CLASS}
+              onClick={() => setMenuOpen(false)}
+            >
+              <Sparkles className={SMART_LINK_MENU_ICON_CLASS} />
+              Use this sound
+            </Link>
+          ) : null}
+        </div>
+      </ProfileDrawerShell>
+
+      {/* Credits drawer */}
+      <ReleaseCreditsDrawer
+        open={creditsOpen}
+        onOpenChange={setCreditsOpen}
+        credits={credits}
+      />
+    </SmartLinkShell>
   );
 }

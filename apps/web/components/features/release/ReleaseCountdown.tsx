@@ -38,11 +38,16 @@ function getTimeLeft(targetDate: Date): TimeLeft {
 
 interface ReleaseCountdownProps {
   readonly releaseDate: Date;
+  /** Compact inline mode: "Drops in 14d 3h 22m" on one line */
+  readonly compact?: boolean;
 }
 
 const UPDATE_INTERVAL_MS = 60_000;
 
-export function ReleaseCountdown({ releaseDate }: ReleaseCountdownProps) {
+export function ReleaseCountdown({
+  releaseDate,
+  compact = false,
+}: ReleaseCountdownProps) {
   const router = useRouter();
   // Initialize with null to avoid hydration mismatch (server/client time differences)
   const [timeLeft, setTimeLeft] = useState<TimeLeft | null>(null);
@@ -76,6 +81,39 @@ export function ReleaseCountdown({ releaseDate }: ReleaseCountdownProps) {
   // Don't render until mounted or if release has passed
   if (!timeLeft || timeLeft.total <= 0) {
     return null;
+  }
+
+  if (compact) {
+    return (
+      <div className='flex items-baseline gap-3 tabular-nums'>
+        {timeLeft.days > 0 && (
+          <span>
+            <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
+              {timeLeft.days}
+            </span>
+            <span className='ml-0.5 text-[10px] font-[590] uppercase tracking-[0.08em] text-white/35'>
+              D
+            </span>
+          </span>
+        )}
+        <span>
+          <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
+            {timeLeft.hours}
+          </span>
+          <span className='ml-0.5 text-[10px] font-[590] uppercase tracking-[0.08em] text-white/35'>
+            H
+          </span>
+        </span>
+        <span>
+          <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
+            {timeLeft.minutes}
+          </span>
+          <span className='ml-0.5 text-[10px] font-[590] uppercase tracking-[0.08em] text-white/35'>
+            M
+          </span>
+        </span>
+      </div>
+    );
   }
 
   return (

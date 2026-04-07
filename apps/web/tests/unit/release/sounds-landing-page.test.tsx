@@ -19,6 +19,38 @@ vi.mock('next/link', () => ({
   ),
 }));
 
+vi.mock('next/image', () => ({
+  __esModule: true,
+  default: (props: { alt?: string; src: string }) => (
+    <img alt={props.alt ?? ''} {...props} />
+  ),
+}));
+
+vi.mock('vaul', () => ({
+  Drawer: {
+    Root: ({
+      children,
+      open,
+    }: {
+      children: React.ReactNode;
+      open?: boolean;
+    }) => (open ? <div>{children}</div> : null),
+    Portal: ({ children }: { children: React.ReactNode }) => (
+      <div>{children}</div>
+    ),
+    Overlay: () => <div />,
+    Content: ({
+      children,
+      ...props
+    }: { children: React.ReactNode } & Record<string, unknown>) => (
+      <div {...props}>{children}</div>
+    ),
+    Title: ({ children }: { children: React.ReactNode }) => (
+      <div>{children}</div>
+    ),
+  },
+}));
+
 // Must import after mocks — use relative path since @/app/ alias
 // maps to app/app/ (authenticated routes), not app/[username]/
 const { SoundsLandingPage } = await import(
@@ -81,11 +113,12 @@ describe('SoundsLandingPage', () => {
   it('renders video provider buttons for each provider', () => {
     render(<SoundsLandingPage {...defaultProps} />);
 
+    // Buttons now use platform name from VIDEO_LOGO_CONFIG, not cta text
     expect(
-      screen.getByRole('link', { name: /use sound on tiktok/i })
+      screen.getByRole('link', { name: /open tiktok/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: /use audio on instagram/i })
+      screen.getByRole('link', { name: /open instagram/i })
     ).toBeInTheDocument();
   });
 
@@ -93,7 +126,7 @@ describe('SoundsLandingPage', () => {
     render(<SoundsLandingPage {...defaultProps} />);
 
     const tiktokLink = screen.getByRole('link', {
-      name: /use sound on tiktok/i,
+      name: /open tiktok/i,
     });
     fireEvent.click(tiktokLink);
 
@@ -113,9 +146,6 @@ describe('SoundsLandingPage', () => {
       />
     );
 
-    // Should not render an img element
-    expect(screen.queryByRole('img')).not.toBeInTheDocument();
-    // The fallback is an Icon component (rendered as svg)
     expect(screen.getByText('Test Song')).toBeInTheDocument();
   });
 
@@ -126,17 +156,20 @@ describe('SoundsLandingPage', () => {
     expect(img).toBeInTheDocument();
   });
 
-  it('shows "Listen on streaming platforms" back link', () => {
+  it('shows listen link in menu drawer', () => {
     render(<SoundsLandingPage {...defaultProps} />);
 
-    const backLink = screen.getByText('Listen on streaming platforms');
-    expect(backLink.closest('a')).toHaveAttribute(
-      'href',
-      '/testartist/test-song'
-    );
+    // Menu not visible before click
+    expect(screen.queryByText('Listen')).not.toBeInTheDocument();
+
+    // Open menu
+    fireEvent.click(screen.getByRole('button', { name: /more options/i }));
+
+    // Listen link in menu
+    expect(screen.getByText('Listen')).toBeInTheDocument();
   });
 
-  it('preserves UTM params on back link', () => {
+  it('preserves UTM params on menu listen link', () => {
     render(
       <SoundsLandingPage
         {...defaultProps}
@@ -144,8 +177,9 @@ describe('SoundsLandingPage', () => {
       />
     );
 
-    const backLink = screen.getByText('Listen on streaming platforms');
-    const href = backLink.closest('a')?.getAttribute('href') ?? '';
+    fireEvent.click(screen.getByRole('button', { name: /more options/i }));
+    const listenLink = screen.getByText('Listen').closest('a');
+    const href = listenLink?.getAttribute('href') ?? '';
     expect(href).toContain('utm_source=tiktok');
     expect(href).toContain('utm_medium=sound');
   });
@@ -157,21 +191,21 @@ describe('SoundsLandingPage', () => {
     expect(artistLink.closest('a')).toHaveAttribute('href', '/testartist');
   });
 
-  it('renders artist name as text when handle is null', () => {
+  it('renders artist name as plain text when handle is null', () => {
     render(
       <SoundsLandingPage
         {...defaultProps}
-        artist={{ name: 'Test Artist', handle: null }}
+        artist={{ name: 'No Handle', handle: null }}
       />
     );
 
-    const artistText = screen.getByText('Test Artist');
-    expect(artistText.tagName).toBe('P');
+    const artistName = screen.getByText('No Handle');
+    expect(artistName.closest('a')).toBeNull();
   });
 
-  it('renders "Use this sound" label', () => {
+  it('renders release title', () => {
     render(<SoundsLandingPage {...defaultProps} />);
 
-    expect(screen.getByText('Use this sound')).toBeInTheDocument();
+    expect(screen.getByText('Test Song')).toBeInTheDocument();
   });
 });

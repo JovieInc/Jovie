@@ -312,7 +312,7 @@ async function warmupDemoRoutes(
     );
     await warmupRoute(warmupPage, `/${publicHandle}`, {
       readyLocator: warmupPage.locator('body'),
-      readyText: 'Tim White',
+      readyText: 'Calvin Harris',
     });
     await warmupRoute(warmupPage, `/${publicHandle}?mode=subscribe`, {
       readyLocator: warmupPage.locator('body'),
@@ -501,7 +501,7 @@ test.describe('YC Demo Recording', () => {
 
     await gotoDemoScene(demoPage, `/${publicHandle}`, {
       readyLocator: demoPage.locator('body'),
-      readyText: 'Tim White',
+      readyText: 'Calvin Harris',
     });
     await injectCaptionOverlay(demoPage);
     await setCaption(
