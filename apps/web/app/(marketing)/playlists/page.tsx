@@ -24,16 +24,21 @@ export const metadata: Metadata = {
 
 async function getPublishedPlaylists() {
   if (!env.DATABASE_URL) return [];
-  return db
-    .select({
-      slug: joviePlaylists.slug,
-      title: joviePlaylists.title,
-      coverImageUrl: joviePlaylists.coverImageUrl,
-      trackCount: joviePlaylists.trackCount,
-    })
-    .from(joviePlaylists)
-    .where(eq(joviePlaylists.status, 'published'))
-    .orderBy(joviePlaylists.publishedAt);
+  try {
+    return await db
+      .select({
+        slug: joviePlaylists.slug,
+        title: joviePlaylists.title,
+        coverImageUrl: joviePlaylists.coverImageUrl,
+        trackCount: joviePlaylists.trackCount,
+      })
+      .from(joviePlaylists)
+      .where(eq(joviePlaylists.status, 'published'))
+      .orderBy(joviePlaylists.publishedAt);
+  } catch {
+    // Table may not exist yet on preview environments before migration runs
+    return [];
+  }
 }
 
 export default async function PlaylistsIndexPage() {

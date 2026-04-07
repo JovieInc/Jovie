@@ -219,29 +219,18 @@ export async function generateCoverArt(options: {
     .toBuffer();
 
   // Step 5: Compress for Spotify (must be <256KB as base64)
+  // Compress from fullRes (which already has text overlay composited) to avoid
+  // Sharp dimension mismatch error when overlaying 1400x1400 SVG on smaller base.
   let spotifyBuffer: Buffer | null = null;
-  let smallestBuffer: Buffer | null = null;
-  let smallestSize = Infinity;
 
   for (let quality = 80; quality >= 20; quality -= 10) {
     const size = quality >= 60 ? 640 : quality >= 40 ? 480 : 320;
-    const compressed = await sharp(processed)
+    const compressed = await sharp(fullRes)
       .resize(size, size)
-      .composite([
-        {
-          input: createTextOverlay(coverText),
-          blend: 'over',
-        },
-      ])
       .jpeg({ quality })
       .toBuffer();
 
     const base64Size = Math.ceil((compressed.length * 4) / 3);
-
-    if (base64Size < smallestSize) {
-      smallestSize = base64Size;
-      smallestBuffer = compressed;
-    }
 
     if (base64Size <= SPOTIFY_MAX_BASE64_BYTES) {
       spotifyBuffer = compressed;
@@ -249,9 +238,12 @@ export async function generateCoverArt(options: {
     }
   }
 
-  // Use the smallest version we generated (even if over limit, Spotify may still accept it)
   if (!spotifyBuffer) {
-    spotifyBuffer = smallestBuffer ?? fullRes;
+    // Last resort: smallest possible resize of the already-composited image
+    spotifyBuffer = await sharp(fullRes)
+      .resize(300, 300)
+      .jpeg({ quality: 20 })
+      .toBuffer();
   }
 
   const spotifyBase64 = spotifyBuffer.toString('base64');

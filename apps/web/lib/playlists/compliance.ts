@@ -73,17 +73,18 @@ export function getTargetPlaylistSize(): number {
  * Appends a short date suffix for uniqueness.
  */
 export function generatePlaylistSlug(title: string): string {
-  const base = title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 60);
+  const base =
+    title
+      .toLowerCase()
+      .replaceAll(/[^a-z0-9\s-]/g, '')
+      .replaceAll(/\s+/g, '-')
+      .replaceAll(/-+/g, '-')
+      .replaceAll(/^-|-$/g, '')
+      .slice(0, 60) || 'playlist';
 
-  // Add MMDD suffix for uniqueness
+  // MMDD + random suffix for guaranteed uniqueness across same-day runs
   const now = new Date();
-  const suffix = `${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+  const suffix = `${String(now.getUTCMonth() + 1).padStart(2, '0')}${String(now.getUTCDate()).padStart(2, '0')}-${Math.random().toString(36).slice(2, 6)}`;
 
   return `${base}-${suffix}`;
 }

@@ -1,13 +1,22 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import { revalidatePath } from 'next/cache';
 import { AdminWorkspacePage } from '@/components/features/admin/layout/AdminWorkspacePage';
 import { APP_ROUTES } from '@/constants/routes';
+import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { joviePlaylists, joviePlaylistTracks } from '@/lib/db/schema/playlists';
 import { generateCoverArt } from '@/lib/playlists/generate-cover';
 import { publishToSpotify } from '@/lib/playlists/publish-spotify';
 import { getJovieSpotifyUserId } from '@/lib/spotify/jovie-account';
+
+async function requireAdmin(): Promise<void> {
+  const { userId } = await getCachedAuth();
+  if (!userId || !(await checkAdminRole(userId))) {
+    throw new Error('Unauthorized');
+  }
+}
 
 export const metadata: Metadata = { title: 'Playlists — Admin' };
 export const runtime = 'nodejs';
@@ -19,17 +28,28 @@ export const runtime = 'nodejs';
 async function approvePlaylist(formData: FormData) {
   'use server';
 
+  await requireAdmin();
+
   const playlistId = formData.get('playlistId') as string;
   if (!playlistId) return;
 
-  // Get the playlist and its tracks
+  // Atomic claim: only proceed if status is still 'pending'
   const [playlist] = await db
-    .select()
-    .from(joviePlaylists)
-    .where(eq(joviePlaylists.id, playlistId))
-    .limit(1);
+    .update(joviePlaylists)
+    .set({
+      status: 'approved',
+      statusChangedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(joviePlaylists.id, playlistId),
+        eq(joviePlaylists.status, 'pending')
+      )
+    )
+    .returning();
 
-  if (!playlist || playlist.status !== 'pending') return;
+  if (!playlist) return; // already claimed by another request
 
   const tracks = await db
     .select()
@@ -42,12 +62,18 @@ async function approvePlaylist(formData: FormData) {
     .filter((id): id is string => id != null);
 
   // Generate cover art using LLM-generated queries from the pipeline
-  const promptData = playlist.llmPrompt
-    ? (JSON.parse(playlist.llmPrompt) as {
-        unsplashQuery?: string;
-        coverTextWords?: string;
-      })
-    : {};
+  const promptData = (() => {
+    try {
+      return playlist.llmPrompt
+        ? (JSON.parse(playlist.llmPrompt) as {
+            unsplashQuery?: string;
+            coverTextWords?: string;
+          })
+        : {};
+    } catch {
+      return {};
+    }
+  })();
   const coverArt = await generateCoverArt({
     unsplashQuery: promptData.unsplashQuery ?? playlist.theme ?? playlist.title,
     coverText:
@@ -88,6 +114,8 @@ async function approvePlaylist(formData: FormData) {
 
 async function rejectPlaylist(formData: FormData) {
   'use server';
+
+  await requireAdmin();
 
   const playlistId = formData.get('playlistId') as string;
   const note = formData.get('note') as string;

@@ -27,7 +27,6 @@ import { curateTracklist } from './curate-tracklist';
 import { type CandidateTrack, discoverTracks } from './discover-tracks';
 import { findMatchingJovieArtistTracks } from './feature-jovie-artists';
 import { generatePlaylistConcept } from './generate-concept';
-import { generateCoverArt } from './generate-cover';
 
 // ============================================================================
 // Types
@@ -103,13 +102,10 @@ export async function generatePlaylist(): Promise<PipelineResult> {
       targetSize,
     });
 
-    // Step 6: Generate cover art
-    const _coverArt = await generateCoverArt({
-      unsplashQuery: concept.unsplashQuery,
-      coverText: concept.coverTextWords,
-    });
+    // Cover art is generated at approval time (admin page), not here.
+    // The unsplashQuery and coverTextWords are persisted in llmPrompt for later use.
 
-    // Step 7: Save to database
+    // Step 6: Save to database
     const slug = generatePlaylistSlug(concept.title);
 
     // Build track lookup for metadata

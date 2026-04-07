@@ -84,7 +84,15 @@ const getSitemapCatalog = unstable_cache(
             coverImageUrl: joviePlaylists.coverImageUrl,
           })
           .from(joviePlaylists)
-          .where(eq(joviePlaylists.status, 'published')),
+          .where(eq(joviePlaylists.status, 'published'))
+          .catch(
+            () =>
+              [] as {
+                slug: string;
+                updatedAt: Date | null;
+                coverImageUrl: string | null;
+              }[]
+          ),
       ]);
 
       return { profiles, releases, tracks, playlists };
