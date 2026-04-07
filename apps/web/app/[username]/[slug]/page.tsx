@@ -75,7 +75,7 @@ const CREDIT_ROLE_SCHEMA_MAP: Record<string, string> = {
  * Generate a single @graph JSON-LD for music content SEO.
  * Includes MusicAlbum/MusicRecording + BreadcrumbList + credits + track list.
  */
-function generateMusicStructuredData(
+export function generateMusicStructuredData(
   content: {
     type: 'release' | 'track';
     title: string;
@@ -87,6 +87,10 @@ function generateMusicStructuredData(
     releaseType?: string | null;
     totalTracks?: number | null;
     credits?: SmartLinkCreditGroup[] | null;
+    durationMs?: number | null;
+    isrc?: string | null;
+    trackNumber?: number | null;
+    inAlbum?: { title: string; url: string; id: string } | null;
   },
   creator: {
     displayName: string | null;
@@ -195,6 +199,20 @@ function generateMusicStructuredData(
     ...(imageValue && { image: imageValue }),
     ...(content.releaseDate && {
       datePublished: toDateOnlySafe(content.releaseDate),
+    }),
+    ...(content.durationMs &&
+      content.durationMs > 0 && {
+        duration: msToIsoDuration(content.durationMs),
+      }),
+    ...(content.isrc && { isrcCode: content.isrc }),
+    ...(content.trackNumber != null && { position: content.trackNumber }),
+    ...(content.inAlbum && {
+      inAlbum: {
+        '@type': 'MusicAlbum',
+        '@id': content.inAlbum.id,
+        name: content.inAlbum.title,
+        url: content.inAlbum.url,
+      },
     }),
     byArtist: {
       '@type': 'MusicGroup',

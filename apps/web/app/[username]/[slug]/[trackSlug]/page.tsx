@@ -9,21 +9,18 @@
 
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
+import { generateMusicStructuredData } from '@/app/[username]/[slug]/page';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { BASE_URL } from '@/constants/app';
-import {
-  buildBreadcrumbObject,
-  buildListenActions,
-} from '@/lib/constants/schemas';
+import { buildBreadcrumbObject } from '@/lib/constants/schemas';
 import {
   derivePreviewState,
   getProviderConfidence,
 } from '@/lib/discography/audio-qa';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
-import { generateArtworkImageObject } from '@/lib/images/seo';
 import { trackServerEvent } from '@/lib/server-analytics';
-import { msToIsoDuration, toISOStringOrNull } from '@/lib/utils/date';
+import { toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
 import {
@@ -168,62 +165,38 @@ export default async function TrackDeepLinkPage({
   const trackUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}/${trackSlug}`;
   const releaseUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}`;
 
-  const listenActions = buildListenActions(track.providerLinks);
-
-  const durationMs = track.durationMs ?? null;
-  const isrc = track.isrc ?? null;
-  const trackNumber = track.trackNumber ?? null;
-
-  // MusicRecording structured data with enhanced fields
-  const musicSchema: Record<string, unknown> = {
-    '@type': 'MusicRecording',
-    '@id': `${trackUrl}#track`,
-    name: track.title,
-    url: trackUrl,
-    isAccessibleForFree: true,
-    ...(track.artworkUrl && {
-      image: generateArtworkImageObject(track.artworkUrl, {
-        title: track.title,
-        artistName,
-        contentType: 'track',
-      }),
-    }),
-    ...(track.releaseDate && {
-      datePublished: toISOStringOrNull(track.releaseDate)?.split('T')[0],
-    }),
-    ...(durationMs &&
-      durationMs > 0 && {
-        duration: msToIsoDuration(durationMs),
-      }),
-    ...(isrc && { isrcCode: isrc }),
-    ...(trackNumber != null && { position: trackNumber }),
-    byArtist: {
-      '@type': 'MusicGroup',
-      '@id': `${BASE_URL}/${creator.usernameNormalized}#musicgroup`,
-      name: artistName,
-      url: `${BASE_URL}/${creator.usernameNormalized}`,
+  // Reuse shared structured data generator with track-specific fields
+  const structuredData = generateMusicStructuredData(
+    {
+      type: 'track',
+      title: track.title,
+      slug: `${slug}/${trackSlug}`,
+      artworkUrl: track.artworkUrl,
+      releaseDate: track.releaseDate,
+      providerLinks: track.providerLinks,
+      durationMs: track.durationMs,
+      isrc: track.isrc,
+      trackNumber: track.trackNumber,
+      inAlbum: {
+        title: releaseContent.title,
+        url: releaseUrl,
+        id: `${releaseUrl}#release`,
+      },
     },
-    inAlbum: {
-      '@type': 'MusicAlbum',
-      '@id': `${releaseUrl}#release`,
-      name: releaseContent.title,
-      url: releaseUrl,
-    },
-    sameAs: track.providerLinks.map(link => link.url),
-    ...(listenActions.length > 0 && { potentialAction: listenActions }),
-  };
+    creator
+  );
 
-  const breadcrumbSchema = buildBreadcrumbObject([
-    { name: 'Home', url: BASE_URL },
-    { name: artistName, url: `${BASE_URL}/${creator.usernameNormalized}` },
-    { name: releaseContent.title, url: releaseUrl },
-    { name: track.title, url: trackUrl },
-  ]);
-
-  const structuredData = {
-    '@context': 'https://schema.org',
-    '@graph': [musicSchema, breadcrumbSchema],
-  };
+  // Add the deeper breadcrumb (4 levels instead of 3)
+  const graph = structuredData['@graph'] as Array<Record<string, unknown>>;
+  const bcIndex = graph.findIndex(s => s['@type'] === 'BreadcrumbList');
+  if (bcIndex >= 0) {
+    graph[bcIndex] = buildBreadcrumbObject([
+      { name: 'Home', url: BASE_URL },
+      { name: artistName, url: `${BASE_URL}/${creator.usernameNormalized}` },
+      { name: releaseContent.title, url: releaseUrl },
+      { name: track.title, url: trackUrl },
+    ]);
+  }
 
   return (
     <>
