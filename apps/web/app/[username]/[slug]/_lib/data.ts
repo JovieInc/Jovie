@@ -751,7 +751,8 @@ export const getReleaseTrackList = cache(
   > => {
     const rows = await db
       .select({
-        title: discogReleaseTracks.title,
+        releaseTrackTitle: discogReleaseTracks.title,
+        recordingTitle: discogRecordings.title,
         slug: discogReleaseTracks.slug,
         trackNumber: discogReleaseTracks.trackNumber,
         durationMs: discogRecordings.durationMs,
@@ -767,7 +768,7 @@ export const getReleaseTrackList = cache(
     return rows
       .filter(row => row.slug)
       .map(row => ({
-        title: row.title ?? '',
+        title: row.releaseTrackTitle ?? row.recordingTitle ?? '',
         slug: row.slug!,
         trackNumber: row.trackNumber,
         durationMs: row.durationMs,

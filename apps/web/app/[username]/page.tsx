@@ -17,6 +17,7 @@ import {
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
+import { buildBreadcrumbObject } from '@/lib/constants/schemas';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for types
 import type {
@@ -171,23 +172,10 @@ function generateProfileStructuredData(
     ...(profile.updated_at && { dateModified: profile.updated_at }),
   };
 
-  const breadcrumbSchema = {
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      {
-        '@type': 'ListItem',
-        position: 1,
-        name: 'Home',
-        item: BASE_URL,
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: artistName,
-        item: profileUrl,
-      },
-    ],
-  };
+  const breadcrumbSchema = buildBreadcrumbObject([
+    { name: 'Home', url: BASE_URL },
+    { name: artistName, url: profileUrl },
+  ]);
 
   // MusicEvent schemas for upcoming tour dates (capped at MAX_EVENT_SCHEMAS)
   const eventSchemas = tourDates.slice(0, MAX_EVENT_SCHEMAS).map(td => {

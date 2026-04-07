@@ -19,7 +19,10 @@ import {
   ScheduledReleasePage,
   UnreleasedReleaseHero,
 } from '@/features/release';
-import { buildListenActions } from '@/lib/constants/schemas';
+import {
+  buildBreadcrumbObject,
+  buildListenActions,
+} from '@/lib/constants/schemas';
 import {
   derivePreviewState,
   getProviderConfidence,
@@ -215,29 +218,11 @@ function generateMusicStructuredData(
     ...(listenActions.length > 0 && { potentialAction: listenActions }),
   };
 
-  const breadcrumbSchema = {
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      {
-        '@type': 'ListItem',
-        position: 1,
-        name: 'Home',
-        item: BASE_URL,
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: artistName,
-        item: artistUrl,
-      },
-      {
-        '@type': 'ListItem',
-        position: 3,
-        name: content.title,
-        item: contentUrl,
-      },
-    ],
-  };
+  const breadcrumbSchema = buildBreadcrumbObject([
+    { name: 'Home', url: BASE_URL },
+    { name: artistName, url: artistUrl },
+    { name: content.title, url: contentUrl },
+  ]);
 
   return {
     '@context': 'https://schema.org',

@@ -11,7 +11,10 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { BASE_URL } from '@/constants/app';
-import { buildListenActions } from '@/lib/constants/schemas';
+import {
+  buildBreadcrumbObject,
+  buildListenActions,
+} from '@/lib/constants/schemas';
 import {
   derivePreviewState,
   getProviderConfidence,
@@ -210,30 +213,12 @@ export default async function TrackDeepLinkPage({
     ...(listenActions.length > 0 && { potentialAction: listenActions }),
   };
 
-  const breadcrumbSchema = {
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: BASE_URL },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: artistName,
-        item: `${BASE_URL}/${creator.usernameNormalized}`,
-      },
-      {
-        '@type': 'ListItem',
-        position: 3,
-        name: releaseContent.title,
-        item: releaseUrl,
-      },
-      {
-        '@type': 'ListItem',
-        position: 4,
-        name: track.title,
-        item: trackUrl,
-      },
-    ],
-  };
+  const breadcrumbSchema = buildBreadcrumbObject([
+    { name: 'Home', url: BASE_URL },
+    { name: artistName, url: `${BASE_URL}/${creator.usernameNormalized}` },
+    { name: releaseContent.title, url: releaseUrl },
+    { name: track.title, url: trackUrl },
+  ]);
 
   const structuredData = {
     '@context': 'https://schema.org',
