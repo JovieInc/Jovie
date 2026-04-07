@@ -208,6 +208,59 @@ export function buildPersonSchema(overrides: {
   });
 }
 
+/**
+ * Build ListenAction entries for provider links.
+ * Shared across release and track pages to avoid duplication.
+ */
+const LISTEN_ACTION_PRIORITY: readonly string[] = [
+  'spotify',
+  'apple_music',
+  'youtube',
+  'soundcloud',
+  'deezer',
+  'tidal',
+];
+
+export function buildListenActions(
+  providerLinks: Array<{ providerId: string; url: string }>,
+  providerLabels?: Record<string, { label: string }>
+): Array<Record<string, unknown>> {
+  return [...providerLinks]
+    .filter(link => link.url)
+    .sort((a, b) => {
+      const ai = LISTEN_ACTION_PRIORITY.indexOf(a.providerId);
+      const bi = LISTEN_ACTION_PRIORITY.indexOf(b.providerId);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    })
+    .slice(0, 5)
+    .map(link => ({
+      '@type': 'ListenAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: link.url,
+        actionPlatform: 'https://schema.org/DesktopWebPlatform',
+      },
+      ...(providerLabels?.[link.providerId]?.label && {
+        name: `Listen on ${providerLabels[link.providerId].label}`,
+      }),
+    }));
+}
+
+/** Build a raw BreadcrumbList object (for embedding in @graph arrays) */
+export function buildBreadcrumbObject(
+  items: Array<{ name: string; url: string }>
+): Record<string, unknown> {
+  return {
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.name,
+      item: item.url,
+    })),
+  };
+}
+
 /** Build a BreadcrumbList schema */
 export function buildBreadcrumbSchema(
   items: Array<{ name: string; url: string }>

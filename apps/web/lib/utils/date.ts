@@ -47,5 +47,23 @@ export function toISOStringOrFallback(
   return date.toISOString();
 }
 
+/**
+ * Convert milliseconds to ISO 8601 duration (e.g., PT3M45S).
+ */
+export function msToIsoDuration(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) {
+    return 'PT0S';
+  }
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  let duration = 'PT';
+  if (hours > 0) duration += `${hours}H`;
+  if (minutes > 0) duration += `${minutes}M`;
+  if (seconds > 0 || duration === 'PT') duration += `${seconds}S`;
+  return duration;
+}
+
 // formatRelativeDate has been moved to @/lib/utils/date-formatting
 export { formatRelativeDate } from './date-formatting';
