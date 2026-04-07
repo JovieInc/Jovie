@@ -37,9 +37,6 @@ vi.mock('@/features/dashboard/organisms/SettingsAudienceSection', () => ({
 vi.mock('@/features/dashboard/organisms/SettingsBillingSection', () => ({
   SettingsBillingSection: () => <div>Billing</div>,
 }));
-vi.mock('@/features/dashboard/organisms/SettingsBrandingSection', () => ({
-  SettingsBrandingSection: () => <div>Branding</div>,
-}));
 vi.mock('@/features/dashboard/organisms/SettingsContactsSection', () => ({
   SettingsContactsSection: () => <div>Contacts</div>,
 }));
