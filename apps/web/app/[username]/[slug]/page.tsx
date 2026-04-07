@@ -492,6 +492,7 @@ function ContentPageBody({
         artworkUrl: content.artworkUrl,
         releaseDate: toISOStringOrNull(content.releaseDate),
         previewUrl: content.previewUrl ?? null,
+        isrc: content.isrc ?? null,
         previewVerification: previewState.previewVerification,
         previewSource: previewState.previewSource,
       }}

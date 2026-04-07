@@ -54,6 +54,7 @@ interface ReleaseLandingPageProps
       readonly artworkUrl: string | null;
       readonly releaseDate: string | null;
       readonly previewUrl?: string | null;
+      readonly isrc?: string | null;
       readonly previewVerification?: PreviewVerification;
       readonly previewSource?: PreviewSource;
     };
@@ -410,6 +411,7 @@ export function ReleaseLandingPage({
               artistName={artist.name}
               artworkUrl={release.artworkUrl}
               previewUrl={release.previewUrl ?? null}
+              isrc={release.isrc}
               previewVerification={release.previewVerification}
               previewSource={release.previewSource}
             />
