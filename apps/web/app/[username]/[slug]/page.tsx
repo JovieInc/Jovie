@@ -461,6 +461,30 @@ export default async function ContentSmartLinkPage({
     showUnreleasedHero = creatorPlan.canAccessFutureReleases;
   }
 
+  // Check for promo downloads (releases only, not tracks)
+  let downloadUrl: string | null = null;
+  if (content.type === 'release' && content.id) {
+    const { promoDownloads: promoDownloadsTable } = await import(
+      '@/lib/db/schema/promo-downloads'
+    );
+    const { db: dbInstance } = await import('@/lib/db');
+    const { eq, and } = await import('drizzle-orm');
+    const [hasDownloads] = await dbInstance
+      .select({ id: promoDownloadsTable.id })
+      .from(promoDownloadsTable)
+      .where(
+        and(
+          eq(promoDownloadsTable.releaseId, content.id),
+          eq(promoDownloadsTable.isActive, true)
+        )
+      )
+      .limit(1);
+
+    if (hasDownloads) {
+      downloadUrl = `/${creator.usernameNormalized}/${content.slug}/download`;
+    }
+  }
+
   return (
     <>
       <script type='application/ld+json'>
@@ -484,6 +508,7 @@ export default async function ContentSmartLinkPage({
         previewState={previewState}
         utmParams={utmParams}
         soundsUrl={soundsUrl}
+        downloadUrl={downloadUrl}
       />
     </>
   );
@@ -498,6 +523,7 @@ function ContentPageBody({
   previewState,
   utmParams,
   soundsUrl,
+  downloadUrl,
 }: Readonly<{
   isUnreleased: boolean;
   showUnreleasedHero: boolean;
@@ -513,6 +539,7 @@ function ContentPageBody({
   previewState: ReturnType<typeof derivePreviewState>;
   utmParams: ReturnType<typeof extractUTMParams>;
   soundsUrl: string | null;
+  downloadUrl: string | null;
 }>) {
   const artistName = creator.displayName ?? creator.username;
 
@@ -605,6 +632,7 @@ function ContentPageBody({
               username: creator.usernameNormalized,
             }
       }
+      downloadUrl={downloadUrl}
     />
   );
 }

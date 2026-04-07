@@ -191,7 +191,8 @@ export type FanNotificationContentType =
   | 'newMusic'
   | 'tourDates'
   | 'merch'
-  | 'general';
+  | 'general'
+  | 'promo';
 
 /** All available content types, ordered for UI display. */
 export const FAN_NOTIFICATION_CONTENT_TYPES: readonly {
@@ -215,6 +216,11 @@ export const FAN_NOTIFICATION_CONTENT_TYPES: readonly {
     label: 'General Updates',
     description: 'Announcements & other news',
   },
+  {
+    key: 'promo',
+    label: 'Promos',
+    description: 'Downloads, stems & DJ promos',
+  },
 ] as const;
 
 /**
@@ -234,6 +240,8 @@ export interface FanNotificationPreferences {
   merch?: boolean;
   /** Opt-in to general announcements */
   general?: boolean;
+  /** Opt-in to promo downloads, stems & DJ promos */
+  promo?: boolean;
 }
 
 // Notification subscriptions table
