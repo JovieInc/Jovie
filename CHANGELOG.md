@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.132] - 2026-04-07
+
+> Higher resolution profile photos on artist pages and sharper hero images on retina displays.
+
+### Changed
+
+- Ingestion pipeline preserves full Spotify image resolution (was downscaling 640px to 512px)
+- Avatar AVIF quality raised from 65-70 to 80 across upload and ingestion pipelines
+- Added 1024px avatar download size for retina hero display
+- Profile photo size mappings updated: large=1024px, medium=512px
+- Next.js image optimizer now serves 1024px breakpoint
+- Profile refresh now re-fetches unlocked DSP-sourced avatars through the higher-quality pipeline
+
 ## [26.4.131] - 2026-04-06
 
 > Fix broken legal page anchor links, inaccurate cookie policy text, and add Lighthouse CI budgets for all legal pages.

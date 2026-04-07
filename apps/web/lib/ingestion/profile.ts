@@ -27,7 +27,12 @@ export async function applyProfileEnrichment(
 
   if (!input.avatarLockedByUser && input.extractedAvatarUrl) {
     const trimmed = input.extractedAvatarUrl.trim();
-    if (trimmed && !input.currentAvatarUrl) {
+    // Skip if the profile already has a blob-hosted avatar — don't replace
+    // a stable, optimized URL with a raw external CDN URL.
+    const alreadyBlobHosted = input.currentAvatarUrl?.includes(
+      'blob.vercel-storage.com'
+    );
+    if (trimmed && !alreadyBlobHosted) {
       updates.avatarUrl = trimmed;
     }
   }

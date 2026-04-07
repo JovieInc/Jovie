@@ -15,13 +15,13 @@ describe('buildAvatarSizes', () => {
 
     expect(sizes).toHaveLength(3);
     expect(sizes[0].key).toBe('medium');
-    expect(sizes[0].label).toBe('Medium (400 x 400)');
+    expect(sizes[0].label).toBe('Medium (512 x 512)');
     expect(sizes[0].url).toContain('/_next/image?');
-    expect(sizes[0].url).toContain('w=400');
+    expect(sizes[0].url).toContain('w=512');
 
     expect(sizes[1].key).toBe('large');
-    expect(sizes[1].label).toBe('Large (1000 x 1000)');
-    expect(sizes[1].url).toContain('w=1000');
+    expect(sizes[1].label).toBe('Large (1024 x 1024)');
+    expect(sizes[1].url).toContain('w=1024');
 
     expect(sizes[2].key).toBe('original');
     expect(sizes[2].url).toBe(
@@ -35,10 +35,10 @@ describe('buildAvatarSizes', () => {
     expect(sizes).toHaveLength(3);
     expect(sizes[0].key).toBe('medium');
     expect(sizes[0].url).toContain('/_next/image?');
-    expect(sizes[0].url).toContain('w=400');
+    expect(sizes[0].url).toContain('w=512');
 
     expect(sizes[1].key).toBe('large');
-    expect(sizes[1].url).toContain('w=1000');
+    expect(sizes[1].url).toContain('w=1024');
 
     expect(sizes[2].key).toBe('original');
   });
@@ -46,6 +46,7 @@ describe('buildAvatarSizes', () => {
   it('uses pre-computed sizes from sizesMap when available', () => {
     const sizesMap = {
       original: 'https://blob.example.com/original.avif',
+      '1024': 'https://blob.example.com/1024.avif',
       '512': 'https://blob.example.com/512.avif',
       '256': 'https://blob.example.com/256.avif',
       '128': 'https://blob.example.com/128.avif',
@@ -56,13 +57,13 @@ describe('buildAvatarSizes', () => {
     expect(sizes).toHaveLength(4);
     expect(sizes[0]).toEqual({
       key: 'large',
-      label: 'Large (512 x 512)',
-      url: 'https://blob.example.com/512.avif',
+      label: 'Large (1024 x 1024)',
+      url: 'https://blob.example.com/1024.avif',
     });
     expect(sizes[1]).toEqual({
       key: 'medium',
-      label: 'Medium (256 x 256)',
-      url: 'https://blob.example.com/256.avif',
+      label: 'Medium (512 x 512)',
+      url: 'https://blob.example.com/512.avif',
     });
     expect(sizes[2]).toEqual({
       key: 'small',
@@ -99,10 +100,10 @@ describe('buildAvatarSizes', () => {
 
     expect(mediumUrl.pathname).toBe('/_next/image');
     expect(mediumUrl.searchParams.get('url')).toBe(avatarUrl);
-    expect(mediumUrl.searchParams.get('w')).toBe('400');
+    expect(mediumUrl.searchParams.get('w')).toBe('512');
 
     expect(largeUrl.pathname).toBe('/_next/image');
     expect(largeUrl.searchParams.get('url')).toBe(avatarUrl);
-    expect(largeUrl.searchParams.get('w')).toBe('1000');
+    expect(largeUrl.searchParams.get('w')).toBe('1024');
   });
 });

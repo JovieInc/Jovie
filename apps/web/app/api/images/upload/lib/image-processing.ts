@@ -80,7 +80,7 @@ export async function optimizeImageToAvif(file: File): Promise<{
       withoutEnlargement: true,
     })
     .toColourspace('srgb')
-    .avif({ quality: 65, effort: 4 })
+    .avif({ quality: AVATAR_AVIF_QUALITY, effort: 4 })
     .toBuffer({ resolveWithObject: true });
 
   return {
@@ -91,9 +91,9 @@ export async function optimizeImageToAvif(file: File): Promise<{
 }
 
 /** Avatar download size presets (square, no upscaling) */
-const AVATAR_DOWNLOAD_SIZES = [512, 256, 128] as const;
+const AVATAR_DOWNLOAD_SIZES = [1024, 512, 256, 128] as const;
 const AVATAR_MAX_DIMENSION = 1536;
-const AVATAR_AVIF_QUALITY = 70;
+const AVATAR_AVIF_QUALITY = 80;
 const PRESS_DOWNLOAD_SIZES = [1200, 800, 400] as const;
 const PRESS_MAX_DIMENSION = 2048;
 const PRESS_AVIF_QUALITY = 75;
