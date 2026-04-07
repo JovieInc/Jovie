@@ -2,7 +2,7 @@
 
 import { BadgeCheck, MoreHorizontal, Play } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
@@ -14,7 +14,7 @@ import {
 import { BASE_URL } from '@/constants/app';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import type { ProfileMode } from '@/features/profile/contracts';
-import type { ProfileDrawerMode } from '@/features/profile/ProfileModeDrawer';
+import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import {
   getProfileMode,
   getProfileModeHref,
@@ -34,18 +34,10 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 
-const ProfileModeDrawer = dynamic(
+const ProfileUnifiedDrawer = dynamic(
   () =>
-    import('@/features/profile/ProfileModeDrawer').then(mod => ({
-      default: mod.ProfileModeDrawer,
-    })),
-  { ssr: false }
-);
-
-const ProfileMenuDrawer = dynamic(
-  () =>
-    import('@/features/profile/ProfileMenuDrawer').then(mod => ({
-      default: mod.ProfileMenuDrawer,
+    import('@/features/profile/ProfileUnifiedDrawer').then(mod => ({
+      default: mod.ProfileUnifiedDrawer,
     })),
   { ssr: false }
 );
@@ -92,14 +84,14 @@ interface ProfileCompactTemplateProps {
   readonly viewerCountryCode?: string | null;
 }
 
-function resolveDrawerMode(
+function resolveDrawerView(
   mode: ProfileMode,
   options: {
     readonly hasContacts: boolean;
     readonly hasDSPs: boolean;
     readonly hasTip: boolean;
   }
-): ProfileDrawerMode | null {
+): DrawerView | null {
   switch (mode) {
     case 'about':
     case 'subscribe':
@@ -146,7 +138,9 @@ export function ProfileCompactTemplate({
   showSubscriptionConfirmedBanner = false,
   viewerCountryCode,
 }: ProfileCompactTemplateProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerView, setDrawerView] = useState<DrawerView>('menu');
+  const revealNotificationsRef = useRef<(() => void) | null>(null);
 
   // Lock orientation to portrait on mobile
   useEffect(() => {
@@ -277,7 +271,7 @@ export function ProfileCompactTemplate({
           notificationsContextValue.setSubscribedChannels({});
           notificationsContextValue.setSubscriptionDetails({});
           notificationsContextValue.setState('idle');
-          setMenuOpen(false);
+          setDrawerOpen(false);
           showSuccess('Notifications turned off');
         },
       }
@@ -309,6 +303,14 @@ export function ProfileCompactTemplate({
     () => socialLinks.some(link => link.platform === 'venmo'),
     [socialLinks]
   );
+  const hasAbout = Boolean(
+    artist.tagline ||
+      artist.location ||
+      artist.hometown ||
+      artist.active_since_year ||
+      (genres && genres.length > 0) ||
+      (allowPhotoDownloads && pressPhotos.length > 0)
+  );
   const searchSuffix = useMemo(() => {
     if (!initialSource) {
       return '';
@@ -324,64 +326,79 @@ export function ProfileCompactTemplate({
     );
   }, [tourDates]);
 
-  const resolveActiveMode = useCallback(
+  const resolveInitialView = useCallback(
     (nextMode: ProfileMode) =>
-      resolveDrawerMode(nextMode, {
+      resolveDrawerView(nextMode, {
         hasContacts,
         hasDSPs: mergedDSPs.length > 0,
         hasTip,
       }),
     [hasContacts, hasTip, mergedDSPs.length]
   );
-  const [activeDrawerMode, setActiveDrawerMode] =
-    useState<ProfileDrawerMode | null>(() => resolveActiveMode(mode));
-
   useEffect(() => {
-    setActiveDrawerMode(resolveActiveMode(mode));
-  }, [mode, resolveActiveMode]);
+    const resolved = resolveInitialView(mode);
+    if (resolved) {
+      setDrawerView(resolved);
+      setDrawerOpen(true);
+    } else {
+      setDrawerView('menu');
+      setDrawerOpen(false);
+    }
+  }, [mode, resolveInitialView]);
 
   useEffect(() => {
     const handlePopState = () => {
       const nextMode = getProfileMode(
         new URLSearchParams(globalThis.location.search).get('mode')
       );
-      setActiveDrawerMode(resolveActiveMode(nextMode));
+      const resolved = resolveInitialView(nextMode);
+      if (resolved) {
+        setDrawerView(resolved);
+        setDrawerOpen(true);
+      } else {
+        setDrawerView('menu');
+        setDrawerOpen(false);
+      }
     };
 
     globalThis.addEventListener('popstate', handlePopState);
     return () => globalThis.removeEventListener('popstate', handlePopState);
-  }, [resolveActiveMode]);
+  }, [resolveInitialView]);
 
   useEffect(() => {
+    const activeMode =
+      drawerOpen && drawerView !== 'menu' && drawerView !== 'notifications'
+        ? drawerView
+        : null;
     const href =
-      activeDrawerMode === null
+      activeMode === null
         ? getProfileModeHref(artist.handle, 'profile', searchSuffix)
-        : getProfileModeHref(artist.handle, activeDrawerMode, searchSuffix);
+        : getProfileModeHref(artist.handle, activeMode, searchSuffix);
     const currentHref = `${globalThis.location.pathname}${globalThis.location.search}`;
     if (currentHref === href) {
       return;
     }
 
     globalThis.history.pushState(globalThis.history.state, '', href);
-  }, [activeDrawerMode, artist.handle, searchSuffix]);
+  }, [drawerOpen, drawerView, artist.handle, searchSuffix]);
 
   const ticketlessTourHref = useMemo(
     () => getProfileModeHref(artist.handle, 'tour', searchSuffix),
     [artist.handle, searchSuffix]
   );
 
-  const openDrawerMode = useCallback((nextMode: ProfileDrawerMode) => {
-    setActiveDrawerMode(nextMode);
-    setMenuOpen(false);
+  const openDrawerMode = useCallback((nextView: DrawerView) => {
+    setDrawerView(nextView);
+    setDrawerOpen(true);
   }, []);
 
   const handlePlayClick = useCallback(() => {
     if (mergedDSPs.length === 0) {
-      setActiveDrawerMode('subscribe');
+      openDrawerMode('subscribe');
       return;
     }
-    setActiveDrawerMode('listen');
-  }, [mergedDSPs.length]);
+    openDrawerMode('listen');
+  }, [mergedDSPs.length, openDrawerMode]);
 
   const handleShare = useCallback(async () => {
     const profileUrl = `${BASE_URL}/${artist.handle}`;
@@ -398,7 +415,7 @@ export function ProfileCompactTemplate({
         // Silent failure
       }
     }
-    setMenuOpen(false);
+    setDrawerOpen(false);
   }, [artist.handle, artist.name]);
 
   return (
@@ -465,7 +482,7 @@ export function ProfileCompactTemplate({
                   <div className='flex items-center gap-2'>
                     <button
                       type='button'
-                      onClick={() => setMenuOpen(true)}
+                      onClick={() => openDrawerMode('menu')}
                       className={`flex h-8 w-8 items-center justify-center rounded-full ${glass.border} bg-black/25 text-white/70 ${glass.blur} transition-colors duration-150 hover:bg-black/40`}
                       aria-label='More options'
                       aria-haspopup='dialog'
@@ -579,7 +596,12 @@ export function ProfileCompactTemplate({
                   </button>
                 ) : null}
 
-                <ProfileInlineNotificationsCTA artist={artist} />
+                <ProfileInlineNotificationsCTA
+                  artist={artist}
+                  onRegisterReveal={fn => {
+                    revealNotificationsRef.current = fn;
+                  }}
+                />
 
                 {/* Social icons — flat, no chrome */}
                 {visibleSocialLinks.length > 0 ? (
@@ -624,43 +646,35 @@ export function ProfileCompactTemplate({
           </main>
         </div>
 
-        <ProfileMenuDrawer
-          open={menuOpen}
-          onOpenChange={setMenuOpen}
+        <ProfileUnifiedDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          view={drawerView}
+          onViewChange={setDrawerView}
+          artist={artist}
+          socialLinks={socialLinks}
+          contacts={availableContacts}
+          primaryChannel={primaryChannel}
+          dsps={mergedDSPs}
           isSubscribed={isSubscribed}
           contentPrefs={contentPrefs}
           onTogglePref={handleTogglePref}
           onUnsubscribe={handleUnsubscribe}
           isUnsubscribing={unsubMutation.isPending}
           onShare={handleShare}
-          onOpenAbout={() => openDrawerMode('about')}
-          onOpenTour={() => openDrawerMode('tour')}
-          onOpenTip={() => openDrawerMode('tip')}
-          onOpenContact={() => openDrawerMode('contact')}
-          onOpenSubscribe={() => openDrawerMode('subscribe')}
+          enableDynamicEngagement={enableDynamicEngagement}
+          subscribeTwoStep={subscribeTwoStep}
+          hasAbout={hasAbout}
           hasTourDates={tourDates.length > 0}
           hasTip={hasTip}
           hasContacts={hasContacts}
-        />
-
-        <ProfileModeDrawer
-          activeMode={activeDrawerMode}
-          onOpenChange={open => {
-            if (!open) {
-              setActiveDrawerMode(null);
-            }
-          }}
-          artist={artist}
-          socialLinks={socialLinks}
-          contacts={availableContacts}
-          primaryChannel={primaryChannel}
-          dsps={mergedDSPs}
-          enableDynamicEngagement={enableDynamicEngagement}
-          subscribeTwoStep={subscribeTwoStep}
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
           tourDates={tourDates}
+          onRevealNotifications={() => {
+            revealNotificationsRef.current?.();
+          }}
         />
       </div>
     </ProfileNotificationsContext.Provider>

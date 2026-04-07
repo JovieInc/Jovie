@@ -48,6 +48,7 @@ import {
 import { APP_ROUTES } from '@/constants/routes';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
+import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import type { DemoTab } from './demo-types';
 
 interface DemoShellProps {
@@ -116,7 +117,7 @@ export function DemoShell({
                     <div className='flex items-center gap-1.5 w-full'>
                       <BrandLogo size={14} className='rounded-sm' tone='auto' />
                       <span className='truncate flex-1 text-app tracking-tight [font-weight:var(--font-weight-nav)]'>
-                        Sora Vale
+                        {INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
                       </span>
                       <ChevronDown className='size-3 shrink-0 text-sidebar-item-icon opacity-60' />
                     </div>
@@ -218,7 +219,9 @@ export function DemoShell({
                           className='rounded-sm'
                           tone='auto'
                         />
-                        <span className='font-medium'>Sora Vale</span>
+                        <span className='font-medium'>
+                          {INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
+                        </span>
                       </SidebarMenuButton>
                       <SidebarMenuSub>
                         <SidebarMenuSubItem>
@@ -330,7 +333,9 @@ export function DemoShell({
           <>
             <header className='flex h-[40px] shrink-0 items-center justify-between border-b border-(--linear-app-frame-seam) px-4 md:px-(--linear-app-header-padding-x)'>
               <div className='flex min-w-0 items-center gap-1 text-[13px]'>
-                <span className='truncate text-tertiary-token'>Sora Vale</span>
+                <span className='truncate text-tertiary-token'>
+                  {INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
+                </span>
                 <ChevronRight className='size-3.5 shrink-0 text-quaternary-token' />
                 <span className='truncate font-[510] text-primary-token'>
                   {TAB_LABEL[activeTab]}

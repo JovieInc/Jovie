@@ -1,8 +1,12 @@
 'use client';
 
-import { CheckCircle2, Music2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
+import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta';
+import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import { useApplePreSaveMutation } from '@/lib/queries';
+import type { Artist } from '@/types/db';
+import { ReleaseCountdown } from './ReleaseCountdown';
 
 interface PreSaveActionsProps {
   readonly releaseId: string;
@@ -11,6 +15,8 @@ interface PreSaveActionsProps {
   readonly slug: string;
   readonly hasSpotify: boolean;
   readonly hasAppleMusic: boolean;
+  readonly releaseDate: Date;
+  readonly artistData: Artist;
 }
 
 export function PreSaveActions({
@@ -20,8 +26,14 @@ export function PreSaveActions({
   slug,
   hasSpotify,
   hasAppleMusic,
+  releaseDate,
+  artistData,
 }: PreSaveActionsProps) {
   const applePreSave = useApplePreSaveMutation();
+  const [appleSaved, setAppleSaved] = useState(false);
+
+  // TODO: Re-enable platform presaves once email signup flow is solid
+  const enablePlatformPresaves = false;
 
   const spotifyHref = useMemo(() => {
     const params = new URLSearchParams({
@@ -37,8 +49,8 @@ export function PreSaveActions({
     return `/api/pre-save/spotify/start?${params.toString()}`;
   }, [releaseId, trackId, slug, username]);
 
-  const handleApplePreAdd = async () => {
-    if (applePreSave.isPending) return;
+  const handleApplePreAdd = useCallback(async () => {
+    if (applePreSave.isPending || appleSaved) return;
 
     try {
       const music = globalThis.window
@@ -56,49 +68,48 @@ export function PreSaveActions({
       }
 
       const userToken = await music.getInstance().authorize();
-      applePreSave.mutate({
-        releaseId,
-        trackId,
-        appleMusicUserToken: userToken,
-      });
+      applePreSave.mutate(
+        { releaseId, trackId, appleMusicUserToken: userToken },
+        { onSuccess: () => setAppleSaved(true) }
+      );
     } catch {
       // MusicKit authorization failed - no action needed
     }
-  };
+  }, [applePreSave, appleSaved, releaseId, trackId]);
+
+  const spotifyConfig = DSP_LOGO_CONFIG.spotify;
+  const appleConfig = DSP_LOGO_CONFIG.apple_music;
 
   return (
-    <div className='mt-5 space-y-2'>
-      <p className='text-muted-foreground text-center text-xs'>
-        Save it now. Listen instantly on release day.
-      </p>
-      <div className='grid grid-cols-1 gap-2'>
-        {hasSpotify ? (
-          <a
-            href={spotifyHref}
-            className='inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-spotify px-4 text-sm font-semibold text-background transition-colors hover:bg-brand-spotify-hover'
-          >
-            <Music2 className='size-4' aria-hidden='true' />
-            Pre-save on Spotify
-          </a>
-        ) : null}
-
-        {hasAppleMusic ? (
-          <button
-            type='button'
-            onClick={handleApplePreAdd}
-            className='inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-apple px-4 text-sm font-semibold text-background transition-colors hover:bg-brand-apple-hover'
-          >
-            {applePreSave.isSuccess ? (
-              <>
-                <CheckCircle2 className='size-4' aria-hidden='true' />
-                Added on Apple Music
-              </>
-            ) : (
-              'Pre-add on Apple Music'
-            )}
-          </button>
-        ) : null}
+    <div className='space-y-3'>
+      {/* Countdown */}
+      <div className='flex w-full items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.05] px-4 py-3 backdrop-blur-2xl'>
+        <ReleaseCountdown releaseDate={releaseDate} compact />
       </div>
+
+      {/* Inline notification signup — same component as artist profiles */}
+      <ProfileInlineNotificationsCTA artist={artistData} />
+
+      {/* Platform presaves — flagged off for now */}
+      {enablePlatformPresaves && hasSpotify ? (
+        <SmartLinkProviderButton
+          label='Spotify'
+          iconPath={spotifyConfig?.iconPath}
+          href={spotifyHref}
+        />
+      ) : null}
+
+      {enablePlatformPresaves && hasAppleMusic ? (
+        <SmartLinkProviderButton
+          label={
+            appleSaved || applePreSave.isSuccess
+              ? 'Saved to Apple Music'
+              : 'Apple Music'
+          }
+          iconPath={appleConfig?.iconPath}
+          onClick={handleApplePreAdd}
+        />
+      ) : null}
     </div>
   );
 }

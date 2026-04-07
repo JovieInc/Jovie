@@ -55,19 +55,32 @@ const circularButtonClassName = `${subscriptionPrimaryActionClassName} !w-10 !h-
 function CircularSubmitButton({
   onClick,
   disabled,
+  submitting = false,
 }: {
   readonly onClick: () => void;
   readonly disabled: boolean;
+  readonly submitting?: boolean;
 }) {
   return (
     <button
       type='button'
       onClick={onClick}
       disabled={disabled}
-      className={circularButtonClassName}
-      aria-label='Submit'
+      className={`${circularButtonClassName} relative`}
+      aria-label={submitting ? 'Submitting' : 'Submit'}
     >
-      <ArrowRight className='h-4 w-4' />
+      {/* Arrow icon — fades out when submitting */}
+      <span
+        className={`transition-opacity duration-200 ${submitting ? 'opacity-0' : 'opacity-100'}`}
+      >
+        <ArrowRight className='h-4 w-4' />
+      </span>
+      {/* Spinner — fades in when submitting */}
+      <span
+        className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${submitting ? 'opacity-100' : 'opacity-0'}`}
+      >
+        <span className='h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent' />
+      </span>
     </button>
   );
 }
@@ -102,6 +115,7 @@ interface InlineInputStepProps {
   readonly onFocus: () => void;
   readonly onBlur: () => void;
   readonly disabled: boolean;
+  readonly submitting?: boolean;
   readonly isFocused: boolean;
   readonly autoComplete?: string;
   readonly maxLength?: number;
@@ -122,6 +136,7 @@ function InlineInputStep({
   onFocus,
   onBlur,
   disabled,
+  submitting = false,
   isFocused,
   autoComplete,
   maxLength,
@@ -130,9 +145,17 @@ function InlineInputStep({
     <SubscriptionPearlComposer
       dataTestId={`${testId}-composer`}
       className={isFocused ? subscriptionComposerFocusClassName : ''}
-      action={<CircularSubmitButton onClick={onSubmit} disabled={disabled} />}
+      action={
+        <CircularSubmitButton
+          onClick={onSubmit}
+          disabled={disabled}
+          submitting={submitting}
+        />
+      }
     >
-      <div className='min-w-0'>
+      <div
+        className={`min-w-0 transition-opacity duration-200 ${submitting ? 'opacity-0' : 'opacity-100'}`}
+      >
         <label htmlFor={inputId} className='sr-only'>
           {label}
         </label>
@@ -161,10 +184,15 @@ function InlineInputStep({
 
 interface ProfileInlineNotificationsCTAProps {
   readonly artist: Artist;
+  readonly onManageNotifications?: () => void;
+  /** Register the reveal function so external callers can trigger the email input */
+  readonly onRegisterReveal?: (reveal: () => void) => void;
 }
 
 export function ProfileInlineNotificationsCTA({
   artist,
+  onManageNotifications,
+  onRegisterReveal,
 }: ProfileInlineNotificationsCTAProps) {
   const {
     emailInput,
@@ -250,6 +278,11 @@ export function ProfileInlineNotificationsCTA({
       source: 'profile_inline_cta',
     });
   }, [artist.handle, openSubscription, handleChannelChange]);
+
+  // Expose the reveal function to external callers (e.g. menu "Get Notified")
+  useEffect(() => {
+    onRegisterReveal?.(handleReveal);
+  }, [onRegisterReveal, handleReveal]);
 
   const handleEmailSubmit = useCallback(() => {
     handleSubscribe().catch(() => {});
@@ -364,6 +397,7 @@ export function ProfileInlineNotificationsCTA({
                 handleFieldBlur();
               }}
               disabled={isSubmitting}
+              submitting={isSubmitting}
               isFocused={isInputFocused}
               autoComplete='email'
               maxLength={254}

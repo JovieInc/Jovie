@@ -17,6 +17,7 @@ import { ReleasesExperience } from '@/features/dashboard/organisms/release-provi
 import { DashboardAnalyticsDemo } from '@/features/home/demo/DashboardAnalyticsDemo';
 import { DashboardEarningsDemo } from '@/features/home/demo/DashboardEarningsDemo';
 import { DashboardLinksDemo } from '@/features/home/demo/DashboardLinksDemo';
+import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import { DemoAuthShell } from './DemoAuthShell';
 import { DemoClientProviders } from './DemoClientProviders';
 import { DemoReleaseLandingSurface } from './DemoReleaseLandingSurface';
@@ -52,16 +53,15 @@ const HANDLE_VALIDATION_MOCK = {
   checking: false,
   error: null,
   clientValid: true,
-  suggestions: ['soravale', 'soravalemusic'],
+  suggestions: ['calvindemo', 'calvinharrisdemo'],
 };
 
 const PROFILE_REVIEW_DATA: EnrichedProfileData = {
-  name: 'Sora Vale',
-  imageUrl:
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=640&q=80',
-  bio: 'Indie electronic artist from Portland creating cinematic synth pop for late-night drives.',
-  genres: ['Indie Electronic', 'Synthwave', 'Ambient Pop'],
-  followers: 184_000,
+  name: INTERNAL_DJ_DEMO_PERSONA.profile.displayName,
+  imageUrl: INTERNAL_DJ_DEMO_PERSONA.profile.avatarSrc,
+  bio: INTERNAL_DJ_DEMO_PERSONA.profile.bio,
+  genres: [...INTERNAL_DJ_DEMO_PERSONA.profile.genres],
+  followers: INTERNAL_DJ_DEMO_PERSONA.profile.spotifyFollowers ?? 184_000,
 };
 
 const DEMO_RELEASE_EXPERIENCE_ADAPTER = {
@@ -173,9 +173,9 @@ function DemoReleasesShowcaseState({
         providerConfig={providerConfig}
         primaryProviders={primaryProviderKeys}
         spotifyConnected={state !== 'disconnected'}
-        spotifyArtistName='Tim White'
+        spotifyArtistName={INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
         appleMusicConnected={state !== 'disconnected'}
-        appleMusicArtistName='Tim White'
+        appleMusicArtistName={INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
         allowArtworkDownloads
         initialImporting={state === 'importing'}
         initialTotalCount={state === 'importing' ? 12 : 0}
@@ -189,7 +189,9 @@ export function DemoShowcaseSurface({
   surface,
 }: Readonly<DemoShowcaseSurfaceProps>) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [handleInput, setHandleInput] = useState('soravale');
+  const [handleInput, setHandleInput] = useState(
+    INTERNAL_DJ_DEMO_PERSONA.profile.handle
+  );
   const noop = useCallback(() => {}, []);
   const searchParams = useSearchParams();
 

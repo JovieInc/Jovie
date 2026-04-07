@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { ReleaseTable } from '@/features/dashboard/organisms/release-provider-matrix/ReleaseTable';
+import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import {
   DEMO_PROVIDER_CONFIG,
@@ -36,7 +37,7 @@ export function DemoRealReleasesPanel() {
       <ReleaseTable
         releases={DEMO_RELEASE_VIEW_MODELS}
         providerConfig={DEMO_PROVIDER_CONFIG}
-        artistName='Tim White'
+        artistName={INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
         onCopy={handleCopy}
         onEdit={handleEdit}
       />
