@@ -10,7 +10,7 @@ export default function SettingsLayout({
       maxWidth='form'
       frame='none'
       contentPadding='none'
-      scroll='panel'
+      scroll='page'
       surfaceClassName='pb-10'
       data-testid='settings-shell-content'
     >
