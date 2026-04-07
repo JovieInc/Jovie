@@ -72,136 +72,102 @@ export function AboutSection({
 
   if (!hasContent) {
     return (
-      <main
-        id='main-content'
-        className='rounded-2xl border border-subtle bg-surface-1 shadow-sm p-8 text-center'
-      >
-        <p className='text-sm text-tertiary-token'>
+      <div className='py-4 text-center'>
+        <p className='text-[14px] font-[470] text-white/40'>
           No information available yet.
         </p>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main id='main-content' className='space-y-4' aria-labelledby='about-title'>
-      <h1 id='about-title' className='sr-only'>
-        About {artist.name}
-      </h1>
+    <div className='space-y-5'>
+      <p className='sr-only'>About {artist.name}</p>
 
-      <div className='rounded-2xl border border-subtle bg-surface-1 shadow-sm overflow-hidden'>
-        {hasBio && (
-          <div className='px-6 pt-6 pb-5'>
-            <p className='text-base leading-relaxed text-secondary-token whitespace-pre-line'>
-              {artist.tagline}
-            </p>
-          </div>
-        )}
+      {hasBio && (
+        <p className='text-[14px] font-[450] leading-relaxed text-white/70 whitespace-pre-line'>
+          {artist.tagline}
+        </p>
+      )}
 
-        {hasMetadata && (
-          <div
-            className={`flex flex-wrap gap-x-5 gap-y-2 px-6 pb-5 ${hasBio ? 'border-t border-subtle pt-5' : 'pt-6'}`}
-          >
-            {hasLocation && (
-              <div className='flex items-center gap-2 text-sm text-tertiary-token'>
-                <MapPin className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
-                <span className='capitalize'>{artist.location}</span>
-              </div>
-            )}
-            {hasHometown && (
-              <div className='flex items-center gap-2 text-sm text-tertiary-token'>
-                <Home className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
-                <span className='capitalize'>From {artist.hometown}</span>
-              </div>
-            )}
-            {hasActiveSince && (
-              <div className='flex items-center gap-2 text-sm text-tertiary-token'>
-                <Calendar className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
-                <span>Active since {artist.active_since_year}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {hasGenres && (
-          <div
-            className={`px-6 pb-6 ${hasBio || hasMetadata ? 'border-t border-subtle pt-5' : 'pt-6'}`}
-          >
-            <div className='flex flex-wrap gap-2'>
-              {genres.map(genre => (
-                <span
-                  key={genre}
-                  className='rounded-full bg-surface-2 px-3 py-1 text-xs font-medium capitalize text-secondary-token'
-                >
-                  {genre}
-                </span>
-              ))}
+      {hasMetadata && (
+        <div className='flex flex-wrap gap-x-5 gap-y-2'>
+          {hasLocation && (
+            <div className='flex items-center gap-2 text-[13px] text-white/50'>
+              <MapPin className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
+              <span className='capitalize'>{artist.location}</span>
             </div>
-          </div>
-        )}
-
-        {hasPressPhotos && (
-          <div
-            className={`px-6 pb-6 ${hasBio || hasMetadata || hasGenres ? 'border-t border-subtle pt-5' : 'pt-6'}`}
-          >
-            <div className='mb-3 flex items-center justify-between gap-3'>
-              <h2 className='text-sm font-medium text-primary-token'>
-                Press Photos
-              </h2>
-              <span className='text-xs text-tertiary-token'>
-                Download originals
-              </span>
+          )}
+          {hasHometown && (
+            <div className='flex items-center gap-2 text-[13px] text-white/50'>
+              <Home className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
+              <span className='capitalize'>From {artist.hometown}</span>
             </div>
+          )}
+          {hasActiveSince && (
+            <div className='flex items-center gap-2 text-[13px] text-white/50'>
+              <Calendar className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
+              <span>Active since {artist.active_since_year}</span>
+            </div>
+          )}
+        </div>
+      )}
 
-            <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
-              {pressPhotos.map((photo, index) => (
-                <div
-                  key={photo.id}
-                  className='overflow-hidden rounded-[20px] border border-subtle bg-surface-0'
-                >
-                  <div className='relative aspect-[4/5] bg-surface-2'>
-                    <Image
-                      src={
-                        photo.mediumUrl ?? photo.smallUrl ?? photo.blobUrl ?? ''
-                      }
-                      alt={
-                        photo.originalFilename ??
-                        `${artist.name} press photo ${index + 1}`
-                      }
-                      fill
-                      sizes='(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw'
-                      className='object-cover'
-                    />
-                  </div>
-                  <div className='flex items-center justify-between gap-3 px-4 py-3'>
-                    <div className='min-w-0'>
-                      <p className='truncate text-sm font-medium text-primary-token'>
-                        {photo.originalFilename ?? `Press photo ${index + 1}`}
-                      </p>
-                      {(photo.width || photo.height) && (
-                        <p className='text-xs text-tertiary-token'>
-                          {photo.width ?? '?'} x {photo.height ?? '?'}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      type='button'
-                      disabled={!photo.blobUrl}
-                      onClick={() => {
-                        void downloadPressPhoto(photo, artist, index);
-                      }}
-                      className='inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1.5 text-xs font-medium text-secondary-token transition-colors hover:border-default hover:text-primary-token disabled:cursor-not-allowed disabled:opacity-50'
-                    >
-                      <Download className='h-3.5 w-3.5' />
-                      Download
-                    </button>
-                  </div>
+      {hasGenres && (
+        <div className='flex flex-wrap gap-2'>
+          {genres.map(genre => (
+            <span
+              key={genre}
+              className='rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-[510] capitalize text-white/60'
+            >
+              {genre}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {hasPressPhotos && (
+        <div>
+          <div className='mb-3 flex items-center justify-between gap-3'>
+            <h2 className='text-[13px] font-[510] text-white/70'>
+              Press photos
+            </h2>
+          </div>
+
+          <div className='grid gap-3 grid-cols-2'>
+            {pressPhotos.map((photo, index) => (
+              <div key={photo.id} className='overflow-hidden rounded-xl'>
+                <div className='relative aspect-[4/5]'>
+                  <Image
+                    src={
+                      photo.mediumUrl ?? photo.smallUrl ?? photo.blobUrl ?? ''
+                    }
+                    alt={
+                      photo.originalFilename ??
+                      `${artist.name} press photo ${index + 1}`
+                    }
+                    fill
+                    sizes='(max-width: 640px) 50vw, 33vw'
+                    className='object-cover'
+                  />
+                  {/* Download button — flat icon, circle on hover */}
+                  <button
+                    type='button'
+                    disabled={!photo.blobUrl}
+                    onClick={() => {
+                      void downloadPressPhoto(photo, artist, index);
+                    }}
+                    className='absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition-colors duration-150 hover:bg-black/40 hover:text-white/90 disabled:cursor-not-allowed disabled:opacity-50'
+                    aria-label={`Download ${photo.originalFilename ?? `press photo ${index + 1}`}`}
+                  >
+                    <Download className='h-4 w-4' />
+                  </button>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
-    </main>
+        </div>
+      )}
+    </div>
   );
 }

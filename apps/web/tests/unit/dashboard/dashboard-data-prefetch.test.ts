@@ -22,6 +22,10 @@ const withDbSessionTxMock = vi.fn(async () => ({
   ...baseDashboardResponse,
 }));
 
+const withDbSessionMock = vi.fn(
+  async (handler: (userId: string) => Promise<unknown>) => handler('user_123')
+);
+
 const getCurrentUserEntitlementsMock = vi.fn(async () => ({
   userId: 'user_123',
   email: 'user@example.com',
@@ -119,7 +123,7 @@ vi.mock('@/lib/auth/session', () => ({
   setupDbSession: vi.fn(),
   validateClerkUserId: vi.fn(),
   withDbSessionTx: withDbSessionTxMock,
-  withDbSession: vi.fn(async handler => handler('user_123')),
+  withDbSession: withDbSessionMock,
 }));
 
 vi.mock('@/lib/entitlements/server', () => ({
@@ -260,53 +264,50 @@ describe('dashboard data prefetch', () => {
   });
 
   it('retries shell user lookup after auth reconciliation when the clerk row is missing', async () => {
-    withDbSessionTxMock.mockImplementation(async handler => {
-      const profile = {
-        id: 'profile_1',
-        userId: 'user_db_1',
-        username: 'tim',
-        usernameNormalized: 'tim',
-        displayName: 'Tim White',
-        isPublic: true,
-        onboardingCompletedAt: new Date('2026-03-31T00:00:00.000Z'),
-        createdAt: new Date('2026-03-31T00:00:00.000Z'),
-        updatedAt: new Date('2026-03-31T00:00:00.000Z'),
-      };
+    // The shell path uses withDbSession (no transaction) + db directly.
+    // Mock db to return empty on first user lookup, then found on retry.
+    const profile = {
+      id: 'profile_1',
+      userId: 'user_db_1',
+      username: 'tim',
+      usernameNormalized: 'tim',
+      displayName: 'Tim White',
+      isPublic: true,
+      onboardingCompletedAt: new Date('2026-03-31T00:00:00.000Z'),
+      createdAt: new Date('2026-03-31T00:00:00.000Z'),
+      updatedAt: new Date('2026-03-31T00:00:00.000Z'),
+    };
 
-      const tx = {
-        select: vi
-          .fn()
-          .mockReturnValueOnce({
-            from: vi.fn().mockReturnValue({
-              where: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue([]),
-              }),
-            }),
-          })
-          .mockReturnValueOnce({
-            from: vi.fn().mockReturnValue({
-              where: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue([
-                  {
-                    id: 'user_db_1',
-                    email: 'user@example.com',
-                    activeProfileId: 'profile_1',
-                  },
-                ]),
-              }),
-            }),
-          })
-          .mockReturnValueOnce({
-            from: vi.fn().mockReturnValue({
-              where: vi.fn().mockReturnValue({
-                orderBy: vi.fn().mockResolvedValue([profile]),
-              }),
-            }),
+    const { db } = await import('@/lib/db');
+    const dbSelectMock = vi.mocked(db.select);
+    dbSelectMock
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
           }),
-      };
-
-      return handler(tx, 'user_123');
-    });
+        }),
+      } as never)
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([
+              {
+                id: 'user_db_1',
+                email: 'user@example.com',
+                activeProfileId: 'profile_1',
+              },
+            ]),
+          }),
+        }),
+      } as never)
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockResolvedValue([profile]),
+          }),
+        }),
+      } as never);
 
     const { getDashboardShellData } = await import(
       '@/app/app/(shell)/dashboard/actions/dashboard-data'
@@ -333,19 +334,21 @@ describe('dashboard data prefetch', () => {
       updatedAt: new Date('2026-03-31T00:00:00.000Z'),
     };
 
-    withDbSessionTxMock
-      .mockResolvedValueOnce({
+    // Shell path now uses withDbSession (no transaction).
+    // First call returns empty profile, second returns recovered profile.
+    withDbSessionMock
+      .mockImplementationOnce(async () => ({
         ...baseDashboardResponse,
         creatorProfiles: [],
         selectedProfile: null,
         needsOnboarding: true,
-      })
-      .mockResolvedValueOnce({
+      }))
+      .mockImplementationOnce(async () => ({
         ...baseDashboardResponse,
         creatorProfiles: [recoveredProfile],
         selectedProfile: recoveredProfile,
         needsOnboarding: false,
-      });
+      }));
 
     const { getDashboardShellData } = await import(
       '@/app/app/(shell)/dashboard/actions/dashboard-data'
@@ -353,7 +356,7 @@ describe('dashboard data prefetch', () => {
 
     const result = await getDashboardShellData('user_123');
 
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(2);
+    expect(withDbSessionMock).toHaveBeenCalledTimes(2);
     expect(result.selectedProfile?.id).toBe('profile_1');
     expect(result.needsOnboarding).toBe(false);
   });

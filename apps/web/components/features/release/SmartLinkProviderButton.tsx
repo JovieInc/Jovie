@@ -3,6 +3,8 @@ import { cn } from '@/lib/utils';
 interface SmartLinkProviderButtonProps {
   readonly label: string;
   readonly iconPath?: string;
+  /** Custom icon element — used instead of iconPath when provided */
+  readonly icon?: React.ReactNode;
   readonly href?: string;
   readonly onClick?: () => void;
   readonly className?: string;
@@ -14,22 +16,24 @@ interface SmartLinkProviderButtonProps {
 export function SmartLinkProviderButton({
   label,
   iconPath,
+  icon,
   href,
   onClick,
   className,
 }: Readonly<SmartLinkProviderButtonProps>) {
   const content = (
     <>
-      {iconPath ? (
-        <svg
-          viewBox='0 0 24 24'
-          fill='currentColor'
-          className='h-5 w-5 shrink-0 text-muted-foreground'
-          aria-hidden='true'
-        >
-          <path d={iconPath} />
-        </svg>
-      ) : null}
+      {icon ??
+        (iconPath ? (
+          <svg
+            viewBox='0 0 24 24'
+            fill='currentColor'
+            className='h-5 w-5 shrink-0 text-muted-foreground'
+            aria-hidden='true'
+          >
+            <path d={iconPath} />
+          </svg>
+        ) : null)}
       <span className='text-foreground flex-1 text-base font-semibold'>
         {label}
       </span>
@@ -47,7 +51,7 @@ export function SmartLinkProviderButton({
   );
 
   const sharedClassName = cn(
-    'group flex w-full items-center gap-3.5 rounded-xl bg-surface-1/70 px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-100 hover:bg-surface-2/80',
+    'group flex w-full items-center gap-3.5 rounded-full bg-surface-1/70 px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-100 hover:bg-surface-2/80',
     className
   );
 

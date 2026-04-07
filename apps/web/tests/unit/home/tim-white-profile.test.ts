@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildDemoProfile } from '@/features/demo/mock-dashboard-data';
 import { MOCK_ARTIST } from '@/features/home/phone-mode-content';
+import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import { TIM_WHITE_SPOTIFY_ID } from '@/lib/spotify/blacklist';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
@@ -21,13 +22,21 @@ describe('Tim White canonical mock identity', () => {
     expect(MOCK_ARTIST.image).toBe(TIM_WHITE_PROFILE.avatarSrc);
   });
 
-  it('keeps the demo profile fallback aligned with the canonical profile', () => {
+  it('keeps the internal demo profile aligned with the canonical internal persona', () => {
     const demoProfile = buildDemoProfile();
 
-    expect(demoProfile.username).toBe(TIM_WHITE_PROFILE.handle);
-    expect(demoProfile.displayName).toBe(TIM_WHITE_PROFILE.name);
-    expect(demoProfile.avatarUrl).toBe(TIM_WHITE_PROFILE.avatarSrc);
-    expect(demoProfile.spotifyId).toBe(TIM_WHITE_SPOTIFY_ID);
-    expect(demoProfile.spotifyUrl).toBe(TIM_WHITE_PROFILE.spotifyUrl);
+    expect(demoProfile.username).toBe(INTERNAL_DJ_DEMO_PERSONA.profile.handle);
+    expect(demoProfile.displayName).toBe(
+      INTERNAL_DJ_DEMO_PERSONA.profile.displayName
+    );
+    expect(demoProfile.avatarUrl).toBe(
+      INTERNAL_DJ_DEMO_PERSONA.profile.avatarSrc
+    );
+    expect(demoProfile.spotifyId).toBe(
+      INTERNAL_DJ_DEMO_PERSONA.profile.spotifyArtistId
+    );
+    expect(demoProfile.spotifyUrl).toBe(
+      INTERNAL_DJ_DEMO_PERSONA.profile.spotifyUrl
+    );
   });
 });

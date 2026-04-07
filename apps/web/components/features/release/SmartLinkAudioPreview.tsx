@@ -17,6 +17,7 @@ interface SmartLinkAudioPreviewProps {
   readonly artistName: string;
   readonly artworkUrl: string | null;
   readonly previewUrl: string | null;
+  readonly isrc?: string | null;
   readonly previewVerification?: PreviewVerification;
   readonly previewSource?: PreviewSource;
 }
@@ -27,6 +28,7 @@ export function SmartLinkAudioPreview({
   artistName,
   artworkUrl,
   previewUrl,
+  isrc,
   previewVerification,
   previewSource,
 }: SmartLinkAudioPreviewProps) {
@@ -49,11 +51,12 @@ export function SmartLinkAudioPreview({
       id: contentId,
       title,
       audioUrl: previewUrl,
+      isrc,
       releaseTitle: title,
       artistName,
       artworkUrl,
     }).catch(() => {});
-  }, [contentId, title, artistName, artworkUrl, previewUrl, toggleTrack]);
+  }, [contentId, title, artistName, artworkUrl, previewUrl, isrc, toggleTrack]);
 
   // Hide entirely when no preview is available
   if (!previewUrl) return null;

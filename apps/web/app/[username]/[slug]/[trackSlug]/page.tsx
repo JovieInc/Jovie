@@ -9,15 +9,16 @@
 
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
+import { generateMusicStructuredData } from '@/app/[username]/[slug]/page';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { BASE_URL } from '@/constants/app';
+import { buildBreadcrumbObject } from '@/lib/constants/schemas';
 import {
   derivePreviewState,
   getProviderConfidence,
 } from '@/lib/discography/audio-qa';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
-import { generateArtworkImageObject } from '@/lib/images/seo';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
@@ -164,79 +165,44 @@ export default async function TrackDeepLinkPage({
   const trackUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}/${trackSlug}`;
   const releaseUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}`;
 
-  // MusicRecording structured data with inAlbum reference
-  const musicSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'MusicRecording',
-    '@id': `${trackUrl}#track`,
-    name: track.title,
-    url: trackUrl,
-    ...(track.artworkUrl && {
-      image: generateArtworkImageObject(track.artworkUrl, {
-        title: track.title,
-        artistName,
-        contentType: 'track',
-      }),
-    }),
-    ...(track.releaseDate && {
-      datePublished: toISOStringOrNull(track.releaseDate)?.split('T')[0],
-    }),
-    byArtist: {
-      '@type': 'MusicGroup',
-      '@id': `${BASE_URL}/${creator.usernameNormalized}#musicgroup`,
-      name: artistName,
-      url: `${BASE_URL}/${creator.usernameNormalized}`,
+  // Reuse shared structured data generator with track-specific fields
+  const structuredData = generateMusicStructuredData(
+    {
+      type: 'track',
+      title: track.title,
+      slug: `${slug}/${trackSlug}`,
+      artworkUrl: track.artworkUrl,
+      releaseDate: track.releaseDate,
+      providerLinks: track.providerLinks,
+      durationMs: track.durationMs,
+      isrc: track.isrc,
+      trackNumber: track.trackNumber,
+      inAlbum: {
+        title: releaseContent.title,
+        url: releaseUrl,
+        id: `${releaseUrl}#release`,
+      },
     },
-    inAlbum: {
-      '@type': 'MusicAlbum',
-      name: releaseContent.title,
-      url: releaseUrl,
-    },
-    sameAs: track.providerLinks.map(link => link.url),
-  };
+    creator
+  );
 
-  const breadcrumbSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: BASE_URL },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: artistName,
-        item: `${BASE_URL}/${creator.usernameNormalized}`,
-      },
-      {
-        '@type': 'ListItem',
-        position: 3,
-        name: releaseContent.title,
-        item: releaseUrl,
-      },
-      {
-        '@type': 'ListItem',
-        position: 4,
-        name: track.title,
-        item: trackUrl,
-      },
-    ],
-  };
+  // Add the deeper breadcrumb (4 levels instead of 3)
+  const graph = structuredData['@graph'] as Array<Record<string, unknown>>;
+  const bcIndex = graph.findIndex(s => s['@type'] === 'BreadcrumbList');
+  if (bcIndex >= 0) {
+    graph[bcIndex] = buildBreadcrumbObject([
+      { name: 'Home', url: BASE_URL },
+      { name: artistName, url: `${BASE_URL}/${creator.usernameNormalized}` },
+      { name: releaseContent.title, url: releaseUrl },
+      { name: track.title, url: trackUrl },
+    ]);
+  }
 
   return (
     <>
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data, safe-serialized
-        dangerouslySetInnerHTML={{
-          __html: safeJsonLdStringify(musicSchema),
-        }}
-      />
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data, safe-serialized
-        dangerouslySetInnerHTML={{
-          __html: safeJsonLdStringify(breadcrumbSchema),
-        }}
-      />
+      <script type='application/ld+json'>
+        {safeJsonLdStringify(structuredData)}
+      </script>
 
       <ReleaseLandingPage
         release={{
@@ -244,6 +210,7 @@ export default async function TrackDeepLinkPage({
           artworkUrl: track.artworkUrl,
           releaseDate: toISOStringOrNull(track.releaseDate),
           previewUrl: track.previewUrl ?? null,
+          isrc: track.isrc ?? null,
           previewVerification: previewState.previewVerification,
           previewSource: previewState.previewSource,
         }}
@@ -320,24 +287,62 @@ export async function generateMetadata({
   const defaultImage = `${BASE_URL}/og/default.png`;
   const ogImageUrl = track.artworkUrl ?? defaultImage;
 
+  const keywords = [
+    track.title,
+    artistName,
+    `${artistName} ${track.title}`,
+    `${track.title} lyrics`,
+    `${track.title} stream`,
+    `${artistName} music`,
+    'stream music',
+    'music links',
+  ];
+
+  const trackDurationMs = track.durationMs ?? null;
+
   return {
     title,
     description,
+    keywords,
+    authors: [{ name: artistName }],
+    creator: artistName,
     metadataBase: new URL(BASE_URL),
     alternates: { canonical: canonicalUrl },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-video-preview': -1,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
     openGraph: {
       type: 'music.song',
       title,
       description,
       url: canonicalUrl,
       siteName: 'Jovie',
+      locale: 'en_US',
       images: ogImageUrl ? [{ url: ogImageUrl }] : [],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
+      creator: '@jovieapp',
+      site: '@jovieapp',
       images: ogImageUrl ? [{ url: ogImageUrl }] : [],
+    },
+    other: {
+      'music:musician': `${BASE_URL}/${creator.usernameNormalized}`,
+      'music:album': `${BASE_URL}/${creator.usernameNormalized}/${slug}`,
+      ...(trackDurationMs &&
+        trackDurationMs > 0 && {
+          'music:duration': String(Math.floor(trackDurationMs / 1000)),
+        }),
     },
   };
 }

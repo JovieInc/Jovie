@@ -3,11 +3,13 @@
  *
  * Minimal "Coming Soon" page shown for unreleased content from free-plan
  * creators. No countdown, no "Notify Me" CTA, no release date display.
- * Matches the visual style of UnreleasedReleaseHero but stripped down.
  */
 
 import Link from 'next/link';
-import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import {
+  SmartLinkArtworkCard,
+  SmartLinkPageFrame,
+} from '@/features/release/SmartLinkPagePrimitives';
 
 interface ScheduledReleasePageProps {
   readonly release: {
@@ -25,63 +27,30 @@ export function ScheduledReleasePage({
   artist,
 }: ScheduledReleasePageProps) {
   return (
-    <div className='min-h-dvh bg-base text-foreground'>
-      {/* Ambient glow */}
-      <div className='pointer-events-none fixed inset-0'>
-        <div className='bg-foreground/5 absolute left-1/2 top-1/3 size-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]' />
+    <SmartLinkPageFrame centered glowClassName='size-[30rem]'>
+      <SmartLinkArtworkCard
+        title={release.title}
+        artworkUrl={release.artworkUrl}
+        className='shadow-black/40'
+      />
+
+      {/* Release Info */}
+      <div className='mt-4 text-center'>
+        <h1 className='text-lg font-semibold leading-snug tracking-tight'>
+          {release.title}
+        </h1>
+        <Link
+          href={`/${artist.handle}`}
+          className='text-muted-foreground hover:text-foreground mt-1 block text-sm transition-colors'
+        >
+          {artist.name}
+        </Link>
       </div>
 
-      <main className='relative z-10 flex min-h-dvh flex-col items-center px-6'>
-        <div className='min-h-6 flex-1' />
-
-        <div className='w-full max-w-[17rem]'>
-          {/* Release Artwork */}
-          <div className='relative aspect-square w-full overflow-hidden rounded-lg bg-surface-1/30 shadow-2xl shadow-black/40 ring-1 ring-white/[0.08]'>
-            <ImageWithFallback
-              src={release.artworkUrl}
-              alt={`${release.title} artwork`}
-              fill
-              className='object-cover'
-              sizes='272px'
-              priority
-              fallbackVariant='release'
-            />
-          </div>
-
-          {/* Release Info */}
-          <div className='mt-4 text-center'>
-            <h1 className='text-lg font-semibold leading-snug tracking-tight'>
-              {release.title}
-            </h1>
-            <Link
-              href={`/${artist.handle}`}
-              className='text-muted-foreground hover:text-foreground mt-1 block text-sm transition-colors'
-            >
-              {artist.name}
-            </Link>
-          </div>
-
-          {/* Coming Soon */}
-          <div className='mt-5 rounded-xl bg-surface-1/50 p-4 text-center ring-1 ring-inset ring-white/[0.05]'>
-            <p className='text-muted-foreground text-sm font-medium'>
-              Coming Soon
-            </p>
-          </div>
-        </div>
-
-        <div className='min-h-6 flex-1' />
-
-        {/* Jovie Branding */}
-        <footer className='shrink-0 pb-5 text-center'>
-          <Link
-            href='/'
-            className='text-muted-foreground/70 hover:text-foreground/90 inline-flex items-center gap-1 text-2xs uppercase tracking-widest transition-colors'
-          >
-            <span>Powered by</span>
-            <span className='font-semibold'>Jovie</span>
-          </Link>
-        </footer>
-      </main>
-    </div>
+      {/* Coming Soon */}
+      <div className='mt-5 rounded-2xl bg-surface-1/50 p-4 text-center ring-1 ring-inset ring-white/[0.08]'>
+        <p className='text-muted-foreground text-sm font-medium'>Coming Soon</p>
+      </div>
+    </SmartLinkPageFrame>
   );
 }

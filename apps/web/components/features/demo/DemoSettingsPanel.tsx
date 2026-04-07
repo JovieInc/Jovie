@@ -4,6 +4,7 @@ import { Button } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import { runDemoAction } from './demo-actions';
 
 const PLATFORM_CONNECTIONS = [
@@ -21,16 +22,22 @@ export function DemoSettingsPanel() {
       <ContentSurfaceCard className='overflow-hidden p-0'>
         <SettingsSection title='Artist Profile'>
           <div className='space-y-3 px-4 py-3'>
-            <SettingsRow label='Name' value='Sora Vale' />
+            <SettingsRow
+              label='Name'
+              value={INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
+            />
             <SettingsRow
               label='Bio'
-              value='Indie electronic artist from Portland, OR. Creating sounds between ambient and synthwave.'
+              value={INTERNAL_DJ_DEMO_PERSONA.profile.bio}
             />
             <SettingsRow
               label='Genres'
-              value='Indie Electronic, Synthwave, Ambient'
+              value={INTERNAL_DJ_DEMO_PERSONA.profile.genres.join(', ')}
             />
-            <SettingsRow label='Handle' value='@soravale' />
+            <SettingsRow
+              label='Handle'
+              value={`@${INTERNAL_DJ_DEMO_PERSONA.profile.handle}`}
+            />
           </div>
         </SettingsSection>
 

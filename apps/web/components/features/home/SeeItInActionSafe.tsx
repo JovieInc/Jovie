@@ -1,13 +1,9 @@
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { checkGate } from '@/lib/feature-flags/server';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import type { FeaturedCreator } from '@/lib/featured-creators';
-import {
-  getCreatorByHandle,
-  getFeaturedCreators,
-} from '@/lib/featured-creators';
+import { resolveHomepageFeaturedCreators } from '@/lib/homepage-featured-selection';
 import { FALLBACK_AVATARS, fillToMinimum } from './featured-creators-fallback';
 import { SeeItInActionCarousel } from './SeeItInActionCarousel';
-
-const PINNED_HANDLE = 'tim';
 
 const Separator = (
   <hr
@@ -20,27 +16,27 @@ const Separator = (
 );
 
 /**
- * "See it in action" section gated by feature flag.
- * When the flag is off, the section is hidden entirely.
+ * "See it in action" section gated by Statsig.
+ * When the gate is off, the section is hidden entirely.
  * When on, always fetches real profiles: tim pinned first,
  * remaining slots from featured creators.
  */
 export async function SeeItInActionSafe() {
-  if (!FEATURE_FLAGS.SHOW_SEE_IT_IN_ACTION) return null;
+  const showSection = await checkGate(
+    null,
+    FEATURE_FLAG_KEYS.SHOW_SEE_IT_IN_ACTION,
+    false
+  );
+
+  if (!showSection) return null;
 
   try {
-    const [timProfile, dbCreators] = await Promise.all([
-      getCreatorByHandle(PINNED_HANDLE),
-      getFeaturedCreators(),
-    ]);
-
-    const others = dbCreators.filter(c => c.handle !== PINNED_HANDLE);
-
-    const pinned: FeaturedCreator[] = [];
-    if (timProfile) pinned.push(timProfile);
-    pinned.push(...others.slice(0, 3 - pinned.length));
-
-    const creators = fillToMinimum(pinned, 3);
+    const { creators: homepageCreators } =
+      await resolveHomepageFeaturedCreators({
+        pinnedHandle: 'tim',
+        limit: 3,
+      });
+    const creators: FeaturedCreator[] = fillToMinimum(homepageCreators, 3);
     return (
       <>
         {Separator}
