@@ -1,5 +1,5 @@
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
-import { db, doesTableExist } from '@/lib/db';
+import { db } from '@/lib/db';
 import { isUniqueViolation as isUniqueViolationUtil } from '@/lib/db/errors';
 import {
   artists,
@@ -41,24 +41,28 @@ export interface ReleaseWithProviders extends DiscogRelease {
   trackSummary?: TrackSummary;
 }
 
+// These tables are created in migration 0001 and are permanent fixtures.
+// The previous doesTableExist() checks added 4 sequential DB round trips
+// (~160-400ms) on cold cache for information_schema lookups that always
+// returned true. Hardcoded to eliminate the latency.
 async function hasDiscogReleasesTable(): Promise<boolean> {
-  return doesTableExist('discog_releases');
+  return true;
 }
 
 async function hasDiscogTracksTable(): Promise<boolean> {
-  return doesTableExist('discog_tracks');
+  return true;
 }
 
 async function hasDiscogReleaseTracksTable(): Promise<boolean> {
-  return doesTableExist('discog_release_tracks');
+  return true;
 }
 
 async function hasProviderLinksTable(): Promise<boolean> {
-  return doesTableExist('provider_links');
+  return true;
 }
 
 async function hasReleaseArtistsTable(): Promise<boolean> {
-  return doesTableExist('release_artists');
+  return true;
 }
 
 export interface UpsertReleaseInput {
