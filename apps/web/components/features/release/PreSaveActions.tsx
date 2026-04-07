@@ -80,29 +80,11 @@ export function PreSaveActions({
   const spotifyConfig = DSP_LOGO_CONFIG.spotify;
   const appleConfig = DSP_LOGO_CONFIG.apple_music;
 
-  const releaseDateObj = new Date(releaseDate);
-  const monthLabel = new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-  }).format(releaseDateObj);
-  const dayLabel = new Intl.DateTimeFormat('en-US', { day: 'numeric' }).format(
-    releaseDateObj
-  );
-
   return (
     <div className='space-y-3'>
-      {/* Countdown card — matches latest release / tour date card */}
-      <div className='flex w-full items-center gap-2.5 rounded-[14px] border border-white/[0.08] bg-white/[0.05] px-3 py-2.5 backdrop-blur-2xl'>
-        <div className='flex shrink-0 flex-col items-center leading-none'>
-          <span className='text-[10px] font-[590] uppercase tracking-[0.1em] text-white/45'>
-            {monthLabel}
-          </span>
-          <span className='text-[18px] font-[680] tracking-[-0.04em] text-white/90'>
-            {dayLabel}
-          </span>
-        </div>
-        <div className='min-w-0 flex-1'>
-          <ReleaseCountdown releaseDate={releaseDate} compact />
-        </div>
+      {/* Countdown */}
+      <div className='flex w-full items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.05] px-4 py-3 backdrop-blur-2xl'>
+        <ReleaseCountdown releaseDate={releaseDate} compact />
       </div>
 
       {/* Inline notification signup — same component as artist profiles */}

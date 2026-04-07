@@ -84,16 +84,35 @@ export function ReleaseCountdown({
   }
 
   if (compact) {
-    const parts: string[] = [];
-    if (timeLeft.days > 0) parts.push(`${timeLeft.days}d`);
-    parts.push(`${timeLeft.hours}h`);
-    parts.push(`${timeLeft.minutes}m`);
-
     return (
-      <p className='text-[13px] font-[510] leading-[1.15] text-white/88'>
-        <span className='text-[11px] font-[450] text-white/45'>Drops in </span>
-        <span className='tabular-nums'>{parts.join(' ')}</span>
-      </p>
+      <div className='flex items-baseline gap-3 tabular-nums'>
+        {timeLeft.days > 0 && (
+          <span>
+            <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
+              {timeLeft.days}
+            </span>
+            <span className='ml-0.5 text-[10px] font-[590] uppercase tracking-[0.08em] text-white/35'>
+              D
+            </span>
+          </span>
+        )}
+        <span>
+          <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
+            {timeLeft.hours}
+          </span>
+          <span className='ml-0.5 text-[10px] font-[590] uppercase tracking-[0.08em] text-white/35'>
+            H
+          </span>
+        </span>
+        <span>
+          <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
+            {timeLeft.minutes}
+          </span>
+          <span className='ml-0.5 text-[10px] font-[590] uppercase tracking-[0.08em] text-white/35'>
+            M
+          </span>
+        </span>
+      </div>
     );
   }
 

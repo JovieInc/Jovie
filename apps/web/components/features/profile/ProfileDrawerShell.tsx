@@ -2,8 +2,6 @@
 
 import { ChevronLeft, X } from 'lucide-react';
 import { Drawer } from 'vaul';
-import { useDrawerContainer } from '@/features/profile/DrawerContainerContext';
-import { cn } from '@/lib/utils';
 
 interface ProfileDrawerShellProps {
   readonly open: boolean;
@@ -12,17 +10,12 @@ interface ProfileDrawerShellProps {
   readonly subtitle?: string;
   readonly onBack?: () => void;
   readonly children: React.ReactNode;
-  /** When provided, the drawer portals into this element and uses absolute positioning (for desktop card containment) */
-  readonly container?: HTMLElement | null;
   /** @deprecated Prefer uniform styling. Only use for edge cases. */
   readonly contentClassName?: string;
   /** @deprecated Prefer uniform styling. Only use for edge cases. */
   readonly bodyClassName?: string;
   readonly dataTestId?: string;
 }
-
-const OVERLAY_BASE = 'inset-0 z-40 bg-black/60 backdrop-blur-sm';
-const WRAPPER_BASE = 'inset-x-0 bottom-0 z-50 flex justify-center';
 
 export function ProfileDrawerShell({
   open,
@@ -31,22 +24,15 @@ export function ProfileDrawerShell({
   subtitle,
   onBack,
   children,
-  container,
   contentClassName,
   bodyClassName,
   dataTestId,
 }: ProfileDrawerShellProps) {
-  const contextContainer = useDrawerContainer();
-  const resolvedContainer = container ?? contextContainer;
-  const useContained = Boolean(resolvedContainer);
-
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
-      <Drawer.Portal container={resolvedContainer ?? undefined}>
-        <Drawer.Overlay
-          className={cn(OVERLAY_BASE, useContained ? 'absolute' : 'fixed')}
-        />
-        <div className={cn(WRAPPER_BASE, useContained ? 'absolute' : 'fixed')}>
+      <Drawer.Portal>
+        <Drawer.Overlay className='fixed inset-0 z-40 bg-black/60 backdrop-blur-sm' />
+        <div className='fixed inset-x-0 bottom-0 z-50 flex justify-center'>
           <Drawer.Content
             className={`flex max-h-[86dvh] w-full flex-col overflow-hidden rounded-t-[24px] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:max-w-[430px] md:rounded-t-[20px] ${contentClassName ?? ''}`}
             data-testid={dataTestId}

@@ -9,9 +9,33 @@ import { UnreleasedReleaseHero } from '@/features/release/UnreleasedReleaseHero'
 const MOCK_ARTWORK =
   'https://i.scdn.co/image/ab67616d0000b273d9985092cd88bffd97653b58';
 
+// Stress test: many providers + long text to verify scrolling and truncation
+const ALL_PROVIDERS = [
+  'spotify',
+  'apple_music',
+  'youtube_music',
+  'youtube',
+  'soundcloud',
+  'deezer',
+  'tidal',
+  'amazon_music',
+  'bandcamp',
+  'beatport',
+  'pandora',
+  'napster',
+  'audiomack',
+  'qobuz',
+  'anghami',
+  'boomplay',
+  'iheartradio',
+  'tiktok',
+  'awa',
+  'audius',
+] as const;
+
 const RELEASED_PROPS = {
   release: {
-    title: 'Midnight Drive',
+    title: 'Midnight Drive (Deluxe Anniversary Remastered Edition)',
     artworkUrl: MOCK_ARTWORK,
     releaseDate: '2025-11-15',
     previewUrl: null,
@@ -21,37 +45,17 @@ const RELEASED_PROPS = {
     handle: 'lunavega',
     avatarUrl: null,
   },
-  featuredArtists: [{ name: 'Kai Rivers', handle: null }],
-  providers: [
-    {
-      key: 'spotify' as const,
-      label: 'Spotify',
-      accent: '#1DB954',
-      url: 'https://open.spotify.com',
-      confidence: 'canonical' as const,
-    },
-    {
-      key: 'apple_music' as const,
-      label: 'Apple Music',
-      accent: '#FA243C',
-      url: 'https://music.apple.com',
-      confidence: 'canonical' as const,
-    },
-    {
-      key: 'youtube_music' as const,
-      label: 'YouTube Music',
-      accent: '#FF0000',
-      url: 'https://music.youtube.com',
-      confidence: 'canonical' as const,
-    },
-    {
-      key: 'soundcloud' as const,
-      label: 'SoundCloud',
-      accent: '#FF5500',
-      url: 'https://soundcloud.com',
-      confidence: 'search_fallback' as const,
-    },
+  featuredArtists: [
+    { name: 'Kai Rivers', handle: null },
+    { name: 'DJ Electronica Supreme', handle: null },
   ],
+  providers: ALL_PROVIDERS.map(key => ({
+    key,
+    label: key,
+    accent: '#888',
+    url: `https://example.com/${key}`,
+    confidence: 'canonical' as const,
+  })),
   credits: [
     {
       role: 'producer' as const,
@@ -97,7 +101,7 @@ const PRESAVE_PROPS = {
   release: {
     id: 'mock-release-id',
     slug: 'midnight-drive',
-    title: 'Midnight Drive',
+    title: 'Midnight Drive (Deluxe Anniversary Remastered Edition)',
     artworkUrl: MOCK_ARTWORK,
     releaseDate: futureDate,
     trackId: null,
@@ -106,7 +110,7 @@ const PRESAVE_PROPS = {
   },
   artist: {
     id: 'mock-artist-id',
-    name: 'Luna Vega',
+    name: 'Luna Vega feat. Kai Rivers',
     handle: 'lunavega',
     avatarUrl: null,
   },
@@ -114,11 +118,11 @@ const PRESAVE_PROPS = {
 
 const SOUNDS_PROPS = {
   release: {
-    title: 'Midnight Drive',
+    title: 'Midnight Drive (Deluxe Anniversary Remastered Edition)',
     artworkUrl: MOCK_ARTWORK,
   },
   artist: {
-    name: 'Luna Vega',
+    name: 'Luna Vega feat. Kai Rivers',
     handle: 'lunavega',
   },
   videoProviders: [
@@ -157,8 +161,13 @@ export function DevSmartLinkPreview() {
           <h2 className='text-sm font-medium text-white/50'>
             Released (Smart Link)
           </h2>
-          <div className='h-[844px] w-[390px] overflow-hidden rounded-[40px] ring-1 ring-white/10'>
-            <ReleaseLandingPage {...RELEASED_PROPS} />
+          <div
+            className='w-[390px] overflow-hidden rounded-[40px] ring-1 ring-white/10'
+            style={{ height: 844 }}
+          >
+            <div className='h-full [&_.profile-viewport]:!h-full [&_.profile-viewport]:!min-h-0'>
+              <ReleaseLandingPage {...RELEASED_PROPS} />
+            </div>
           </div>
         </div>
 
@@ -166,15 +175,25 @@ export function DevSmartLinkPreview() {
           <h2 className='text-sm font-medium text-white/50'>
             Unreleased (Presave)
           </h2>
-          <div className='h-[844px] w-[390px] overflow-hidden rounded-[40px] ring-1 ring-white/10'>
-            <UnreleasedReleaseHero {...PRESAVE_PROPS} />
+          <div
+            className='w-[390px] overflow-hidden rounded-[40px] ring-1 ring-white/10'
+            style={{ height: 844 }}
+          >
+            <div className='h-full [&_.profile-viewport]:!h-full [&_.profile-viewport]:!min-h-0'>
+              <UnreleasedReleaseHero {...PRESAVE_PROPS} />
+            </div>
           </div>
         </div>
 
         <div className='flex flex-col items-center gap-3'>
           <h2 className='text-sm font-medium text-white/50'>Use This Sound</h2>
-          <div className='h-[844px] w-[390px] overflow-hidden rounded-[40px] ring-1 ring-white/10'>
-            <SoundsLandingPage {...SOUNDS_PROPS} />
+          <div
+            className='w-[390px] overflow-hidden rounded-[40px] ring-1 ring-white/10'
+            style={{ height: 844 }}
+          >
+            <div className='h-full [&_.profile-viewport]:!h-full [&_.profile-viewport]:!min-h-0'>
+              <SoundsLandingPage {...SOUNDS_PROPS} />
+            </div>
           </div>
         </div>
       </div>

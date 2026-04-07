@@ -111,6 +111,8 @@ interface ProfileUnifiedDrawerProps {
   readonly pressPhotos?: readonly PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
   readonly tourDates?: TourDateViewModel[];
+  /** When provided, "Get Notified" closes drawer and triggers inline input reveal */
+  readonly onRevealNotifications?: () => void;
 }
 
 const menuItemClass =
@@ -214,6 +216,7 @@ export function ProfileUnifiedDrawer({
   pressPhotos = [],
   allowPhotoDownloads = false,
   tourDates = [],
+  onRevealNotifications,
 }: ProfileUnifiedDrawerProps) {
   const meta = VIEW_META[view];
 
@@ -387,10 +390,18 @@ export function ProfileUnifiedDrawer({
                   type='button'
                   role='menuitem'
                   className={menuItemClass}
-                  onClick={() => navigateTo('subscribe')}
+                  onClick={() => {
+                    if (onRevealNotifications) {
+                      handleOpenChange(false);
+                      // Small delay to let drawer close animation start
+                      setTimeout(() => onRevealNotifications(), 200);
+                    } else {
+                      navigateTo('subscribe');
+                    }
+                  }}
                 >
                   <Bell className={iconClass} />
-                  Get Notified
+                  Turn on notifications
                 </button>
               )}
             </div>
