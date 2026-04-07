@@ -11,6 +11,7 @@ import type {
   ReleaseSidebarAnalytics,
   ReleaseSidebarTrack,
 } from '@/components/organisms/release-sidebar/types';
+import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import type { AudienceMember } from '@/types';
 
@@ -42,254 +43,72 @@ export const DEMO_PROVIDER_CONFIG: Record<
 
 // Helper to create provider links
 function makeProviders(
-  keys: ProviderKey[],
-  slug: string
+  release: (typeof INTERNAL_DJ_DEMO_PERSONA.releases)[number]
 ): ReleaseViewModel['providers'] {
-  return keys.map((key, i) => ({
+  const entries = Object.entries(release.providerUrls) as Array<
+    [ProviderKey, string]
+  >;
+
+  return entries.map(([key, url], i) => ({
     key,
-    url: `https://${key}.example.com/${slug}`,
+    url,
     source: 'ingested' as const,
     updatedAt: '2026-02-01T00:00:00Z',
     label: DEMO_PROVIDER_CONFIG[key].label,
-    path: `/${slug}`,
+    path: `/${INTERNAL_DJ_DEMO_PERSONA.profile.handle}/${release.slug}`,
     isPrimary: i < 3,
   }));
 }
 
 // ── Release view models ─────────────────────────────────────────────────────
 
-export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] = [
-  {
+export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] =
+  INTERNAL_DJ_DEMO_PERSONA.releases.map(release => ({
     profileId: 'demo-profile',
-    id: 'rel-take-me-over',
-    title: 'Take Me Over',
-    artistNames: ['Tim White', 'Erica Gibson'],
-    releaseDate: '2014-10-01',
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d0000b2732c05c3b2fb08c606843e7d98',
-    slug: 'take-me-over',
-    smartLinkPath: '/tim-white/take-me-over',
-    spotifyPopularity: 70,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 210_000,
-    primaryIsrc: 'USRC17300001',
-    genres: ['Dance', 'Pop'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'amazon_music', 'deezer', 'tidal'],
-      'take-me-over'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-never-say-a-word',
-    title: 'Never Say A Word',
-    artistNames: ['Tim White'],
-    releaseDate: '2024-05-07',
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d0000b273cbe401fd4a00b05b26a5233f',
-    slug: 'never-say-a-word',
-    smartLinkPath: '/tim-white/never-say-a-word',
-    spotifyPopularity: 61,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 225_000,
-    primaryIsrc: 'USRC17400002',
-    genres: ['Pop', 'Electronic'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'amazon_music', 'deezer'],
-      'never-say-a-word'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-deep-end',
-    title: 'The Deep End',
-    artistNames: ['Cosmic Gate', 'Tim White'],
-    releaseDate: '2017-02-10',
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d0000b273164aac758a1deb79d33cc1b4',
-    slug: 'the-deep-end',
-    smartLinkPath: '/tim-white/the-deep-end',
-    spotifyPopularity: 64,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 198_000,
-    primaryIsrc: 'USRC17100003',
-    genres: ['Trance', 'Progressive House'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'amazon_music', 'deezer', 'tidal'],
-      'the-deep-end'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-revival',
-    title: 'Revival',
-    artistNames: ['Tom Fall', 'Tim White'],
-    releaseDate: '2016-09-12',
-    artworkUrl: undefined,
-    slug: 'revival',
-    smartLinkPath: '/tim-white/revival',
-    spotifyPopularity: 53,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 2,
-    totalDurationMs: 469_000,
-    primaryIsrc: 'USRC12345004',
-    genres: ['Trance', 'Dance'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'amazon_music', 'deezer'],
-      'revival'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-sober',
-    title: 'Sober',
-    artistNames: ['Jochen Miller', 'Tom Fall', 'Tim White'],
-    releaseDate: '2016-11-07',
-    artworkUrl: undefined,
-    slug: 'sober',
-    smartLinkPath: '/tim-white/sober',
-    spotifyPopularity: 49,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 214_000,
-    primaryIsrc: 'USRC12345005',
-    genres: ['Dance', 'Electronic'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'deezer'],
-      'sober'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-wheels-up',
-    title: 'Wheels Up',
-    artistNames: ['Lynx', 'Tim White'],
-    releaseDate: '2018-04-27',
-    artworkUrl: undefined,
-    slug: 'wheels-up',
-    smartLinkPath: '/tim-white/wheels-up',
-    spotifyPopularity: 46,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 189_000,
-    primaryIsrc: 'USRC12345006',
-    genres: ['Pop', 'Dance'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'amazon_music'],
-      'wheels-up'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-seaside-heights',
-    title: 'Seaside Heights',
-    artistNames: ['Tim White'],
-    releaseDate: '2020-05-15',
-    artworkUrl: undefined,
-    slug: 'seaside-heights',
-    smartLinkPath: '/tim-white/seaside-heights',
-    spotifyPopularity: 43,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 201_000,
-    primaryIsrc: 'USRC12345007',
-    genres: ['Pop', 'Electronic'],
-    providers: makeProviders(['spotify', 'apple_music'], 'seaside-heights'),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-tomorrow-sounds',
-    title: 'Tomorrow Sounds',
-    artistNames: ['Tim White'],
-    releaseDate: '2020-04-03',
-    artworkUrl: undefined,
-    slug: 'tomorrow-sounds',
-    smartLinkPath: '/tim-white/tomorrow-sounds',
-    spotifyPopularity: 39,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 203_000,
-    primaryIsrc: 'USRC12345008',
-    genres: ['Pop', 'Synthwave'],
-    providers: makeProviders(['spotify'], 'tomorrow-sounds'),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-doge-to-mars',
-    title: 'Doge (To Mars)',
-    artistNames: ['Tim White'],
-    releaseDate: '2021-02-21',
-    artworkUrl: undefined,
-    slug: 'doge-to-mars',
-    smartLinkPath: '/tim-white/doge-to-mars',
-    spotifyPopularity: 35,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 186_000,
-    primaryIsrc: 'USRC12345009',
-    genres: ['Electronic', 'Pop'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'bandcamp'],
-      'doge-to-mars'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-this-is-love',
-    title: 'This Is Love',
-    artistNames: ['Tim White'],
-    releaseDate: '2020-01-31',
-    artworkUrl: undefined,
-    slug: 'this-is-love',
-    smartLinkPath: '/tim-white/this-is-love',
-    spotifyPopularity: 37,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 191_000,
-    primaryIsrc: 'USRC12345010',
-    genres: ['Pop', 'Dance'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'deezer', 'tidal'],
-      'this-is-love'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-supernova-girl',
-    title: 'Supernova Girl',
-    artistNames: ['Tim White'],
-    releaseDate: '2020-03-06',
-    artworkUrl: undefined,
-    slug: 'supernova-girl',
-    smartLinkPath: '/tim-white/supernova-girl',
-    spotifyPopularity: 33,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 153_000,
-    primaryIsrc: 'USRC12345011',
-    genres: ['Pop', 'Dance'],
-    providers: makeProviders(['spotify', 'apple_music'], 'supernova-girl'),
-  },
-];
+    id: release.id,
+    title: release.title,
+    artistNames: [...release.artistNames],
+    releaseDate: release.releaseDate,
+    artworkUrl: release.artworkUrl,
+    slug: release.slug,
+    smartLinkPath: `/${INTERNAL_DJ_DEMO_PERSONA.profile.handle}/${release.slug}`,
+    spotifyPopularity: release.spotifyPopularity,
+    releaseType: release.releaseType,
+    isExplicit: Boolean(release.tracks?.some(track => track.isExplicit)),
+    totalTracks: release.totalTracks,
+    totalDurationMs: release.totalDurationMs,
+    primaryIsrc: release.primaryIsrc,
+    genres: [...release.genres],
+    providers: makeProviders(release),
+  }));
 
 function makeDemoTracks(
   release: ReleaseViewModel,
   count = Math.min(Math.max(release.totalTracks, 1), 6)
 ): ReleaseSidebarTrack[] {
+  const personaRelease = INTERNAL_DJ_DEMO_PERSONA.releases.find(
+    item => item.id === release.id
+  );
+  if (personaRelease?.tracks?.length) {
+    return personaRelease.tracks.slice(0, count).map(track => ({
+      id: `${release.id}-track-${track.trackNumber}`,
+      releaseId: release.id,
+      releaseSlug: release.slug,
+      title: track.title,
+      slug: track.slug,
+      smartLinkPath: `${release.smartLinkPath}/tracks/${track.trackNumber}`,
+      trackNumber: track.trackNumber,
+      discNumber: track.discNumber,
+      durationMs: track.durationMs,
+      isrc: track.isrc,
+      isExplicit: Boolean(track.isExplicit),
+      previewUrl: release.previewUrl ?? null,
+      audioUrl: null,
+      audioFormat: null,
+      providers: release.providers,
+    }));
+  }
+
   return Array.from({ length: count }, (_, index) => {
     const trackNumber = index + 1;
     return {

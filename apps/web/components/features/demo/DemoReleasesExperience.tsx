@@ -7,6 +7,7 @@ import {
   providerConfig,
 } from '@/app/app/(shell)/dashboard/releases/config';
 import { ReleasesExperience } from '@/features/dashboard/organisms/release-provider-matrix';
+import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { DemoAuthShell } from './DemoAuthShell';
@@ -87,9 +88,9 @@ export function DemoReleasesExperience({
         providerConfig={providerConfig}
         primaryProviders={primaryProviderKeys}
         spotifyConnected
-        spotifyArtistName='Tim White'
+        spotifyArtistName={INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
         appleMusicConnected
-        appleMusicArtistName='Tim White'
+        appleMusicArtistName={INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
         allowArtworkDownloads
         experienceAdapter={{
           mode: 'demo',
