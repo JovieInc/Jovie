@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
@@ -42,33 +42,38 @@ export function buildHandleCandidates(name: string): string[] {
   return candidates;
 }
 
-async function isHandleAvailable(candidate: string): Promise<boolean> {
-  const [existing] = await db
-    .select({ username: creatorProfiles.username })
+async function findTakenHandles(candidates: string[]): Promise<Set<string>> {
+  if (candidates.length === 0) return new Set();
+  const rows = await db
+    .select({ normalized: creatorProfiles.usernameNormalized })
     .from(creatorProfiles)
-    .where(eq(creatorProfiles.usernameNormalized, candidate))
-    .limit(1);
-
-  return !existing;
+    .where(inArray(creatorProfiles.usernameNormalized, candidates));
+  return new Set(rows.map(r => r.normalized));
 }
 
 export async function reserveOnboardingHandle(name: string): Promise<string> {
   const bases = buildHandleCandidates(name);
 
-  for (const base of bases) {
-    if (await isHandleAvailable(base)) {
-      return base;
-    }
+  // Build all candidates up front, then check availability in a single query
+  const candidates: string[] = [];
 
+  for (const base of bases) {
+    candidates.push(base);
     for (let suffix = 1; suffix <= MAX_SUFFIX_ATTEMPTS; suffix++) {
       const candidate = `${base}${suffix}`;
-      if (!validateUsername(candidate).isValid) {
-        continue;
+      if (validateUsername(candidate).isValid) {
+        candidates.push(candidate);
       }
+    }
+  }
 
-      if (await isHandleAvailable(candidate)) {
-        return candidate;
-      }
+  // Single batch query instead of up to 30+ sequential queries
+  const taken = await findTakenHandles(candidates);
+
+  // Return the first available candidate in priority order
+  for (const candidate of candidates) {
+    if (!taken.has(candidate)) {
+      return candidate;
     }
   }
 

@@ -8,6 +8,7 @@ import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { ClaimBanner } from '@/features/profile/ClaimBanner';
 import type { ProfileMode } from '@/features/profile/contracts';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
+import { ProfileFooter } from '@/features/profile/ProfileFooter';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import {
   getProfileMode,
@@ -555,6 +556,7 @@ export default async function ArtistPage({
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
       )}
+      <ProfileFooter artist={artist} />
     </>
   );
 }
