@@ -41,7 +41,13 @@ export async function GET(request: Request) {
     );
   }
 
-  const result = await lookupDeezerByIsrc(isrc);
+  // 5-second timeout prevents indefinite hangs on Deezer API
+  const fetchWithTimeout: typeof fetch = (input, init) =>
+    fetch(input, { ...init, signal: AbortSignal.timeout(5_000) });
+
+  const result = await lookupDeezerByIsrc(isrc, {
+    fetcher: fetchWithTimeout,
+  });
 
   if (!result?.previewUrl) {
     return NextResponse.json(
