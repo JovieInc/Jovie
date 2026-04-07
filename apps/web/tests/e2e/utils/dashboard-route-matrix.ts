@@ -414,7 +414,7 @@ const billingRoutes = [
     performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
   },
   {
-    path: APP_ROUTES.BILLING_REMOVE_BRANDING,
+    path: APP_ROUTES.PRICING,
     name: 'Billing Remove Branding',
     kind: 'render',
     surface: 'billing',
