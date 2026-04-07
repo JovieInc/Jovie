@@ -3,7 +3,8 @@ import { APP_NAME, BASE_URL } from '@/constants/app';
 import { EngagementEngineLanding } from '@/features/home/EngagementEngineLanding';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} - An Always-On Engagement Engine`;
+  const title = 'An Always-On Engagement Engine';
+  const ogTitle = `${APP_NAME} - An Always-On Engagement Engine`;
   const description =
     'Turn attention into a warm list. Personalize per fan. Follow up automatically.';
 
@@ -16,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     openGraph: {
       type: 'website',
-      title,
+      title: ogTitle,
       description,
       url: `${BASE_URL}/engagement-engine`,
       siteName: APP_NAME,
@@ -32,7 +33,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     twitter: {
       card: 'summary_large_image',
-      title,
+      title: ogTitle,
       description,
       images: ['/og/default.png'],
     },

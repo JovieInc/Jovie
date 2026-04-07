@@ -4,7 +4,7 @@ import { DemoVideoPlayer } from '@/features/demo/DemoVideoPlayer';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const metadata: Metadata = {
-  title: 'Jovie — Product Demo',
+  title: 'Product Demo',
   description:
     'See how Jovie turns every artist profile into a growth engine — in 30 seconds.',
   robots: NOINDEX_ROBOTS,

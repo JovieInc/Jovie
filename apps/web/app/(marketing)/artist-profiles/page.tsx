@@ -6,7 +6,8 @@ import { HeroCinematic } from '@/features/home/HeroCinematic';
 
 export const revalidate = false;
 
-const ARTIST_PROFILES_TITLE = `Artist Profiles | ${APP_NAME}`;
+const ARTIST_PROFILES_TITLE = 'Artist Profiles';
+const ARTIST_PROFILES_OG_TITLE = `Artist Profiles | ${APP_NAME}`;
 const ARTIST_PROFILES_DESCRIPTION =
   'Claim your free artist profile on Jovie. Smart links, fan engagement, and release automation — all in one link-in-bio built for musicians.';
 const ARTIST_PROFILES_URL = `${BASE_URL}${APP_ROUTES.ARTIST_PROFILES}`;
@@ -29,7 +30,7 @@ export const metadata: Metadata = {
     canonical: ARTIST_PROFILES_URL,
   },
   openGraph: {
-    title: ARTIST_PROFILES_TITLE,
+    title: ARTIST_PROFILES_OG_TITLE,
     description: ARTIST_PROFILES_DESCRIPTION,
     url: ARTIST_PROFILES_URL,
     siteName: APP_NAME,
@@ -47,7 +48,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: ARTIST_PROFILES_TITLE,
+    title: ARTIST_PROFILES_OG_TITLE,
     description: ARTIST_PROFILES_DESCRIPTION,
     images: [ARTIST_PROFILES_OG_IMAGE],
     creator: '@meetjovie',

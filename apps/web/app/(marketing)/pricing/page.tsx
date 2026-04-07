@@ -13,7 +13,7 @@ import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 // SEO Metadata
 export const metadata: Metadata = {
-  title: `Pricing - ${APP_NAME}`,
+  title: 'Pricing',
   description:
     'Start free with unlimited smart links. Upgrade for advanced analytics, fan CRM, and more.',
   keywords: [
