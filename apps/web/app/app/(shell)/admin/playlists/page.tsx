@@ -51,64 +51,79 @@ async function approvePlaylist(formData: FormData) {
 
   if (!playlist) return; // already claimed by another request
 
-  const tracks = await db
-    .select()
-    .from(joviePlaylistTracks)
-    .where(eq(joviePlaylistTracks.playlistId, playlistId))
-    .orderBy(joviePlaylistTracks.position);
+  try {
+    const tracks = await db
+      .select()
+      .from(joviePlaylistTracks)
+      .where(eq(joviePlaylistTracks.playlistId, playlistId))
+      .orderBy(joviePlaylistTracks.position);
 
-  const trackIds = tracks
-    .map(t => t.spotifyTrackId)
-    .filter((id): id is string => id != null);
+    const trackIds = tracks
+      .map(t => t.spotifyTrackId)
+      .filter((id): id is string => id != null);
 
-  // Generate cover art using LLM-generated queries from the pipeline
-  const promptData = (() => {
-    try {
-      return playlist.llmPrompt
-        ? (JSON.parse(playlist.llmPrompt) as {
-            unsplashQuery?: string;
-            coverTextWords?: string;
-          })
-        : {};
-    } catch {
-      return {};
-    }
-  })();
-  const coverArt = await generateCoverArt({
-    unsplashQuery: promptData.unsplashQuery ?? playlist.theme ?? playlist.title,
-    coverText:
-      promptData.coverTextWords ??
-      playlist.title.split(' ').slice(0, 4).join(' '),
-  });
+    // Generate cover art using LLM-generated queries from the pipeline
+    const promptData = (() => {
+      try {
+        return playlist.llmPrompt
+          ? (JSON.parse(playlist.llmPrompt) as {
+              unsplashQuery?: string;
+              coverTextWords?: string;
+            })
+          : {};
+      } catch {
+        return {};
+      }
+    })();
+    const coverArt = await generateCoverArt({
+      unsplashQuery:
+        promptData.unsplashQuery ?? playlist.theme ?? playlist.title,
+      coverText:
+        promptData.coverTextWords ??
+        playlist.title.split(' ').slice(0, 4).join(' '),
+    });
 
-  // Publish to Spotify
-  const result = await publishToSpotify({
-    title: playlist.title,
-    description: playlist.description ?? '',
-    trackIds,
-    coverBase64: coverArt.spotifyBase64,
-    slug: playlist.slug,
-  });
+    // Publish to Spotify
+    const result = await publishToSpotify({
+      title: playlist.title,
+      description: playlist.description ?? '',
+      trackIds,
+      coverBase64: coverArt.spotifyBase64,
+      slug: playlist.slug,
+    });
 
-  // Get Spotify user ID for audit trail
-  const spotifyUserId = await getJovieSpotifyUserId();
+    // Get Spotify user ID for audit trail
+    const spotifyUserId = await getJovieSpotifyUserId();
 
-  // Update playlist status
-  await db
-    .update(joviePlaylists)
-    .set({
-      status: 'published',
-      statusChangedAt: new Date(),
-      publishedAt: new Date(),
-      spotifyPlaylistId: result.spotifyPlaylistId,
-      curatorSpotifyUserId: spotifyUserId,
-      trackCount: result.tracksAdded,
-      updatedAt: new Date(),
-    })
-    .where(eq(joviePlaylists.id, playlistId));
+    // Update playlist status to published
+    await db
+      .update(joviePlaylists)
+      .set({
+        status: 'published',
+        statusChangedAt: new Date(),
+        publishedAt: new Date(),
+        spotifyPlaylistId: result.spotifyPlaylistId,
+        curatorSpotifyUserId: spotifyUserId,
+        trackCount: result.tracksAdded,
+        updatedAt: new Date(),
+      })
+      .where(eq(joviePlaylists.id, playlistId));
 
-  revalidatePath('/playlists');
-  revalidatePath(`/playlists/${playlist.slug}`);
+    revalidatePath('/playlists');
+    revalidatePath(`/playlists/${playlist.slug}`);
+  } catch (error) {
+    // Revert to pending so the admin can retry (prevents "approved" limbo)
+    await db
+      .update(joviePlaylists)
+      .set({
+        status: 'pending',
+        statusChangedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(joviePlaylists.id, playlistId));
+    throw error;
+  }
+
   revalidatePath(APP_ROUTES.ADMIN_PLAYLISTS);
 }
 
