@@ -7,6 +7,7 @@
 
 import { APP_NAME } from '@/constants/app';
 import { BASE_URL } from '@/constants/domains';
+import { formatExtension, formatFileSize } from '@/lib/promo-downloads/format';
 import { escapeHtml } from '../utils';
 
 export interface PromoDownloadFile {
@@ -27,24 +28,6 @@ export interface PromoDownloadThankYouTemplateData {
   artworkUrl?: string | null;
   /** Download files with signed URLs */
   files: PromoDownloadFile[];
-}
-
-function formatFileSize(bytes: number | null): string {
-  if (!bytes) return '';
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-}
-
-function formatExtension(mimeType: string): string {
-  const map: Record<string, string> = {
-    'audio/mpeg': 'MP3',
-    'audio/wav': 'WAV',
-    'audio/flac': 'FLAC',
-    'audio/aiff': 'AIFF',
-    'audio/mp4': 'M4A',
-    'audio/x-m4a': 'M4A',
-  };
-  return map[mimeType] ?? 'Audio';
 }
 
 export function getPromoDownloadThankYouSubject(

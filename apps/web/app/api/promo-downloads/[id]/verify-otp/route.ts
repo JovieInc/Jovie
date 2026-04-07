@@ -6,16 +6,10 @@
  * Analytics writes are best-effort (never block the download).
  */
 
-import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
-import {
-  promoDownloadEvents,
-  promoDownloads,
-} from '@/lib/db/schema/promo-downloads';
+import { promoDownloadEvents } from '@/lib/db/schema/promo-downloads';
 import {
   getPromoDownloadThankYouHtml,
   getPromoDownloadThankYouSubject,
@@ -28,6 +22,11 @@ import {
   verifyEmailOtp,
 } from '@/lib/notifications/otp-service';
 import { sendNotification } from '@/lib/notifications/service';
+import {
+  getActivePromoFiles,
+  getPromoDownloadWithCreator,
+} from '@/lib/promo-downloads/queries';
+import { extractGeoFromHeaders } from '@/lib/promo-downloads/request-utils';
 
 export const runtime = 'nodejs';
 
@@ -54,26 +53,7 @@ export async function POST(
     }
 
     // Fetch the promo download to get the creatorProfileId
-    const [download] = await db
-      .select({
-        id: promoDownloads.id,
-        creatorProfileId: promoDownloads.creatorProfileId,
-        releaseId: promoDownloads.releaseId,
-        title: promoDownloads.title,
-        artworkUrl: promoDownloads.artworkUrl,
-        isActive: promoDownloads.isActive,
-        artistName: creatorProfiles.displayName,
-        artistHandle: creatorProfiles.username,
-        isPro: users.isPro,
-      })
-      .from(promoDownloads)
-      .innerJoin(
-        creatorProfiles,
-        eq(creatorProfiles.id, promoDownloads.creatorProfileId)
-      )
-      .leftJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(eq(promoDownloads.id, id))
-      .limit(1);
+    const download = await getPromoDownloadWithCreator(id);
 
     if (!download || !download.isActive || !download.isPro) {
       return NextResponse.json(
@@ -96,28 +76,10 @@ export async function POST(
       );
     }
 
-    // Fetch ALL active files for this release (not just the one referenced by id)
-    const allFiles = await db
-      .select({
-        id: promoDownloads.id,
-        title: promoDownloads.title,
-        fileUrl: promoDownloads.fileUrl,
-        fileName: promoDownloads.fileName,
-        fileMimeType: promoDownloads.fileMimeType,
-        fileSizeBytes: promoDownloads.fileSizeBytes,
-      })
-      .from(promoDownloads)
-      .where(
-        and(
-          eq(promoDownloads.releaseId, download.releaseId),
-          eq(promoDownloads.isActive, true)
-        )
-      )
-      .orderBy(promoDownloads.position);
+    // Fetch ALL active files for this release
+    const allFiles = await getActivePromoFiles(download.releaseId);
 
     // Map files with their blob URLs (revealed only after OTP verification)
-    // The fileUrl field stores the blob URL. Access control is at the API layer,
-    // not the URL layer — the URL is only returned after successful OTP verify.
     const filesWithUrls = allFiles.map(file => ({
       id: file.id,
       title: file.title,
@@ -127,13 +89,8 @@ export async function POST(
       downloadUrl: file.fileUrl,
     }));
 
-    // Best-effort analytics: record download events + audience upsert
-    const ip =
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-    const ua = request.headers.get('user-agent') ?? null;
-    const rawCity = request.headers.get('x-vercel-ip-city');
-    const city = rawCity ? decodeURIComponent(rawCity) : null;
-    const country = request.headers.get('x-vercel-ip-country') ?? null;
+    // Best-effort analytics
+    const { ip, country, city, userAgent } = extractGeoFromHeaders(request);
 
     // Fire-and-forget: download events
     void (async () => {
@@ -144,7 +101,7 @@ export async function POST(
             creatorProfileId: download.creatorProfileId,
             email: parsed.data.email,
             ipAddress: ip,
-            userAgent: ua,
+            userAgent,
             country,
             city,
           });
@@ -159,7 +116,7 @@ export async function POST(
       download.creatorProfileId,
       parsed.data.email,
       ip,
-      ua
+      userAgent
     );
 
     // Fire-and-forget: thank-you email

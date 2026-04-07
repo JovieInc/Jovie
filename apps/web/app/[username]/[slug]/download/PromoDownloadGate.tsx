@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { OtpInput } from '@/features/auth/atoms/otp-input';
+import { formatExtension, formatFileSize } from '@/lib/promo-downloads/format';
 
 const STORAGE_KEY = 'jv_promo_email';
 
@@ -33,24 +34,6 @@ interface PromoDownloadGateProps {
 }
 
 type GateState = 'email' | 'otp' | 'ready';
-
-function formatFileSize(bytes: number | null): string {
-  if (!bytes) return '';
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-}
-
-function formatExtension(mimeType: string): string {
-  const map: Record<string, string> = {
-    'audio/mpeg': 'MP3',
-    'audio/wav': 'WAV',
-    'audio/flac': 'FLAC',
-    'audio/aiff': 'AIFF',
-    'audio/mp4': 'M4A',
-    'audio/x-m4a': 'M4A',
-  };
-  return map[mimeType] ?? '???';
-}
 
 export function PromoDownloadGate({
   releaseId,

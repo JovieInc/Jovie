@@ -7,13 +7,10 @@
  */
 
 import { type HandleUploadBody, handleUpload } from '@vercel/blob/client';
-import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { getCreatorProfileForUser } from '@/lib/promo-downloads/queries';
 
 export const runtime = 'nodejs';
 
@@ -39,16 +36,7 @@ export async function POST(request: NextRequest) {
       body,
       request,
       onBeforeGenerateToken: async _pathname => {
-        // Verify user owns a creator profile and has Pro
-        const [profile] = await db
-          .select({
-            id: creatorProfiles.id,
-            isPro: users.isPro,
-          })
-          .from(creatorProfiles)
-          .leftJoin(users, eq(users.id, creatorProfiles.userId))
-          .where(eq(creatorProfiles.userId, userId))
-          .limit(1);
+        const profile = await getCreatorProfileForUser(userId);
 
         if (!profile) {
           throw new Error('Creator profile not found');
@@ -67,10 +55,8 @@ export async function POST(request: NextRequest) {
           }),
         };
       },
-      onUploadCompleted: async ({ blob, tokenPayload }) => {
-        // This callback fires after the client upload completes.
-        // We don't insert the DB record here because the client
-        // needs to call /api/promo-downloads/confirm with metadata.
+      onUploadCompleted: async () => {
+        // Client calls /api/promo-downloads/confirm with metadata after upload.
       },
     });
 

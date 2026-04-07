@@ -11,6 +11,7 @@ import { upload } from '@vercel/blob/client';
 import { useParams } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { formatExtension, formatFileSize } from '@/lib/promo-downloads/format';
 
 interface PromoDownloadFile {
   id: string;
@@ -32,24 +33,6 @@ const ALLOWED_TYPES = new Set([
   'audio/mp4',
   'audio/x-m4a',
 ]);
-
-function formatFileSize(bytes: number | null): string {
-  if (!bytes) return '';
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatExtension(mimeType: string): string {
-  const map: Record<string, string> = {
-    'audio/mpeg': 'MP3',
-    'audio/wav': 'WAV',
-    'audio/flac': 'FLAC',
-    'audio/aiff': 'AIFF',
-    'audio/mp4': 'M4A',
-    'audio/x-m4a': 'M4A',
-  };
-  return map[mimeType] ?? 'Audio';
-}
 
 export default function PromoDownloadsPage() {
   const { releaseId } = useParams<{ releaseId: string }>();

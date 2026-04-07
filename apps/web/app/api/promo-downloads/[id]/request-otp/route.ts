@@ -5,13 +5,8 @@
  * for downloading promo tracks. Rate-limited per IP and email.
  */
 
-import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import {
   getPromoDownloadOtpHtml,
   getPromoDownloadOtpSubject,
@@ -21,6 +16,8 @@ import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { requestEmailOtp } from '@/lib/notifications/otp-service';
 import { sendNotification } from '@/lib/notifications/service';
+import { getPromoDownloadWithCreator } from '@/lib/promo-downloads/queries';
+import { extractGeoFromHeaders } from '@/lib/promo-downloads/request-utils';
 
 export const runtime = 'nodejs';
 
@@ -56,25 +53,7 @@ export async function POST(
     }
 
     // Fetch promo download + verify active + artist is Pro
-    const [download] = await db
-      .select({
-        id: promoDownloads.id,
-        creatorProfileId: promoDownloads.creatorProfileId,
-        releaseId: promoDownloads.releaseId,
-        title: promoDownloads.title,
-        artworkUrl: promoDownloads.artworkUrl,
-        isActive: promoDownloads.isActive,
-        artistName: creatorProfiles.displayName,
-        isPro: users.isPro,
-      })
-      .from(promoDownloads)
-      .innerJoin(
-        creatorProfiles,
-        eq(creatorProfiles.id, promoDownloads.creatorProfileId)
-      )
-      .leftJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(eq(promoDownloads.id, id))
-      .limit(1);
+    const download = await getPromoDownloadWithCreator(id);
 
     if (!download || !download.isActive || !download.isPro) {
       return NextResponse.json(
@@ -83,12 +62,7 @@ export async function POST(
       );
     }
 
-    // Extract geo from headers
-    const ip =
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-    const country = request.headers.get('x-vercel-ip-country') ?? null;
-    const rawCity = request.headers.get('x-vercel-ip-city');
-    const city = rawCity ? decodeURIComponent(rawCity) : null;
+    const { ip, country, city } = extractGeoFromHeaders(request);
 
     // Request OTP via shared service
     const result = await requestEmailOtp({
