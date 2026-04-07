@@ -9,10 +9,15 @@
 
 import { Share2 } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import { SmartLinkPoweredByFooter } from '@/features/release/SmartLinkPagePrimitives';
-import { SmartLinkShell } from '@/features/release/SmartLinkShell';
+import {
+  SMART_LINK_MENU_ICON_CLASS,
+  SMART_LINK_MENU_ITEM_CLASS,
+  SmartLinkShell,
+  useSmartLinkShare,
+} from '@/features/release/SmartLinkShell';
 import type { Artist } from '@/types/db';
 import { PreSaveActions } from './PreSaveActions';
 import { ReleaseNotificationsProvider } from './ReleaseNotificationsProvider';
@@ -35,10 +40,6 @@ interface UnreleasedReleaseHeroProps {
     readonly avatarUrl: string | null;
   };
 }
-
-const menuItemClass =
-  'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-150 active:bg-white/[0.06]';
-const menuIconClass = 'h-[16px] w-[16px] text-white/40';
 
 function mapToArtistType(artist: UnreleasedReleaseHeroProps['artist']): Artist {
   return {
@@ -63,17 +64,9 @@ export function UnreleasedReleaseHero({
   const artistData = mapToArtistType(artist);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const handleShare = useCallback(async () => {
-    setMenuOpen(false);
-    try {
-      await navigator.share?.({
-        title: `${release.title} — ${artist.name}`,
-        url: globalThis.location.href,
-      });
-    } catch {
-      // User cancelled or share not available
-    }
-  }, [release.title, artist.name]);
+  const handleShare = useSmartLinkShare(release.title, artist.name, () =>
+    setMenuOpen(false)
+  );
 
   return (
     <ReleaseNotificationsProvider artist={artistData}>
@@ -126,10 +119,10 @@ export function UnreleasedReleaseHero({
           <button
             type='button'
             role='menuitem'
-            className={menuItemClass}
+            className={SMART_LINK_MENU_ITEM_CLASS}
             onClick={() => handleShare()}
           >
-            <Share2 className={menuIconClass} />
+            <Share2 className={SMART_LINK_MENU_ICON_CLASS} />
             Share
           </button>
         </div>

@@ -197,9 +197,9 @@ describe('SoundsLandingPage', () => {
     expect(artistName.closest('a')).toBeNull();
   });
 
-  it('renders "Use this sound" label', () => {
+  it('renders release title', () => {
     render(<SoundsLandingPage {...defaultProps} />);
 
-    expect(screen.getByText('Use this sound')).toBeInTheDocument();
+    expect(screen.getByText('Test Song')).toBeInTheDocument();
   });
 });

@@ -14,7 +14,12 @@ import { VIDEO_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import { SmartLinkPoweredByFooter } from '@/features/release/SmartLinkPagePrimitives';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
-import { SmartLinkShell } from '@/features/release/SmartLinkShell';
+import {
+  SMART_LINK_MENU_ICON_CLASS,
+  SMART_LINK_MENU_ITEM_CLASS,
+  SmartLinkShell,
+  useSmartLinkShare,
+} from '@/features/release/SmartLinkShell';
 import type { VideoProviderKey } from '@/lib/discography/types';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
@@ -45,10 +50,6 @@ interface SoundsLandingPageProps {
     readonly smartLinkSlug?: string | null;
   };
 }
-
-const menuItemClass =
-  'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-150 active:bg-white/[0.06]';
-const menuIconClass = 'h-[16px] w-[16px] text-white/40';
 
 export function SoundsLandingPage({
   release,
@@ -84,17 +85,9 @@ export function SoundsLandingPage({
     [artist.handle, tracking]
   );
 
-  const handleShare = useCallback(async () => {
-    setMenuOpen(false);
-    try {
-      await navigator.share?.({
-        title: `${release.title} — ${artist.name}`,
-        url: globalThis.location.href,
-      });
-    } catch {
-      // User cancelled or share not available
-    }
-  }, [release.title, artist.name]);
+  const handleShare = useSmartLinkShare(release.title, artist.name, () =>
+    setMenuOpen(false)
+  );
 
   return (
     <>
@@ -104,10 +97,7 @@ export function SoundsLandingPage({
         onMenuOpen={() => setMenuOpen(true)}
         heroOverlay={
           <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
-            <p className='text-[11px] font-[510] uppercase tracking-[0.1em] text-white/50'>
-              Use this sound
-            </p>
-            <h1 className='mt-1 text-[28px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
+            <h1 className='text-[28px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
               {release.title}
             </h1>
             {artist.handle ? (
@@ -160,21 +150,21 @@ export function SoundsLandingPage({
           <button
             type='button'
             role='menuitem'
-            className={menuItemClass}
+            className={SMART_LINK_MENU_ITEM_CLASS}
             onClick={() => {
               handleShare();
             }}
           >
-            <Share2 className={menuIconClass} />
+            <Share2 className={SMART_LINK_MENU_ICON_CLASS} />
             Share
           </button>
           <Link
             href={appendUTMParamsToUrl(smartLinkPath, utmParams)}
             role='menuitem'
-            className={menuItemClass}
+            className={SMART_LINK_MENU_ITEM_CLASS}
             onClick={() => setMenuOpen(false)}
           >
-            <Headphones className={menuIconClass} />
+            <Headphones className={SMART_LINK_MENU_ICON_CLASS} />
             Listen
           </Link>
         </div>

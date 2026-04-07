@@ -23,7 +23,12 @@ import { ReleaseCreditsDrawer } from '@/features/release/ReleaseCreditsDrawer';
 import { SmartLinkAudioPreview } from '@/features/release/SmartLinkAudioPreview';
 import { SmartLinkPoweredByFooter } from '@/features/release/SmartLinkPagePrimitives';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
-import { SmartLinkShell } from '@/features/release/SmartLinkShell';
+import {
+  SMART_LINK_MENU_ICON_CLASS,
+  SMART_LINK_MENU_ITEM_CLASS,
+  SmartLinkShell,
+  useSmartLinkShare,
+} from '@/features/release/SmartLinkShell';
 import type {
   PreviewSource,
   PreviewVerification,
@@ -202,10 +207,6 @@ function SmartLinkArtistLine({
   );
 }
 
-const menuItemClass =
-  'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-150 active:bg-white/[0.06]';
-const menuIconClass = 'h-[16px] w-[16px] text-white/40';
-
 export function ReleaseLandingPage({
   release,
   artist,
@@ -259,17 +260,9 @@ export function ReleaseLandingPage({
     [artist.handle, tracking]
   );
 
-  const handleShare = useCallback(async () => {
-    setMenuOpen(false);
-    try {
-      await navigator.share?.({
-        title: `${release.title} — ${artist.name}`,
-        url: globalThis.location.href,
-      });
-    } catch {
-      // User cancelled or share not available
-    }
-  }, [release.title, artist.name]);
+  const handleShare = useSmartLinkShare(release.title, artist.name, () =>
+    setMenuOpen(false)
+  );
 
   return (
     <SmartLinkShell
@@ -371,25 +364,25 @@ export function ReleaseLandingPage({
           <button
             type='button'
             role='menuitem'
-            className={menuItemClass}
+            className={SMART_LINK_MENU_ITEM_CLASS}
             onClick={() => {
               handleShare();
             }}
           >
-            <Share2 className={menuIconClass} />
+            <Share2 className={SMART_LINK_MENU_ICON_CLASS} />
             Share
           </button>
           {hasCredits ? (
             <button
               type='button'
               role='menuitem'
-              className={menuItemClass}
+              className={SMART_LINK_MENU_ITEM_CLASS}
               onClick={() => {
                 setMenuOpen(false);
                 setCreditsOpen(true);
               }}
             >
-              <Users className={menuIconClass} />
+              <Users className={SMART_LINK_MENU_ICON_CLASS} />
               Credits
             </button>
           ) : null}
@@ -397,10 +390,10 @@ export function ReleaseLandingPage({
             <Link
               href={appendUTMParamsToUrl(soundsUrl, utmParams)}
               role='menuitem'
-              className={menuItemClass}
+              className={SMART_LINK_MENU_ITEM_CLASS}
               onClick={() => setMenuOpen(false)}
             >
-              <Sparkles className={menuIconClass} />
+              <Sparkles className={SMART_LINK_MENU_ICON_CLASS} />
               Use this sound
             </Link>
           ) : null}
