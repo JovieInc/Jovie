@@ -155,10 +155,12 @@ function bindAudioEvents(el: HTMLAudioElement): void {
     // backgrounding/resuming) even when src is already cleared.
     if (!state.activeTrackId) return;
 
-    // Try refreshing the preview URL once via ISRC lookup.
-    // Deezer preview URLs expire within hours (time-limited auth tokens).
-    // When a stored URL returns 403, we fetch a fresh one from Deezer's API.
-    if (_activeTrackIsrc && !_hasRetriedRefresh) {
+    // Only attempt a preview URL refresh for network errors (code 2),
+    // which indicate an expired Deezer token (403). Decode errors (code 3)
+    // and unsupported source errors (code 4) won't be fixed by a fresh URL.
+    const isNetworkError = el.error?.code === MediaError.MEDIA_ERR_NETWORK;
+
+    if (isNetworkError && _activeTrackIsrc && !_hasRetriedRefresh) {
       _hasRetriedRefresh = true;
       const trackIdAtError = state.activeTrackId;
       fetch(
@@ -169,8 +171,12 @@ function bindAudioEvents(el: HTMLAudioElement): void {
           (
             data: { previewUrl: string | null; source: string | null } | null
           ) => {
-            // Guard: only retry if the same track is still active
-            if (data?.previewUrl && state.activeTrackId === trackIdAtError) {
+            // Guard: only act if the same track is still active.
+            // If the user switched tracks while the fetch was in-flight,
+            // the new track owns the audio element. Do nothing.
+            if (state.activeTrackId !== trackIdAtError) return;
+
+            if (data?.previewUrl) {
               el.src = data.previewUrl;
               el.play().catch(() => {
                 handlePlaybackFailure(el, 'media_error');
@@ -181,7 +187,10 @@ function bindAudioEvents(el: HTMLAudioElement): void {
           }
         )
         .catch(() => {
-          handlePlaybackFailure(el, 'media_error');
+          // Only fail if the errored track is still active
+          if (state.activeTrackId === trackIdAtError) {
+            handlePlaybackFailure(el, 'media_error');
+          }
         });
       return;
     }

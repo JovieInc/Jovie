@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { lookupDeezerByIsrc } from '@/lib/discography/provider-links';
+import {
+  apiLimiter,
+  createRateLimitHeaders,
+  getClientIP,
+} from '@/lib/rate-limit';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 const ISRC_REGEX = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
 
@@ -13,8 +18,19 @@ const ISRC_REGEX = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
  * so this endpoint provides on-demand refresh when stored URLs expire.
  *
  * No authentication required — Deezer's API is public and ISRCs are not sensitive.
+ * Rate limited to 100 req/min per IP via the shared API limiter.
  */
 export async function GET(request: Request) {
+  // Rate limit by IP to prevent abuse
+  const ip = getClientIP(request);
+  const rateLimitResult = await apiLimiter.limit(ip);
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: createRateLimitHeaders(rateLimitResult) }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const isrc = searchParams.get('isrc')?.trim().toUpperCase();
 
@@ -32,7 +48,7 @@ export async function GET(request: Request) {
       { previewUrl: null, source: null },
       {
         headers: {
-          'Cache-Control': 'public, max-age=300',
+          'Cache-Control': 'private, max-age=300',
         },
       }
     );
@@ -42,7 +58,7 @@ export async function GET(request: Request) {
     { previewUrl: result.previewUrl, source: 'deezer' },
     {
       headers: {
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': 'private, max-age=600',
       },
     }
   );
