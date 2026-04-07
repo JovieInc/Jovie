@@ -24,8 +24,6 @@ interface ProfileNavButtonProps {
   readonly showBackButton: boolean;
   /** The artist handle for back navigation */
   readonly artistHandle: string;
-  /** If true, creator has removed branding; hide upsell/claim CTA */
-  readonly hideBranding?: boolean;
   /** Additional class names */
   readonly className?: string;
   /** Optional loading state to show animated spinner on the logo */
@@ -40,7 +38,6 @@ interface ProfileNavButtonProps {
 export function ProfileNavButton({
   showBackButton,
   artistHandle,
-  hideBranding = false,
   className,
   loading = false,
 }: ProfileNavButtonProps) {
@@ -107,11 +104,9 @@ export function ProfileNavButton({
             Copy profile link
           </DropdownMenuItem>
 
-          {hideBranding ? null : (
-            <DropdownMenuItem asChild>
-              <Link href={APP_ROUTES.SIGNUP}>Claim your profile</Link>
-            </DropdownMenuItem>
-          )}
+          <DropdownMenuItem asChild>
+            <Link href={APP_ROUTES.SIGNUP}>Claim your profile</Link>
+          </DropdownMenuItem>
 
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>Legal</DropdownMenuSubTrigger>

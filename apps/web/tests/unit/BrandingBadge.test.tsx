@@ -1,59 +1,9 @@
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { BrandingBadge } from '@/components/organisms/BrandingBadge';
 
-const mockUsePlanGate = vi.hoisted(() => vi.fn());
-
-vi.mock('@/lib/queries/usePlanGate', () => ({
-  usePlanGate: mockUsePlanGate,
-}));
-
 describe('BrandingBadge', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('shows branding for free plan users', () => {
-    mockUsePlanGate.mockReturnValue({
-      canRemoveBranding: false,
-      isLoading: false,
-    });
-    render(<BrandingBadge />);
-    expect(screen.getByText('Made with Jovie')).toBeInTheDocument();
-  });
-
-  it('hides branding for pro plan users', () => {
-    mockUsePlanGate.mockReturnValue({
-      canRemoveBranding: true,
-      isLoading: false,
-    });
-    const { container } = render(<BrandingBadge />);
-    expect(container.firstChild).toBeNull();
-  });
-
-  it('shows branding when canRemoveBranding is undefined (defaults to showing)', () => {
-    mockUsePlanGate.mockReturnValue({
-      canRemoveBranding: undefined,
-      isLoading: false,
-    });
-    render(<BrandingBadge />);
-    expect(screen.getByText('Made with Jovie')).toBeInTheDocument();
-  });
-
-  it('shows placeholder while loading', () => {
-    mockUsePlanGate.mockReturnValue({
-      canRemoveBranding: false,
-      isLoading: true,
-    });
-    const { container } = render(<BrandingBadge />);
-    expect(container.firstChild).toHaveClass('skeleton');
-  });
-
-  it('shows branding for unauthenticated users', () => {
-    mockUsePlanGate.mockReturnValue({
-      canRemoveBranding: false,
-      isLoading: false,
-    });
+  it('always renders platform branding', () => {
     render(<BrandingBadge />);
     expect(screen.getByText('Made with Jovie')).toBeInTheDocument();
   });
