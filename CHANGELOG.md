@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.130] - 2026-04-06
+
+> Add standalone DMCA policy page and legal links on public artist profiles.
+
+### Added
+
+- Standalone DMCA policy page at `/legal/dmca` with takedown procedure, counter-notice process, and designated agent
+- Privacy and Terms links now appear in the footer of all public artist profiles
+
+### Fixed
+
+- Profile footer no longer disappears entirely when artist hides branding, legal links always render
+- ProfileFooter now renders on public profile pages (was missing from the compact template)
+
 ## [26.4.129] - 2026-04-06
 
 > Tighten Lighthouse and Playwright performance budgets for public profiles and onboarding to Gmail-rule targets. Convert 2 presentational components to server components for reduced JS bundle.
