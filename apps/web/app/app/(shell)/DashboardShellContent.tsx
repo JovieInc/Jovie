@@ -49,9 +49,36 @@ export async function DashboardShellContent({
   const useEssentialShell = shouldUseEssentialShellData(pathname);
   const cookieStorePromise = cookies();
 
-  // Run ban check in parallel with dashboard data fetch
+  // Run ban check in parallel with dashboard data fetch.
+  // For releases route: also start the release matrix prefetch in parallel
+  // so it overlaps with the shell data fetch instead of running after it.
+  const isReleasesRoute = pathname === APP_ROUTES.DASHBOARD_RELEASES;
+  const shellDataPromise = useEssentialShell
+    ? getDashboardShellData(userId)
+    : getDashboardData();
+
+  // Fire-and-forget: start release matrix prefetch as soon as shell data
+  // resolves, while ban check and cookie read continue in parallel.
+  if (isReleasesRoute) {
+    void shellDataPromise.then(async data => {
+      const profileId = data.selectedProfile?.id;
+      if (profileId) {
+        const { getQueryClient } = await import('@/lib/queries/server');
+        const { queryKeys } = await import('@/lib/queries');
+        const { loadReleaseMatrix } = await import(
+          './dashboard/releases/actions'
+        );
+        const queryClient = getQueryClient();
+        void queryClient.prefetchQuery({
+          queryKey: queryKeys.releases.matrix(profileId),
+          queryFn: () => loadReleaseMatrix(profileId),
+        });
+      }
+    });
+  }
+
   const [dashboardData, banStatus, cookieStore] = await Promise.all([
-    useEssentialShell ? getDashboardShellData(userId) : getDashboardData(),
+    shellDataPromise,
     getUserBanStatus(userId),
     cookieStorePromise,
   ]);

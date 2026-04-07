@@ -3,11 +3,9 @@ import { APP_ROUTES } from '@/constants/routes';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
-import { queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
-import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
+import { getDehydratedState } from '@/lib/queries/server';
 import { getDashboardShellData } from '../actions';
-import { loadReleaseMatrix } from './actions';
 import { ReleasesClientBoundary } from './ReleasesClientBoundary';
 import { ReleasesPageClient } from './ReleasesPageClient';
 
@@ -29,7 +27,9 @@ export default async function ReleasesPage() {
     );
   }
 
-  // Get shell data to check onboarding and extract profile ID for prefetch
+  // Shell data is cached from the shell layout (same request) — resolves instantly.
+  // Release matrix prefetch is already started at the shell level (DashboardShellContent)
+  // in parallel with the shell data fetch, so it may already be in the query cache.
   const dashboardData = await getDashboardShellData(userId);
 
   if (dashboardData.dashboardLoadError) {
@@ -45,17 +45,6 @@ export default async function ReleasesPage() {
 
   if (dashboardData.needsOnboarding) {
     redirect(APP_ROUTES.ONBOARDING);
-  }
-
-  const profileId = dashboardData.selectedProfile?.id;
-
-  // Prefetch release matrix into TanStack cache for instant client render
-  if (profileId) {
-    const queryClient = getQueryClient();
-    await queryClient.prefetchQuery({
-      queryKey: queryKeys.releases.matrix(profileId),
-      queryFn: () => loadReleaseMatrix(profileId),
-    });
   }
 
   return (
