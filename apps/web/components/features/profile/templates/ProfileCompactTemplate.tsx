@@ -356,6 +356,7 @@ export function ProfileCompactTemplate({
         setDrawerView(resolved);
         setDrawerOpen(true);
       } else {
+        setDrawerView('menu');
         setDrawerOpen(false);
       }
     };
