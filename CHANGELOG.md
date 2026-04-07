@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.128] - 2026-04-06
+
+> Unified design system across release smart links, presave pages, sounds pages, and artist profiles.
+
+### Added
+
+- Unified profile drawer: single persistent drawer with animated crossfade between menu, about, listen, contact, tip, tour, subscribe, and notification views
+- Credits drawer using shared ProfileDrawerShell with sentence case labels
+- "Use this sound" menu item on release pages (links to sounds page)
+- Dev preview page at `/dev/smart-links` showing all 3 page types side-by-side with stress test data (20 DSPs, long titles)
+- Submit button animation: arrow fades to spinner on email submit, input text fades out simultaneously
+- Inline notification reveal from menu: "Turn on notifications" closes drawer and focuses the email input on the page
+
+### Changed
+
+- Release, presave, and sounds pages now use the same profile card shell (ambient background, card container, top bar, drawers)
+- DSP buttons are pill-shaped (rounded-full) across all smart link pages
+- Provider list is flat (removed "More ways to verify" collapsible sections)
+- Notification preference toggles use Apple-style green switches instead of dots
+- About section flattened (removed card wrapper, borders, shadows)
+- Contact channel icons are flat by default with hover circle (no permanent border/bg)
+- Drawer headers left-aligned with optional back button matching close button style
+- Drawer body has min-height to prevent shrinking between views
+- Countdown display: large prominent numbers with faded uppercase D/H/M units
+- Hero artwork uses fixed aspect-[4/3] on mobile so content area scrolls
+- Content area scrolls independently, "Powered by Jovie" footer pinned at bottom
+- Homepage section heading updated
+- Homepage footer flattened (transparent, dimmer text, no border)
+- Notification input text size matches button (15px)
+
+### Fixed
+
+- About button hidden in profile menu when no about content exists
+- Zero layout shift between notification button and email input states
+
 ## [26.4.130] - 2026-04-06
 
 > Add standalone DMCA policy page and legal links on public artist profiles.
