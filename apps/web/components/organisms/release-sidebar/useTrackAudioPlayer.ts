@@ -158,7 +158,10 @@ function bindAudioEvents(el: HTMLAudioElement): void {
     // Only attempt a preview URL refresh for network errors (code 2),
     // which indicate an expired Deezer token (403). Decode errors (code 3)
     // and unsupported source errors (code 4) won't be fixed by a fresh URL.
-    const isNetworkError = el.error?.code === MediaError.MEDIA_ERR_NETWORK;
+    // Use numeric literal (2) instead of MediaError.MEDIA_ERR_NETWORK since
+    // the MediaError global is unavailable in some test environments (jsdom).
+    const MEDIA_ERR_NETWORK = 2;
+    const isNetworkError = el.error?.code === MEDIA_ERR_NETWORK;
 
     if (isNetworkError && _activeTrackIsrc && !_hasRetriedRefresh) {
       _hasRetriedRefresh = true;
