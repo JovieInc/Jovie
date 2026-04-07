@@ -17,7 +17,10 @@ import {
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
-import { buildBreadcrumbObject } from '@/lib/constants/schemas';
+import {
+  buildBreadcrumbObject,
+  buildListenActions,
+} from '@/lib/constants/schemas';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for types
 import type {
@@ -86,7 +89,9 @@ function generateProfileStructuredData(
   tourDates: TourDateViewModel[]
 ) {
   const artistName = profile.display_name || profile.username;
-  const profileUrl = `${BASE_URL}/${profile.username}`;
+  const normalizedUsername =
+    profile.username_normalized || profile.username.toLowerCase();
+  const profileUrl = `${BASE_URL}/${normalizedUsername}`;
 
   // Extract social profile URLs for sameAs
   const socialUrls = links
@@ -107,26 +112,36 @@ function generateProfileStructuredData(
   if (profile.youtube_url) socialUrls.push(profile.youtube_url);
   const uniqueSocialUrls = [...new Set(socialUrls)];
 
-  // Build ListenAction for DSP links
-  const listenActions: Record<string, unknown>[] = [];
-  const dspLinks = [
-    { url: profile.spotify_url, name: 'Spotify' },
-    { url: profile.apple_music_url, name: 'Apple Music' },
-    { url: profile.youtube_url, name: 'YouTube' },
-  ];
-  for (const dsp of dspLinks) {
-    if (dsp.url) {
-      listenActions.push({
-        '@type': 'ListenAction',
-        target: {
-          '@type': 'EntryPoint',
-          urlTemplate: dsp.url,
-          actionPlatform: 'https://schema.org/DesktopWebPlatform',
-        },
-        name: `Listen on ${dsp.name}`,
-      });
+  // Build ListenAction from all DSP links (profile columns + social links table)
+  const DSP_PLATFORMS: Record<string, string> = {
+    spotify: 'Spotify',
+    apple_music: 'Apple Music',
+    youtube: 'YouTube',
+    soundcloud: 'SoundCloud',
+    deezer: 'Deezer',
+    tidal: 'Tidal',
+  };
+  const dspUrls = new Map<string, { url: string; name: string }>();
+  // Profile columns first (highest priority)
+  if (profile.spotify_url)
+    dspUrls.set('spotify', { url: profile.spotify_url, name: 'Spotify' });
+  if (profile.apple_music_url)
+    dspUrls.set('apple_music', {
+      url: profile.apple_music_url,
+      name: 'Apple Music',
+    });
+  if (profile.youtube_url)
+    dspUrls.set('youtube', { url: profile.youtube_url, name: 'YouTube' });
+  // Social links table (fill gaps)
+  for (const link of links) {
+    const platform = link.platform?.toLowerCase() ?? '';
+    if (DSP_PLATFORMS[platform] && link.url && !dspUrls.has(platform)) {
+      dspUrls.set(platform, { url: link.url, name: DSP_PLATFORMS[platform] });
     }
   }
+  const listenActions = buildListenActions(
+    [...dspUrls.entries()].map(([id, d]) => ({ providerId: id, url: d.url }))
+  );
 
   const musicGroupSchema: Record<string, unknown> = {
     '@type': 'MusicGroup',
@@ -711,7 +726,9 @@ function buildProfileMetadata(
   latestRelease?: DiscogRelease | null
 ): Metadata {
   const artistName = profile.display_name || profile.username;
-  const profileUrl = `${BASE_URL}/${profile.username}`;
+  const normalizedUsername =
+    profile.username_normalized || profile.username.toLowerCase();
+  const profileUrl = `${BASE_URL}/${normalizedUsername}`;
   const title = artistName;
   const socialTitle = `${artistName} | Jovie`;
   const description = buildProfileDescription(profile, artistName, genres);
