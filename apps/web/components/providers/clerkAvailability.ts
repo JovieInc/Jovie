@@ -27,11 +27,15 @@ export function shouldBypassClerk(
     : globalThis.location
 ): boolean {
   const normalizedKey = publishableKey?.trim();
-  return (
-    !normalizedKey ||
-    clerkMockFlag === '1' ||
-    isMockPublishableKey(normalizedKey)
-  );
+  if (!normalizedKey || clerkMockFlag === '1') {
+    return true;
+  }
+
+  if (isMockPublishableKey(normalizedKey)) {
+    return true;
+  }
+
+  return shouldDisableClerkProxyForLocation(locationLike);
 }
 
 function isPrivateHostname(hostname: string): boolean {

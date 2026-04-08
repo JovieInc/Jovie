@@ -11,29 +11,39 @@ describe('clerkAvailability', () => {
     expect(shouldBypassClerk('   ', '0')).toBe(true);
   });
 
-  it('keeps Clerk enabled for live Clerk keys on insecure private origins', () => {
+  it('bypasses Clerk for live Clerk keys on insecure private origins', () => {
     expect(
       shouldBypassClerk(
         'pk_live_example',
         '0',
         new URL('http://localhost:3100')
       )
-    ).toBe(false);
+    ).toBe(true);
     expect(
       shouldBypassClerk(
         'pk_live_example',
         '0',
         new URL('http://127.0.0.1:3100')
       )
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it('keeps Clerk enabled for test keys on insecure private origins', () => {
+  it('bypasses Clerk for test keys on insecure private origins', () => {
     expect(
       shouldBypassClerk(
         'pk_test_example',
         '0',
         new URL('http://localhost:3100')
+      )
+    ).toBe(true);
+  });
+
+  it('keeps Clerk enabled for real keys on secure public origins', () => {
+    expect(
+      shouldBypassClerk(
+        'pk_live_example',
+        '0',
+        new URL('https://staging.jov.ie')
       )
     ).toBe(false);
   });
