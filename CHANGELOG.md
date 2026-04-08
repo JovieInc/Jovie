@@ -14,6 +14,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Settings pages now use page-level scrolling again inside the app shell
 - Added a regression unit test to keep the settings layout on the correct scroll mode
 - Removed duplicate app-name suffixes from affected marketing and legal page titles while preserving branded social metadata
+### Changed
+
+- The top-left Jovie mark on public artist profiles now links to the artist profiles landing page instead of acting as decorative chrome
+- [internal] Added a unit test that locks the public-profile logo destination to the artist profiles route
 
 ## [26.4.132] - 2026-04-07
 

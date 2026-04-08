@@ -36,7 +36,7 @@ describe('settings layout scroll mode', () => {
       );
     }
     const source = readFileSync(SETTINGS_LAYOUT, 'utf-8');
-    expect(source).toContain("scroll='page'");
-    expect(source).not.toContain("scroll='panel'");
+    expect(source).toMatch(/scroll=["']page["']/);
+    expect(source).not.toMatch(/scroll=["']panel["']/);
   });
 });
