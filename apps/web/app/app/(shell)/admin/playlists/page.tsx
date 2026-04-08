@@ -7,6 +7,7 @@ import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { joviePlaylists, joviePlaylistTracks } from '@/lib/db/schema/playlists';
+import { captureError } from '@/lib/error-tracking';
 import { generateCoverArt } from '@/lib/playlists/generate-cover';
 import { publishToSpotify } from '@/lib/playlists/publish-spotify';
 import { uploadPlaylistCoverImage } from '@/lib/playlists/upload-cover-image';
@@ -119,15 +120,24 @@ async function approvePlaylist(formData: FormData) {
     revalidatePath('/playlists');
     revalidatePath(`/playlists/${playlist.slug}`);
   } catch (error) {
-    // Revert to pending so the admin can retry (prevents "approved" limbo)
-    await db
-      .update(joviePlaylists)
-      .set({
-        status: 'pending',
-        statusChangedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(joviePlaylists.id, playlistId));
+    // Revert to pending so the admin can retry (prevents "approved" limbo).
+    // Preserve the original publish error if the revert itself fails.
+    try {
+      await db
+        .update(joviePlaylists)
+        .set({
+          status: 'pending',
+          statusChangedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(joviePlaylists.id, playlistId));
+    } catch (revertError) {
+      captureError('[Admin Playlists] Revert to pending failed', revertError, {
+        playlistId,
+        originalError: error instanceof Error ? error.message : String(error),
+      });
+    }
+
     throw error;
   }
 
@@ -143,7 +153,7 @@ async function rejectPlaylist(formData: FormData) {
   const note = formData.get('note') as string;
   if (!playlistId) return;
 
-  await db
+  const [rejectedPlaylist] = await db
     .update(joviePlaylists)
     .set({
       status: 'rejected',
@@ -151,7 +161,15 @@ async function rejectPlaylist(formData: FormData) {
       rejectionNote: note || null,
       updatedAt: new Date(),
     })
-    .where(eq(joviePlaylists.id, playlistId));
+    .where(
+      and(
+        eq(joviePlaylists.id, playlistId),
+        eq(joviePlaylists.status, 'pending')
+      )
+    )
+    .returning({ id: joviePlaylists.id });
+
+  if (!rejectedPlaylist) return;
 
   revalidatePath(APP_ROUTES.ADMIN_PLAYLISTS);
 }

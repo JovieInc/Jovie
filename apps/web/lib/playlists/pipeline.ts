@@ -54,18 +54,18 @@ export interface PipelineResult {
 export async function generatePlaylist(): Promise<PipelineResult> {
   const startTime = Date.now();
 
-  // Step 1: Compliance check
-  const shouldGenerate = await shouldGenerateToday();
-  if (!shouldGenerate) {
-    return {
-      success: true,
-      skipped: true,
-      skipReason: 'Compliance cadence check: skipping today',
-      durationMs: Date.now() - startTime,
-    };
-  }
-
   try {
+    // Step 1: Compliance check
+    const shouldGenerate = await shouldGenerateToday();
+    if (!shouldGenerate) {
+      return {
+        success: true,
+        skipped: true,
+        skipReason: 'Compliance cadence check: skipping today',
+        durationMs: Date.now() - startTime,
+      };
+    }
+
     // Step 2: Generate concept
     const concept = await generatePlaylistConcept();
 
