@@ -101,4 +101,39 @@ describe('AuthClientProviders', () => {
       appearance: authClerkAppearance,
     });
   });
+
+  it('keeps Clerk enabled for live keys on localhost and only disables the proxy', async () => {
+    const originalLocation = globalThis.location;
+
+    try {
+      globalThis.history.replaceState(null, '', '/signin');
+      Object.defineProperty(globalThis, 'location', {
+        configurable: true,
+        value: new URL('http://localhost:3100/signin'),
+      });
+
+      render(
+        <AuthClientProviders publishableKey='pk_live_example'>
+          <div data-testid='child'>child</div>
+        </AuthClientProviders>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('clerk-provider')).toBeInTheDocument();
+      });
+
+      const props = clerkProviderMock.mock.calls[0]?.[0];
+      expect(props).toMatchObject({
+        publishableKey: 'pk_live_example',
+        proxyUrl: undefined,
+        signInUrl: APP_ROUTES.SIGNIN,
+        signUpUrl: APP_ROUTES.SIGNUP,
+      });
+    } finally {
+      Object.defineProperty(globalThis, 'location', {
+        configurable: true,
+        value: originalLocation,
+      });
+    }
+  });
 });
