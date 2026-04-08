@@ -12,7 +12,7 @@ const mockArtist: Artist = {
   image_url: 'https://placekitten.com/200/200',
   tagline: 'Artist tagline',
   theme: {},
-  settings: { hide_branding: false },
+  settings: {},
   spotify_url: 'https://open.spotify.com/artist/123',
   apple_music_url: 'https://music.apple.com/artist/123',
   youtube_url: 'https://youtube.com/channel/123',
