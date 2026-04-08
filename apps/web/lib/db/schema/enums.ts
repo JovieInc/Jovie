@@ -18,6 +18,15 @@ export const photoStatusEnum = pgEnum('photo_status', [
   'failed',
 ]);
 
+export const playlistStatusEnum = pgEnum('playlist_status', [
+  'draft',
+  'pending',
+  'approved',
+  'published',
+  'archived',
+  'rejected',
+]);
+
 // Link & Social Enums
 export const linkTypeEnum = pgEnum('link_type', [
   'listen',

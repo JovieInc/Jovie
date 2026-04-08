@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.134] - 2026-04-07
+
+> Automated playlist network engine: LLM-curated Spotify playlists as an inbound artist acquisition channel.
+
+### Added
+
+- Automated playlist generation using AI to create niche, searchable music collections featuring Jovie artists
+- Public playlist pages and genre/mood discovery hubs for organic growth
+- Admin approval workflow for generated playlists before publishing
+- Daily automated playlist creation with compliance-safe cadence controls
+- Sitemap integration for published playlists
+- [internal] LLM curation pipeline uses Claude (Haiku concept generation, Sonnet sequencing) with Spotify discovery, Sharp cover rendering, and publish orchestration
+- [internal] Marketing playlist routes are implemented at `/playlists` and `/playlists/[slug]` with structured data support
+- [internal] Admin moderation route is implemented at `/admin/playlists`
+- [internal] Spotify OAuth for the system account is coordinated via Clerk with health checks and Sentry alerting
+- [internal] Daily cron trigger runs at 6 AM UTC behind the `PLAYLIST_ENGINE` feature flag
+- [internal] Playlist persistence uses `jovie_playlists` and `jovie_playlist_tracks` tables with supporting indexes
+
 ## [26.4.133] - 2026-04-07
 
 > Restore settings-page scrolling and clean up duplicate app-name page titles across marketing and legal routes.
