@@ -22,7 +22,6 @@ const PLAN_IDS: readonly PlanId[] = ['free', 'pro', 'max'] as const;
 // ---------------------------------------------------------------------------
 
 export type BooleanEntitlement =
-  | 'canRemoveBranding'
   | 'canExportContacts'
   | 'canAccessAdvancedAnalytics'
   | 'canFilterSelfFromAnalytics'
@@ -82,7 +81,6 @@ export interface PlanEntitlements {
 // ---------------------------------------------------------------------------
 
 const PRO_BOOLEANS: Record<BooleanEntitlement, boolean> = {
-  canRemoveBranding: true,
   canExportContacts: true,
   canAccessAdvancedAnalytics: true,
   canFilterSelfFromAnalytics: true,
@@ -123,7 +121,6 @@ const PRO_FEATURES: readonly string[] = [
   'Pre-save campaigns',
   'Pre-release & countdown pages',
   'Release notifications',
-  'Remove Jovie branding',
   'Extended analytics (180 days)',
   'Advanced analytics & geographic insights',
   'Traffic quality filtering',
@@ -148,7 +145,6 @@ const PRO_FEATURES: readonly string[] = [
 export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
   free: {
     booleans: {
-      canRemoveBranding: false,
       canExportContacts: false,
       canAccessAdvancedAnalytics: false,
       canFilterSelfFromAnalytics: false,
@@ -226,7 +222,6 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
   },
   max: {
     booleans: {
-      canRemoveBranding: true,
       canExportContacts: true,
       canAccessAdvancedAnalytics: true,
       canFilterSelfFromAnalytics: true,
@@ -389,7 +384,6 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
         max: true,
       },
       { name: 'Verified badge', free: false, pro: true, max: true },
-      { name: 'Remove Jovie branding', free: false, pro: true, max: true },
       {
         name: 'White-label / custom domain',
         free: false,

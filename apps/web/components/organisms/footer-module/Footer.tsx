@@ -84,8 +84,6 @@ import type { FooterProps } from './types';
 export function Footer({
   variant = 'marketing',
   artistHandle,
-  hideBranding = false,
-  artistSettings,
   showThemeToggle = false,
   themeShortcutKey,
   className = '',
@@ -95,7 +93,6 @@ export function Footer({
 }: FooterProps) {
   const isLightModeEnabled = useCodeFlag('ENABLE_LIGHT_MODE');
   const effectiveShowThemeToggle = showThemeToggle && isLightModeEnabled;
-  const shouldHideBranding = artistSettings?.hide_branding ?? hideBranding;
   const maxWidthClass = CONTAINER_SIZES[containerSize];
 
   const variantConfigs = getVariantConfigs(maxWidthClass, containerSize);
@@ -104,17 +101,15 @@ export function Footer({
   if (variant === 'profile') {
     return (
       <footer className={`${config.containerClass} ${className}`}>
-        {!shouldHideBranding && (
-          <div className='flex flex-col items-center justify-center space-y-1.5 pb-2'>
-            <FooterBranding
-              artistHandle={artistHandle}
-              variant={config.colorVariant}
-              size='sm'
-              showCTA={false}
-              mark='text'
-            />
-          </div>
-        )}
+        <div className='flex flex-col items-center justify-center space-y-1.5 pb-2'>
+          <FooterBranding
+            artistHandle={artistHandle}
+            variant={config.colorVariant}
+            size='sm'
+            showCTA={false}
+            mark='text'
+          />
+        </div>
 
         <div className='md:hidden absolute bottom-2 right-4'>
           <FooterNavigation

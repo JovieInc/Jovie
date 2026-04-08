@@ -10,7 +10,8 @@ import { publicEnv } from '@/lib/env-public';
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `Pricing — ${APP_NAME}`;
+  const title = 'Pricing';
+  const ogTitle = `Pricing — ${APP_NAME}`;
   const description =
     'Simple pricing. No surprises. Free and Pro plans for every stage of your music career.';
 
@@ -18,13 +19,13 @@ export async function generateMetadata(): Promise<Metadata> {
     title,
     description,
     openGraph: {
-      title,
+      title: ogTitle,
       description,
       url: `${BASE_URL}/launch/pricing`,
       siteName: APP_NAME,
       type: 'website',
     },
-    twitter: { card: 'summary_large_image', title, description },
+    twitter: { card: 'summary_large_image', title: ogTitle, description },
     alternates: { canonical: `${BASE_URL}/launch/pricing` },
   };
 }

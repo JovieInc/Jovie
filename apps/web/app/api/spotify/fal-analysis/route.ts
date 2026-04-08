@@ -11,10 +11,22 @@ import {
   searchSpotifyArtists,
 } from '@/lib/spotify/client';
 import type { SanitizedArtist } from '@/lib/spotify/sanitize';
-import { generateHealthReport } from '@/lib/spotify/scoring';
+import {
+  type AlgorithmHealthReport,
+  generateHealthReport,
+  generateUnavailableHealthReport,
+  isSpotifyErrorPageHtml,
+} from '@/lib/spotify/scoring';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
+
+class FalUnavailableError extends Error {
+  constructor(readonly report: AlgorithmHealthReport) {
+    super('FAL data unavailable');
+    this.name = 'FalUnavailableError';
+  }
+}
 
 /**
  * GET /api/spotify/fal-analysis?artistId={id}
@@ -64,6 +76,8 @@ export async function GET(request: NextRequest) {
     const report = await cacheQuery(
       `fal-analysis:${artistId}`,
       async () => {
+        const checkedAt = new Date().toISOString();
+
         // 1. Fetch target artist
         const targetArtist = await getSpotifyArtist(artistId);
         if (!targetArtist) {
@@ -71,44 +85,53 @@ export async function GET(request: NextRequest) {
         }
 
         // 2. Scrape FAL names from Spotify profile page
-        const falNames = await scrapeFansAlsoLike(artistId);
+        const falResult = await scrapeFansAlsoLike(artistId);
 
-        // null means scraper failed (not "no FAL data") — don't cache
-        if (falNames === null) {
-          throw new Error('FAL scrape failed');
+        if (falResult.status === 'unavailable') {
+          throw new FalUnavailableError(
+            generateUnavailableHealthReport(targetArtist, {
+              checkedAt,
+              attemptedNeighbourCount: 0,
+              warnings: falResult.warnings,
+              detail: falResult.detail,
+            })
+          );
         }
 
+        const falNames = falResult.names;
+
         if (falNames.length === 0) {
-          return generateHealthReport(targetArtist, []);
+          return generateHealthReport(targetArtist, [], {
+            checkedAt,
+            attemptedNeighbourCount: 0,
+          });
         }
 
         // 3. Resolve each FAL artist name to full artist data via search
-        const resolvedArtists = await resolveFalArtists(falNames);
+        const resolved = await resolveFalArtists(falNames);
 
         // 4. Generate health report
-        return generateHealthReport(targetArtist, resolvedArtists);
+        return generateHealthReport(targetArtist, resolved.artists, {
+          checkedAt,
+          attemptedNeighbourCount: falNames.length,
+          warnings: resolved.warnings,
+        });
       },
       { ttlSeconds: 600 } // 10 minute cache
     );
 
     return NextResponse.json(report);
   } catch (error) {
+    if (error instanceof FalUnavailableError) {
+      return NextResponse.json(error.report);
+    }
+
     const message = error instanceof Error ? error.message : 'Unknown error';
 
     if (message === 'Artist not found') {
       return NextResponse.json(
         { error: 'Spotify artist not found' },
         { status: 404 }
-      );
-    }
-
-    if (message === 'FAL scrape failed') {
-      return NextResponse.json(
-        {
-          error:
-            'Could not retrieve FAL data from Spotify. The scraper may be blocked or the page structure changed.',
-        },
-        { status: 502 }
       );
     }
 
@@ -125,9 +148,20 @@ export async function GET(request: NextRequest) {
 
 /**
  * Scrape "Fans Also Like" artist names from the Spotify profile page.
- * Returns null on failure (as distinct from empty array = no FAL artists).
+ * Returns either related-artist names or an unavailable diagnostic.
  */
-async function scrapeFansAlsoLike(artistId: string): Promise<string[] | null> {
+type FalNameResult =
+  | {
+      status: 'ready';
+      names: string[];
+    }
+  | {
+      status: 'unavailable';
+      detail: string;
+      warnings: string[];
+    };
+
+async function scrapeFansAlsoLike(artistId: string): Promise<FalNameResult> {
   try {
     const response = await serverFetch(
       `https://open.spotify.com/artist/${artistId}/related`,
@@ -148,10 +182,26 @@ async function scrapeFansAlsoLike(artistId: string): Promise<string[] | null> {
         undefined,
         { component: 'fal-scrape', artistId }
       );
-      return null;
+      return {
+        status: 'unavailable',
+        detail: 'Spotify returned an unavailable related-artists page.',
+        warnings: [`Spotify related page returned HTTP ${response.status}.`],
+      };
     }
 
     const html = await response.text();
+    if (isSpotifyErrorPageHtml(html)) {
+      await captureWarning(
+        '[FAL Scrape] Spotify returned an error page',
+        undefined,
+        { component: 'fal-scrape', artistId }
+      );
+      return {
+        status: 'unavailable',
+        detail: 'Spotify showed an error page instead of related artists.',
+        warnings: ['Spotify rendered a Page not available response.'],
+      };
+    }
 
     const names: string[] = [];
 
@@ -192,13 +242,20 @@ async function scrapeFansAlsoLike(artistId: string): Promise<string[] | null> {
       }
     }
 
-    return names;
+    return {
+      status: 'ready',
+      names,
+    };
   } catch (error) {
     await captureError('[FAL Scrape] Error', error, {
       component: 'fal-scrape',
       artistId,
     });
-    return null;
+    return {
+      status: 'unavailable',
+      detail: 'Spotify could not be reached for related artists.',
+      warnings: ['Spotify related-artists scrape failed.'],
+    };
   }
 }
 
@@ -206,8 +263,13 @@ async function scrapeFansAlsoLike(artistId: string): Promise<string[] | null> {
  * Resolve FAL artist names to full SanitizedArtist objects via Spotify search.
  * Verifies name match to avoid wrong-artist substitution.
  */
-async function resolveFalArtists(names: string[]): Promise<SanitizedArtist[]> {
+async function resolveFalArtists(
+  names: string[]
+): Promise<{ artists: SanitizedArtist[]; warnings: string[] }> {
   const resolved: SanitizedArtist[] = [];
+  let missingCount = 0;
+  let mismatchCount = 0;
+  let fetchErrorCount = 0;
 
   // Process in batches of 5 to avoid rate limits
   const batchSize = 5;
@@ -219,6 +281,7 @@ async function resolveFalArtists(names: string[]): Promise<SanitizedArtist[]> {
         if (searchResults.length > 0) {
           // Verify name match to avoid wrong-artist substitution
           if (searchResults[0].name.toLowerCase() !== name.toLowerCase()) {
+            mismatchCount++;
             logger.warn(
               `[FAL Resolve] Name mismatch: searched "${name}", got "${searchResults[0].name}" — skipping`,
               undefined,
@@ -227,8 +290,18 @@ async function resolveFalArtists(names: string[]): Promise<SanitizedArtist[]> {
             return null;
           }
           const fullArtist = await getSpotifyArtist(searchResults[0].spotifyId);
+          if (!fullArtist) {
+            fetchErrorCount++;
+            logger.warn(
+              `[FAL Resolve] Could not load artist details for "${name}" (${searchResults[0].spotifyId})`,
+              undefined,
+              'fal-analysis'
+            );
+            return null;
+          }
           return fullArtist;
         }
+        missingCount++;
         return null;
       })
     );
@@ -238,5 +311,22 @@ async function resolveFalArtists(names: string[]): Promise<SanitizedArtist[]> {
     }
   }
 
-  return resolved;
+  const warnings: string[] = [];
+  if (missingCount > 0) {
+    warnings.push(
+      `${missingCount} related artist${missingCount === 1 ? '' : 's'} could not be resolved in Spotify search.`
+    );
+  }
+  if (mismatchCount > 0) {
+    warnings.push(
+      `${mismatchCount} related artist${mismatchCount === 1 ? '' : 's'} were skipped because the top Spotify match did not match exactly.`
+    );
+  }
+  if (fetchErrorCount > 0) {
+    warnings.push(
+      `${fetchErrorCount} related artist${fetchErrorCount === 1 ? '' : 's'} matched in Spotify search but could not be loaded fully.`
+    );
+  }
+
+  return { artists: resolved, warnings };
 }

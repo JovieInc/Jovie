@@ -131,6 +131,7 @@ export {
   type UseAdminSocialLinksQueryOptions,
   useAdminSocialLinksQuery,
 } from './useAdminSocialLinksQuery';
+export { useAlgorithmHealthQuery } from './useAlgorithmHealthQuery';
 export {
   type AppleMusicArtistResult,
   type AppleMusicSearchState,
@@ -477,7 +478,6 @@ export {
 export {
   type SettingsUpdateInput,
   useAnalyticsFilterMutation,
-  useBrandingSettingsMutation,
   useHighContrastMutation,
   useNotificationSettingsMutation,
   useThemeMutation,

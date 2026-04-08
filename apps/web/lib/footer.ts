@@ -5,7 +5,6 @@ import { Artist } from '@/types/db';
 interface FooterOptions {
   artist: Artist;
   utmSource?: string;
-  userPlan?: string;
 }
 
 /**
@@ -16,17 +15,8 @@ interface FooterOptions {
 export async function generateFooterHTML({
   artist,
   utmSource = 'listen',
-  userPlan = 'free',
 }: FooterOptions): Promise<string> {
   // Feature flags not needed; waitlist removed
-
-  // Hide branding for Pro users or if explicitly set in artist settings
-  const hideBranding =
-    userPlan === 'pro' || artist.settings?.hide_branding || false;
-
-  if (hideBranding) {
-    return '';
-  }
 
   const logoSvg = `
     <svg

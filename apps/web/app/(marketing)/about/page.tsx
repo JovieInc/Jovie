@@ -33,7 +33,7 @@ const FAQ_ITEMS = [
   {
     question: 'Is Jovie free?',
     answer:
-      'Yes, Jovie offers a free tier that lets you create a profile, add releases, and start collecting fans. Paid plans unlock advanced analytics, branding removal, contact export, and more.',
+      'Yes, Jovie offers a free tier that lets you create a profile, add releases, and start collecting fans. Paid plans unlock advanced analytics, release notifications, contact export, and more.',
   },
   {
     question: 'How is Jovie different from Linktree?',
@@ -43,7 +43,7 @@ const FAQ_ITEMS = [
 ];
 
 export const metadata: Metadata = {
-  title: `About ${APP_NAME} — The Release Platform for Independent Musicians`,
+  title: 'About — The Release Platform for Independent Musicians',
   description:
     'Jovie is a release platform for independent musicians, combining smart links, artist profiles, audience intelligence, and AI. Founded by Tim White. Not affiliated with Jovie childcare.',
   keywords: [

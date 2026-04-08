@@ -11,7 +11,7 @@ export interface ProfileFormProps {
 
 export type ProfileFormData = Pick<
   ProfileIdentityFields,
-  'name' | 'tagline' | 'imageUrl' | 'hideBranding'
+  'name' | 'tagline' | 'imageUrl'
 >;
 
 export interface UseProfileFormReturn {
@@ -22,7 +22,6 @@ export interface UseProfileFormReturn {
   success: boolean;
   formSubmitted: boolean;
   validationErrors: Record<string, string>;
-  hasRemoveBrandingFeature: boolean;
   formData: ProfileFormData;
   formErrors: Record<string, string>;
   setFormData: React.Dispatch<React.SetStateAction<ProfileFormData>>;

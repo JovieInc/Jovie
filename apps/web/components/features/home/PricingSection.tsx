@@ -26,7 +26,7 @@ const FREE_FEATURE_PREVIEW = [
 const PRO_FEATURE_PREVIEW = [
   'Release notifications',
   'Advanced analytics & geographic insights',
-  'Remove Jovie branding',
+  'Contact export',
 ] as const;
 
 export function PricingSection() {
@@ -59,7 +59,7 @@ export function PricingSection() {
             <p className='homepage-section-copy marketing-lead-linear text-secondary-token'>
               Start free with smart links and your artist profile. Upgrade when
               you want release notifications, deeper audience intelligence, and
-              branding control.
+              stronger fan ownership.
             </p>
           </div>
 
@@ -152,7 +152,7 @@ export function PricingSection() {
                 <span className='text-[14px] text-tertiary-token'>/mo</span>
               </div>
               <p className='mt-3 text-[14px] leading-relaxed text-secondary-token'>
-                Release notifications, audience intelligence, branding control,
+                Release notifications, audience intelligence, contact export,
                 and deeper fan ownership.
               </p>
 

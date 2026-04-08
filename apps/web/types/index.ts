@@ -297,7 +297,6 @@ export interface UserEntitlements {
   isPro: boolean; // true for founding, pro, or max
   hasAdvancedFeatures: boolean; // true for max only
   // Feature gates
-  canRemoveBranding: boolean;
   canExportContacts: boolean;
   canAccessAdvancedAnalytics: boolean;
   canFilterSelfFromAnalytics: boolean;

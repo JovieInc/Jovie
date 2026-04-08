@@ -3,7 +3,6 @@ import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { syncSocialLinksFromPrimaryMusicUrls } from '@/lib/db/social-links-sync';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
@@ -131,30 +130,6 @@ export async function PUT(req: Request) {
         avatarUrl,
         usernameUpdate,
       } = parsedRequest;
-
-      // Gate pro-only settings behind plan entitlements
-      const settings = dbProfileUpdates.settings as
-        | Record<string, unknown>
-        | undefined;
-      if (settings?.hide_branding === true) {
-        try {
-          const entitlements = await getCurrentUserEntitlements();
-          if (!entitlements.canRemoveBranding) {
-            return NextResponse.json(
-              {
-                error:
-                  'Removing branding requires a Pro plan. Upgrade to unlock this feature.',
-              },
-              { status: 403, headers: NO_STORE_HEADERS }
-            );
-          }
-        } catch {
-          return NextResponse.json(
-            { error: 'Unable to verify plan status. Please try again.' },
-            { status: 503, headers: NO_STORE_HEADERS }
-          );
-        }
-      }
 
       if (process.env.NODE_ENV === 'test') {
         return handleTestProfileUpdate({

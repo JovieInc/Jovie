@@ -13,6 +13,20 @@ warn()    { echo -e "${YELLOW}⚠  $*${RESET}"; }
 success() { echo -e "${GREEN}✅ $*${RESET}"; }
 info()    { echo "   $*"; }
 
+install_with_apt() {
+  if ! command -v apt-get &>/dev/null; then
+    return 1
+  fi
+
+  if command -v sudo &>/dev/null; then
+    sudo apt-get update && sudo apt-get install -y "$1"
+  elif [ "${EUID:-$(id -u)}" -eq 0 ]; then
+    apt-get update && apt-get install -y "$1"
+  else
+    return 1
+  fi
+}
+
 MISSING=()
 IS_WORKTREE=false
 DOPPLER_PROJECT="jovie-web"
@@ -67,7 +81,48 @@ else
   fi
 fi
 
-# ─── 3. Doppler CLI ─────────────────────────────────────────────────────────
+# ─── 3. ripgrep ─────────────────────────────────────────────────────────────
+echo ""
+echo "── ripgrep ──────────────────────────────────────────────────────────────"
+if command -v rg &>/dev/null; then
+  success "$(rg --version 2>/dev/null | head -1)"
+else
+  warn "ripgrep (rg) not found — installing if supported..."
+  OS="$(uname -s 2>/dev/null || echo Windows)"
+  case "$OS" in
+    Darwin)
+      if command -v brew &>/dev/null; then
+        info "Installing via Homebrew..."
+        brew install ripgrep
+      else
+        warn "Homebrew not found — install ripgrep manually: brew install ripgrep"
+        MISSING+=("ripgrep (rg)")
+      fi
+      ;;
+    Linux)
+      if ! install_with_apt ripgrep; then
+        warn "Auto-install failed — install ripgrep manually with your package manager"
+        info "Debian/Ubuntu: sudo apt-get install -y ripgrep"
+        MISSING+=("ripgrep (rg)")
+      fi
+      ;;
+    Windows* | MINGW* | MSYS* | CYGWIN*)
+      warn "Windows detected — install ripgrep manually"
+      info "  winget install BurntSushi.ripgrep"
+      MISSING+=("ripgrep (rg)")
+      ;;
+    *)
+      warn "Unknown OS ($OS) — install ripgrep manually"
+      MISSING+=("ripgrep (rg)")
+      ;;
+  esac
+
+  if command -v rg &>/dev/null; then
+    success "$(rg --version 2>/dev/null | head -1)"
+  fi
+fi
+
+# ─── 4. Doppler CLI ─────────────────────────────────────────────────────────
 echo ""
 echo "── Doppler CLI ─────────────────────────────────────────────────────────"
 if command -v doppler &>/dev/null; then
@@ -107,7 +162,7 @@ else
   fi
 fi
 
-# ─── 4. pnpm install ────────────────────────────────────────────────────────
+# ─── 5. pnpm install ────────────────────────────────────────────────────────
 echo ""
 echo "── Dependencies ────────────────────────────────────────────────────────"
 if command -v pnpm &>/dev/null; then
@@ -122,7 +177,7 @@ else
   MISSING+=("pnpm install")
 fi
 
-# ─── 4.5. Clear stale Turbopack cache ──────────────────────────────────────
+# ─── 5.5. Clear stale Turbopack cache ──────────────────────────────────────
 echo ""
 echo "── Turbopack cache ─────────────────────────────────────────────────"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -134,7 +189,7 @@ else
   info "No Turbopack cache to clear"
 fi
 
-# ─── 5. Doppler auth / config check ─────────────────────────────────────────
+# ─── 6. Doppler auth / config check ─────────────────────────────────────────
 echo ""
 echo "── Doppler auth ────────────────────────────────────────────────────────"
 if ! command -v doppler &>/dev/null; then
@@ -179,7 +234,7 @@ else
   fi
 fi
 
-# ─── 6. Sync dev Clerk IDs ────────────────────────────────────────────────────
+# ─── 7. Sync dev Clerk IDs ────────────────────────────────────────────────────
 # The dev Clerk instance assigns different user IDs than production.
 # If the shared DB has production Clerk IDs, local auth will fail with
 # USER_CREATION_FAILED. This step syncs them automatically.
@@ -207,10 +262,13 @@ if [[ ${#MISSING[@]} -eq 0 ]]; then
   success "Ready to develop"
   echo ""
   echo "  Start the dev server:"
-  echo "    doppler run --project ${DOPPLER_PROJECT} --config ${DOPPLER_CONFIG} -- pnpm --filter web dev:local"
+  echo "    pnpm run dev:web:local"
   echo ""
   echo "  Run tests:"
-  echo "    doppler run --project ${DOPPLER_PROJECT} --config ${DOPPLER_CONFIG} -- pnpm vitest run"
+  echo "    pnpm run test:web"
+  echo ""
+  echo "  Start browse-compatible local auth flow:"
+  echo "    pnpm run dev:web:browse"
 else
   warn "Missing: $(IFS=', '; echo "${MISSING[*]}")"
   echo "  See instructions above to resolve each item, then re-run: ./scripts/setup.sh"

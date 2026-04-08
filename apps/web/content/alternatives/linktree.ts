@@ -47,12 +47,12 @@ export const linktreeAlternative: AlternativeData = {
     {
       question: 'Is Jovie free?',
       answer:
-        'Yes. Jovie has a free tier that includes a profile, smart links, and fan collection. Paid plans unlock advanced analytics, branding removal, and contact export.',
+        'Yes. Jovie has a free tier that includes a profile, smart links, and fan collection. Paid plans unlock advanced analytics, release notifications, and contact export.',
     },
     {
       question: 'Can I use Jovie instead of Linktree?',
       answer:
-        'Yes. Your Jovie profile at jov.ie/username replaces your Linktree. It does everything Linktree does (link-in-bio, custom branding, analytics) plus music-specific features like smart links, fan notifications, and release automation.',
+        'Yes. Your Jovie profile at jov.ie/username replaces your Linktree. It does everything Linktree does (link-in-bio and analytics) plus music-specific features like smart links, fan notifications, and release automation.',
     },
   ],
 };

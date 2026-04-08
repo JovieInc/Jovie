@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ArtistContactsButton } from '@/features/profile/artist-contacts-button';
 import { encodeContactPayload } from '@/lib/contacts/obfuscation';
@@ -81,7 +81,8 @@ describe('ArtistContactsButton', () => {
     // Should open drawer, not navigate directly
     expect(navigate).not.toHaveBeenCalled();
     // Verify drawer content is visible
-    expect(screen.getByText(/bookings/i)).toBeInTheDocument();
+    const [contactItem] = screen.getAllByTestId('contact-drawer-item');
+    expect(within(contactItem).getByText('Bookings')).toBeInTheDocument();
   }, 15_000);
 
   it('renders mailto and tel links in the contact drawer actions', () => {
@@ -183,7 +184,8 @@ describe('ArtistContactsButton', () => {
 
     expect(navigate).not.toHaveBeenCalled();
     // Verify drawer content is visible with both contacts
-    expect(screen.getByText(/bookings/i)).toBeInTheDocument();
-    expect(screen.getByText(/press/i)).toBeInTheDocument();
+    const contactItems = screen.getAllByTestId('contact-drawer-item');
+    expect(within(contactItems[0]).getByText('Bookings')).toBeInTheDocument();
+    expect(within(contactItems[1]).getByText('Press')).toBeInTheDocument();
   }, 15_000);
 });

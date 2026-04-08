@@ -1,10 +1,6 @@
 export interface FooterProps {
   readonly variant?: 'marketing' | 'profile' | 'minimal' | 'regular';
   readonly artistHandle?: string;
-  readonly hideBranding?: boolean;
-  readonly artistSettings?: {
-    readonly hide_branding?: boolean;
-  };
   readonly showThemeToggle?: boolean;
   readonly className?: string;
   readonly themeShortcutKey?: string;

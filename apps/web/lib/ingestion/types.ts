@@ -36,7 +36,7 @@ export interface ExtractionResult {
   /**
    * Whether the Linktree profile has a verification badge.
    * Verification requires a paid plan + identity confirmation.
-   * Stronger paid-tier signal than branding removal alone.
+   * Stronger paid-tier signal than surface presentation alone.
    */
   isLinktreeVerified?: boolean | null;
   /**

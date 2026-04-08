@@ -532,7 +532,7 @@ export function OnboardingDemoStep({
                 </li>
                 <li className='flex items-start gap-2'>
                   <Check className='mt-0.5 h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-                  Remove branding
+                  Contact export
                 </li>
                 <li className='flex items-start gap-2'>
                   <Check className='mt-0.5 h-3.5 w-3.5 shrink-0 text-tertiary-token' />

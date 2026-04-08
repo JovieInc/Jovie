@@ -12,7 +12,7 @@ Before running ANY command in this repo, run:
 ./scripts/setup.sh
 ```
 
-This idempotent script checks Node.js (22.x), pnpm (9.15.4), and Doppler CLI, installs missing tools, runs `pnpm install`, and verifies Doppler auth.
+This idempotent script checks Node.js (22.x), pnpm (9.15.4), `ripgrep` (`rg`), and Doppler CLI, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
 
 On every fresh Git worktree, run `./scripts/setup.sh` again before doing anything else.
 Worktrees do not share `node_modules`, so dependency installation is per-worktree even when Turbo cache is shared.
@@ -46,9 +46,12 @@ If a dedicated helper is added later (for example `./scripts/dev-db-branch.sh`),
 
 ALL commands that need secrets MUST be prefixed with Doppler, and local/dev commands should pin the repo's default scope explicitly as `doppler run --project jovie-web --config dev --`:
 
-- `doppler run --project jovie-web --config dev -- pnpm test`
-- `doppler run --project jovie-web --config dev -- pnpm exec playwright test`
-- `doppler run --project jovie-web --config dev -- pnpm run dev:local`
+- `pnpm run test:web`
+- `pnpm run test:web:watch`
+- `pnpm run test:web:e2e`
+- `pnpm run test:web:smoke`
+- `pnpm run dev:web:local`
+- `pnpm run dev:web:browse`
 - `pnpm test` alone **will fail** — missing env vars
 
 Reason: local agents and worktrees should not rely on whatever Doppler scope happens to be active in the shell.
@@ -162,7 +165,7 @@ pnpm turbo build --filter=@jovie/web
 | `yarn add` | `pnpm add` |
 | `npx turbo ...` | `pnpm turbo ...` |
 | Running turbo from wrong directory | Always run from repo root |
-| `cd apps/web && pnpm dev` | `pnpm --filter web dev` (from root) |
+| `cd apps/web && pnpm dev` | `pnpm run dev:web:local` |
 | `node script.js` with Node < 22 | Verify `node --version` first |
 
 ---
@@ -171,18 +174,20 @@ pnpm turbo build --filter=@jovie/web
 
 **Always run from repository root.** Never `cd` into packages to run commands.
 
+For local web dev and secret-bound test flows, prefer the root wrappers (`pnpm run dev:web:local`, `pnpm run dev:web:browse`, `pnpm run test:web`) over direct filtered package commands.
+
 ```bash
 # Development
 pnpm dev                    # Start all dev servers
-pnpm --filter web dev       # Start only web app
+pnpm run dev:web:local      # Start local web app with pinned Doppler scope
 
 # Building
 pnpm build                  # Build all packages
 pnpm --filter web build     # Build only web app
 
 # Testing
-pnpm test                   # Run all tests
-pnpm --filter web test      # Run web tests only
+pnpm test                   # Run all workspace tests
+pnpm run test:web           # Run web tests with pinned Doppler scope
 
 # Linting & Type Checking
 pnpm lint                   # Lint all packages
@@ -190,8 +195,8 @@ pnpm typecheck              # Type check all packages
 
 # Database (web app specific)
 pnpm --filter web drizzle:generate   # Generate migrations
-pnpm --filter web drizzle:migrate    # Apply migrations
-pnpm --filter web drizzle:studio     # Open Drizzle Studio
+pnpm run db:web:migrate             # Apply migrations with pinned Doppler scope
+pnpm run db:web:studio              # Open Drizzle Studio with pinned Doppler scope
 ```
 
 ---
@@ -1184,20 +1189,20 @@ Use Clerk's official Playwright testing helpers whenever an E2E test needs auth.
 
 - E2E users are tagged with metadata (`role: 'e2e'`).
 - Clean stale users interactively:
-  - `doppler run -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts`
+  - `doppler run --project jovie-web --config dev -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts`
 - Clean stale users non-interactively (for agents and CI):
-  - `doppler run -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --force`
+  - `doppler run --project jovie-web --config dev -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --force`
 - Preview what would be deleted (dry run):
-  - `doppler run -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --dry-run`
+  - `doppler run --project jovie-web --config dev -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --dry-run`
 - To re-seed users:
-  - `doppler run -- pnpm tsx apps/web/scripts/setup-e2e-users.ts`
+  - `doppler run --project jovie-web --config dev -- pnpm tsx apps/web/scripts/setup-e2e-users.ts`
 
 **Agent cleanup requirement:**
 
 Agents **MUST** run cleanup after any session that creates test accounts via sign-up flows (E2E tests, `/qa` runs that trigger signup). Run:
 
 ```bash
-doppler run -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --force
+doppler run --project jovie-web --config dev -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --force
 ```
 
 This deletes all Clerk users matching either `role: 'e2e'` metadata OR `+clerk_test` email pattern, AND their corresponding database records (cascading to related tables). Only works against test Clerk instances (`sk_test_` keys). Safe to run repeatedly.
@@ -1615,7 +1620,7 @@ When running `/qa` or `/browse` against local Jovie, agents **MUST** use the bui
 1. Start the browse-compatible dev server:
 
    ```bash
-   doppler run -- pnpm --filter web dev:local:browse
+   pnpm run dev:web:browse
    ```
 
 2. Authenticate the browse session by opening:
