@@ -6,6 +6,14 @@ import {
   type RawKeyEncryptionResult,
 } from '@/lib/utils/url-encryption.server';
 
+const DEV_FALLBACK_KEY_SYMBOL = Symbol.for(
+  'jovie.url-encryption.dev-fallback-key'
+);
+
+type UrlEncryptionGlobal = typeof globalThis & {
+  [DEV_FALLBACK_KEY_SYMBOL]?: string;
+};
+
 describe('Raw-key AES-256-GCM URL encryption', () => {
   it('encrypts and decrypts a URL round-trip', () => {
     const url = 'https://open.spotify.com/album/abc123';
@@ -75,6 +83,53 @@ describe('Raw-key AES-256-GCM URL encryption', () => {
         delete process.env.URL_ENCRYPTION_KEY;
       } else {
         process.env.URL_ENCRYPTION_KEY = originalEncryptionKey;
+      }
+
+      vi.resetModules();
+    }
+  });
+
+  it('reuses the fallback key across module reloads in the same process', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalEncryptionKey = process.env.URL_ENCRYPTION_KEY;
+    const globalWithFallback = globalThis as UrlEncryptionGlobal;
+    const originalFallbackKey = globalWithFallback[DEV_FALLBACK_KEY_SYMBOL];
+
+    try {
+      process.env.NODE_ENV = 'test';
+      delete process.env.URL_ENCRYPTION_KEY;
+      delete globalWithFallback[DEV_FALLBACK_KEY_SYMBOL];
+
+      vi.resetModules();
+      const firstModule = await import('@/lib/utils/url-encryption.server');
+      const encrypted = firstModule.encryptUrlRawKey(
+        'https://example.com/reload-stable'
+      );
+
+      vi.resetModules();
+      const secondModule = await import('@/lib/utils/url-encryption.server');
+
+      expect(secondModule.decryptUrlRawKey(encrypted)).toBe(
+        'https://example.com/reload-stable'
+      );
+      expect(globalWithFallback[DEV_FALLBACK_KEY_SYMBOL]).toBeTruthy();
+    } finally {
+      if (originalNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+
+      if (originalEncryptionKey === undefined) {
+        delete process.env.URL_ENCRYPTION_KEY;
+      } else {
+        process.env.URL_ENCRYPTION_KEY = originalEncryptionKey;
+      }
+
+      if (originalFallbackKey === undefined) {
+        delete globalWithFallback[DEV_FALLBACK_KEY_SYMBOL];
+      } else {
+        globalWithFallback[DEV_FALLBACK_KEY_SYMBOL] = originalFallbackKey;
       }
 
       vi.resetModules();

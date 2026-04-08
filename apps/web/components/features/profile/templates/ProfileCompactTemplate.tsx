@@ -123,6 +123,29 @@ function unwrapNextImageUrl(url: string | null | undefined): string | null {
   }
 }
 
+function getModeFromLocation(fallbackMode: ProfileMode): ProfileMode {
+  if (typeof globalThis.window === 'undefined') {
+    return fallbackMode;
+  }
+
+  const modeParam = new URLSearchParams(globalThis.location.search).get('mode');
+  return modeParam === null ? fallbackMode : getProfileMode(modeParam);
+}
+
+function getModeFromDrawerView(view: DrawerView): ProfileMode | null {
+  switch (view) {
+    case 'about':
+    case 'subscribe':
+    case 'contact':
+    case 'listen':
+    case 'tip':
+    case 'tour':
+      return view;
+    default:
+      return null;
+  }
+}
+
 export function ProfileCompactTemplate({
   mode,
   artist,
@@ -142,7 +165,11 @@ export function ProfileCompactTemplate({
 }: ProfileCompactTemplateProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<DrawerView>('menu');
+  const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
+    getModeFromLocation(mode)
+  );
   const revealNotificationsRef = useRef<(() => void) | null>(null);
+  const suppressNextHistorySyncRef = useRef(true);
 
   // Lock orientation to portrait on mobile
   useEffect(() => {
@@ -180,7 +207,7 @@ export function ProfileCompactTemplate({
   }, [artist.image_url, photoDownloadSizes]);
 
   const initialSource = useMemo(() => {
-    if (typeof window === 'undefined') return null;
+    if (typeof globalThis.window === 'undefined') return null;
     return new URLSearchParams(globalThis.location.search).get('source');
   }, []);
 
@@ -191,7 +218,7 @@ export function ProfileCompactTemplate({
       viewerCountryCode,
       contacts,
       visitTrackingToken,
-      modeOverride: mode,
+      modeOverride: requestedMode,
       sourceOverride: initialSource,
       smsEnabled: enableDynamicEngagement,
     });
@@ -273,7 +300,7 @@ export function ProfileCompactTemplate({
           notificationsContextValue.setSubscribedChannels({});
           notificationsContextValue.setSubscriptionDetails({});
           notificationsContextValue.setState('idle');
-          setDrawerOpen(false);
+          setRequestedMode('profile');
           showSuccess('Notifications turned off');
         },
       }
@@ -337,8 +364,23 @@ export function ProfileCompactTemplate({
       }),
     [hasContacts, hasTip, mergedDSPs.length]
   );
+
+  const syncRequestedModeFromLocation = useCallback(() => {
+    setRequestedMode(currentMode => {
+      const nextMode = getModeFromLocation(mode);
+      if (currentMode !== nextMode) {
+        suppressNextHistorySyncRef.current = true;
+      }
+      return nextMode;
+    });
+  }, [mode]);
+
   useEffect(() => {
-    const resolved = resolveInitialView(mode);
+    syncRequestedModeFromLocation();
+  }, [mode, syncRequestedModeFromLocation]);
+
+  useEffect(() => {
+    const resolved = resolveInitialView(requestedMode);
     if (resolved) {
       setDrawerView(resolved);
       setDrawerOpen(true);
@@ -346,28 +388,23 @@ export function ProfileCompactTemplate({
       setDrawerView('menu');
       setDrawerOpen(false);
     }
-  }, [mode, resolveInitialView]);
+  }, [requestedMode, resolveInitialView]);
 
   useEffect(() => {
     const handlePopState = () => {
-      const nextMode = getProfileMode(
-        new URLSearchParams(globalThis.location.search).get('mode')
-      );
-      const resolved = resolveInitialView(nextMode);
-      if (resolved) {
-        setDrawerView(resolved);
-        setDrawerOpen(true);
-      } else {
-        setDrawerView('menu');
-        setDrawerOpen(false);
-      }
+      syncRequestedModeFromLocation();
     };
 
     globalThis.addEventListener('popstate', handlePopState);
     return () => globalThis.removeEventListener('popstate', handlePopState);
-  }, [resolveInitialView]);
+  }, [syncRequestedModeFromLocation]);
 
   useEffect(() => {
+    if (suppressNextHistorySyncRef.current) {
+      suppressNextHistorySyncRef.current = false;
+      return;
+    }
+
     const activeMode =
       drawerOpen && drawerView !== 'menu' && drawerView !== 'notifications'
         ? drawerView
@@ -390,6 +427,32 @@ export function ProfileCompactTemplate({
   );
 
   const openDrawerMode = useCallback((nextView: DrawerView) => {
+    const nextMode = getModeFromDrawerView(nextView);
+    if (nextMode) {
+      setRequestedMode(nextMode);
+      return;
+    }
+
+    setDrawerView(nextView);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleDrawerOpenChange = useCallback((nextOpen: boolean) => {
+    if (!nextOpen) {
+      setRequestedMode('profile');
+      return;
+    }
+
+    setDrawerOpen(true);
+  }, []);
+
+  const handleDrawerViewChange = useCallback((nextView: DrawerView) => {
+    const nextMode = getModeFromDrawerView(nextView);
+    if (nextMode) {
+      setRequestedMode(nextMode);
+      return;
+    }
+
     setDrawerView(nextView);
     setDrawerOpen(true);
   }, []);
@@ -417,7 +480,7 @@ export function ProfileCompactTemplate({
         // Silent failure
       }
     }
-    setDrawerOpen(false);
+    setRequestedMode('profile');
   }, [artist.handle, artist.name]);
 
   return (
@@ -656,9 +719,9 @@ export function ProfileCompactTemplate({
 
         <ProfileUnifiedDrawer
           open={drawerOpen}
-          onOpenChange={setDrawerOpen}
+          onOpenChange={handleDrawerOpenChange}
           view={drawerView}
-          onViewChange={setDrawerView}
+          onViewChange={handleDrawerViewChange}
           artist={artist}
           socialLinks={socialLinks}
           contacts={availableContacts}

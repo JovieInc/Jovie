@@ -7,6 +7,20 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.136] - 2026-04-07
 
+> Strengthened signup, onboarding, and ingest regression coverage so breakage is caught earlier in CI and after deploys.
+
+### Added
+
+- Direct unit and integration coverage for onboarding completion, onboarding discovery, welcome chat bootstrap, and signup lead attribution
+- [internal] Deterministic signup funnel smoke coverage uses the local auth-bypass flow so CI catches breakage before real auth providers are in the loop
+
+### Changed
+
+- Expanded signup, onboarding, creator-ingest, ingestion job, and admin ingestion tests to cover key negative paths and persistence behavior
+- [internal] Pointed smoke and overnight QA selectors at the new signup funnel and onboarding completion coverage so the merge gate watches the real conversion path
+- [internal] Added `/signup` to the CI and canary health checks for post-deploy visibility into signup outages
+- [internal] Synced the canonical version file and workspace package versions to `26.4.136`
+
 ### Fixed
 
 - Workspace archive cleanup now always prunes stale git worktree metadata immediately (`git worktree prune --expire now`), even when `.claude/worktrees` is missing

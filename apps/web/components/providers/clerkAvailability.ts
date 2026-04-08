@@ -16,10 +16,6 @@ export function isMockPublishableKey(publishableKey: string): boolean {
   );
 }
 
-function isLivePublishableKey(publishableKey: string): boolean {
-  return publishableKey.trim().toLowerCase().startsWith('pk_live_');
-}
-
 export function shouldBypassClerk(
   publishableKey: string | undefined,
   clerkMockFlag: string | undefined,
@@ -34,9 +30,7 @@ export function shouldBypassClerk(
   return (
     !normalizedKey ||
     clerkMockFlag === '1' ||
-    isMockPublishableKey(normalizedKey) ||
-    (isLivePublishableKey(normalizedKey) &&
-      shouldDisableClerkProxyForLocation(locationLike))
+    isMockPublishableKey(normalizedKey)
   );
 }
 

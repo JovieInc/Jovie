@@ -6,14 +6,9 @@ import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/a
 import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { ClaimBanner } from '@/features/profile/ClaimBanner';
-import type { ProfileMode } from '@/features/profile/contracts';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileFooter } from '@/features/profile/ProfileFooter';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
-import {
-  getProfileMode,
-  getProfileModeSubtitle,
-} from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
@@ -298,7 +293,13 @@ const fetchProfileAndLinks = async (
   status: 'ok' | 'not_found' | 'error';
 }> => {
   try {
-    const result = await getCreatorProfileWithLinks(username);
+    // The page-level unstable_cache is the canonical cache for public profile
+    // rendering. Bypass the profile service's Redis layer here because its
+    // Upstash fetch is `no-store`, which turns uncached ISR handles into
+    // static-to-dynamic runtime errors in production.
+    const result = await getCreatorProfileWithLinks(username, {
+      skipCache: true,
+    });
 
     // Use truthy check (not strict equality) for isPublic because the neon-http
     // driver may return boolean columns as non-boolean truthy values (e.g., 1, "t")
@@ -433,6 +434,16 @@ const fetchProfileAndLinks = async (
 
 const PROFILE_SUCCESS_CACHE_TTL_SECONDS = 3600; // 1 hour
 
+class NonCacheableProfileResultError extends Error {
+  readonly result: Awaited<ReturnType<typeof fetchProfileAndLinks>>;
+
+  constructor(result: Awaited<ReturnType<typeof fetchProfileAndLinks>>) {
+    super(`Profile fetch returned non-cacheable status: ${result.status}`);
+    this.name = 'NonCacheableProfileResultError';
+    this.result = result;
+  }
+}
+
 /**
  * Cached profile fetcher. Only caches successful (status: 'ok') results.
  *
@@ -442,8 +453,7 @@ const PROFILE_SUCCESS_CACHE_TTL_SECONDS = 3600; // 1 hour
  * revalidation failures by serving the stale value — causing not_found results
  * to become permanently sticky even after the profile becomes available.
  *
- * Instead, not_found and error results are always fetched fresh. The Redis
- * cache in getProfileWithLinks already provides request-level deduplication.
+ * Instead, not_found and error results are always fetched fresh.
  */
 const getCachedProfileAndLinks = async (username: string) => {
   // Skip Next.js cache in test/development environments
@@ -462,8 +472,10 @@ const getCachedProfileAndLinks = async (username: string) => {
         const data = await fetchProfileAndLinks(username);
         if (data.status !== 'ok') {
           // Don't cache not_found or error results — throw to prevent
-          // stale success from being served on background revalidation
-          throw new Error(`Profile ${username} status: ${data.status}`);
+          // stale success from being served on background revalidation.
+          // Carry the original payload through the throw path so callers do not
+          // need to re-read storage just to render a fresh non-ok response.
+          throw new NonCacheableProfileResultError(data);
         }
         return data;
       },
@@ -474,8 +486,12 @@ const getCachedProfileAndLinks = async (username: string) => {
       }
     );
     return await cachedFetch();
-  } catch {
-    // Cache miss for non-ok status, or cache layer failure — fetch fresh
+  } catch (error) {
+    if (error instanceof NonCacheableProfileResultError) {
+      return error.result;
+    }
+
+    // Cache layer failure — fetch fresh
     return fetchProfileAndLinks(username);
   }
 };
@@ -518,9 +534,6 @@ interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
-  readonly searchParams?: Promise<{
-    mode?: ProfileMode;
-  }>;
 }
 
 async function getPublicTourDates(
@@ -537,10 +550,7 @@ async function getPublicTourDates(
   }
 }
 
-export default async function ArtistPage({
-  params,
-  searchParams,
-}: Readonly<Props>) {
+export default async function ArtistPage({ params }: Readonly<Props>) {
   const { username } = await params;
 
   // Early reject obviously invalid usernames before hitting the database
@@ -552,8 +562,6 @@ export default async function ArtistPage({
     notFound();
   }
 
-  const resolvedSearchParams = await searchParams;
-  const mode = getProfileMode(resolvedSearchParams?.mode);
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
   const viewerCountryCode = null;
 
@@ -610,13 +618,6 @@ export default async function ArtistPage({
     artist.name
   );
 
-  const subtitle = getProfileModeSubtitle(mode);
-
-  // Show tip button whenever artist has Venmo, and style active state in tip mode.
-  const hasVenmoLink = links.some(link => link.platform === 'venmo');
-  const showTipButton = hasVenmoLink;
-  const showBackButton = mode !== 'profile';
-
   // Read profile photo download settings
   const profileSettings =
     (profile.settings as Record<string, unknown> | null) ?? {};
@@ -659,14 +660,13 @@ export default async function ArtistPage({
       {/* Server-side pixel tracking */}
       {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
       <StaticArtistPage
-        mode={mode}
+        mode='profile'
         artist={artist}
         socialLinks={links}
         viewerCountryCode={viewerCountryCode}
         contacts={publicContacts}
-        subtitle={subtitle}
-        showTipButton={showTipButton}
-        showBackButton={showBackButton}
+        subtitle='Artist'
+        showBackButton={false}
         showTourButton={true}
         enableDynamicEngagement={creatorIsPro}
         latestRelease={latestRelease}

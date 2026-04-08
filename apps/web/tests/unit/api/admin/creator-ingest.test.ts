@@ -1,171 +1,450 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
+const {
+  mockCaptureError,
+  mockCheckAdminCreatorIngestRateLimit,
+  mockCheckExistingProfile,
+  mockCreateRateLimitHeaders,
+  mockDetectFullExtractionPlatform,
+  mockFetchFullExtractionProfile,
+  mockGetCurrentUserEntitlements,
+  mockHandleNewProfileIngest,
+  mockHandleReingestProfile,
+  mockIngestSocialPlatformUrl,
+  mockLoggerError,
+  mockMarkReingestFailure,
+  mockNormalizeUrl,
+  mockParseJsonBody,
+  mockResolveFullExtractionContext,
+  mockResolveHostedAvatarUrl,
+  mockCreatorIngestSchemaSafeParse,
+} = vi.hoisted(() => ({
+  mockCaptureError: vi.fn(),
+  mockCheckAdminCreatorIngestRateLimit: vi.fn(),
+  mockCheckExistingProfile: vi.fn(),
+  mockCreateRateLimitHeaders: vi.fn(),
+  mockDetectFullExtractionPlatform: vi.fn(),
+  mockFetchFullExtractionProfile: vi.fn(),
+  mockGetCurrentUserEntitlements: vi.fn(),
+  mockHandleNewProfileIngest: vi.fn(),
+  mockHandleReingestProfile: vi.fn(),
+  mockIngestSocialPlatformUrl: vi.fn(),
+  mockLoggerError: vi.fn(),
+  mockMarkReingestFailure: vi.fn(),
+  mockNormalizeUrl: vi.fn(),
+  mockParseJsonBody: vi.fn(),
+  mockResolveFullExtractionContext: vi.fn(),
+  mockResolveHostedAvatarUrl: vi.fn(),
+  mockCreatorIngestSchemaSafeParse: vi.fn(),
+}));
 
 vi.mock('@/lib/entitlements/server', () => ({
   getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
 }));
 
-vi.mock('@/lib/ingestion/session', () => ({
-  withSystemIngestionSession: vi
-    .fn()
-    .mockImplementation(
-      async (operation: (tx: unknown) => Promise<unknown>) => {
-        const tx = {
-          select: vi.fn().mockReturnValue({
-            from: vi.fn().mockReturnValue({
-              where: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue([]),
-              }),
-            }),
-          }),
-          insert: vi.fn().mockReturnValue({
-            values: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([
-                {
-                  id: 'profile_123',
-                  username: 'test',
-                  usernameNormalized: 'test',
-                  displayName: 'Test',
-                  avatarUrl: null,
-                  claimToken: 'claim_token',
-                  isClaimed: false,
-                  claimTokenExpiresAt: new Date('2030-01-01T00:00:00.000Z'),
-                  avatarLockedByUser: false,
-                  displayNameLocked: false,
-                },
-              ]),
-            }),
-          }),
-        };
-
-        return operation(tx);
-      }
-    ),
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: mockCaptureError,
 }));
 
-vi.mock('@/lib/ingestion/strategies/linktree', () => ({
-  isValidHandle: vi.fn().mockReturnValue(true),
-  validateLinktreeUrl: vi
-    .fn()
-    .mockImplementation(
-      (url: string) => `https://linktr.ee/${url.split('/').pop()}`
-    ),
-  extractLinktreeHandle: vi.fn().mockReturnValue('test'),
-  normalizeHandle: vi.fn().mockReturnValue('test'),
-  fetchLinktreeDocument: vi.fn().mockResolvedValue('<html></html>'),
-  extractLinktree: vi.fn().mockReturnValue({
-    displayName: 'Test',
-    avatarUrl: null,
-    links: [],
-  }),
+vi.mock('@/lib/http/parse-json', () => ({
+  parseJsonBody: mockParseJsonBody,
 }));
 
-vi.mock('@/lib/ingestion/magic-profile-avatar', () => ({
-  maybeCopyIngestionAvatarFromLinks: vi.fn().mockResolvedValue(null),
+vi.mock('@/lib/ingestion/flows/avatar-hosting', () => ({
+  resolveHostedAvatarUrl: mockResolveHostedAvatarUrl,
 }));
 
-vi.mock('@/lib/ingestion/processor', () => ({
-  enqueueFollowupIngestionJobs: vi.fn().mockResolvedValue(undefined),
-  normalizeAndMergeExtraction: vi.fn().mockResolvedValue(undefined),
+vi.mock('@/lib/ingestion/flows/full-extraction-flow', () => ({
+  detectFullExtractionPlatform: mockDetectFullExtractionPlatform,
+  fetchFullExtractionProfile: mockFetchFullExtractionProfile,
+  resolveFullExtractionContext: mockResolveFullExtractionContext,
 }));
 
-vi.mock('@/lib/ingestion/status-manager', () => ({
-  IngestionStatusManager: {
-    markProcessing: vi.fn().mockResolvedValue(undefined),
-    markIdleOrFailed: vi.fn().mockResolvedValue(undefined),
+vi.mock('@/lib/ingestion/flows/profile-operations', () => ({
+  checkExistingProfile: mockCheckExistingProfile,
+  markReingestFailure: mockMarkReingestFailure,
+}));
+
+vi.mock('@/lib/ingestion/flows/reingest-flow', () => ({
+  handleNewProfileIngest: mockHandleNewProfileIngest,
+  handleReingestProfile: mockHandleReingestProfile,
+}));
+
+vi.mock('@/lib/ingestion/flows/social-platform-ingest', () => ({
+  ingestSocialPlatformUrl: mockIngestSocialPlatformUrl,
+}));
+
+vi.mock('@/lib/rate-limit', () => ({
+  checkAdminCreatorIngestRateLimit: mockCheckAdminCreatorIngestRateLimit,
+  createRateLimitHeaders: mockCreateRateLimitHeaders,
+}));
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: {
+    error: mockLoggerError,
   },
 }));
 
-// Import after mocks are set up
-import { POST } from '@/app/api/admin/creator-ingest/route';
+vi.mock('@/lib/utils/platform-detection', () => ({
+  normalizeUrl: mockNormalizeUrl,
+}));
 
-describe('Admin Creator Ingest API', () => {
+vi.mock('@/lib/validation/schemas', () => ({
+  creatorIngestSchema: {
+    safeParse: mockCreatorIngestSchemaSafeParse,
+  },
+}));
+
+describe('POST /api/admin/creator-ingest', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    mockGetCurrentUserEntitlements.mockResolvedValue({
+      userId: 'admin_123',
+      email: 'admin@example.com',
+      isAuthenticated: true,
+      isAdmin: true,
+    });
+    mockCheckAdminCreatorIngestRateLimit.mockResolvedValue({
+      success: true,
+      reset: new Date(Date.now() + 60_000),
+    });
+    mockCreateRateLimitHeaders.mockReturnValue({
+      'x-ratelimit-limit': '10',
+    });
+    mockParseJsonBody.mockResolvedValue({
+      ok: true,
+      data: { url: 'https://linktr.ee/test-artist' },
+    });
+    mockCreatorIngestSchemaSafeParse.mockReturnValue({
+      success: true,
+      data: { url: 'https://linktr.ee/test-artist' },
+    });
+    mockNormalizeUrl.mockImplementation((url: string) => url.trim());
+    mockDetectFullExtractionPlatform.mockReturnValue({
+      isLinktree: true,
+      isLaylo: false,
+      linktreeValidatedUrl: 'https://linktr.ee/test-artist',
+    });
+    mockResolveFullExtractionContext.mockReturnValue({
+      ok: true,
+      validatedUrl: 'https://linktr.ee/test-artist',
+      handle: 'test-artist',
+    });
+    mockCheckExistingProfile.mockResolvedValue({
+      existing: null,
+      finalHandle: 'test-artist',
+      isReingest: false,
+    });
+    mockFetchFullExtractionProfile.mockResolvedValue({
+      displayName: 'Test Artist',
+      avatarUrl: 'https://images.test/avatar.png',
+      links: [],
+    });
+    mockResolveHostedAvatarUrl.mockResolvedValue(
+      'https://blob.test/avatar.avif'
+    );
+    mockHandleNewProfileIngest.mockResolvedValue(
+      NextResponse.json({
+        ok: true,
+        profile: { id: 'profile_123', username: 'test-artist' },
+      })
+    );
+    mockHandleReingestProfile.mockResolvedValue(
+      NextResponse.json({
+        ok: true,
+        reingested: true,
+      })
+    );
+    mockIngestSocialPlatformUrl.mockResolvedValue(
+      NextResponse.json({
+        ok: true,
+        platform: 'instagram',
+      })
+    );
+    mockMarkReingestFailure.mockResolvedValue(undefined);
   });
 
-  describe('POST /api/admin/creator-ingest', () => {
-    it('returns 401 when not authenticated', async () => {
-      mockGetCurrentUserEntitlements.mockResolvedValue({
-        userId: null,
-        email: null,
-        isAuthenticated: false,
-        isAdmin: false,
-        isPro: false,
-        hasAdvancedFeatures: false,
-        canRemoveBranding: false,
-      });
-      const request = new NextRequest(
-        'http://localhost/api/admin/creator-ingest',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: 'https://linktr.ee/test' }),
-        }
-      );
-
-      const response = await POST(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(401);
-      expect(data.error).toBe('Unauthorized');
+  it('returns 401 when not authenticated', async () => {
+    mockGetCurrentUserEntitlements.mockResolvedValueOnce({
+      userId: null,
+      email: null,
+      isAuthenticated: false,
+      isAdmin: false,
     });
 
-    it('returns 403 when user is not admin', async () => {
-      mockGetCurrentUserEntitlements.mockResolvedValue({
-        userId: 'user_123',
-        email: 'user@example.com',
-        isAuthenticated: true,
-        isAdmin: false,
-        isPro: false,
-        hasAdvancedFeatures: false,
-        canRemoveBranding: false,
-      });
+    const { POST } = await import('@/app/api/admin/creator-ingest/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/admin/creator-ingest', {
+        method: 'POST',
+      })
+    );
 
-      const request = new NextRequest(
-        'http://localhost/api/admin/creator-ingest',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: 'https://linktr.ee/test' }),
-        }
-      );
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+  });
 
-      const response = await POST(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(403);
-      expect(data.error).toBe('Forbidden');
+  it('returns 403 when the user is not an admin', async () => {
+    mockGetCurrentUserEntitlements.mockResolvedValueOnce({
+      userId: 'user_123',
+      email: 'user@example.com',
+      isAuthenticated: true,
+      isAdmin: false,
     });
 
-    it('triggers ingestion for admins', async () => {
-      mockGetCurrentUserEntitlements.mockResolvedValue({
-        userId: 'admin_123',
-        email: 'admin@example.com',
-        isAuthenticated: true,
-        isAdmin: true,
-        isPro: true,
-        hasAdvancedFeatures: true,
-        canRemoveBranding: true,
+    const { POST } = await import('@/app/api/admin/creator-ingest/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/admin/creator-ingest', {
+        method: 'POST',
+      })
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: 'Forbidden' });
+  });
+
+  it('routes new full-extraction ingests through the new-profile flow', async () => {
+    const { POST } = await import('@/app/api/admin/creator-ingest/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/admin/creator-ingest', {
+        method: 'POST',
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({
+      ok: true,
+      profile: { id: 'profile_123', username: 'test-artist' },
+    });
+    expect(mockHandleNewProfileIngest).toHaveBeenCalledWith({
+      finalHandle: 'test-artist',
+      displayName: 'Test Artist',
+      hostedAvatarUrl: 'https://blob.test/avatar.avif',
+      extraction: expect.objectContaining({
+        displayName: 'Test Artist',
+        avatarUrl: 'https://blob.test/avatar.avif',
+      }),
+    });
+    expect(mockHandleReingestProfile).not.toHaveBeenCalled();
+  });
+
+  it('returns 429 when the admin rate limit is exceeded', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-08T00:00:00Z'));
+
+    try {
+      const reset = new Date(Date.now() + 2_500);
+      mockCheckAdminCreatorIngestRateLimit.mockResolvedValueOnce({
+        success: false,
+        reason: 'Slow down',
+        reset,
       });
 
-      const request = new NextRequest(
-        'http://localhost/api/admin/creator-ingest',
-        {
+      const { POST } = await import('@/app/api/admin/creator-ingest/route');
+      const response = await POST(
+        new NextRequest('http://localhost/api/admin/creator-ingest', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: 'https://linktr.ee/test' }),
-        }
+        })
       );
+      const payload = await response.json();
 
-      const response = await POST(request);
-      const data = await response.json();
+      expect(response.status).toBe(429);
+      expect(payload).toEqual(
+        expect.objectContaining({
+          error: 'Rate limit exceeded',
+          message: 'Slow down',
+          retryAfter: 3,
+        })
+      );
+      expect(response.headers.get('x-ratelimit-limit')).toBe('10');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
-      expect(response.status).toBe(200);
-      expect(data.ok).toBe(true);
-      expect(data.profile).toBeDefined();
+  it('returns the parseJsonBody error response for malformed requests', async () => {
+    mockParseJsonBody.mockResolvedValueOnce({
+      ok: false,
+      response: NextResponse.json({ error: 'Malformed JSON' }, { status: 400 }),
     });
+
+    const { POST } = await import('@/app/api/admin/creator-ingest/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/admin/creator-ingest', {
+        method: 'POST',
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Malformed JSON' });
+  });
+
+  it('returns 400 when the request body fails schema validation', async () => {
+    mockCreatorIngestSchemaSafeParse.mockReturnValueOnce({
+      success: false,
+      error: {
+        flatten: () => ({ fieldErrors: { url: ['Invalid profile URL'] } }),
+      },
+    });
+
+    const { POST } = await import('@/app/api/admin/creator-ingest/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/admin/creator-ingest', {
+        method: 'POST',
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({
+        error: 'Invalid request body',
+      })
+    );
+  });
+
+  it('returns 409 when no unique username can be allocated', async () => {
+    mockCheckExistingProfile.mockResolvedValueOnce({
+      existing: null,
+      finalHandle: null,
+      isReingest: false,
+    });
+
+    const { POST } = await import('@/app/api/admin/creator-ingest/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/admin/creator-ingest', {
+        method: 'POST',
+      })
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Unable to allocate unique username',
+      details: 'All fallback username attempts exhausted.',
+    });
+  });
+
+  it('returns 409 when the target profile is already claimed', async () => {
+    mockCheckExistingProfile.mockResolvedValueOnce({
+      existing: { id: 'profile_123', isClaimed: true },
+      finalHandle: 'test-artist',
+      isReingest: false,
+    });
+
+    const { POST } = await import('@/app/api/admin/creator-ingest/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/admin/creator-ingest', {
+        method: 'POST',
+      })
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Profile already claimed',
+      details: 'Cannot overwrite a claimed profile.',
+    });
+  });
+
+  it('returns 502 and marks failure when full extraction fetching fails', async () => {
+    const fetchError = new Error('upstream failed');
+    mockFetchFullExtractionProfile.mockRejectedValueOnce(fetchError);
+
+    const { POST } = await import('@/app/api/admin/creator-ingest/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/admin/creator-ingest', {
+        method: 'POST',
+      })
+    );
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Failed to fetch profile',
+      details: 'upstream failed',
+    });
+    expect(mockMarkReingestFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ finalHandle: 'test-artist' }),
+      'upstream failed'
+    );
+  });
+
+  it('routes reingests through the reingest flow', async () => {
+    mockCheckExistingProfile.mockResolvedValueOnce({
+      existing: { id: 'profile_123', isClaimed: false },
+      finalHandle: 'test-artist',
+      isReingest: true,
+    });
+
+    const { POST } = await import('@/app/api/admin/creator-ingest/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/admin/creator-ingest', {
+        method: 'POST',
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({ ok: true, reingested: true });
+    expect(mockHandleReingestProfile).toHaveBeenCalled();
+    expect(mockHandleNewProfileIngest).not.toHaveBeenCalled();
+  });
+
+  it('falls back to social-platform ingest for non-full-extraction URLs', async () => {
+    mockDetectFullExtractionPlatform.mockReturnValueOnce({
+      isLinktree: false,
+      isLaylo: false,
+      linktreeValidatedUrl: null,
+    });
+    mockCreatorIngestSchemaSafeParse.mockReturnValueOnce({
+      success: true,
+      data: { url: 'https://instagram.com/test-artist' },
+    });
+    mockParseJsonBody.mockResolvedValueOnce({
+      ok: true,
+      data: { url: 'https://instagram.com/test-artist' },
+    });
+    mockNormalizeUrl.mockReturnValueOnce('https://instagram.com/test-artist');
+
+    const { POST } = await import('@/app/api/admin/creator-ingest/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/admin/creator-ingest', {
+        method: 'POST',
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({ ok: true, platform: 'instagram' });
+    expect(mockIngestSocialPlatformUrl).toHaveBeenCalledWith(
+      'https://instagram.com/test-artist'
+    );
+  });
+
+  it('captures and classifies unexpected errors', async () => {
+    // Trigger the route's catch-all error classification path via parseJsonBody;
+    // the "unique constraint" text is mapped to 409 regardless of origin.
+    const crash = new Error('unique constraint violated');
+    mockParseJsonBody.mockRejectedValueOnce(crash);
+
+    const { POST } = await import('@/app/api/admin/creator-ingest/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/admin/creator-ingest', {
+        method: 'POST',
+      })
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: 'A creator profile with that handle already exists',
+    });
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Admin creator ingest failed',
+      crash,
+      expect.objectContaining({
+        route: '/api/admin/creator-ingest',
+        method: 'POST',
+      })
+    );
+    expect(mockLoggerError).toHaveBeenCalled();
   });
 });

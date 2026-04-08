@@ -11,21 +11,21 @@ describe('clerkAvailability', () => {
     expect(shouldBypassClerk('   ', '0')).toBe(true);
   });
 
-  it('bypasses live Clerk keys on insecure private origins', () => {
+  it('keeps Clerk enabled for live Clerk keys on insecure private origins', () => {
     expect(
       shouldBypassClerk(
         'pk_live_example',
         '0',
         new URL('http://localhost:3100')
       )
-    ).toBe(true);
+    ).toBe(false);
     expect(
       shouldBypassClerk(
         'pk_live_example',
         '0',
         new URL('http://127.0.0.1:3100')
       )
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('keeps Clerk enabled for test keys on insecure private origins', () => {

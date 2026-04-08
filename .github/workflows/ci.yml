@@ -1340,9 +1340,9 @@ jobs:
             FAILURES=$((FAILURES + 1))
           fi
 
-          # -- 4. Critical pages: /sign-up, /pricing -- no 5xx --
+          # -- 4. Critical pages: /signup, /pricing -- no 5xx --
           check_critical_pages() {
-            for route in "/sign-up" "/pricing"; do
+            for route in "/signup" "/pricing"; do
               local response
               response=$(fetch "https://jov.ie${route}")
               local status="${response##*$'\n'}"

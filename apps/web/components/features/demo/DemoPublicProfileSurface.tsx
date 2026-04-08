@@ -82,7 +82,6 @@ export function DemoPublicProfileSurface() {
           socialLinks={[...DEMO_PUBLIC_SOCIAL_LINKS]}
           contacts={[]}
           subtitle='Festival headliner, producer, and catalog powerhouse'
-          showTipButton
           showBackButton={false}
           showFooter
           showSubscriptionConfirmedBanner={false}

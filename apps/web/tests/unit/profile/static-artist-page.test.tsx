@@ -10,17 +10,28 @@ import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Artist } from '@/types/db';
 
+const mountIds: string[] = [];
+
 // Mock the compact template
 vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
-  ProfileCompactTemplate: (props: Record<string, unknown>) =>
-    React.createElement('div', {
+  ProfileCompactTemplate: (props: Record<string, unknown>) => {
+    const mountIdRef = React.useRef(
+      `mount-${(props.artist as Artist)?.id}-${mountIds.length + 1}`
+    );
+    if (!mountIds.includes(mountIdRef.current)) {
+      mountIds.push(mountIdRef.current);
+    }
+
+    return React.createElement('div', {
       'data-testid': 'profile-compact-template',
       'data-mode': props.mode,
       'data-artist-name': (props.artist as Artist)?.name,
       'data-show-subscription-confirmed-banner': String(
         props.showSubscriptionConfirmedBanner
       ),
-    }),
+      'data-mount-id': mountIdRef.current,
+    });
+  },
 }));
 
 // Mock hooks used by ProfileCompactTemplate (shouldn't be needed since it's mocked,
@@ -59,6 +70,7 @@ const mockSocialLinks = [
 
 describe('StaticArtistPage', () => {
   afterEach(() => {
+    mountIds.length = 0;
     cleanup();
   });
 
@@ -74,7 +86,6 @@ describe('StaticArtistPage', () => {
         socialLinks={mockSocialLinks}
         contacts={[]}
         subtitle='Profile'
-        showTipButton={false}
         showBackButton={false}
       />
     );
@@ -94,7 +105,6 @@ describe('StaticArtistPage', () => {
         socialLinks={mockSocialLinks}
         contacts={[]}
         subtitle='Listen'
-        showTipButton={false}
         showBackButton={true}
       />
     );
@@ -115,7 +125,6 @@ describe('StaticArtistPage', () => {
         socialLinks={mockSocialLinks}
         contacts={[]}
         subtitle='Profile'
-        showTipButton={false}
         showBackButton={false}
       />
     );
@@ -136,7 +145,6 @@ describe('StaticArtistPage', () => {
         socialLinks={mockSocialLinks}
         contacts={[]}
         subtitle='Profile'
-        showTipButton={false}
         showBackButton={false}
         showSubscriptionConfirmedBanner
       />
@@ -146,5 +154,48 @@ describe('StaticArtistPage', () => {
     expect(
       template.getAttribute('data-show-subscription-confirmed-banner')
     ).toBe('true');
+  });
+
+  it('remounts the compact template when artist identity changes', async () => {
+    const { StaticArtistPage } = await import(
+      '@/features/profile/StaticArtistPage'
+    );
+
+    const { rerender } = render(
+      <StaticArtistPage
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Profile'
+        showBackButton={false}
+      />
+    );
+
+    const firstMountId = screen
+      .getByTestId('profile-compact-template')
+      .getAttribute('data-mount-id');
+
+    rerender(
+      <StaticArtistPage
+        mode='profile'
+        artist={{
+          ...mockArtist,
+          id: 'test-id-2',
+          handle: 'testartist-2',
+          name: 'Test Artist 2',
+        }}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Profile'
+        showBackButton={false}
+      />
+    );
+
+    const secondMountId = screen
+      .getByTestId('profile-compact-template')
+      .getAttribute('data-mount-id');
+
+    expect(firstMountId).not.toBe(secondMountId);
   });
 });

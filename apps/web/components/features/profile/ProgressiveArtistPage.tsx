@@ -26,13 +26,15 @@ interface ProgressiveArtistPageProps {
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
   readonly subtitle: string;
-  readonly showTipButton: boolean;
   readonly showBackButton: boolean;
 }
 
 export function ProgressiveArtistPage(props: ProgressiveArtistPageProps) {
   const [shouldUseAnimated, setShouldUseAnimated] = useState(false);
   const router = useRouter();
+  const showTipButton = props.socialLinks.some(
+    link => link.platform === 'venmo'
+  );
 
   // Prefetch all artist modes for snappy transitions
   useEffect(() => {
@@ -61,5 +63,5 @@ export function ProgressiveArtistPage(props: ProgressiveArtistPageProps) {
   }
 
   // Upgrade to animated version after hydration
-  return <AnimatedArtistPage {...props} />;
+  return <AnimatedArtistPage {...props} showTipButton={showTipButton} />;
 }
