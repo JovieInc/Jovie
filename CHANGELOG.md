@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.137] - 2026-04-08
+
+> Add a repo-owned canonical surface contract for the four design-system surfaces that actually exist on fresh `main`.
+
+### Added
+
+- `apps/web/lib/canonical-surfaces.ts` as the typed source of truth for `homepage`, `public-profile`, `release-landing`, and `dashboard-releases`
+- `docs/CANONICAL_SURFACES.md` documenting the live routes, review routes, screenshot IDs, owners, and exclusions for the canonical surfaces
+- Static invariant coverage that locks the current screenshot IDs, review routes, and redirect-only exclusions for the canonical surface registry
+
+### Changed
+
+- [internal] Synced the canonical version file, `version.json`, and workspace package versions to `26.4.137`
+
 ## [26.4.136] - 2026-04-07
 
 > Strengthened signup, onboarding, and ingest regression coverage so breakage is caught earlier in CI and after deploys.
