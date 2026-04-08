@@ -118,7 +118,6 @@ export const APP_ROUTES = {
 
   // Billing
   BILLING: '/billing',
-  BILLING_REMOVE_BRANDING: '/billing/remove-branding',
   BILLING_SUCCESS: '/billing/success',
   BILLING_CANCEL: '/billing/cancel',
 

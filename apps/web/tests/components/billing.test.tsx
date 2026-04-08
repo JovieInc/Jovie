@@ -136,7 +136,7 @@ describe('Billing Components', () => {
       expect(screen.getByText('Custom Upgrade Text')).toBeInTheDocument();
     });
 
-    it('redirects to the billing remove-branding flow when feature flag is disabled', async () => {
+    it('redirects to pricing when direct checkout is disabled', async () => {
       mockUseFeatureFlag.mockReturnValue(false);
 
       renderWithQueryClient(<UpgradeButton />);
@@ -145,7 +145,7 @@ describe('Billing Components', () => {
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(pushMock).toHaveBeenCalledWith('/billing/remove-branding');
+        expect(pushMock).toHaveBeenCalledWith('/pricing');
       });
     });
 
@@ -158,7 +158,7 @@ describe('Billing Components', () => {
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(pushMock).toHaveBeenCalledWith('/billing/remove-branding');
+        expect(pushMock).toHaveBeenCalledWith('/pricing');
       });
     });
 
