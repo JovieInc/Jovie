@@ -3,6 +3,7 @@ import { clerkSetup } from '@clerk/testing/playwright';
 import { config } from 'dotenv';
 import path from 'path';
 import { APP_ROUTES } from '../constants/routes';
+import { ADMIN_PRIMARY_NAV_SURFACES } from './e2e/utils/admin-surface-manifest';
 import {
   isExternalBaseUrl,
   isSafePreviewBaseUrl,
@@ -65,6 +66,16 @@ const SENSITIVE_PATTERNS = [
   'placeholder',
 ];
 
+const ADMIN_NAV_WARMUP_ROUTES = [
+  ...new Set([
+    ...ADMIN_PRIMARY_NAV_SURFACES.map(surface => surface.path),
+    APP_ROUTES.ADMIN_CREATORS,
+    APP_ROUTES.ADMIN_USERS,
+    APP_ROUTES.SETTINGS_ADMIN,
+    APP_ROUTES.ADMIN_ALGORITHM_HEALTH,
+  ]),
+];
+
 function isRealKey(key: string | undefined): key is string {
   if (!key) return false;
   const lowerKey = key.toLowerCase();
@@ -94,6 +105,42 @@ function writeWarmupStamp(baseURL: string) {
     warmupStampPath,
     JSON.stringify({ baseURL, warmedAt: Date.now() }, null, 2)
   );
+}
+
+async function getProtectedWarmupHeaders(
+  baseURL: string
+): Promise<Record<string, string> | undefined> {
+  if (!useTestAuthBypass || isPublicNoAuthOnly) {
+    return undefined;
+  }
+
+  try {
+    const response = await fetch(`${baseURL}/api/dev/test-auth/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ persona: 'admin' }),
+      signal: AbortSignal.timeout(120_000),
+    });
+
+    if (!response.ok) {
+      console.log(
+        `  Protected route warmup auth failed (${response.status}) - continuing without auth cookies`
+      );
+      return undefined;
+    }
+
+    const cookieHeader = response.headers
+      .getSetCookie()
+      .map(value => value.split(';', 1)[0])
+      .join('; ');
+
+    return cookieHeader.length > 0 ? { Cookie: cookieHeader } : undefined;
+  } catch {
+    console.log(
+      '  Protected route warmup auth failed (request error) - continuing without auth cookies'
+    );
+    return undefined;
+  }
 }
 
 async function globalSetup() {
@@ -223,6 +270,8 @@ async function globalSetup() {
 
     console.log('Warming up Turbopack routes...');
     const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
+    const protectedWarmupHeaders =
+      await getProtectedWarmupHeaders(localBaseURL);
     const warmupRoutes = isPublicNoAuthOnly
       ? isFastIteration
         ? ['/', `/${testProfile}`]
@@ -253,14 +302,16 @@ async function globalSetup() {
             `/${testProfile}?mode=subscribe`,
             `/${testProfile}?mode=tip`,
             '/testartist?mode=tip',
-            APP_ROUTES.ADMIN,
-            APP_ROUTES.ADMIN_CREATORS,
-            APP_ROUTES.ADMIN_USERS,
+            ...ADMIN_NAV_WARMUP_ROUTES,
           ];
 
     for (const route of warmupRoutes) {
       try {
         const res = await fetch(`${localBaseURL}${route}`, {
+          headers:
+            route.startsWith('/app/') || route.startsWith('/api/')
+              ? protectedWarmupHeaders
+              : undefined,
           signal: AbortSignal.timeout(120_000),
           redirect: 'follow',
         });
