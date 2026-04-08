@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.135] - 2026-04-07
+
+> Document the local `ripgrep` prerequisite so fresh worktrees have `rg` available for agent and search tooling.
+
+### Changed
+
+- Documented `ripgrep` as a local prerequisite in the getting-started guide
+- Added `ripgrep` install commands for macOS and Ubuntu/Debian after the initial workspace bootstrap step
+- Synced the canonical version file and workspace package versions to `26.4.135`
+- Taught `setup.sh` to verify `rg` and auto-install it on supported local environments
+
 ## [26.4.134] - 2026-04-07
 
 > Automated playlist network engine: LLM-curated Spotify playlists as an inbound artist acquisition channel.

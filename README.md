@@ -85,6 +85,7 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 
 - **Node.js 22.13.0+** (22.x only)
 - **pnpm 9.15.4** (exact, via Corepack)
+- **ripgrep (`rg`)** for local agent and search tooling
 - **Doppler CLI** (secrets management) - [Install Guide](docs/DOPPLER_SETUP.md)
 - **Accounts Required:**
   - [Neon](https://neon.tech/) - PostgreSQL database
@@ -109,7 +110,13 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
    ./scripts/setup.sh
    ```
 
-   This verifies the required Node/pnpm versions, installs dependencies, and checks Doppler access.
+   This verifies the required Node/pnpm/ripgrep tooling, installs dependencies, and checks Doppler access.
+   On supported macOS and Debian/Ubuntu systems it will attempt to install `ripgrep` automatically. If auto-install is unavailable, use:
+
+   ```bash
+   brew install ripgrep  # macOS
+   sudo apt-get install -y ripgrep  # Ubuntu/Debian
+   ```
 
 ### Internal Quickstart
 

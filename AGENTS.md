@@ -12,7 +12,7 @@ Before running ANY command in this repo, run:
 ./scripts/setup.sh
 ```
 
-This idempotent script checks Node.js (22.x), pnpm (9.15.4), and Doppler CLI, installs missing tools, runs `pnpm install`, and verifies Doppler auth.
+This idempotent script checks Node.js (22.x), pnpm (9.15.4), `ripgrep` (`rg`), and Doppler CLI, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
 
 On every fresh Git worktree, run `./scripts/setup.sh` again before doing anything else.
 Worktrees do not share `node_modules`, so dependency installation is per-worktree even when Turbo cache is shared.
