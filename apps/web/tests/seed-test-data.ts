@@ -46,6 +46,12 @@ interface SeedTestDataOptions {
   readonly publicProfilesOnly?: boolean;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
 async function withSeedOperationTimeout<T>(
   operation: Promise<T>,
   timeoutMs: number,
@@ -83,6 +89,55 @@ function isMissingActiveProfileIdColumn(error: unknown): boolean {
     message.includes('active_profile_id') &&
     message.includes('column')
   );
+}
+
+export function isRetryableSeedDatabaseError(error: unknown): boolean {
+  const message = (
+    error instanceof Error ? error.message : String(error)
+  ).toLowerCase();
+  const code =
+    typeof error === 'object' && error !== null
+      ? ((error as { code?: string; cause?: { code?: string } }).code ??
+        (error as { cause?: { code?: string } }).cause?.code)
+      : undefined;
+
+  return (
+    message.includes('password authentication failed') ||
+    message.includes('connection terminated unexpectedly') ||
+    message.includes('server closed the connection unexpectedly') ||
+    message.includes('the database system is starting up') ||
+    code === '57P03'
+  );
+}
+
+async function withSeedDatabaseRetry<T>(
+  operation: () => Promise<T>,
+  options: {
+    readonly attempts: number;
+    readonly initialDelayMs: number;
+    readonly label: string;
+  }
+): Promise<T> {
+  let attempt = 0;
+  let delayMs = options.initialDelayMs;
+
+  while (true) {
+    attempt += 1;
+
+    try {
+      return await operation();
+    } catch (error) {
+      if (attempt >= options.attempts || !isRetryableSeedDatabaseError(error)) {
+        throw error;
+      }
+
+      console.warn(
+        `  ⚠ ${options.label} failed on attempt ${attempt}/${options.attempts}; retrying in ${delayMs}ms`
+      );
+      await sleep(delayMs);
+      delayMs *= 2;
+    }
+  }
 }
 
 const TEST_PROFILES: TestProfile[] = [
@@ -836,130 +891,141 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
   const db = drizzle(sql, { schema });
 
   try {
-    if (!options.publicProfilesOnly) {
-      // Create E2E test user (for authenticated dashboard tests)
-      // These values come from the setup script: scripts/setup-e2e-users.ts
-      const {
-        E2E_CLERK_USER_ID: configuredE2EClerkUserId,
-        E2E_CLERK_USER_USERNAME,
-      } = getSeedEnv();
-      const E2E_EMAIL = normalizeEmail(E2E_CLERK_USER_USERNAME || 'e2e@jov.ie');
-      const isAllowlistedE2EEmail = isAllowlistedE2ESeedEmail(E2E_EMAIL);
-      const E2E_USERNAME = 'e2e-test-user';
-      const E2E_CLERK_USER_ID = isAllowlistedE2EEmail
-        ? await resolveSeedUserClerkId(E2E_EMAIL, configuredE2EClerkUserId)
-        : null;
-
-      if (E2E_CLERK_USER_ID) {
-        // Keep the Playwright auth-bypass path aligned with the Clerk user ID
-        // actually seeded into the database for this run.
-        process.env.E2E_CLERK_USER_ID = E2E_CLERK_USER_ID;
-      }
-
-      if (!isAllowlistedE2EEmail) {
-        console.warn(
-          `  ⚠ Refusing to seed privileged E2E user for non-allowlisted email ${E2E_EMAIL}`
-        );
-      } else if (!E2E_CLERK_USER_ID) {
-        console.log(
-          '  ⚠ E2E_CLERK_USER_ID not set, skipping E2E user creation'
-        );
-        console.log(
-          '    Run scripts/setup-e2e-users.ts to create test users in Clerk'
-        );
-      } else {
-        console.log('  Creating E2E test user...');
-        try {
-          const { id: userId, previousClerkId } = await ensureUser(db, {
-            clerkId: E2E_CLERK_USER_ID,
-            email: E2E_EMAIL,
-            name: 'E2E Test',
-            userStatus: 'active',
-            isAdmin: true,
-          });
-          console.log(
-            `    ✓ Ensured E2E user with admin privileges (ID: ${userId})`
+    await withSeedDatabaseRetry(
+      async () => {
+        if (!options.publicProfilesOnly) {
+          // Create E2E test user (for authenticated dashboard tests)
+          // These values come from the setup script: scripts/setup-e2e-users.ts
+          const {
+            E2E_CLERK_USER_ID: configuredE2EClerkUserId,
+            E2E_CLERK_USER_USERNAME,
+          } = getSeedEnv();
+          const E2E_EMAIL = normalizeEmail(
+            E2E_CLERK_USER_USERNAME || 'e2e@jov.ie'
           );
-          if (previousClerkId) {
-            console.log(
-              `    ✓ Adopted existing E2E user from stale Clerk ID ${previousClerkId} to ${E2E_CLERK_USER_ID}`
-            );
+          const isAllowlistedE2EEmail = isAllowlistedE2ESeedEmail(E2E_EMAIL);
+          const E2E_USERNAME = 'e2e-test-user';
+          const E2E_CLERK_USER_ID = isAllowlistedE2EEmail
+            ? await resolveSeedUserClerkId(E2E_EMAIL, configuredE2EClerkUserId)
+            : null;
+
+          if (E2E_CLERK_USER_ID) {
+            // Keep the Playwright auth-bypass path aligned with the Clerk user ID
+            // actually seeded into the database for this run.
+            process.env.E2E_CLERK_USER_ID = E2E_CLERK_USER_ID;
           }
 
-          const profileId = await ensureCreatorProfile(db, {
-            userId,
-            username: E2E_USERNAME,
-            usernameNormalized: E2E_USERNAME.toLowerCase(),
-            displayName: 'E2E Test User',
-            bio: 'Automated test user',
-            avatarUrl: DEFAULT_TEST_AVATAR_URL,
-            spotifyUrl: null,
-            appleMusicUrl: null,
-            appleMusicId: null,
-            youtubeMusicId: null,
-            deezerId: null,
-            tidalId: null,
-            soundcloudId: null,
-            creatorType: 'artist',
-            isPublic: true,
-            isVerified: false,
-            isClaimed: true,
-            ingestionStatus: 'idle',
-            onboardingCompletedAt: new Date(),
-          });
-
-          await setActiveProfile(db, userId, profileId);
-
-          console.log(
-            `    ✓ Ensured E2E profile ${E2E_USERNAME} (ID: ${profileId})`
-          );
-          console.log(`    ✓ Set active profile for E2E user`);
-
-          await seedReleasesForProfile(db, profileId);
-          await seedTourDatesForProfile(db, profileId);
-
-          const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } =
-            getSeedEnv();
-          if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
+          if (!isAllowlistedE2EEmail) {
+            console.warn(
+              `  ⚠ Refusing to seed privileged E2E user for non-allowlisted email ${E2E_EMAIL}`
+            );
+          } else if (!E2E_CLERK_USER_ID) {
+            console.log(
+              '  ⚠ E2E_CLERK_USER_ID not set, skipping E2E user creation'
+            );
+            console.log(
+              '    Run scripts/setup-e2e-users.ts to create test users in Clerk'
+            );
+          } else {
+            console.log('  Creating E2E test user...');
             try {
-              const redis = new Redis({
-                url: UPSTASH_REDIS_REST_URL,
-                token: UPSTASH_REDIS_REST_TOKEN,
+              const { id: userId, previousClerkId } = await ensureUser(db, {
+                clerkId: E2E_CLERK_USER_ID,
+                email: E2E_EMAIL,
+                name: 'E2E Test',
+                userStatus: 'active',
+                isAdmin: true,
               });
-              const clerkIdsToInvalidate = [
-                previousClerkId,
-                E2E_CLERK_USER_ID,
-              ].filter((clerkId): clerkId is string => Boolean(clerkId));
-
-              let deletedCount = 0;
-              for (const clerkId of clerkIdsToInvalidate) {
-                const proxyStateCacheKey = `proxy:user-state:${clerkId}`;
-                const adminRoleCacheKey = `admin:role:${clerkId}`;
-                deletedCount += await redis.del(proxyStateCacheKey);
-                deletedCount += await redis.del(adminRoleCacheKey);
+              console.log(
+                `    ✓ Ensured E2E user with admin privileges (ID: ${userId})`
+              );
+              if (previousClerkId) {
+                console.log(
+                  `    ✓ Adopted existing E2E user from stale Clerk ID ${previousClerkId} to ${E2E_CLERK_USER_ID}`
+                );
               }
 
+              const profileId = await ensureCreatorProfile(db, {
+                userId,
+                username: E2E_USERNAME,
+                usernameNormalized: E2E_USERNAME.toLowerCase(),
+                displayName: 'E2E Test User',
+                bio: 'Automated test user',
+                avatarUrl: DEFAULT_TEST_AVATAR_URL,
+                spotifyUrl: null,
+                appleMusicUrl: null,
+                appleMusicId: null,
+                youtubeMusicId: null,
+                deezerId: null,
+                tidalId: null,
+                soundcloudId: null,
+                creatorType: 'artist',
+                isPublic: true,
+                isVerified: false,
+                isClaimed: true,
+                ingestionStatus: 'idle',
+                onboardingCompletedAt: new Date(),
+              });
+
+              await setActiveProfile(db, userId, profileId);
+
               console.log(
-                `    ✓ Invalidated proxy/admin caches for E2E user (${deletedCount} key(s) across ${clerkIdsToInvalidate.length} Clerk ID(s))`
+                `    ✓ Ensured E2E profile ${E2E_USERNAME} (ID: ${profileId})`
               );
+              console.log(`    ✓ Set active profile for E2E user`);
+
+              await seedReleasesForProfile(db, profileId);
+              await seedTourDatesForProfile(db, profileId);
+
+              const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } =
+                getSeedEnv();
+              if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
+                try {
+                  const redis = new Redis({
+                    url: UPSTASH_REDIS_REST_URL,
+                    token: UPSTASH_REDIS_REST_TOKEN,
+                  });
+                  const clerkIdsToInvalidate = [
+                    previousClerkId,
+                    E2E_CLERK_USER_ID,
+                  ].filter((clerkId): clerkId is string => Boolean(clerkId));
+
+                  let deletedCount = 0;
+                  for (const clerkId of clerkIdsToInvalidate) {
+                    const proxyStateCacheKey = `proxy:user-state:${clerkId}`;
+                    const adminRoleCacheKey = `admin:role:${clerkId}`;
+                    deletedCount += await redis.del(proxyStateCacheKey);
+                    deletedCount += await redis.del(adminRoleCacheKey);
+                  }
+
+                  console.log(
+                    `    ✓ Invalidated proxy/admin caches for E2E user (${deletedCount} key(s) across ${clerkIdsToInvalidate.length} Clerk ID(s))`
+                  );
+                } catch (error) {
+                  console.warn(
+                    '    ⚠ Failed to invalidate proxy state cache for E2E user:',
+                    error
+                  );
+                }
+              }
             } catch (error) {
+              if (!isMissingActiveProfileIdColumn(error)) {
+                throw error;
+              }
+
               console.warn(
-                '    ⚠ Failed to invalidate proxy state cache for E2E user:',
-                error
+                '    ⚠ Skipping E2E user creation because the preview database is missing users.active_profile_id'
               );
             }
           }
-        } catch (error) {
-          if (!isMissingActiveProfileIdColumn(error)) {
-            throw error;
-          }
-
-          console.warn(
-            '    ⚠ Skipping E2E user creation because the preview database is missing users.active_profile_id'
-          );
         }
+      },
+      {
+        attempts: process.env.CI ? 4 : 2,
+        initialDelayMs: 1_500,
+        label: 'E2E seed database access',
       }
-    }
+    );
 
     // Create test profiles
     for (const profile of TEST_PROFILES) {
