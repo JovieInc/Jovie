@@ -112,7 +112,6 @@ describe('dashboard clerk-safe rendering', () => {
       name: 'Tim White',
       tagline: '',
       imageUrl: '',
-      hideBranding: false,
     } as unknown as Artist;
 
     const { result } = renderHook(() =>
