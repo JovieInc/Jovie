@@ -39,10 +39,10 @@ describe('GetStartedChecklistCard', () => {
     localStorage.clear();
   });
 
-  it('renders 5 checklist items', () => {
+  it('renders 4 checklist items', () => {
     render(<GetStartedChecklistCard userId={userId} />);
     const items = screen.getAllByRole('listitem');
-    expect(items).toHaveLength(5);
+    expect(items).toHaveLength(4);
   });
 
   it('shows progress bar', () => {
@@ -93,7 +93,6 @@ describe('GetStartedChecklistCard', () => {
       'share-instagram',
       'spotify-bio',
       'qr-code',
-      'invite-artist',
       'connect-venmo',
     ];
     localStorage.setItem(

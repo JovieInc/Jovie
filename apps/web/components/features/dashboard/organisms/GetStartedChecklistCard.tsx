@@ -41,12 +41,6 @@ const CHECKLIST_ITEMS: ChecklistItem[] = [
     description: 'Print it for merch tables and venues',
   },
   {
-    id: 'invite-artist',
-    label: 'Invite an artist friend',
-    description: 'Earn 50% commission for 24 months',
-    href: `${APP_ROUTES.SETTINGS}/referral`,
-  },
-  {
     id: 'set-up-tips',
     label: 'Set Up Tips',
     description: 'Let fans support you directly',
