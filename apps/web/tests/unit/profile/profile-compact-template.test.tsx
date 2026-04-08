@@ -1,8 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import type { Artist } from '@/types/db';
+
+const mockCanonicalProfileDSPs = vi.fn(() => []);
 
 vi.mock('next/dynamic', () => ({
   default: () => () => null,
@@ -90,7 +92,8 @@ vi.mock('@/lib/dsp', () => ({
 }));
 
 vi.mock('@/lib/profile-dsps', () => ({
-  getCanonicalProfileDSPs: () => [],
+  getCanonicalProfileDSPs: (...args: unknown[]) =>
+    mockCanonicalProfileDSPs(...args),
 }));
 
 const mockArtist: Artist = {
@@ -110,6 +113,11 @@ const mockArtist: Artist = {
 };
 
 describe('ProfileCompactTemplate', () => {
+  beforeEach(() => {
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    window.history.replaceState(null, '', '/test-artist');
+  });
+
   it('links the top-left Jovie mark to the artist profiles landing page', async () => {
     const { ProfileCompactTemplate } = await import(
       '@/features/profile/templates/ProfileCompactTemplate'
@@ -127,5 +135,29 @@ describe('ProfileCompactTemplate', () => {
     expect(
       screen.getByRole('link', { name: 'Create your artist profile on Jovie' })
     ).toHaveAttribute('href', APP_ROUTES.ARTIST_PROFILES);
+  });
+
+  it('does not push an intermediate profile URL when deep-linked into a mode', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    window.history.replaceState(null, '', '/test-artist?mode=listen');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    const { ProfileCompactTemplate } = await import(
+      '@/features/profile/templates/ProfileCompactTemplate'
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    expect(window.location.search).toBe('?mode=listen');
+    expect(pushStateSpy).not.toHaveBeenCalled();
+
+    pushStateSpy.mockRestore();
   });
 });

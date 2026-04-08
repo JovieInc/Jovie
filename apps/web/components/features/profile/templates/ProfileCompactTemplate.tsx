@@ -156,6 +156,7 @@ export function ProfileCompactTemplate({
     getModeFromLocation()
   );
   const revealNotificationsRef = useRef<(() => void) | null>(null);
+  const suppressNextHistorySyncRef = useRef(true);
 
   // Lock orientation to portrait on mobile
   useEffect(() => {
@@ -351,9 +352,19 @@ export function ProfileCompactTemplate({
     [hasContacts, hasTip, mergedDSPs.length]
   );
 
+  const syncRequestedModeFromLocation = useCallback(() => {
+    setRequestedMode(currentMode => {
+      const nextMode = getModeFromLocation();
+      if (currentMode !== nextMode) {
+        suppressNextHistorySyncRef.current = true;
+      }
+      return nextMode;
+    });
+  }, []);
+
   useEffect(() => {
-    setRequestedMode(getModeFromLocation());
-  }, [mode]);
+    syncRequestedModeFromLocation();
+  }, [mode, syncRequestedModeFromLocation]);
 
   useEffect(() => {
     const resolved = resolveInitialView(requestedMode);
@@ -368,14 +379,19 @@ export function ProfileCompactTemplate({
 
   useEffect(() => {
     const handlePopState = () => {
-      setRequestedMode(getModeFromLocation());
+      syncRequestedModeFromLocation();
     };
 
     globalThis.addEventListener('popstate', handlePopState);
     return () => globalThis.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [syncRequestedModeFromLocation]);
 
   useEffect(() => {
+    if (suppressNextHistorySyncRef.current) {
+      suppressNextHistorySyncRef.current = false;
+      return;
+    }
+
     const activeMode =
       drawerOpen && drawerView !== 'menu' && drawerView !== 'notifications'
         ? drawerView
