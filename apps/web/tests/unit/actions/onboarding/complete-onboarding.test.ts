@@ -7,7 +7,6 @@ const {
   mockCaptureError,
   mockCreateProfileForExistingUser,
   mockCreateUserAndProfile,
-  mockCurrentUser,
   mockDeactivateOrphanedProfiles,
   mockEnforceOnboardingRateLimit,
   mockEnsureEmailAvailable,
@@ -16,6 +15,7 @@ const {
   mockFetchExistingProfile,
   mockFetchExistingUser,
   mockGetCachedAuth,
+  mockGetCachedCurrentUser,
   mockHandleBackgroundAvatarUpload,
   mockHeaders,
   mockInvalidateProfileCache,
@@ -39,7 +39,6 @@ const {
   mockCaptureError: vi.fn(),
   mockCreateProfileForExistingUser: vi.fn(),
   mockCreateUserAndProfile: vi.fn(),
-  mockCurrentUser: vi.fn(),
   mockDeactivateOrphanedProfiles: vi.fn(),
   mockEnforceOnboardingRateLimit: vi.fn(),
   mockEnsureEmailAvailable: vi.fn(),
@@ -48,6 +47,7 @@ const {
   mockFetchExistingProfile: vi.fn(),
   mockFetchExistingUser: vi.fn(),
   mockGetCachedAuth: vi.fn(),
+  mockGetCachedCurrentUser: vi.fn(),
   mockHandleBackgroundAvatarUpload: vi.fn(),
   mockHeaders: vi.fn(),
   mockInvalidateProfileCache: vi.fn(),
@@ -70,10 +70,6 @@ const {
   mockRevalidatePath: vi.fn(),
 }));
 
-vi.mock('@clerk/nextjs/server', () => ({
-  currentUser: mockCurrentUser,
-}));
-
 vi.mock('next/cache', () => ({
   revalidatePath: mockRevalidatePath,
 }));
@@ -91,6 +87,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
+  getCachedCurrentUser: mockGetCachedCurrentUser,
 }));
 
 vi.mock('@/lib/auth/clerk-identity', () => ({
@@ -191,7 +188,7 @@ describe('completeOnboarding', () => {
     mockHeaders.mockResolvedValue({
       get: vi.fn((name: string) => (name === 'cookie' ? 'session=test' : null)),
     });
-    mockCurrentUser.mockResolvedValue({ id: 'clerk-user-123' });
+    mockGetCachedCurrentUser.mockResolvedValue({ id: 'clerk-user-123' });
     mockResolveClerkIdentity.mockReturnValue({
       avatarUrl: 'https://images.test/avatar.png',
       email: 'artist@example.com',
@@ -382,6 +379,7 @@ describe('completeOnboarding', () => {
       'layout'
     );
     expect(mockRedirect).not.toHaveBeenCalled();
+    expect(mockGetCachedCurrentUser).toHaveBeenCalled();
   });
 
   it('updates an existing incomplete profile and deactivates orphaned profiles', async () => {

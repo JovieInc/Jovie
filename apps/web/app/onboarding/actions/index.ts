@@ -4,12 +4,11 @@
 
 'use server';
 
-import { currentUser } from '@clerk/nextjs/server';
 import { revalidatePath } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -107,7 +106,7 @@ export async function completeOnboarding({
     const clientIP = extractClientIP(headersList);
     const cookieHeader = headersList.get('cookie');
 
-    const clerkUser = await currentUser();
+    const clerkUser = await getCachedCurrentUser();
     const clerkIdentity = resolveClerkIdentity(clerkUser);
     const oauthAvatarUrl = clerkIdentity.avatarUrl;
 

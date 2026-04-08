@@ -8,6 +8,8 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { neon } from '@neondatabase/serverless';
 import type { Page } from '@playwright/test';
+import { ensureClerkTestUser } from '@/lib/testing/test-user-provision.server';
+import { setTestAuthBypassSession } from '@/tests/helpers/clerk-auth';
 
 /* ------------------------------------------------------------------ */
 /*  Environment gates                                                   */
@@ -492,6 +494,29 @@ export async function ensureDbUser(
     `;
   }
 
+  // Bypass mode authenticates via test cookies, but the server only knows the
+  // unique per-run email if we seed the matching DB row up front. Without
+  // this, getCachedCurrentUser() falls back to the shared browse test persona
+  // and onboarding submits against a mismatched identity.
+  if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
+    const [user] = (await sql`
+      INSERT INTO users (clerk_id, email, name, user_status)
+      VALUES (${clerkUserId}, ${email}, 'Golden Path', 'waitlist_approved')
+      ON CONFLICT (clerk_id) DO UPDATE SET
+        email = ${email},
+        name = 'Golden Path',
+        user_status = 'waitlist_approved',
+        updated_at = NOW()
+      RETURNING id
+    `) as EnsuredUserRow[];
+
+    if (!user?.id) {
+      throw new Error(`Failed to ensure DB user for Clerk user ${clerkUserId}`);
+    }
+
+    return;
+  }
+
   const [user] = (await sql`
     INSERT INTO users (clerk_id, email, user_status)
     VALUES (${clerkUserId}, ${email}, 'waitlist_approved')
@@ -533,6 +558,21 @@ export async function interceptTrackingCalls(page: Page) {
  * with the magic code 424242 before a session is created.
  */
 export async function createFreshUser(page: Page, uniqueSeed: string) {
+  const email = `gp-${uniqueSeed}+clerk_test@test.jovie.com`;
+
+  if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
+    const clerkUserId = await ensureClerkTestUser({
+      email,
+      username: `gp-${uniqueSeed}`.replaceAll(/[^a-z0-9-]/gi, '').slice(0, 32),
+      firstName: 'Golden',
+      lastName: 'Path',
+      metadata: { source: 'e2e-smoke-bypass' },
+    });
+
+    await setTestAuthBypassSession(page, null, clerkUserId);
+    return { email, clerkUserId };
+  }
+
   await setupClerkTestingToken({ page });
 
   const loadClerk = async () => {
@@ -568,8 +608,6 @@ export async function createFreshUser(page: Page, uniqueSeed: string) {
   if (!loaded) {
     throw new Error('Clerk JS failed to load — cannot create test user');
   }
-
-  const email = `gp-${uniqueSeed}+clerk_test@test.jovie.com`;
 
   const clerkUserId = await page.evaluate(async (targetEmail: string) => {
     const clerkInstance = (window as any).Clerk;
