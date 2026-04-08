@@ -338,11 +338,32 @@ export async function ensureCreatorProfileRecord(
   database: DbOrTransaction,
   values: SeededCreatorProfileValues
 ): Promise<string> {
-  const [existingProfile] = await database
-    .select({ id: creatorProfiles.id })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
-    .limit(1);
+  const findExistingByUserId = async () => {
+    if (!values.userId) {
+      return null;
+    }
+
+    const [profile] = await database
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.userId, values.userId))
+      .limit(1);
+
+    return profile ?? null;
+  };
+
+  const findExistingByUsername = async () => {
+    const [profile] = await database
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
+      .limit(1);
+
+    return profile ?? null;
+  };
+
+  const existingProfile =
+    (await findExistingByUserId()) ?? (await findExistingByUsername());
 
   if (existingProfile) {
     await database
@@ -363,11 +384,8 @@ export async function ensureCreatorProfileRecord(
       throw error;
     }
 
-    const [racedProfile] = await database
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
-      .limit(1);
+    const racedProfile =
+      (await findExistingByUserId()) ?? (await findExistingByUsername());
 
     if (!racedProfile) {
       throw error;

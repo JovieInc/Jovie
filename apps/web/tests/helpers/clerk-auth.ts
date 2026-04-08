@@ -184,49 +184,46 @@ export async function waitForAuthenticatedHealth(
   expectedUserId?: string | null
 ): Promise<void> {
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
-  const expectedHost = new URL(baseUrl).host;
+  const authHealthUrl = new URL('/api/health/auth', baseUrl).toString();
 
   await expect
     .poll(
       async () => {
-        const currentUrl = page.url();
-        if (!currentUrl || currentUrl === 'about:blank') {
-          return 'about:blank';
+        try {
+          const response = await page.request.get(authHealthUrl, {
+            failOnStatusCode: false,
+          });
+
+          if (!response.ok()) {
+            return `http-${response.status()}`;
+          }
+
+          const payload = (await response.json()) as {
+            authenticated?: boolean;
+            userId?: string | null;
+          };
+
+          if (!payload.authenticated) {
+            return 'anonymous';
+          }
+
+          if (expectedUserId && payload.userId !== expectedUserId) {
+            return `user-mismatch:${payload.userId ?? 'unknown'}`;
+          }
+
+          return 'authenticated';
+        } catch (error) {
+          if (error instanceof Error) {
+            if (
+              error.message.includes('Execution context was destroyed') ||
+              error.message.includes('ECONNRESET') ||
+              error.message.includes('socket hang up')
+            ) {
+              return 'retrying';
+            }
+          }
+          throw error;
         }
-
-        const currentHost = new URL(currentUrl).host;
-        if (currentHost !== expectedHost) {
-          return `host-mismatch:${currentHost}`;
-        }
-
-        return page.evaluate(
-          async ({ expectedUserId: expected }) => {
-            const response = await fetch('/api/health/auth', {
-              credentials: 'include',
-              cache: 'no-store',
-            });
-
-            if (!response.ok) {
-              return `http-${response.status}`;
-            }
-
-            const payload = (await response.json()) as {
-              authenticated?: boolean;
-              userId?: string | null;
-            };
-
-            if (!payload.authenticated) {
-              return 'anonymous';
-            }
-
-            if (expected && payload.userId !== expected) {
-              return `user-mismatch:${payload.userId ?? 'unknown'}`;
-            }
-
-            return 'authenticated';
-          },
-          { expectedUserId }
-        );
       },
       { timeout: 30_000 }
     )

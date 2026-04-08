@@ -59,18 +59,16 @@ export function SettingsProfileSection({
       | 'targetPlaylists',
     value: string
   ) => {
-    setFormData(prev => {
-      const next = { ...prev, [field]: value };
-      setProfileSaveStatus(s => ({ ...s, success: null, error: null }));
-      saveProfile({
-        displayName: next.displayName,
-        username: next.username,
-        location: next.location,
-        hometown: next.hometown,
-        careerHighlights: next.careerHighlights,
-        targetPlaylists: next.targetPlaylists,
-      });
-      return next;
+    const next = { ...formData, [field]: value };
+    setFormData(next);
+    setProfileSaveStatus(s => ({ ...s, success: null, error: null }));
+    saveProfile({
+      displayName: next.displayName,
+      username: next.username,
+      location: next.location,
+      hometown: next.hometown,
+      careerHighlights: next.careerHighlights,
+      targetPlaylists: next.targetPlaylists,
     });
   };
 

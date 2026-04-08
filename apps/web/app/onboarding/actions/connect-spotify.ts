@@ -295,8 +295,8 @@ export async function connectOnboardingSpotifyArtist(
   const runSpotifyImport = async (): Promise<SpotifyImportResult> => {
     const fastImportOptions = isE2EFastOnboardingEnabled()
       ? {
-          maxReleases: 4,
-          maxTracksPerRelease: 12,
+          maxReleases: 1,
+          maxTracksPerRelease: 6,
         }
       : {};
 

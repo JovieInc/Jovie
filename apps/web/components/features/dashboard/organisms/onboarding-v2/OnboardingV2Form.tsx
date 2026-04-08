@@ -30,13 +30,13 @@ import { OnboardingExperienceShell } from '@/components/features/onboarding/Onbo
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthBackButton } from '@/features/auth';
-import { useHandleValidation } from '@/features/dashboard/organisms/apple-style-onboarding/useHandleValidation';
+import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding';
+import { useHandleValidation } from '@/features/dashboard/organisms/onboarding-v2/shared/useHandleValidation';
 import {
   type AutoConnectedArtistSelection,
   extractSignupClaimArtistSelection,
   useOnboardingSubmit,
-} from '@/features/dashboard/organisms/apple-style-onboarding/useOnboardingSubmit';
-import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding';
+} from '@/features/dashboard/organisms/onboarding-v2/shared/useOnboardingSubmit';
 import {
   DEFAULT_UPSELL_PLAN,
   getPlanIntent,
@@ -207,6 +207,7 @@ interface OnboardingV2FormProps {
   readonly initialHandle?: string;
   readonly initialProfileId?: string | null;
   readonly initialResumeStep?: string | null;
+  readonly isHydrated: boolean;
   readonly isReservedHandle?: boolean;
   readonly shouldAutoSubmitHandle?: boolean;
   readonly userEmail?: string | null;
@@ -698,6 +699,7 @@ export function OnboardingV2Form({
   initialHandle = '',
   initialProfileId = null,
   initialResumeStep = null,
+  isHydrated,
   isReservedHandle = false,
   shouldAutoSubmitHandle = false,
   userEmail = null,
@@ -769,6 +771,7 @@ export function OnboardingV2Form({
   }, [currentStep]);
 
   const handleStepCtaDisabledReason = useMemo(() => {
+    if (!isHydrated) return 'Preparing your handle step...';
     if (!profileHandle) return 'Enter a handle to continue';
     if (!handleValidation.clientValid) {
       return handleValidation.error || 'Handle is invalid';
@@ -778,7 +781,7 @@ export function OnboardingV2Form({
       return handleValidation.error || 'Handle is taken';
     }
     return null;
-  }, [handleValidation, profileHandle]);
+  }, [handleValidation, isHydrated, profileHandle]);
 
   useEffect(() => {
     if (!profileHandle) {
@@ -822,6 +825,7 @@ export function OnboardingV2Form({
     handle,
     handleInput: profileHandle,
     handleValidation,
+    isHydrated,
     isReservedHandle,
     onAutoConnectStarted: selection => {
       setSelectedArtist(normalizeSelectedArtist(selection));
@@ -1504,6 +1508,7 @@ export function OnboardingV2Form({
             handleInput={profileHandle}
             handleValidation={handleValidation}
             inputRef={handleInputRef}
+            isHydrated={isHydrated}
             isPendingSubmit={isPendingSubmit}
             isReservedHandle={isReservedHandle}
             isSubmitting={state.isSubmitting}

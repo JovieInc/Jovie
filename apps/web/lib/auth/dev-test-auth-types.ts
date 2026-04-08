@@ -4,7 +4,7 @@ export interface DevTestAuthActor {
   readonly persona: DevTestAuthPersona;
   readonly clerkUserId: string;
   readonly email: string;
-  readonly username: string;
+  readonly username: string | null;
   readonly fullName: string;
   readonly isAdmin: boolean;
   readonly profilePath: string | null;

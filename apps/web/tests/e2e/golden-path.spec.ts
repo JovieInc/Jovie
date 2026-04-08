@@ -164,6 +164,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     // ──────────────────────────────────────────────────────────────────
     await completeOnboardingV2(page, spotifyArtist.url, {
       clerkUserId,
+      expectedHandle: onboardingHandle,
     });
 
     await ensureServerAuthenticated(page, clerkUserId);

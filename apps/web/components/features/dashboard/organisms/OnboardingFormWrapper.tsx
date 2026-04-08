@@ -99,6 +99,7 @@ export function OnboardingFormWrapper({
         key={formKey}
         initialDisplayName={initialDisplayName}
         initialHandle={resolvedHandle}
+        isHydrated={isHydrated}
         isReservedHandle={isReservedHandle}
         userEmail={userEmail}
         userId={userId}

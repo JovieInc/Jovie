@@ -212,6 +212,25 @@ describe('dev-test-auth.server', () => {
     );
   });
 
+  it('does not fall back to the stable persona username for matched users without an active profile', async () => {
+    const { buildDevTestAuthCurrentUser } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    const currentUser = buildDevTestAuthCurrentUser({
+      persona: 'creator',
+      clerkUserId: 'user_clerk',
+      dbUserId: 'db_user',
+      email: 'browse+clerk_test@jov.ie',
+      username: null,
+      fullName: 'Browse Test User',
+      isAdmin: false,
+      profilePath: null,
+    });
+
+    expect(currentUser.username).toBeNull();
+  });
+
   it('does not fail bootstrap when cache invalidation fails', async () => {
     mockInvalidateTestUserCaches.mockRejectedValue(
       new Error('redis unavailable')

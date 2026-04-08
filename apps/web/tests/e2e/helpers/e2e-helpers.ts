@@ -12,7 +12,10 @@ import {
   setTestAuthBypassSession,
   waitForAuthenticatedHealth,
 } from '../../helpers/clerk-auth';
-import { smokeNavigateWithRetry } from '../utils/smoke-test-utils';
+import {
+  smokeNavigateWithRetry,
+  waitForHydration,
+} from '../utils/smoke-test-utils';
 
 /* ------------------------------------------------------------------ */
 /*  Environment gates                                                   */
@@ -336,12 +339,18 @@ export function buildValidOnboardingHandle(
 export async function completeOnboardingV2(
   page: Page,
   spotifyArtistUrl: string = DEFAULT_ONBOARDING_SPOTIFY_ARTIST.url,
-  options: Readonly<{ clerkUserId?: string }> = {}
+  options: Readonly<{ clerkUserId?: string; expectedHandle?: string }> = {}
 ) {
+  if (options.clerkUserId) {
+    await ensureServerAuthenticated(page, options.clerkUserId);
+  }
+
   const onboardingWrapper = page.locator(
     '[data-testid="onboarding-form-wrapper"]'
   );
-  const continueButton = page.getByRole('button', { name: 'Continue' });
+  const handleSubmitButton = onboardingWrapper
+    .locator('button[type="submit"]')
+    .first();
   const spotifyHeading = page.getByRole('heading', {
     name: 'Pick your Spotify artist',
   });
@@ -355,7 +364,7 @@ export async function completeOnboardingV2(
           return 'spotify';
         }
 
-        if (await continueButton.isVisible().catch(() => false)) {
+        if (await handleSubmitButton.isVisible().catch(() => false)) {
           return 'handle';
         }
 
@@ -365,23 +374,57 @@ export async function completeOnboardingV2(
     )
     .toMatch(/handle|spotify/);
 
+  await waitForHydration(page, { timeout: 90_000 });
+
   if (!(await spotifyHeading.isVisible().catch(() => false))) {
     const handleInput = page.getByLabel('Enter your desired handle');
     await expect(onboardingWrapper).toHaveAttribute('data-hydrated', 'true', {
-      timeout: 30_000,
+      timeout: 90_000,
     });
-    await expect(handleInput).toBeVisible({ timeout: 20_000 });
-    await expect(continueButton).toBeEnabled({ timeout: 20_000 });
-    await handleInput.focus();
-    await handleInput.press('Enter');
+    await expect
+      .poll(
+        async () => {
+          if (await spotifyHeading.isVisible().catch(() => false)) {
+            return 'spotify';
+          }
 
-    const reachedSpotifyViaEnter = await spotifyHeading
-      .isVisible({ timeout: 5_000 })
-      .catch(() => false);
+          if (await handleInput.isVisible().catch(() => false)) {
+            if (options.expectedHandle) {
+              const currentValue = (await handleInput.inputValue()).trim();
+              if (currentValue !== options.expectedHandle) {
+                return `unexpected-handle:${currentValue || 'empty'}`;
+              }
+            }
 
-    if (!reachedSpotifyViaEnter) {
-      await continueButton.click();
+            if (await handleSubmitButton.isEnabled().catch(() => false)) {
+              return 'handle-ready';
+            }
+
+            if (await handleSubmitButton.isVisible().catch(() => false)) {
+              return 'handle-loading';
+            }
+          }
+
+          return 'waiting';
+        },
+        { timeout: 90_000 }
+      )
+      .toMatch(/spotify|handle-ready|handle-loading|unexpected-handle:.+/);
+
+    if (await spotifyHeading.isVisible().catch(() => false)) {
+      return;
     }
+
+    await expect(handleInput).toBeVisible({ timeout: 20_000 });
+    if (options.expectedHandle) {
+      await expect
+        .poll(async () => (await handleInput.inputValue()).trim(), {
+          timeout: 20_000,
+        })
+        .toBe(options.expectedHandle);
+    }
+    await expect(handleSubmitButton).toBeEnabled({ timeout: 20_000 });
+    await handleSubmitButton.click();
   }
 
   await expect(spotifyHeading).toBeVisible({ timeout: 60_000 });
@@ -438,8 +481,29 @@ export async function completeOnboardingV2(
     await artistConfirmContinue.click();
   }
 
-  if (!(await profileReadyHeading.isVisible().catch(() => false))) {
-    await expect(upgradeHeading).toBeVisible({ timeout: 30_000 });
+  const postConfirmStep = await expect
+    .poll(
+      async () => {
+        if (await profileReadyHeading.isVisible().catch(() => false)) {
+          return 'profile-ready';
+        }
+
+        if (await upgradeHeading.isVisible().catch(() => false)) {
+          return 'upgrade';
+        }
+
+        return 'waiting';
+      },
+      { timeout: 30_000 }
+    )
+    .toMatch(/profile-ready|upgrade/)
+    .then(async () =>
+      (await profileReadyHeading.isVisible().catch(() => false))
+        ? 'profile-ready'
+        : 'upgrade'
+    );
+
+  if (postConfirmStep === 'upgrade') {
     await page.getByRole('button', { name: 'Continue free' }).click();
   }
 
@@ -666,6 +730,23 @@ export async function clearOnboardingRateLimits() {
   }
 }
 
+async function clearCachedUserState(clerkUserId: string) {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return;
+
+  try {
+    await fetch(
+      `${url}/del/${encodeURIComponent(`proxy:user-state:${clerkUserId}`)}/${encodeURIComponent(`admin:role:${clerkUserId}`)}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+  } catch {
+    // Non-critical — stale cache will self-heal, but local E2E may need a reload
+  }
+}
+
 /**
  * Pre-create a DB user row via direct Neon HTTP query.
  *
@@ -713,6 +794,7 @@ export async function ensureDbUser(
     VALUES (${clerkUserId}, ${email}, 'waitlist_approved')
     ON CONFLICT (clerk_id) DO UPDATE SET
       email = ${email},
+      is_admin = false,
       user_status = 'waitlist_approved',
       updated_at = NOW()
     RETURNING id
@@ -752,6 +834,8 @@ export async function ensureDbUser(
       updated_at = NOW()
     WHERE id = ${user.id}
   `;
+
+  await clearCachedUserState(clerkUserId);
 }
 
 /* ------------------------------------------------------------------ */
@@ -780,7 +864,13 @@ export async function interceptTrackingCalls(page: Page) {
  * with the magic code 424242 before a session is created.
  */
 export async function createFreshUser(page: Page, uniqueSeed: string) {
-  if (process.env.E2E_USE_TEST_AUTH_BYPASS !== '1') {
+  const email = `gp-${uniqueSeed}+clerk_test@test.jovie.com`;
+
+  const shouldUseClerkTestingToken =
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1' &&
+    process.env.E2E_ATTACH_TEST_AUTH_BYPASS_AFTER_SIGNUP !== '1';
+
+  if (shouldUseClerkTestingToken) {
     await setupClerkTestingToken({ page });
   }
 
@@ -817,8 +907,6 @@ export async function createFreshUser(page: Page, uniqueSeed: string) {
   if (!loaded) {
     throw new Error('Clerk JS failed to load — cannot create test user');
   }
-
-  const email = `gp-${uniqueSeed}+clerk_test@test.jovie.com`;
 
   const clerkUserId = await page.evaluate(async (targetEmail: string) => {
     const clerkInstance = (window as any).Clerk;

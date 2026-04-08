@@ -41,6 +41,8 @@ test.use({ storageState: { cookies: [], origins: [] } });
 const TEST_SPOTIFY_URL =
   'https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we'; // Dua Lipa
 
+let completedOnboardingUser: { clerkUserId: string } | null = null;
+
 test.describe('Onboarding Completion & Empty States', () => {
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(300_000);
@@ -115,13 +117,10 @@ test.describe('Onboarding Completion & Empty States', () => {
       .toBe(handle);
     console.log(`[onboarding-completion] Entered handle: ${handle}`);
 
-    const continueBtn = page.getByRole('button', { name: 'Continue' });
-    await expect(continueBtn).toBeEnabled({ timeout: 20_000 });
-    await continueBtn.click();
-
     // STEP 4: Complete V2 onboarding flow
     await completeOnboardingV2(page, TEST_SPOTIFY_URL, {
       clerkUserId: user.clerkUserId,
+      expectedHandle: handle,
     });
     console.log('[onboarding-completion] Completed V2 onboarding flow');
 
@@ -165,10 +164,17 @@ test.describe('Onboarding Completion & Empty States', () => {
     console.log(
       `[onboarding-completion] Dashboard has actionable CTA: ${hasActionableCTA}`
     );
+
+    completedOnboardingUser = { clerkUserId: user.clerkUserId };
   });
 
   test('empty releases page shows warmth and action', async ({ page }) => {
-    // This test reuses the session from the previous serial test
+    expect(
+      completedOnboardingUser,
+      'Expected a completed onboarding user from the prior serial test'
+    ).toBeTruthy();
+
+    await ensureServerAuthenticated(page, completedOnboardingUser!.clerkUserId);
     await smokeNavigateWithRetry(page, '/app/dashboard/releases', {
       retries: 2,
       timeout: 120_000,
@@ -192,6 +198,12 @@ test.describe('Onboarding Completion & Empty States', () => {
   });
 
   test('empty audience page shows onboarding path', async ({ page }) => {
+    expect(
+      completedOnboardingUser,
+      'Expected a completed onboarding user from the prior serial test'
+    ).toBeTruthy();
+
+    await ensureServerAuthenticated(page, completedOnboardingUser!.clerkUserId);
     await smokeNavigateWithRetry(page, '/app/dashboard/audience', {
       retries: 2,
       timeout: 120_000,

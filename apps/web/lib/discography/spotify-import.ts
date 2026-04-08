@@ -56,11 +56,11 @@ import { generateUniqueSlug } from './slug';
 
 /** Maximum number of releases to import in a single operation */
 const MAX_RELEASES_PER_IMPORT = 200;
-const E2E_FAST_MAX_RELEASES_PER_IMPORT = 4;
+const E2E_FAST_MAX_RELEASES_PER_IMPORT = 1;
 
 /** Maximum number of tracks per release */
 const MAX_TRACKS_PER_RELEASE = 100;
-const E2E_FAST_MAX_TRACKS_PER_RELEASE = 12;
+const E2E_FAST_MAX_TRACKS_PER_RELEASE = 6;
 
 const ISRC_REGEX = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
 

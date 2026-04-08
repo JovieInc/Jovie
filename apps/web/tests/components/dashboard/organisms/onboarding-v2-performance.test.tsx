@@ -247,7 +247,7 @@ vi.mock('@/app/onboarding/actions/enrich-profile', () => ({
 }));
 
 vi.mock(
-  '@/features/dashboard/organisms/apple-style-onboarding/useHandleValidation',
+  '@/features/dashboard/organisms/onboarding-v2/shared/useHandleValidation',
   () => ({
     useHandleValidation: () => ({
       handle: 'perf-budget',
@@ -265,7 +265,7 @@ vi.mock(
 );
 
 vi.mock(
-  '@/features/dashboard/organisms/apple-style-onboarding/useOnboardingSubmit',
+  '@/features/dashboard/organisms/onboarding-v2/shared/useOnboardingSubmit',
   () => ({
     extractSignupClaimArtistSelection: () => null,
     useOnboardingSubmit: () => ({
@@ -370,6 +370,7 @@ describe('Onboarding screen performance budgets', () => {
             initialHandle='perf-budget'
             initialProfileId='profile-performance'
             initialResumeStep={initialResumeStep}
+            isHydrated
             userEmail='perf@example.com'
             userId='user-performance'
           />
@@ -401,6 +402,7 @@ describe('Onboarding screen performance budgets', () => {
             initialHandle='perf-budget'
             initialProfileId='profile-performance'
             initialResumeStep='spotify'
+            isHydrated
             userEmail='perf@example.com'
             userId='user-performance'
           />
@@ -460,6 +462,7 @@ describe('Onboarding screen performance budgets', () => {
         initialHandle='perf-budget'
         initialProfileId='profile-performance'
         initialResumeStep='artist-confirm'
+        isHydrated
         userEmail='perf@example.com'
         userId='user-performance'
       />
@@ -495,6 +498,7 @@ describe('Onboarding screen performance budgets', () => {
         initialHandle='perf-budget'
         initialProfileId='profile-performance'
         initialResumeStep='artist-confirm'
+        isHydrated
         userEmail='perf@example.com'
         userId='user-performance'
       />
@@ -536,6 +540,7 @@ describe('Onboarding screen performance budgets', () => {
         initialHandle='perf-budget'
         initialProfileId='profile-performance'
         initialResumeStep='releases'
+        isHydrated
         userEmail='perf@example.com'
         userId='user-performance'
       />

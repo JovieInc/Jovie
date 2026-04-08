@@ -20,7 +20,7 @@ import type { CompletionResult } from '@/app/onboarding/actions/types';
 import {
   getOnboardingCompletionMethod,
   toDurationMs,
-} from '@/features/dashboard/organisms/apple-style-onboarding/analytics';
+} from '@/features/dashboard/organisms/onboarding-v2/shared/analytics';
 import { identify, track } from '@/lib/analytics';
 import {
   clearSignupClaimValue,
@@ -229,6 +229,7 @@ interface UseOnboardingSubmitOptions {
   handle: string;
   handleInput: string;
   handleValidation: HandleValidationState;
+  isHydrated: boolean;
   goToNextStep: () => void;
   setProfileReadyHandle: (handle: string) => void;
   shouldAutoSubmitHandle: boolean;
@@ -264,6 +265,7 @@ export function useOnboardingSubmit({
   handle,
   handleInput,
   handleValidation,
+  isHydrated,
   goToNextStep,
   setProfileReadyHandle,
   shouldAutoSubmitHandle,
@@ -389,6 +391,10 @@ export function useOnboardingSubmit({
     async (e?: FormEvent) => {
       if (e) e.preventDefault();
 
+      if (!isHydrated) {
+        return;
+      }
+
       const resolvedHandle = getResolvedHandle(handle, handleInput);
       const redirectUrl = `/onboarding?handle=${encodeURIComponent(resolvedHandle)}`;
 
@@ -511,6 +517,7 @@ export function useOnboardingSubmit({
       handleInput,
       handleSubmitError,
       handleValidation,
+      isHydrated,
       setProfileReadyHandle,
       userEmail,
       userId,
@@ -527,6 +534,7 @@ export function useOnboardingSubmit({
   useEffect(() => {
     if (
       !shouldAutoSubmitHandle ||
+      !isHydrated ||
       state.isSubmitting ||
       isPendingSubmit ||
       Boolean(state.error)
@@ -548,6 +556,7 @@ export function useOnboardingSubmit({
     handleValidation.clientValid,
     isPendingSubmit,
     shouldAutoSubmitHandle,
+    isHydrated,
     state.error,
     state.isSubmitting,
   ]);

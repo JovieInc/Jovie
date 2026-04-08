@@ -80,4 +80,125 @@ describe('test-user-provision.server', () => {
       isAllowlistedPrivilegedTestAccountEmail('e2e+clerk_test@jov.ie')
     ).toBe(true);
   });
+
+  it('updates the existing claimed profile for the same user before checking username', async () => {
+    const updateValues: Array<Record<string, unknown>> = [];
+    const selectQueue = [[{ id: 'profile_existing' }]];
+    const database = {
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn(async () => selectQueue.shift() ?? []),
+          })),
+        })),
+      })),
+      update: vi.fn(() => ({
+        set: vi.fn((values: Record<string, unknown>) => {
+          updateValues.push(values);
+          return {
+            where: vi.fn(async () => undefined),
+          };
+        }),
+      })),
+      insert: vi.fn(),
+    };
+
+    const { ensureCreatorProfileRecord } = await import(
+      '@/lib/testing/test-user-provision.server'
+    );
+
+    await expect(
+      ensureCreatorProfileRecord(database as never, {
+        userId: 'user_123',
+        creatorType: 'artist',
+        username: 'next-name',
+        usernameNormalized: 'next-name',
+        displayName: 'Next Name',
+        bio: null,
+        venmoHandle: null,
+        avatarUrl: null,
+        spotifyUrl: null,
+        appleMusicUrl: null,
+        appleMusicId: null,
+        youtubeMusicId: null,
+        deezerId: null,
+        tidalId: null,
+        soundcloudId: null,
+        isPublic: true,
+        isVerified: false,
+        isClaimed: true,
+        ingestionStatus: 'idle',
+        onboardingCompletedAt: null,
+      })
+    ).resolves.toBe('profile_existing');
+
+    expect(database.insert).not.toHaveBeenCalled();
+    expect(updateValues).toHaveLength(1);
+    expect(updateValues[0]).toMatchObject({
+      userId: 'user_123',
+      username: 'next-name',
+      usernameNormalized: 'next-name',
+      isClaimed: true,
+    });
+  });
+
+  it('recovers duplicate claimed-profile races by retrying user lookup before username lookup', async () => {
+    const duplicateError = new Error(
+      'duplicate key value violates unique constraint "idx_creator_profiles_one_claimed_per_user"'
+    );
+    const selectQueue = [[], [], [{ id: 'profile_raced' }]];
+    const database = {
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn(async () => selectQueue.shift() ?? []),
+          })),
+        })),
+      })),
+      update: vi.fn(() => ({
+        set: vi.fn(() => ({
+          where: vi.fn(async () => undefined),
+        })),
+      })),
+      insert: vi.fn(() => ({
+        values: vi.fn(() => ({
+          returning: vi.fn(async () => {
+            throw duplicateError;
+          }),
+        })),
+      })),
+    };
+
+    const { ensureCreatorProfileRecord } = await import(
+      '@/lib/testing/test-user-provision.server'
+    );
+
+    await expect(
+      ensureCreatorProfileRecord(database as never, {
+        userId: 'user_123',
+        creatorType: 'artist',
+        username: 'next-name',
+        usernameNormalized: 'next-name',
+        displayName: 'Next Name',
+        bio: null,
+        venmoHandle: null,
+        avatarUrl: null,
+        spotifyUrl: null,
+        appleMusicUrl: null,
+        appleMusicId: null,
+        youtubeMusicId: null,
+        deezerId: null,
+        tidalId: null,
+        soundcloudId: null,
+        isPublic: true,
+        isVerified: false,
+        isClaimed: true,
+        ingestionStatus: 'idle',
+        onboardingCompletedAt: null,
+      })
+    ).resolves.toBe('profile_raced');
+
+    expect(database.insert).toHaveBeenCalledTimes(1);
+    expect(database.update).toHaveBeenCalledTimes(1);
+  });
 });
