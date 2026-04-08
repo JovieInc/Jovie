@@ -424,6 +424,18 @@ export function ProfileCompactTemplate({
       drawerOpen && drawerView !== 'menu' && drawerView !== 'notifications'
         ? drawerView
         : null;
+    const isHistoryModeSettled =
+      requestedMode === 'profile'
+        ? activeMode === null
+        : activeMode === requestedMode;
+
+    // In React StrictMode, mount effects run twice before the drawer state has
+    // committed. Wait until the visual drawer state matches the requested mode
+    // so we do not collapse deep links like ?mode=subscribe back to /handle.
+    if (!isHistoryModeSettled) {
+      return;
+    }
+
     const href =
       activeMode === null
         ? getProfileModeHref(artist.handle, 'profile', searchSuffix)
@@ -434,7 +446,7 @@ export function ProfileCompactTemplate({
     }
 
     globalThis.history.pushState(globalThis.history.state, '', href);
-  }, [drawerOpen, drawerView, artist.handle, searchSuffix]);
+  }, [drawerOpen, drawerView, requestedMode, artist.handle, searchSuffix]);
 
   const ticketlessTourHref = useMemo(
     () => getProfileModeHref(artist.handle, 'tour', searchSuffix),

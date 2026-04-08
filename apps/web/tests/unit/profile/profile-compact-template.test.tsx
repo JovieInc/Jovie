@@ -200,12 +200,14 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const ui = (
-      <ProfileCompactTemplate
-        mode='profile'
-        artist={mockArtist}
-        socialLinks={[]}
-        contacts={[]}
-      />
+      <React.StrictMode>
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      </React.StrictMode>
     );
 
     const windowDescriptor = Object.getOwnPropertyDescriptor(
