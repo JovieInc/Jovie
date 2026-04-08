@@ -27,8 +27,12 @@ echo "  Removed node_modules"
 # Remove agent worktrees (stale subagent git worktrees)
 if [ -d ".claude/worktrees" ]; then
   rm -rf .claude/worktrees 2>/dev/null || true
-  git worktree prune 2>/dev/null || true
   echo "  Removed .claude/worktrees"
 fi
+
+# Always prune stale Git metadata immediately. The default prune expiry
+# keeps stale entries around for months, which can break future worktree add.
+git worktree prune --expire now 2>/dev/null || true
+echo "  Pruned stale git worktree metadata"
 
 echo "Archive cleanup complete."

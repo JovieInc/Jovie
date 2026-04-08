@@ -106,7 +106,7 @@ describe('dashboard clerk-safe rendering', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('defaults profile form entitlements safely without a Clerk provider', () => {
+  it('initializes profile form safely without a Clerk provider', () => {
     const artist = {
       id: 'artist-1',
       name: 'Tim White',

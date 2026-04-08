@@ -284,6 +284,7 @@ export {
   photoStatusEnum,
   pixelEventTypeEnum,
   pixelForwardStatusEnum,
+  playlistStatusEnum,
   profileClaimRoleEnum,
   profileOwnershipActionEnum,
   providerKindEnum,
@@ -486,6 +487,19 @@ export {
   selectCreatorPixelSchema,
   selectPixelEventSchema,
 } from './pixels';
+// Playlists (Jovie-curated playlists)
+export {
+  insertJoviePlaylistSchema,
+  insertJoviePlaylistTrackSchema,
+  type JoviePlaylist,
+  type JoviePlaylistTrack,
+  joviePlaylists,
+  joviePlaylistTracks,
+  type NewJoviePlaylist,
+  type NewJoviePlaylistTrack,
+  selectJoviePlaylistSchema,
+  selectJoviePlaylistTrackSchema,
+} from './playlists';
 // Pre-save campaigns (Spotify, Apple Music)
 export {
   type NewPreSaveToken,
