@@ -40,9 +40,10 @@ export const linktreeComparison: ComparisonData = {
       competitor: true,
     },
     {
-      name: 'Custom branding',
+      name: 'Trusted profile destination',
       jovie: true,
-      competitor: true,
+      competitor: false,
+      note: 'Jovie keeps profiles consistent and recognizable for fans',
     },
     {
       name: 'Analytics',
@@ -92,7 +93,7 @@ export const linktreeComparison: ComparisonData = {
     {
       question: 'Is Jovie free like Linktree?',
       answer:
-        'Yes, Jovie has a free tier. Create a profile, add releases, and collect fans at no cost. Paid plans unlock advanced analytics, branding removal, and contact export.',
+        'Yes, Jovie has a free tier. Create a profile, add releases, and collect fans at no cost. Paid plans unlock advanced analytics, release notifications, and contact export.',
     },
     {
       question: 'Does Jovie work with Spotify, Apple Music, and YouTube?',

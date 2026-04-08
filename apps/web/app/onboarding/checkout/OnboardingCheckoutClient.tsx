@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { BadgeCheck, BarChart3, Eye, Sparkles } from 'lucide-react';
+import { BadgeCheck, BarChart3, Bell, Sparkles } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Avatar } from '@/components/molecules/Avatar/Avatar';
@@ -40,9 +40,9 @@ function getAnnualSavingsPercent(
 
 const PRO_HIGHLIGHTS = [
   {
-    icon: Eye,
-    label: 'Remove Jovie branding',
-    detail: 'Clean, professional profile',
+    icon: Bell,
+    label: 'Release notifications',
+    detail: 'Notify fans the moment you drop',
   },
   {
     icon: BarChart3,
@@ -59,21 +59,15 @@ const PRO_HIGHLIGHTS = [
 interface ProfilePreviewCardProps {
   readonly avatarUrl: string | null;
   readonly displayName: string;
-  readonly planDisplayName: string;
-  readonly showBranding: boolean;
   readonly spotifyFollowers: number | null;
   readonly username: string;
-  readonly onToggleBranding: () => void;
 }
 
 function ProfilePreviewCard({
   avatarUrl,
   displayName,
-  planDisplayName,
-  showBranding,
   spotifyFollowers,
   username,
-  onToggleBranding,
 }: ProfilePreviewCardProps) {
   return (
     <>
@@ -94,36 +88,15 @@ function ProfilePreviewCard({
           </div>
 
           <div className='w-full'>
-            <button
-              type='button'
-              aria-pressed={!showBranding}
-              onClick={onToggleBranding}
-              className={cn(
-                AUTH_SURFACE.fieldShell,
-                'justify-between px-3.5 py-2.5'
-              )}
-            >
+            <div className='flex items-center justify-between rounded-[14px] border border-subtle bg-surface-1 px-3.5 py-2.5'>
               <span className='text-[13px] text-secondary-token'>
                 Jovie branding
               </span>
-              <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-medium transition-all ${
-                  showBranding
-                    ? 'bg-surface-2 text-tertiary-token'
-                    : 'bg-(--linear-accent)/10 text-(--linear-accent)'
-                }`}
-              >
-                {showBranding ? 'Visible' : 'Hidden with Pro'}
+              <span className='rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-tertiary-token'>
+                Visible
               </span>
-            </button>
-
-            <div
-              className={`mt-2 flex justify-center transition-all duration-300 ${
-                showBranding
-                  ? 'max-h-8 opacity-100'
-                  : 'max-h-0 overflow-hidden opacity-0'
-              }`}
-            >
+            </div>
+            <div className='mt-2 flex justify-center'>
               <span className='rounded-full bg-surface-2 px-3 py-1 text-[10px] font-medium text-tertiary-token'>
                 Made with Jovie
               </span>
@@ -140,8 +113,7 @@ function ProfilePreviewCard({
             <span className='font-medium text-primary-token'>
               {spotifyFollowers.toLocaleString()} Spotify followers
             </span>
-            . {planDisplayName} analytics shows exactly where they&apos;re
-            listening from.
+            . Pro analytics shows exactly where they&apos;re listening from.
           </p>
         </ContentSurfaceCard>
       ) : null}
@@ -225,7 +197,6 @@ export function OnboardingCheckoutClient({
   const [isAnnual, setIsAnnual] = useState(annualSavingsPercent > 25);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showBranding, setShowBranding] = useState(true);
 
   const planMarketing = getEntitlements(plan).marketing;
 
@@ -235,9 +206,6 @@ export function OnboardingCheckoutClient({
     isAnnual && annualAmount !== null ? annualAmount : monthlyAmount;
   const interval = isAnnual ? 'year' : 'month';
   const returnTo = normalizeOnboardingReturnTo(searchParams.get('returnTo'));
-  const handleToggleBranding = useCallback(() => {
-    setShowBranding(current => !current);
-  }, []);
 
   useEffect(() => {
     track('onboarding_checkout_shown', {
@@ -317,11 +285,8 @@ export function OnboardingCheckoutClient({
         <ProfilePreviewCard
           avatarUrl={avatarUrl}
           displayName={displayName}
-          planDisplayName={planMarketing.displayName}
-          showBranding={showBranding}
           spotifyFollowers={spotifyFollowers}
           username={username}
-          onToggleBranding={handleToggleBranding}
         />
 
         {/* Pro highlights */}

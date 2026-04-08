@@ -9,6 +9,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { captureError } from '@/lib/error-tracking';
+import { withTimeout } from '@/lib/resilience/primitives';
 import type { CandidateTrack } from './discover-tracks';
 import { extractJsonPayload } from './extract-json-payload';
 import type { JovieArtistTrack } from './feature-jovie-artists';
@@ -21,6 +22,51 @@ import { buildCurationPrompt } from './prompts';
 export interface CuratedTracklist {
   trackIds: string[];
   trackCount: number;
+}
+
+const CURATED_TRACK_IDS_SCHEMA = z.array(z.string()).min(10).max(50);
+const ANTHROPIC_REQUEST_TIMEOUT_MS = 30_000;
+
+export function parseTrackIdsFromResponseText(responseText: string): string[] {
+  const jsonStr = extractJsonPayload(responseText);
+  const parsed = JSON.parse(jsonStr);
+  return CURATED_TRACK_IDS_SCHEMA.parse(parsed);
+}
+
+function createArtistLookup(
+  candidates: CandidateTrack[],
+  jovieArtistTracks: JovieArtistTrack[]
+): Map<string, string> {
+  const artistLookup = new Map<string, string>();
+  for (const candidate of candidates) {
+    artistLookup.set(candidate.id, candidate.artist);
+  }
+  for (const jovieTrack of jovieArtistTracks) {
+    artistLookup.set(jovieTrack.spotifyTrackId, jovieTrack.artist);
+  }
+  return artistLookup;
+}
+
+export function dedupeTrackIdsByArtist(
+  trackIds: string[],
+  artistLookup: Map<string, string>
+): string[] {
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  let lastArtist = '';
+
+  for (const id of trackIds) {
+    if (seen.has(id)) continue;
+
+    const artist = artistLookup.get(id) ?? '';
+    if (artist === lastArtist && artist !== '') continue;
+
+    seen.add(id);
+    deduped.push(id);
+    lastArtist = artist;
+  }
+
+  return deduped;
 }
 
 // ============================================================================
@@ -62,30 +108,36 @@ export async function curateTracklist(options: {
   });
 
   const anthropic = new Anthropic();
+  const validIds = new Set([
+    ...candidates.map(track => track.id),
+    ...jovieArtistTracks.map(track => track.spotifyTrackId),
+  ]);
+  const artistLookup = createArtistLookup(candidates, jovieArtistTracks);
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const message = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6-20250514',
-        max_tokens: 1500,
-        messages: [{ role: 'user', content: prompt }],
-      });
+      const message = await withTimeout(
+        anthropic.messages.create(
+          {
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1500,
+            messages: [{ role: 'user', content: prompt }],
+          },
+          { timeout: ANTHROPIC_REQUEST_TIMEOUT_MS }
+        ),
+        {
+          timeoutMs: ANTHROPIC_REQUEST_TIMEOUT_MS + 1_000,
+          context: 'Anthropic curateTracklist',
+        }
+      );
 
-      const textBlock = message.content.find(b => b.type === 'text');
-      if (!textBlock || textBlock.type !== 'text') {
+      const textBlock = message.content.find(block => block.type === 'text');
+      const responseText = textBlock?.type === 'text' ? textBlock.text : null;
+      if (!responseText) {
         throw new Error('No text response from Claude');
       }
 
-      const jsonStr = extractJsonPayload(textBlock.text);
-      const parsed = JSON.parse(jsonStr);
-      const trackIds = z.array(z.string()).min(10).max(50).parse(parsed);
-
-      // Validate all IDs are from our candidates or Jovie artists
-      const validIds = new Set([
-        ...candidates.map(t => t.id),
-        ...jovieArtistTracks.map(t => t.spotifyTrackId),
-      ]);
-
+      const trackIds = parseTrackIdsFromResponseText(responseText);
       const validatedIds = trackIds.filter(id => validIds.has(id));
 
       if (validatedIds.length < 10) {
@@ -101,24 +153,7 @@ export async function curateTracklist(options: {
         continue;
       }
 
-      // Enforce no back-to-back same artist (use artist name for consistent comparison)
-      const artistLookup = new Map<string, string>();
-      for (const c of candidates) artistLookup.set(c.id, c.artist);
-      for (const j of jovieArtistTracks)
-        artistLookup.set(j.spotifyTrackId, j.artist);
-
-      const seen = new Set<string>();
-      const deduped: string[] = [];
-      let lastArtist = '';
-
-      for (const id of validatedIds) {
-        if (seen.has(id)) continue;
-        const artist = artistLookup.get(id) ?? '';
-        if (artist === lastArtist && artist !== '') continue;
-        seen.add(id);
-        deduped.push(id);
-        lastArtist = artist;
-      }
+      const deduped = dedupeTrackIdsByArtist(validatedIds, artistLookup);
 
       if (deduped.length < 10) {
         captureError('[Curate Tracklist] Too few tracks after dedupe', null, {

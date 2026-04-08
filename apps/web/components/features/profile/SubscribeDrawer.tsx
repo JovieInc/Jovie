@@ -25,7 +25,7 @@ export function SubscribeDrawer({
       open={open}
       onOpenChange={onOpenChange}
       title='Get notified'
-      subtitle={`Stay close to ${artist.name} without checking back manually.`}
+      subtitle={`Get notified about new releases and shows from ${artist.name}.`}
     >
       {subscribeTwoStep ? (
         <TwoStepNotificationsCTA artist={artist} />

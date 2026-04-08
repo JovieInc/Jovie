@@ -206,7 +206,6 @@ export function ProfileShell({
             <ProfileNavButton
               showBackButton={showBackButton}
               artistHandle={artist.handle}
-              hideBranding={Boolean(artist.settings?.hide_branding)}
             />
           </div>
 

@@ -37,7 +37,12 @@ export async function findMatchingJovieArtistTracks(options: {
   moodTags: string[];
   maxTracks?: number;
 }): Promise<JovieArtistTrack[]> {
-  const { maxTracks = 5 } = options;
+  const { genreTags, moodTags, maxTracks = 5 } = options;
+  const thematicTags = new Set(
+    [...genreTags, ...moodTags]
+      .map(tag => tag.trim().toLowerCase())
+      .filter(tag => tag.length > 0)
+  );
 
   try {
     // Find Jovie profiles that have Spotify IDs and matching genres
@@ -48,6 +53,8 @@ export async function findMatchingJovieArtistTracks(options: {
         username: creatorProfiles.usernameNormalized,
         displayName: creatorProfiles.displayName,
         spotifyId: creatorProfiles.spotifyId,
+        genres: creatorProfiles.genres,
+        spotifyPopularity: creatorProfiles.spotifyPopularity,
       })
       .from(creatorProfiles)
       .where(
@@ -60,10 +67,46 @@ export async function findMatchingJovieArtistTracks(options: {
 
     if (profiles.length === 0) return [];
 
+    // Rank artists by overlap between playlist tags and Spotify genres.
+    // If no overlap is found, fall back to the full list to avoid empty results.
+    const rankedProfiles = profiles
+      .map(profile => {
+        const profileGenres =
+          profile.genres
+            ?.map(genre => genre.trim().toLowerCase())
+            .filter(genre => genre.length > 0) ?? [];
+
+        let score = 0;
+        if (thematicTags.size > 0 && profileGenres.length > 0) {
+          for (const tag of thematicTags) {
+            if (
+              profileGenres.some(
+                genre => genre.includes(tag) || tag.includes(genre)
+              )
+            ) {
+              score += 1;
+            }
+          }
+        }
+
+        return { ...profile, score };
+      })
+      .filter(profile => thematicTags.size === 0 || profile.score > 0)
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          (b.spotifyPopularity ?? 0) - (a.spotifyPopularity ?? 0)
+      );
+
+    const candidateProfiles =
+      rankedProfiles.length > 0
+        ? rankedProfiles
+        : profiles.map(profile => ({ ...profile, score: 0 }));
+
     // For each profile, fetch their top tracks from Spotify
     const results: JovieArtistTrack[] = [];
 
-    for (const profile of profiles) {
+    for (const profile of candidateProfiles) {
       if (results.length >= maxTracks) break;
       if (!profile.spotifyId) continue;
 

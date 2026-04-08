@@ -67,7 +67,6 @@ vi.mock('@/lib/queries/keys', () => ({
 
 import {
   useAnalyticsFilterMutation,
-  useBrandingSettingsMutation,
   useHighContrastMutation,
   useNotificationSettingsMutation,
   useThemeMutation,
@@ -153,22 +152,6 @@ describe('useUpdateSettingsMutation', () => {
     );
   });
 
-  it('shows branding success toast when updating hide_branding', async () => {
-    const { result } = renderHook(() => useUpdateSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
-
-    await act(async () => {
-      await result.current.mutateAsync({
-        updates: { settings: { hide_branding: true } },
-      });
-    });
-
-    expect(mockHandleMutationSuccess).toHaveBeenCalledWith(
-      'Branding settings saved'
-    );
-  });
-
   it('shows analytics filter success toast when updating exclude_self_from_analytics', async () => {
     const { result } = renderHook(() => useUpdateSettingsMutation(), {
       wrapper: TestWrapper,
@@ -240,30 +223,6 @@ describe('useUpdateSettingsMutation', () => {
     expect(mockHandleMutationError).toHaveBeenCalledWith(
       error,
       'Failed to save theme preference'
-    );
-  });
-
-  it('shows branding error toast when branding mutation fails', async () => {
-    const error = new Error('Server error');
-    mockMutationFn.mockRejectedValueOnce(error);
-
-    const { result } = renderHook(() => useUpdateSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
-
-    await act(async () => {
-      try {
-        await result.current.mutateAsync({
-          updates: { settings: { hide_branding: false } },
-        });
-      } catch {
-        // expected
-      }
-    });
-
-    expect(mockHandleMutationError).toHaveBeenCalledWith(
-      error,
-      'Failed to save branding settings'
     );
   });
 
@@ -472,68 +431,6 @@ describe('useNotificationSettingsMutation', () => {
     });
 
     expect(result.current).toHaveProperty('updateNotifications');
-    expect(result.current).toHaveProperty('isPending');
-    expect(result.current).toHaveProperty('isError');
-    expect(result.current).toHaveProperty('error');
-  });
-});
-
-/* ================================================================== */
-/*  useBrandingSettingsMutation                                        */
-/* ================================================================== */
-
-describe('useBrandingSettingsMutation', () => {
-  it('sends hide_branding=true when updateBranding(true) is called', async () => {
-    const { result } = renderHook(() => useBrandingSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
-
-    await act(async () => {
-      result.current.updateBranding(true);
-    });
-
-    expect(mockMutationFn.mock.calls[0][0]).toEqual({
-      updates: { settings: { hide_branding: true } },
-    });
-  });
-
-  it('sends hide_branding=false when updateBranding(false) is called', async () => {
-    const { result } = renderHook(() => useBrandingSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
-
-    await act(async () => {
-      result.current.updateBranding(false);
-    });
-
-    expect(mockMutationFn.mock.calls[0][0]).toEqual({
-      updates: { settings: { hide_branding: false } },
-    });
-  });
-
-  it('provides an async variant (updateBrandingAsync) that returns a promise', async () => {
-    const { result } = renderHook(() => useBrandingSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
-
-    let response: unknown;
-    await act(async () => {
-      response = await result.current.updateBrandingAsync(true);
-    });
-
-    expect(response).toEqual({ success: true });
-    expect(mockMutationFn.mock.calls[0][0]).toEqual({
-      updates: { settings: { hide_branding: true } },
-    });
-  });
-
-  it('exposes isPending, isError, and error', () => {
-    const { result } = renderHook(() => useBrandingSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
-
-    expect(result.current).toHaveProperty('updateBranding');
-    expect(result.current).toHaveProperty('updateBrandingAsync');
     expect(result.current).toHaveProperty('isPending');
     expect(result.current).toHaveProperty('isError');
     expect(result.current).toHaveProperty('error');

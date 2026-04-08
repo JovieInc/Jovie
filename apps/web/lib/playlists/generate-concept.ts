@@ -8,11 +8,12 @@
 
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
-import { desc } from 'drizzle-orm';
+import { count, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
 import { captureError } from '@/lib/error-tracking';
+import { withTimeout } from '@/lib/resilience/primitives';
 import { extractJsonPayload } from './extract-json-payload';
 import { buildConceptPrompt } from './prompts';
 
@@ -64,6 +65,8 @@ const CATEGORY_ROTATION: Array<'general' | 'soundtrack' | 'cultural'> = [
   'general',
 ];
 
+const ANTHROPIC_REQUEST_TIMEOUT_MS = 30_000;
+
 // ============================================================================
 // Main Function
 // ============================================================================
@@ -76,6 +79,10 @@ export async function generatePlaylistConcept(options?: {
   genreFocus?: string;
   category?: 'general' | 'soundtrack' | 'cultural';
 }): Promise<PlaylistConcept> {
+  const [{ totalCount }] = await db
+    .select({ totalCount: count() })
+    .from(joviePlaylists);
+
   // Get previous titles for deduplication (last 50)
   const existingPlaylists = await db
     .select({ title: joviePlaylists.title })
@@ -86,7 +93,7 @@ export async function generatePlaylistConcept(options?: {
   const previousTitles = existingPlaylists.map(p => p.title);
 
   // Determine genre and category from rotation if not specified
-  const playlistCount = existingPlaylists.length;
+  const playlistCount = Number(totalCount ?? 0);
   const genreFocus =
     options?.genreFocus ??
     GENRE_ROTATION[playlistCount % GENRE_ROTATION.length];
@@ -106,11 +113,20 @@ export async function generatePlaylistConcept(options?: {
   // Try up to 3 times to get a valid concept
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const message = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }],
-      });
+      const message = await withTimeout(
+        anthropic.messages.create(
+          {
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 2000,
+            messages: [{ role: 'user', content: prompt }],
+          },
+          { timeout: ANTHROPIC_REQUEST_TIMEOUT_MS }
+        ),
+        {
+          timeoutMs: ANTHROPIC_REQUEST_TIMEOUT_MS + 1_000,
+          context: 'Anthropic generatePlaylistConcept',
+        }
+      );
 
       const textBlock = message.content.find(b => b.type === 'text');
       if (!textBlock || textBlock.type !== 'text') {

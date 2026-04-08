@@ -36,7 +36,7 @@ export const ProFeatures: Story = {
   args: {
     title: 'Pro Features',
     features: [
-      { title: 'Remove Jovie branding' },
+      { title: 'Release notifications' },
       { title: 'Priority support' },
       { title: 'Advanced analytics' },
       { title: 'Custom themes' },

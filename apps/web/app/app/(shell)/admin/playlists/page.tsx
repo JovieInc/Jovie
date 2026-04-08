@@ -9,6 +9,7 @@ import { db } from '@/lib/db';
 import { joviePlaylists, joviePlaylistTracks } from '@/lib/db/schema/playlists';
 import { generateCoverArt } from '@/lib/playlists/generate-cover';
 import { publishToSpotify } from '@/lib/playlists/publish-spotify';
+import { uploadPlaylistCoverImage } from '@/lib/playlists/upload-cover-image';
 import { getJovieSpotifyUserId } from '@/lib/spotify/jovie-account';
 
 async function requireAdmin(): Promise<void> {
@@ -82,6 +83,10 @@ async function approvePlaylist(formData: FormData) {
         promptData.coverTextWords ??
         playlist.title.split(' ').slice(0, 4).join(' '),
     });
+    const coverImageUrl = await uploadPlaylistCoverImage({
+      slug: playlist.slug,
+      imageBuffer: coverArt.fullResBuffer,
+    });
 
     // Publish to Spotify
     const result = await publishToSpotify({
@@ -105,6 +110,8 @@ async function approvePlaylist(formData: FormData) {
         spotifyPlaylistId: result.spotifyPlaylistId,
         curatorSpotifyUserId: spotifyUserId,
         trackCount: result.tracksAdded,
+        coverImageUrl,
+        coverImageFullUrl: coverImageUrl,
         updatedAt: new Date(),
       })
       .where(eq(joviePlaylists.id, playlistId));

@@ -16,9 +16,7 @@ const mockArtist: Artist = {
   is_featured: false,
   marketing_opt_out: false,
   created_at: '2023-01-01T00:00:00Z',
-  settings: {
-    hide_branding: false,
-  },
+  settings: {},
 };
 
 const mockSocialLinks: LegacySocialLink[] = [
