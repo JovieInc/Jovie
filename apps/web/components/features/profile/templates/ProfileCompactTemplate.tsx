@@ -2,6 +2,7 @@
 
 import { BadgeCheck, MoreHorizontal, Play } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -12,6 +13,7 @@ import {
   useProfileShell,
 } from '@/components/organisms/profile-shell';
 import { BASE_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import type { ProfileMode } from '@/features/profile/contracts';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
@@ -471,13 +473,19 @@ export function ProfileCompactTemplate({
                   className='relative z-10 flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),20px)]'
                   data-testid='profile-header'
                 >
-                  <BrandLogo
-                    size={22}
-                    tone='white'
-                    rounded={false}
-                    className='opacity-45 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
-                    aria-hidden={false}
-                  />
+                  <Link
+                    href={APP_ROUTES.ARTIST_PROFILES}
+                    aria-label='Create your artist profile on Jovie'
+                    className='rounded-full opacity-45 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)] transition-opacity duration-150 hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                  >
+                    <BrandLogo
+                      size={22}
+                      tone='white'
+                      rounded={false}
+                      className='block'
+                      aria-hidden={false}
+                    />
+                  </Link>
 
                   <div className='flex items-center gap-2'>
                     <button
