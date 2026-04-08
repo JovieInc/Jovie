@@ -349,15 +349,15 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
       primaryIsrc: 'GBARL2400216',
       providerUrls: {
         spotify:
-          "https://open.spotify.com/search/Lovers%20In%20A%20Past%20Life%20Calvin%20Harris%20Rag'n'Bone%20Man",
+          'https://open.spotify.com/search/Lovers%20In%20A%20Past%20Life%20Calvin%20Harris%20Rag%27n%27Bone%20Man',
         apple_music:
-          "https://music.apple.com/us/search?term=Lovers%20In%20A%20Past%20Life%20Calvin%20Harris%20Rag'n'Bone%20Man",
+          'https://music.apple.com/us/search?term=Lovers%20In%20A%20Past%20Life%20Calvin%20Harris%20Rag%27n%27Bone%20Man',
         youtube_music:
-          "https://music.youtube.com/search?q=Lovers+In+A+Past+Life+Calvin+Harris+Rag'n'Bone+Man",
+          'https://music.youtube.com/search?q=Lovers+In+A+Past+Life+Calvin+Harris+Rag%27n%27Bone+Man',
         amazon_music:
-          "https://music.amazon.com/search/Lovers%20In%20A%20Past%20Life%20Calvin%20Harris%20Rag'n'Bone%20Man",
+          'https://music.amazon.com/search/Lovers%20In%20A%20Past%20Life%20Calvin%20Harris%20Rag%27n%27Bone%20Man',
         tidal:
-          "https://listen.tidal.com/search?q=Lovers%20In%20A%20Past%20Life%20Calvin%20Harris%20Rag'n'Bone%20Man",
+          'https://listen.tidal.com/search?q=Lovers%20In%20A%20Past%20Life%20Calvin%20Harris%20Rag%27n%27Bone%20Man',
       },
       tracks: [
         {
@@ -532,6 +532,22 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
     },
     {
       externalId: 'calvin-ibiza-2026-05-29',
+      title: 'Ushuaia Ibiza Opening Party',
+      venueName: 'Ushuaia Ibiza',
+      city: 'Ibiza',
+      region: null,
+      country: 'Spain',
+      provider: 'manual',
+      ticketStatus: 'available',
+      ticketUrl: 'https://calvinharris.com/shows',
+      latitude: 38.9067,
+      longitude: 1.4206,
+      timezone: 'Europe/Madrid',
+      startDate: '2026-05-29T23:30:00+02:00',
+      startTime: '11:30 PM',
+    },
+    {
+      externalId: 'calvin-ibiza-2026-06-05',
       title: 'Ushuaia Ibiza Residency',
       venueName: 'Ushuaia Ibiza',
       city: 'Ibiza',
@@ -543,8 +559,8 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
       latitude: 38.9067,
       longitude: 1.4206,
       timezone: 'Europe/Madrid',
-      startDate: '2026-05-29T21:00:00+02:00',
-      startTime: '9:00 PM',
+      startDate: '2026-06-05T23:30:00+02:00',
+      startTime: '11:30 PM',
     },
   ],
 };
