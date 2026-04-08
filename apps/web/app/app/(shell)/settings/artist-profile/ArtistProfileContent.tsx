@@ -4,7 +4,6 @@ import { ExternalLink, PanelRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ProfileSettingsLoading } from '@/components/molecules/SettingsLoadingSkeleton';
-import { SettingsBrandingSection } from '@/features/dashboard/organisms/SettingsBrandingSection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 import { SettingsTipsSection } from '@/features/dashboard/organisms/SettingsTipsSection';
 import { SettingsProfileSection } from '@/features/dashboard/organisms/settings-profile-section';
@@ -39,7 +38,7 @@ function MobileProfilePanelTrigger() {
 
 export function ArtistProfileContent() {
   const router = useRouter();
-  const { artist, setArtist, isPro, avatarQuality } = useSettingsContext();
+  const { artist, setArtist, avatarQuality } = useSettingsContext();
 
   if (!artist) {
     return <ProfileSettingsLoading />;
@@ -71,11 +70,6 @@ export function ArtistProfileContent() {
             avatarQuality={avatarQuality}
             onArtistUpdate={setArtist}
             onRefresh={() => router.refresh()}
-          />
-          <SettingsBrandingSection
-            artist={artist}
-            onArtistUpdate={setArtist}
-            isPro={isPro}
           />
           <SettingsTipsSection />
           <ShopifyStoreCard />

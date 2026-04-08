@@ -477,7 +477,6 @@ export {
 export {
   type SettingsUpdateInput,
   useAnalyticsFilterMutation,
-  useBrandingSettingsMutation,
   useHighContrastMutation,
   useNotificationSettingsMutation,
   useThemeMutation,

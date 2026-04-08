@@ -29,7 +29,6 @@ describe('profile update contract', () => {
       displayName: 'Test Artist',
       location: 'Austin, TX',
       hometown: 'Tulsa, OK',
-      settings: { hide_branding: true },
     });
 
     expect(parsed.ok).toBe(true);
@@ -44,9 +43,24 @@ describe('profile update contract', () => {
       displayName: 'Test Artist',
       location: 'Austin, TX',
       settings: {
-        hide_branding: true,
         hometown: 'Tulsa, OK',
       },
     });
+  });
+
+  it('rejects legacy branding-removal settings', async () => {
+    const result = parseProfileUpdates({
+      displayName: 'Test Artist',
+      settings: { hide_branding: true },
+    });
+
+    expect(result.ok).toBe(false);
+
+    if (result.ok) {
+      throw new TypeError('Expected hide_branding validation to fail');
+    }
+
+    const payload = await result.response.json();
+    expect(payload.error).toBe('Unrecognized key: "hide_branding"');
   });
 });

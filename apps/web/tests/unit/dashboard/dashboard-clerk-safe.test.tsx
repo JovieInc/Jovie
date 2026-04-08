@@ -122,7 +122,11 @@ describe('dashboard clerk-safe rendering', () => {
       })
     );
 
-    expect(result.current.hasRemoveBrandingFeature).toBe(false);
     expect(result.current.formData.name).toBe('Tim White');
+    expect(result.current.formData).toEqual({
+      imageUrl: '',
+      name: 'Tim White',
+      tagline: '',
+    });
   });
 });

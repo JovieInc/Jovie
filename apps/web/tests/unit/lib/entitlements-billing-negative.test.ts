@@ -63,7 +63,6 @@ function setupAuthenticatedUser(billingData: Record<string, unknown>) {
 
 /** All the boolean feature gates that must be false for free users */
 const FREE_FEATURES: (keyof UserEntitlements)[] = [
-  'canRemoveBranding',
   'canExportContacts',
   'canAccessAdvancedAnalytics',
   'canFilterSelfFromAnalytics',
@@ -278,7 +277,6 @@ describe('Entitlements – Plan Tier Completeness', () => {
       'plan',
       'isPro',
       'hasAdvancedFeatures',
-      'canRemoveBranding',
       'canExportContacts',
       'canAccessAdvancedAnalytics',
       'canFilterSelfFromAnalytics',

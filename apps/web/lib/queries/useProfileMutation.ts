@@ -24,7 +24,6 @@ import { uploadAvatarToBlob } from './useAvatarUploadMutation';
  * Profile settings update payload.
  */
 export interface ProfileSettingsUpdate {
-  hide_branding?: boolean;
   hometown?: string | null;
 }
 
