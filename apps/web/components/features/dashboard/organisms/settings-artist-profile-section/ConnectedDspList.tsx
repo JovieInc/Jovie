@@ -15,6 +15,7 @@ import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search
 import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { DspConnectionPill } from '@/features/dashboard/atoms/DspConnectionPill';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
+import { env } from '@/lib/env-client';
 import {
   type DspMatch,
   queryKeys,
@@ -82,6 +83,7 @@ async function connectProvider(
       spotifyArtistId: artist.id,
       spotifyArtistUrl: artist.url,
       artistName: artist.name,
+      forceInlineImport: env.IS_E2E,
     });
   }
   return connectAppleMusicArtist({

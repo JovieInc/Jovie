@@ -46,7 +46,8 @@ export function useSpotifyConnect({
   fireAndForget = false,
 }: UseSpotifyConnectParams) {
   const [isPending, startTransition] = useTransition();
-  const includeTracks = env.IS_E2E ? false : undefined;
+  const includeTracks = env.IS_E2E ? true : undefined;
+  const forceInlineImport = env.IS_E2E;
 
   // Extract Spotify artist ID from URL
   const extractSpotifyArtistId = useCallback((input: string): string | null => {
@@ -71,6 +72,7 @@ export function useSpotifyConnect({
           spotifyArtistId: artistId,
           spotifyArtistUrl: artistUrl,
           artistName: '',
+          forceInlineImport,
           includeTracks,
           skipMusicFetchEnrichment: true,
         }).catch(() => {
@@ -86,6 +88,7 @@ export function useSpotifyConnect({
             spotifyArtistId: artistId,
             spotifyArtistUrl: artistUrl,
             artistName: '',
+            forceInlineImport,
             includeTracks,
           });
 
@@ -119,6 +122,7 @@ export function useSpotifyConnect({
       onConnected,
       onImportStart,
       fireAndForget,
+      forceInlineImport,
       includeTracks,
     ]
   );
@@ -137,6 +141,7 @@ export function useSpotifyConnect({
           spotifyArtistId: artist.id,
           spotifyArtistUrl: artist.url,
           artistName: artist.name,
+          forceInlineImport,
           includeTracks,
           skipMusicFetchEnrichment: true,
         }).catch(() => {
@@ -152,6 +157,7 @@ export function useSpotifyConnect({
             spotifyArtistId: artist.id,
             spotifyArtistUrl: artist.url,
             artistName: artist.name,
+            forceInlineImport,
             includeTracks,
           });
 
@@ -184,6 +190,7 @@ export function useSpotifyConnect({
       onConnected,
       onImportStart,
       fireAndForget,
+      forceInlineImport,
       includeTracks,
     ]
   );

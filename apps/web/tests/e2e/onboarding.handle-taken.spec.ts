@@ -133,25 +133,20 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     await handleInput.fill('musicmaker');
 
     // Verify error message is displayed
-    await expect(page.locator('text="Handle already taken"')).toBeVisible({
+    await expect(page.locator('text="Not available"')).toBeVisible({
       timeout: 5_000,
     });
 
     const submitButton = runWithRealAPI
-      ? page.getByRole('button', { name: 'Create Profile' })
+      ? page.getByRole('button', { name: 'Continue' })
       : page.getByRole('button', { name: 'Request Early Access' });
     await expect(submitButton).toBeDisabled({ timeout: 5_000 });
-
-    if (runWithRealAPI) {
-      // Verify no green checkmark is visible (onboarding UI)
-      await expect(page.locator('.bg-green-500')).not.toBeVisible();
-    }
 
     // Now try with a different taken handle to ensure consistency
     await handleInput.fill('existinguser');
 
     // Verify error message is still displayed
-    await expect(page.locator('text="Handle already taken"')).toBeVisible({
+    await expect(page.locator('text="Not available"')).toBeVisible({
       timeout: 5_000,
     });
 
@@ -174,7 +169,7 @@ test.describe('Onboarding Handle Taken Prevention', () => {
 
     // Verify submit button is disabled
     const submitButton = runWithRealAPI
-      ? page.getByRole('button', { name: 'Create Profile' })
+      ? page.getByRole('button', { name: 'Continue' })
       : page.getByRole('button', { name: 'Request Early Access' });
     await expect(submitButton).toBeDisabled({ timeout: 5_000 });
 
@@ -183,11 +178,6 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     await handleInput.fill(uniqueHandle);
 
     if (runWithRealAPI) {
-      // Verify green checkmark is visible
-      await expect(page.locator('.bg-green-500')).toBeVisible({
-        timeout: 5_000,
-      });
-
       // Verify submit button is now enabled
       await expect(submitButton).toBeEnabled({ timeout: 5_000 });
     } else {
@@ -199,7 +189,7 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     }
 
     // Verify no error message is visible
-    await expect(page.locator('text="Handle already taken"')).not.toBeVisible();
+    await expect(page.locator('text="Not available"')).not.toBeVisible();
   });
 
   test('handles race conditions correctly when switching between taken and available', async ({

@@ -6,6 +6,7 @@ import { OnboardingFormWrapper } from '@/features/dashboard/organisms/Onboarding
 import { getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
+import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
@@ -31,8 +32,7 @@ export default async function OnboardingPage({
 }: Readonly<OnboardingPageProps>) {
   const resolvedSearchParams = await searchParams;
   const shouldSkipDashboardPrefetch =
-    process.env.E2E_FAST_ONBOARDING === '1' &&
-    Boolean(resolvedSearchParams?.handle);
+    isE2EFastOnboardingEnabled() && Boolean(resolvedSearchParams?.handle);
 
   const authResult = await resolveUserState();
 

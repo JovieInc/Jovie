@@ -11,7 +11,6 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { MUSICFETCH_ALL_SERVICES } from '@/lib/dsp-registry';
 import { env } from '@/lib/env-server';
 import {
   isMusicfetchInvalidServicesError,
@@ -30,9 +29,40 @@ const REQUEST_TIMEOUT_MS = 15_000;
 
 /**
  * Services to request from MusicFetch when looking up an artist.
- * Derived from the canonical DSP registry (all 40 services).
+ *
+ * This is intentionally narrower than the full DSP registry. The MusicFetch
+ * artist lookup endpoint rejects some registry values (`allMusic`,
+ * `youtubeShorts`, `napster`, `telmoreMusik`) and our current account also
+ * does not have every optional social provider enabled. Invalid values cause a
+ * hard 400 and abort enrichment entirely, so keep this list limited to the
+ * stable supported subset for artist lookups.
  */
-const ARTIST_LOOKUP_SERVICES = MUSICFETCH_ALL_SERVICES.join(',');
+export const MUSICFETCH_ARTIST_LOOKUP_SERVICES = [
+  'spotify',
+  'appleMusic',
+  'youtubeMusic',
+  'soundcloud',
+  'deezer',
+  'tidal',
+  'amazonMusic',
+  'bandcamp',
+  'pandora',
+  'audiomack',
+  'qobuz',
+  'anghami',
+  'boomplay',
+  'iHeartRadio',
+  'beatport',
+  'youtube',
+  'genius',
+  'discogs',
+  'musicBrainz',
+  'shazam',
+  'sevenDigital',
+  'youseeMusik',
+] as const;
+
+const ARTIST_LOOKUP_SERVICES = MUSICFETCH_ARTIST_LOOKUP_SERVICES.join(',');
 
 // ============================================================================
 // Types

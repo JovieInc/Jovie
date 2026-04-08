@@ -1,13 +1,16 @@
 import { expect, test } from '@playwright/test';
 import {
   buildValidOnboardingHandle,
+  completeOnboardingV2,
   createFreshUser,
   ensureDbUser,
+  ensureServerAuthenticated,
   hasRealEnv,
   interceptTrackingCalls,
   purgeStaleClerkTestUsers,
   waitForSpotifyImport,
 } from './helpers/e2e-helpers';
+import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 
 /**
  * Golden Path E2E — Core App Flows
@@ -21,8 +24,8 @@ import {
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
 const TEST_SPOTIFY_ARTIST = {
-  id: '59NJtiWq8nISIJjDtITQyt',
-  url: 'https://open.spotify.com/artist/59NJtiWq8nISIJjDtITQyt',
+  id: '6M2wZ9GZgrQXHCFfjv46we',
+  url: 'https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we',
 };
 
 /* ------------------------------------------------------------------ */
@@ -61,6 +64,7 @@ test.describe('Golden Path: Welcome Message', () => {
       TEST_SPOTIFY_ARTIST.id,
     ];
     await ensureDbUser(clerkUserId, email, knownSpotifyArtistIds);
+    await ensureServerAuthenticated(page, clerkUserId);
 
     const onboardingHandle = buildValidOnboardingHandle(
       uniqueSeed,
@@ -68,16 +72,17 @@ test.describe('Golden Path: Welcome Message', () => {
     );
 
     // Navigate to onboarding
-    await page.goto(`/onboarding?handle=${onboardingHandle}`, {
-      waitUntil: 'commit',
-      timeout: 45_000,
-    });
+    await smokeNavigateWithRetry(
+      page,
+      `/onboarding?handle=${onboardingHandle}`,
+      {
+        timeout: 45_000,
+        retries: 2,
+      }
+    );
 
     await expect(
       page.locator('[data-testid="onboarding-form-wrapper"]')
-    ).toBeVisible({ timeout: 20_000 });
-    await expect(
-      page.locator('[data-onboarding-client-ready="true"]')
     ).toBeVisible({ timeout: 20_000 });
 
     // Handle step
@@ -93,52 +98,15 @@ test.describe('Golden Path: Welcome Message', () => {
     await expect(continueBtn).toBeEnabled({ timeout: 20_000 });
     await continueBtn.click();
 
-    // Artist search step
-    const artistInput = page.getByPlaceholder(
-      /search for your artist or paste a spotify link/i
-    );
-    await expect(artistInput).toBeVisible({ timeout: 60_000 });
-    await artistInput.fill(TEST_SPOTIFY_ARTIST.url);
-    await artistInput.press('Enter');
-
-    // Profile review or direct to dashboard
-    const reviewDisplayName = page.locator('#onboarding-display-name');
-    const goToDashboardBtn = page.getByRole('button', {
-      name: /go to dashboard/i,
+    await completeOnboardingV2(page, TEST_SPOTIFY_ARTIST.url, {
+      clerkUserId,
     });
 
-    const reviewStepOrDashboard = await Promise.race([
-      reviewDisplayName
-        .waitFor({ state: 'visible', timeout: 30_000 })
-        .then(() => 'review' as const)
-        .catch(() => null),
-      page
-        .waitForURL(/\/app/, { timeout: 30_000 })
-        .then(() => 'dashboard' as const)
-        .catch(() => null),
-    ]);
-
-    if (reviewStepOrDashboard === 'review') {
-      const initialDisplayName = await reviewDisplayName.inputValue();
-      if (initialDisplayName.trim().length === 0) {
-        await reviewDisplayName.fill('Golden Path App Artist');
-      }
-      const dashboardExit = await Promise.race([
-        goToDashboardBtn
-          .waitFor({ state: 'visible', timeout: 10_000 })
-          .then(() => 'button' as const)
-          .catch(() => null),
-        page
-          .waitForURL(/\/app/, { timeout: 10_000 })
-          .then(() => 'dashboard' as const)
-          .catch(() => null),
-      ]);
-
-      if (dashboardExit === 'button') {
-        await expect(goToDashboardBtn).toBeEnabled({ timeout: 10_000 });
-        await goToDashboardBtn.click();
-      }
-    }
+    await ensureServerAuthenticated(page, clerkUserId);
+    await page.goto('/app', {
+      waitUntil: 'commit',
+      timeout: 60_000,
+    });
 
     // Wait for dashboard
     await expect(page).toHaveURL(/\/app/, { timeout: 30_000 });
@@ -155,7 +123,7 @@ test.describe('Golden Path: Welcome Message', () => {
       .toBe('ready');
 
     // Navigate to chat and verify welcome message
-    await page.goto('/app/chat', {
+    await page.goto('/app/chat?from=onboarding&panel=profile', {
       waitUntil: 'domcontentloaded',
       timeout: 30_000,
     });

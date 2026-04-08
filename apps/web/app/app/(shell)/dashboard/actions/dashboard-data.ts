@@ -255,6 +255,10 @@ function buildProfileCompletion(
  */
 type CoreData = Omit<DashboardData, 'isAdmin'>;
 
+function shouldBypassDashboardCache(): boolean {
+  return process.env.NEXT_PUBLIC_E2E_MODE === '1';
+}
+
 function applyAdminOnboardingBypass(
   coreData: CoreData,
   isAdmin: boolean
@@ -866,12 +870,16 @@ async function resolveDashboardDataWith(
   }
 
   try {
-    let coreData = await Sentry.startSpan(
-      { op: 'task', name: spanName },
-      async () => fetchFn(userId)
-    );
+    let coreData = shouldBypassDashboardCache()
+      ? await fetchFreshFn(userId)
+      : await Sentry.startSpan({ op: 'task', name: spanName }, async () =>
+          fetchFn(userId)
+        );
 
-    if (shouldRefreshUnstableDashboardState(coreData)) {
+    if (
+      !shouldBypassDashboardCache() &&
+      shouldRefreshUnstableDashboardState(coreData)
+    ) {
       coreData = await fetchFreshFn(userId);
     }
 
@@ -917,19 +925,23 @@ async function resolveDashboardShellData(
   try {
     const [adminResult, cachedCoreData] = await Promise.allSettled([
       checkAdminRole(clerkUserId),
-      Sentry.startSpan(
-        { op: 'task', name: 'dashboard.getShellData' },
-        async () => getCachedDashboardShell(clerkUserId)
-      ),
+      shouldBypassDashboardCache()
+        ? fetchDashboardShellWithSession(clerkUserId)
+        : Sentry.startSpan(
+            { op: 'task', name: 'dashboard.getShellData' },
+            async () => getCachedDashboardShell(clerkUserId)
+          ),
     ]);
 
     if (cachedCoreData.status === 'rejected') throw cachedCoreData.reason;
 
     const isAdmin =
       adminResult.status === 'fulfilled' ? adminResult.value : false;
-    const coreData = shouldRefreshUnstableDashboardState(cachedCoreData.value)
-      ? await fetchDashboardShellWithSession(clerkUserId)
-      : cachedCoreData.value;
+    const coreData =
+      !shouldBypassDashboardCache() &&
+      shouldRefreshUnstableDashboardState(cachedCoreData.value)
+        ? await fetchDashboardShellWithSession(clerkUserId)
+        : cachedCoreData.value;
 
     return {
       ...applyAdminOnboardingBypass(coreData, isAdmin),

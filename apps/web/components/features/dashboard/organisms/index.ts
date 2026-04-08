@@ -1,4 +1,3 @@
-export { AppleStyleOnboardingForm } from './apple-style-onboarding';
 export { ArtistSelectionForm } from './artist-selection-form';
 export { DashboardPreview } from './DashboardPreview';
 export { ListenNowForm } from './listen-now-form';

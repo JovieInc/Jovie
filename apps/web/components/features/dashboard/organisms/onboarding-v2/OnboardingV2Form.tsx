@@ -51,7 +51,6 @@ import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 const DISCOVERY_POLL_INTERVAL_MS = 1200;
-const DISCOVERY_STAGE_TIMEOUT_MS = 10000;
 const DISCOVERY_AUTO_ADVANCE_MS = 800;
 
 type StepId =
@@ -127,6 +126,28 @@ interface DiscoveryRelease {
   title: string;
 }
 
+type DiscoveryImportStatus =
+  | 'idle'
+  | 'importing'
+  | 'complete'
+  | 'failed'
+  | 'unknown';
+
+type DiscoveryReadinessPhase =
+  | 'connecting'
+  | 'importing'
+  | 'discovering'
+  | 'ready'
+  | 'failed';
+
+type DiscoveryBlockingReason =
+  | 'missing_spotify_selection'
+  | 'spotify_import_in_progress'
+  | 'spotify_import_failed'
+  | 'discovery_in_progress'
+  | 'awaiting_first_release'
+  | null;
+
 interface DiscoverySnapshot {
   counts: {
     activeSocialCount: number;
@@ -135,6 +156,15 @@ interface DiscoverySnapshot {
   };
   dspItems: DiscoveryDspItem[];
   hasPendingDiscoveryJob: boolean;
+  importState?: {
+    activeSocialCount: number;
+    confirmedDspCount: number;
+    hasImportedReleases: boolean;
+    hasSpotifySelection: boolean;
+    recordingCount: number;
+    releaseCount: number;
+    spotifyImportStatus: DiscoveryImportStatus;
+  };
   profile: {
     activeSinceYear: number | null;
     appleMusicConnected: boolean;
@@ -149,6 +179,11 @@ interface DiscoverySnapshot {
     username: string;
   };
   releases: DiscoveryRelease[];
+  readiness?: {
+    blockingReason: DiscoveryBlockingReason;
+    canProceedToDashboard: boolean;
+    phase: DiscoveryReadinessPhase;
+  };
   selectedSpotifyProfile: SelectedArtist | null;
   socialItems: DiscoverySocialItem[];
 }
@@ -264,18 +299,41 @@ function getResumeQueryValue(step: StepId): string | null {
   }
 }
 
-function hasBlockingDspItems(snapshot: DiscoverySnapshot | null): boolean {
-  if (!snapshot) return true;
-  return snapshot.dspItems.some(item => item.status === 'suggested');
+function getDiscoveryReadiness(snapshot: DiscoverySnapshot | null) {
+  return snapshot?.readiness ?? null;
 }
 
-function hasBlockingSocialItems(snapshot: DiscoverySnapshot | null): boolean {
-  if (!snapshot) return true;
+function canProceedToDashboard(snapshot: DiscoverySnapshot | null): boolean {
+  return Boolean(getDiscoveryReadiness(snapshot)?.canProceedToDashboard);
+}
 
-  return snapshot.socialItems.some(item => {
-    if (item.kind === 'suggestion') return item.state === 'pending';
-    return item.state === 'suggested';
-  });
+function getBlockingReason(
+  snapshot: DiscoverySnapshot | null
+): DiscoveryBlockingReason {
+  return getDiscoveryReadiness(snapshot)?.blockingReason ?? null;
+}
+
+function isReadinessPending(snapshot: DiscoverySnapshot | null): boolean {
+  return !canProceedToDashboard(snapshot);
+}
+
+function getReadinessMessage(
+  snapshot: DiscoverySnapshot | null
+): string | null {
+  switch (getBlockingReason(snapshot)) {
+    case 'missing_spotify_selection':
+      return 'Choose your Spotify artist to start importing.';
+    case 'spotify_import_in_progress':
+      return 'We are still importing your Spotify releases.';
+    case 'spotify_import_failed':
+      return 'Spotify import failed. Choose your artist again to retry.';
+    case 'discovery_in_progress':
+      return 'We are finishing cross-platform discovery now.';
+    case 'awaiting_first_release':
+      return 'Your first releases have not landed yet. This is taking longer than usual.';
+    default:
+      return null;
+  }
 }
 
 function extractSpotifyArtistId(input: string): string | null {
@@ -565,7 +623,7 @@ function SelectedArtistCard({
             {isLoading ? (
               <>
                 <Loader2 className='h-4 w-4 animate-spin' />
-                <span>Importing and enriching in the background…</span>
+                <span>Finishing import and discovery...</span>
               </>
             ) : (
               <>
@@ -672,7 +730,6 @@ export function OnboardingV2Form({
   const [searchInput, setSearchInput] = useState('');
   const [anythingElse, setAnythingElse] = useState('');
   const handleInputRef = useRef<HTMLInputElement | null>(null);
-  const stageStartedAtRef = useRef<number>(Date.now());
   const selectedArtistRef = useRef<SelectedArtist | null>(selectedArtist);
   const currentStepRef = useRef<StepId>(currentStep);
   const discoverySnapshotRef = useRef<DiscoverySnapshot | null>(null);
@@ -890,17 +947,6 @@ export function OnboardingV2Form({
     refreshDiscovery(controller.signal);
 
     const intervalId = globalThis.setInterval(() => {
-      if (
-        currentStepRef.current === 'dsp' ||
-        currentStepRef.current === 'social' ||
-        currentStepRef.current === 'releases'
-      ) {
-        const elapsed = Date.now() - stageStartedAtRef.current;
-        if (elapsed >= DISCOVERY_STAGE_TIMEOUT_MS) {
-          return;
-        }
-      }
-
       refreshDiscovery(controller.signal);
     }, DISCOVERY_POLL_INTERVAL_MS);
 
@@ -932,7 +978,7 @@ export function OnboardingV2Form({
     didResolveInitialResumeRef.current = true;
 
     if (discoverySnapshot.selectedSpotifyProfile) {
-      setCurrentStep('dsp');
+      setCurrentStep('artist-confirm');
       return;
     }
 
@@ -940,8 +986,20 @@ export function OnboardingV2Form({
   }, [currentStep, discoverySnapshot, initialStep, profileId]);
 
   useEffect(() => {
-    stageStartedAtRef.current = Date.now();
-  }, [currentStep]);
+    if (currentStep !== 'profile-ready') {
+      return;
+    }
+
+    if (!discoverySnapshot) {
+      return;
+    }
+
+    if (canProceedToDashboard(discoverySnapshot)) {
+      return;
+    }
+
+    setCurrentStep('releases');
+  }, [currentStep, discoverySnapshot]);
 
   useEffect(() => {
     const upgradeStatus = searchParams.get('upgrade');
@@ -1012,9 +1070,8 @@ export function OnboardingV2Form({
       try {
         const connectResult = await connectOnboardingSpotifyArtist({
           artistName: artist.name,
-          includeTracks: false,
+          includeTracks: true,
           profileId,
-          skipMusicFetchEnrichment: true,
           spotifyArtistId: artist.id,
           spotifyArtistUrl: artist.url,
         });
@@ -1038,11 +1095,10 @@ export function OnboardingV2Form({
         return;
       }
 
-      await enrichProfileFromDsp(artist.id, artist.url).catch(() => {
+      setIsArtistConnectPending(false);
+      void enrichProfileFromDsp(artist.id, artist.url).catch(() => {
         // Best-effort: if enrichment fails, the profile keeps its current name.
       });
-
-      setIsArtistConnectPending(false);
       await refreshDiscovery().catch(() => {
         // refreshDiscovery is responsible for setting user-facing error state
       });
@@ -1074,35 +1130,45 @@ export function OnboardingV2Form({
     setCurrentStep(previous => {
       switch (previous) {
         case 'artist-confirm':
-          return 'upgrade';
+          return canProceedToDashboard(discoverySnapshot)
+            ? 'upgrade'
+            : 'artist-confirm';
         case 'upgrade':
-          return 'dsp';
+          return canProceedToDashboard(discoverySnapshot) ? 'dsp' : 'upgrade';
         case 'dsp':
+          if (isReadinessPending(discoverySnapshot)) {
+            return 'dsp';
+          }
           return 'social';
         case 'social':
+          if (isReadinessPending(discoverySnapshot)) {
+            return 'social';
+          }
           return 'releases';
         case 'releases':
-          return lateArrivals.length > 0 ? 'late-arrivals' : 'profile-ready';
-        case 'late-arrivals':
+          if (
+            isReadinessPending(discoverySnapshot) ||
+            (discoverySnapshot?.counts.releaseCount ?? 0) <= 0
+          ) {
+            return 'releases';
+          }
           return 'profile-ready';
+        case 'late-arrivals':
+          return canProceedToDashboard(discoverySnapshot)
+            ? 'profile-ready'
+            : 'releases';
         default:
           return previous;
       }
     });
-  }, [lateArrivals.length]);
+  }, [discoverySnapshot]);
 
   useEffect(() => {
-    if (currentStep === 'dsp' && !hasBlockingDspItems(discoverySnapshot)) {
-      const timeoutId = globalThis.setTimeout(
-        advanceFromStep,
-        DISCOVERY_AUTO_ADVANCE_MS
-      );
-      return () => globalThis.clearTimeout(timeoutId);
-    }
-
     if (
-      currentStep === 'social' &&
-      !hasBlockingSocialItems(discoverySnapshot)
+      currentStep === 'artist-confirm' &&
+      !isArtistConnectPending &&
+      !isConnecting &&
+      canProceedToDashboard(discoverySnapshot)
     ) {
       const timeoutId = globalThis.setTimeout(
         advanceFromStep,
@@ -1111,7 +1177,27 @@ export function OnboardingV2Form({
       return () => globalThis.clearTimeout(timeoutId);
     }
 
-    if (currentStep === 'releases') {
+    if (currentStep === 'dsp' && canProceedToDashboard(discoverySnapshot)) {
+      const timeoutId = globalThis.setTimeout(
+        advanceFromStep,
+        DISCOVERY_AUTO_ADVANCE_MS
+      );
+      return () => globalThis.clearTimeout(timeoutId);
+    }
+
+    if (currentStep === 'social' && canProceedToDashboard(discoverySnapshot)) {
+      const timeoutId = globalThis.setTimeout(
+        advanceFromStep,
+        DISCOVERY_AUTO_ADVANCE_MS
+      );
+      return () => globalThis.clearTimeout(timeoutId);
+    }
+
+    if (
+      currentStep === 'releases' &&
+      canProceedToDashboard(discoverySnapshot) &&
+      (discoverySnapshot?.counts.releaseCount ?? 0) > 0
+    ) {
       const timeoutId = globalThis.setTimeout(
         advanceFromStep,
         DISCOVERY_AUTO_ADVANCE_MS
@@ -1120,19 +1206,13 @@ export function OnboardingV2Form({
     }
 
     return undefined;
-  }, [advanceFromStep, currentStep, discoverySnapshot]);
-
-  useEffect(() => {
-    if (currentStep !== 'dsp' && currentStep !== 'social') {
-      return;
-    }
-
-    const timeoutId = globalThis.setTimeout(() => {
-      advanceFromStep();
-    }, DISCOVERY_STAGE_TIMEOUT_MS);
-
-    return () => globalThis.clearTimeout(timeoutId);
-  }, [advanceFromStep, currentStep]);
+  }, [
+    advanceFromStep,
+    currentStep,
+    discoverySnapshot,
+    isArtistConnectPending,
+    isConnecting,
+  ]);
 
   const runDiscoveryMutation = useCallback(
     async ({
@@ -1440,7 +1520,7 @@ export function OnboardingV2Form({
         return (
           <StepFrame
             title='Pick your Spotify artist'
-            prompt='Search for your artist page or paste a Spotify artist URL. We will start importing as soon as you choose one.'
+            prompt='Search for your artist page or paste a Spotify artist URL. We will finish your import and discovery before you leave onboarding.'
           >
             {discoveryError ? (
               <InlineNotice>{discoveryError}</InlineNotice>
@@ -1473,11 +1553,13 @@ export function OnboardingV2Form({
               </p>
               <ul className='mt-3 space-y-2 text-sm leading-6 text-secondary-token'>
                 <li>We claim the Spotify artist on your profile right away.</li>
-                <li>Cross-platform discovery starts in the background.</li>
                 <li>
-                  You can reselect a different artist if you picked the wrong
-                  one.
+                  We finish your first import before the next step unlocks.
                 </li>
+                <li>
+                  Cross-platform discovery is completed during onboarding.
+                </li>
+                <li>You can still reselect a different artist if needed.</li>
               </ul>
             </FlatPanel>
           </StepFrame>
@@ -1487,22 +1569,37 @@ export function OnboardingV2Form({
         return (
           <StepFrame
             title='Spotify is connected'
-            prompt='We are importing your core profile data now. You can keep going while the rest of discovery catches up.'
+            prompt='We are finishing your import and discovery now.'
             actions={
               <>
                 <Button
                   onClick={() => setCurrentStep('spotify')}
+                  disabled={isArtistConnectPending || isConnecting}
                   variant='secondary'
                 >
                   Choose a different artist
                 </Button>
-                <Button onClick={advanceFromStep}>
-                  Continue
+                <Button
+                  disabled={
+                    isArtistConnectPending ||
+                    isConnecting ||
+                    !canProceedToDashboard(discoverySnapshot)
+                  }
+                  onClick={advanceFromStep}
+                >
+                  {canProceedToDashboard(discoverySnapshot)
+                    ? 'Continue'
+                    : 'Finishing import'}
                   <ArrowRight className='ml-1 h-4 w-4' />
                 </Button>
               </>
             }
           >
+            {getReadinessMessage(discoverySnapshot) ? (
+              <InlineNotice>
+                {getReadinessMessage(discoverySnapshot)}
+              </InlineNotice>
+            ) : null}
             <SelectedArtistCard
               artist={selectedArtist}
               isLoading={
@@ -1519,10 +1616,14 @@ export function OnboardingV2Form({
         return (
           <StepFrame
             title='Want the full profile from day one?'
-            prompt='You can keep going for free, or unlock the paid plan before you land in the dashboard.'
+            prompt='Your import is ready. Continue with the free plan, or unlock the paid plan before you land in the dashboard.'
             actions={
               <>
-                <Button onClick={advanceFromStep} variant='secondary'>
+                <Button
+                  disabled={isReadinessPending(discoverySnapshot)}
+                  onClick={advanceFromStep}
+                  variant='secondary'
+                >
                   Continue free
                 </Button>
                 <Button
@@ -1541,11 +1642,11 @@ export function OnboardingV2Form({
           >
             <ContentSurfaceCard className='p-5'>
               <p className='text-sm font-[560] text-primary-token'>
-                You can still finish discovery first.
+                Discovery is already complete for this onboarding pass.
               </p>
               <p className='mt-2 text-sm leading-6 text-secondary-token'>
-                Checkout returns directly to discovery, so this is a short
-                detour rather than a separate flow.
+                Checkout still returns directly to the onboarding flow, so this
+                is a short detour rather than a separate setup.
               </p>
             </ContentSurfaceCard>
           </StepFrame>
@@ -1628,7 +1729,7 @@ export function OnboardingV2Form({
                     ? 'Still discovering DSPs'
                     : 'No additional DSP matches yet'
                 }
-                body='You can keep going. New matches that arrive later will still be surfaced before you land in the dashboard.'
+                body='We did not find additional DSP matches in this onboarding pass.'
               />
             )}
           </StepFrame>
@@ -1713,7 +1814,7 @@ export function OnboardingV2Form({
             ) : (
               <EmptyState
                 title='No social suggestions yet'
-                body='If discovery turns up more profiles after this step, they will appear in the final summary before you enter the dashboard.'
+                body='We did not find any social suggestions in this onboarding pass.'
               />
             )}
           </StepFrame>
@@ -1723,12 +1824,24 @@ export function OnboardingV2Form({
         return (
           <StepFrame
             title='Your release preview'
-            prompt='This is what Jovie pulled in from your catalog so far.'
+            prompt='This is what Jovie pulled in from your catalog.'
             actions={
-              <Button onClick={advanceFromStep}>
-                Continue
-                <ArrowRight className='ml-1 h-4 w-4' />
-              </Button>
+              <>
+                <Button onClick={() => refreshDiscovery()} variant='secondary'>
+                  <RefreshCw className='mr-1 h-4 w-4' />
+                  Refresh
+                </Button>
+                <Button
+                  disabled={
+                    isReadinessPending(discoverySnapshot) ||
+                    (discoverySnapshot?.counts.releaseCount ?? 0) <= 0
+                  }
+                  onClick={advanceFromStep}
+                >
+                  Continue
+                  <ArrowRight className='ml-1 h-4 w-4' />
+                </Button>
+              </>
             }
           >
             {discoverySnapshot?.releases.length ? (
@@ -1764,8 +1877,11 @@ export function OnboardingV2Form({
               ))
             ) : (
               <EmptyState
-                title='No releases have landed yet'
-                body='That usually means enrichment is still catching up. You can keep going and the dashboard will continue hydrating in the background.'
+                title='Still importing releases'
+                body={
+                  getReadinessMessage(discoverySnapshot) ??
+                  'This is taking longer than usual. Refresh to check again.'
+                }
               />
             )}
           </StepFrame>
@@ -1802,7 +1918,10 @@ export function OnboardingV2Form({
             title='Your profile is ready'
             prompt='The dashboard is next. We will carry your preview straight through the route transition.'
             actions={
-              <Button onClick={handleOpenDashboard}>
+              <Button
+                disabled={!canProceedToDashboard(discoverySnapshot)}
+                onClick={handleOpenDashboard}
+              >
                 Open dashboard
                 <ArrowRight className='ml-1 h-4 w-4' />
               </Button>

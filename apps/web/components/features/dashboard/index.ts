@@ -1,6 +1,5 @@
 export { ProfileLinkCard } from './molecules';
 export {
-  AppleStyleOnboardingForm,
   ArtistSelectionForm,
   DashboardPreview,
   ListenNowForm,

@@ -4,12 +4,11 @@
 
 'use server';
 
-import { currentUser } from '@clerk/nextjs/server';
 import { revalidatePath } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -21,10 +20,12 @@ import {
   createOnboardingError,
   OnboardingErrorCode,
   onboardingErrorToError,
+  unwrapDatabaseError,
 } from '@/lib/errors/onboarding';
 import { attributeLeadSignupFromClerkUserId } from '@/lib/leads/funnel-events';
 import { cacheHandleAvailability } from '@/lib/onboarding/handle-availability-cache';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
+import { withTimeout } from '@/lib/resilience/primitives';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { isContentClean } from '@/lib/validation/content-filter';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
@@ -42,6 +43,73 @@ import {
 import { runBackgroundSyncOperations } from './sync';
 import type { CompletionResult } from './types';
 import { ensureEmailAvailable, ensureHandleAvailable } from './validation';
+
+const POST_ONBOARDING_SIDE_EFFECT_TIMEOUT_MS = 2_000;
+
+function isHandleUniqueViolation(error: unknown): boolean {
+  const unwrapped = unwrapDatabaseError(error);
+  const message = (
+    unwrapped.message || (error instanceof Error ? error.message : '')
+  ).toLowerCase();
+  const constraint = (unwrapped.constraint ?? '').toLowerCase();
+  const detail = (unwrapped.detail ?? '').toLowerCase();
+
+  if (unwrapped.code !== '23505' && !message.includes('duplicate')) {
+    return false;
+  }
+
+  return (
+    constraint.includes('creator_profiles_username_normalized_unique') ||
+    message.includes('username_normalized') ||
+    detail.includes('username_normalized') ||
+    detail.includes('username')
+  );
+}
+
+async function recoverConcurrentProfileClaim(
+  clerkUserId: string,
+  normalizedUsername: string
+): Promise<CompletionResult | null> {
+  return withDbSessionTx(async tx => {
+    const existingUser = await fetchExistingUser(tx, clerkUserId);
+    if (!existingUser) {
+      return null;
+    }
+
+    const existingProfile = await fetchExistingProfile(tx, existingUser.id);
+    if (!existingProfile) {
+      return null;
+    }
+
+    if (existingProfile.usernameNormalized !== normalizedUsername) {
+      return null;
+    }
+
+    return {
+      username: existingProfile.usernameNormalized,
+      status: 'complete',
+      profileId: existingProfile.id,
+    };
+  });
+}
+
+async function runBoundedPostOnboardingSideEffect(
+  context: string,
+  operation: () => Promise<void>,
+  contextData?: Record<string, string | null | undefined>
+): Promise<void> {
+  try {
+    await withTimeout(operation(), {
+      timeoutMs: POST_ONBOARDING_SIDE_EFFECT_TIMEOUT_MS,
+      context,
+    });
+  } catch (error) {
+    await captureError(`${context} failed`, error, {
+      route: 'onboarding',
+      contextData,
+    });
+  }
+}
 
 export async function completeOnboarding({
   username,
@@ -107,7 +175,7 @@ export async function completeOnboarding({
     const clientIP = extractClientIP(headersList);
     const cookieHeader = headersList.get('cookie');
 
-    const clerkUser = await currentUser();
+    const clerkUser = await getCachedCurrentUser();
     const clerkIdentity = resolveClerkIdentity(clerkUser);
     const oauthAvatarUrl = clerkIdentity.avatarUrl;
 
@@ -235,13 +303,56 @@ export async function completeOnboarding({
           { isolationLevel: 'serializable' }
         ),
       'completeOnboarding'
-    );
+    ).catch(async error => {
+      if (!isHandleUniqueViolation(error)) {
+        throw error;
+      }
 
-    await cacheHandleAvailability(completion.username, false);
+      const recovered = await recoverConcurrentProfileClaim(
+        userId,
+        normalizedUsername
+      );
 
-    // Immediately invalidate user state cache so middleware sees fresh state
-    // This prevents stale cache from causing redirect loops
-    await invalidateProxyUserStateCache(userId);
+      if (recovered) {
+        return recovered;
+      }
+
+      throw error;
+    });
+
+    await Promise.allSettled([
+      runBoundedPostOnboardingSideEffect(
+        'cache_handle_availability',
+        () => cacheHandleAvailability(completion.username, false),
+        {
+          username: completion.username,
+        }
+      ),
+      // Immediately invalidate user state cache so middleware sees fresh state.
+      // This is best-effort because the completion cookie below also prevents
+      // redirect loops during the handoff to /app.
+      runBoundedPostOnboardingSideEffect(
+        'invalidate_proxy_user_state_cache',
+        () => invalidateProxyUserStateCache(userId),
+        {
+          userId,
+        }
+      ),
+      runBoundedPostOnboardingSideEffect(
+        'attribute_lead_signup',
+        () => attributeLeadSignupFromClerkUserId(userId).then(() => {}),
+        {
+          userId,
+        }
+      ),
+      runBoundedPostOnboardingSideEffect(
+        'invalidate_profile_cache',
+        () => invalidateProfileCache(completion.username),
+        {
+          username: completion.username,
+        }
+      ),
+    ]);
 
     // Step 7: Avatar upload (fire-and-forget, background processing)
     const profileId = completion.profileId;
@@ -256,15 +367,6 @@ export async function completeOnboarding({
     // Step 8: Sync operations (parallel, fire-and-forget)
     runBackgroundSyncOperations(userId, completion.username);
 
-    try {
-      await attributeLeadSignupFromClerkUserId(userId);
-    } catch (error) {
-      await captureError('Lead signup attribution failed', error, {
-        route: 'onboarding',
-        contextData: { userId },
-      });
-    }
-
     // ENG-002: Set completion cookie to prevent redirect loop race condition
     // The proxy checks this cookie and bypasses needsOnboarding check for 30s
     // This handles the race between transaction commit and proxy's DB read
@@ -278,12 +380,6 @@ export async function completeOnboarding({
       maxAge: 120, // 2 minutes - enough time to view completion step before going to dashboard
       path: '/',
     });
-
-    // Invalidate public profile cache so the profile page reflects the new isPublic state.
-    // Without this, a stale not_found result cached by unstable_cache would persist
-    // for up to 1 hour after onboarding completes (e.g., waitlist profiles that were
-    // previously visited while isPublic was false).
-    await invalidateProfileCache(completion.username);
 
     // Invalidate dashboard data cache to prevent stale data causing redirect loops
     // This ensures the app layout gets fresh data showing onboarding is complete

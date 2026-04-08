@@ -50,6 +50,15 @@ const DISCOVERY_SNAPSHOT = {
     },
   ],
   hasPendingDiscoveryJob: false,
+  importState: {
+    activeSocialCount: 2,
+    confirmedDspCount: 1,
+    hasImportedReleases: true,
+    hasSpotifySelection: true,
+    recordingCount: 8,
+    releaseCount: 3,
+    spotifyImportStatus: 'complete',
+  },
   profile: {
     activeSinceYear: 2024,
     appleMusicConnected: false,
@@ -62,6 +71,11 @@ const DISCOVERY_SNAPSHOT = {
     location: 'Tennessee',
     onboardingCompletedAt: null,
     username: 'perf-budget',
+  },
+  readiness: {
+    blockingReason: null,
+    canProceedToDashboard: true,
+    phase: 'ready',
   },
   releases: [
     {
@@ -93,6 +107,58 @@ const DISCOVERY_SNAPSHOT = {
     },
   ],
 } as const;
+
+function createDiscoverySnapshot(
+  overrides: Partial<typeof DISCOVERY_SNAPSHOT> = {}
+) {
+  return {
+    ...DISCOVERY_SNAPSHOT,
+    ...overrides,
+    counts: {
+      ...DISCOVERY_SNAPSHOT.counts,
+      ...overrides.counts,
+    },
+    importState: {
+      ...DISCOVERY_SNAPSHOT.importState,
+      ...overrides.importState,
+    },
+    profile: {
+      ...DISCOVERY_SNAPSHOT.profile,
+      ...overrides.profile,
+    },
+    readiness: {
+      ...DISCOVERY_SNAPSHOT.readiness,
+      ...overrides.readiness,
+    },
+  };
+}
+
+function mockDiscoveryResponse(
+  snapshot: ReturnType<
+    typeof createDiscoverySnapshot
+  > = createDiscoverySnapshot()
+) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+
+      if (!url.includes('/api/onboarding/discovery')) {
+        throw new Error(`Unexpected fetch to: ${url}`);
+      }
+
+      return new Response(JSON.stringify({ snapshot, success: true }), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    })
+  );
+}
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace }),
@@ -262,29 +328,7 @@ beforeEach(() => {
   mockValidateHandle.mockReset();
   mockTrack.mockReset();
 
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (input: RequestInfo | URL) => {
-      const url =
-        typeof input === 'string'
-          ? input
-          : input instanceof URL
-            ? input.href
-            : input.url;
-
-      if (!url.includes('/api/onboarding/discovery')) {
-        throw new Error(`Unexpected fetch to: ${url}`);
-      }
-
-      return new Response(
-        JSON.stringify({ snapshot: DISCOVERY_SNAPSHOT, success: true }),
-        {
-          headers: { 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
-    })
-  );
+  mockDiscoveryResponse();
 });
 
 afterEach(() => {
@@ -393,5 +437,116 @@ describe('Onboarding screen performance budgets', () => {
     expect(renderTime).toBeLessThan(
       getBudgetThreshold(SCREEN_BUDGETS.checkout)
     );
+  });
+
+  it('keeps artist confirmation blocked until import readiness is terminal', async () => {
+    mockDiscoveryResponse(
+      createDiscoverySnapshot({
+        importState: {
+          releaseCount: 0,
+          spotifyImportStatus: 'importing',
+        },
+        readiness: {
+          blockingReason: 'spotify_import_in_progress',
+          canProceedToDashboard: false,
+          phase: 'importing',
+        },
+      })
+    );
+
+    render(
+      <OnboardingV2Form
+        initialDisplayName='Perf Budget'
+        initialHandle='perf-budget'
+        initialProfileId='profile-performance'
+        initialResumeStep='artist-confirm'
+        userEmail='perf@example.com'
+        userId='user-performance'
+      />
+    );
+
+    await screen.findByRole('heading', { name: 'Spotify is connected' });
+    expect(
+      screen.getByRole('button', { name: /Finishing import/i })
+    ).toBeDisabled();
+    expect(
+      screen.getByText('We are still importing your Spotify releases.')
+    ).toBeInTheDocument();
+  });
+
+  it('shows retry guidance when Spotify import fails', async () => {
+    mockDiscoveryResponse(
+      createDiscoverySnapshot({
+        importState: {
+          releaseCount: 0,
+          spotifyImportStatus: 'failed',
+        },
+        readiness: {
+          blockingReason: 'spotify_import_failed',
+          canProceedToDashboard: false,
+          phase: 'failed',
+        },
+      })
+    );
+
+    render(
+      <OnboardingV2Form
+        initialDisplayName='Perf Budget'
+        initialHandle='perf-budget'
+        initialProfileId='profile-performance'
+        initialResumeStep='artist-confirm'
+        userEmail='perf@example.com'
+        userId='user-performance'
+      />
+    );
+
+    await screen.findByRole('heading', { name: 'Spotify is connected' });
+    expect(
+      screen.getByText(
+        'Spotify import failed. Choose your artist again to retry.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Choose a different artist/i })
+    ).toBeEnabled();
+  });
+
+  it('blocks the releases step when no releases are ready yet', async () => {
+    mockDiscoveryResponse(
+      createDiscoverySnapshot({
+        counts: {
+          releaseCount: 0,
+        },
+        importState: {
+          hasImportedReleases: false,
+          releaseCount: 0,
+        },
+        readiness: {
+          blockingReason: 'awaiting_first_release',
+          canProceedToDashboard: false,
+          phase: 'importing',
+        },
+        releases: [],
+      })
+    );
+
+    render(
+      <OnboardingV2Form
+        initialDisplayName='Perf Budget'
+        initialHandle='perf-budget'
+        initialProfileId='profile-performance'
+        initialResumeStep='releases'
+        userEmail='perf@example.com'
+        userId='user-performance'
+      />
+    );
+
+    await screen.findByRole('heading', { name: 'Your release preview' });
+    expect(screen.getByRole('button', { name: /^Continue$/i })).toBeDisabled();
+    expect(
+      screen.getByText(
+        'Your first releases have not landed yet. This is taking longer than usual.'
+      )
+    ).toBeInTheDocument();
   });
 });

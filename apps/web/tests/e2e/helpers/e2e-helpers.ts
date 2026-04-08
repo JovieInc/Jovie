@@ -7,7 +7,12 @@
 
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { neon } from '@neondatabase/serverless';
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
+import {
+  setTestAuthBypassSession,
+  waitForAuthenticatedHealth,
+} from '../../helpers/clerk-auth';
+import { smokeNavigateWithRetry } from '../utils/smoke-test-utils';
 
 /* ------------------------------------------------------------------ */
 /*  Environment gates                                                   */
@@ -65,11 +70,35 @@ export interface DemoReleaseLookup {
   releaseDate?: string | null;
 }
 
+interface OnboardingDiscoveryReadiness {
+  blockingReason:
+    | 'missing_spotify_selection'
+    | 'spotify_import_in_progress'
+    | 'spotify_import_failed'
+    | 'discovery_in_progress'
+    | 'awaiting_first_release'
+    | null;
+  canProceedToDashboard: boolean;
+  phase: 'connecting' | 'importing' | 'discovering' | 'ready' | 'failed';
+}
+
+interface OnboardingDiscoverySnapshot {
+  profile: {
+    id: string;
+  };
+  readiness?: OnboardingDiscoveryReadiness;
+}
+
 /** Spotify IDs for known major artists with guaranteed multi-DSP coverage */
 export const MAJOR_ARTIST_IDS = new Set([
   '6M2wZ9GZgrQXHCFfjv46we', // Dua Lipa
   '06HL4z0CvFAxyc27GXpf02', // Taylor Swift
 ]);
+
+export const DEFAULT_ONBOARDING_SPOTIFY_ARTIST = {
+  id: '6M2wZ9GZgrQXHCFfjv46we',
+  url: 'https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we',
+} as const;
 
 /* ------------------------------------------------------------------ */
 /*  Spotify import helpers                                              */
@@ -87,11 +116,12 @@ export function spotifyImportIsReady(
   const hasSpotifyProfile =
     Boolean(state.spotify_id) && Boolean(state.spotify_url);
 
-  if (state.spotify_import_status === 'complete') {
-    return true;
-  }
-
-  return hasSpotifyProfile && releaseCount > 0 && releaseLinkCount > 0;
+  return (
+    state.spotify_import_status === 'complete' &&
+    hasSpotifyProfile &&
+    releaseCount > 0 &&
+    releaseLinkCount > 0
+  );
 }
 
 export function countPopulatedDspFields(
@@ -303,6 +333,249 @@ export function buildValidOnboardingHandle(
   return `j${seedFragment}${userFragment.slice(-6)}`.slice(0, 30);
 }
 
+export async function completeOnboardingV2(
+  page: Page,
+  spotifyArtistUrl: string = DEFAULT_ONBOARDING_SPOTIFY_ARTIST.url,
+  options: Readonly<{ clerkUserId?: string }> = {}
+) {
+  const onboardingWrapper = page.locator(
+    '[data-testid="onboarding-form-wrapper"]'
+  );
+  const continueButton = page.getByRole('button', { name: 'Continue' });
+  const spotifyHeading = page.getByRole('heading', {
+    name: 'Pick your Spotify artist',
+  });
+  // Seeded handles arrive from the query string, and the V2 form immediately
+  // revalidates them on mount. Waiting briefly avoids clicking during the
+  // transient "checking" window, which otherwise leaves the step pending.
+  await expect
+    .poll(
+      async () => {
+        if (await spotifyHeading.isVisible().catch(() => false)) {
+          return 'spotify';
+        }
+
+        if (await continueButton.isVisible().catch(() => false)) {
+          return 'handle';
+        }
+
+        return 'waiting';
+      },
+      { timeout: 30_000 }
+    )
+    .toMatch(/handle|spotify/);
+
+  if (!(await spotifyHeading.isVisible().catch(() => false))) {
+    const handleInput = page.getByLabel('Enter your desired handle');
+    await expect(onboardingWrapper).toHaveAttribute('data-hydrated', 'true', {
+      timeout: 30_000,
+    });
+    await expect(handleInput).toBeVisible({ timeout: 20_000 });
+    await expect(continueButton).toBeEnabled({ timeout: 20_000 });
+    await handleInput.focus();
+    await handleInput.press('Enter');
+
+    const reachedSpotifyViaEnter = await spotifyHeading
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
+
+    if (!reachedSpotifyViaEnter) {
+      await continueButton.click();
+    }
+  }
+
+  await expect(spotifyHeading).toBeVisible({ timeout: 60_000 });
+
+  const artistInput = page.getByPlaceholder(
+    'Search by artist name or paste a Spotify link'
+  );
+  await expect(artistInput).toBeVisible({ timeout: 20_000 });
+  await artistInput.fill(spotifyArtistUrl);
+
+  await expect(
+    page.getByRole('heading', { name: 'Spotify is connected' })
+  ).toBeVisible({ timeout: 60_000 });
+  const upgradeHeading = page.getByRole('heading', {
+    name: 'Want the full profile from day one?',
+  });
+  const artistConfirmContinue = page.getByRole('button', { name: 'Continue' });
+  const profileReadyHeading = page.getByRole('heading', {
+    name: 'Your profile is ready',
+  });
+
+  if (options.clerkUserId) {
+    await waitForOnboardingReadiness(page, options.clerkUserId);
+  }
+
+  await expect
+    .poll(
+      async () => {
+        if (await profileReadyHeading.isVisible().catch(() => false)) {
+          return 'profile-ready';
+        }
+
+        if (await upgradeHeading.isVisible().catch(() => false)) {
+          return 'upgrade';
+        }
+
+        if (
+          (await artistConfirmContinue.isVisible().catch(() => false)) &&
+          (await artistConfirmContinue.isEnabled().catch(() => false))
+        ) {
+          return 'artist-confirm-ready';
+        }
+
+        return 'waiting';
+      },
+      { timeout: 180_000 }
+    )
+    .toMatch(/upgrade|artist-confirm-ready|profile-ready/);
+
+  if (
+    (await artistConfirmContinue.isVisible().catch(() => false)) &&
+    (await artistConfirmContinue.isEnabled().catch(() => false))
+  ) {
+    await artistConfirmContinue.click();
+  }
+
+  if (!(await profileReadyHeading.isVisible().catch(() => false))) {
+    await expect(upgradeHeading).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'Continue free' }).click();
+  }
+
+  if (options.clerkUserId) {
+    await expect
+      .poll(
+        async () => {
+          const importState = await waitForSpotifyImport(options.clerkUserId!);
+          return importState?.spotify_import_status ?? 'missing';
+        },
+        { timeout: 30_000 }
+      )
+      .not.toBe('importing');
+  }
+
+  await expect(profileReadyHeading).toBeVisible({ timeout: 120_000 });
+  await expect(
+    page.getByRole('button', { name: 'Open dashboard' })
+  ).toBeEnabled({ timeout: 30_000 });
+}
+
+export async function ensureServerAuthenticated(
+  page: Page,
+  clerkUserId: string
+): Promise<void> {
+  const shouldAttachTestBypass =
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
+    process.env.E2E_ATTACH_TEST_AUTH_BYPASS_AFTER_SIGNUP === '1';
+
+  if (!shouldAttachTestBypass) {
+    return;
+  }
+
+  await setTestAuthBypassSession(page, null, clerkUserId);
+  await waitForAuthenticatedHealth(page, clerkUserId);
+}
+
+async function fetchOnboardingDiscoverySnapshot(
+  page: Page,
+  profileId: string
+): Promise<{
+  snapshot: OnboardingDiscoverySnapshot | null;
+  status: string;
+}> {
+  return page.evaluate(async id => {
+    const response = await fetch(`/api/onboarding/discovery?profileId=${id}`, {
+      cache: 'no-store',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      return {
+        snapshot: null,
+        status: `discovery-http-${response.status}`,
+      };
+    }
+
+    const payload = (await response.json()) as {
+      snapshot?: OnboardingDiscoverySnapshot;
+      success?: boolean;
+    };
+
+    if (!payload.success || !payload.snapshot) {
+      return {
+        snapshot: null,
+        status: 'discovery-empty',
+      };
+    }
+
+    return {
+      snapshot: payload.snapshot,
+      status: 'ok',
+    };
+  }, profileId);
+}
+
+export async function waitForOnboardingReadiness(
+  page: Page,
+  clerkUserId: string
+): Promise<string> {
+  let profileId: string | null = null;
+
+  await expect
+    .poll(
+      async () => {
+        await ensureServerAuthenticated(page, clerkUserId);
+
+        const importState = await waitForSpotifyImport(clerkUserId);
+        profileId = importState?.id ?? null;
+
+        if (!profileId) {
+          return 'missing-profile';
+        }
+
+        if (importState?.spotify_import_status === 'importing') {
+          return 'spotify_import_in_progress';
+        }
+
+        const discovery = await fetchOnboardingDiscoverySnapshot(
+          page,
+          profileId
+        );
+        if (discovery.status !== 'ok') {
+          return discovery.status;
+        }
+
+        const snapshot = discovery.snapshot;
+        if (!snapshot?.readiness) {
+          return 'missing-readiness';
+        }
+
+        if (!snapshot.readiness.canProceedToDashboard) {
+          return (
+            snapshot.readiness.blockingReason ??
+            snapshot.readiness.phase ??
+            'waiting'
+          );
+        }
+
+        if (importState?.spotify_import_status === 'importing') {
+          return 'spotify_import_in_progress';
+        }
+
+        return 'ready';
+      },
+      { timeout: 180_000 }
+    )
+    .toBe('ready');
+
+  if (!profileId) {
+    throw new Error('Onboarding readiness resolved without a profile ID');
+  }
+
+  return profileId;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Clerk user management                                               */
 /* ------------------------------------------------------------------ */
@@ -448,6 +721,37 @@ export async function ensureDbUser(
   if (!user?.id) {
     throw new Error(`Failed to ensure DB user for Clerk user ${clerkUserId}`);
   }
+
+  // Force "fresh user" tests back to a profile-less state for this Clerk ID.
+  // Reused Clerk users in dev/test can carry an old claimed profile, which
+  // causes /app to skip onboarding entirely even though the spec expects a
+  // brand-new waitlist-approved user.
+  await sql`
+    DELETE FROM user_profile_claims
+    WHERE user_id = ${user.id}
+  `;
+
+  await sql`
+    UPDATE creator_profiles
+    SET
+      user_id = NULL,
+      is_claimed = false,
+      claimed_at = NULL,
+      onboarding_completed_at = NULL,
+      spotify_id = NULL,
+      spotify_url = NULL,
+      updated_at = NOW()
+    WHERE user_id = ${user.id}
+  `;
+
+  await sql`
+    UPDATE users
+    SET
+      active_profile_id = NULL,
+      user_status = 'waitlist_approved',
+      updated_at = NOW()
+    WHERE id = ${user.id}
+  `;
 }
 
 /* ------------------------------------------------------------------ */
@@ -476,12 +780,14 @@ export async function interceptTrackingCalls(page: Page) {
  * with the magic code 424242 before a session is created.
  */
 export async function createFreshUser(page: Page, uniqueSeed: string) {
-  await setupClerkTestingToken({ page });
+  if (process.env.E2E_USE_TEST_AUTH_BYPASS !== '1') {
+    await setupClerkTestingToken({ page });
+  }
 
   const loadClerk = async () => {
-    await page.goto('/signin', {
-      waitUntil: 'domcontentloaded',
-      timeout: 60_000,
+    await smokeNavigateWithRetry(page, '/signin', {
+      timeout: 120_000,
+      retries: 2,
     });
 
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -499,7 +805,7 @@ export async function createFreshUser(page: Page, uniqueSeed: string) {
       if (await retryButton.isVisible().catch(() => false)) {
         await retryButton.click();
       } else {
-        await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: 120_000 });
       }
     }
 
@@ -548,6 +854,48 @@ export async function createFreshUser(page: Page, uniqueSeed: string) {
   if (!clerkUserId) {
     throw new Error('Clerk session not established after signup');
   }
+
+  await page.waitForFunction(
+    () => {
+      const clerkInstance = (
+        window as {
+          Clerk?: {
+            session?: { id?: string | null } | null;
+            user?: { id?: string | null } | null;
+          };
+        }
+      ).Clerk;
+
+      return Boolean(clerkInstance?.session?.id && clerkInstance?.user?.id);
+    },
+    { timeout: 30_000 }
+  );
+
+  await expect
+    .poll(
+      async () => {
+        const cookies = await page.context().cookies();
+        return cookies.some(cookie => {
+          return (
+            cookie.name === '__session' ||
+            cookie.name.startsWith('__clerk') ||
+            cookie.name.startsWith('__client')
+          );
+        });
+      },
+      { timeout: 30_000 }
+    )
+    .toBe(true);
+
+  const shouldAttachTestBypass =
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
+    process.env.E2E_ATTACH_TEST_AUTH_BYPASS_AFTER_SIGNUP === '1';
+
+  if (shouldAttachTestBypass) {
+    await ensureServerAuthenticated(page, clerkUserId);
+  }
+
+  await page.waitForTimeout(1_000);
 
   return { email, clerkUserId };
 }

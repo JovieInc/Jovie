@@ -179,6 +179,60 @@ export async function setTestAuthBypassSession(
   }
 }
 
+export async function waitForAuthenticatedHealth(
+  page: Page,
+  expectedUserId?: string | null
+): Promise<void> {
+  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  const expectedHost = new URL(baseUrl).host;
+
+  await expect
+    .poll(
+      async () => {
+        const currentUrl = page.url();
+        if (!currentUrl || currentUrl === 'about:blank') {
+          return 'about:blank';
+        }
+
+        const currentHost = new URL(currentUrl).host;
+        if (currentHost !== expectedHost) {
+          return `host-mismatch:${currentHost}`;
+        }
+
+        return page.evaluate(
+          async ({ expectedUserId: expected }) => {
+            const response = await fetch('/api/health/auth', {
+              credentials: 'include',
+              cache: 'no-store',
+            });
+
+            if (!response.ok) {
+              return `http-${response.status}`;
+            }
+
+            const payload = (await response.json()) as {
+              authenticated?: boolean;
+              userId?: string | null;
+            };
+
+            if (!payload.authenticated) {
+              return 'anonymous';
+            }
+
+            if (expected && payload.userId !== expected) {
+              return `user-mismatch:${payload.userId ?? 'unknown'}`;
+            }
+
+            return 'authenticated';
+          },
+          { expectedUserId }
+        );
+      },
+      { timeout: 30_000 }
+    )
+    .toBe('authenticated');
+}
+
 async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
   await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
     timeout: 120_000,

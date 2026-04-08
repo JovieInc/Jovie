@@ -293,12 +293,11 @@ export function OnboardingHandleStep({
             </div>
 
             <AuthButton
-              type='button'
+              type='submit'
               disabled={Boolean(ctaDisabledReason) || isTransitioning}
               aria-describedby={
                 ctaDisabledReason ? disabledReasonId : undefined
               }
-              onClick={() => onSubmit()}
               variant='primary'
             >
               <ButtonContent
