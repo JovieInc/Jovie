@@ -81,8 +81,24 @@ export const CANONICAL_SURFACES_BY_ID = CANONICAL_SURFACES.reduce<
   {} as Record<CanonicalSurfaceId, CanonicalSurfaceDefinition>
 );
 
+const CANONICAL_SURFACES_BY_SCREENSHOT_ID = CANONICAL_SURFACES.reduce<
+  Partial<Record<string, CanonicalSurfaceDefinition>>
+>((accumulator, surface) => {
+  for (const screenshotId of surface.screenshotIds) {
+    accumulator[screenshotId] = surface;
+  }
+
+  return accumulator;
+}, {});
+
 export function getCanonicalSurface(
   id: CanonicalSurfaceId
 ): CanonicalSurfaceDefinition {
   return CANONICAL_SURFACES_BY_ID[id];
+}
+
+export function getCanonicalSurfaceForScreenshotId(
+  screenshotId: string
+): CanonicalSurfaceDefinition | null {
+  return CANONICAL_SURFACES_BY_SCREENSHOT_ID[screenshotId] ?? null;
 }

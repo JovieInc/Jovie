@@ -6,6 +6,10 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
 import type { ScreenshotInfo } from '@/lib/admin/types';
+import {
+  CANONICAL_SURFACES,
+  type CanonicalSurfaceId,
+} from '@/lib/canonical-surfaces';
 import { GROUP_LABELS } from '@/lib/screenshots/registry';
 import type {
   ScreenshotConsumer,
@@ -16,11 +20,25 @@ interface ScreenshotGalleryProps {
   readonly screenshots: readonly ScreenshotInfo[];
 }
 
+type SurfaceFilter = 'all' | 'other' | CanonicalSurfaceId;
+
+const SURFACE_FILTERS: ReadonlyArray<{
+  readonly id: SurfaceFilter;
+  readonly label: string;
+}> = [
+  { id: 'all', label: 'All Captures' },
+  ...CANONICAL_SURFACES.map(surface => ({
+    id: surface.id,
+    label: surface.label,
+  })),
+  { id: 'other', label: 'Other Captures' },
+] as const;
+
 const GROUP_FILTERS: ReadonlyArray<{
   readonly id: 'all' | ScreenshotGroup;
   readonly label: string;
 }> = [
-  { id: 'all', label: 'All' },
+  { id: 'all', label: 'All Groups' },
   ...Object.entries(GROUP_LABELS).map(([id, label]) => ({
     id: id as ScreenshotGroup,
     label,
@@ -71,6 +89,7 @@ function formatConsumerLabel(consumer: DisplayScreenshotConsumer) {
 
 export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [surfaceFilter, setSurfaceFilter] = useState<SurfaceFilter>('all');
   const [groupFilter, setGroupFilter] = useState<'all' | ScreenshotGroup>(
     'all'
   );
@@ -79,15 +98,25 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
   >('all');
   const isOpen = selectedIndex !== null;
   const filteredScreenshots = screenshots.filter(screenshot => {
+    const surfaceMatch =
+      surfaceFilter === 'all'
+        ? true
+        : surfaceFilter === 'other'
+          ? screenshot.canonicalSurfaceId === undefined
+          : screenshot.canonicalSurfaceId === surfaceFilter;
     const groupMatch =
       groupFilter === 'all' || screenshot.group === groupFilter;
     const consumerMatch =
       consumerFilter === 'all' || screenshot.consumers.includes(consumerFilter);
-    return groupMatch && consumerMatch;
+    return surfaceMatch && groupMatch && consumerMatch;
   });
   const selected =
     selectedIndex === null ? null : filteredScreenshots[selectedIndex];
   const filteredScreenshotsCount = filteredScreenshots.length;
+  const totalCanonicalCaptures = screenshots.filter(
+    screenshot => screenshot.canonicalSurfaceId !== undefined
+  ).length;
+  const totalOtherCaptures = screenshots.length - totalCanonicalCaptures;
 
   function handleClose() {
     setSelectedIndex(null);
@@ -113,14 +142,94 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
 
   useEffect(() => {
     setSelectedIndex(null);
-  }, [groupFilter, consumerFilter]);
+  }, [surfaceFilter, groupFilter, consumerFilter]);
 
   const indexMap = new Map(filteredScreenshots.map((s, i) => [s.id, i]));
-  const grouped = new Map<string, ScreenshotInfo[]>();
-  for (const ss of filteredScreenshots) {
-    const group = grouped.get(ss.groupLabel) ?? [];
-    group.push(ss);
-    grouped.set(ss.groupLabel, group);
+  const canonicalSections = CANONICAL_SURFACES.map(surface => ({
+    surface,
+    items: filteredScreenshots.filter(
+      screenshot => screenshot.canonicalSurfaceId === surface.id
+    ),
+  })).filter(section => section.items.length > 0);
+
+  const otherGroups = new Map<string, ScreenshotInfo[]>();
+  for (const screenshot of filteredScreenshots.filter(
+    ss => ss.canonicalSurfaceId === undefined
+  )) {
+    const group = otherGroups.get(screenshot.groupLabel) ?? [];
+    group.push(screenshot);
+    otherGroups.set(screenshot.groupLabel, group);
+  }
+
+  function renderScreenshotCard(screenshot: ScreenshotInfo) {
+    const globalIndex = indexMap.get(screenshot.id) ?? 0;
+
+    return (
+      <ContentSurfaceCard
+        key={screenshot.id}
+        className='group overflow-hidden rounded-lg bg-surface-0'
+      >
+        <button
+          type='button'
+          onClick={() => setSelectedIndex(globalIndex)}
+          className='block w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
+          aria-label={`View ${screenshot.title}`}
+        >
+          <div className='relative aspect-video overflow-hidden bg-surface-1'>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={screenshot.url}
+              alt={screenshot.title}
+              loading='lazy'
+              decoding='async'
+              className='h-full w-full object-cover object-top transition-transform duration-200 group-hover:scale-105'
+            />
+          </div>
+        </button>
+
+        <div className='flex items-center justify-between gap-3 p-3'>
+          <div className='min-w-0'>
+            <p className='truncate text-[12px] font-[510] text-primary-token'>
+              {screenshot.title}
+            </p>
+            <div className='mt-1 flex flex-wrap items-center gap-2 text-[11px] text-secondary-token'>
+              {screenshot.canonicalSurfaceLabel ? (
+                <span className='rounded-full bg-surface-1 px-2 py-0.5'>
+                  {screenshot.canonicalSurfaceLabel}
+                </span>
+              ) : null}
+              <span className='rounded-full bg-surface-1 px-2 py-0.5'>
+                {screenshot.viewport}
+              </span>
+              <span>{formatCaptureDate(screenshot.capturedAt)}</span>
+              <span>{formatSize(screenshot.sizeBytes)}</span>
+            </div>
+            <div className='mt-2 flex flex-wrap gap-1.5'>
+              <span className='rounded-full bg-surface-1 px-2 py-0.5 text-[10px] text-secondary-token'>
+                {screenshot.groupLabel}
+              </span>
+              {screenshot.consumers.filter(isDisplayConsumer).map(consumer => (
+                <span
+                  key={consumer}
+                  className='rounded-full bg-surface-1 px-2 py-0.5 text-[10px] text-secondary-token'
+                >
+                  {formatConsumerLabel(consumer)}
+                </span>
+              ))}
+            </div>
+          </div>
+          <DrawerButton tone='ghost' size='icon' asChild>
+            <a
+              href={screenshot.url}
+              download={`${screenshot.id}.png`}
+              aria-label={`Download ${screenshot.title}`}
+            >
+              <Download className='size-3.5' />
+            </a>
+          </DrawerButton>
+        </div>
+      </ContentSurfaceCard>
+    );
   }
 
   return (
@@ -134,9 +243,32 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
               </p>
               <p className='text-[12px] text-secondary-token'>
                 Showing {filteredScreenshots.length} of {screenshots.length}{' '}
-                surfaces.
+                captures. Canonical: {totalCanonicalCaptures}. Other:{' '}
+                {totalOtherCaptures}.
               </p>
             </div>
+            <div className='flex flex-wrap gap-2'>
+              {SURFACE_FILTERS.map(filter => (
+                <button
+                  key={filter.id}
+                  type='button'
+                  onClick={() => setSurfaceFilter(filter.id)}
+                  aria-pressed={surfaceFilter === filter.id}
+                  className={`rounded-full border px-3 py-1.5 text-[12px] ${
+                    surfaceFilter === filter.id
+                      ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
+                      : 'border-subtle bg-surface-0 text-secondary-token'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className='space-y-2'>
+            <p className='text-[12px] font-[560] text-primary-token'>
+              Capture Group
+            </p>
             <div className='flex flex-wrap gap-2'>
               {GROUP_FILTERS.map(filter => (
                 <button
@@ -155,106 +287,123 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
               ))}
             </div>
           </div>
-          <div className='flex flex-wrap gap-2'>
-            {CONSUMER_FILTERS.map(filter => (
-              <button
-                key={filter.id}
-                type='button'
-                onClick={() => setConsumerFilter(filter.id)}
-                aria-pressed={consumerFilter === filter.id}
-                className={`rounded-full border px-3 py-1.5 text-[12px] ${
-                  consumerFilter === filter.id
-                    ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
-                    : 'border-subtle bg-surface-0 text-secondary-token'
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
+          <div className='space-y-2'>
+            <p className='text-[12px] font-[560] text-primary-token'>
+              Use Case
+            </p>
+            <div className='flex flex-wrap gap-2'>
+              {CONSUMER_FILTERS.map(filter => (
+                <button
+                  key={filter.id}
+                  type='button'
+                  onClick={() => setConsumerFilter(filter.id)}
+                  aria-pressed={consumerFilter === filter.id}
+                  className={`rounded-full border px-3 py-1.5 text-[12px] ${
+                    consumerFilter === filter.id
+                      ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
+                      : 'border-subtle bg-surface-0 text-secondary-token'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
           </div>
         </ContentSurfaceCard>
 
-        {[...grouped.entries()].map(([sourceLabel, items]) => (
-          <ContentSurfaceCard
-            key={sourceLabel}
-            as='section'
-            className='overflow-hidden'
-          >
-            <div className='flex items-center justify-between gap-3 border-b border-subtle px-4 py-3'>
-              <h2 className='truncate text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
-                {sourceLabel}
+        {canonicalSections.length > 0 ? (
+          <ContentSurfaceCard as='section' className='overflow-hidden'>
+            <div className='border-b border-subtle px-4 py-3'>
+              <h2 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
+                Canonical Surfaces
               </h2>
-              <span className='shrink-0 text-[12px] text-secondary-token'>
-                {items.length}
-              </span>
+              <p className='mt-1 text-[12px] text-secondary-token'>
+                Review the four repo-owned design-system surfaces directly.
+              </p>
             </div>
-            <div className='grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
-              {items.map(ss => {
-                const globalIndex = indexMap.get(ss.id) ?? 0;
-                return (
-                  <ContentSurfaceCard
-                    key={ss.id}
-                    className='group overflow-hidden rounded-lg bg-surface-0'
-                  >
-                    <button
-                      type='button'
-                      onClick={() => setSelectedIndex(globalIndex)}
-                      className='block w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
-                      aria-label={`View ${ss.title}`}
-                    >
-                      <div className='relative aspect-video overflow-hidden bg-surface-1'>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={ss.url}
-                          alt={ss.title}
-                          loading='lazy'
-                          decoding='async'
-                          className='h-full w-full object-cover object-top transition-transform duration-200 group-hover:scale-105'
-                        />
-                      </div>
-                    </button>
-
-                    <div className='flex items-center justify-between gap-3 p-3'>
+            <div className='space-y-4 p-4'>
+              {canonicalSections.map(({ surface, items }) => (
+                <ContentSurfaceCard
+                  key={surface.id}
+                  as='section'
+                  className='overflow-hidden bg-surface-0'
+                >
+                  <div className='border-b border-subtle px-4 py-3'>
+                    <div className='flex items-start justify-between gap-3'>
                       <div className='min-w-0'>
-                        <p className='truncate text-[12px] font-[510] text-primary-token'>
-                          {ss.title}
+                        <h3 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
+                          {surface.label}
+                        </h3>
+                        <p className='mt-1 text-[12px] text-secondary-token'>
+                          {surface.description}
                         </p>
-                        <div className='mt-1 flex flex-wrap items-center gap-2 text-[11px] text-secondary-token'>
+                        <div className='mt-2 flex flex-wrap items-center gap-2 text-[11px] text-secondary-token'>
                           <span className='rounded-full bg-surface-1 px-2 py-0.5'>
-                            {ss.viewport}
+                            Review Route: {surface.reviewRoute}
                           </span>
-                          <span>{formatCaptureDate(ss.capturedAt)}</span>
-                          <span>{formatSize(ss.sizeBytes)}</span>
-                        </div>
-                        <div className='mt-2 flex flex-wrap gap-1.5'>
-                          {ss.consumers
-                            .filter(isDisplayConsumer)
-                            .map(consumer => (
-                              <span
-                                key={consumer}
-                                className='rounded-full bg-surface-1 px-2 py-0.5 text-[10px] text-secondary-token'
-                              >
-                                {formatConsumerLabel(consumer)}
-                              </span>
-                            ))}
+                          <span className='rounded-full bg-surface-1 px-2 py-0.5'>
+                            {items.length} Capture
+                            {items.length === 1 ? '' : 's'}
+                          </span>
                         </div>
                       </div>
-                      <DrawerButton tone='ghost' size='icon' asChild>
-                        <a
-                          href={ss.url}
-                          download={`${ss.id}.png`}
-                          aria-label={`Download ${ss.title}`}
-                        >
-                          <Download className='size-3.5' />
-                        </a>
-                      </DrawerButton>
                     </div>
-                  </ContentSurfaceCard>
-                );
-              })}
+                  </div>
+                  <div className='grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
+                    {items.map(renderScreenshotCard)}
+                  </div>
+                </ContentSurfaceCard>
+              ))}
             </div>
           </ContentSurfaceCard>
-        ))}
+        ) : null}
+
+        {otherGroups.size > 0 ? (
+          <ContentSurfaceCard as='section' className='overflow-hidden'>
+            <div className='border-b border-subtle px-4 py-3'>
+              <h2 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
+                Other Captures
+              </h2>
+              <p className='mt-1 text-[12px] text-secondary-token'>
+                Supporting screenshot coverage outside the four canonical review
+                surfaces.
+              </p>
+            </div>
+            <div className='space-y-4 p-4'>
+              {[...otherGroups.entries()].map(([sourceLabel, items]) => (
+                <ContentSurfaceCard
+                  key={sourceLabel}
+                  as='section'
+                  className='overflow-hidden bg-surface-0'
+                >
+                  <div className='flex items-center justify-between gap-3 border-b border-subtle px-4 py-3'>
+                    <h3 className='truncate text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
+                      {sourceLabel}
+                    </h3>
+                    <span className='shrink-0 text-[12px] text-secondary-token'>
+                      {items.length}
+                    </span>
+                  </div>
+                  <div className='grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
+                    {items.map(renderScreenshotCard)}
+                  </div>
+                </ContentSurfaceCard>
+              ))}
+            </div>
+          </ContentSurfaceCard>
+        ) : null}
+
+        {filteredScreenshots.length === 0 ? (
+          <ContentSurfaceCard className='p-6'>
+            <p className='text-[13px] font-[560] text-primary-token'>
+              No screenshots match the current filters.
+            </p>
+            <p className='mt-1 text-[12px] text-secondary-token'>
+              Clear one or more filters to see canonical surfaces and supporting
+              captures again.
+            </p>
+          </ContentSurfaceCard>
+        ) : null}
       </div>
 
       {/* Lightbox modal */}
@@ -315,6 +464,12 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                     {selected.title}
                   </p>
                   <div className='mt-1 flex flex-wrap gap-2 text-[12px] text-secondary-token'>
+                    {selected.canonicalSurfaceLabel ? (
+                      <>
+                        <span>{selected.canonicalSurfaceLabel}</span>
+                        <span>&middot;</span>
+                      </>
+                    ) : null}
                     <span>{selected.groupLabel}</span>
                     <span>&middot;</span>
                     <span>{selected.viewport}</span>
@@ -323,6 +478,11 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                     <span>&middot;</span>
                     <span>{formatSize(selected.sizeBytes)}</span>
                   </div>
+                  {selected.canonicalSurfaceReviewRoute ? (
+                    <p className='mt-1 text-[11px] text-secondary-token'>
+                      Review Route: {selected.canonicalSurfaceReviewRoute}
+                    </p>
+                  ) : null}
                   {selected.gitSha ? (
                     <p className='mt-1 text-[11px] text-secondary-token'>
                       {selected.gitSha.slice(0, 8)}
