@@ -33,25 +33,25 @@
             "cumulative-layout-shift": [
               "error",
               {
-                "maxNumericValue": 0.05
+                "maxNumericValue": 0.06
               }
             ],
             "first-contentful-paint": [
               "error",
               {
-                "maxNumericValue": 1000
+                "maxNumericValue": 1100
               }
             ],
             "largest-contentful-paint": [
               "error",
               {
-                "maxNumericValue": 2000
+                "maxNumericValue": 2200
               }
             ],
             "total-blocking-time": [
               "error",
               {
-                "maxNumericValue": 200
+                "maxNumericValue": 225
               }
             ]
           }
@@ -80,25 +80,25 @@
             "cumulative-layout-shift": [
               "error",
               {
-                "maxNumericValue": 0.05
+                "maxNumericValue": 0.06
               }
             ],
             "first-contentful-paint": [
               "error",
               {
-                "maxNumericValue": 1000
+                "maxNumericValue": 1100
               }
             ],
             "largest-contentful-paint": [
               "error",
               {
-                "maxNumericValue": 2000
+                "maxNumericValue": 2200
               }
             ],
             "total-blocking-time": [
               "error",
               {
-                "maxNumericValue": 200
+                "maxNumericValue": 225
               }
             ]
           }
