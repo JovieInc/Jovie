@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -12,13 +12,14 @@ import { describe, expect, it } from 'vitest';
  * Found by /qa on 2026-04-07.
  */
 
-const SETTINGS_LAYOUT = join(
+const SETTINGS_LAYOUT = resolve(
   __dirname,
   '../../../app/app/(shell)/settings/layout.tsx'
 );
 
 describe('settings layout scroll mode', () => {
   it('uses page-level scrolling, not panel scrolling', () => {
+    expect(existsSync(SETTINGS_LAYOUT)).toBe(true);
     const source = readFileSync(SETTINGS_LAYOUT, 'utf-8');
     expect(source).toContain("scroll='page'");
     expect(source).not.toContain("scroll='panel'");

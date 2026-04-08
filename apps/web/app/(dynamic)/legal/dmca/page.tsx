@@ -5,6 +5,7 @@ import { getLegalDocument } from '@/lib/legal/getLegalDocument';
 
 // Full SSG - markdown content is read at build time, no runtime regeneration needed
 export const dynamic = 'force-static';
+export const revalidate = false;
 
 export const metadata: Metadata = {
   title: 'DMCA Policy',

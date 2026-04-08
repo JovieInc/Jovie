@@ -12,6 +12,8 @@ import { publicEnv } from '@/lib/env-public';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 // SEO Metadata
+export const revalidate = false;
+
 export const metadata: Metadata = {
   title: 'Pricing',
   description:
