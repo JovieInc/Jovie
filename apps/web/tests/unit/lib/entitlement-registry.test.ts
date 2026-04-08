@@ -21,7 +21,6 @@ describe('Entitlement Registry Consistency', () => {
 
   it('all boolean keys are present in every plan', () => {
     const booleanKeys: BooleanEntitlement[] = [
-      'canRemoveBranding',
       'canExportContacts',
       'canAccessAdvancedAnalytics',
       'canFilterSelfFromAnalytics',
