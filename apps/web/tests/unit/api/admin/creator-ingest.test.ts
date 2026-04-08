@@ -295,7 +295,7 @@ describe('POST /api/admin/creator-ingest', () => {
     mockCheckExistingProfile.mockResolvedValueOnce({
       existing: { id: 'profile_123', isClaimed: true },
       finalHandle: 'test-artist',
-      isReingest: true,
+      isReingest: false,
     });
 
     const { POST } = await import('@/app/api/admin/creator-ingest/route');

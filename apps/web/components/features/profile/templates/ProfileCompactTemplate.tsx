@@ -123,6 +123,16 @@ function unwrapNextImageUrl(url: string | null | undefined): string | null {
   }
 }
 
+function getModeFromLocation(): ProfileMode {
+  if (typeof window === 'undefined') {
+    return 'profile';
+  }
+
+  return getProfileMode(
+    new URLSearchParams(globalThis.location.search).get('mode')
+  );
+}
+
 export function ProfileCompactTemplate({
   mode,
   artist,
@@ -142,6 +152,9 @@ export function ProfileCompactTemplate({
 }: ProfileCompactTemplateProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<DrawerView>('menu');
+  const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
+    getModeFromLocation()
+  );
   const revealNotificationsRef = useRef<(() => void) | null>(null);
 
   // Lock orientation to portrait on mobile
@@ -191,7 +204,7 @@ export function ProfileCompactTemplate({
       viewerCountryCode,
       contacts,
       visitTrackingToken,
-      modeOverride: mode,
+      modeOverride: requestedMode,
       sourceOverride: initialSource,
       smsEnabled: enableDynamicEngagement,
     });
@@ -337,8 +350,13 @@ export function ProfileCompactTemplate({
       }),
     [hasContacts, hasTip, mergedDSPs.length]
   );
+
   useEffect(() => {
-    const resolved = resolveInitialView(mode);
+    setRequestedMode(getModeFromLocation());
+  }, [mode]);
+
+  useEffect(() => {
+    const resolved = resolveInitialView(requestedMode);
     if (resolved) {
       setDrawerView(resolved);
       setDrawerOpen(true);
@@ -346,26 +364,16 @@ export function ProfileCompactTemplate({
       setDrawerView('menu');
       setDrawerOpen(false);
     }
-  }, [mode, resolveInitialView]);
+  }, [requestedMode, resolveInitialView]);
 
   useEffect(() => {
     const handlePopState = () => {
-      const nextMode = getProfileMode(
-        new URLSearchParams(globalThis.location.search).get('mode')
-      );
-      const resolved = resolveInitialView(nextMode);
-      if (resolved) {
-        setDrawerView(resolved);
-        setDrawerOpen(true);
-      } else {
-        setDrawerView('menu');
-        setDrawerOpen(false);
-      }
+      setRequestedMode(getModeFromLocation());
     };
 
     globalThis.addEventListener('popstate', handlePopState);
     return () => globalThis.removeEventListener('popstate', handlePopState);
-  }, [resolveInitialView]);
+  }, []);
 
   useEffect(() => {
     const activeMode =

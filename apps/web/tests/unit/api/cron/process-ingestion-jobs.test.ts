@@ -1,3 +1,4 @@
+import { NextResponse } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -67,7 +68,7 @@ describe('GET /api/cron/process-ingestion-jobs', () => {
 
   it('returns the cron auth failure response directly', async () => {
     mockVerifyCronRequest.mockReturnValueOnce(
-      Response.json({ error: 'Unauthorized' }, { status: 401 })
+      NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     );
 
     const { GET } = await import('@/app/api/cron/process-ingestion-jobs/route');

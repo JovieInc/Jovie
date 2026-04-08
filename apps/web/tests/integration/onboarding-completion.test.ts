@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 /* eslint-disable no-restricted-imports -- Integration test requires full schema access */
 import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -32,29 +32,25 @@ beforeAll(() => {
 });
 
 afterEach(async () => {
+  if (createdUserIds.length > 0) {
+    await db
+      .update(users)
+      .set({ activeProfileId: null })
+      .where(inArray(users.id, createdUserIds));
+  }
+
   if (createdProfileIds.length > 0) {
     await db
       .delete(userProfileClaims)
-      .where(eq(userProfileClaims.creatorProfileId, createdProfileIds[0]!))
-      .catch(() => undefined);
+      .where(inArray(userProfileClaims.creatorProfileId, createdProfileIds));
 
-    for (const profileId of createdProfileIds) {
-      await db
-        .delete(userProfileClaims)
-        .where(eq(userProfileClaims.creatorProfileId, profileId))
-        .catch(() => undefined);
-      await db
-        .delete(creatorProfiles)
-        .where(eq(creatorProfiles.id, profileId))
-        .catch(() => undefined);
-    }
+    await db
+      .delete(creatorProfiles)
+      .where(inArray(creatorProfiles.id, createdProfileIds));
   }
 
-  for (const userId of createdUserIds) {
-    await db
-      .delete(users)
-      .where(eq(users.id, userId))
-      .catch(() => undefined);
+  if (createdUserIds.length > 0) {
+    await db.delete(users).where(inArray(users.id, createdUserIds));
   }
 
   createdProfileIds.length = 0;

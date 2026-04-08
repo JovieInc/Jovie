@@ -95,7 +95,7 @@ describe('attributeLeadSignupFromClerkUserId', () => {
 
     expect(result).toEqual({ leadId: null, userId: null });
     expect(mockDbSelect).not.toHaveBeenCalled();
-  }, 15_000);
+  });
 
   it('treats an invalid cookie as missing attribution', async () => {
     const cookieStore = createCookieStore();

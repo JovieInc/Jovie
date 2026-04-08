@@ -7,19 +7,19 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.136] - 2026-04-07
 
-> Make signup, onboarding, and ingest regressions fail fast with higher-signal tests and post-deploy checks.
+> Strengthened signup, onboarding, and ingest regression coverage so breakage is caught earlier in CI and after deploys.
 
 ### Added
 
-- Deterministic signup funnel smoke coverage using the local auth-bypass flow so CI catches breakage before real auth providers are in the loop
 - Direct unit and integration coverage for onboarding completion, onboarding discovery, welcome chat bootstrap, and signup lead attribution
+- [internal] Deterministic signup funnel smoke coverage uses the local auth-bypass flow so CI catches breakage before real auth providers are in the loop
 
 ### Changed
 
 - Expanded signup, onboarding, creator-ingest, ingestion job, and admin ingestion tests to cover key negative paths and persistence behavior
-- Pointed smoke and overnight QA selectors at the new signup funnel and onboarding completion coverage so the merge gate watches the real conversion path
-- Added `/signup` to the CI and canary health checks for post-deploy visibility into signup outages
-- Synced the canonical version file and workspace package versions to `26.4.136`
+- [internal] Pointed smoke and overnight QA selectors at the new signup funnel and onboarding completion coverage so the merge gate watches the real conversion path
+- [internal] Added `/signup` to the CI and canary health checks for post-deploy visibility into signup outages
+- [internal] Synced the canonical version file and workspace package versions to `26.4.136`
 
 ## [26.4.135] - 2026-04-07
 
