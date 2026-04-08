@@ -7,7 +7,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.135] - 2026-04-07
 
-> Fold Spotify algorithm diagnosis into the creator sidebar, eliminate misleading empty-score states, and document the local `ripgrep` prerequisite for fresh worktrees.
+> Fold Spotify algorithm diagnosis into the creator sidebar and stop showing misleading empty-score states when Spotify fails upstream.
 
 ### Added
 
@@ -18,9 +18,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Spotify Fans Also Like analysis now returns explicit `ready`, `empty`, or `unavailable` states with verdict metadata, timestamps, and attempted-versus-resolved artist counts
 - Admin algorithm analysis now resolves context from creator-linked Spotify profiles instead of asking operators for a raw artist ID
-- Documented `ripgrep` as a local prerequisite in the getting-started guide
-- Added `ripgrep` install commands for macOS and Ubuntu/Debian after the initial workspace bootstrap step
-- Taught `setup.sh` to verify `rg` and auto-install it on supported local environments
+- [internal] Documented `ripgrep` as a local prerequisite in the getting-started guide
+- [internal] Added `ripgrep` install commands for macOS and Ubuntu/Debian after the initial workspace bootstrap step
+- [internal] Taught `setup.sh` to verify `rg` and auto-install it on supported local environments
 
 ### Fixed
 

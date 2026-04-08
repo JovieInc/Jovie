@@ -316,10 +316,7 @@ function buildEmptyVerdict(
   };
 }
 
-function buildUnavailableVerdict(
-  detail: string,
-  _warnings: readonly string[]
-): AlgorithmHealthVerdict {
+function buildUnavailableVerdict(detail: string): AlgorithmHealthVerdict {
   return {
     label: 'Unavailable',
     confidence: 'Low',
@@ -464,7 +461,7 @@ export function generateUnavailableHealthReport(
   return {
     targetArtist,
     status: 'unavailable',
-    verdict: buildUnavailableVerdict(detail, warnings),
+    verdict: buildUnavailableVerdict(detail),
     nextActions: buildUnavailableNextActions(),
     checkedAt,
     attemptedNeighbourCount,

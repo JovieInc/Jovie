@@ -457,6 +457,14 @@ describe('isSpotifyErrorPageHtml', () => {
     expect(isSpotifyErrorPageHtml(html)).toBe(true);
   });
 
+  it('detects Spotify fallback error copy', () => {
+    expect(
+      isSpotifyErrorPageHtml(
+        '<html><body>Something went wrong, please try again later.</body></html>'
+      )
+    ).toBe(true);
+  });
+
   it('ignores normal markup', () => {
     expect(isSpotifyErrorPageHtml('<html><title>Artist</title></html>')).toBe(
       false

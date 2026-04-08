@@ -15,6 +15,7 @@ import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import type {
   AlgorithmHealthConfidence,
   AlgorithmHealthReport,
+  AlgorithmHealthSummary,
   AlgorithmHealthVerdictLabel,
   ScoredNeighbour,
 } from '@/lib/spotify/scoring';
@@ -347,17 +348,22 @@ function buildMeaningBullets(report: AlgorithmHealthReport): string[] {
     ];
   }
 
-  const ratioSummary =
-    report.summary.bigger > report.summary.smaller
-      ? 'More resolved neighbours are bigger than the target.'
-      : report.summary.bigger === report.summary.smaller
-        ? 'The resolved neighbour mix is balanced between larger and smaller artists.'
-        : 'More resolved neighbours are smaller than the target.';
-
   return [
-    ratioSummary,
+    getRatioSummary(report.summary),
     `Confidence is ${report.verdict.confidence.toLowerCase()} because ${report.resolvedNeighbourCount} of ${report.attemptedNeighbourCount} related artists were resolved cleanly.`,
   ];
+}
+
+function getRatioSummary(summary: AlgorithmHealthSummary): string {
+  if (summary.bigger > summary.smaller) {
+    return 'More resolved neighbours are bigger than the target.';
+  }
+
+  if (summary.bigger === summary.smaller) {
+    return 'The resolved neighbour mix is balanced between larger and smaller artists.';
+  }
+
+  return 'More resolved neighbours are smaller than the target.';
 }
 
 function getVerdictBadgeVariant(label: AlgorithmHealthVerdictLabel) {
