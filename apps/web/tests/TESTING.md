@@ -22,7 +22,7 @@ pnpm run test:web
 pnpm test:ci
 
 # Watch mode
-pnpm --filter=@jovie/web run test:watch
+pnpm run test:web:watch
 ```
 
 ### E2E Tests (Playwright)

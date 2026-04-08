@@ -47,6 +47,7 @@ If a dedicated helper is added later (for example `./scripts/dev-db-branch.sh`),
 ALL commands that need secrets MUST be prefixed with Doppler, and local/dev commands should pin the repo's default scope explicitly as `doppler run --project jovie-web --config dev --`:
 
 - `pnpm run test:web`
+- `pnpm run test:web:watch`
 - `pnpm run test:web:e2e`
 - `pnpm run test:web:smoke`
 - `pnpm run dev:web:local`

@@ -69,26 +69,31 @@ doppler configure get
 Doppler is the canonical internal local workflow. The root wrapper commands already pin the correct `jovie-web/dev` scope for common web tasks.
 
 **Development server:**
+
 ```bash
 pnpm run dev:web:local
 ```
 
 **Type checking:**
+
 ```bash
 doppler run --project jovie-web --config dev -- pnpm typecheck
 ```
 
 **Tests:**
+
 ```bash
 pnpm run test:web
 ```
 
 **Database migrations:**
+
 ```bash
 pnpm run db:web:migrate
 ```
 
 **Any command:**
+
 ```bash
 doppler run --project jovie-web --config dev -- <your-command>
 ```
