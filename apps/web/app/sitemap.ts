@@ -8,6 +8,7 @@ import { getComparisonSlugs } from '@/content/comparisons';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
 import { db } from '@/lib/db';
 import { discogRecordings, discogReleases } from '@/lib/db/schema/content';
+import { joviePlaylists } from '@/lib/db/schema/playlists';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 
@@ -30,16 +31,21 @@ type SitemapCatalog = {
     slug: string;
     updatedAt: Date | null;
   }>;
+  playlists: Array<{
+    slug: string;
+    updatedAt: Date | null;
+    coverImageUrl: string | null;
+  }>;
 };
 
 const getSitemapCatalog = unstable_cache(
   async (): Promise<SitemapCatalog> => {
     if (!env.DATABASE_URL) {
-      return { profiles: [], releases: [], tracks: [] };
+      return { profiles: [], releases: [], tracks: [], playlists: [] };
     }
 
     try {
-      const [profiles, releases, tracks] = await Promise.all([
+      const [profiles, releases, tracks, playlists] = await Promise.all([
         db
           .select({
             username: creatorProfiles.username,
@@ -75,12 +81,29 @@ const getSitemapCatalog = unstable_cache(
             eq(discogRecordings.creatorProfileId, creatorProfiles.id)
           )
           .where(eq(creatorProfiles.isPublic, true)),
+
+        db
+          .select({
+            slug: joviePlaylists.slug,
+            updatedAt: joviePlaylists.updatedAt,
+            coverImageUrl: joviePlaylists.coverImageUrl,
+          })
+          .from(joviePlaylists)
+          .where(eq(joviePlaylists.status, 'published'))
+          .catch(
+            () =>
+              [] as {
+                slug: string;
+                updatedAt: Date | null;
+                coverImageUrl: string | null;
+              }[]
+          ),
       ]);
 
-      return { profiles, releases, tracks };
+      return { profiles, releases, tracks, playlists };
     } catch (error) {
       Sentry.captureException(error);
-      return { profiles: [], releases: [], tracks: [] };
+      return { profiles: [], releases: [], tracks: [], playlists: [] };
     }
   },
   ['sitemap-catalog-v1'],
@@ -259,6 +282,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     }));
 
+  const playlistPages: MetadataRoute.Sitemap = catalog.playlists.map(
+    playlist => ({
+      url: `${BASE_URL}/playlists/${playlist.slug}`,
+      lastModified: playlist.updatedAt ?? now,
+      changeFrequency: 'weekly' as const,
+      priority: 0.7,
+      ...(playlist.coverImageUrl ? { images: [playlist.coverImageUrl] } : {}),
+    })
+  );
+
   return [
     ...staticPages,
     ...blogPages,
@@ -269,5 +302,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...profilePages,
     ...releasePages,
     ...trackPages,
+    ...playlistPages,
   ];
 }
