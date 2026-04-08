@@ -1,8 +1,6 @@
 import { createClerkClient } from '@clerk/backend';
 import { Redis } from '@upstash/redis';
 import { and, eq, or } from 'drizzle-orm';
-import { revalidateTag } from 'next/cache';
-import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -515,6 +513,11 @@ export async function invalidateTestUserCaches(
   if (clerkIds.length === 0) {
     return;
   }
+
+  // Keep seed helpers importable from plain tsx/Node entrypoints used by
+  // Playwright global setup. These server-only modules are only needed here.
+  const [{ revalidateTag }, { invalidateProxyUserStateCache }] =
+    await Promise.all([import('next/cache'), import('@/lib/auth/proxy-state')]);
 
   for (const clerkId of clerkIds) {
     await invalidateProxyUserStateCache(clerkId);
