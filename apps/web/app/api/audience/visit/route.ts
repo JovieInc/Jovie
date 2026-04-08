@@ -11,7 +11,17 @@ import {
 import { isVisitorBlocked } from '@/lib/audience/block-check';
 import { type DbOrTransaction, db, doesTableExist } from '@/lib/db';
 import { audienceMembers, dailyProfileViews } from '@/lib/db/schema/analytics';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import {
+  creatorDistributionEvents,
+  creatorProfiles,
+} from '@/lib/db/schema/profiles';
+import {
+  buildDistributionDedupeKey,
+  getBioLinkActivationWindowEnd,
+  INSTAGRAM_DISTRIBUTION_PLATFORM,
+  isInstagramActivationSource,
+  isInstagramReferrer,
+} from '@/lib/distribution/instagram-activation';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { publicVisitLimiter } from '@/lib/rate-limit';
@@ -160,6 +170,13 @@ function isMissingDailyProfileViewsTableError(error: unknown): boolean {
     .includes('relation "daily_profile_views" does not exist');
 }
 
+function isMissingCreatorDistributionEventsTableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message
+    .toLowerCase()
+    .includes('relation "creator_distribution_events" does not exist');
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Extract client IP for rate limiting
@@ -269,7 +286,11 @@ export async function POST(request: NextRequest) {
 
     // Validate profile exists AND is public before recording
     const [profile] = await db
-      .select({ id: creatorProfiles.id, isPublic: creatorProfiles.isPublic })
+      .select({
+        id: creatorProfiles.id,
+        isPublic: creatorProfiles.isPublic,
+        onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+      })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profileId))
       .limit(1);
@@ -303,6 +324,16 @@ export async function POST(request: NextRequest) {
     const normalizedDevice =
       deviceType ?? inferDeviceType(resolvedUserAgent ?? null);
     const now = new Date();
+    const activationWindowEnd = getBioLinkActivationWindowEnd(
+      profile.onboardingCompletedAt
+    );
+    const shouldTrackInstagramActivation =
+      activationWindowEnd !== null &&
+      now.getTime() <= activationWindowEnd.getTime() &&
+      isInstagramActivationSource({
+        referrer: resolvedReferrer,
+        utmParams,
+      });
     const referrerEntry = resolvedReferrer
       ? [{ url: resolvedReferrer.trim(), timestamp: now.toISOString() }]
       : [];
@@ -370,6 +401,15 @@ export async function POST(request: NextRequest) {
       const resolvedUtmParams = hasUtmParams
         ? utmParams
         : (existing?.utmParams ?? {});
+      const referrerHost = resolvedReferrer
+        ? (() => {
+            try {
+              return new URL(resolvedReferrer).hostname.toLowerCase();
+            } catch {
+              return null;
+            }
+          })()
+        : null;
       if (hasDailyProfileViewsTable && !isBotAudienceMember) {
         try {
           await incrementDailyProfileViews(tx, profileId, viewDate, now);
@@ -382,6 +422,43 @@ export async function POST(request: NextRequest) {
             '[audience/visit] daily_profile_views table missing; skipping aggregate write',
             error,
             { profileId, viewDate }
+          );
+        }
+      }
+
+      if (shouldTrackInstagramActivation && !isBotAudienceMember) {
+        try {
+          await tx
+            .insert(creatorDistributionEvents)
+            .values({
+              createdAt: now,
+              creatorProfileId: profileId,
+              dedupeKey: buildDistributionDedupeKey(
+                profileId,
+                INSTAGRAM_DISTRIBUTION_PLATFORM,
+                'activated'
+              ),
+              eventType: 'activated',
+              metadata: {
+                referrerHost: isInstagramReferrer(resolvedReferrer)
+                  ? referrerHost
+                  : null,
+                utmContent: utmParams?.content ?? null,
+                utmMedium: utmParams?.medium ?? null,
+                utmSource: utmParams?.source ?? null,
+              },
+              platform: INSTAGRAM_DISTRIBUTION_PLATFORM,
+            })
+            .onConflictDoNothing();
+        } catch (error) {
+          if (!isMissingCreatorDistributionEventsTableError(error)) {
+            throw error;
+          }
+
+          await captureWarning(
+            '[audience/visit] creator_distribution_events table missing; skipping activation write',
+            error,
+            { profileId }
           );
         }
       }

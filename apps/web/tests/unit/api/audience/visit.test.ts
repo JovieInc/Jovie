@@ -495,6 +495,175 @@ describe('POST /api/audience/visit', () => {
     expect(data.fingerprint).toBeDefined();
   });
 
+  it('writes one activated event for Instagram-sourced visits inside the activation window', async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([
+            {
+              id: 'profile_123',
+              isPublic: true,
+              onboardingCompletedAt: new Date('2026-04-03T00:00:00.000Z'),
+            },
+          ]),
+        }),
+      }),
+    });
+
+    const insertedValues: unknown[] = [];
+    mockWithSystemIngestionSession.mockImplementation(async callback => {
+      const mockInsert = vi
+        .fn()
+        .mockReturnValueOnce({
+          values: vi.fn().mockImplementation(value => {
+            insertedValues.push(value);
+            return {
+              onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+            };
+          }),
+        })
+        .mockReturnValueOnce({
+          values: vi.fn().mockImplementation(value => {
+            insertedValues.push(value);
+            return {
+              onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            };
+          }),
+        })
+        .mockReturnValueOnce({
+          values: vi.fn().mockImplementation(value => {
+            insertedValues.push(value);
+            return {
+              onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            };
+          }),
+        });
+
+      await callback({
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        insert: mockInsert,
+      });
+    });
+
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+        referrer:
+          'https://l.instagram.com/?u=https%3A%2F%2Fjov.ie%2Fartist-profile',
+        utmParams: {
+          content: 'bio',
+          medium: 'social',
+          source: 'instagram',
+        },
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(insertedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          creatorProfileId: '123e4567-e89b-12d3-a456-426614174000',
+          dedupeKey: 'instagram:activated:123e4567-e89b-12d3-a456-426614174000',
+          eventType: 'activated',
+          metadata: expect.objectContaining({
+            referrerHost: 'l.instagram.com',
+            utmContent: 'bio',
+            utmSource: 'instagram',
+          }),
+          platform: 'instagram',
+        }),
+      ])
+    );
+  });
+
+  it('does not write an activated event after the seven-day window expires', async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([
+            {
+              id: 'profile_123',
+              isPublic: true,
+              onboardingCompletedAt: new Date('2026-03-20T00:00:00.000Z'),
+            },
+          ]),
+        }),
+      }),
+    });
+
+    const insertedValues: unknown[] = [];
+    mockWithSystemIngestionSession.mockImplementation(async callback => {
+      const mockInsert = vi
+        .fn()
+        .mockReturnValueOnce({
+          values: vi.fn().mockImplementation(value => {
+            insertedValues.push(value);
+            return {
+              onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+            };
+          }),
+        })
+        .mockReturnValueOnce({
+          values: vi.fn().mockImplementation(value => {
+            insertedValues.push(value);
+            return {
+              onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            };
+          }),
+        });
+
+      await callback({
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        insert: mockInsert,
+      });
+    });
+
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+        utmParams: {
+          content: 'bio',
+          medium: 'social',
+          source: 'instagram',
+        },
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(
+      insertedValues.some(
+        value =>
+          typeof value === 'object' &&
+          value !== null &&
+          (value as { eventType?: unknown }).eventType === 'activated'
+      )
+    ).toBe(false);
+  });
+
   it('skips the aggregate write when daily_profile_views is missing', async () => {
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
