@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.133] - 2026-04-07
+
+> Restore settings-page scrolling and clean up duplicate app-name page titles across marketing and legal routes.
+
+### Fixed
+
+- Settings pages now use page-level scrolling again inside the app shell
+- Added a regression unit test to keep the settings layout on the correct scroll mode
+- Removed duplicate app-name suffixes from affected marketing and legal page titles while preserving branded social metadata
+
 ## [26.4.132] - 2026-04-07
 
 > Higher resolution profile photos on artist pages and sharper hero images on retina displays.
