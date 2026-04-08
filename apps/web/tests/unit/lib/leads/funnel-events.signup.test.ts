@@ -151,27 +151,30 @@ describe('attributeLeadSignupFromClerkUserId', () => {
     mockCookies.mockResolvedValue(cookieStore);
 
     const dateNowSpy = vi.spyOn(Date, 'now');
-    dateNowSpy.mockReturnValue(1_700_000_000_000);
+    try {
+      dateNowSpy.mockReturnValue(1_700_000_000_000);
 
-    const { attributeLeadSignupFromClerkUserId, setLeadAttributionCookie } =
-      await import('@/lib/leads/funnel-events');
+      const { attributeLeadSignupFromClerkUserId, setLeadAttributionCookie } =
+        await import('@/lib/leads/funnel-events');
 
-    await setLeadAttributionCookie({
-      leadId: 'lead_123',
-      channel: 'email',
-      provider: 'instantly',
-      campaignKey: 'claim_invite',
-      variantKey: null,
-      contactAttemptId: 'attempt_123',
-    });
+      await setLeadAttributionCookie({
+        leadId: 'lead_123',
+        channel: 'email',
+        provider: 'instantly',
+        campaignKey: 'claim_invite',
+        variantKey: null,
+        contactAttemptId: 'attempt_123',
+      });
 
-    dateNowSpy.mockReturnValue(1_700_000_000_000 + 31 * 24 * 60 * 60 * 1000);
+      dateNowSpy.mockReturnValue(1_700_000_000_000 + 31 * 24 * 60 * 60 * 1000);
 
-    const result = await attributeLeadSignupFromClerkUserId('clerk_123');
+      const result = await attributeLeadSignupFromClerkUserId('clerk_123');
 
-    expect(result).toEqual({ leadId: null, userId: null });
-    expect(mockDbSelect).not.toHaveBeenCalled();
-    dateNowSpy.mockRestore();
+      expect(result).toEqual({ leadId: null, userId: null });
+      expect(mockDbSelect).not.toHaveBeenCalled();
+    } finally {
+      dateNowSpy.mockRestore();
+    }
   });
 
   it('returns the lead id when the user has not been persisted yet', async () => {
@@ -274,8 +277,9 @@ describe('attributeLeadSignupFromClerkUserId', () => {
       contactAttemptId: 'attempt_123',
     });
 
+    const onConflictDoNothingMock = vi.fn().mockResolvedValue(undefined);
     const insertValuesMock = vi.fn(() => ({
-      onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+      onConflictDoNothing: onConflictDoNothingMock,
     }));
     mockDbInsert.mockImplementation(() => ({
       values: insertValuesMock,
@@ -299,6 +303,7 @@ describe('attributeLeadSignupFromClerkUserId', () => {
     expect(result).toEqual({ leadId: 'lead_123', userId: 'user_123' });
     expect(mockDbUpdate).toHaveBeenCalledTimes(1);
     expect(insertValuesMock).toHaveBeenCalledTimes(2);
+    expect(onConflictDoNothingMock).toHaveBeenCalledTimes(2);
     expect(insertValuesMock).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({

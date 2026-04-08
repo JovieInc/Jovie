@@ -204,14 +204,7 @@ describe('POST /api/admin/creator-ingest', () => {
     await expect(response.json()).resolves.toEqual({ error: 'Forbidden' });
   });
 
-  it('returns 429 when the admin rate limit is exceeded', async () => {
-    const reset = new Date(Date.now() + 2_500);
-    mockCheckAdminCreatorIngestRateLimit.mockResolvedValueOnce({
-      success: false,
-      reason: 'Slow down',
-      reset,
-    });
-
+  it('routes new full-extraction ingests through the new-profile flow', async () => {
     const { POST } = await import('@/app/api/admin/creator-ingest/route');
     const response = await POST(
       new NextRequest('http://localhost/api/admin/creator-ingest', {
@@ -220,14 +213,55 @@ describe('POST /api/admin/creator-ingest', () => {
     );
     const payload = await response.json();
 
-    expect(response.status).toBe(429);
-    expect(payload).toEqual(
-      expect.objectContaining({
-        error: 'Rate limit exceeded',
-        message: 'Slow down',
-      })
-    );
-    expect(response.headers.get('x-ratelimit-limit')).toBe('10');
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({
+      ok: true,
+      profile: { id: 'profile_123', username: 'test-artist' },
+    });
+    expect(mockHandleNewProfileIngest).toHaveBeenCalledWith({
+      finalHandle: 'test-artist',
+      displayName: 'Test Artist',
+      hostedAvatarUrl: 'https://blob.test/avatar.avif',
+      extraction: expect.objectContaining({
+        displayName: 'Test Artist',
+        avatarUrl: 'https://blob.test/avatar.avif',
+      }),
+    });
+    expect(mockHandleReingestProfile).not.toHaveBeenCalled();
+  });
+
+  it('returns 429 when the admin rate limit is exceeded', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-08T00:00:00Z'));
+
+    try {
+      const reset = new Date(Date.now() + 2_500);
+      mockCheckAdminCreatorIngestRateLimit.mockResolvedValueOnce({
+        success: false,
+        reason: 'Slow down',
+        reset,
+      });
+
+      const { POST } = await import('@/app/api/admin/creator-ingest/route');
+      const response = await POST(
+        new NextRequest('http://localhost/api/admin/creator-ingest', {
+          method: 'POST',
+        })
+      );
+      const payload = await response.json();
+
+      expect(response.status).toBe(429);
+      expect(payload).toEqual(
+        expect.objectContaining({
+          error: 'Rate limit exceeded',
+          message: 'Slow down',
+          retryAfter: 3,
+        })
+      );
+      expect(response.headers.get('x-ratelimit-limit')).toBe('10');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('returns the parseJsonBody error response for malformed requests', async () => {

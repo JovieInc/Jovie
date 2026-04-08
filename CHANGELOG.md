@@ -21,6 +21,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Added `/signup` to the CI and canary health checks for post-deploy visibility into signup outages
 - [internal] Synced the canonical version file and workspace package versions to `26.4.136`
 
+### Fixed
+
+- Workspace archive cleanup now always prunes stale git worktree metadata immediately (`git worktree prune --expire now`), even when `.claude/worktrees` is missing
+
 ## [26.4.135] - 2026-04-07
 
 > Fold Spotify algorithm diagnosis into the creator sidebar, eliminate misleading empty-score states, and document the local `ripgrep` prerequisite for fresh worktrees.
