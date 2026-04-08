@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.133] - 2026-04-07
+
+> Turn the public-profile Jovie logo into a branded path to the artist profile landing page.
+
+### Changed
+
+- The top-left Jovie mark on public artist profiles now links to the artist profiles landing page instead of acting as decorative chrome
+- [internal] Added a unit test that locks the public-profile logo destination to the artist profiles route
+
 ## [26.4.132] - 2026-04-07
 
 > Higher resolution profile photos on artist pages and sharper hero images on retina displays.
