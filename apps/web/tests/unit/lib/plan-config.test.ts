@@ -20,7 +20,6 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       });
       expect(free.booleans).toEqual({
         canExportContacts: false,
-        canRemoveBranding: false,
         canAccessAdvancedAnalytics: false,
         canFilterSelfFromAnalytics: false,
         canAccessAdPixels: false,
@@ -59,7 +58,6 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       });
       expect(pro.booleans).toEqual({
         canExportContacts: true,
-        canRemoveBranding: true,
         canAccessAdvancedAnalytics: true,
         canFilterSelfFromAnalytics: true,
         canAccessAdPixels: true,
@@ -98,7 +96,6 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       });
       expect(max.booleans).toEqual({
         canExportContacts: true,
-        canRemoveBranding: true,
         canAccessAdvancedAnalytics: true,
         canFilterSelfFromAnalytics: true,
         canAccessAdPixels: true,
@@ -266,7 +263,6 @@ describe('Plan Configuration (Entitlement Registry)', () => {
     it('free plan has expected boolean feature mix', () => {
       const booleans = ENTITLEMENT_REGISTRY.free.booleans;
       // Pro-only features stay false
-      expect(booleans.canRemoveBranding).toBe(false);
       expect(booleans.canExportContacts).toBe(false);
       expect(booleans.canAccessAdvancedAnalytics).toBe(false);
       expect(booleans.canFilterSelfFromAnalytics).toBe(false);

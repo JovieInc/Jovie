@@ -17,10 +17,10 @@ describe('entitlement registry boundary helpers', () => {
   });
 
   it('returns expected boolean gates for known plans and false for unknown plans', () => {
-    expect(checkBoolean('free', 'canRemoveBranding')).toBe(false);
-    expect(checkBoolean('pro', 'canRemoveBranding')).toBe(true);
-    expect(checkBoolean('max', 'canRemoveBranding')).toBe(true);
-    expect(checkBoolean('not-a-plan', 'canRemoveBranding')).toBe(false);
+    expect(checkBoolean('free', 'canExportContacts')).toBe(false);
+    expect(checkBoolean('pro', 'canExportContacts')).toBe(true);
+    expect(checkBoolean('max', 'canExportContacts')).toBe(true);
+    expect(checkBoolean('not-a-plan', 'canExportContacts')).toBe(false);
   });
 
   it('returns expected limits for known plans and free defaults for unknown plans', () => {
