@@ -10,6 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { captureError } from '@/lib/error-tracking';
 import type { CandidateTrack } from './discover-tracks';
+import { extractJsonPayload } from './extract-json-payload';
 import type { JovieArtistTrack } from './feature-jovie-artists';
 import { buildCurationPrompt } from './prompts';
 
@@ -75,13 +76,7 @@ export async function curateTracklist(options: {
         throw new Error('No text response from Claude');
       }
 
-      // Extract JSON array from response
-      let jsonStr = textBlock.text.trim();
-      const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (fenceMatch) {
-        jsonStr = fenceMatch[1]!.trim();
-      }
-
+      const jsonStr = extractJsonPayload(textBlock.text);
       const parsed = JSON.parse(jsonStr);
       const trackIds = z.array(z.string()).min(10).max(50).parse(parsed);
 

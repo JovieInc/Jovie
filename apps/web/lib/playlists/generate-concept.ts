@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
 import { captureError } from '@/lib/error-tracking';
+import { extractJsonPayload } from './extract-json-payload';
 import { buildConceptPrompt } from './prompts';
 
 // ============================================================================
@@ -116,13 +117,7 @@ export async function generatePlaylistConcept(options?: {
         throw new Error('No text response from Claude');
       }
 
-      // Extract JSON from response (handle markdown code fences)
-      let jsonStr = textBlock.text.trim();
-      const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (fenceMatch) {
-        jsonStr = fenceMatch[1]!.trim();
-      }
-
+      const jsonStr = extractJsonPayload(textBlock.text);
       const parsed = JSON.parse(jsonStr);
       const concept = PlaylistConceptSchema.parse(parsed);
 

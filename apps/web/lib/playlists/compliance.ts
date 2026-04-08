@@ -6,6 +6,7 @@
  */
 
 import 'server-only';
+import { randomInt } from 'node:crypto';
 import { count, gte } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
@@ -48,8 +49,8 @@ export async function shouldGenerateToday(): Promise<boolean> {
   // Random chance based on remaining budget
   // If we haven't created any today, 80% chance
   // If we created 1, 30% chance of a second
-  if (todayCount === 0) return Math.random() < 0.8;
-  return Math.random() < 0.3;
+  if (todayCount === 0) return randomInt(10) < 8;
+  return randomInt(10) < 3;
 }
 
 // ============================================================================
@@ -61,7 +62,7 @@ export async function shouldGenerateToday(): Promise<boolean> {
  * Varies between 20-40 tracks to look organic.
  */
 export function getTargetPlaylistSize(): number {
-  return MIN_TRACKS + Math.floor(Math.random() * (MAX_TRACKS - MIN_TRACKS + 1));
+  return randomInt(MIN_TRACKS, MAX_TRACKS + 1);
 }
 
 // ============================================================================
@@ -84,7 +85,10 @@ export function generatePlaylistSlug(title: string): string {
 
   // MMDD + random suffix for guaranteed uniqueness across same-day runs
   const now = new Date();
-  const suffix = `${String(now.getUTCMonth() + 1).padStart(2, '0')}${String(now.getUTCDate()).padStart(2, '0')}-${Math.random().toString(36).slice(2, 6)}`;
+  const randomSuffix = randomInt(36 ** 4)
+    .toString(36)
+    .padStart(4, '0');
+  const suffix = `${String(now.getUTCMonth() + 1).padStart(2, '0')}${String(now.getUTCDate()).padStart(2, '0')}-${randomSuffix}`;
 
   return `${base}-${suffix}`;
 }
