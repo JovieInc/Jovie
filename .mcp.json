@@ -21,7 +21,7 @@
     "stitch": {
       "url": "https://stitch.googleapis.com/mcp",
       "headers": {
-        "X-Goog-Api-Key": "${GOOGLE_STITCH_API_KEY:-}"
+        "X-Goog-Api-Key": "${GOOGLE_STITCH_API_KEY}"
       }
     }
   }
