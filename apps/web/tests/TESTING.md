@@ -10,33 +10,35 @@
 
 ## Running Tests
 
+Run the commands below from the repo root.
+
 ### Unit Tests (Vitest)
 
 ```bash
-# Fast (local development)
-pnpm test
+# Web app suite with pinned Doppler scope
+pnpm run test:web
 
 # CI mode with coverage
 pnpm test:ci
 
 # Watch mode
-pnpm test:watch
+pnpm --filter=@jovie/web run test:watch
 ```
 
 ### E2E Tests (Playwright)
 
 ```bash
 # Full E2E suite
-doppler run -- pnpm test:e2e
+pnpm run test:web:e2e
 
 # Smoke tests only (fast)
-SMOKE_ONLY=1 doppler run -- pnpm e2e:smoke
+pnpm run test:web:smoke
 
 # Specific test file
-doppler run -- pnpm test:e2e tests/e2e/smoke-public.spec.ts
+doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e tests/e2e/smoke-public.spec.ts
 
 # With UI
-doppler run -- pnpm test:e2e:ui
+doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e:ui
 ```
 
 ## Smoke Test Files
@@ -185,7 +187,7 @@ Local `/browse` and `/qa` runs should use the app's dev auth bootstrap, not manu
 Start the local browse-compatible server:
 
 ```bash
-doppler run -- pnpm --filter web dev:local:browse
+pnpm run dev:web:browse
 ```
 
 Then authenticate the browse session with one route hit:
@@ -206,7 +208,7 @@ Notes:
 If you need cookie export for a non-loopback preview host that already has a real Clerk test user configured, use:
 
 ```bash
-doppler run -- pnpm tsx scripts/browse-auth.ts --base-url https://<preview-host> --persona creator
+doppler run --project jovie-web --config dev -- pnpm tsx scripts/browse-auth.ts --base-url https://<preview-host> --persona creator
 ```
 
 The helper now prefers the local dev auth route on loopback/private hosts and only uses the Clerk testing-token flow as fallback on non-loopback hosts. That fallback requires real `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, and `E2E_CLERK_USER_USERNAME` values plus a matching live Clerk test account. In practice, localhost with `/api/dev/test-auth/enter?...` is the normal browse path; staging usually uses the live Clerk instance and is not the default flow for this bootstrap.
@@ -215,13 +217,13 @@ The helper now prefers the local dev auth route on loopback/private hosts and on
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `⚠ Skipping: E2E_CLERK_USER_USERNAME not configured` | Missing Doppler env var | Run with `doppler run -p jovie-web -c dev --` |
+| `⚠ Skipping: E2E_CLERK_USER_USERNAME not configured` | Missing Doppler env var | Run with `pnpm run test:web:e2e` or another pinned wrapper |
 | `⚠ Skipping: Clerk testing setup was not successful` | `clerkSetup()` failed | Check `CLERK_SECRET_KEY` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` are real keys |
 | Screenshots show login screen | Auth guard skipping tests | Ensure `E2E_CLERK_USER_USERNAME` contains `+clerk_test` |
 | `audience-crm.png` missing | Auth guard skipped `audience.spec.ts` | Same as above — fix the auth guard |
 | `CLERK_SETUP_FAILED` | Real Clerk keys not in env | Run via Doppler, not bare `pnpm` |
 | `Failed to load Clerk JS` on localhost | Clerk proxy forces HTTPS, localhost has no SSL | The app now auto-disables the Clerk proxy on insecure local/private HTTP origins. If you are reusing an already-running dev server, restart it so the new runtime path is active. You can still force the old behavior with `NEXT_PUBLIC_CLERK_PROXY_DISABLED=1` when needed for test pipelines. |
-| Local `/browse` still looks signed out | Dev server was not started in browse mode | Restart with `doppler run -- pnpm --filter web dev:local:browse` |
+| Local `/browse` still looks signed out | Dev server was not started in browse mode | Restart with `pnpm run dev:web:browse` |
 | Local `/browse` hits `/signin` | Dev auth bootstrap route was not used | Open `/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings` first |
 | OTP input not visible | Testing token not set before navigation | Only relevant for non-loopback fallback; check `setupClerkTestingToken()` runs in `auth.setup.ts` |
 | `Couldn't find your account` on staging | Staging uses live Clerk instance, test user is in test instance | Always run screenshots against localhost (dev server), not staging |

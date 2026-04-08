@@ -111,6 +111,23 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 
    This verifies the required Node/pnpm versions, installs dependencies, and checks Doppler access.
 
+### Internal Quickstart
+
+From the repo root, use the root wrappers for the canonical internal workflow:
+
+```bash
+pnpm run db:web:migrate
+pnpm run dev:web:local
+pnpm run test:web
+pnpm run dev:web:browse
+```
+
+For authenticated local browser QA, open:
+
+```text
+/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings
+```
+
 3. **Set up Doppler (Recommended)**
 
    Follow the [Doppler setup guide](docs/DOPPLER_SETUP.md):
@@ -126,9 +143,9 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
    doppler setup --project jovie-web --config dev
    ```
 
-4. **Alternative: Manual Environment Setup**
+4. **Manual Environment Setup (Non-Canonical Fallback)**
 
-   If not using Doppler, copy `.env.example` to `.env.local`:
+   Internal team and agent workflows should use Doppler plus the root wrapper commands above. Only use a manual `.env.local` flow if you explicitly need to run outside the standard internal setup:
 
    ```bash
    cp .env.example .env.local
@@ -138,21 +155,13 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 5. **Run database migrations**
 
    ```bash
-   # With Doppler
-   doppler run --project jovie-web --config dev -- pnpm drizzle:migrate:main
-
-   # Or without Doppler
-   pnpm drizzle:migrate:main
+   pnpm run db:web:migrate
    ```
 
 6. **Start the development server**
 
    ```bash
-   # With Doppler (recommended)
-   doppler run --project jovie-web --config dev -- pnpm dev
-
-   # Or without Doppler
-   pnpm dev
+   pnpm run dev:web:local
    ```
 
    Open [http://localhost:3000](http://localhost:3000) in your browser.
@@ -178,16 +187,16 @@ Jovie/
 
 ```bash
 # Check schema matches database
-pnpm drizzle:check:main
+pnpm --filter=@jovie/web run drizzle:check
 
 # Generate migrations from schema changes
-pnpm drizzle:generate
+pnpm --filter=@jovie/web run drizzle:generate
 
 # Run migrations on main branch
-pnpm drizzle:migrate:main
+pnpm run db:web:migrate
 
 # Open Drizzle Studio (database GUI)
-pnpm drizzle:studio
+pnpm run db:web:studio
 
 # Note: Migrations are APPEND-ONLY - never modify existing migrations
 ```
@@ -195,23 +204,17 @@ pnpm drizzle:studio
 ### Testing
 
 ```bash
-# Unit tests (fast)
+# Web app test suite with pinned Doppler scope
+pnpm run test:web
+
+# Web smoke suite
+pnpm run test:web:smoke
+
+# Web E2E suite
+pnpm run test:web:e2e
+
+# Workspace-wide fast unit tests
 pnpm test:fast
-
-# All tests
-pnpm test
-
-# E2E smoke tests
-pnpm e2e:smoke
-
-# E2E full suite
-pnpm test:e2e
-
-# E2E with UI
-pnpm test:e2e:ui
-
-# Profile tests
-pnpm test:profile
 ```
 
 ### Code Quality
@@ -349,7 +352,7 @@ See `.env.example` for complete list.
 **Manual (Production):**
 ```bash
 export ALLOW_PROD_MIGRATIONS=true
-doppler run --config prd -- pnpm drizzle:migrate:main
+doppler run --project jovie-web --config prd -- pnpm --filter @jovie/web run drizzle:migrate
 ```
 
 ## Monitoring & Observability
@@ -414,7 +417,7 @@ This project has evolved through several migrations:
    - `fix:` - Bug fixes
    - `chore:` - Maintenance tasks
    - `docs:` - Documentation updates
-4. **Test** - Ensure all tests pass: `pnpm test:fast && pnpm typecheck`
+4. **Test** - Ensure all tests pass: `pnpm run test:web && pnpm typecheck`
 5. **Submit PR** - PRs auto-run fast CI checks
 
 ### Code Review Process
