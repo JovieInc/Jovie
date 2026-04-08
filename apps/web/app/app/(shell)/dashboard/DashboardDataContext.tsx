@@ -18,6 +18,7 @@ function normalizeDashboardData(value: DashboardData): DashboardData {
   return {
     ...value,
     avatarQuality: value.avatarQuality ?? UNKNOWN_AVATAR_QUALITY,
+    bioLinkActivation: value.bioLinkActivation ?? null,
     profileCompletion: value.profileCompletion ?? EMPTY_PROFILE_COMPLETION,
   };
 }

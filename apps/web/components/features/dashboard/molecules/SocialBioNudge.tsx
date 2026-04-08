@@ -1,122 +1,239 @@
 'use client';
 
-import { Share2, X } from 'lucide-react';
-import { memo, useCallback, useEffect, useState } from 'react';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
+import { Button } from '@jovie/ui';
+import { CheckCircle2, Clock3, Copy, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { captureWarning } from '@/lib/error-tracking';
-
-const STORAGE_KEY_PREFIX = 'jovie_social_bio_nudge_dismissed';
+import { APP_ROUTES } from '@/constants/routes';
+import { useClipboard } from '@/hooks/useClipboard';
+import {
+  type BioLinkActivation,
+  buildInstagramBioLink,
+  INSTAGRAM_EDIT_PROFILE_URL,
+  postDistributionEvent,
+} from '@/lib/distribution/instagram-activation';
+import { useNotifications } from '@/lib/hooks/useNotifications';
+import { cn } from '@/lib/utils';
 
 interface SocialBioNudgeProps {
+  readonly bioLinkActivation?: BioLinkActivation | null;
   readonly profileId: string;
   readonly profileUrl: string;
 }
 
-export const SocialBioNudge = memo(function SocialBioNudge({
-  profileId,
-  profileUrl,
-}: SocialBioNudgeProps): React.ReactElement | null {
-  const [dismissed, setDismissed] = useState(false);
+interface MilestoneRowProps {
+  readonly description: string;
+  readonly isComplete: boolean;
+  readonly label: string;
+}
 
-  const storageKey = `${STORAGE_KEY_PREFIX}:${profileId}`;
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored === '1') {
-        setDismissed(true);
-      }
-    } catch {
-      captureWarning('[SocialBioNudge] Failed to read localStorage');
-    }
-  }, [storageKey]);
-
-  const handleDismiss = useCallback(() => {
-    setDismissed(true);
-    try {
-      localStorage.setItem(storageKey, '1');
-    } catch {
-      captureWarning('[SocialBioNudge] Failed to set localStorage');
-    }
-  }, [storageKey]);
-
-  if (dismissed) {
+function formatDate(value: string | null | undefined): string | null {
+  if (!value) {
     return null;
   }
 
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+function MilestoneRow({
+  description,
+  isComplete,
+  label,
+}: Readonly<MilestoneRowProps>) {
   return (
-    <div className='flex items-start gap-2 rounded-md border border-(--linear-app-frame-seam) px-2 py-1.5'>
-      <div
-        className='shrink-0 rounded-md bg-surface-0 p-1.5'
-        aria-hidden='true'
+    <li className='flex items-start gap-3'>
+      <span
+        className={cn(
+          'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border',
+          isComplete
+            ? 'border-success/25 bg-success/10 text-success'
+            : 'border-(--linear-app-frame-seam) bg-surface-0 text-tertiary-token'
+        )}
       >
-        <Share2 className='h-3.5 w-3.5 text-secondary-token' />
+        {isComplete ? (
+          <CheckCircle2 className='h-3.5 w-3.5' aria-hidden='true' />
+        ) : (
+          <Clock3 className='h-3.5 w-3.5' aria-hidden='true' />
+        )}
+      </span>
+      <div className='min-w-0'>
+        <p className='text-[13px] font-[560] text-primary-token'>{label}</p>
+        <p className='text-[12.5px] leading-5 text-secondary-token'>
+          {description}
+        </p>
       </div>
-      <div className='min-w-0 flex-1 space-y-1'>
-        <div className='space-y-0.5'>
-          <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
-            Grow your audience
-          </p>
-          <p className='text-[14px] font-[590] leading-5 text-primary-token'>
-            Share your Jovie link
-          </p>
-          <p className='text-[13px] leading-5 text-secondary-token'>
-            Add{' '}
-            <span className='font-[510] text-primary-token'>{profileUrl}</span>{' '}
-            to your Instagram, TikTok, or Twitter bio to start capturing fans
-            every time someone visits.
-          </p>
-        </div>
-        <div className='flex flex-wrap items-center gap-x-4 gap-y-1.5'>
-          <a
-            href='https://www.instagram.com/accounts/edit/'
-            target='_blank'
-            rel='noopener noreferrer'
-            className='inline-flex items-center gap-1.5 text-[12.5px] text-secondary-token transition-colors hover:text-primary-token'
-          >
-            <SocialIcon
-              platform='instagram'
-              className='h-3.5 w-3.5'
-              aria-hidden={true}
-            />
-            Instagram bio
-          </a>
-          <a
-            href='https://www.tiktok.com/setting/'
-            target='_blank'
-            rel='noopener noreferrer'
-            className='inline-flex items-center gap-1.5 text-[12.5px] text-secondary-token transition-colors hover:text-primary-token'
-          >
-            <SocialIcon
-              platform='tiktok'
-              className='h-3.5 w-3.5'
-              aria-hidden={true}
-            />
-            TikTok bio
-          </a>
-          <a
-            href='https://x.com/settings/profile'
-            target='_blank'
-            rel='noopener noreferrer'
-            className='inline-flex items-center gap-1.5 text-[12.5px] text-secondary-token transition-colors hover:text-primary-token'
-          >
-            <SocialIcon
-              platform='x'
-              className='h-3.5 w-3.5'
-              aria-hidden={true}
-            />
-            X / Twitter bio
-          </a>
+    </li>
+  );
+}
+
+export const SocialBioNudge = memo(function SocialBioNudge({
+  bioLinkActivation,
+  profileId,
+  profileUrl,
+}: SocialBioNudgeProps): React.ReactElement | null {
+  const notifications = useNotifications();
+  const instagramBioUrl = useMemo(
+    () => buildInstagramBioLink(profileUrl),
+    [profileUrl]
+  );
+  const [didCopyLink, setDidCopyLink] = useState(
+    Boolean(bioLinkActivation?.copiedAt)
+  );
+  const [didOpenInstagram, setDidOpenInstagram] = useState(
+    Boolean(bioLinkActivation?.openedAt)
+  );
+
+  const { copy, isError, isSuccess } = useClipboard({
+    onError: () => {
+      notifications.error('Failed to copy link');
+    },
+    onSuccess: () => {
+      setDidCopyLink(true);
+      notifications.success('Instagram bio link copied', { duration: 2000 });
+      void postDistributionEvent({
+        eventType: 'link_copied',
+        metadata: { surface: 'dashboard' },
+        platform: 'instagram',
+        profileId,
+      });
+    },
+  });
+
+  const handleOpenInstagram = useCallback(() => {
+    setDidOpenInstagram(true);
+    void postDistributionEvent({
+      eventType: 'platform_opened',
+      metadata: { surface: 'dashboard' },
+      platform: 'instagram',
+      profileId,
+    });
+
+    globalThis.open(
+      INSTAGRAM_EDIT_PROFILE_URL,
+      '_blank',
+      'noopener,noreferrer'
+    );
+  }, [profileId]);
+
+  const handleCopyLink = useCallback(() => {
+    void copy(instagramBioUrl);
+  }, [copy, instagramBioUrl]);
+
+  if (!bioLinkActivation) {
+    return null;
+  }
+
+  const hasCopiedLink = didCopyLink || Boolean(bioLinkActivation.copiedAt);
+  const hasOpenedLink = didOpenInstagram || Boolean(bioLinkActivation.openedAt);
+  const activatedAtLabel = formatDate(bioLinkActivation.activatedAt);
+  const windowEndLabel = formatDate(bioLinkActivation.windowEndsAt);
+
+  if (bioLinkActivation.status === 'activated') {
+    return (
+      <div className='rounded-xl border border-success/20 bg-success/5 p-4'>
+        <div className='flex items-start gap-3'>
+          <div className='rounded-full border border-success/20 bg-success/10 p-2 text-success'>
+            <CheckCircle2 className='h-4 w-4' aria-hidden='true' />
+          </div>
+          <div className='min-w-0 flex-1 space-y-1.5'>
+            <div className='space-y-0.5'>
+              <p className='text-[14px] font-[590] text-primary-token'>
+                Instagram activated
+              </p>
+              <p className='text-[13px] leading-5 text-secondary-token'>
+                Your first Instagram visitor landed on Jovie
+                {activatedAtLabel ? ` on ${activatedAtLabel}.` : '.'}
+              </p>
+            </div>
+            <div className='flex flex-wrap gap-2'>
+              <Button asChild size='sm' variant='secondary'>
+                <Link href={APP_ROUTES.DASHBOARD_AUDIENCE}>
+                  View Analytics
+                  <ExternalLink className='ml-1 h-3.5 w-3.5' />
+                </Link>
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
-      <AppIconButton
-        onClick={handleDismiss}
-        ariaLabel='Dismiss nudge'
-        className='self-start border-transparent bg-transparent text-tertiary-token hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
-      >
-        <X className='h-4 w-4' aria-hidden='true' />
-      </AppIconButton>
+    );
+  }
+
+  const title =
+    bioLinkActivation.status === 'expired'
+      ? 'Try Instagram again'
+      : 'Activate your Instagram bio link';
+  const description =
+    bioLinkActivation.status === 'expired'
+      ? `No Instagram visitor landed in the first seven days${windowEndLabel ? ` by ${windowEndLabel}` : ''}. Copy the tagged link again and paste it into your bio.`
+      : 'Copy your tagged Jovie link, open Instagram, and paste it into your bio. We will mark activation on the first Instagram-sourced visit.';
+
+  return (
+    <div className='rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-4'>
+      <div className='flex items-start gap-3'>
+        <div
+          className='rounded-full border border-(--linear-app-frame-seam) bg-surface-0 p-2 text-secondary-token'
+          aria-hidden='true'
+        >
+          <SocialIcon platform='instagram' className='h-4 w-4' />
+        </div>
+        <div className='min-w-0 flex-1 space-y-3'>
+          <div className='space-y-1'>
+            <p className='text-[14px] font-[590] text-primary-token'>{title}</p>
+            <p className='text-[13px] leading-5 text-secondary-token'>
+              {description}
+            </p>
+            <p className='text-[12.5px] font-[560] text-primary-token'>
+              {profileUrl}
+            </p>
+          </div>
+
+          <ul className='space-y-2'>
+            <MilestoneRow
+              description='Use the tagged version so Instagram traffic stays attributable.'
+              isComplete={hasCopiedLink}
+              label='Copy your Instagram bio link'
+            />
+            <MilestoneRow
+              description='Open your Instagram profile settings and update the website field.'
+              isComplete={hasOpenedLink}
+              label='Open Instagram'
+            />
+            <MilestoneRow
+              description={
+                bioLinkActivation.status === 'expired'
+                  ? 'The activation window expired before the first Instagram visit arrived.'
+                  : 'Activation happens after the first Instagram-sourced visit lands on your profile.'
+              }
+              isComplete={false}
+              label='Waiting for first Instagram visit'
+            />
+          </ul>
+
+          <div className='flex flex-wrap gap-2'>
+            <Button onClick={handleCopyLink} size='sm'>
+              <Copy className='mr-1.5 h-3.5 w-3.5' aria-hidden='true' />
+              {isSuccess
+                ? 'Copied'
+                : isError
+                  ? 'Retry Copy'
+                  : 'Copy Instagram Bio Link'}
+            </Button>
+            <Button onClick={handleOpenInstagram} size='sm' variant='secondary'>
+              Open Instagram
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 });
