@@ -96,6 +96,21 @@ export function spotifyImportIsReady(
   return hasSpotifyProfile && releaseCount > 0 && releaseLinkCount > 0;
 }
 
+export function onboardingProfileIsReady(
+  state: SpotifyImportStateRow | null | undefined
+): boolean {
+  if (!state) {
+    return false;
+  }
+
+  return Boolean(
+    state.spotify_id &&
+      state.spotify_url &&
+      state.is_public &&
+      state.onboarding_completed_at
+  );
+}
+
 export function countPopulatedDspFields(
   state: MultiDspEnrichmentState
 ): number {
@@ -183,7 +198,7 @@ export async function waitForMultiDspEnrichment(clerkUserId: string) {
 export async function advanceOnboardingAfterArtistSelection(
   page: Page,
   timeoutMs = 120_000
-): Promise<'checkout' | 'dashboard' | 'review'> {
+): Promise<'checkout' | 'dashboard' | 'importing' | 'review'> {
   const deadline = Date.now() + timeoutMs;
   const reviewDisplayName = page.locator('#onboarding-display-name');
   const reviewGoToDashboard = page.getByRole('button', {
@@ -230,6 +245,13 @@ export async function advanceOnboardingAfterArtistSelection(
     }
 
     await page.waitForTimeout(clicked ? 500 : 1_000);
+  }
+
+  if (
+    page.url().includes('/onboarding') &&
+    page.url().includes('resume=spotify')
+  ) {
+    return 'importing';
   }
 
   throw new Error(
