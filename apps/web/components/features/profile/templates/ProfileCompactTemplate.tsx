@@ -483,7 +483,7 @@ export function ProfileCompactTemplate({
                       tone='white'
                       rounded={false}
                       className='block'
-                      aria-hidden={false}
+                      aria-hidden={true}
                     />
                   </Link>
 

@@ -12,7 +12,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Changed
 
 - The top-left Jovie mark on public artist profiles now links to the artist profiles landing page instead of acting as decorative chrome
-- Added a unit test that locks the public-profile logo destination to the artist profiles route
+- [internal] Added a unit test that locks the public-profile logo destination to the artist profiles route
 
 ## [26.4.132] - 2026-04-07
 
