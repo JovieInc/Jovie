@@ -42,7 +42,11 @@ interface ShellPage {
 function toRoutePath(filePath: string): string {
   let relativePath = path.relative(SHELL_ROOT, filePath).replace(/\\/g, '/');
   relativePath = relativePath.replace(/(^|\/)page\.(tsx|ts)$/, '');
-  relativePath = relativePath.replace(/\/$/, '');
+  relativePath = relativePath
+    .split('/')
+    .filter(segment => segment.length > 0)
+    .filter(segment => !/^\([^/]+\)$/.test(segment))
+    .join('/');
 
   return `/app${relativePath ? `/${relativePath}` : ''}`;
 }
