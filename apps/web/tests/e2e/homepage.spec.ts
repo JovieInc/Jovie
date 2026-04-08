@@ -96,7 +96,9 @@ test.describe('Homepage', () => {
         name: 'You made the song. Now make it hit.',
       })
     ).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Start Free' })).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Get Started' }).last()
+    ).toBeVisible();
   });
 
   test('is responsive on mobile', async ({ page }) => {
@@ -106,16 +108,20 @@ test.describe('Homepage', () => {
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
 
-    await expect(page.getByTestId('homepage-hero-release-card')).toBeVisible({
+    await expect(
+      page.getByTestId('homepage-hero-release-card').first()
+    ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-    await expect(page.getByTestId('homepage-hero-profile-card')).toBeVisible({
+    await expect(
+      page.getByTestId('homepage-hero-profile-card').first()
+    ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
 
-    await expect(page.getByRole('link', { name: /start free/i })).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
+    await expect(
+      page.getByRole('link', { name: /get started/i }).first()
+    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
   });
 
   test('has proper meta information and no obvious error state', async ({
