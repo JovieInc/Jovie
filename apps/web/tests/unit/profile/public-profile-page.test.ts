@@ -642,5 +642,18 @@ describe('Public Profile Page Logic', () => {
       expect(shouldCache('not_found')).toBe(false);
       expect(shouldCache('error')).toBe(false);
     });
+
+    it('carries the first non-ok payload through the unstable_cache throw path', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'NonCacheableProfileResultError'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'throw new NonCacheableProfileResultError(data)'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'if (error instanceof NonCacheableProfileResultError)'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('return error.result');
+    });
   });
 });

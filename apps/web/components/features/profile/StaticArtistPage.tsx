@@ -51,6 +51,7 @@ export function StaticArtistPage({
 }: StaticArtistPageProps) {
   return (
     <ProfileCompactTemplate
+      key={artist.id}
       mode={mode}
       artist={artist}
       socialLinks={socialLinks}

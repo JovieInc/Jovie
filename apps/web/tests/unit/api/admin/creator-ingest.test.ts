@@ -387,6 +387,8 @@ describe('POST /api/admin/creator-ingest', () => {
   });
 
   it('captures and classifies unexpected errors', async () => {
+    // Trigger the route's catch-all error classification path via parseJsonBody;
+    // the "unique constraint" text is mapped to 409 regardless of origin.
     const crash = new Error('unique constraint violated');
     mockParseJsonBody.mockRejectedValueOnce(crash);
 

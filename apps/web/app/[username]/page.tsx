@@ -434,6 +434,16 @@ const fetchProfileAndLinks = async (
 
 const PROFILE_SUCCESS_CACHE_TTL_SECONDS = 3600; // 1 hour
 
+class NonCacheableProfileResultError extends Error {
+  readonly result: Awaited<ReturnType<typeof fetchProfileAndLinks>>;
+
+  constructor(result: Awaited<ReturnType<typeof fetchProfileAndLinks>>) {
+    super(`Profile fetch returned non-cacheable status: ${result.status}`);
+    this.name = 'NonCacheableProfileResultError';
+    this.result = result;
+  }
+}
+
 /**
  * Cached profile fetcher. Only caches successful (status: 'ok') results.
  *
@@ -462,8 +472,10 @@ const getCachedProfileAndLinks = async (username: string) => {
         const data = await fetchProfileAndLinks(username);
         if (data.status !== 'ok') {
           // Don't cache not_found or error results — throw to prevent
-          // stale success from being served on background revalidation
-          throw new Error(`Profile ${username} status: ${data.status}`);
+          // stale success from being served on background revalidation.
+          // Carry the original payload through the throw path so callers do not
+          // need to re-read storage just to render a fresh non-ok response.
+          throw new NonCacheableProfileResultError(data);
         }
         return data;
       },
@@ -474,8 +486,12 @@ const getCachedProfileAndLinks = async (username: string) => {
       }
     );
     return await cachedFetch();
-  } catch {
-    // Cache miss for non-ok status, or cache layer failure — fetch fresh
+  } catch (error) {
+    if (error instanceof NonCacheableProfileResultError) {
+      return error.result;
+    }
+
+    // Cache layer failure — fetch fresh
     return fetchProfileAndLinks(username);
   }
 };

@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -68,6 +69,15 @@ function createSelectChain<T>(rows: T[]) {
   return chain;
 }
 
+function signLeadAttributionBody(body: string): string {
+  const secret = crypto
+    .createHmac('sha256', 'lead-secret')
+    .update('lead-attribution-cookie')
+    .digest('hex');
+
+  return crypto.createHmac('sha256', secret).update(body).digest('hex');
+}
+
 describe('attributeLeadSignupFromClerkUserId', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -109,6 +119,31 @@ describe('attributeLeadSignupFromClerkUserId', () => {
 
     expect(result).toEqual({ leadId: null, userId: null });
     expect(mockDbSelect).not.toHaveBeenCalled();
+  });
+
+  it('captures malformed signed cookie payloads and treats them as missing attribution', async () => {
+    const cookieStore = createCookieStore();
+    const body = Buffer.from('{', 'utf8').toString('base64url');
+    cookieStore.values.set(
+      'jovie_lead_attribution',
+      `${body}.${signLeadAttributionBody(body)}`
+    );
+    mockCookies.mockResolvedValue(cookieStore);
+
+    const { attributeLeadSignupFromClerkUserId } = await import(
+      '@/lib/leads/funnel-events'
+    );
+    const result = await attributeLeadSignupFromClerkUserId('clerk_123');
+
+    expect(result).toEqual({ leadId: null, userId: null });
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Failed to parse lead attribution cookie',
+      expect.any(SyntaxError),
+      expect.objectContaining({
+        route: 'lib/leads/funnel-events',
+      })
+    );
   });
 
   it('treats an expired cookie as missing attribution', async () => {
