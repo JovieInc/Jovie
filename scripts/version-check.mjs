@@ -42,11 +42,13 @@ if (!parsed) {
 
 for (const rel of [
   'package.json',
-  ...['apps', 'packages'].flatMap(scope =>
-    readdirSync(join(ROOT, scope), { withFileTypes: true })
-      .filter(entry => entry.isDirectory())
-      .map(entry => `${scope}/${entry.name}/package.json`)
-  ).sort(),
+  ...['apps', 'packages']
+    .flatMap(scope =>
+      readdirSync(join(ROOT, scope), { withFileTypes: true })
+        .filter(entry => entry.isDirectory())
+        .map(entry => `${scope}/${entry.name}/package.json`)
+    )
+    .sort(),
 ]) {
   const version = JSON.parse(readFileSync(join(ROOT, rel), 'utf-8')).version;
   if (version !== currentVersion) {
@@ -58,7 +60,9 @@ for (const rel of [
 
 const versionFile = readFileSync(join(ROOT, 'VERSION'), 'utf-8').trim();
 if (versionFile !== currentVersion) {
-  errors.push(`VERSION (${versionFile}) does not match version.json (${currentVersion}).`);
+  errors.push(
+    `VERSION (${versionFile}) does not match version.json (${currentVersion}).`
+  );
 }
 
 const changelog = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf-8');
