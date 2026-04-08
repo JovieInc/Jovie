@@ -7,8 +7,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.133] - 2026-04-07
 
-> Turn the public-profile Jovie logo into a branded path to the artist profile landing page.
+> Restore settings-page scrolling and clean up duplicate app-name page titles across marketing and legal routes.
 
+### Fixed
+
+- Settings pages now use page-level scrolling again inside the app shell
+- Added a regression unit test to keep the settings layout on the correct scroll mode
+- Removed duplicate app-name suffixes from affected marketing and legal page titles while preserving branded social metadata
 ### Changed
 
 - The top-left Jovie mark on public artist profiles now links to the artist profiles landing page instead of acting as decorative chrome
