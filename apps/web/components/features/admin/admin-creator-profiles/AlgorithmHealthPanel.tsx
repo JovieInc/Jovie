@@ -263,26 +263,33 @@ function BulletList({
   items,
   tone = 'default',
 }: Readonly<{ items: readonly string[]; tone?: 'default' | 'warning' }>) {
+  const itemCounts = new Map<string, number>();
+
   return (
     <ul className='space-y-2'>
-      {items.map((item, index) => (
-        <li
-          key={`${tone}-${index}`}
-          className='flex items-start gap-2 text-[12px] leading-[18px]'
-        >
-          <span
-            className={`mt-1 size-1.5 rounded-full ${tone === 'warning' ? 'bg-warning' : 'bg-secondary-token'}`}
-            aria-hidden='true'
-          />
-          <span
-            className={
-              tone === 'warning' ? 'text-warning' : 'text-secondary-token'
-            }
+      {items.map(item => {
+        const duplicateCount = itemCounts.get(item) ?? 0;
+        itemCounts.set(item, duplicateCount + 1);
+
+        return (
+          <li
+            key={`${tone}-${item}-${duplicateCount}`}
+            className='flex items-start gap-2 text-[12px] leading-[18px]'
           >
-            {item}
-          </span>
-        </li>
-      ))}
+            <span
+              className={`mt-1 size-1.5 rounded-full ${tone === 'warning' ? 'bg-warning' : 'bg-secondary-token'}`}
+              aria-hidden='true'
+            />
+            <span
+              className={
+                tone === 'warning' ? 'text-warning' : 'text-secondary-token'
+              }
+            >
+              {item}
+            </span>
+          </li>
+        );
+      })}
     </ul>
   );
 }
