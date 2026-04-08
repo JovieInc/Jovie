@@ -5,6 +5,7 @@ import {
   type NextRequest,
   NextResponse,
 } from 'next/server';
+import { shouldBypassClerk } from '@/components/providers/clerkAvailability';
 import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
@@ -1292,7 +1293,15 @@ export default async function middleware(
   }
 
   const clerkPathInfo: ClerkBypassPathInfo = pathInfo;
+  const { publishableKey: resolvedClerkPublishableKey } =
+    resolveClerkKeys(hostname);
+  const shouldForceBypassClerk = shouldBypassClerk(
+    resolvedClerkPublishableKey,
+    process.env.NEXT_PUBLIC_CLERK_MOCK,
+    req.nextUrl
+  );
   const allowAuthRouteClerkBypass =
+    shouldForceBypassClerk ||
     process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
     process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 
@@ -1302,6 +1311,7 @@ export default async function middleware(
       pathname,
       pathInfo: clerkPathInfo,
       cookies: req.cookies.getAll(),
+      forceBypass: shouldForceBypassClerk,
     })
   ) {
     return handleRequest(req, null);

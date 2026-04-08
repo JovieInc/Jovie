@@ -221,4 +221,32 @@ describe('ProfileCompactTemplate', () => {
       );
     });
   });
+
+  it('does not rewrite the URL when a non-mode drawer opens over a deep-linked mode', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    window.history.replaceState(null, '', '/test-artist?mode=listen');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    const { ProfileCompactTemplate } = await import(
+      '@/features/profile/templates/ProfileCompactTemplate'
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    pushStateSpy.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: 'More options' }));
+
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(window.location.search).toBe('?mode=listen');
+
+    pushStateSpy.mockRestore();
+  });
 });

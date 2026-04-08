@@ -52,6 +52,26 @@ describe('shouldBypassClerkForRequest', () => {
     ).toBe(false);
   });
 
+  it('force-bypasses protected and auth routes when runtime Clerk is unavailable', () => {
+    expect(
+      shouldBypassClerkForRequest({
+        cookies: [],
+        forceBypass: true,
+        pathInfo: PROTECTED_PATH_INFO,
+        pathname: '/onboarding',
+      })
+    ).toBe(true);
+
+    expect(
+      shouldBypassClerkForRequest({
+        cookies: [],
+        forceBypass: true,
+        pathInfo: { ...PUBLIC_PATH_INFO, isAuthPath: true },
+        pathname: '/signin',
+      })
+    ).toBe(true);
+  });
+
   it('keeps Clerk enabled for auth and Clerk proxy routes', () => {
     expect(
       shouldBypassClerkForRequest({

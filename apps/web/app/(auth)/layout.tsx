@@ -1,4 +1,5 @@
 import './auth-utilities.css';
+import { headers } from 'next/headers';
 import { AuthClientProviders } from '@/components/providers/AuthClientProviders';
 import { shouldBypassClerk } from '@/components/providers/clerkAvailability';
 import {
@@ -17,9 +18,23 @@ export default async function AuthLayout({
   children: React.ReactNode;
 }>) {
   const publishableKey = await resolvePublishableKeyFromHeaders();
+  const requestHeaders = await headers();
+  const forwardedHost =
+    requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host') ?? '';
+  const forwardedProto = requestHeaders.get('x-forwarded-proto') ?? 'https';
+  const requestLocation =
+    forwardedHost.length > 0
+      ? {
+          hostname: forwardedHost.split(':')[0] ?? '',
+          protocol: forwardedProto.endsWith(':')
+            ? forwardedProto
+            : `${forwardedProto}:`,
+        }
+      : undefined;
   const isClerkUnavailable = shouldBypassClerk(
     publishableKey,
-    publicEnv.NEXT_PUBLIC_CLERK_MOCK
+    publicEnv.NEXT_PUBLIC_CLERK_MOCK,
+    requestLocation
   );
 
   if (isClerkUnavailable) {

@@ -58,9 +58,14 @@ function hasActiveClerkCookie(cookie: ClerkCookieLike) {
 export function shouldBypassClerkForRequest(options: {
   allowAuthRouteBypass?: boolean;
   cookies: Iterable<ClerkCookieLike>;
+  forceBypass?: boolean;
   pathInfo: ClerkBypassPathInfo;
   pathname: string;
 }) {
+  if (options.forceBypass === true) {
+    return true;
+  }
+
   const allowAuthRouteBypass = options.allowAuthRouteBypass === true;
 
   // Public API routes must be able to answer as signed-out requests without
