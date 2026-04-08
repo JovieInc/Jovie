@@ -205,7 +205,7 @@ export function buildSweepManifest(
     },
     {
       id: 'onboarding-nightly',
-      label: 'Nightly Onboarding',
+      label: 'Nightly Onboarding Completion',
       kind: 'playwright',
       priority: 110,
       command: [
@@ -213,7 +213,7 @@ export function buildSweepManifest(
         'exec',
         'playwright',
         'test',
-        'tests/e2e/nightly/onboarding-flow.spec.ts',
+        'tests/e2e/onboarding-completion.spec.ts',
         '--config=playwright.config.nightly.ts',
         '--project=chromium',
         '--reporter=json',

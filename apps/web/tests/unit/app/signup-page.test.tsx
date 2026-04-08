@@ -183,4 +183,102 @@ describe('signup page', () => {
       })
     );
   });
+
+  it('ignores invalid plan values and does not track plan intent', async () => {
+    searchParamsState.value = 'plan=not-a-plan&handle=TestHandle';
+    validatePlanMock.mockReturnValue(null);
+
+    render(<SignUpPage />);
+
+    await waitFor(() => {
+      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(validatePlanMock).toHaveBeenCalledWith('not-a-plan');
+    expect(setPlanIntentMock).not.toHaveBeenCalled();
+    expect(trackMock).not.toHaveBeenCalled();
+  });
+
+  it('does not crash when sessionStorage writes fail', async () => {
+    searchParamsState.value = 'handle=QuotaCase';
+    const setItemSpy = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(() => {
+        throw new Error('quota exceeded');
+      });
+
+    render(<SignUpPage />);
+
+    await waitFor(() => {
+      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/handle/check?handle=quotacase',
+        expect.objectContaining({
+          signal: expect.any(AbortSignal),
+        })
+      );
+    });
+
+    expect(screen.getByTestId('clerk-sign-up')).toBeInTheDocument();
+    setItemSpy.mockRestore();
+  });
+
+  it('renders the taken-handle state when the requested handle is unavailable', async () => {
+    searchParamsState.value = 'handle=TakenHandle';
+    fetchMock.mockResolvedValueOnce({
+      json: async () => ({ available: false }),
+    });
+
+    render(<SignUpPage />);
+
+    expect(
+      await screen.findByText(
+        '@takenhandle is already taken. You can pick another handle after signing up.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('renders the fallback state when handle availability lookup fails', async () => {
+    searchParamsState.value = 'handle=BrokenHandle';
+    fetchMock.mockRejectedValueOnce(new Error('network down'));
+
+    render(<SignUpPage />);
+
+    expect(
+      await screen.findByText(
+        "Couldn't check if @brokenhandle is available. You can still sign up and choose a handle."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('shows the access denied oauth banner without losing redirect params', async () => {
+    searchParamsState.value =
+      'oauth_error=access_denied&redirect_url=%2Fonboarding%3Fhandle%3Dartist';
+    globalThis.history.replaceState(
+      null,
+      '',
+      '/signup?oauth_error=access_denied&redirect_url=%2Fonboarding%3Fhandle%3Dartist'
+    );
+
+    render(<SignUpPage />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Required permissions were not granted. Please try again and accept all permissions.'
+    );
+
+    await waitFor(() => {
+      expect(globalThis.location.search).toBe(
+        '?redirect_url=%2Fonboarding%3Fhandle%3Dartist'
+      );
+    });
+
+    expect(clerkSignUpMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signInUrl: '/signin?redirect_url=%2Fonboarding%3Fhandle%3Dartist',
+      })
+    );
+  });
 });

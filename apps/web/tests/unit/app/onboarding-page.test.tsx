@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { render } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
-const { redirectMock } = vi.hoisted(() => ({
+const { onboardingWrapperPropsSpy, redirectMock } = vi.hoisted(() => ({
+  onboardingWrapperPropsSpy: vi.fn(),
   redirectMock: vi.fn((url: string) => {
     throw new Error(`REDIRECT:${url}`);
   }),
@@ -23,7 +25,10 @@ vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
 }));
 
 vi.mock('@/features/dashboard/organisms/OnboardingFormWrapper', () => ({
-  OnboardingFormWrapper: () => <div data-testid='onboarding-form' />,
+  OnboardingFormWrapper: (props: Record<string, unknown>) => {
+    onboardingWrapperPropsSpy(props);
+    return <div data-testid='onboarding-form' />;
+  },
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -87,6 +92,11 @@ vi.mock('@/lib/utils/errors', () => ({
 import OnboardingPage from '../../../app/onboarding/page';
 
 describe('onboarding page', () => {
+  beforeEach(() => {
+    onboardingWrapperPropsSpy.mockClear();
+    redirectMock.mockClear();
+  });
+
   it('redirects waitlist-state users back to the waitlist instead of rendering onboarding', async () => {
     await expect(
       OnboardingPage({ searchParams: Promise.resolve({}) })
@@ -249,5 +259,126 @@ describe('onboarding page', () => {
 
     expect(page).toBeTruthy();
     expect(redirectMock).not.toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
+  });
+
+  it('redirects banned users to the unavailable page', async () => {
+    const { resolveUserState } = await import('@/lib/auth/gate');
+
+    vi.mocked(resolveUserState).mockResolvedValueOnce({
+      state: 'BANNED',
+      clerkUserId: 'clerk_123',
+      dbUserId: 'db_123',
+      profileId: 'profile_123',
+      redirectTo: APP_ROUTES.UNAVAILABLE,
+      context: {
+        isAdmin: false,
+        isPro: false,
+        email: 'artist@example.com',
+      },
+    });
+
+    await expect(
+      OnboardingPage({ searchParams: Promise.resolve({}) })
+    ).rejects.toThrow(`REDIRECT:${APP_ROUTES.UNAVAILABLE}`);
+  });
+
+  it('redirects user creation failures to the dedicated error page', async () => {
+    const { resolveUserState } = await import('@/lib/auth/gate');
+
+    vi.mocked(resolveUserState).mockResolvedValueOnce({
+      state: 'USER_CREATION_FAILED',
+      clerkUserId: 'clerk_123',
+      dbUserId: null,
+      profileId: null,
+      redirectTo: '/error/user-creation-failed',
+      context: {
+        isAdmin: false,
+        isPro: false,
+        email: 'artist@example.com',
+      },
+    });
+
+    await expect(
+      OnboardingPage({ searchParams: Promise.resolve({}) })
+    ).rejects.toThrow('REDIRECT:/error/user-creation-failed');
+  });
+
+  it('redirects active users without a continuation signal back to the app shell', async () => {
+    const { resolveUserState } = await import('@/lib/auth/gate');
+
+    vi.mocked(resolveUserState).mockResolvedValueOnce({
+      state: 'ACTIVE',
+      clerkUserId: 'clerk_123',
+      dbUserId: 'db_123',
+      profileId: 'profile_123',
+      redirectTo: APP_ROUTES.DASHBOARD,
+      context: {
+        isAdmin: false,
+        isPro: false,
+        email: 'artist@example.com',
+      },
+    });
+
+    await expect(
+      OnboardingPage({ searchParams: Promise.resolve({}) })
+    ).rejects.toThrow('REDIRECT:/app');
+  });
+
+  it('redirects to signin when clerkUserId is missing despite routing into onboarding', async () => {
+    const { resolveUserState } = await import('@/lib/auth/gate');
+
+    vi.mocked(resolveUserState).mockResolvedValueOnce({
+      state: 'NEEDS_ONBOARDING',
+      clerkUserId: null,
+      dbUserId: 'db_123',
+      profileId: null,
+      redirectTo: APP_ROUTES.ONBOARDING,
+      context: {
+        isAdmin: false,
+        isPro: false,
+        email: 'artist@example.com',
+      },
+    });
+
+    await expect(
+      OnboardingPage({ searchParams: Promise.resolve({}) })
+    ).rejects.toThrow(
+      `REDIRECT:${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.ONBOARDING}`
+    );
+  });
+
+  it('prefills a reserved handle when no explicit handle is provided', async () => {
+    const { resolveUserState } = await import('@/lib/auth/gate');
+    const { reserveOnboardingHandle } = await import(
+      '@/lib/onboarding/reserved-handle'
+    );
+
+    vi.mocked(resolveUserState).mockResolvedValueOnce({
+      state: 'NEEDS_ONBOARDING',
+      clerkUserId: 'clerk_123',
+      dbUserId: 'db_123',
+      profileId: 'profile_123',
+      redirectTo: APP_ROUTES.ONBOARDING,
+      context: {
+        isAdmin: false,
+        isPro: false,
+        email: 'artist@example.com',
+      },
+    });
+    vi.mocked(reserveOnboardingHandle).mockResolvedValueOnce('reserved-handle');
+
+    const page = await OnboardingPage({
+      searchParams: Promise.resolve({}),
+    });
+    render(page);
+
+    expect(page).toBeTruthy();
+    expect(onboardingWrapperPropsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialHandle: 'reserved-handle',
+        isReservedHandle: true,
+        userId: 'clerk_123',
+      })
+    );
   });
 });
