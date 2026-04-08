@@ -36,6 +36,7 @@ export function NotificationsPageClient({ artist }: Props) {
           aria-hidden='true'
         />
         <div className='relative z-10 w-full max-w-sm rounded-[32px] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] p-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl sm:p-6'>
+          <h1 className='sr-only'>Turn on notifications for {artist.name}</h1>
           <TwoStepNotificationsCTA artist={artist} startExpanded />
         </div>
       </div>

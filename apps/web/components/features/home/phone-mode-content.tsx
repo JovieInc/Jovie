@@ -184,12 +184,9 @@ function TourContent() {
           {show.date}
         </span>
       </div>
-      <button
-        type='button'
-        className='text-[12px] font-medium text-tertiary-token hover:text-secondary-token transition-colors'
-      >
+      <span className='text-[12px] font-medium text-tertiary-token'>
         See more dates
-      </button>
+      </span>
     </div>
   );
 }
@@ -214,12 +211,9 @@ function ProfileContent() {
             New Single
           </p>
         </div>
-        <button
-          type='button'
-          className='shrink-0 rounded-lg bg-btn-primary px-3.5 py-1.5 text-[12px] font-semibold text-btn-primary-foreground shadow-sm'
-        >
+        <span className='shrink-0 rounded-lg bg-btn-primary px-3.5 py-1.5 text-[12px] font-semibold text-btn-primary-foreground shadow-sm'>
           Listen
-        </button>
+        </span>
       </div>
     </div>
   );

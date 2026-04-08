@@ -32,12 +32,16 @@ async function main() {
   const databaseUrl = rawUrl.replace(NEON_URL_PATTERN, 'postgres$2$4');
 
   const sql = neon(databaseUrl);
+  const statements = sqlText
+    .split(/--> statement-breakpoint|;\s*(?:\r?\n|$)/g)
+    .map(statement => statement.trim())
+    .filter(Boolean);
 
   try {
     console.log(`[SQL] Applying file: ${absPath}`);
-    // Execute raw SQL using tagged template literal syntax
-    // Cast to TemplateStringsArray for raw SQL text execution
-    await sql([sqlText] as unknown as TemplateStringsArray);
+    for (const statement of statements) {
+      await sql.query(statement);
+    }
     console.log('[SQL] Success');
   } catch (err) {
     console.error('[SQL] Error applying file:', err);

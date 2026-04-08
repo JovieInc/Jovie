@@ -112,7 +112,7 @@ jobs:
             echo "run_test=false" >> "$GITHUB_OUTPUT"
           fi
 
-          PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.pr\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
+          PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.pr\.json|apps/web/\.lighthouserc\.public-launch\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|apps/web/scripts/run-public-lighthouse\.ts|apps/web/scripts/public-route-qa\.ts|apps/web/scripts/public-surface-qa\.ts|apps/web/scripts/performance-route-manifest\.ts|apps/web/tests/e2e/public-exhaustive\.spec\.ts|apps/web/tests/e2e/axe-audit\.spec\.ts|apps/web/tests/e2e/utils/public-surface-(manifest|helpers)\.ts|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
           if echo "$CHANGED_FILES" | grep -q -E "$PUBLIC_LIGHTHOUSE_PATTERN"; then
             echo "run_public_lighthouse=true" >> "$GITHUB_OUTPUT"
           else
@@ -760,6 +760,12 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
+      - name: Seed public QA fixtures
+        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+
       - name: Download build artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -769,7 +775,7 @@ jobs:
       - name: Extract build artifact
         run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
 
-      - name: Run Lighthouse CI (PR thresholds)
+      - name: Run Lighthouse CI (public launch thresholds)
         run: |
           cd apps/web
           cleanup() {
@@ -801,8 +807,9 @@ jobs:
             exit 1
           fi
 
-          pnpm exec lhci autorun --config=.lighthouserc.pr.json
+          pnpm run test:lighthouse:public:launch
         env:
+          BASE_URL: http://127.0.0.1:3000
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           DATABASE_URL: ${{ env.DATABASE_URL }}
           URL_ENCRYPTION_KEY: lighthouse-public-ci-url-encryption-key
@@ -1668,12 +1675,10 @@ jobs:
   ci-a11y:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
-    # Informational only — never blocks PRs or merge queue.
     needs: [ci-build-public, ci-path-changes]
     if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true' }}
-    continue-on-error: true
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -1701,6 +1706,26 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
 
+      - name: Create ephemeral Neon database branch (with retry)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        id: neon-branch
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: public-a11y-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Resolve DATABASE_URL (Neon ephemeral)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          CANDIDATE="${{ steps.neon-branch.outputs.db_url }}"
+          if [ -z "$CANDIDATE" ]; then
+            echo "No Neon ephemeral DATABASE_URL available."
+            exit 1
+          fi
+          echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+
       - name: Cache Playwright Browsers
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
@@ -1726,6 +1751,22 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
 
+      - name: Run migrations (ephemeral Neon)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: pr-${{ github.event.pull_request.number || github.run_id }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Seed public QA fixtures
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+
       - name: Run axe a11y audit (public routes)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
@@ -1742,18 +1783,13 @@ jobs:
             if curl -sf http://localhost:3100 > /dev/null 2>&1; then break; fi
             sleep 1
           done
-          pnpm exec playwright test tests/e2e/axe-audit.spec.ts --project=chromium --reporter=line || EXIT_CODE=$?
+          pnpm exec playwright test tests/e2e/axe-audit.spec.ts --config=playwright.config.ts --project=chromium --reporter=line
           kill $SERVER_PID 2>/dev/null || true
-          # Non-blocking: the production server lacks runtime secrets (DB, Clerk)
-          # so all routes return 500. Axe fails on the error page, not the app.
-          # TODO: re-enable blocking once test env has proper mocks.
-          if [ "${EXIT_CODE:-0}" -ne 0 ]; then
-            echo "::warning::A11y audit failed (exit $EXIT_CODE) — non-blocking until test env is fixed"
-          fi
         env:
           BASE_URL: http://localhost:3100
           SMOKE_ONLY: '1'
           CI: true
+          DATABASE_URL: ${{ env.DATABASE_URL }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
 
       - name: Upload Playwright Report on Failure

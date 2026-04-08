@@ -61,7 +61,7 @@ export function SupportChannels() {
                   ? { target: '_blank', rel: 'noopener noreferrer' }
                   : {})}
               >
-                {channel.external ? 'Visit' : 'Send email'} &rarr;
+                {channel.external ? 'Visit →' : 'Send email →'}
               </a>
             </Button>
           </div>

@@ -11,9 +11,9 @@ export function AuthUnavailableCard() {
       <p className='text-[13px] font-[510] text-secondary-token'>
         Auth unavailable
       </p>
-      <h2 className={cn(FORM_LAYOUT.title, 'mt-3')}>
+      <h1 className={cn(FORM_LAYOUT.title, 'mt-3')}>
         Clerk isn&apos;t configured here
-      </h2>
+      </h1>
       <p className={cn(FORM_LAYOUT.hint, 'mt-3')}>
         Clerk is not configured for this environment.
       </p>
