@@ -1,3 +1,4 @@
+import { getCanonicalSurfaceForScreenshotId } from '@/lib/canonical-surfaces';
 import type {
   ScreenshotConsumer,
   ScreenshotGroup,
@@ -49,9 +50,14 @@ function defineScenario({
   viewport = 'desktop',
   ...scenario
 }: ScreenshotScenarioInput): ScreenshotScenario {
+  const canonicalSurface = getCanonicalSurfaceForScreenshotId(scenario.id);
+
   return {
     ...scenario,
     groupLabel: GROUP_LABELS[scenario.group],
+    canonicalSurfaceId: canonicalSurface?.id,
+    canonicalSurfaceLabel: canonicalSurface?.label,
+    canonicalSurfaceReviewRoute: canonicalSurface?.reviewRoute,
     viewport,
     theme,
     fullPage,

@@ -103,6 +103,10 @@ function hasSameStableManifestFields(
     previousEntry.title === nextEntry.title &&
     previousEntry.group === nextEntry.group &&
     previousEntry.groupLabel === nextEntry.groupLabel &&
+    previousEntry.canonicalSurfaceId === nextEntry.canonicalSurfaceId &&
+    previousEntry.canonicalSurfaceLabel === nextEntry.canonicalSurfaceLabel &&
+    previousEntry.canonicalSurfaceReviewRoute ===
+      nextEntry.canonicalSurfaceReviewRoute &&
     previousEntry.route === nextEntry.route &&
     previousEntry.viewport === nextEntry.viewport &&
     previousEntry.theme === nextEntry.theme &&
@@ -281,6 +285,10 @@ test.describe('Screenshot Catalog', () => {
         title: preparedScenario.title,
         group: preparedScenario.group,
         groupLabel: preparedScenario.groupLabel,
+        canonicalSurfaceId: preparedScenario.canonicalSurfaceId,
+        canonicalSurfaceLabel: preparedScenario.canonicalSurfaceLabel,
+        canonicalSurfaceReviewRoute:
+          preparedScenario.canonicalSurfaceReviewRoute,
         route: preparedScenario.route,
         viewport: preparedScenario.viewport,
         theme: preparedScenario.theme,

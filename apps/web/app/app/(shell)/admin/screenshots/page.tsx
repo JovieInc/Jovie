@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { getScreenshots } from '@/lib/admin/screenshots';
+import { CANONICAL_SURFACES } from '@/lib/canonical-surfaces';
 
 const SKELETON_KEYS = Array.from({ length: 8 }, (_, i) => `ss-skel-${i}`);
 
@@ -38,11 +39,15 @@ export const runtime = 'nodejs';
 
 export default async function AdminScreenshotsPage() {
   const screenshots = await getScreenshots();
+  const canonicalCaptureCount = screenshots.filter(
+    screenshot => screenshot.canonicalSurfaceId !== undefined
+  ).length;
+  const supportingCaptureCount = screenshots.length - canonicalCaptureCount;
 
   return (
     <AdminToolPage
       title='Screenshots'
-      description={`${screenshots.length} canonical product surfaces from the latest screenshot catalog.`}
+      description={`Review ${CANONICAL_SURFACES.length} canonical surfaces across ${canonicalCaptureCount} canonical captures, plus ${supportingCaptureCount} supporting captures from the latest screenshot catalog.`}
       testId='admin-screenshots-page'
     >
       <ScreenshotGallery screenshots={screenshots} />
