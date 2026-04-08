@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockAuth = vi.hoisted(() => vi.fn());
+const mockGetCachedAuth = vi.hoisted(() => vi.fn());
 const mockCreateBillingPortalSession = vi.hoisted(() => vi.fn());
 const mockGetUserBillingInfo = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mockGetCachedAuth,
 }));
 
 vi.mock('@/lib/stripe/client', () => ({
@@ -16,16 +16,16 @@ vi.mock('@/lib/stripe/customer-sync', () => ({
   getUserBillingInfo: mockGetUserBillingInfo,
 }));
 
+import { POST } from '@/app/api/stripe/portal/route';
+
 describe('POST /api/stripe/portal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
   });
 
   it('returns 401 when not authenticated', async () => {
-    mockAuth.mockResolvedValue({ userId: null });
+    mockGetCachedAuth.mockResolvedValue({ userId: null });
 
-    const { POST } = await import('@/app/api/stripe/portal/route');
     const response = await POST();
     const data = await response.json();
 
@@ -34,7 +34,7 @@ describe('POST /api/stripe/portal', () => {
   });
 
   it('returns 400 when user has no Stripe customer ID', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_123' });
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
     mockGetUserBillingInfo.mockResolvedValue({
       success: true,
       data: {
@@ -42,7 +42,6 @@ describe('POST /api/stripe/portal', () => {
       },
     });
 
-    const { POST } = await import('@/app/api/stripe/portal/route');
     const response = await POST();
     const data = await response.json();
 
@@ -54,7 +53,7 @@ describe('POST /api/stripe/portal', () => {
   });
 
   it('creates portal session for user with Stripe customer', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_123' });
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
     mockGetUserBillingInfo.mockResolvedValue({
       success: true,
       data: {
@@ -66,7 +65,6 @@ describe('POST /api/stripe/portal', () => {
       url: 'https://billing.stripe.com/session/bps_123',
     });
 
-    const { POST } = await import('@/app/api/stripe/portal/route');
     const response = await POST();
     const data = await response.json();
 
