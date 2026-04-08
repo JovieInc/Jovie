@@ -29,7 +29,11 @@ const managedWebServerPort = managedWebServerUrl.port;
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: ['**/nightly/**/*.spec.ts', '**/dashboard-pages-health.spec.ts'],
+  testMatch: [
+    '**/nightly/**/*.spec.ts',
+    '**/dashboard-pages-health.spec.ts',
+    '**/onboarding-completion.spec.ts',
+  ],
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,

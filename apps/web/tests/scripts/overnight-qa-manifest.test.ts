@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 import {
   buildSweepManifest,
@@ -44,5 +46,11 @@ describe('overnight-qa manifest', () => {
     );
     expect(inferSurfaceFromText('SignIn loop detected')).toBe('auth');
     expect(inferSurfaceFromText('Unknown failure', 'alias')).toBe('alias');
+  });
+
+  it('keeps nightly playwright coverage aligned with the manifest sweep', () => {
+    const nightlyConfig = readFileSync('playwright.config.nightly.ts', 'utf8');
+
+    expect(nightlyConfig).toContain('**/onboarding-completion.spec.ts');
   });
 });
