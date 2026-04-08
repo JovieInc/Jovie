@@ -1,5 +1,5 @@
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
-import { db, doesTableExist } from '@/lib/db';
+import { db } from '@/lib/db';
 import { isUniqueViolation as isUniqueViolationUtil } from '@/lib/db/errors';
 import {
   artists,
@@ -39,26 +39,6 @@ export interface ReleaseWithProviders extends DiscogRelease {
   providerLinks: ProviderLink[];
   artistNames?: string[];
   trackSummary?: TrackSummary;
-}
-
-async function hasDiscogReleasesTable(): Promise<boolean> {
-  return doesTableExist('discog_releases');
-}
-
-async function hasDiscogTracksTable(): Promise<boolean> {
-  return doesTableExist('discog_tracks');
-}
-
-async function hasDiscogReleaseTracksTable(): Promise<boolean> {
-  return doesTableExist('discog_release_tracks');
-}
-
-async function hasProviderLinksTable(): Promise<boolean> {
-  return doesTableExist('provider_links');
-}
-
-async function hasReleaseArtistsTable(): Promise<boolean> {
-  return doesTableExist('release_artists');
 }
 
 export interface UpsertReleaseInput {
@@ -167,7 +147,7 @@ function rowToTrackSummary(row: {
 async function getTrackSummariesForReleases(
   releaseIds: string[]
 ): Promise<Map<string, TrackSummary>> {
-  if (releaseIds.length === 0 || !(await hasDiscogReleaseTracksTable())) {
+  if (releaseIds.length === 0) {
     return new Map();
   }
 
@@ -191,7 +171,7 @@ async function getTrackSummariesForReleases(
 async function getArtistNamesForReleases(
   releaseIds: string[]
 ): Promise<Map<string, string[]>> {
-  if (releaseIds.length === 0 || !(await hasReleaseArtistsTable())) {
+  if (releaseIds.length === 0) {
     return new Map();
   }
 
@@ -228,10 +208,6 @@ async function getArtistNamesForReleases(
 export async function getLatestReleaseForProfile(
   creatorProfileId: string
 ): Promise<DiscogRelease | null> {
-  if (!(await hasDiscogReleasesTable())) {
-    return null;
-  }
-
   const [release] = await db
     .select()
     .from(discogReleases)
@@ -250,10 +226,6 @@ export async function getLatestReleaseForProfile(
 export async function getLatestReleaseByUsername(
   usernameNormalized: string
 ): Promise<DiscogRelease | null> {
-  if (!(await hasDiscogReleasesTable())) {
-    return null;
-  }
-
   const [release] = await db
     .select({
       id: discogReleases.id,
@@ -297,10 +269,6 @@ export async function getLatestReleaseByUsername(
 export async function getReleaseStatsByUsername(
   usernameNormalized: string
 ): Promise<{ releaseCount: number; topReleaseTitles: string[] }> {
-  if (!(await hasDiscogReleasesTable())) {
-    return { releaseCount: 0, topReleaseTitles: [] };
-  }
-
   const [countResult, topReleases] = await Promise.all([
     db
       .select({
@@ -336,10 +304,6 @@ export async function getReleaseStatsByUsername(
 export async function getReleasesForProfile(
   creatorProfileId: string
 ): Promise<ReleaseWithProviders[]> {
-  if (!(await hasDiscogReleasesTable())) {
-    return [];
-  }
-
   // Fetch releases
   const releases = await db
     .select()
@@ -358,20 +322,15 @@ export async function getReleasesForProfile(
     await Promise.all([
       getTrackSummariesForReleases(releaseIds),
       getArtistNamesForReleases(releaseIds),
-      hasProviderLinksTable().then(async hasTable => {
-        if (!hasTable) return [];
-        if (releaseIds.length === 0) return [];
-        // Use SQL filtering instead of JavaScript for better performance
-        return db
-          .select()
-          .from(providerLinks)
-          .where(
-            and(
-              eq(providerLinks.ownerType, 'release'),
-              inArray(providerLinks.releaseId, releaseIds)
-            )
-          );
-      }),
+      db
+        .select()
+        .from(providerLinks)
+        .where(
+          and(
+            eq(providerLinks.ownerType, 'release'),
+            inArray(providerLinks.releaseId, releaseIds)
+          )
+        ),
     ]);
 
   // Group links by release ID
@@ -399,10 +358,6 @@ export async function getReleaseBySlug(
   creatorProfileId: string,
   slug: string
 ): Promise<ReleaseWithProviders | null> {
-  if (!(await hasDiscogReleasesTable())) {
-    return null;
-  }
-
   const [release] = await db
     .select()
     .from(discogReleases)
@@ -418,29 +373,18 @@ export async function getReleaseBySlug(
     return null;
   }
 
-  const [artistNamesByRelease, hasLinksTable] = await Promise.all([
+  const [artistNamesByRelease, links] = await Promise.all([
     getArtistNamesForReleases([release.id]),
-    hasProviderLinksTable(),
+    db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release'),
+          eq(providerLinks.releaseId, release.id)
+        )
+      ),
   ]);
-
-  if (!hasLinksTable) {
-    return {
-      ...release,
-      artistNames: artistNamesByRelease.get(release.id) ?? [],
-      providerLinks: [],
-    };
-  }
-
-  // Fetch provider links for this release
-  const links = await db
-    .select()
-    .from(providerLinks)
-    .where(
-      and(
-        eq(providerLinks.ownerType, 'release'),
-        eq(providerLinks.releaseId, release.id)
-      )
-    );
 
   return {
     ...release,
@@ -455,10 +399,6 @@ export async function getReleaseBySlug(
 export async function getReleaseById(
   releaseId: string
 ): Promise<ReleaseWithProviders | null> {
-  if (!(await hasDiscogReleasesTable())) {
-    return null;
-  }
-
   const [release] = await db
     .select()
     .from(discogReleases)
@@ -469,29 +409,18 @@ export async function getReleaseById(
     return null;
   }
 
-  const [artistNamesByRelease, hasLinksTable] = await Promise.all([
+  const [artistNamesByRelease, links] = await Promise.all([
     getArtistNamesForReleases([release.id]),
-    hasProviderLinksTable(),
+    db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release'),
+          eq(providerLinks.releaseId, release.id)
+        )
+      ),
   ]);
-
-  if (!hasLinksTable) {
-    return {
-      ...release,
-      artistNames: artistNamesByRelease.get(release.id) ?? [],
-      providerLinks: [],
-    };
-  }
-
-  // Fetch provider links for this release
-  const links = await db
-    .select()
-    .from(providerLinks)
-    .where(
-      and(
-        eq(providerLinks.ownerType, 'release'),
-        eq(providerLinks.releaseId, release.id)
-      )
-    );
 
   return {
     ...release,
@@ -978,10 +907,6 @@ export async function setRecordingPreviewResolutionByIsrc(
 export async function getTracksForRelease(
   releaseId: string
 ): Promise<(typeof discogTracks.$inferSelect)[]> {
-  if (!(await hasDiscogTracksTable())) {
-    return [];
-  }
-
   return db
     .select()
     .from(discogTracks)
@@ -1029,10 +954,6 @@ export async function getTracksForReleaseWithProviders(
   const limit = options?.limit ?? 50;
   const offset = options?.offset ?? 0;
 
-  if (!(await hasDiscogTracksTable())) {
-    return { tracks: [], total: 0, hasMore: false };
-  }
-
   // Get total count for pagination
   const [countResult] = await db
     .select({ count: drizzleSql<number>`COUNT(*)` })
@@ -1060,31 +981,26 @@ export async function getTracksForReleaseWithProviders(
 
   // Fetch provider links for ONLY paginated tracks (not all tracks)
   const trackIds = tracks.map(t => t.id);
-  let trackProviderLinks: ProviderLink[] = [];
-  let releaseProviderLinks: ProviderLink[] = [];
-
-  if (await hasProviderLinksTable()) {
-    [trackProviderLinks, releaseProviderLinks] = await Promise.all([
-      db
-        .select()
-        .from(providerLinks)
-        .where(
-          and(
-            eq(providerLinks.ownerType, 'track'),
-            inArray(providerLinks.trackId, trackIds)
-          )
-        ),
-      db
-        .select()
-        .from(providerLinks)
-        .where(
-          and(
-            eq(providerLinks.ownerType, 'release'),
-            eq(providerLinks.releaseId, releaseId)
-          )
-        ),
-    ]);
-  }
+  const [trackProviderLinks, releaseProviderLinks] = await Promise.all([
+    db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'track'),
+          inArray(providerLinks.trackId, trackIds)
+        )
+      ),
+    db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release'),
+          eq(providerLinks.releaseId, releaseId)
+        )
+      ),
+  ]);
 
   // Group links by track ID
   const linksByTrack = new Map<string, ProviderLink[]>();

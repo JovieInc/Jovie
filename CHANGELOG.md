@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.133] - 2026-04-07
+## [26.4.134] - 2026-04-07
 
 > Automated playlist network engine: LLM-curated Spotify playlists as an inbound artist acquisition channel.
 
@@ -22,6 +22,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Spotify OAuth for the system account is coordinated via Clerk with health checks and Sentry alerting
 - [internal] Daily cron trigger runs at 6 AM UTC behind the `PLAYLIST_ENGINE` feature flag
 - [internal] Playlist persistence uses `jovie_playlists` and `jovie_playlist_tracks` tables with supporting indexes
+
+## [26.4.133] - 2026-04-07
+
+> Turn the public-profile Jovie logo into a branded path to the artist profile landing page.
+
+### Changed
+
+- The top-left Jovie mark on public artist profiles now links to the artist profiles landing page instead of acting as decorative chrome
+- [internal] Added a unit test that locks the public-profile logo destination to the artist profiles route
 
 ## [26.4.132] - 2026-04-07
 
