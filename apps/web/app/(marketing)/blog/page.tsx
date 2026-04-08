@@ -10,7 +10,7 @@ import { BlogCard } from './components/BlogCard';
 export const revalidate = false;
 
 export const metadata = {
-  title: 'Jovie Blog',
+  title: 'Blog',
   description:
     'Signals, playbooks, and product notes for building lasting momentum as an independent artist.',
   alternates: {

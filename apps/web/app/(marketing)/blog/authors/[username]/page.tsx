@@ -57,7 +57,7 @@ export async function generateMetadata({ params }: AuthorPageProps) {
   const authorName = profile?.displayName ?? authorPosts[0].author;
 
   return {
-    title: `${authorName} — Jovie Blog`,
+    title: `${authorName} — Blog`,
     description: `Articles by ${authorName} on the Jovie blog.`,
     alternates: {
       canonical: `${BASE_URL}/blog/authors/${username}`,

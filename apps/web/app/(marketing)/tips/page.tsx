@@ -2,8 +2,11 @@ import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { TipsLanding } from '@/features/tips/TipsLanding';
 
+export const revalidate = false;
+
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} — Turn Every Tip Into a Fan`;
+  const title = 'Turn Every Tip Into a Fan';
+  const ogTitle = `${APP_NAME} — Turn Every Tip Into a Fan`;
   const description =
     'Scan. Tip. Stream. One QR code turns a stranger into a superfan. Perfect for buskers, open mic nights, merch tables, and house shows.';
 
@@ -16,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     openGraph: {
       type: 'website',
-      title,
+      title: ogTitle,
       description,
       url: `${BASE_URL}/tips`,
       siteName: APP_NAME,
@@ -32,7 +35,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     twitter: {
       card: 'summary_large_image',
-      title,
+      title: ogTitle,
       description,
       images: ['/og/default.png'],
     },

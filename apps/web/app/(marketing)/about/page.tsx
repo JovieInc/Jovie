@@ -43,7 +43,7 @@ const FAQ_ITEMS = [
 ];
 
 export const metadata: Metadata = {
-  title: `About ${APP_NAME} — The Release Platform for Independent Musicians`,
+  title: 'About — The Release Platform for Independent Musicians',
   description:
     'Jovie is a release platform for independent musicians, combining smart links, artist profiles, audience intelligence, and AI. Founded by Tim White. Not affiliated with Jovie childcare.',
   keywords: [
