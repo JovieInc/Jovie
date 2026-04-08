@@ -1,7 +1,13 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { BarChart3, Eye, PartyPopper, ShieldCheck, Upload } from 'lucide-react';
+import {
+  BarChart3,
+  Bell,
+  PartyPopper,
+  ShieldCheck,
+  Upload,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -16,9 +22,9 @@ import { useBillingStatusQuery } from '@/lib/queries';
 
 const UNLOCKED_FEATURES = [
   {
-    icon: Eye,
-    title: 'Branding Removed',
-    description: 'Your profile now shows your brand, not ours.',
+    icon: Bell,
+    title: 'Release Notifications',
+    description: 'Reach fans automatically when your next release goes live.',
   },
   {
     icon: BarChart3,
