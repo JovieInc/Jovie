@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.136] - 2026-04-07
+
+> Make signup, onboarding, and ingest regressions fail fast with higher-signal tests and post-deploy checks.
+
+### Added
+
+- Deterministic signup funnel smoke coverage using the local auth-bypass flow so CI catches breakage before real auth providers are in the loop
+- Direct unit and integration coverage for onboarding completion, onboarding discovery, welcome chat bootstrap, and signup lead attribution
+
+### Changed
+
+- Expanded signup, onboarding, creator-ingest, ingestion job, and admin ingestion tests to cover key negative paths and persistence behavior
+- Pointed smoke and overnight QA selectors at the new signup funnel and onboarding completion coverage so the merge gate watches the real conversion path
+- Added `/signup` to the CI and canary health checks for post-deploy visibility into signup outages
+- Synced the canonical version file and workspace package versions to `26.4.136`
+
 ## [26.4.135] - 2026-04-07
 
 > Document the local `ripgrep` prerequisite so fresh worktrees have `rg` available for agent and search tooling.
