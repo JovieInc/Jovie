@@ -263,16 +263,6 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     utilityRoot: true,
     includeInFastHealth: true,
   },
-  {
-    id: 'algorithm-health',
-    name: 'Admin Algorithm Health',
-    path: `${APP_ROUTES.ADMIN_ALGORITHM_HEALTH}?fixture=e2e`,
-    rootTestId: 'admin-algorithm-health-page',
-    snapshotSlug: 'admin-algorithm-health',
-    primaryWorkspace: false,
-    utilityRoot: true,
-    includeInFastHealth: true,
-  },
 ] as const;
 
 export const ADMIN_REDIRECT_SURFACES: readonly AdminRedirectDescriptor[] =

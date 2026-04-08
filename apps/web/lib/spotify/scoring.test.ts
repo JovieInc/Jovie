@@ -7,6 +7,8 @@ import {
   computeGenreOverlap,
   computeHealthScore,
   generateHealthReport,
+  generateUnavailableHealthReport,
+  isSpotifyErrorPageHtml,
   scoreNeighbour,
 } from './scoring';
 
@@ -350,7 +352,7 @@ describe('computeHealthScore', () => {
 // ─── generateHealthReport ────────────────────────────────
 
 describe('generateHealthReport', () => {
-  it('generates a complete report with sorted neighbours', () => {
+  it('generates a complete ready report with sorted neighbours', () => {
     const target = makeArtist({
       spotifyId: 'target',
       name: 'Tim White',
@@ -383,15 +385,31 @@ describe('generateHealthReport', () => {
       }),
     ];
 
-    const report = generateHealthReport(target, related);
+    const report = generateHealthReport(target, related, {
+      checkedAt: '2026-04-08T03:22:14.406Z',
+      attemptedNeighbourCount: 4,
+      warnings: ['1 related artist could not be resolved in Spotify search.'],
+    });
 
     expect(report.targetArtist.name).toBe('Tim White');
+    expect(report.status).toBe('ready');
     expect(report.neighbours).toHaveLength(3);
     expect(report.summary.bigger).toBe(2); // Jynx + Taryn
     expect(report.summary.smaller).toBe(1); // Brother Blake (within 5pts, fewer followers)
     expect(report.summary.similar).toBe(0);
     expect(report.summary.total).toBe(3);
+    if (report.status !== 'ready') {
+      throw new Error('Expected ready report');
+    }
     expect(report.healthScore).toBe(67); // 2/3 = 66.67 → rounded to 67
+    expect(report.verdict.label).toBe('Healthy');
+    expect(report.verdict.confidence).toBe('Medium');
+    expect(report.checkedAt).toBe('2026-04-08T03:22:14.406Z');
+    expect(report.attemptedNeighbourCount).toBe(4);
+    expect(report.resolvedNeighbourCount).toBe(3);
+    expect(report.warnings).toEqual([
+      '1 related artist could not be resolved in Spotify search.',
+    ]);
 
     // Sorted: bigger first
     expect(report.neighbours[0].size).toBe('BIGGER');
@@ -404,8 +422,44 @@ describe('generateHealthReport', () => {
     const target = makeArtist();
     const report = generateHealthReport(target, []);
 
+    expect(report.status).toBe('empty');
     expect(report.neighbours).toHaveLength(0);
-    expect(report.healthScore).toBe(0);
     expect(report.summary.total).toBe(0);
+    expect(report.verdict.label).toBe('Weak');
+    expect(report.nextActions).toHaveLength(2);
+  });
+
+  it('builds an unavailable report without a health score', () => {
+    const target = makeArtist({ name: 'Tim White' });
+    const report = generateUnavailableHealthReport(target, {
+      checkedAt: '2026-04-08T03:22:14.406Z',
+      warnings: ['Spotify rendered a Page not available response.'],
+    });
+
+    expect(report.status).toBe('unavailable');
+    expect(report.verdict.label).toBe('Unavailable');
+    expect(report.verdict.confidence).toBe('Low');
+    expect(report.checkedAt).toBe('2026-04-08T03:22:14.406Z');
+    expect(report.summary.total).toBe(0);
+    expect('healthScore' in report).toBe(false);
+  });
+});
+
+describe('isSpotifyErrorPageHtml', () => {
+  it('detects Spotify error pages', () => {
+    const html = `
+      <html>
+        <head><title>Page not available</title></head>
+        <body><h1>Page not available</h1></body>
+      </html>
+    `;
+
+    expect(isSpotifyErrorPageHtml(html)).toBe(true);
+  });
+
+  it('ignores normal markup', () => {
+    expect(isSpotifyErrorPageHtml('<html><title>Artist</title></html>')).toBe(
+      false
+    );
   });
 });

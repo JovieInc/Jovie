@@ -23,14 +23,29 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.135] - 2026-04-07
 
-> Document the local `ripgrep` prerequisite so fresh worktrees have `rg` available for agent and search tooling.
+> Fold Spotify algorithm diagnosis into the creator sidebar, eliminate misleading empty-score states, and document the local `ripgrep` prerequisite for fresh worktrees.
+
+### Added
+
+- An `Algorithm` tab in the admin creator sidebar with a verdict-first view, confidence, next actions, warnings, and an on-demand compared-artists list
+- Focused API and sidebar test coverage for ready, unavailable, and no-Spotify-link states
 
 ### Changed
 
+- Spotify Fans Also Like analysis now returns explicit `ready`, `empty`, or `unavailable` states with verdict metadata, timestamps, and attempted-versus-resolved artist counts
+- Admin algorithm analysis now resolves context from creator-linked Spotify profiles instead of asking operators for a raw artist ID
 - Documented `ripgrep` as a local prerequisite in the getting-started guide
 - Added `ripgrep` install commands for macOS and Ubuntu/Debian after the initial workspace bootstrap step
-- Synced the canonical version file and workspace package versions to `26.4.135`
 - Taught `setup.sh` to verify `rg` and auto-install it on supported local environments
+
+### Fixed
+
+- Spotify error pages and scrape failures now surface as unavailable diagnostics instead of a misleading `0%` score
+- The legacy `/app/admin/algorithm-health` route now redirects into the creators workspace
+
+### Removed
+
+- The standalone Admin Algorithm Health utility surface from admin navigation and admin snapshot coverage
 
 ## [26.4.134] - 2026-04-07
 

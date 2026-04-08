@@ -152,6 +152,8 @@ export const queryKeys = {
     all: ['spotify'] as const,
     artistSearch: (query: string, limit: number) =>
       [...queryKeys.spotify.all, 'artist-search', { query, limit }] as const,
+    falAnalysis: (artistId: string) =>
+      [...queryKeys.spotify.all, 'fal-analysis', artistId] as const,
   },
 
   // Apple Music search queries

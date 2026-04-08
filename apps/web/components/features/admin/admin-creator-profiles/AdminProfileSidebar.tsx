@@ -22,10 +22,12 @@ import {
 } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import type { Contact } from '@/types';
+import { AlgorithmHealthPanel } from './AlgorithmHealthPanel';
 
 const PROFILE_TAB_OPTIONS = [
   { value: 'social' as const, label: 'Social' },
   { value: 'dsp' as const, label: 'Music' },
+  { value: 'algorithm' as const, label: 'Algorithm' },
   { value: 'earnings' as const, label: 'Earn' },
   { value: 'about' as const, label: 'About' },
 ];
@@ -56,7 +58,7 @@ export function AdminProfileSidebar({
   contextMenuItems,
 }: AdminProfileSidebarProps) {
   const [selectedCategory, setSelectedCategory] = useState<
-    CategoryOption | 'about'
+    CategoryOption | 'about' | 'algorithm'
   >('social');
 
   const links = useMemo(() => {
@@ -152,7 +154,9 @@ export function AdminProfileSidebar({
           <DrawerTabs
             value={selectedCategory}
             onValueChange={value =>
-              setSelectedCategory(value as CategoryOption | 'about')
+              setSelectedCategory(
+                value as CategoryOption | 'about' | 'algorithm'
+              )
             }
             options={PROFILE_TAB_OPTIONS}
             ariaLabel='Creator profile sidebar view'
@@ -168,6 +172,12 @@ export function AdminProfileSidebar({
             hometown={profile.hometown ?? null}
             activeSinceYear={profile.activeSinceYear ?? null}
             allowPhotoDownloads={false}
+          />
+        ) : selectedCategory === 'algorithm' ? (
+          <AlgorithmHealthPanel
+            profile={profile}
+            contact={contact}
+            isActive={selectedCategory === 'algorithm'}
           />
         ) : (
           <ProfileLinkList
