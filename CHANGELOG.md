@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.136] - 2026-04-07
+
+### Fixed
+
+- Workspace archive cleanup now always prunes stale git worktree metadata immediately (`git worktree prune --expire now`), even when `.claude/worktrees` is missing
+
 ## [26.4.135] - 2026-04-07
 
 > Fold Spotify algorithm diagnosis into the creator sidebar, eliminate misleading empty-score states, and document the local `ripgrep` prerequisite for fresh worktrees.
