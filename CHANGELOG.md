@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.134] - 2026-04-07
+
+> Add Google Stitch MCP configuration for workspace-local tooling.
+
+### Added
+
+- [internal] Added a repo-local `stitch` MCP server entry in `.mcp.json`
+- [internal] Configured the Google Stitch MCP endpoint to read the `X-Goog-Api-Key` header from `GOOGLE_STITCH_API_KEY` for local agent tooling
+
 ## [26.4.133] - 2026-04-07
 
 > Turn the public-profile Jovie logo into a branded path to the artist profile landing page.

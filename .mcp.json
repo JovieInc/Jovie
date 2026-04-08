@@ -17,6 +17,12 @@
     "next-devtools": {
       "command": "/opt/homebrew/bin/npx",
       "args": ["-y", "next-devtools-mcp@latest"]
+    },
+    "stitch": {
+      "url": "https://stitch.googleapis.com/mcp",
+      "headers": {
+        "X-Goog-Api-Key": "${GOOGLE_STITCH_API_KEY:-}"
+      }
     }
   }
 }
