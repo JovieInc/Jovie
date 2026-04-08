@@ -110,8 +110,8 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
    ./scripts/setup.sh
    ```
 
-   This verifies the required Node/pnpm versions, installs dependencies, and checks Doppler access.
-   Install `ripgrep` separately if `rg` is missing:
+   This verifies the required Node/pnpm/ripgrep tooling, installs dependencies, and checks Doppler access.
+   On supported macOS and Debian/Ubuntu systems it will attempt to install `ripgrep` automatically. If auto-install is unavailable, use:
 
    ```bash
    brew install ripgrep  # macOS

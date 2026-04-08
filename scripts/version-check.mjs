@@ -8,7 +8,7 @@
  * - CHANGELOG latest release equals current version
  */
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -42,9 +42,11 @@ if (!parsed) {
 
 for (const rel of [
   'package.json',
-  'apps/web/package.json',
-  'apps/should-i-make/package.json',
-  'packages/ui/package.json',
+  ...['apps', 'packages'].flatMap(scope =>
+    readdirSync(join(ROOT, scope), { withFileTypes: true })
+      .filter(entry => entry.isDirectory())
+      .map(entry => `${scope}/${entry.name}/package.json`)
+  ).sort(),
 ]) {
   const version = JSON.parse(readFileSync(join(ROOT, rel), 'utf-8')).version;
   if (version !== currentVersion) {
@@ -52,6 +54,11 @@ for (const rel of [
       `${rel} version (${version}) does not match version.json (${currentVersion}).`
     );
   }
+}
+
+const versionFile = readFileSync(join(ROOT, 'VERSION'), 'utf-8').trim();
+if (versionFile !== currentVersion) {
+  errors.push(`VERSION (${versionFile}) does not match version.json (${currentVersion}).`);
 }
 
 const changelog = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf-8');

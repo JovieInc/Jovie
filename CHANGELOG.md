@@ -13,6 +13,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Documented `ripgrep` as a local prerequisite in the getting-started guide
 - Added `ripgrep` install commands for macOS and Ubuntu/Debian after the initial workspace bootstrap step
+- Synced the canonical version file and workspace package versions to `26.4.135`
+- Taught `setup.sh` to verify `rg` and auto-install it on supported local environments
 
 ## [26.4.134] - 2026-04-07
 
@@ -31,6 +33,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Spotify OAuth for the system account is coordinated via Clerk with health checks and Sentry alerting
 - [internal] Daily cron trigger runs at 6 AM UTC behind the `PLAYLIST_ENGINE` feature flag
 - [internal] Playlist persistence uses `jovie_playlists` and `jovie_playlist_tracks` tables with supporting indexes
+- [internal] Added a repo-local `stitch` MCP server entry in `.mcp.json`
+- [internal] Configured the Google Stitch MCP endpoint to read the `X-Goog-Api-Key` header from `GOOGLE_STITCH_API_KEY` for local agent tooling
 
 ## [26.4.133] - 2026-04-07
 
