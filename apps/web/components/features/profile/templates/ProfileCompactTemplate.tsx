@@ -169,6 +169,7 @@ export function ProfileCompactTemplate({
     getModeFromLocation(mode)
   );
   const revealNotificationsRef = useRef<(() => void) | null>(null);
+  const initialLocationModeAlignedRef = useRef(false);
   const suppressNextHistorySyncRef = useRef(true);
 
   // Lock orientation to portrait on mobile
@@ -370,6 +371,7 @@ export function ProfileCompactTemplate({
       const nextMode = getModeFromLocation(mode);
       if (currentMode !== nextMode) {
         suppressNextHistorySyncRef.current = true;
+        initialLocationModeAlignedRef.current = false;
       }
       return nextMode;
     });
@@ -378,6 +380,12 @@ export function ProfileCompactTemplate({
   useEffect(() => {
     syncRequestedModeFromLocation();
   }, [mode, syncRequestedModeFromLocation]);
+
+  useEffect(() => {
+    if (requestedMode === getModeFromLocation(mode)) {
+      initialLocationModeAlignedRef.current = true;
+    }
+  }, [mode, requestedMode]);
 
   useEffect(() => {
     const resolved = resolveInitialView(requestedMode);
@@ -400,6 +408,13 @@ export function ProfileCompactTemplate({
   }, [syncRequestedModeFromLocation]);
 
   useEffect(() => {
+    // During hydration, the server-rendered mode can briefly disagree with the
+    // actual query string. Wait until the client has reconciled that first so
+    // we do not strip deep-link modes like ?mode=subscribe.
+    if (!initialLocationModeAlignedRef.current) {
+      return;
+    }
+
     if (suppressNextHistorySyncRef.current) {
       suppressNextHistorySyncRef.current = false;
       return;
