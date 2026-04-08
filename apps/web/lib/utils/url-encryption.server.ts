@@ -27,13 +27,33 @@ const runtimeEnvironment = env.VERCEL_ENV || env.NODE_ENV || 'development';
 const allowsEphemeralDevKey =
   runtimeEnvironment === 'development' || runtimeEnvironment === 'test';
 
-// Generate a development-only key at runtime (not hardcoded in source)
-// This key changes on each server restart, which is acceptable for local dev
-// and ephemeral test servers such as Playwright smoke runs in CI.
-const DEV_FALLBACK_KEY =
-  isTestTime || allowsEphemeralDevKey
-    ? crypto.randomBytes(32).toString('base64')
-    : undefined;
+const DEV_FALLBACK_KEY_SYMBOL = Symbol.for(
+  'jovie.url-encryption.dev-fallback-key'
+);
+
+type UrlEncryptionGlobal = typeof globalThis & {
+  [DEV_FALLBACK_KEY_SYMBOL]?: string;
+};
+
+function getDevFallbackKey(): string | undefined {
+  if (!isTestTime && !allowsEphemeralDevKey) {
+    return undefined;
+  }
+
+  const globalWithFallback = globalThis as UrlEncryptionGlobal;
+  const existingKey = globalWithFallback[DEV_FALLBACK_KEY_SYMBOL];
+  if (existingKey) {
+    return existingKey;
+  }
+
+  // Keep the fallback stable for the lifetime of the server process.
+  // In Next.js dev, separate route bundles can evaluate this module
+  // independently; module-local random keys break decrypt/verify flows
+  // between /api/wrap-link, /go/:id, /out/:id, and /api/link/:id.
+  const generatedKey = crypto.randomBytes(32).toString('base64');
+  globalWithFallback[DEV_FALLBACK_KEY_SYMBOL] = generatedKey;
+  return generatedKey;
+}
 
 if (!isBuildTime && !ENCRYPTION_KEY) {
   if (runtimeEnvironment === 'production' || runtimeEnvironment === 'preview') {
@@ -53,7 +73,7 @@ if (!isBuildTime && !ENCRYPTION_KEY) {
 }
 
 export function encryptUrl(url: string): EncryptionResult {
-  const keyMaterial = ENCRYPTION_KEY || DEV_FALLBACK_KEY;
+  const keyMaterial = ENCRYPTION_KEY || getDevFallbackKey();
 
   if (!keyMaterial) {
     throw new Error(
@@ -105,7 +125,7 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
       );
     }
 
-    const keyMaterial = ENCRYPTION_KEY || DEV_FALLBACK_KEY;
+    const keyMaterial = ENCRYPTION_KEY || getDevFallbackKey();
 
     if (!keyMaterial) {
       throw new Error(
@@ -157,7 +177,7 @@ export interface RawKeyEncryptionResult {
  * Throws if no key material is available.
  */
 function getRawAesKey(): Buffer {
-  const keyMaterial = ENCRYPTION_KEY || DEV_FALLBACK_KEY;
+  const keyMaterial = ENCRYPTION_KEY || getDevFallbackKey();
   if (!keyMaterial) {
     throw new Error(
       '[url-encryption] Cannot encrypt/decrypt: URL_ENCRYPTION_KEY not configured.'
@@ -248,7 +268,7 @@ export function createChallengeToken(shortId: string): {
   token: string;
   issuedAt: number;
 } {
-  const keyMaterial = ENCRYPTION_KEY || DEV_FALLBACK_KEY;
+  const keyMaterial = ENCRYPTION_KEY || getDevFallbackKey();
   if (!keyMaterial) {
     throw new Error(
       '[url-encryption] Cannot create challenge token: encryption key not configured.'
@@ -269,7 +289,7 @@ export function createChallengeToken(shortId: string): {
  * matches the given shortId, and has not expired.
  */
 export function verifyChallengeToken(shortId: string, token: string): boolean {
-  const keyMaterial = ENCRYPTION_KEY || DEV_FALLBACK_KEY;
+  const keyMaterial = ENCRYPTION_KEY || getDevFallbackKey();
   if (!keyMaterial) return false;
 
   const dotIndex = token.indexOf('.');
