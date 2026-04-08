@@ -9,7 +9,6 @@
 
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
-import { generateMusicStructuredData } from '@/app/[username]/[slug]/page';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { BASE_URL } from '@/constants/app';
 import { buildBreadcrumbObject } from '@/lib/constants/schemas';
@@ -29,6 +28,7 @@ import {
   getCreatorPlan,
   getTrackBySlugInRelease,
 } from '../_lib/data';
+import { generateMusicStructuredData } from '../music-structured-data';
 
 export const revalidate = 300;
 
@@ -183,7 +183,8 @@ export default async function TrackDeepLinkPage({
         id: `${releaseUrl}#release`,
       },
     },
-    creator
+    creator,
+    BASE_URL
   );
 
   // Add the deeper breadcrumb (4 levels instead of 3)

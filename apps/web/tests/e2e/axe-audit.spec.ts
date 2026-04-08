@@ -1,160 +1,163 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
-import { waitForLoad } from './utils/smoke-test-utils';
+import { expect, test } from './setup';
+import {
+  assertPublicSurfaceHealthy,
+  installPublicRouteMocks,
+  runDeclaredPublicInteractions,
+  waitForPublicSurfaceReady,
+} from './utils/public-surface-helpers';
+import {
+  getLighthousePublicSurfaceManifest,
+  resolvePublicSurfaceManifest,
+} from './utils/public-surface-manifest';
 
-/**
- * Axe WCAG 2.1 Level AA Compliance Tests
- *
- * These tests use axe-core to scan critical routes for accessibility violations.
- * Tests run against WCAG 2.0 Level A and AA, plus WCAG 2.1 Level A and AA standards.
- *
- * NOTE: Tests public routes for unauthenticated visitors.
- * Must run without saved authentication.
- *
- * @see https://www.deque.com/axe/core-documentation/api-documentation/
- */
-
-// Override global storageState to run these tests as unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
-const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+
+function getSurfaceFilter() {
+  const raw = process.env.PUBLIC_SURFACE_FILTER?.trim();
+  if (!raw) {
+    return null;
+  }
+
+  return new Set(
+    raw
+      .split(',')
+      .map(entry => entry.trim())
+      .filter(Boolean)
+  );
+}
+
+async function assertInteractiveLabels(
+  page: import('@playwright/test').Page,
+  surfaceId: string
+) {
+  const unlabeled = await page.locator('button, a, input').evaluateAll(nodes =>
+    nodes
+      .map(node => {
+        const element = node as HTMLElement;
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        const isVisible =
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          rect.width > 0 &&
+          rect.height > 0;
+
+        if (!isVisible) {
+          return null;
+        }
+
+        const label =
+          element.getAttribute('aria-label') ||
+          element.textContent ||
+          (element as HTMLInputElement).labels?.[0]?.textContent ||
+          '';
+
+        if (label.trim().length > 0) {
+          return null;
+        }
+
+        return element.outerHTML.slice(0, 200);
+      })
+      .filter(Boolean)
+      .slice(0, 5)
+  );
+
+  expect(
+    unlabeled,
+    `${surfaceId} rendered unlabeled visible interactive elements`
+  ).toHaveLength(0);
+}
 
 test.describe('Axe WCAG 2.1 Compliance', () => {
-  test.skip(
-    FAST_ITERATION,
-    'Accessibility audits run in the dedicated a11y lane, not the fast deploy gate'
-  );
+  test.setTimeout(240_000);
 
-  // Turbopack cold compilation can take 30-90s per route
-  test.setTimeout(180_000);
+  test.beforeEach(async ({ page }) => {
+    await installPublicRouteMocks(page);
+  });
 
-  const publicRoutes = [
-    { path: '/', name: 'Homepage' },
-    { path: '/signin', name: 'Sign In' },
-    { path: '/signup', name: 'Sign Up' },
-    { path: '/pricing', name: 'Pricing' },
-    { path: '/support', name: 'Support' },
-  ];
+  test('all public anonymous surfaces pass WCAG AA', async ({
+    page,
+  }, testInfo) => {
+    const filter = getSurfaceFilter();
+    const surfaces = (await resolvePublicSurfaceManifest()).filter(surface =>
+      filter ? filter.has(surface.id) : true
+    );
 
-  for (const route of publicRoutes) {
-    test(`${route.name} (${route.path}) should have no a11y violations`, async ({
-      page,
-    }) => {
-      await page.route('**/api/profile/view', r =>
-        r.fulfill({ status: 200, body: '{}' })
-      );
-      await page.route('**/api/audience/visit', r =>
-        r.fulfill({ status: 200, body: '{}' })
-      );
-      await page.route('**/api/track', r =>
-        r.fulfill({ status: 200, body: '{}' })
-      );
-      await page.goto(route.path, { timeout: 120_000 });
-      await waitForLoad(page);
-
-      const results = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-        .analyze();
-
-      if (results.violations.length > 0) {
-        console.log(
-          `\nAccessibility violations found on ${route.name} (${route.path}):`
-        );
-        results.violations.forEach(violation => {
-          console.log(`\n- ${violation.id}: ${violation.description}`);
-          console.log(`  Impact: ${violation.impact}`);
-          console.log(`  Help: ${violation.helpUrl}`);
-          console.log(
-            `  Affected elements: ${violation.nodes.length} element(s)`
-          );
+    for (const surface of surfaces) {
+      await test.step(`${surface.id} ${surface.resolvedPath}`, async () => {
+        await page.goto(surface.resolvedPath, {
+          waitUntil: 'domcontentloaded',
+          timeout: 120_000,
         });
-      }
-
-      expect(results.violations).toEqual([]);
-    });
-  }
-
-  // Authenticated routes tests (skipped in smoke mode)
-  const authenticatedRoutes = [
-    { path: '/dashboard', name: 'Dashboard' },
-    { path: '/dashboard/links', name: 'Links Manager' },
-    { path: '/dashboard/settings', name: 'Settings' },
-  ];
-
-  const smokeOnly = process.env.SMOKE_ONLY === '1';
-
-  for (const route of authenticatedRoutes) {
-    test(`${route.name} (${route.path}) should have no a11y violations`, async ({
-      page,
-    }) => {
-      test.skip(smokeOnly, 'Skip authenticated routes in smoke mode');
-      await page.route('**/api/profile/view', r =>
-        r.fulfill({ status: 200, body: '{}' })
-      );
-      await page.route('**/api/audience/visit', r =>
-        r.fulfill({ status: 200, body: '{}' })
-      );
-      await page.route('**/api/track', r =>
-        r.fulfill({ status: 200, body: '{}' })
-      );
-      await page.goto(route.path, { timeout: 120_000 });
-      await waitForLoad(page);
-
-      const results = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-        .analyze();
-
-      if (results.violations.length > 0) {
-        console.log(
-          `\nAccessibility violations found on ${route.name} (${route.path}):`
+        await waitForPublicSurfaceReady(page, surface);
+        await assertPublicSurfaceHealthy(page, surface);
+        await runDeclaredPublicInteractions(
+          page,
+          surface,
+          testInfo.project.name
         );
-        results.violations.forEach(violation => {
-          console.log(`\n- ${violation.id}: ${violation.description}`);
-          console.log(`  Impact: ${violation.impact}`);
-          console.log(`  Help: ${violation.helpUrl}`);
-          console.log(
-            `  Affected elements: ${violation.nodes.length} element(s)`
-          );
-        });
-      }
+        await assertInteractiveLabels(page, surface.id);
 
-      expect(results.violations).toEqual([]);
-    });
-  }
-});
+        if (surface.expectedState !== 'redirect') {
+          const h1Count = await page.locator('h1').count();
+          expect(h1Count, `${surface.id} should render exactly one h1`).toBe(1);
+        }
 
-test.describe('Axe Best Practices', () => {
-  test.skip(
-    FAST_ITERATION,
-    'Accessibility audits run in the dedicated a11y lane, not the fast deploy gate'
-  );
+        const results = await new AxeBuilder({ page })
+          .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+          .analyze();
 
-  test('Homepage should follow best practices', async ({ page }) => {
-    await page.route('**/api/profile/view', r =>
-      r.fulfill({ status: 200, body: '{}' })
-    );
-    await page.route('**/api/audience/visit', r =>
-      r.fulfill({ status: 200, body: '{}' })
-    );
-    await page.route('**/api/track', r =>
-      r.fulfill({ status: 200, body: '{}' })
-    );
-    await page.goto('/', { timeout: 120_000 });
-    await waitForLoad(page);
-
-    const results = await new AxeBuilder({ page })
-      .withTags(['best-practice'])
-      .analyze();
-
-    if (results.violations.length > 0) {
-      console.log('\nBest practice violations found on Homepage:');
-      results.violations.forEach(violation => {
-        console.log(`\n- ${violation.id}: ${violation.description}`);
-        console.log(`  Impact: ${violation.impact}`);
-        console.log(`  Help: ${violation.helpUrl}`);
+        expect(
+          results.violations,
+          `${surface.id} has accessibility violations`
+        ).toEqual([]);
       });
     }
+  });
 
-    // Log warnings but don't fail on best-practice violations
-    expect(results.violations.length).toBeGreaterThanOrEqual(0);
+  test('best-practice scan stays informational on launch lighthouse surfaces', async ({
+    page,
+  }, testInfo) => {
+    const filter = getSurfaceFilter();
+    const surfaces = (await getLighthousePublicSurfaceManifest()).filter(
+      surface => (filter ? filter.has(surface.id) : true)
+    );
+
+    for (const surface of surfaces) {
+      await test.step(`${surface.id} best-practice`, async () => {
+        await page.goto(surface.resolvedPath, {
+          waitUntil: 'domcontentloaded',
+          timeout: 120_000,
+        });
+        await waitForPublicSurfaceReady(page, surface);
+        await runDeclaredPublicInteractions(
+          page,
+          surface,
+          testInfo.project.name
+        );
+
+        const results = await new AxeBuilder({ page })
+          .withTags(['best-practice'])
+          .analyze();
+
+        if (results.violations.length > 0) {
+          console.log(
+            JSON.stringify(
+              {
+                surfaceId: surface.id,
+                bestPracticeViolations: results.violations.map(violation => ({
+                  id: violation.id,
+                  impact: violation.impact,
+                  help: violation.help,
+                })),
+              },
+              null,
+              2
+            )
+          );
+        }
+      });
+    }
   });
 });

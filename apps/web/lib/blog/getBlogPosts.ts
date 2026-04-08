@@ -128,6 +128,8 @@ async function loadBlogPost(slug: string): Promise<BlogPost> {
   const doc = await createMarkdownDocument(content);
   const excerpt = createExcerpt(content);
   const words = countWords(content);
+  const html = doc.html.replace(/<h1[^>]*>.*?<\/h1>/i, '');
+  const toc = doc.toc.filter(entry => entry.level !== 1);
 
   return {
     slug,
@@ -144,6 +146,8 @@ async function loadBlogPost(slug: string): Promise<BlogPost> {
     readingTime: calculateReadingTime(words),
     wordCount: words,
     ...doc,
+    html,
+    toc,
   };
 }
 
