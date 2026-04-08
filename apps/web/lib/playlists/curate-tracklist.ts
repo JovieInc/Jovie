@@ -112,14 +112,27 @@ export async function curateTracklist(options: {
       for (const j of jovieArtistTracks)
         artistLookup.set(j.spotifyTrackId, j.artist);
 
+      const seen = new Set<string>();
       const deduped: string[] = [];
       let lastArtist = '';
 
       for (const id of validatedIds) {
+        if (seen.has(id)) continue;
         const artist = artistLookup.get(id) ?? '';
         if (artist === lastArtist && artist !== '') continue;
+        seen.add(id);
         deduped.push(id);
         lastArtist = artist;
+      }
+
+      if (deduped.length < 10) {
+        captureError('[Curate Tracklist] Too few tracks after dedupe', null, {
+          requested: trackIds.length,
+          valid: validatedIds.length,
+          deduped: deduped.length,
+          attempt,
+        });
+        continue;
       }
 
       return {

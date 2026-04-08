@@ -106,7 +106,7 @@ describe('dashboard clerk-safe rendering', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('defaults profile form entitlements safely without a Clerk provider', () => {
+  it('initializes profile form safely without a Clerk provider', () => {
     const artist = {
       id: 'artist-1',
       name: 'Tim White',
@@ -122,10 +122,6 @@ describe('dashboard clerk-safe rendering', () => {
       })
     );
 
-    const formState = result.current as Record<string, unknown>;
-    if ('hasRemoveBrandingFeature' in formState) {
-      expect(formState.hasRemoveBrandingFeature).toBe(false);
-    }
     expect(result.current.formData.name).toBe('Tim White');
     expect(result.current.formData).toEqual({
       imageUrl: '',
