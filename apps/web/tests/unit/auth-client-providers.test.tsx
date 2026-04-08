@@ -141,4 +141,32 @@ describe('AuthClientProviders', () => {
       });
     }
   });
+
+  it('can force-enable Clerk for auth pages on localhost', async () => {
+    const originalLocation = globalThis.location;
+
+    try {
+      globalThis.history.replaceState(null, '', '/signin');
+      Object.defineProperty(globalThis, 'location', {
+        configurable: true,
+        value: new URL('http://localhost:3100/signin'),
+      });
+
+      render(
+        <AuthClientProviders forceEnableClerk publishableKey='pk_live_example'>
+          <div data-testid='child'>child</div>
+        </AuthClientProviders>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('clerk-provider')).toBeInTheDocument();
+      });
+      expect(clerkProviderMock).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.defineProperty(globalThis, 'location', {
+        configurable: true,
+        value: originalLocation,
+      });
+    }
+  });
 });

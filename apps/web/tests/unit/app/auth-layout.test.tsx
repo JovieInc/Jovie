@@ -80,19 +80,18 @@ describe('auth route layout', () => {
     expect(screen.queryByTestId('auth-child')).not.toBeInTheDocument();
   });
 
-  it('renders the unavailable fallback for private http forwarded locations', async () => {
+  it('renders auth children for private http forwarded locations when real Clerk keys exist', async () => {
     await renderAuthRouteLayout({
       publishableKey: 'pk_test_example',
       forwardedHost: '[::1]:3000, localhost:3000',
       forwardedProto: 'HTTP, https',
     });
 
-    expect(screen.getByTestId('auth-layout')).toBeInTheDocument();
-    expect(screen.getByTestId('auth-clerk-unavailable')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-client-providers')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-child')).toBeInTheDocument();
     expect(
-      screen.queryByTestId('auth-client-providers')
+      screen.queryByTestId('auth-clerk-unavailable')
     ).not.toBeInTheDocument();
-    expect(screen.queryByTestId('auth-child')).not.toBeInTheDocument();
   });
 
   it('renders auth children through AuthClientProviders when Clerk is available', async () => {

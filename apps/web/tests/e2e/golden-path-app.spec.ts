@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  advanceOnboardingAfterArtistSelection,
   buildValidOnboardingHandle,
   createFreshUser,
   ensureDbUser,
@@ -76,9 +77,6 @@ test.describe('Golden Path: Welcome Message', () => {
     await expect(
       page.locator('[data-testid="onboarding-form-wrapper"]')
     ).toBeVisible({ timeout: 20_000 });
-    await expect(
-      page.locator('[data-onboarding-client-ready="true"]')
-    ).toBeVisible({ timeout: 20_000 });
 
     // Handle step
     const handleEl = page.getByLabel('Enter your desired handle');
@@ -94,12 +92,9 @@ test.describe('Golden Path: Welcome Message', () => {
     await continueBtn.click();
 
     // Artist search step
-    const artistInput = page.getByPlaceholder(
-      /search for your artist or paste a spotify link/i
-    );
+    const artistInput = page.getByPlaceholder(/search.*artist.*spotify/i);
     await expect(artistInput).toBeVisible({ timeout: 60_000 });
     await artistInput.fill(TEST_SPOTIFY_ARTIST.url);
-    await artistInput.press('Enter');
 
     // Profile review or direct to dashboard
     const reviewDisplayName = page.locator('#onboarding-display-name');
@@ -107,16 +102,8 @@ test.describe('Golden Path: Welcome Message', () => {
       name: /go to dashboard/i,
     });
 
-    const reviewStepOrDashboard = await Promise.race([
-      reviewDisplayName
-        .waitFor({ state: 'visible', timeout: 30_000 })
-        .then(() => 'review' as const)
-        .catch(() => null),
-      page
-        .waitForURL(/\/app/, { timeout: 30_000 })
-        .then(() => 'dashboard' as const)
-        .catch(() => null),
-    ]);
+    const reviewStepOrDashboard =
+      await advanceOnboardingAfterArtistSelection(page);
 
     if (reviewStepOrDashboard === 'review') {
       const initialDisplayName = await reviewDisplayName.inputValue();

@@ -178,6 +178,63 @@ export async function waitForMultiDspEnrichment(clerkUserId: string) {
   return state ?? null;
 }
 
+export async function advanceOnboardingAfterArtistSelection(
+  page: Page,
+  timeoutMs = 120_000
+): Promise<'checkout' | 'dashboard' | 'review'> {
+  const deadline = Date.now() + timeoutMs;
+  const reviewDisplayName = page.locator('#onboarding-display-name');
+  const reviewGoToDashboard = page.getByRole('button', {
+    name: /go to dashboard/i,
+  });
+  const actionButtons = [
+    page.getByRole('button', { name: /^Continue$/i }),
+    page.getByRole('button', { name: /^Continue free$/i }),
+    page.getByRole('button', { name: /^Finish setup$/i }),
+    page.getByRole('button', { name: /^Open dashboard$/i }),
+  ];
+
+  while (Date.now() < deadline) {
+    if (/\/app(?:\/|$|\?)/.test(page.url())) {
+      return 'dashboard';
+    }
+
+    if (/\/onboarding\/checkout(?:\/|$|\?)/.test(page.url())) {
+      return 'checkout';
+    }
+
+    if (
+      (await reviewDisplayName.isVisible().catch(() => false)) ||
+      (await reviewGoToDashboard.isVisible().catch(() => false))
+    ) {
+      return 'review';
+    }
+
+    let clicked = false;
+    for (const button of actionButtons) {
+      const candidate = button.first();
+      if (
+        (await candidate.isVisible().catch(() => false)) &&
+        (await candidate.isEnabled().catch(() => false))
+      ) {
+        try {
+          await candidate.click({ timeout: 3_000 });
+          clicked = true;
+          break;
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    await page.waitForTimeout(clicked ? 500 : 1_000);
+  }
+
+  throw new Error(
+    `Onboarding did not reach review or dashboard after artist selection. Current URL: ${page.url()}`
+  );
+}
+
 export async function getFirstReleaseForUser(
   clerkUserId: string
 ): Promise<DemoReleaseLookup | null> {
