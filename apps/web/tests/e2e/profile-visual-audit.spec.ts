@@ -245,17 +245,27 @@ async function waitForVisibleSelector(
     .toBe(true);
 }
 
-async function ensureComposerVisible(page: import('@playwright/test').Page) {
+async function hasVisibleComposer(page: import('@playwright/test').Page) {
   const composer = page.locator('[data-testid="subscription-pearl-composer"]');
+  const count = await composer.count();
 
-  if ((await composer.count()) > 0) {
-    const visible = await composer
-      .first()
-      .isVisible()
-      .catch(() => false);
-    if (visible) {
-      return;
+  for (let index = 0; index < count; index += 1) {
+    if (
+      await composer
+        .nth(index)
+        .isVisible()
+        .catch(() => false)
+    ) {
+      return true;
     }
+  }
+
+  return false;
+}
+
+async function ensureComposerVisible(page: import('@playwright/test').Page) {
+  if (await hasVisibleComposer(page)) {
+    return;
   }
 
   const revealCandidates = [
@@ -269,11 +279,11 @@ async function ensureComposerVisible(page: import('@playwright/test').Page) {
   for (const candidate of revealCandidates) {
     const trigger = candidate.first();
     if (await trigger.isVisible().catch(() => false)) {
+      await trigger.scrollIntoViewIfNeeded().catch(() => undefined);
       await trigger.click();
       break;
     }
   }
-
   await waitForVisibleSelector(
     page,
     '[data-testid="subscription-pearl-composer"]'
