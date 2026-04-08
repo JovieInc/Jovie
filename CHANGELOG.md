@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.135] - 2026-04-07
+
+> Fold Spotify algorithm diagnosis into the creator sidebar and stop showing misleading empty-score states when Spotify fails upstream.
+
+### Added
+
+- An `Algorithm` tab in the admin creator sidebar with a verdict-first view, confidence, next actions, warnings, and an on-demand compared-artists list
+- Focused API and sidebar test coverage for ready, unavailable, and no-Spotify-link states
+
+### Changed
+
+- Spotify Fans Also Like analysis now returns explicit `ready`, `empty`, or `unavailable` states with verdict metadata, timestamps, and attempted-versus-resolved artist counts
+- Admin algorithm analysis now resolves context from creator-linked Spotify profiles instead of asking operators for a raw artist ID
+
+### Fixed
+
+- Spotify error pages and scrape failures now surface as unavailable diagnostics instead of a misleading `0%` score
+- The legacy `/app/admin/algorithm-health` route now redirects into the creators workspace
+
+### Removed
+
+- The standalone Admin Algorithm Health utility surface from admin navigation and admin snapshot coverage
+
 ## [26.4.134] - 2026-04-07
 
 > Automated playlist network engine: LLM-curated Spotify playlists as an inbound artist acquisition channel.
