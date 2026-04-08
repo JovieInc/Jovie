@@ -6,7 +6,10 @@ import { db, doesTableExist } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { discogReleases } from '@/lib/db/schema/content';
 import { leadFunnelEvents, leads } from '@/lib/db/schema/leads';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import {
+  creatorDistributionEvents,
+  creatorProfiles,
+} from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getAdminStripeOverviewMetrics } from './stripe-metrics';
 
@@ -62,6 +65,16 @@ function isMissingLeadAttributionColumnError(error: unknown): boolean {
 }
 
 export interface AdminFunnelMetrics {
+  /** Onboarding completion step views for Instagram share flow in the last 7 days */
+  instagramShareStepViews7d: number;
+  /** Distinct creators who copied the Instagram bio link in the last 7 days */
+  instagramBioCopies7d: number;
+  /** Instagram open rate from the share step in the last 7 days (0-1) */
+  instagramBioOpenRate7d: number | null;
+  /** Distinct creators activated by Instagram traffic in the last 7 days */
+  instagramBioActivations7d: number;
+  /** Activation rate from share-step view to activated visit in the last 7 days (0-1) */
+  instagramBioActivationRate7d: number | null;
   /** Total attributable outbound contacts in the last 7 days (email queued + DM sent) */
   outreachSent7d: number;
   /** Claim-page visits in the last 7 days from attributable outbound links */
@@ -254,6 +267,69 @@ async function getPaidConversions7d(sevenDaysAgo: Date): Promise<number> {
 
     captureError('Error fetching paid conversions count', error);
     return 0;
+  }
+}
+
+async function getInstagramActivationMetrics7d(sevenDaysAgo: Date): Promise<{
+  activations: number;
+  copies: number;
+  platformOpens: number;
+  stepViews: number;
+}> {
+  const empty = {
+    activations: 0,
+    copies: 0,
+    platformOpens: 0,
+    stepViews: 0,
+  };
+
+  try {
+    const hasTable = await doesTableExist('creator_distribution_events');
+    if (!hasTable) {
+      return empty;
+    }
+
+    const [row] = await db
+      .select({
+        activations: drizzleSql<number>`
+          count(*) filter (where ${creatorDistributionEvents.eventType} = 'activated')::int
+        `,
+        copies: drizzleSql<number>`
+          count(*) filter (
+            where ${creatorDistributionEvents.eventType} = 'link_copied'
+              and coalesce(${creatorDistributionEvents.metadata}->>'surface', '') = 'onboarding'
+          )::int
+        `,
+        platformOpens: drizzleSql<number>`
+          count(*) filter (
+            where ${creatorDistributionEvents.eventType} = 'platform_opened'
+              and coalesce(${creatorDistributionEvents.metadata}->>'surface', '') = 'onboarding'
+          )::int
+        `,
+        stepViews: drizzleSql<number>`
+          count(*) filter (
+            where ${creatorDistributionEvents.eventType} = 'step_viewed'
+              and coalesce(${creatorDistributionEvents.metadata}->>'surface', '') = 'onboarding'
+          )::int
+        `,
+      })
+      .from(creatorDistributionEvents)
+      .where(
+        and(
+          eq(creatorDistributionEvents.platform, 'instagram'),
+          gte(creatorDistributionEvents.createdAt, sevenDaysAgo)
+        )
+      );
+
+    return {
+      activations: Number(row?.activations ?? 0),
+      copies: Number(row?.copies ?? 0),
+      platformOpens: Number(row?.platformOpens ?? 0),
+      stepViews: Number(row?.stepViews ?? 0),
+    };
+  } catch (error) {
+    captureError('Error fetching Instagram activation metrics', error);
+    return empty;
   }
 }
 
@@ -600,6 +676,7 @@ export async function getAdminFunnelMetrics(): Promise<AdminFunnelMetrics> {
   const sevenDaysAgo = new Date(Date.now() - 7 * MS_PER_DAY);
 
   const [
+    instagramActivationMetrics,
     outreachSent7d,
     claimClicks7d,
     signups7d,
@@ -610,6 +687,17 @@ export async function getAdminFunnelMetrics(): Promise<AdminFunnelMetrics> {
     cacUsd,
     activeProfiles30d,
   ] = await Promise.all([
+    getInstagramActivationMetrics7d(sevenDaysAgo).catch(err => {
+      errors.push(
+        `Instagram Activation: ${err instanceof Error ? err.message : 'unknown'}`
+      );
+      return {
+        activations: 0,
+        copies: 0,
+        platformOpens: 0,
+        stepViews: 0,
+      };
+    }),
     getOutreachSent7d(sevenDaysAgo).catch(err => {
       errors.push(
         `Outreach: ${err instanceof Error ? err.message : 'unknown'}`
@@ -691,6 +779,17 @@ export async function getAdminFunnelMetrics(): Promise<AdminFunnelMetrics> {
       : null;
 
   return {
+    instagramShareStepViews7d: instagramActivationMetrics.stepViews,
+    instagramBioCopies7d: instagramActivationMetrics.copies,
+    instagramBioOpenRate7d: safeRate(
+      instagramActivationMetrics.platformOpens,
+      instagramActivationMetrics.stepViews
+    ),
+    instagramBioActivations7d: instagramActivationMetrics.activations,
+    instagramBioActivationRate7d: safeRate(
+      instagramActivationMetrics.activations,
+      instagramActivationMetrics.stepViews
+    ),
     outreachSent7d,
     claimClicks7d,
     claimRate: safeRate(claimClicks7d, outreachSent7d),

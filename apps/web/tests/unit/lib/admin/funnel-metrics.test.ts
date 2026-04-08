@@ -81,6 +81,41 @@ describe('getAdminFunnelMetrics outreach query', () => {
     );
   });
 
+  it('filters Instagram onboarding metrics to onboarding-surface events', async () => {
+    hoisted.doesTableExist.mockImplementation((tableName: string) =>
+      Promise.resolve(tableName === 'creator_distribution_events')
+    );
+
+    await getAdminFunnelMetrics();
+
+    const selection = hoisted.selectMock.mock.calls
+      .map(([arg]) => arg)
+      .find(
+        (arg): arg is Record<string, unknown> =>
+          typeof arg === 'object' &&
+          arg !== null &&
+          'stepViews' in arg &&
+          'copies' in arg &&
+          'platformOpens' in arg
+      );
+
+    expect(selection).toBeDefined();
+
+    const dialect = new PgDialect();
+    const copiesSql = dialect.sqlToQuery(selection?.copies as never).sql;
+    const platformOpensSql = dialect.sqlToQuery(
+      selection?.platformOpens as never
+    ).sql;
+    const stepViewsSql = dialect.sqlToQuery(selection?.stepViews as never).sql;
+
+    expect(copiesSql).toContain(`->>'surface'`);
+    expect(copiesSql).toContain(`'onboarding'`);
+    expect(platformOpensSql).toContain(`->>'surface'`);
+    expect(platformOpensSql).toContain(`'onboarding'`);
+    expect(stepViewsSql).toContain(`->>'surface'`);
+    expect(stepViewsSql).toContain(`'onboarding'`);
+  });
+
   it('returns zero when outreach_status is missing during a schema rollout', async () => {
     hoisted.whereMock.mockRejectedValueOnce(
       new Error('column leads.outreach_status does not exist')
