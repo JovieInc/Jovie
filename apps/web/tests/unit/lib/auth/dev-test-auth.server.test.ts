@@ -165,7 +165,7 @@ describe('dev-test-auth.server', () => {
       expect.anything(),
       expect.objectContaining({
         username: 'browse-ready-user',
-        spotifyUrl: 'https://open.spotify.com/artist/4u',
+        spotifyUrl: 'https://open.spotify.com/artist/4NHQUkpP4uKj7LKEMstSxN',
         venmoHandle: 'browse-ready-user',
         isClaimed: true,
       })

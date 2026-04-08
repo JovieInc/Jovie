@@ -47,7 +47,8 @@ const DEFAULT_READY_CREATOR_FULL_NAME = 'Browse Ready User';
 const DEFAULT_READY_CREATOR_BIO =
   'Stable creator profile with a publishable baseline for perf measurement.';
 const DEFAULT_READY_CREATOR_VENMO = 'browse-ready-user';
-const DEFAULT_READY_CREATOR_SPOTIFY_URL = 'https://open.spotify.com/artist/4u';
+const DEFAULT_READY_CREATOR_SPOTIFY_URL =
+  'https://open.spotify.com/artist/4NHQUkpP4uKj7LKEMstSxN';
 
 const DEFAULT_ADMIN_EMAIL = 'browse-admin+clerk_test@jov.ie';
 const DEFAULT_ADMIN_USERNAME = 'browse-admin-user';

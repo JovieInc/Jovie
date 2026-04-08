@@ -10,10 +10,21 @@ export default function ProfileLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const shouldBypassClerkForPublicProfiles =
+    process.env.NODE_ENV === 'test' ||
+    process.env.VERCEL_ENV === 'preview' ||
+    publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
+    publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1';
 
   return (
-    <ClientProviders publishableKey={publishableKey} skipCoreProviders>
+    <ClientProviders
+      forceBypassClerk={shouldBypassClerkForPublicProfiles}
+      // Preview/test profile runs can hit Clerk origin/handshake issues.
+      // Keep the bypass scoped there so production /[username] routes still
+      // expose real Clerk context for authenticated profile UI.
+      publishableKey={publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      skipCoreProviders
+    >
       {children}
     </ClientProviders>
   );
