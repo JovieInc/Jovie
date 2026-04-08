@@ -12,14 +12,29 @@ import { describe, expect, it } from 'vitest';
  * Found by /qa on 2026-04-07.
  */
 
-const SETTINGS_LAYOUT = resolve(
-  __dirname,
-  '../../../app/app/(shell)/settings/layout.tsx'
+const SETTINGS_LAYOUT_CANDIDATES = [
+  resolve(process.cwd(), 'app/app/(shell)/settings/layout.tsx'),
+  resolve(process.cwd(), 'apps/web/app/app/(shell)/settings/layout.tsx'),
+];
+
+const SETTINGS_LAYOUT = SETTINGS_LAYOUT_CANDIDATES.find(candidate =>
+  existsSync(candidate)
 );
 
 describe('settings layout scroll mode', () => {
+  it('locates the settings layout source file', () => {
+    expect(
+      SETTINGS_LAYOUT,
+      `Could not find settings layout source. Checked: ${SETTINGS_LAYOUT_CANDIDATES.join(', ')}`
+    ).toBeDefined();
+  });
+
   it('uses page-level scrolling, not panel scrolling', () => {
-    expect(existsSync(SETTINGS_LAYOUT)).toBe(true);
+    if (!SETTINGS_LAYOUT) {
+      throw new Error(
+        `Could not find settings layout source. Checked: ${SETTINGS_LAYOUT_CANDIDATES.join(', ')}`
+      );
+    }
     const source = readFileSync(SETTINGS_LAYOUT, 'utf-8');
     expect(source).toContain("scroll='page'");
     expect(source).not.toContain("scroll='panel'");

@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { TipsLanding } from '@/features/tips/TipsLanding';
 
+export const revalidate = false;
+
 export async function generateMetadata(): Promise<Metadata> {
   const title = 'Turn Every Tip Into a Fan';
   const ogTitle = `${APP_NAME} — Turn Every Tip Into a Fan`;

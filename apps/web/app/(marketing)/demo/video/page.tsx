@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { DemoVideoPlayer } from '@/features/demo/DemoVideoPlayer';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
+export const revalidate = false;
+
 export const metadata: Metadata = {
   title: 'Product Demo',
   description:

@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { EngagementEngineLanding } from '@/features/home/EngagementEngineLanding';
 
+export const revalidate = false;
+
 export async function generateMetadata(): Promise<Metadata> {
   const title = 'An Always-On Engagement Engine';
   const ogTitle = `${APP_NAME} - An Always-On Engagement Engine`;
