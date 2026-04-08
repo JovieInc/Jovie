@@ -123,14 +123,27 @@ function unwrapNextImageUrl(url: string | null | undefined): string | null {
   }
 }
 
-function getModeFromLocation(): ProfileMode {
-  if (typeof window === 'undefined') {
-    return 'profile';
+function getModeFromLocation(fallbackMode: ProfileMode): ProfileMode {
+  if (typeof globalThis.window === 'undefined') {
+    return fallbackMode;
   }
 
-  return getProfileMode(
-    new URLSearchParams(globalThis.location.search).get('mode')
-  );
+  const modeParam = new URLSearchParams(globalThis.location.search).get('mode');
+  return modeParam === null ? fallbackMode : getProfileMode(modeParam);
+}
+
+function getModeFromDrawerView(view: DrawerView): ProfileMode | null {
+  switch (view) {
+    case 'about':
+    case 'subscribe':
+    case 'contact':
+    case 'listen':
+    case 'tip':
+    case 'tour':
+      return view;
+    default:
+      return null;
+  }
 }
 
 export function ProfileCompactTemplate({
@@ -153,7 +166,7 @@ export function ProfileCompactTemplate({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<DrawerView>('menu');
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
-    getModeFromLocation()
+    getModeFromLocation(mode)
   );
   const revealNotificationsRef = useRef<(() => void) | null>(null);
   const suppressNextHistorySyncRef = useRef(true);
@@ -194,7 +207,7 @@ export function ProfileCompactTemplate({
   }, [artist.image_url, photoDownloadSizes]);
 
   const initialSource = useMemo(() => {
-    if (typeof window === 'undefined') return null;
+    if (typeof globalThis.window === 'undefined') return null;
     return new URLSearchParams(globalThis.location.search).get('source');
   }, []);
 
@@ -287,7 +300,7 @@ export function ProfileCompactTemplate({
           notificationsContextValue.setSubscribedChannels({});
           notificationsContextValue.setSubscriptionDetails({});
           notificationsContextValue.setState('idle');
-          setDrawerOpen(false);
+          setRequestedMode('profile');
           showSuccess('Notifications turned off');
         },
       }
@@ -354,13 +367,13 @@ export function ProfileCompactTemplate({
 
   const syncRequestedModeFromLocation = useCallback(() => {
     setRequestedMode(currentMode => {
-      const nextMode = getModeFromLocation();
+      const nextMode = getModeFromLocation(mode);
       if (currentMode !== nextMode) {
         suppressNextHistorySyncRef.current = true;
       }
       return nextMode;
     });
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
     syncRequestedModeFromLocation();
@@ -414,6 +427,32 @@ export function ProfileCompactTemplate({
   );
 
   const openDrawerMode = useCallback((nextView: DrawerView) => {
+    const nextMode = getModeFromDrawerView(nextView);
+    if (nextMode) {
+      setRequestedMode(nextMode);
+      return;
+    }
+
+    setDrawerView(nextView);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleDrawerOpenChange = useCallback((nextOpen: boolean) => {
+    if (!nextOpen) {
+      setRequestedMode('profile');
+      return;
+    }
+
+    setDrawerOpen(true);
+  }, []);
+
+  const handleDrawerViewChange = useCallback((nextView: DrawerView) => {
+    const nextMode = getModeFromDrawerView(nextView);
+    if (nextMode) {
+      setRequestedMode(nextMode);
+      return;
+    }
+
     setDrawerView(nextView);
     setDrawerOpen(true);
   }, []);
@@ -441,7 +480,7 @@ export function ProfileCompactTemplate({
         // Silent failure
       }
     }
-    setDrawerOpen(false);
+    setRequestedMode('profile');
   }, [artist.handle, artist.name]);
 
   return (
@@ -680,9 +719,9 @@ export function ProfileCompactTemplate({
 
         <ProfileUnifiedDrawer
           open={drawerOpen}
-          onOpenChange={setDrawerOpen}
+          onOpenChange={handleDrawerOpenChange}
           view={drawerView}
-          onViewChange={setDrawerView}
+          onViewChange={handleDrawerViewChange}
           artist={artist}
           socialLinks={socialLinks}
           contacts={availableContacts}
