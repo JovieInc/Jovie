@@ -15,6 +15,7 @@ import { waitlistEntries, waitlistSettings } from '@/lib/db/schema/waitlist';
 import { captureError } from '@/lib/error-tracking';
 import { hashClaimToken } from '@/lib/security/claim-token';
 import {
+  DEFAULT_TEST_AVATAR_URL,
   ensureCreatorProfileRecord,
   ensureUserRecord,
   setActiveProfileForUser,
@@ -22,8 +23,7 @@ import {
 import { logger } from '@/lib/utils/logger';
 
 const FIXTURE_BASE_TIME = new Date('2099-01-01T12:00:00.000Z');
-const FIXTURE_IMAGE =
-  'https://i.scdn.co/image/ab6761610000e5eb0bae7cfd3fb1b2866db6bc8d';
+const FIXTURE_IMAGE = DEFAULT_TEST_AVATAR_URL;
 
 const FIXTURE_USERS = [
   {

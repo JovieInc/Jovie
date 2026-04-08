@@ -149,6 +149,45 @@ describe('dev-test-auth.server', () => {
     });
   });
 
+  it('provisions the ready creator persona with a publishable profile baseline', async () => {
+    const { ensureDevTestAuthActor } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+    const actor = await ensureDevTestAuthActor('creator-ready');
+
+    expect(mockEnsureClerkTestUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'browse-ready+clerk_test@jov.ie',
+        username: 'browse-ready-user',
+      })
+    );
+    expect(mockEnsureCreatorProfileRecord).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        username: 'browse-ready-user',
+        spotifyUrl: 'https://open.spotify.com/artist/4u',
+        venmoHandle: 'browse-ready-user',
+        isClaimed: true,
+      })
+    );
+    expect(mockEnsureSocialLinkRecord).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        platform: 'venmo',
+        url: 'https://venmo.com/browse-ready-user',
+      })
+    );
+    expect(actor).toEqual({
+      persona: 'creator-ready',
+      clerkUserId: 'user_clerk',
+      email: 'browse-ready+clerk_test@jov.ie',
+      username: 'browse-ready-user',
+      fullName: 'Browse Ready User',
+      isAdmin: false,
+      profilePath: '/browse-ready-user',
+    });
+  });
+
   it('prefers explicit admin credentials and provisions an admin profile', async () => {
     vi.stubEnv('E2E_CLERK_ADMIN_USERNAME', 'admin+clerk_test@jov.ie');
     const { ensureDevTestAuthActor } = await import(

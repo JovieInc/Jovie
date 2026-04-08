@@ -15,6 +15,7 @@ interface PerfAuthCliOptions {
 
 interface StorageStateCookie {
   readonly name: string;
+  readonly value?: string;
 }
 
 interface StorageStateLike {
@@ -73,7 +74,11 @@ function parseCliArgs(args: readonly string[]): PerfAuthCliOptions {
 
     if (arg === '--persona') {
       const value = args[index + 1];
-      if (value !== 'creator' && value !== 'admin') {
+      if (
+        value !== 'creator' &&
+        value !== 'creator-ready' &&
+        value !== 'admin'
+      ) {
         throw new TypeError('Missing or invalid value for --persona');
       }
       persona = value;
@@ -102,6 +107,14 @@ function hasUsableCookies(filePath: string) {
   }
 
   return (readStorageState(filePath).cookies?.length ?? 0) > 0;
+}
+
+function readBypassUserId(filePath: string) {
+  return (
+    readStorageState(filePath).cookies?.find(
+      cookie => cookie.name === '__e2e_test_user_id'
+    )?.value ?? null
+  );
 }
 
 function runAuthSetup(baseUrl: string) {
@@ -207,6 +220,7 @@ async function main() {
     cookieCount: readStorageState(options.outPath).cookies?.length ?? 0,
     persona: options.persona,
     sourcePath: usedBypassAuth ? 'test-auth-bypass' : authSetupOutputPath,
+    userId: readBypassUserId(options.outPath),
   });
 }
 
