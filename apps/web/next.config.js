@@ -288,7 +288,14 @@ const nextConfig = {
         source: '/app/settings/retargeting-ads',
         destination: '/app/settings/audience',
       },
-      { source: '/app/settings/referral', destination: '/app/referrals' },
+      {
+        source: '/app/settings/referral',
+        destination: '/app/settings/account',
+      },
+      {
+        source: '/app/referrals',
+        destination: '/app/settings/account',
+      },
       {
         source: '/app/settings/remove-branding',
         destination: '/app/settings/artist-profile',
