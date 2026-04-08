@@ -75,7 +75,7 @@ async function authenticateForRoute(
   }
 
   if (usesBypassAuth()) {
-    await setTestAuthBypassSession(page, 'creator');
+    await setTestAuthBypassSession(page, 'creator-ready');
     return;
   }
 

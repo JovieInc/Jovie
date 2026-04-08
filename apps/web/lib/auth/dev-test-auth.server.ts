@@ -262,22 +262,27 @@ async function ensurePersonaProfile(
 ) {
   const isAdminPersona = persona === 'admin';
   const isReadyCreatorPersona = persona === 'creator-ready';
+  const isIncompleteCreatorPersona =
+    persona === 'creator' && !isAdminPersona && !isReadyCreatorPersona;
+  let bio = DEFAULT_CREATOR_BIO;
+  let venmoHandle = DEFAULT_CREATOR_VENMO;
+
+  if (isAdminPersona) {
+    bio = DEFAULT_ADMIN_BIO;
+    venmoHandle = DEFAULT_ADMIN_VENMO;
+  } else if (isReadyCreatorPersona) {
+    bio = DEFAULT_READY_CREATOR_BIO;
+    venmoHandle = DEFAULT_READY_CREATOR_VENMO;
+  }
+
   const profileId = await ensureCreatorProfileRecord(db, {
     userId: dbUserId,
     creatorType: 'artist',
     username: config.username,
     usernameNormalized: config.username.toLowerCase(),
     displayName: config.fullName,
-    bio: isAdminPersona
-      ? DEFAULT_ADMIN_BIO
-      : isReadyCreatorPersona
-        ? DEFAULT_READY_CREATOR_BIO
-        : DEFAULT_CREATOR_BIO,
-    venmoHandle: isAdminPersona
-      ? DEFAULT_ADMIN_VENMO
-      : isReadyCreatorPersona
-        ? DEFAULT_READY_CREATOR_VENMO
-        : DEFAULT_CREATOR_VENMO,
+    bio,
+    venmoHandle,
     avatarUrl: DEFAULT_TEST_AVATAR_URL,
     spotifyUrl: isReadyCreatorPersona
       ? DEFAULT_READY_CREATOR_SPOTIFY_URL
@@ -288,11 +293,11 @@ async function ensurePersonaProfile(
     deezerId: null,
     tidalId: null,
     soundcloudId: null,
-    isPublic: !isAdminPersona,
+    isPublic: isAdminPersona ? false : !isIncompleteCreatorPersona,
     isVerified: false,
     isClaimed: true,
     ingestionStatus: 'idle',
-    onboardingCompletedAt: new Date(),
+    onboardingCompletedAt: isIncompleteCreatorPersona ? null : new Date(),
   });
 
   await ensureUserProfileClaim(db, dbUserId, profileId);

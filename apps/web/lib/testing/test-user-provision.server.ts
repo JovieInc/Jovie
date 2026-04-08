@@ -1,6 +1,9 @@
 import { createClerkClient } from '@clerk/backend';
 import { Redis } from '@upstash/redis';
 import { and, eq, or } from 'drizzle-orm';
+import { revalidateTag } from 'next/cache';
+import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
+import { CACHE_TAGS } from '@/lib/cache/tags';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -509,17 +512,26 @@ export async function ensureSocialLinkRecord(
 export async function invalidateTestUserCaches(
   clerkIds: readonly string[]
 ): Promise<void> {
+  if (clerkIds.length === 0) {
+    return;
+  }
+
+  for (const clerkId of clerkIds) {
+    await invalidateProxyUserStateCache(clerkId);
+  }
+
+  revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
+
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-  if (!url || !token || clerkIds.length === 0) {
+  if (!url || !token) {
     return;
   }
 
   const redis = new Redis({ url, token });
 
   for (const clerkId of clerkIds) {
-    await redis.del(`proxy:user-state:${clerkId}`);
     await redis.del(`admin:role:${clerkId}`);
   }
 }

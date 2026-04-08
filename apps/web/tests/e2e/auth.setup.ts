@@ -1,6 +1,7 @@
 import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test as setup } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
 import {
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_COOKIE,
@@ -19,22 +20,26 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
-function getRequestedBypassPersona(): 'creator' | 'admin' | null {
+function getRequestedBypassPersona(): DevTestAuthPersona | null {
   const persona = process.env.E2E_TEST_AUTH_PERSONA?.trim();
-  if (persona === 'creator' || persona === 'admin') {
+  if (
+    persona === 'creator' ||
+    persona === 'creator-ready' ||
+    persona === 'admin'
+  ) {
     return persona;
   }
   return null;
 }
 
-function canFallbackToBypassUserId(persona: 'creator' | 'admin' | null) {
-  return persona === 'creator';
+function canFallbackToBypassUserId(persona: DevTestAuthPersona | null) {
+  return persona === 'creator' || persona === 'creator-ready';
 }
 
 async function resolveBypassUserId(
   cookieBaseUrl: string,
   fallbackUserId: string,
-  persona: 'creator' | 'admin' | null
+  persona: DevTestAuthPersona | null
 ): Promise<string> {
   if (!persona) {
     return fallbackUserId;

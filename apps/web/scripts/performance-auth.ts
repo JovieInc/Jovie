@@ -39,7 +39,8 @@ function parseCliArgs(args: readonly string[]): PerfAuthCliOptions {
   let baseUrl = defaultBaseUrl;
   let json = false;
   let outPath = defaultPerfAuthPath;
-  let persona: DevTestAuthPersona = 'creator';
+  let persona: DevTestAuthPersona =
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ? 'creator-ready' : 'creator';
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
