@@ -53,7 +53,7 @@ describe('CheckoutSuccessPage', () => {
 
   it('shows 3 feature cards', () => {
     render(<CheckoutSuccessPage />);
-    expect(screen.getByText('Branding Removed')).toBeInTheDocument();
+    expect(screen.getByText('Release Notifications')).toBeInTheDocument();
     expect(screen.getByText('Advanced Analytics')).toBeInTheDocument();
     expect(screen.getByText('Contact Export')).toBeInTheDocument();
   });
