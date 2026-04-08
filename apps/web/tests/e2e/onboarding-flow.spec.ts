@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { isClerkRedirectUrl } from './utils/smoke-test-utils';
 
 /**
  * Onboarding Flow Tests
@@ -103,6 +104,14 @@ test.describe('Onboarding Flow', () => {
     // Navigate directly to onboarding while unauthenticated
     await page.goto('/onboarding', { waitUntil: 'domcontentloaded' });
 
+    if (isClerkRedirectUrl(page.url())) {
+      test.skip(
+        true,
+        'Clerk preview handshake took over unauthenticated onboarding redirect'
+      );
+      return;
+    }
+
     // Should redirect to canonical /signin route
     await expect(page).toHaveURL(/\/signin/);
 
@@ -120,6 +129,14 @@ test.describe('Onboarding Flow', () => {
       waitUntil: 'domcontentloaded',
       timeout: 60000,
     });
+
+    if (isClerkRedirectUrl(page.url())) {
+      test.skip(
+        true,
+        'Clerk preview handshake took over unauthenticated onboarding redirect'
+      );
+      return;
+    }
 
     // Final destination should be the canonical /signin page (allow time for redirect)
     await expect(page).toHaveURL(/\/signin/, { timeout: 30000 });

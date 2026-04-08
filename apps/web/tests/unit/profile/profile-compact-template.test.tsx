@@ -140,6 +140,25 @@ describe('ProfileCompactTemplate', () => {
     ).toHaveAttribute('href', APP_ROUTES.ARTIST_PROFILES);
   });
 
+  it('links the artist name back to the canonical profile route', async () => {
+    const { ProfileCompactTemplate } = await import(
+      '@/features/profile/templates/ProfileCompactTemplate'
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    expect(
+      screen.getByRole('link', { name: `Go to ${mockArtist.name}'s profile` })
+    ).toHaveAttribute('href', `/${mockArtist.handle}`);
+  });
+
   it('does not push an intermediate profile URL when deep-linked into a mode', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=listen');
