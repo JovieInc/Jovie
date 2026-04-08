@@ -98,6 +98,7 @@ const nextConfig = {
 
       // ── Infrastructure ────────────────────────────────────
       { protocol: 'https', hostname: 'api.qrserver.com' },
+      { protocol: 'https', hostname: 'blob.test' }, // Test-only blob host for local E2E fixtures
       { protocol: 'https', hostname: '*.blob.vercel-storage.com' },
       { protocol: 'https', hostname: '*.supabase.co' },
       { protocol: 'https', hostname: '*.supabase.in' },

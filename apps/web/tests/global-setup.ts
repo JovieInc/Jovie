@@ -3,7 +3,10 @@ import { clerkSetup } from '@clerk/testing/playwright';
 import { config } from 'dotenv';
 import path from 'path';
 import { APP_ROUTES } from '../constants/routes';
-import { ADMIN_PRIMARY_NAV_SURFACES } from './e2e/utils/admin-surface-manifest';
+import {
+  ADMIN_LOCAL_BYPASS_NAV_SURFACES,
+  ADMIN_PRIMARY_NAV_SURFACES,
+} from './e2e/utils/admin-surface-manifest';
 import {
   isExternalBaseUrl,
   isSafePreviewBaseUrl,
@@ -64,16 +67,6 @@ const SENSITIVE_PATTERNS = [
   '1234567890',
   'test-key',
   'placeholder',
-];
-
-const ADMIN_NAV_WARMUP_ROUTES = [
-  ...new Set([
-    ...ADMIN_PRIMARY_NAV_SURFACES.map(surface => surface.path),
-    APP_ROUTES.ADMIN_CREATORS,
-    APP_ROUTES.ADMIN_USERS,
-    APP_ROUTES.SETTINGS_ADMIN,
-    APP_ROUTES.ADMIN_ALGORITHM_HEALTH,
-  ]),
 ];
 
 function isRealKey(key: string | undefined): key is string {
@@ -270,6 +263,18 @@ async function globalSetup() {
 
     console.log('Warming up Turbopack routes...');
     const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
+    const adminNavWarmupRoutes = [
+      ...new Set([
+        ...(!isCI && useTestAuthBypass
+          ? ADMIN_LOCAL_BYPASS_NAV_SURFACES
+          : ADMIN_PRIMARY_NAV_SURFACES
+        ).map(surface => surface.path),
+        APP_ROUTES.ADMIN_CREATORS,
+        APP_ROUTES.ADMIN_USERS,
+        APP_ROUTES.SETTINGS_ADMIN,
+        APP_ROUTES.ADMIN_ALGORITHM_HEALTH,
+      ]),
+    ];
     const protectedWarmupHeaders =
       await getProtectedWarmupHeaders(localBaseURL);
     const warmupRoutes = isPublicNoAuthOnly
@@ -302,7 +307,7 @@ async function globalSetup() {
             `/${testProfile}?mode=subscribe`,
             `/${testProfile}?mode=tip`,
             '/testartist?mode=tip',
-            ...ADMIN_NAV_WARMUP_ROUTES,
+            ...adminNavWarmupRoutes,
           ];
 
     for (const route of warmupRoutes) {

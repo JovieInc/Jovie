@@ -277,6 +277,11 @@ export const ADMIN_PRIMARY_NAV_SURFACES = ADMIN_RENDER_SURFACES.filter(
   surface => surface.primaryWorkspace
 );
 
+// The growth leads surface is covered elsewhere, but it is too expensive and
+// flaky for local bypass-driven nav persistence runs under next dev.
+export const ADMIN_LOCAL_BYPASS_NAV_SURFACES =
+  ADMIN_PRIMARY_NAV_SURFACES.filter(surface => surface.id !== 'growth-leads');
+
 export const ADMIN_FAST_HEALTH_SURFACES = ADMIN_RENDER_SURFACES.filter(
   surface => surface.includeInFastHealth
 );

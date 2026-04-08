@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { ensureSignedInUser } from '../helpers/clerk-auth';
 import {
+  ADMIN_LOCAL_BYPASS_NAV_SURFACES,
   ADMIN_PRIMARY_NAV_SURFACES,
   getAdminSurfaceById,
 } from './utils/admin-surface-manifest';
@@ -35,10 +36,14 @@ import {
  * Admin pages to test for navigation persistence
  */
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+const LOCAL_BYPASS_RUN =
+  !process.env.CI && process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 
 const ADMIN_PAGES = FAST_ITERATION
   ? [getAdminSurfaceById('overview')]
-  : ADMIN_PRIMARY_NAV_SURFACES;
+  : LOCAL_BYPASS_RUN
+    ? ADMIN_LOCAL_BYPASS_NAV_SURFACES
+    : ADMIN_PRIMARY_NAV_SURFACES;
 
 /**
  * Dashboard pages to test navigation from
