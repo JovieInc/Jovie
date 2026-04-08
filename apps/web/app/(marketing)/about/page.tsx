@@ -33,7 +33,7 @@ const FAQ_ITEMS = [
   {
     question: 'Is Jovie free?',
     answer:
-      'Yes, Jovie offers a free tier that lets you create a profile, add releases, and start collecting fans. Paid plans unlock advanced analytics, branding removal, contact export, and more.',
+      'Yes, Jovie offers a free tier that lets you create a profile, add releases, and start collecting fans. Paid plans unlock advanced analytics, release notifications, contact export, and more.',
   },
   {
     question: 'How is Jovie different from Linktree?',

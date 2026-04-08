@@ -116,7 +116,7 @@ export function NotificationsSettingsLoading() {
   );
 }
 
-/** Branding settings loading skeleton (used by branding and remove-branding pages) */
+/** Branding settings loading skeleton retained for legacy route loading states. */
 export function BrandingSettingsLoading() {
   return (
     <SettingsLoadingSkeleton titleWidth='w-56' descriptionWidth='w-96'>

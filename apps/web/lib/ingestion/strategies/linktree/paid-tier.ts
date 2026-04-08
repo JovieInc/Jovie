@@ -45,7 +45,7 @@ export function detectLinktreePaidTier(html: string): boolean | null {
 /**
  * Detect if a Linktree profile has a verification badge.
  * Verification requires a paid Linktree plan + identity confirmation.
- * This is a stronger paid-tier signal than branding removal alone.
+ * This is a stronger paid-tier signal than surface presentation alone.
  *
  * Checks two sources:
  * 1. __NEXT_DATA__ JSON (user.isVerified, account.isVerified/verified)

@@ -46,7 +46,6 @@ describe('getCurrentUserEntitlements', () => {
       plan: 'free',
       isPro: false,
       hasAdvancedFeatures: false,
-      canRemoveBranding: false,
       canExportContacts: false,
       canAccessAdvancedAnalytics: false,
       canFilterSelfFromAnalytics: false,
@@ -188,7 +187,6 @@ describe('getCurrentUserEntitlements', () => {
       plan: 'free',
       isPro: false,
       hasAdvancedFeatures: false,
-      canRemoveBranding: false,
       canExportContacts: false,
       canAccessAdvancedAnalytics: false,
       canFilterSelfFromAnalytics: false,
@@ -251,7 +249,6 @@ describe('getCurrentUserEntitlements', () => {
       plan: 'pro',
       isPro: true,
       hasAdvancedFeatures: false,
-      canRemoveBranding: true,
       canExportContacts: true,
       canAccessAdvancedAnalytics: true,
       canFilterSelfFromAnalytics: true,
@@ -314,7 +311,6 @@ describe('getCurrentUserEntitlements', () => {
       plan: 'growth',
       isPro: true,
       hasAdvancedFeatures: true,
-      canRemoveBranding: true,
       canExportContacts: true,
       canAccessAdvancedAnalytics: true,
       canFilterSelfFromAnalytics: true,
@@ -396,7 +392,7 @@ describe('getCurrentUserEntitlements', () => {
 
     expect(entitlements.plan).toBe('pro');
     expect(entitlements.isPro).toBe(true);
-    expect(entitlements.canRemoveBranding).toBe(true);
+    expect(entitlements.canExportContacts).toBe(true);
     expect(entitlements.analyticsRetentionDays).toBe(180);
     expect(entitlements.contactsLimit).toBe(5000);
   });
@@ -451,7 +447,6 @@ describe('getCurrentUserEntitlements', () => {
     // isPro is the gate — plan string alone does not grant features
     expect(entitlements.plan).toBe('free');
     expect(entitlements.isPro).toBe(false);
-    expect(entitlements.canRemoveBranding).toBe(false);
     expect(entitlements.canExportContacts).toBe(false);
     expect(entitlements.contactsLimit).toBe(100);
     expect(entitlements.analyticsRetentionDays).toBe(30);

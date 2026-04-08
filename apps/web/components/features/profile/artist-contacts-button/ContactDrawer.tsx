@@ -53,7 +53,7 @@ export function ContactDrawer({
       open={open}
       onOpenChange={handleOpenChange}
       title={`Contact ${artistName}`}
-      subtitle='Reach the right person without leaving the profile.'
+      subtitle='Management, booking, press, and more.'
       dataTestId='contact-drawer'
     >
       <div className='flex flex-col gap-0.5'>

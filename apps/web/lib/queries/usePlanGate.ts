@@ -34,8 +34,6 @@ export interface PlanGateEntitlements {
   isPro: boolean;
   /** User's current plan */
   plan: string | null;
-  /** Pro: can remove Jovie branding */
-  canRemoveBranding: boolean;
   /** Pro: can access ad pixel integrations */
   canAccessAdPixels: boolean;
   /** Pro: can filter own traffic from analytics */

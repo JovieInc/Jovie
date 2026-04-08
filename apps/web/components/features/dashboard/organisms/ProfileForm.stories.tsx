@@ -12,9 +12,7 @@ const mockArtist: Artist = {
   image_url: 'https://via.placeholder.com/150',
   tagline:
     'This is a sample artist tagline that showcases their music style and personality.',
-  settings: {
-    hide_branding: false,
-  },
+  settings: {},
   spotify_url: 'https://spotify.com/artist/123',
   apple_music_url: 'https://music.apple.com/artist/123',
   youtube_url: 'https://youtube.com/channel/123',

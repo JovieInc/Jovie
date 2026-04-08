@@ -142,7 +142,6 @@ export interface CreatorProfile {
 }
 
 export interface ArtistSettings extends Record<string, unknown> {
-  hide_branding?: boolean;
   exclude_self_from_analytics?: boolean;
   hometown?: string | null;
 }
@@ -439,9 +438,7 @@ export function getHometownFromSettings(
 function mapCanonicalProfileToArtist(
   profile: CanonicalArtistProfileShape
 ): Artist {
-  const artistSettings = (profile.settings as ArtistSettings | null) ?? {
-    hide_branding: false,
-  };
+  const artistSettings = (profile.settings as ArtistSettings | null) ?? {};
   const hometown =
     profile.hometown ?? getHometownFromSettings(profile.settings);
 

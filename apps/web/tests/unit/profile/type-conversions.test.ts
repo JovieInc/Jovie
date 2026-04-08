@@ -41,7 +41,7 @@ const baseProfile: CreatorProfile = {
   search_text: 'test artist',
   display_title: 'Test Artist',
   profile_completion_pct: 80,
-  settings: { hide_branding: true, hometown: 'Tulsa, OK' },
+  settings: { hometown: 'Tulsa, OK' },
   theme: { primaryColor: '#ff0000' },
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-15T00:00:00Z',
@@ -56,7 +56,7 @@ const baseArtist: Artist = {
   image_url: 'https://example.com/avatar.jpg',
   tagline: 'An amazing artist',
   theme: { primaryColor: '#ff0000' },
-  settings: { hide_branding: true, hometown: 'Tulsa, OK' },
+  settings: { hometown: 'Tulsa, OK' },
   spotify_url: 'https://open.spotify.com/artist/123',
   apple_music_url: 'https://music.apple.com/artist/123',
   youtube_url: 'https://youtube.com/channel/123',
@@ -140,7 +140,7 @@ describe('convertCreatorProfileToArtist', () => {
     const noSettings = { ...baseProfile, settings: null };
     const artist = convertCreatorProfileToArtist(noSettings);
 
-    expect(artist.settings).toEqual({ hide_branding: false });
+    expect(artist.settings).toEqual({});
   });
 
   it('converts null platform URLs to undefined', () => {
@@ -195,7 +195,6 @@ describe('convertArtistToCreatorProfile', () => {
     expect(profile.youtube_url).toBe(baseArtist.youtube_url);
     expect(profile.spotify_id).toBe(baseArtist.spotify_id);
     expect(profile.settings).toEqual({
-      hide_branding: true,
       hometown: 'Tulsa, OK',
     });
     expect(profile.is_public).toBe(baseArtist.published);

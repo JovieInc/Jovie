@@ -54,8 +54,8 @@ export function CurrentPlanCard({
               </div>
               <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
                 {isPro
-                  ? 'Full access to all features. Branding removed from your profile.'
-                  : 'Upgrade to unlock branding removal, extended analytics, and more.'}
+                  ? 'Full access to release notifications, deeper analytics, and fan growth tools.'
+                  : 'Upgrade to unlock release notifications, advanced analytics, and more.'}
               </p>
             </div>
           </div>
