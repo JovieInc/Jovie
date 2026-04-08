@@ -81,7 +81,11 @@ describe('ArtistContactsButton', () => {
     // Should open drawer, not navigate directly
     expect(navigate).not.toHaveBeenCalled();
     // Verify drawer content is visible
-    expect(screen.getByText(/bookings/i)).toBeInTheDocument();
+    expect(
+      screen.getByText('Bookings', {
+        selector: '[data-testid="contact-drawer-item"] span',
+      })
+    ).toBeInTheDocument();
   }, 15_000);
 
   it('renders mailto and tel links in the contact drawer actions', () => {
@@ -183,7 +187,15 @@ describe('ArtistContactsButton', () => {
 
     expect(navigate).not.toHaveBeenCalled();
     // Verify drawer content is visible with both contacts
-    expect(screen.getByText(/bookings/i)).toBeInTheDocument();
-    expect(screen.getByText(/press/i)).toBeInTheDocument();
+    expect(
+      screen.getByText('Bookings', {
+        selector: '[data-testid="contact-drawer-item"] span',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Press', {
+        selector: '[data-testid="contact-drawer-item"] span',
+      })
+    ).toBeInTheDocument();
   }, 15_000);
 });

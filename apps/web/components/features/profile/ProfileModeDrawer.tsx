@@ -58,17 +58,17 @@ const MODE_META: Record<ProfileDrawerMode, DrawerMeta> = {
   },
   contact: {
     title: 'Contact',
-    subtitle: 'Reach the right person without leaving the profile.',
+    subtitle: 'Management, booking, press, and more.',
     icon: Mail,
   },
   listen: {
     title: 'Listen',
-    subtitle: 'Pick the platform that already fits how you listen.',
+    subtitle: 'Stream or download on your favorite platform.',
     icon: Music2,
   },
   subscribe: {
     title: 'Get Notified',
-    subtitle: 'Stay close without checking back manually.',
+    subtitle: 'Get notified about new releases and shows.',
     icon: Bell,
   },
   tip: {
