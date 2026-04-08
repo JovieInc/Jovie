@@ -110,25 +110,6 @@ setupDatabaseBeforeAll();
 let db: TestDb;
 const createdProfileIds: string[] = [];
 
-function parseCsv(content: string): Array<Record<string, string>> {
-  const rows = content.trim().split('\n');
-  if (rows.length === 0) return [];
-
-  const headers = rows[0]!.split(',').map(header => header.trim());
-
-  return rows
-    .slice(1)
-    .map(row => row.trim())
-    .filter(Boolean)
-    .map(row => {
-      const cells = row.split(',').map(cell => cell.trim());
-      return headers.reduce<Record<string, string>>((acc, header, index) => {
-        acc[header] = cells[index] ?? '';
-        return acc;
-      }, {});
-    });
-}
-
 beforeAll(() => {
   const connection = (globalThis as typeof globalThis & { db?: TestDb }).db;
   if (!connection) {
@@ -162,14 +143,13 @@ afterEach(async () => {
 describe('Admin ingestion pipeline (integration)', () => {
   it('processes CSV upload through ingestion pipeline', async () => {
     const handle = `csv-import-${Date.now()}`;
-    const csv = `url,platform\nhttps://linktr.ee/${handle},linktree`;
-    const [row] = parseCsv(csv);
+    const url = `https://linktr.ee/${handle}`;
 
     const response = await POST(
       new Request('http://localhost/api/admin/creator-ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: row?.url }),
+        body: JSON.stringify({ url }),
       })
     );
 
@@ -225,14 +205,13 @@ describe('Admin ingestion pipeline (integration)', () => {
   });
 
   it('rejects invalid CSV rows with clear validation errors', async () => {
-    const invalidCsv = 'url,platform\nnot-a-valid-url,linktree';
-    const [row] = parseCsv(invalidCsv);
+    const url = 'not-a-valid-url';
 
     const response = await POST(
       new Request('http://localhost/api/admin/creator-ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: row?.url }),
+        body: JSON.stringify({ url }),
       })
     );
 
@@ -245,14 +224,13 @@ describe('Admin ingestion pipeline (integration)', () => {
 
   it('blocks duplicate claimed profiles during CSV ingestion', async () => {
     const handle = `csv-duplicate-${Date.now()}`;
-    const csv = `url,platform\nhttps://linktr.ee/${handle},linktree`;
-    const [row] = parseCsv(csv);
+    const url = `https://linktr.ee/${handle}`;
 
     const initial = await POST(
       new Request('http://localhost/api/admin/creator-ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: row?.url }),
+        body: JSON.stringify({ url }),
       })
     );
 
@@ -272,7 +250,7 @@ describe('Admin ingestion pipeline (integration)', () => {
       new Request('http://localhost/api/admin/creator-ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: row?.url }),
+        body: JSON.stringify({ url }),
       })
     );
 
@@ -290,14 +268,13 @@ describe('Admin ingestion pipeline (integration)', () => {
 
   it('reingests an unclaimed profile without creating a duplicate record', async () => {
     const handle = `csv-reingest-${Date.now()}`;
-    const csv = `url,platform\nhttps://linktr.ee/${handle},linktree`;
-    const [row] = parseCsv(csv);
+    const url = `https://linktr.ee/${handle}`;
 
     const initial = await POST(
       new Request('http://localhost/api/admin/creator-ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: row?.url }),
+        body: JSON.stringify({ url }),
       })
     );
 
@@ -323,7 +300,7 @@ describe('Admin ingestion pipeline (integration)', () => {
       new Request('http://localhost/api/admin/creator-ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: row?.url }),
+        body: JSON.stringify({ url }),
       })
     );
 
