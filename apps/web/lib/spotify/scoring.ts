@@ -318,11 +318,11 @@ function buildEmptyVerdict(
 
 function buildUnavailableVerdict(
   detail: string,
-  warnings: readonly string[]
+  _warnings: readonly string[]
 ): AlgorithmHealthVerdict {
   return {
     label: 'Unavailable',
-    confidence: warnings.length > 0 ? 'Low' : 'Medium',
+    confidence: 'Low',
     headline: 'Algorithm health is temporarily unavailable.',
     detail,
   };

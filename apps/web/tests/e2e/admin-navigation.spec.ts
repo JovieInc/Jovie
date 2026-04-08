@@ -293,8 +293,11 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     });
     await settleAdminNavigation(page);
 
-    for (const label of ['Investors', 'Screenshots']) {
-      await expect(page.getByText(label, { exact: true })).toBeVisible({
+    for (const href of [
+      APP_ROUTES.ADMIN_INVESTORS,
+      APP_ROUTES.ADMIN_SCREENSHOTS,
+    ]) {
+      await expect(page.locator(`a[href="${href}"]`)).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
     }

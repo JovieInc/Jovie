@@ -56,7 +56,7 @@ export function AlgorithmHealthPanel({
     );
   }
 
-  if (query.isLoading || query.isFetching) {
+  if (query.isLoading) {
     return (
       <DrawerSection title='Algorithm Health' collapsible={false}>
         <DrawerSurfaceCard
@@ -265,9 +265,9 @@ function BulletList({
 }: Readonly<{ items: readonly string[]; tone?: 'default' | 'warning' }>) {
   return (
     <ul className='space-y-2'>
-      {items.map(item => (
+      {items.map((item, index) => (
         <li
-          key={item}
+          key={`${tone}-${index}`}
           className='flex items-start gap-2 text-[12px] leading-[18px]'
         >
           <span

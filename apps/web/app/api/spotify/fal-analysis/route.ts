@@ -191,6 +191,11 @@ async function scrapeFansAlsoLike(artistId: string): Promise<FalNameResult> {
 
     const html = await response.text();
     if (isSpotifyErrorPageHtml(html)) {
+      await captureWarning(
+        '[FAL Scrape] Spotify returned an error page',
+        undefined,
+        { component: 'fal-scrape', artistId }
+      );
       return {
         status: 'unavailable',
         detail: 'Spotify showed an error page instead of related artists.',

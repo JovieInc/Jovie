@@ -297,4 +297,72 @@ describe('AdminProfileSidebar', () => {
     expect(await screen.findByText('Unavailable')).toBeInTheDocument();
     expect(screen.queryByText('0%')).not.toBeInTheDocument();
   });
+
+  it('shows the empty algorithm report without rendering a zero percent score', async () => {
+    const user = userEvent.setup();
+    const emptyReport: AlgorithmHealthReport = {
+      targetArtist: {
+        spotifyId: '1234567890123456789012',
+        name: 'Alice',
+        bio: null,
+        imageUrl: null,
+        genres: ['indie pop'],
+        followerCount: 1200,
+        popularity: 42,
+        externalUrls: {},
+      },
+      status: 'empty',
+      verdict: {
+        label: 'Weak',
+        confidence: 'Low',
+        headline: 'No comparable artists were available for a meaningful read.',
+        detail:
+          'Spotify did not provide enough usable related artists to judge adjacency health.',
+      },
+      nextActions: [
+        'Check that the creator has an active Spotify artist profile with usable related-artist data.',
+        'Avoid making positioning decisions from this result until Spotify yields comparable artists.',
+      ],
+      checkedAt: '2026-04-08T03:22:14.406Z',
+      attemptedNeighbourCount: 0,
+      resolvedNeighbourCount: 0,
+      warnings: [],
+      neighbours: [],
+      summary: {
+        bigger: 0,
+        similar: 0,
+        smaller: 0,
+        total: 0,
+      },
+    };
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(emptyReport), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    renderWithQueryClient(
+      <AdminProfileSidebar
+        profile={profile}
+        contact={contact}
+        isOpen
+        onClose={() => {}}
+      />
+    );
+
+    await user.click(screen.getByRole('tab', { name: 'Algorithm' }));
+
+    expect(
+      await screen.findByText('No Comparable Artists')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('0%')).not.toBeInTheDocument();
+    expect(fetchSpy).toHaveBeenCalledWith(
+      '/api/spotify/fal-analysis?artistId=1234567890123456789012',
+      expect.objectContaining({
+        cache: 'no-store',
+        signal: expect.any(AbortSignal),
+      })
+    );
+  });
 });

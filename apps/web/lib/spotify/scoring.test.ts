@@ -438,6 +438,7 @@ describe('generateHealthReport', () => {
 
     expect(report.status).toBe('unavailable');
     expect(report.verdict.label).toBe('Unavailable');
+    expect(report.verdict.confidence).toBe('Low');
     expect(report.checkedAt).toBe('2026-04-08T03:22:14.406Z');
     expect(report.summary.total).toBe(0);
     expect('healthScore' in report).toBe(false);
