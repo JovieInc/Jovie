@@ -441,7 +441,7 @@ async function startStandaloneServer(port: number) {
   }
 
   const baseUrl = `http://127.0.0.1:${port}`;
-  const child = spawn('node', [standaloneServerPath], {
+  const child = spawn('doppler', ['run', '--', 'node', standaloneServerPath], {
     cwd: repoRoot,
     env: {
       ...process.env,
