@@ -345,6 +345,33 @@ jobs:
 
           echo "✅ Homepage renders correctly"
 
+          # Verify signup still renders because this is the top conversion entrypoint.
+          echo "Checking signup route renders..."
+          signup_url="${deployment_url%/}/signup"
+          signup_response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${signup_url}$( [[ "$signup_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
+          signup_code="${signup_response##*$'\n'}"
+          signup_body="${signup_response%$'\n'*}"
+
+          if [ "$signup_code" != "200" ]; then
+            echo "❌ Canary failed: /signup returned HTTP $signup_code"
+            echo "canary_status=failed_signup" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if [ ${#signup_body} -lt 500 ]; then
+            echo "❌ Canary failed: /signup body too short (${#signup_body} chars) - likely broken"
+            echo "canary_status=failed_signup" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if echo "$signup_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred\|this page could not be found"; then
+            echo "❌ Canary failed: /signup contains error message"
+            echo "canary_status=failed_signup" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          echo "✅ Signup renders correctly"
+
           # Verify the public profile route renders without a server error.
           # "Profile not found" with HTTP 200 is a valid app response (data issue,
           # not a code regression), so only block on 5xx or actual error pages.

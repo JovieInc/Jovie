@@ -26,17 +26,53 @@ const extractLinktreeMock = vi.fn(() => ({
   displayName: 'CSV Import Artist',
   avatarUrl: 'https://images.test/csv-avatar.png',
   links: [
-    { url: 'https://spotify.com/csv-import', title: 'Spotify' },
-    { url: 'https://linktr.ee/csv-related', title: 'Linktree Mirror' },
+    { url: 'https://open.spotify.com/artist/4u', title: 'Spotify' },
+    { url: 'https://instagram.com/csvimportartist', title: 'Instagram' },
   ],
 }));
 
 const avatarFromLinksMock = vi.fn(async () => {
   return 'https://blob.test/ingestion-avatar.avif';
 });
+const copyExternalAvatarToStorageMock = vi.fn(async () => {
+  return 'https://blob.test/copied-avatar.avif';
+});
+const {
+  invalidateProfileEdgeCacheMock,
+  revalidatePathMock,
+  revalidateTagMock,
+} = vi.hoisted(() => ({
+  revalidatePathMock: vi.fn(),
+  revalidateTagMock: vi.fn(),
+  invalidateProfileEdgeCacheMock: vi.fn(async () => undefined),
+}));
+
+vi.mock('next/cache', () => ({
+  revalidatePath: revalidatePathMock,
+  revalidateTag: revalidateTagMock,
+}));
+
+vi.mock('@/lib/services/profile/queries', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/lib/services/profile/queries')
+  >('@/lib/services/profile/queries');
+
+  return {
+    ...actual,
+    invalidateProfileEdgeCache: invalidateProfileEdgeCacheMock,
+  };
+});
 
 vi.mock('@/lib/entitlements/server', () => ({
   getCurrentUserEntitlements: vi.fn(async () => adminEntitlements),
+}));
+
+vi.mock('@/lib/rate-limit', () => ({
+  checkAdminCreatorIngestRateLimit: vi.fn(async () => ({
+    success: true,
+    reset: new Date(Date.now() + 60_000),
+  })),
+  createRateLimitHeaders: vi.fn(() => ({})),
 }));
 
 vi.mock('@/lib/ingestion/strategies/linktree', () => ({
@@ -61,6 +97,9 @@ vi.mock('@/lib/ingestion/strategies/laylo', () => ({
 }));
 
 vi.mock('@/lib/ingestion/magic-profile-avatar', () => ({
+  copyExternalAvatarToStorage: (
+    ...args: Parameters<typeof copyExternalAvatarToStorageMock>
+  ) => copyExternalAvatarToStorageMock(...args),
   maybeCopyIngestionAvatarFromLinks: (
     ...args: Parameters<typeof avatarFromLinksMock>
   ) => avatarFromLinksMock(...args),
@@ -70,25 +109,6 @@ setupDatabaseBeforeAll();
 
 let db: TestDb;
 const createdProfileIds: string[] = [];
-
-function parseCsv(content: string): Array<Record<string, string>> {
-  const rows = content.trim().split('\n');
-  if (rows.length === 0) return [];
-
-  const headers = rows[0]!.split(',').map(header => header.trim());
-
-  return rows
-    .slice(1)
-    .map(row => row.trim())
-    .filter(Boolean)
-    .map(row => {
-      const cells = row.split(',').map(cell => cell.trim());
-      return headers.reduce<Record<string, string>>((acc, header, index) => {
-        acc[header] = cells[index] ?? '';
-        return acc;
-      }, {});
-    });
-}
 
 beforeAll(() => {
   const connection = (globalThis as typeof globalThis & { db?: TestDb }).db;
@@ -114,19 +134,22 @@ afterEach(async () => {
   createdProfileIds.length = 0;
   extractLinktreeMock.mockClear();
   avatarFromLinksMock.mockClear();
+  copyExternalAvatarToStorageMock.mockClear();
+  revalidatePathMock.mockClear();
+  revalidateTagMock.mockClear();
+  invalidateProfileEdgeCacheMock.mockClear();
 });
 
 describe('Admin ingestion pipeline (integration)', () => {
   it('processes CSV upload through ingestion pipeline', async () => {
     const handle = `csv-import-${Date.now()}`;
-    const csv = `url,platform\nhttps://linktr.ee/${handle},linktree`;
-    const [row] = parseCsv(csv);
+    const url = `https://linktr.ee/${handle}`;
 
     const response = await POST(
       new Request('http://localhost/api/admin/creator-ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: row?.url }),
+        body: JSON.stringify({ url }),
       })
     );
 
@@ -182,34 +205,32 @@ describe('Admin ingestion pipeline (integration)', () => {
   });
 
   it('rejects invalid CSV rows with clear validation errors', async () => {
-    const invalidCsv = 'url,platform\nnot-a-valid-url,linktree';
-    const [row] = parseCsv(invalidCsv);
+    const url = 'not-a-valid-url';
 
     const response = await POST(
       new Request('http://localhost/api/admin/creator-ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: row?.url }),
+        body: JSON.stringify({ url }),
       })
     );
 
     const payload = (await response.json()) as { error?: string };
 
-    expect(response.status).toBe(400);
-    expect(payload.error).toContain('Invalid profile URL');
+    expect(response.status).toBe(422);
+    expect(payload.error).toContain('Unable to extract username from URL');
     expect(extractLinktreeMock).not.toHaveBeenCalled();
   });
 
   it('blocks duplicate claimed profiles during CSV ingestion', async () => {
     const handle = `csv-duplicate-${Date.now()}`;
-    const csv = `url,platform\nhttps://linktr.ee/${handle},linktree`;
-    const [row] = parseCsv(csv);
+    const url = `https://linktr.ee/${handle}`;
 
     const initial = await POST(
       new Request('http://localhost/api/admin/creator-ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: row?.url }),
+        body: JSON.stringify({ url }),
       })
     );
 
@@ -229,7 +250,7 @@ describe('Admin ingestion pipeline (integration)', () => {
       new Request('http://localhost/api/admin/creator-ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: row?.url }),
+        body: JSON.stringify({ url }),
       })
     );
 
@@ -244,4 +265,73 @@ describe('Admin ingestion pipeline (integration)', () => {
       .where(eq(creatorProfiles.usernameNormalized, handle));
     expect(existing).toHaveLength(1);
   });
+
+  it('reingests an unclaimed profile without creating a duplicate record', async () => {
+    const handle = `csv-reingest-${Date.now()}`;
+    const url = `https://linktr.ee/${handle}`;
+
+    const initial = await POST(
+      new Request('http://localhost/api/admin/creator-ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+    );
+
+    const initialPayload = (await initial.json()) as {
+      profile?: { id: string; username: string };
+      links?: number;
+    };
+    const profileId = initialPayload.profile?.id;
+    expect(profileId).toBeDefined();
+    createdProfileIds.push(profileId!);
+
+    extractLinktreeMock.mockReturnValueOnce({
+      displayName: 'CSV Import Artist Reingested',
+      avatarUrl: 'https://images.test/csv-avatar-v2.png',
+      links: [
+        { url: 'https://open.spotify.com/artist/4u', title: 'Spotify' },
+        { url: 'https://instagram.com/csvimportartist', title: 'Instagram' },
+        { url: 'https://youtube.com/@csvimportartist', title: 'YouTube' },
+      ],
+    });
+
+    const reingest = await POST(
+      new Request('http://localhost/api/admin/creator-ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+    );
+
+    const reingestPayload = (await reingest.json()) as {
+      ok?: boolean;
+      profile?: { id: string; username: string };
+      links?: number;
+    };
+
+    expect(reingest.status).toBe(200);
+    expect(reingestPayload.ok).toBe(true);
+    expect(reingestPayload.profile?.id).toBe(profileId);
+    expect(reingestPayload.profile?.username).toBe(handle);
+    expect(reingestPayload.links).toBe(3);
+
+    const profiles = await db
+      .select({
+        id: creatorProfiles.id,
+        displayName: creatorProfiles.displayName,
+      })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, handle));
+
+    expect(profiles).toHaveLength(1);
+    expect(profiles[0]?.displayName).toBe('CSV Import Artist');
+
+    const links = await db
+      .select({ url: socialLinks.url })
+      .from(socialLinks)
+      .where(eq(socialLinks.creatorProfileId, profileId!));
+
+    expect(links).toHaveLength(3);
+  }, 15_000);
 });

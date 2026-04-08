@@ -77,7 +77,6 @@ export function ProfilePreview({
           artist={mockArtist}
           socialLinks={socialLinks}
           subtitle=''
-          showTipButton={false}
           showBackButton={false}
           contacts={[]}
           showFooter={false}

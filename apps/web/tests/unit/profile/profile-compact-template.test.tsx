@@ -1,8 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import type { Artist } from '@/types/db';
+
+const mockCanonicalProfileDSPs = vi.fn(() => []);
+const mockUseProfileShell = vi.fn();
 
 vi.mock('next/dynamic', () => ({
   default: () => () => null,
@@ -47,18 +50,7 @@ vi.mock('@/components/atoms/SocialIcon', () => ({
 
 vi.mock('@/components/organisms/profile-shell', () => ({
   ProfileNotificationsContext: React.createContext(null),
-  useProfileShell: () => ({
-    notificationsContextValue: {
-      subscribedChannels: {},
-      subscriptionDetails: {},
-      setSubscribedChannels: vi.fn(),
-      setSubscriptionDetails: vi.fn(),
-      setState: vi.fn(),
-    },
-    notificationsController: {
-      contentPreferences: null,
-    },
-  }),
+  useProfileShell: (...args: unknown[]) => mockUseProfileShell(...args),
 }));
 
 vi.mock('@/features/profile/artist-contacts-button/useArtistContacts', () => ({
@@ -86,11 +78,12 @@ vi.mock('@/lib/hooks/useNotifications', () => ({
 }));
 
 vi.mock('@/lib/dsp', () => ({
-  sortDSPsByGeoPopularity: () => [],
+  sortDSPsByGeoPopularity: (dsps: unknown[]) => dsps,
 }));
 
 vi.mock('@/lib/profile-dsps', () => ({
-  getCanonicalProfileDSPs: () => [],
+  getCanonicalProfileDSPs: (...args: unknown[]) =>
+    mockCanonicalProfileDSPs(...args),
 }));
 
 const mockArtist: Artist = {
@@ -110,6 +103,24 @@ const mockArtist: Artist = {
 };
 
 describe('ProfileCompactTemplate', () => {
+  beforeEach(() => {
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    mockUseProfileShell.mockReset();
+    mockUseProfileShell.mockImplementation(() => ({
+      notificationsContextValue: {
+        subscribedChannels: {},
+        subscriptionDetails: {},
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+    window.history.replaceState(null, '', '/test-artist');
+  });
+
   it('links the top-left Jovie mark to the artist profiles landing page', async () => {
     const { ProfileCompactTemplate } = await import(
       '@/features/profile/templates/ProfileCompactTemplate'
@@ -127,5 +138,87 @@ describe('ProfileCompactTemplate', () => {
     expect(
       screen.getByRole('link', { name: 'Create your artist profile on Jovie' })
     ).toHaveAttribute('href', APP_ROUTES.ARTIST_PROFILES);
+  });
+
+  it('does not push an intermediate profile URL when deep-linked into a mode', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    window.history.replaceState(null, '', '/test-artist?mode=listen');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    const { ProfileCompactTemplate } = await import(
+      '@/features/profile/templates/ProfileCompactTemplate'
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    expect(window.location.search).toBe('?mode=listen');
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        modeOverride: 'listen',
+      })
+    );
+
+    pushStateSpy.mockRestore();
+  });
+
+  it('uses the mode prop as the fallback when the URL has no mode param', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+
+    const { ProfileCompactTemplate } = await import(
+      '@/features/profile/templates/ProfileCompactTemplate'
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        modeOverride: 'listen',
+      })
+    );
+  });
+
+  it('keeps modeOverride in sync when user interactions open a mode drawer', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+
+    const { ProfileCompactTemplate } = await import(
+      '@/features/profile/templates/ProfileCompactTemplate'
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: `Play ${mockArtist.name}` })
+    );
+
+    await waitFor(() => {
+      expect(window.location.search).toContain('mode=listen');
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          modeOverride: 'listen',
+        })
+      );
+    });
   });
 });

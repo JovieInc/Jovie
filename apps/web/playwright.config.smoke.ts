@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Smoke Test Playwright Configuration
  *
- * Focused config for the 4 required smoke test files that gate production deploys.
+ * Focused config for the highest-signal smoke test files that gate production deploys.
  * Optimized for speed: higher parallelism, shorter timeouts, no video recording.
  *
  * Usage:
@@ -27,11 +27,11 @@ const managedWebServerPort = managedWebServerUrl.port;
 
 export default defineConfig({
   testDir: './tests/e2e',
-  // Only include the 4 required smoke test files
+  // Keep this lane limited to the highest-signal unauthenticated/public/auth flows.
   testMatch: [
     'smoke-public.spec.ts',
     'golden-path.spec.ts',
-    'content-gate.spec.ts',
+    'signup-funnel.smoke.spec.ts',
     'smoke-auth.spec.ts',
   ],
   fullyParallel: true,
