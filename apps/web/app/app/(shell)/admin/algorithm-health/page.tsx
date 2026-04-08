@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
-import { AlgorithmHealthWorkspace } from '@/components/features/admin/algorithm-health/AlgorithmHealthWorkspace';
-import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
-import { ALGORITHM_HEALTH_E2E_REPORT } from './fixture';
+import { redirect } from 'next/navigation';
+import { buildAdminPeopleHref } from '@/constants/admin-navigation';
 
 interface AlgorithmHealthPageProps {
   readonly searchParams: Promise<{
@@ -19,22 +18,14 @@ export default async function AlgorithmHealthPage({
   searchParams,
 }: Readonly<AlgorithmHealthPageProps>) {
   const params = await searchParams;
+  const nextParams = new URLSearchParams();
+
   const fixtureParam = Array.isArray(params.fixture)
     ? params.fixture[0]
     : params.fixture;
+  if (fixtureParam) {
+    nextParams.set('legacyAlgorithmHealth', fixtureParam);
+  }
 
-  return (
-    <AdminToolPage
-      title='Algorithm Health'
-      description='Diagnose Spotify Fans Also Like positioning with a consistent admin shell.'
-      testId='admin-algorithm-health-page'
-    >
-      <AlgorithmHealthWorkspace
-        key={fixtureParam === 'e2e' ? 'fixture-e2e' : 'fixture-live'}
-        fixtureReport={
-          fixtureParam === 'e2e' ? ALGORITHM_HEALTH_E2E_REPORT : null
-        }
-      />
-    </AdminToolPage>
-  );
+  redirect(buildAdminPeopleHref('creators', nextParams));
 }

@@ -281,7 +281,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
       ).toBeVisible();
     }
 
-    for (const label of ['Investors', 'Screenshots', 'Algorithm Health']) {
+    for (const label of ['Investors', 'Screenshots']) {
       await expect(
         adminNavSection.getByText(label, { exact: true })
       ).toHaveCount(0);
@@ -293,11 +293,30 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     });
     await settleAdminNavigation(page);
 
-    for (const label of ['Investors', 'Screenshots', 'Algorithm Health']) {
+    for (const label of ['Investors', 'Screenshots']) {
       await expect(page.getByText(label, { exact: true })).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
     }
+  });
+
+  test('legacy algorithm health route redirects to creators workspace', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+
+    await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN_ALGORITHM_HEALTH, {
+      timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
+      retries: FAST_ITERATION ? 3 : 2,
+    });
+    await settleAdminNavigation(page);
+
+    await expect(page).toHaveURL(/\/app\/admin\/people\?view=creators/);
+    await expect(
+      page.locator('[data-testid="admin-people-view-creators"]')
+    ).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
   });
 
   /**
