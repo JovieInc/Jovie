@@ -48,6 +48,7 @@ ALL commands that need secrets MUST be prefixed with Doppler, and local/dev comm
 
 - `pnpm run test:web`
 - `pnpm run test:web:e2e`
+- `pnpm run test:web:smoke`
 - `pnpm run dev:web:local`
 - `pnpm run dev:web:browse`
 - `pnpm test` alone **will fail** — missing env vars
