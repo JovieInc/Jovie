@@ -4,11 +4,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 interface RenderAuthLayoutOptions {
   readonly clerkMockFlag?: string;
+  readonly forwardedHost?: string;
+  readonly forwardedProto?: string;
   readonly publishableKey?: string;
 }
 
 async function renderAuthRouteLayout({
   clerkMockFlag = '0',
+  forwardedHost = 'staging.jov.ie',
+  forwardedProto = 'https',
   publishableKey,
 }: RenderAuthLayoutOptions) {
   vi.resetModules();
@@ -30,6 +34,15 @@ async function renderAuthRouteLayout({
     AuthClientProviders: ({ children }: { children: ReactNode }) => (
       <div data-testid='auth-client-providers'>{children}</div>
     ),
+  }));
+
+  vi.doMock('next/headers', () => ({
+    headers: async () =>
+      new Headers({
+        host: forwardedHost,
+        'x-forwarded-host': forwardedHost,
+        'x-forwarded-proto': forwardedProto,
+      }),
   }));
 
   vi.doMock('@/features/auth', () => ({
