@@ -42,7 +42,7 @@ export async function generateMetadata({ params }: CategoryPageProps) {
   }
 
   return {
-    title: `${category.name} — Jovie Blog`,
+    title: `${category.name} — Blog`,
     description: category.description,
     alternates: {
       canonical: `${BASE_URL}/blog/category/${slug}`,

@@ -55,6 +55,18 @@ vi.mock('@/lib/db/schema/content', () => ({
   },
 }));
 
+vi.mock('@/lib/db/schema/playlists', () => ({
+  joviePlaylists: {
+    slug: 'slug',
+    title: 'title',
+    coverImageUrl: 'coverImageUrl',
+    trackCount: 'trackCount',
+    updatedAt: 'updatedAt',
+    status: 'status',
+    publishedAt: 'publishedAt',
+  },
+}));
+
 vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: {
     username: 'username',
@@ -114,7 +126,9 @@ describe('sitemap', () => {
           slug: 'single',
           updatedAt: new Date('2026-01-04'),
         },
-      ]);
+      ])
+      // playlists query
+      .mockResolvedValueOnce([]);
 
     const { default: sitemap } = await import('../../app/sitemap');
     const entries = await sitemap();
@@ -149,7 +163,7 @@ describe('sitemap', () => {
       expect(entries.map(entry => entry.url)).not.toContain(blockedUrl);
     }
 
-    expect(selectMock).toHaveBeenCalledTimes(3);
+    expect(selectMock).toHaveBeenCalledTimes(4);
     expect(queryMock).toHaveBeenCalled();
   });
 });

@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.135] - 2026-04-07
+
+> Document the local `ripgrep` prerequisite so fresh worktrees have `rg` available for agent and search tooling.
+
+### Changed
+
+- Documented `ripgrep` as a local prerequisite in the getting-started guide
+- Added `ripgrep` install commands for macOS and Ubuntu/Debian after the initial workspace bootstrap step
+- Synced the canonical version file and workspace package versions to `26.4.135`
+- Taught `setup.sh` to verify `rg` and auto-install it on supported local environments
+
+## [26.4.134] - 2026-04-07
+
+> Automated playlist network engine: LLM-curated Spotify playlists as an inbound artist acquisition channel.
+
+### Added
+
+- Automated playlist generation using AI to create niche, searchable music collections featuring Jovie artists
+- Public playlist pages and genre/mood discovery hubs for organic growth
+- Admin approval workflow for generated playlists before publishing
+- Daily automated playlist creation with compliance-safe cadence controls
+- Sitemap integration for published playlists
+- [internal] LLM curation pipeline uses Claude (Haiku concept generation, Sonnet sequencing) with Spotify discovery, Sharp cover rendering, and publish orchestration
+- [internal] Marketing playlist routes are implemented at `/playlists` and `/playlists/[slug]` with structured data support
+- [internal] Admin moderation route is implemented at `/admin/playlists`
+- [internal] Spotify OAuth for the system account is coordinated via Clerk with health checks and Sentry alerting
+- [internal] Daily cron trigger runs at 6 AM UTC behind the `PLAYLIST_ENGINE` feature flag
+- [internal] Playlist persistence uses `jovie_playlists` and `jovie_playlist_tracks` tables with supporting indexes
+- [internal] Added a repo-local `stitch` MCP server entry in `.mcp.json`
+- [internal] Configured the Google Stitch MCP endpoint to read the `X-Goog-Api-Key` header from `GOOGLE_STITCH_API_KEY` for local agent tooling
+
+## [26.4.133] - 2026-04-07
+
+> Restore settings-page scrolling and clean up duplicate app-name page titles across marketing and legal routes.
+
+### Fixed
+
+- Settings pages now use page-level scrolling again inside the app shell
+- Added a regression unit test to keep the settings layout on the correct scroll mode
+- Removed duplicate app-name suffixes from affected marketing and legal page titles while preserving branded social metadata
+### Changed
+
+- The top-left Jovie mark on public artist profiles now links to the artist profiles landing page instead of acting as decorative chrome
+- [internal] Added a unit test that locks the public-profile logo destination to the artist profiles route
+
 ## [26.4.132] - 2026-04-07
 
 > Higher resolution profile photos on artist pages and sharper hero images on retina displays.

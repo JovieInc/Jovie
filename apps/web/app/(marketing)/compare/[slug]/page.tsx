@@ -25,7 +25,7 @@ export async function generateMetadata({
   if (!data) return { title: 'Comparison' };
 
   return {
-    title: `${data.title} | ${APP_NAME}`,
+    title: data.title,
     description: data.metaDescription,
     alternates: {
       canonical: `${BASE_URL}/compare/${data.slug}`,

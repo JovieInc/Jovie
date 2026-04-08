@@ -65,15 +65,15 @@ const VIEW_META: Record<DrawerView, DrawerMeta> = {
   },
   listen: {
     title: 'Listen',
-    subtitle: 'Pick the platform that already fits how you listen.',
+    subtitle: 'Stream or download on your favorite platform.',
   },
   subscribe: {
     title: 'Get Notified',
-    subtitle: 'Stay close without checking back manually.',
+    subtitle: 'Get notified about new releases and shows.',
   },
   contact: {
     title: 'Contact',
-    subtitle: 'Reach the right person without leaving the profile.',
+    subtitle: 'Management, booking, press, and more.',
   },
   tip: {
     title: 'Tip',
