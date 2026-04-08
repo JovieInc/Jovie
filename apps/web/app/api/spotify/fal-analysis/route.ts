@@ -264,6 +264,7 @@ async function resolveFalArtists(
   const resolved: SanitizedArtist[] = [];
   let missingCount = 0;
   let mismatchCount = 0;
+  let fetchErrorCount = 0;
 
   // Process in batches of 5 to avoid rate limits
   const batchSize = 5;
@@ -284,6 +285,15 @@ async function resolveFalArtists(
             return null;
           }
           const fullArtist = await getSpotifyArtist(searchResults[0].spotifyId);
+          if (!fullArtist) {
+            fetchErrorCount++;
+            logger.warn(
+              `[FAL Resolve] Could not load artist details for "${name}" (${searchResults[0].spotifyId})`,
+              undefined,
+              'fal-analysis'
+            );
+            return null;
+          }
           return fullArtist;
         }
         missingCount++;
@@ -305,6 +315,11 @@ async function resolveFalArtists(
   if (mismatchCount > 0) {
     warnings.push(
       `${mismatchCount} related artist${mismatchCount === 1 ? '' : 's'} were skipped because the top Spotify match did not match exactly.`
+    );
+  }
+  if (fetchErrorCount > 0) {
+    warnings.push(
+      `${fetchErrorCount} related artist${fetchErrorCount === 1 ? '' : 's'} matched in Spotify search but could not be loaded fully.`
     );
   }
 

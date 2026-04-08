@@ -156,6 +156,54 @@ describe('GET /api/spotify/fal-analysis', () => {
     expect(cacheOutcome.state).toBe('threw');
   });
 
+  it('tracks artist fetch failures separately from search misses', async () => {
+    mockServerFetch.mockResolvedValue(
+      new Response(
+        '<html><script>{"name":"Bigger Artist","@type":"MusicGroup"}</script><script>{"name":"Missing Details Artist","@type":"MusicGroup"}</script></html>',
+        { status: 200, headers: { 'Content-Type': 'text/html' } }
+      )
+    );
+
+    mockSearchSpotifyArtists.mockImplementation(async (name: string) => {
+      if (name === 'Missing Details Artist') {
+        return [
+          {
+            spotifyId: 'missing-details',
+            name,
+            imageUrl: null,
+            followerCount: 2000,
+            popularity: 35,
+          },
+        ];
+      }
+
+      return [
+        {
+          spotifyId: 'resolved-neighbour',
+          name,
+          imageUrl: null,
+          followerCount: 5000,
+          popularity: 55,
+        },
+      ];
+    });
+
+    const response = await GET(
+      new NextRequest(
+        'http://localhost/api/spotify/fal-analysis?artistId=1234567890123456789012'
+      )
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe('ready');
+    expect(data.attemptedNeighbourCount).toBe(2);
+    expect(data.resolvedNeighbourCount).toBe(1);
+    expect(data.warnings).toContain(
+      '1 related artist matched in Spotify search but could not be loaded fully.'
+    );
+  });
+
   it('returns 400 for an invalid artist ID', async () => {
     const response = await GET(
       new NextRequest('http://localhost/api/spotify/fal-analysis?artistId=bad')

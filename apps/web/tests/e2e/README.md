@@ -4,20 +4,20 @@ This directory contains Playwright end-to-end coverage for the Jovie web app.
 
 ## Running E2E Tests
 
-All commands that need secrets should be run with Doppler from the repo root.
+Run these commands from the repo root. Secret-bound local flows should use the pinned root wrappers.
 
 ```bash
 # Full E2E suite
-doppler run -- pnpm test:e2e
+pnpm run test:web:e2e
 
 # Headed mode
-doppler run -- pnpm test:e2e -- --headed
+doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e -- --headed
 
 # Single spec
-doppler run -- pnpm test:e2e tests/e2e/auth.spec.ts
+doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e tests/e2e/auth.spec.ts
 
 # Playwright UI
-doppler run -- pnpm test:e2e:ui
+doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e:ui
 ```
 
 ## Auth Test Model
@@ -67,7 +67,7 @@ Jovie now has two different auth-testing modes:
 
 ```bash
 # Debug one spec
-PWDEBUG=1 doppler run -- pnpm test:e2e tests/e2e/auth.spec.ts
+PWDEBUG=1 doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e tests/e2e/auth.spec.ts
 
 # Open the Playwright report
 pnpm exec playwright show-report
@@ -99,8 +99,8 @@ Local signed-in QA should use the dev auth bootstrap route, not manual cookie im
 
 Recommended flow:
 
-1. Start the local browse server:
-   `doppler run -- pnpm --filter web dev:local:browse`
+1. Start the local browse server from the repo root:
+   `pnpm run dev:web:browse`
 2. In `/browse`, open:
    `/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings`
 3. Use `persona=admin` only for admin flows:
