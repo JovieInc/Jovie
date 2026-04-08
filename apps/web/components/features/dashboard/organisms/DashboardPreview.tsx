@@ -85,7 +85,6 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
                   artist={artist}
                   socialLinks={previewSocialLinks}
                   subtitle=''
-                  showTipButton={false}
                   showBackButton={false}
                   contacts={[]}
                   showFooter={false}

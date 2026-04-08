@@ -13,7 +13,6 @@ export interface StaticArtistPageProps {
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
   readonly subtitle: string;
-  readonly showTipButton: boolean;
   readonly showBackButton: boolean;
   readonly showTourButton?: boolean;
   readonly showFooter?: boolean;

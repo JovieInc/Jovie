@@ -491,25 +491,9 @@ describe('Public Profile Page Logic', () => {
       expect(getProfileModeSubtitle('unknown')).toBe('Artist');
     });
 
-    it('shows tip button whenever a venmo link exists', () => {
-      const hasVenmoLink = mockLinks.some(link => link.platform === 'venmo');
-      const showTipButton = hasVenmoLink;
-      expect(showTipButton).toBe(false);
-
-      const linksWithVenmo = [
-        ...mockLinks,
-        {
-          id: 'link-v',
-          artist_id: 'profile-123',
-          platform: 'venmo',
-          url: 'https://venmo.com/u/test',
-          clicks: 0,
-          created_at: '2024-01-01T00:00:00Z',
-        },
-      ];
-      const hasVenmo2 = linksWithVenmo.some(link => link.platform === 'venmo');
-      const showTipButton2 = hasVenmo2;
-      expect(showTipButton2).toBe(true);
+    it('passes social links through so compact profile tipping can derive from venmo links', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('socialLinks={links}');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('showTipButton=');
     });
 
     it('shows back button only for non-profile modes', () => {

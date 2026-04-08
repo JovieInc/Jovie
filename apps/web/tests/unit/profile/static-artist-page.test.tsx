@@ -86,7 +86,6 @@ describe('StaticArtistPage', () => {
         socialLinks={mockSocialLinks}
         contacts={[]}
         subtitle='Profile'
-        showTipButton={false}
         showBackButton={false}
       />
     );
@@ -106,7 +105,6 @@ describe('StaticArtistPage', () => {
         socialLinks={mockSocialLinks}
         contacts={[]}
         subtitle='Listen'
-        showTipButton={false}
         showBackButton={true}
       />
     );
@@ -127,7 +125,6 @@ describe('StaticArtistPage', () => {
         socialLinks={mockSocialLinks}
         contacts={[]}
         subtitle='Profile'
-        showTipButton={false}
         showBackButton={false}
       />
     );
@@ -148,7 +145,6 @@ describe('StaticArtistPage', () => {
         socialLinks={mockSocialLinks}
         contacts={[]}
         subtitle='Profile'
-        showTipButton={false}
         showBackButton={false}
         showSubscriptionConfirmedBanner
       />
@@ -172,7 +168,6 @@ describe('StaticArtistPage', () => {
         socialLinks={mockSocialLinks}
         contacts={[]}
         subtitle='Profile'
-        showTipButton={false}
         showBackButton={false}
       />
     );
@@ -193,7 +188,6 @@ describe('StaticArtistPage', () => {
         socialLinks={mockSocialLinks}
         contacts={[]}
         subtitle='Profile'
-        showTipButton={false}
         showBackButton={false}
       />
     );

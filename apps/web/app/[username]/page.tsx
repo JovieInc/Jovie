@@ -666,7 +666,6 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         viewerCountryCode={viewerCountryCode}
         contacts={publicContacts}
         subtitle='Artist'
-        showTipButton={false}
         showBackButton={false}
         showTourButton={true}
         enableDynamicEngagement={creatorIsPro}
