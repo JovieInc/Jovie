@@ -31,6 +31,8 @@ describe('POST /api/stripe/portal', () => {
 
     expect(response.status).toBe(401);
     expect(data.error).toBe('Unauthorized');
+    expect(mockGetUserBillingInfo).not.toHaveBeenCalled();
+    expect(mockCreateBillingPortalSession).not.toHaveBeenCalled();
   });
 
   it('returns 400 when user has no Stripe customer ID', async () => {
@@ -50,6 +52,7 @@ describe('POST /api/stripe/portal', () => {
       'No billing account found. Upgrade to Pro to manage billing.'
     );
     expect(data.code).toBe('no_billing_account');
+    expect(mockCreateBillingPortalSession).not.toHaveBeenCalled();
   });
 
   it('creates portal session for user with Stripe customer', async () => {

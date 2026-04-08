@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getClerkProxyUrl,
+  getRequestLocationFromHeaders,
   isMockPublishableKey,
   shouldBypassClerk,
   shouldDisableClerkProxyForLocation,
@@ -52,6 +53,31 @@ describe('clerkAvailability', () => {
     expect(isMockPublishableKey('mock-publishable-key')).toBe(true);
     expect(isMockPublishableKey('dummy')).toBe(true);
     expect(isMockPublishableKey('pk_test_example')).toBe(false);
+  });
+
+  describe('getRequestLocationFromHeaders', () => {
+    it('normalizes comma-separated hosts, uppercase proto, and IPv6 ports', () => {
+      const headers = new Headers({
+        'x-forwarded-host': '[::1]:3000, localhost:3000',
+        'x-forwarded-proto': 'HTTP, https',
+      });
+
+      expect(getRequestLocationFromHeaders(headers)).toEqual({
+        hostname: '::1',
+        protocol: 'http:',
+      });
+    });
+
+    it('defaults missing proto headers to http for private hosts', () => {
+      const headers = new Headers({
+        host: 'localhost:3000',
+      });
+
+      expect(getRequestLocationFromHeaders(headers)).toEqual({
+        hostname: 'localhost',
+        protocol: 'http:',
+      });
+    });
   });
 
   describe('getClerkProxyUrl', () => {

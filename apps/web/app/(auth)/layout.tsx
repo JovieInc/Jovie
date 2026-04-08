@@ -1,7 +1,10 @@
 import './auth-utilities.css';
 import { headers } from 'next/headers';
 import { AuthClientProviders } from '@/components/providers/AuthClientProviders';
-import { shouldBypassClerk } from '@/components/providers/clerkAvailability';
+import {
+  getRequestLocationFromHeaders,
+  shouldBypassClerk,
+} from '@/components/providers/clerkAvailability';
 import {
   AuthLayout as AuthShellLayout,
   AuthUnavailableCard,
@@ -19,18 +22,7 @@ export default async function AuthLayout({
 }>) {
   const publishableKey = await resolvePublishableKeyFromHeaders();
   const requestHeaders = await headers();
-  const forwardedHost =
-    requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host') ?? '';
-  const forwardedProto = requestHeaders.get('x-forwarded-proto') ?? 'https';
-  const requestLocation =
-    forwardedHost.length > 0
-      ? {
-          hostname: forwardedHost.split(':')[0] ?? '',
-          protocol: forwardedProto.endsWith(':')
-            ? forwardedProto
-            : `${forwardedProto}:`,
-        }
-      : undefined;
+  const requestLocation = getRequestLocationFromHeaders(requestHeaders);
   const isClerkUnavailable = shouldBypassClerk(
     publishableKey,
     publicEnv.NEXT_PUBLIC_CLERK_MOCK,

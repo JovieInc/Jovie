@@ -889,304 +889,305 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
   // This ensures we write to the same connection pool the app reads from
   const sql = neon(databaseUrl);
   const db = drizzle(sql, { schema });
+  const seedRetryOptions = {
+    attempts: process.env.CI ? 4 : 2,
+    initialDelayMs: 1_500,
+    label: 'E2E seed database access',
+  } as const;
 
   try {
-    await withSeedDatabaseRetry(
-      async () => {
-        if (!options.publicProfilesOnly) {
-          // Create E2E test user (for authenticated dashboard tests)
-          // These values come from the setup script: scripts/setup-e2e-users.ts
-          const {
-            E2E_CLERK_USER_ID: configuredE2EClerkUserId,
-            E2E_CLERK_USER_USERNAME,
-          } = getSeedEnv();
-          const E2E_EMAIL = normalizeEmail(
-            E2E_CLERK_USER_USERNAME || 'e2e@jov.ie'
-          );
-          const isAllowlistedE2EEmail = isAllowlistedE2ESeedEmail(E2E_EMAIL);
-          const E2E_USERNAME = 'e2e-test-user';
-          const E2E_CLERK_USER_ID = isAllowlistedE2EEmail
-            ? await resolveSeedUserClerkId(E2E_EMAIL, configuredE2EClerkUserId)
-            : null;
+    await withSeedDatabaseRetry(async () => {
+      if (!options.publicProfilesOnly) {
+        // Create E2E test user (for authenticated dashboard tests)
+        // These values come from the setup script: scripts/setup-e2e-users.ts
+        const {
+          E2E_CLERK_USER_ID: configuredE2EClerkUserId,
+          E2E_CLERK_USER_USERNAME,
+        } = getSeedEnv();
+        const E2E_EMAIL = normalizeEmail(
+          E2E_CLERK_USER_USERNAME || 'e2e@jov.ie'
+        );
+        const isAllowlistedE2EEmail = isAllowlistedE2ESeedEmail(E2E_EMAIL);
+        const E2E_USERNAME = 'e2e-test-user';
+        const E2E_CLERK_USER_ID = isAllowlistedE2EEmail
+          ? await resolveSeedUserClerkId(E2E_EMAIL, configuredE2EClerkUserId)
+          : null;
 
-          if (E2E_CLERK_USER_ID) {
-            // Keep the Playwright auth-bypass path aligned with the Clerk user ID
-            // actually seeded into the database for this run.
-            process.env.E2E_CLERK_USER_ID = E2E_CLERK_USER_ID;
-          }
-
-          if (!isAllowlistedE2EEmail) {
-            console.warn(
-              `  ⚠ Refusing to seed privileged E2E user for non-allowlisted email ${E2E_EMAIL}`
-            );
-          } else if (!E2E_CLERK_USER_ID) {
-            console.log(
-              '  ⚠ E2E_CLERK_USER_ID not set, skipping E2E user creation'
-            );
-            console.log(
-              '    Run scripts/setup-e2e-users.ts to create test users in Clerk'
-            );
-          } else {
-            console.log('  Creating E2E test user...');
-            try {
-              const { id: userId, previousClerkId } = await ensureUser(db, {
-                clerkId: E2E_CLERK_USER_ID,
-                email: E2E_EMAIL,
-                name: 'E2E Test',
-                userStatus: 'active',
-                isAdmin: true,
-              });
-              console.log(
-                `    ✓ Ensured E2E user with admin privileges (ID: ${userId})`
-              );
-              if (previousClerkId) {
-                console.log(
-                  `    ✓ Adopted existing E2E user from stale Clerk ID ${previousClerkId} to ${E2E_CLERK_USER_ID}`
-                );
-              }
-
-              const profileId = await ensureCreatorProfile(db, {
-                userId,
-                username: E2E_USERNAME,
-                usernameNormalized: E2E_USERNAME.toLowerCase(),
-                displayName: 'E2E Test User',
-                bio: 'Automated test user',
-                avatarUrl: DEFAULT_TEST_AVATAR_URL,
-                spotifyUrl: null,
-                appleMusicUrl: null,
-                appleMusicId: null,
-                youtubeMusicId: null,
-                deezerId: null,
-                tidalId: null,
-                soundcloudId: null,
-                creatorType: 'artist',
-                isPublic: true,
-                isVerified: false,
-                isClaimed: true,
-                ingestionStatus: 'idle',
-                onboardingCompletedAt: new Date(),
-              });
-
-              await setActiveProfile(db, userId, profileId);
-
-              console.log(
-                `    ✓ Ensured E2E profile ${E2E_USERNAME} (ID: ${profileId})`
-              );
-              console.log(`    ✓ Set active profile for E2E user`);
-
-              await seedReleasesForProfile(db, profileId);
-              await seedTourDatesForProfile(db, profileId);
-
-              const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } =
-                getSeedEnv();
-              if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
-                try {
-                  const redis = new Redis({
-                    url: UPSTASH_REDIS_REST_URL,
-                    token: UPSTASH_REDIS_REST_TOKEN,
-                  });
-                  const clerkIdsToInvalidate = [
-                    previousClerkId,
-                    E2E_CLERK_USER_ID,
-                  ].filter((clerkId): clerkId is string => Boolean(clerkId));
-
-                  let deletedCount = 0;
-                  for (const clerkId of clerkIdsToInvalidate) {
-                    const proxyStateCacheKey = `proxy:user-state:${clerkId}`;
-                    const adminRoleCacheKey = `admin:role:${clerkId}`;
-                    deletedCount += await redis.del(proxyStateCacheKey);
-                    deletedCount += await redis.del(adminRoleCacheKey);
-                  }
-
-                  console.log(
-                    `    ✓ Invalidated proxy/admin caches for E2E user (${deletedCount} key(s) across ${clerkIdsToInvalidate.length} Clerk ID(s))`
-                  );
-                } catch (error) {
-                  console.warn(
-                    '    ⚠ Failed to invalidate proxy state cache for E2E user:',
-                    error
-                  );
-                }
-              }
-            } catch (error) {
-              if (!isMissingActiveProfileIdColumn(error)) {
-                throw error;
-              }
-
-              console.warn(
-                '    ⚠ Skipping E2E user creation because the preview database is missing users.active_profile_id'
-              );
-            }
-          }
+        if (E2E_CLERK_USER_ID) {
+          // Keep the Playwright auth-bypass path aligned with the Clerk user ID
+          // actually seeded into the database for this run.
+          process.env.E2E_CLERK_USER_ID = E2E_CLERK_USER_ID;
         }
-      },
-      {
-        attempts: process.env.CI ? 4 : 2,
-        initialDelayMs: 1_500,
-        label: 'E2E seed database access',
-      }
-    );
 
-    // Create test profiles
-    for (const profile of TEST_PROFILES) {
-      console.log(`  Creating profile: ${profile.username}`);
-
-      // For dualipa, include real multi-DSP IDs so E2E tests can verify multi-DSP rendering
-      const dspFields =
-        profile.username === 'dualipa'
-          ? {
-              appleMusicId: '1031397873',
-              appleMusicUrl:
-                'https://music.apple.com/us/artist/dua-lipa/1031397873',
-              deezerId: '13206246',
-              tidalId: '7551163',
-              youtubeMusicId: 'UC-J-KZfRV8c13fOCkhXdLiQ',
-              soundcloudId: 'dualipa',
+        if (!isAllowlistedE2EEmail) {
+          console.warn(
+            `  ⚠ Refusing to seed privileged E2E user for non-allowlisted email ${E2E_EMAIL}`
+          );
+        } else if (!E2E_CLERK_USER_ID) {
+          console.log(
+            '  ⚠ E2E_CLERK_USER_ID not set, skipping E2E user creation'
+          );
+          console.log(
+            '    Run scripts/setup-e2e-users.ts to create test users in Clerk'
+          );
+        } else {
+          console.log('  Creating E2E test user...');
+          try {
+            const { id: userId, previousClerkId } = await ensureUser(db, {
+              clerkId: E2E_CLERK_USER_ID,
+              email: E2E_EMAIL,
+              name: 'E2E Test',
+              userStatus: 'active',
+              isAdmin: true,
+            });
+            console.log(
+              `    ✓ Ensured E2E user with admin privileges (ID: ${userId})`
+            );
+            if (previousClerkId) {
+              console.log(
+                `    ✓ Adopted existing E2E user from stale Clerk ID ${previousClerkId} to ${E2E_CLERK_USER_ID}`
+              );
             }
-          : {
-              appleMusicId: null,
+
+            const profileId = await ensureCreatorProfile(db, {
+              userId,
+              username: E2E_USERNAME,
+              usernameNormalized: E2E_USERNAME.toLowerCase(),
+              displayName: 'E2E Test User',
+              bio: 'Automated test user',
+              avatarUrl: DEFAULT_TEST_AVATAR_URL,
+              spotifyUrl: null,
               appleMusicUrl: null,
+              appleMusicId: null,
+              youtubeMusicId: null,
               deezerId: null,
               tidalId: null,
-              youtubeMusicId: null,
               soundcloudId: null,
-            };
+              creatorType: 'artist',
+              isPublic: true,
+              isVerified: false,
+              isClaimed: true,
+              ingestionStatus: 'idle',
+              onboardingCompletedAt: new Date(),
+            });
 
-      const createdProfileId = await ensureCreatorProfile(db, {
-        userId: null,
-        username: profile.username,
-        usernameNormalized: profile.username.toLowerCase(),
-        displayName: profile.displayName,
-        bio: profile.bio,
-        spotifyUrl: profile.spotifyUrl || null,
-        avatarUrl: profile.avatarUrl || null,
-        creatorType: 'artist',
-        isPublic: true,
-        isVerified: false,
-        isClaimed: false,
-        ingestionStatus: 'idle',
-        onboardingCompletedAt: null,
-        ...dspFields,
-      });
+            await setActiveProfile(db, userId, profileId);
 
-      console.log(
-        `    ✓ Ensured profile ${profile.username} (ID: ${createdProfileId})`
-      );
+            console.log(
+              `    ✓ Ensured E2E profile ${E2E_USERNAME} (ID: ${profileId})`
+            );
+            console.log(`    ✓ Set active profile for E2E user`);
 
-      // Add a sample social link
-      if (profile.spotifyUrl) {
-        await ensureSocialLink(db, {
-          creatorProfileId: createdProfileId,
-          platform: 'spotify',
-          platformType: 'music_streaming',
-          url: profile.spotifyUrl,
-          displayText: 'Listen on Spotify',
-          isActive: true,
-          sortOrder: 1,
-          state: 'active',
-        });
-        console.log(`    ✓ Added Spotify link for ${profile.username}`);
+            await seedReleasesForProfile(db, profileId);
+            await seedTourDatesForProfile(db, profileId);
+
+            const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } =
+              getSeedEnv();
+            if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
+              try {
+                const redis = new Redis({
+                  url: UPSTASH_REDIS_REST_URL,
+                  token: UPSTASH_REDIS_REST_TOKEN,
+                });
+                const clerkIdsToInvalidate = [
+                  previousClerkId,
+                  E2E_CLERK_USER_ID,
+                ].filter((clerkId): clerkId is string => Boolean(clerkId));
+
+                let deletedCount = 0;
+                for (const clerkId of clerkIdsToInvalidate) {
+                  const proxyStateCacheKey = `proxy:user-state:${clerkId}`;
+                  const adminRoleCacheKey = `admin:role:${clerkId}`;
+                  deletedCount += await redis.del(proxyStateCacheKey);
+                  deletedCount += await redis.del(adminRoleCacheKey);
+                }
+
+                console.log(
+                  `    ✓ Invalidated proxy/admin caches for E2E user (${deletedCount} key(s) across ${clerkIdsToInvalidate.length} Clerk ID(s))`
+                );
+              } catch (error) {
+                console.warn(
+                  '    ⚠ Failed to invalidate proxy state cache for E2E user:',
+                  error
+                );
+              }
+            }
+          } catch (error) {
+            if (!isMissingActiveProfileIdColumn(error)) {
+              throw error;
+            }
+
+            console.warn(
+              '    ⚠ Skipping E2E user creation because the preview database is missing users.active_profile_id'
+            );
+          }
+        }
       }
+    }, seedRetryOptions);
 
-      // Add multi-DSP social links for dualipa so E2E tests verify multi-DSP rendering
-      if (profile.username === 'dualipa') {
-        const dualipaSocialLinks = [
-          {
-            platform: 'apple_music',
-            platformType: 'music_streaming' as const,
-            url: 'https://music.apple.com/us/artist/dua-lipa/1031397873',
-            displayText: 'Listen on Apple Music',
-            sortOrder: 2,
-          },
-          {
-            platform: 'instagram',
-            platformType: 'social' as const,
-            url: 'https://instagram.com/dualipa',
-            displayText: 'Instagram',
-            sortOrder: 3,
-          },
-          {
-            platform: 'tiktok',
-            platformType: 'social' as const,
-            url: 'https://tiktok.com/@dualipa',
-            displayText: 'TikTok',
-            sortOrder: 4,
-          },
-          {
-            platform: 'youtube',
-            platformType: 'video' as const,
-            url: 'https://youtube.com/channel/UC-J-KZfRV8c13fOCkhXdLiQ',
-            displayText: 'YouTube',
-            sortOrder: 5,
-          },
-        ];
-        for (const link of dualipaSocialLinks) {
+    await withSeedDatabaseRetry(async () => {
+      // Create test profiles
+      for (const profile of TEST_PROFILES) {
+        console.log(`  Creating profile: ${profile.username}`);
+
+        // For dualipa, include real multi-DSP IDs so E2E tests can verify multi-DSP rendering
+        const dspFields =
+          profile.username === 'dualipa'
+            ? {
+                appleMusicId: '1031397873',
+                appleMusicUrl:
+                  'https://music.apple.com/us/artist/dua-lipa/1031397873',
+                deezerId: '13206246',
+                tidalId: '7551163',
+                youtubeMusicId: 'UC-J-KZfRV8c13fOCkhXdLiQ',
+                soundcloudId: 'dualipa',
+              }
+            : {
+                appleMusicId: null,
+                appleMusicUrl: null,
+                deezerId: null,
+                tidalId: null,
+                youtubeMusicId: null,
+                soundcloudId: null,
+              };
+
+        const createdProfileId = await ensureCreatorProfile(db, {
+          userId: null,
+          username: profile.username,
+          usernameNormalized: profile.username.toLowerCase(),
+          displayName: profile.displayName,
+          bio: profile.bio,
+          spotifyUrl: profile.spotifyUrl || null,
+          avatarUrl: profile.avatarUrl || null,
+          creatorType: 'artist',
+          isPublic: true,
+          isVerified: false,
+          isClaimed: false,
+          ingestionStatus: 'idle',
+          onboardingCompletedAt: null,
+          ...dspFields,
+        });
+
+        console.log(
+          `    ✓ Ensured profile ${profile.username} (ID: ${createdProfileId})`
+        );
+
+        // Add a sample social link
+        if (profile.spotifyUrl) {
           await ensureSocialLink(db, {
             creatorProfileId: createdProfileId,
-            platform: link.platform,
-            platformType: link.platformType,
-            url: link.url,
-            displayText: link.displayText,
+            platform: 'spotify',
+            platformType: 'music_streaming',
+            url: profile.spotifyUrl,
+            displayText: 'Listen on Spotify',
             isActive: true,
-            sortOrder: link.sortOrder,
+            sortOrder: 1,
             state: 'active',
           });
+          console.log(`    ✓ Added Spotify link for ${profile.username}`);
         }
-        console.log(
-          `    ✓ Added ${dualipaSocialLinks.length} multi-DSP social links for dualipa`
-        );
-      }
 
-      // Add tour dates for dualipa to test public touring display
-      if (profile.username === 'dualipa') {
-        await seedTourDatesForProfile(db, createdProfileId);
-        await seedPublicContactsForProfile(db, createdProfileId);
-      }
-
-      // Add Venmo payment link for tipping tests
-      if (profile.username === 'testartist') {
-        await ensureSocialLink(db, {
-          creatorProfileId: createdProfileId,
-          platform: 'venmo',
-          platformType: 'payment',
-          url: 'https://venmo.com/testartist',
-          displayText: 'Tip on Venmo',
-          isActive: true,
-          sortOrder: 2,
-          state: 'active',
-        });
-        console.log(`    ✓ Added Venmo link for ${profile.username}`);
-      }
-
-      // Invalidate Redis cache for this profile to ensure fresh data
-      // Only attempt if Redis credentials are available
-      const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } = getSeedEnv();
-      if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
-        try {
-          const redis = new Redis({
-            url: UPSTASH_REDIS_REST_URL,
-            token: UPSTASH_REDIS_REST_TOKEN,
-          });
-          const cacheKey = `profile:data:${profile.username.toLowerCase()}`;
-
-          // Verify cache exists before deletion
-          const beforeCache = await redis.get(cacheKey);
-          const deletedCount = await redis.del(cacheKey);
-
-          // Verify cache was actually deleted
-          const afterCache = await redis.get(cacheKey);
-
+        // Add multi-DSP social links for dualipa so E2E tests verify multi-DSP rendering
+        if (profile.username === 'dualipa') {
+          const dualipaSocialLinks = [
+            {
+              platform: 'apple_music',
+              platformType: 'music_streaming' as const,
+              url: 'https://music.apple.com/us/artist/dua-lipa/1031397873',
+              displayText: 'Listen on Apple Music',
+              sortOrder: 2,
+            },
+            {
+              platform: 'instagram',
+              platformType: 'social' as const,
+              url: 'https://instagram.com/dualipa',
+              displayText: 'Instagram',
+              sortOrder: 3,
+            },
+            {
+              platform: 'tiktok',
+              platformType: 'social' as const,
+              url: 'https://tiktok.com/@dualipa',
+              displayText: 'TikTok',
+              sortOrder: 4,
+            },
+            {
+              platform: 'youtube',
+              platformType: 'video' as const,
+              url: 'https://youtube.com/channel/UC-J-KZfRV8c13fOCkhXdLiQ',
+              displayText: 'YouTube',
+              sortOrder: 5,
+            },
+          ];
+          for (const link of dualipaSocialLinks) {
+            await ensureSocialLink(db, {
+              creatorProfileId: createdProfileId,
+              platform: link.platform,
+              platformType: link.platformType,
+              url: link.url,
+              displayText: link.displayText,
+              isActive: true,
+              sortOrder: link.sortOrder,
+              state: 'active',
+            });
+          }
           console.log(
-            `    ✓ Invalidated Redis cache for ${profile.username} (deleted ${deletedCount} key(s), before: ${beforeCache ? 'EXISTS' : 'NULL'}, after: ${afterCache ? 'EXISTS' : 'NULL'})`
-          );
-        } catch (error) {
-          console.warn(
-            `    ⚠ Failed to invalidate Redis cache for ${profile.username}:`,
-            error
+            `    ✓ Added ${dualipaSocialLinks.length} multi-DSP social links for dualipa`
           );
         }
+
+        // Add tour dates for dualipa to test public touring display
+        if (profile.username === 'dualipa') {
+          await seedTourDatesForProfile(db, createdProfileId);
+          await seedPublicContactsForProfile(db, createdProfileId);
+        }
+
+        // Add Venmo payment link for tipping tests
+        if (profile.username === 'testartist') {
+          await ensureSocialLink(db, {
+            creatorProfileId: createdProfileId,
+            platform: 'venmo',
+            platformType: 'payment',
+            url: 'https://venmo.com/testartist',
+            displayText: 'Tip on Venmo',
+            isActive: true,
+            sortOrder: 2,
+            state: 'active',
+          });
+          console.log(`    ✓ Added Venmo link for ${profile.username}`);
+        }
+
+        // Invalidate Redis cache for this profile to ensure fresh data
+        // Only attempt if Redis credentials are available
+        const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } =
+          getSeedEnv();
+        if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
+          try {
+            const redis = new Redis({
+              url: UPSTASH_REDIS_REST_URL,
+              token: UPSTASH_REDIS_REST_TOKEN,
+            });
+            const cacheKey = `profile:data:${profile.username.toLowerCase()}`;
+
+            // Verify cache exists before deletion
+            const beforeCache = await redis.get(cacheKey);
+            const deletedCount = await redis.del(cacheKey);
+
+            // Verify cache was actually deleted
+            const afterCache = await redis.get(cacheKey);
+
+            console.log(
+              `    ✓ Invalidated Redis cache for ${profile.username} (deleted ${deletedCount} key(s), before: ${beforeCache ? 'EXISTS' : 'NULL'}, after: ${afterCache ? 'EXISTS' : 'NULL'})`
+            );
+          } catch (error) {
+            console.warn(
+              `    ⚠ Failed to invalidate Redis cache for ${profile.username}:`,
+              error
+            );
+          }
+        }
       }
-    }
+    }, seedRetryOptions);
 
     console.log('✅ Test data seeding complete');
     return { success: true };

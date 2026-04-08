@@ -79,6 +79,12 @@ describe('POST /api/wrap-link', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
+    expect(mockCreateWrappedLink).toHaveBeenCalledWith({
+      customAlias: undefined,
+      expiresInHours: undefined,
+      url: 'https://example.com/path',
+      userId: undefined,
+    });
     expect(data.normalUrl).toBe('/go/abc123');
     expect(data.sensitiveUrl).toBe('/out/abc123');
   });
