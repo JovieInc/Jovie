@@ -19,6 +19,7 @@ import {
   ensureCreatorProfileRecord as ensureCreatorProfile,
   ensureSocialLinkRecord as ensureSocialLink,
   ensureUserRecord as ensureUser,
+  getDeterministicTestClerkId as getSeedDeterministicClerkId,
   isAllowlistedPrivilegedTestAccountEmail,
   resolveClerkTestUserId as resolveSeedUserClerkId,
   setActiveProfileForUser as setActiveProfile,
@@ -1046,7 +1047,10 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
         const isAllowlistedE2EEmail = isAllowlistedE2ESeedEmail(E2E_EMAIL);
         const E2E_USERNAME = 'e2e-test-user';
         const E2E_CLERK_USER_ID = isAllowlistedE2EEmail
-          ? await resolveSeedUserClerkId(E2E_EMAIL, configuredE2EClerkUserId)
+          ? await resolveSeedUserClerkId(
+              E2E_EMAIL,
+              configuredE2EClerkUserId ?? getSeedDeterministicClerkId(E2E_EMAIL)
+            )
           : null;
 
         if (E2E_CLERK_USER_ID) {

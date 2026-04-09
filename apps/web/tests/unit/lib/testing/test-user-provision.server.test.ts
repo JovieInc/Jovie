@@ -111,6 +111,21 @@ describe('test-user-provision.server', () => {
     });
   });
 
+  it('uses an explicit fallback id for unauthorized Clerk lookups', async () => {
+    mockGetUserList.mockRejectedValue({
+      status: 401,
+      errors: [{ code: 'authentication_invalid' }],
+    });
+
+    const { resolveClerkTestUserId } = await import(
+      '@/lib/testing/test-user-provision.server'
+    );
+
+    await expect(
+      resolveClerkTestUserId('e2e+clerk_test@jov.ie', 'user_seed_fallback')
+    ).resolves.toBe('user_seed_fallback');
+  });
+
   it('keeps privileged seeding narrower than the generic browse allowlist', async () => {
     const {
       isAllowlistedPrivilegedTestAccountEmail,

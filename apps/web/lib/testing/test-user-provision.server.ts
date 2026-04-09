@@ -143,7 +143,7 @@ export function isAllowlistedPrivilegedTestAccountEmail(
   );
 }
 
-function buildDeterministicClerkId(email: string): string {
+export function getDeterministicTestClerkId(email: string): string {
   const normalizedEmail = normalizeEmail(email);
   const stableId = normalizedEmail.replaceAll(/[^a-z0-9]+/gi, '_').slice(0, 48);
   return `user_dev_${stableId || 'browse'}`;
@@ -203,15 +203,15 @@ export async function resolveClerkTestUserId(
   const secretKey = process.env.CLERK_SECRET_KEY;
 
   if (!normalizedEmail) {
-    return fallbackClerkId ?? buildDeterministicClerkId(email);
+    return fallbackClerkId ?? getDeterministicTestClerkId(email);
   }
 
   if (!secretKey?.startsWith('sk_test_')) {
-    return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+    return fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail);
   }
 
   if (!isAllowlistedTestAccountEmail(normalizedEmail)) {
-    return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+    return fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail);
   }
 
   const clerk = createClerkClient({ secretKey });
@@ -230,7 +230,7 @@ export async function resolveClerkTestUserId(
   return (
     existingUsers.data[0]?.id ??
     fallbackClerkId ??
-    buildDeterministicClerkId(normalizedEmail)
+    getDeterministicTestClerkId(normalizedEmail)
   );
 }
 
@@ -246,11 +246,11 @@ export async function ensureClerkTestUser({
   const secretKey = process.env.CLERK_SECRET_KEY;
 
   if (!secretKey?.startsWith('sk_test_')) {
-    return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+    return fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail);
   }
 
   if (!isAllowlistedTestAccountEmail(normalizedEmail)) {
-    return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+    return fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail);
   }
 
   const clerk = createClerkClient({ secretKey });

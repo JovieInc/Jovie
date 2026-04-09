@@ -542,7 +542,6 @@ interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
-  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 async function getPublicTourDates(
@@ -559,12 +558,8 @@ async function getPublicTourDates(
   }
 }
 
-export default async function ArtistPage({
-  params,
-  searchParams,
-}: Readonly<Props>) {
+export default async function ArtistPage({ params }: Readonly<Props>) {
   const { username } = await params;
-  const resolvedSearchParams = await searchParams;
 
   // Early reject obviously invalid usernames before hitting the database
   if (
@@ -576,9 +571,6 @@ export default async function ArtistPage({
   }
 
   const isPublicNoAuthSmoke = shouldBypassPublicProfileQaCache();
-  const requestedMode = Array.isArray(resolvedSearchParams.mode)
-    ? resolvedSearchParams.mode[0]
-    : resolvedSearchParams.mode;
   const viewerCountryCode = null;
 
   const profileResult = await getProfileAndLinks(username);
@@ -659,7 +651,6 @@ export default async function ArtistPage({
     links,
     tourDates
   );
-  const publicTourDates = tourDates.slice(0, MAX_EVENT_SCHEMAS);
 
   return (
     <>
@@ -692,7 +683,7 @@ export default async function ArtistPage({
         pressPhotos={pressPhotos}
         subscribeTwoStep
         genres={genres}
-        tourDates={requestedMode === 'tour' ? tourDates : publicTourDates}
+        tourDates={tourDates}
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
