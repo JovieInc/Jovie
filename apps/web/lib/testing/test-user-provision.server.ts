@@ -395,7 +395,7 @@ export async function ensureCreatorProfileRecord(
     .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
     .limit(1);
 
-  const [existingClaimedProfileForUser] =
+  const existingClaimedProfilesForUser =
     values.userId && values.isClaimed
       ? await database
           .select({ id: creatorProfiles.id })
@@ -406,8 +406,16 @@ export async function ensureCreatorProfileRecord(
               eq(creatorProfiles.isClaimed, true)
             )
           )
-          .limit(1)
+          .limit(2)
       : [];
+
+  if (existingClaimedProfilesForUser.length > 1) {
+    throw new Error(
+      `Ambiguous claimed creator profiles for user ${values.userId}`
+    );
+  }
+
+  const existingClaimedProfileForUser = existingClaimedProfilesForUser[0];
 
   if (
     existingProfileByUsername &&
@@ -447,7 +455,7 @@ export async function ensureCreatorProfileRecord(
       .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
       .limit(1);
 
-    const [racedClaimedProfileForUser] =
+    const racedClaimedProfilesForUser =
       values.userId && values.isClaimed
         ? await database
             .select({ id: creatorProfiles.id })
@@ -458,8 +466,16 @@ export async function ensureCreatorProfileRecord(
                 eq(creatorProfiles.isClaimed, true)
               )
             )
-            .limit(1)
+            .limit(2)
         : [];
+
+    if (racedClaimedProfilesForUser.length > 1) {
+      throw new Error(
+        `Ambiguous claimed creator profiles for user ${values.userId}`
+      );
+    }
+
+    const racedClaimedProfileForUser = racedClaimedProfilesForUser[0];
 
     if (
       racedProfileByUsername &&

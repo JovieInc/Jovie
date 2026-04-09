@@ -15,7 +15,7 @@ export default function AiPage() {
     <main className='bg-base px-6 py-16 text-primary-token sm:px-8 lg:px-12'>
       <div className='mx-auto flex max-w-5xl flex-col gap-10'>
         <section className='max-w-3xl space-y-5'>
-          <p className='text-sm font-medium uppercase tracking-[0.18em] text-muted-token'>
+          <p className='text-sm font-medium tracking-tight text-muted-token'>
             Public Brief
           </p>
           <h1 className='text-4xl font-semibold tracking-tight sm:text-5xl'>
@@ -104,7 +104,7 @@ export default function AiPage() {
               </Link>
               <Link
                 className='btn-linear-secondary'
-                href='/blog/the-myspace-problem'
+                href={APP_ROUTES.BLOG_THE_MYSPACE_PROBLEM}
               >
                 Read The Memo
               </Link>

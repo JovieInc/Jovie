@@ -6,7 +6,10 @@ const HOME_LINK_LABEL = 'Go to homepage';
 const NORMALIZED_ATTR = 'data-jovie-home-link-label';
 
 function hasAccessibleName(anchor: HTMLAnchorElement): boolean {
-  const ariaLabel = anchor.getAttribute('aria-label')?.trim();
+  const ariaLabel =
+    anchor.getAttribute(NORMALIZED_ATTR) === 'true'
+      ? null
+      : anchor.getAttribute('aria-label')?.trim();
   if (ariaLabel) {
     return true;
   }
@@ -52,7 +55,21 @@ function normalizeHomeLinks(root: HTMLElement) {
       continue;
     }
 
-    if (!isHomepageHref(node) || hasAccessibleName(node)) {
+    const wasNormalized = node.getAttribute(NORMALIZED_ATTR) === 'true';
+
+    if (!isHomepageHref(node)) {
+      if (wasNormalized) {
+        node.removeAttribute('aria-label');
+        node.removeAttribute(NORMALIZED_ATTR);
+      }
+      continue;
+    }
+
+    if (hasAccessibleName(node)) {
+      if (wasNormalized) {
+        node.removeAttribute('aria-label');
+        node.removeAttribute(NORMALIZED_ATTR);
+      }
       continue;
     }
 

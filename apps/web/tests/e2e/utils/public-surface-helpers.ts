@@ -225,6 +225,18 @@ async function assertOverlayLifecycle(page: Page, trigger: Locator) {
     await expect(overlay).toBeVisible({ timeout: 5_000 });
     await page.keyboard.press('Tab').catch(() => undefined);
     await closeTransientUi(page);
+
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      const settled = await page.locator(OVERLAY_SELECTOR).count();
+      if (settled <= before) {
+        return;
+      }
+
+      await page.waitForTimeout(100);
+    }
+
+    throw new Error('Overlay did not close after dismissal');
   }
 }
 
@@ -317,21 +329,19 @@ async function runCookieBannerInteraction(page: Page) {
     .isVisible()
     .catch(() => false);
 
-  if (!customizeVisible) {
-    const manageTrigger = banner
-      .getByRole('button', { name: /manage/i })
-      .first();
-    const manageVisible = await manageTrigger.isVisible().catch(() => false);
-
-    if (!manageVisible) {
-      return;
-    }
-
-    await manageTrigger.click({ force: true });
-    await page.waitForTimeout(150);
+  if (customizeVisible) {
+    await assertOverlayLifecycle(page, customizeTrigger);
+    return;
   }
 
-  await assertOverlayLifecycle(page, customizeTrigger);
+  const manageTrigger = banner.getByRole('button', { name: /manage/i }).first();
+  const manageVisible = await manageTrigger.isVisible().catch(() => false);
+
+  if (!manageVisible) {
+    return;
+  }
+
+  await assertOverlayLifecycle(page, manageTrigger);
 }
 
 async function runHeaderNavigationInteraction(page: Page) {
@@ -433,18 +443,17 @@ export async function runDeclaredPublicInteractions(
   surface: ResolvedPublicSurfaceSpec,
   projectName: string
 ) {
+  const viewport = page.viewportSize();
+  const isMobile =
+    (viewport?.width ?? Number.POSITIVE_INFINITY) < 768 ||
+    projectName.toLowerCase().includes('mobile');
+
   for (const interaction of surface.interactions) {
-    if (
-      interaction.viewport === 'desktop' &&
-      projectName.toLowerCase().includes('mobile')
-    ) {
+    if (interaction.viewport === 'desktop' && isMobile) {
       continue;
     }
 
-    if (
-      interaction.viewport === 'mobile' &&
-      !projectName.toLowerCase().includes('mobile')
-    ) {
+    if (interaction.viewport === 'mobile' && !isMobile) {
       continue;
     }
 
@@ -471,6 +480,28 @@ export async function runDeclaredPublicInteractions(
         await runDspInteraction(page);
         break;
       case 'profile-mode-drawer':
+        if (!page.url().includes('mode=')) {
+          break;
+        }
+
+        const originalUrl = page.url();
+        const profileTrigger = page
+          .locator('[data-testid="profile-trigger"]')
+          .first();
+        if (!(await profileTrigger.isVisible().catch(() => false))) {
+          break;
+        }
+
+        await profileTrigger.click({ force: true });
+        await page.waitForURL(url => !url.searchParams.has('mode'), {
+          timeout: 15_000,
+        });
+        await page
+          .goBack({ waitUntil: 'domcontentloaded' })
+          .catch(() => undefined);
+        await page
+          .waitForURL(originalUrl, { timeout: 15_000 })
+          .catch(() => undefined);
         await waitForPublicSurfaceReady(page, surface);
         break;
       case 'safe-trigger-sweep':

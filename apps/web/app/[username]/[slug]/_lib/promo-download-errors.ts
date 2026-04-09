@@ -9,7 +9,7 @@ export function isMissingPromoDownloadsRelation(error: unknown): boolean {
       : undefined;
 
   return (
-    (code === '42P01' || message.includes('does not exist')) &&
-    message.includes('promo_downloads')
+    (code === '42P01' && message.includes('promo_downloads')) ||
+    /relation ["']?promo_downloads["']? does not exist/.test(message)
   );
 }

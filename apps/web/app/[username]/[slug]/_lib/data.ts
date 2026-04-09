@@ -567,7 +567,8 @@ export const getContentBySlug = cache(
   ): Promise<Omit<ContentData, 'creator'> | null> => {
     if (
       process.env.NODE_ENV === 'test' ||
-      process.env.NODE_ENV === 'development'
+      process.env.NODE_ENV === 'development' ||
+      shouldBypassPublicProfileQaCache()
     ) {
       const result = await fetchContentBySlug(creatorProfileId, slug);
       return result ? rehydrateContent(result) : null;

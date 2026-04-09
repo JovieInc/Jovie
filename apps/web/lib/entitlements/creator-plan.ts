@@ -3,7 +3,7 @@ import 'server-only';
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import {
   checkBoolean,
   getEntitlements,
@@ -24,7 +24,11 @@ export async function getCreatorEntitlements(
   const [result] = await db
     .select({ plan: users.plan })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .innerJoin(
+      userProfileClaims,
+      eq(userProfileClaims.creatorProfileId, creatorProfiles.id)
+    )
+    .innerJoin(users, eq(users.id, userProfileClaims.userId))
     .where(eq(creatorProfiles.id, creatorProfileId))
     .limit(1);
 
@@ -49,7 +53,11 @@ export async function getBatchCreatorEntitlements(
       plan: users.plan,
     })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .innerJoin(
+      userProfileClaims,
+      eq(userProfileClaims.creatorProfileId, creatorProfiles.id)
+    )
+    .innerJoin(users, eq(users.id, userProfileClaims.userId))
     .where(inArray(creatorProfiles.id, creatorProfileIds));
 
   const map = new Map<

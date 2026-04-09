@@ -64,7 +64,7 @@ const DEFAULTS = {
   musicHandle: process.env.PUBLIC_SURFACE_MUSIC_HANDLE?.trim() || 'dualipa',
   tipHandle: process.env.PUBLIC_SURFACE_TIP_HANDLE?.trim() || 'testartist',
   downloadHandle:
-    process.env.PUBLIC_SURFACE_DOWNLOAD_HANDLE?.trim() || 'e2e-test-user',
+    process.env.PUBLIC_SURFACE_DOWNLOAD_HANDLE?.trim() || 'dualipa',
   releaseSlug:
     process.env.PUBLIC_SURFACE_RELEASE_SLUG?.trim() || 'neon-skyline',
   trackSlug: process.env.PUBLIC_SURFACE_TRACK_SLUG?.trim() || 'neon-skyline',
@@ -172,11 +172,11 @@ function resolveBlogCategoryPath(): string {
 }
 
 function resolveAlternativesPath(): string {
-  return '/alternatives/linktree';
+  return `${APP_ROUTES.ALTERNATIVES}/linktree`;
 }
 
 function resolveComparePath(): string {
-  return '/compare/linktree';
+  return `${APP_ROUTES.COMPARE}/linktree`;
 }
 
 const MARKETING_SURFACES = [
@@ -683,7 +683,7 @@ const PROFILE_MODE_SURFACES = [
     ],
     mainSelector: 'main',
     minMainTextLength: 40,
-    allowedFinalPaths: [/^\/[^/?#]+(?:\?mode=about)?$/],
+    allowedFinalPaths: [/^\/[^/?#]+\?mode=about$/],
     lighthouse: false,
     perfGroups: ['public-profile-mode-shell'],
     interactions: PROFILE_INTERACTIONS,
@@ -700,7 +700,7 @@ const PROFILE_MODE_SURFACES = [
     ],
     mainSelector: 'main',
     minMainTextLength: 40,
-    allowedFinalPaths: [/^\/[^/?#]+(?:\?mode=contact)?$/],
+    allowedFinalPaths: [/^\/[^/?#]+\?mode=contact$/],
     lighthouse: false,
     perfGroups: ['public-profile-mode-shell'],
     interactions: PROFILE_INTERACTIONS,
@@ -717,7 +717,7 @@ const PROFILE_MODE_SURFACES = [
     ],
     mainSelector: 'main',
     minMainTextLength: 40,
-    allowedFinalPaths: [/^\/[^/?#]+(?:\?mode=listen)?$/],
+    allowedFinalPaths: [/^\/[^/?#]+\?mode=listen$/],
     lighthouse: true,
     perfGroups: ['public-profile-mode-shell'],
     interactions: PROFILE_INTERACTIONS,
@@ -734,7 +734,7 @@ const PROFILE_MODE_SURFACES = [
     ],
     mainSelector: 'main',
     minMainTextLength: 40,
-    allowedFinalPaths: [/^\/[^/?#]+(?:\?mode=subscribe)?$/],
+    allowedFinalPaths: [/^\/[^/?#]+\?mode=subscribe$/],
     lighthouse: true,
     perfGroups: ['public-profile-mode-shell'],
     interactions: [
@@ -754,7 +754,7 @@ const PROFILE_MODE_SURFACES = [
     ],
     mainSelector: 'main',
     minMainTextLength: 40,
-    allowedFinalPaths: [/^\/[^/?#]+(?:\?mode=tip)?$/],
+    allowedFinalPaths: [/^\/[^/?#]+\?mode=tip$/],
     lighthouse: true,
     perfGroups: ['public-profile-mode-shell'],
     interactions: PROFILE_INTERACTIONS,
@@ -771,7 +771,7 @@ const PROFILE_MODE_SURFACES = [
     ],
     mainSelector: 'main',
     minMainTextLength: 40,
-    allowedFinalPaths: [/^\/[^/?#]+(?:\?mode=tour)?$/],
+    allowedFinalPaths: [/^\/[^/?#]+\?mode=tour$/],
     lighthouse: false,
     perfGroups: ['public-profile-mode-shell'],
     interactions: PROFILE_INTERACTIONS,

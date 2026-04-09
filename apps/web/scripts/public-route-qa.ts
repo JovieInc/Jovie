@@ -33,12 +33,12 @@ const BASE_URL = process.env.BASE_URL?.trim() || 'http://127.0.0.1:3100';
 const OUTPUT_SEGMENT =
   process.env.PUBLIC_ROUTE_QA_OUTPUT_DIR?.trim() || 'latest';
 const FILTER = process.env.PUBLIC_ROUTE_QA_FILTER?.trim() || '';
-const OUTPUT_ROOT = path.resolve(
+const OUTPUT_BASE = path.resolve(
   process.cwd(),
   'test-results',
-  'public-route-qa',
-  OUTPUT_SEGMENT
+  'public-route-qa'
 );
+const OUTPUT_ROOT = path.resolve(OUTPUT_BASE, OUTPUT_SEGMENT);
 const SCREENSHOT_DIR = path.join(OUTPUT_ROOT, 'screenshots');
 
 try {
@@ -46,6 +46,16 @@ try {
 } catch {
   console.error(`Invalid BASE_URL: ${BASE_URL}`);
   process.exit(1);
+}
+
+const outputRelativePath = path.relative(OUTPUT_BASE, OUTPUT_ROOT);
+if (
+  outputRelativePath.startsWith('..') ||
+  path.isAbsolute(outputRelativePath)
+) {
+  throw new Error(
+    'PUBLIC_ROUTE_QA_OUTPUT_DIR must stay within test-results/public-route-qa'
+  );
 }
 
 function buildAbsoluteUrl(baseUrl: string, resolvedPath: string) {
@@ -240,67 +250,75 @@ async function runSurfaceCheck(
 
 async function main() {
   const browser = await chromium.launch();
-  const context = await browser.newContext({
-    baseURL: BASE_URL,
-    storageState: { cookies: [], origins: [] },
-  });
+  let context: Awaited<ReturnType<typeof browser.newContext>> | undefined;
 
-  const filterTerms = FILTER.split(',')
-    .map(term => term.trim())
-    .filter(Boolean);
-  const surfaces = (await resolvePublicSurfaceManifest()).filter(surface =>
-    filterTerms.length === 0
-      ? true
-      : filterTerms.some(
-          term =>
-            surface.id.includes(term) ||
-            surface.resolvedPath.includes(term) ||
-            surface.family.includes(term)
-        )
-  );
-  const results: PublicQaResult[] = [];
+  try {
+    context = await browser.newContext({
+      baseURL: BASE_URL,
+      storageState: { cookies: [], origins: [] },
+    });
 
-  for (const surface of surfaces) {
-    console.log(
-      `[public-route-qa] checking ${surface.id} ${surface.resolvedPath}`
+    const filterTerms = FILTER.split(',')
+      .map(term => term.trim())
+      .filter(Boolean);
+    const surfaces = (await resolvePublicSurfaceManifest()).filter(surface =>
+      filterTerms.length === 0
+        ? true
+        : filterTerms.some(
+            term =>
+              surface.id.includes(term) ||
+              surface.resolvedPath.includes(term) ||
+              surface.family.includes(term)
+          )
     );
-    const page = await context.newPage();
-    await installPublicRouteMocks(page);
-    const result = await runSurfaceCheck(page, surface);
-    console.log(
-      `[public-route-qa] ${result.status.toUpperCase()} ${surface.id} -> ${
-        result.finalUrl || surface.resolvedPath
-      }${result.errorMessage ? ` | ${result.errorMessage}` : ''}`
+    const results: PublicQaResult[] = [];
+
+    for (const surface of surfaces) {
+      console.log(
+        `[public-route-qa] checking ${surface.id} ${surface.resolvedPath}`
+      );
+      const page = await context.newPage();
+
+      try {
+        await installPublicRouteMocks(page);
+        const result = await runSurfaceCheck(page, surface);
+        console.log(
+          `[public-route-qa] ${result.status.toUpperCase()} ${surface.id} -> ${
+            result.finalUrl || surface.resolvedPath
+          }${result.errorMessage ? ` | ${result.errorMessage}` : ''}`
+        );
+        results.push(result);
+      } finally {
+        await page.close().catch(() => undefined);
+      }
+    }
+
+    await mkdir(OUTPUT_ROOT, { recursive: true });
+    const summary = {
+      baseUrl: BASE_URL,
+      checkedAt: new Date().toISOString(),
+      totals: {
+        total: results.length,
+        failed: results.filter(result => result.status === 'fail').length,
+        passed: results.filter(result => result.status === 'pass').length,
+      },
+      results,
+    };
+
+    await writeFile(
+      path.join(OUTPUT_ROOT, 'summary.json'),
+      `${JSON.stringify(summary, null, 2)}\n`
     );
-    results.push(result);
-    await page.close();
-  }
 
-  await mkdir(OUTPUT_ROOT, { recursive: true });
-  const summary = {
-    baseUrl: BASE_URL,
-    checkedAt: new Date().toISOString(),
-    totals: {
-      total: results.length,
-      failed: results.filter(result => result.status === 'fail').length,
-      passed: results.filter(result => result.status === 'pass').length,
-    },
-    results,
-  };
-
-  await writeFile(
-    path.join(OUTPUT_ROOT, 'summary.json'),
-    `${JSON.stringify(summary, null, 2)}\n`
-  );
-
-  await context.close();
-  await browser.close();
-
-  const failed = results.filter(result => result.status === 'fail');
-  if (failed.length > 0) {
-    throw new Error(
-      `Public route QA failed for: ${failed.map(result => result.id).join(', ')}`
-    );
+    const failed = results.filter(result => result.status === 'fail');
+    if (failed.length > 0) {
+      throw new Error(
+        `Public route QA failed for: ${failed.map(result => result.id).join(', ')}`
+      );
+    }
+  } finally {
+    await context?.close().catch(() => undefined);
+    await browser.close().catch(() => undefined);
   }
 }
 

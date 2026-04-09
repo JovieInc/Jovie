@@ -30,6 +30,7 @@ import {
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import type { ProviderKey } from '@/lib/discography/types';
 import { isVideoProviderKey } from '@/lib/discography/video-providers';
+import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
@@ -37,7 +38,6 @@ import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
 import {
   getContentBySlug,
   getCreatorByUsername,
-  getCreatorPlan,
   getReleaseTrackList,
 } from './_lib/data';
 import { isMissingPromoDownloadsRelation } from './_lib/promo-download-errors';
@@ -255,37 +255,45 @@ export default async function ContentSmartLinkPage({
 
   // Check if the creator's plan allows unreleased content features
   let showUnreleasedHero = false;
+  let creatorEntitlements: Awaited<
+    ReturnType<typeof getCreatorEntitlements>
+  > | null = null;
   if (isUnreleased) {
-    const creatorPlan = await getCreatorPlan(creator.id);
-    showUnreleasedHero = creatorPlan.canAccessFutureReleases;
+    creatorEntitlements = await getCreatorEntitlements(creator.id);
+    showUnreleasedHero =
+      creatorEntitlements.entitlements.booleans.canAccessFutureReleases;
   }
 
   // Check for promo downloads (releases only, not tracks)
   let downloadUrl: string | null = null;
   if (content.type === 'release' && content.id) {
-    try {
-      const { promoDownloads: promoDownloadsTable } = await import(
-        '@/lib/db/schema/promo-downloads'
-      );
-      const { db: dbInstance } = await import('@/lib/db');
-      const { eq, and } = await import('drizzle-orm');
-      const [hasDownloads] = await dbInstance
-        .select({ id: promoDownloadsTable.id })
-        .from(promoDownloadsTable)
-        .where(
-          and(
-            eq(promoDownloadsTable.releaseId, content.id),
-            eq(promoDownloadsTable.isActive, true)
-          )
-        )
-        .limit(1);
+    creatorEntitlements ??= await getCreatorEntitlements(creator.id);
 
-      if (hasDownloads) {
-        downloadUrl = `/${creator.usernameNormalized}/${content.slug}/download`;
-      }
-    } catch (error) {
-      if (!isMissingPromoDownloadsRelation(error)) {
-        throw error;
+    if (creatorEntitlements.plan !== 'free') {
+      try {
+        const { promoDownloads: promoDownloadsTable } = await import(
+          '@/lib/db/schema/promo-downloads'
+        );
+        const { db: dbInstance } = await import('@/lib/db');
+        const { eq, and } = await import('drizzle-orm');
+        const [hasDownloads] = await dbInstance
+          .select({ id: promoDownloadsTable.id })
+          .from(promoDownloadsTable)
+          .where(
+            and(
+              eq(promoDownloadsTable.releaseId, content.id),
+              eq(promoDownloadsTable.isActive, true)
+            )
+          )
+          .limit(1);
+
+        if (hasDownloads) {
+          downloadUrl = `/${creator.usernameNormalized}/${content.slug}/download`;
+        }
+      } catch (error) {
+        if (!isMissingPromoDownloadsRelation(error)) {
+          throw error;
+        }
       }
     }
   }

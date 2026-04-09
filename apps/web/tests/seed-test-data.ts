@@ -974,12 +974,14 @@ async function seedReleasesForProfile(
         .onConflictDoNothing();
       console.log('    ✓ Ensured promo download fixture for Neon Skyline');
     } catch (error) {
-      if (!isMissingRelationError(error, 'promo_downloads')) {
-        throw error;
+      if (isMissingRelationError(error, 'promo_downloads')) {
+        throw new Error(
+          `promo_downloads is missing while seeding public QA fixtures: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
       }
-      console.warn(
-        '    ⚠ Skipping promo download fixture because promo_downloads is missing in this database'
-      );
+      throw error;
     }
   }
 

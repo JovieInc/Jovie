@@ -104,6 +104,7 @@ describe('test-user-provision.server', () => {
         username: 'browse-test-user',
         firstName: 'Browse',
         lastName: 'Test',
+        fallbackClerkId: 'user_fallback_admin',
       })
     ).rejects.toMatchObject({
       status: 429,

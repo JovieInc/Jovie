@@ -4,8 +4,10 @@ import process from 'node:process';
 
 const DEFAULT_LOCAL_BASE_URL = 'http://127.0.0.1:3100';
 const BASE_URL = process.env.BASE_URL?.trim() || DEFAULT_LOCAL_BASE_URL;
-const IS_EXTERNAL_BASE_URL =
-  !BASE_URL.includes('127.0.0.1') && !BASE_URL.includes('localhost');
+const LOCAL_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+const IS_EXTERNAL_BASE_URL = !LOCAL_HOSTNAMES.has(
+  parseBaseUrl(BASE_URL).hostname
+);
 
 function parseBaseUrl(baseUrl: string) {
   const parsed = new URL(baseUrl);

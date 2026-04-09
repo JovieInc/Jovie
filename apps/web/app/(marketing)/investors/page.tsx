@@ -91,7 +91,7 @@ export default function InvestorsPage() {
               <Link
                 className='btn-linear-secondary'
                 prefetch={false}
-                href='/blog/the-contact-problem'
+                href={APP_ROUTES.BLOG_THE_CONTACT_PROBLEM}
               >
                 Read The Thesis
               </Link>

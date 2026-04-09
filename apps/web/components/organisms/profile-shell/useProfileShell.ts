@@ -68,33 +68,52 @@ export interface UseProfileShellReturn {
 }
 
 const LOCATION_SEARCH_CHANGE_EVENT = 'jovie:location-search-change';
-let historyPatched = false;
+const HISTORY_PATCHED = Symbol('jovie.location-search-patched');
+
+type PatchedHistoryMethod = History['pushState'] & {
+  [HISTORY_PATCHED]?: true;
+};
 
 function patchHistoryEvents() {
-  if (historyPatched || globalThis.history === undefined) {
+  if (globalThis.history === undefined) {
     return;
   }
 
   const { pushState, replaceState } = globalThis.history;
+  const patchedPushState = pushState as PatchedHistoryMethod;
+  const patchedReplaceState = replaceState as PatchedHistoryMethod;
+
+  if (
+    patchedPushState[HISTORY_PATCHED] &&
+    patchedReplaceState[HISTORY_PATCHED]
+  ) {
+    return;
+  }
+
   const dispatchChange = () => {
     globalThis.dispatchEvent(new Event(LOCATION_SEARCH_CHANGE_EVENT));
   };
 
-  globalThis.history.pushState = function patchedPushState(
+  const nextPushState: PatchedHistoryMethod = function patchedPushState(
+    this: History,
     ...args: Parameters<History['pushState']>
   ) {
     pushState.apply(this, args);
     dispatchChange();
   };
 
-  globalThis.history.replaceState = function patchedReplaceState(
+  const nextReplaceState: PatchedHistoryMethod = function patchedReplaceState(
+    this: History,
     ...args: Parameters<History['replaceState']>
   ) {
     replaceState.apply(this, args);
     dispatchChange();
   };
 
-  historyPatched = true;
+  nextPushState[HISTORY_PATCHED] = true;
+  nextReplaceState[HISTORY_PATCHED] = true;
+  globalThis.history.pushState = nextPushState;
+  globalThis.history.replaceState = nextReplaceState;
 }
 
 function subscribeToLocationSearch(onStoreChange: () => void): () => void {
@@ -147,7 +166,7 @@ function resolveSourceFromSearch(
     return fallbackSource;
   }
 
-  return new URLSearchParams(search).get('source');
+  return new URLSearchParams(search).get('source') ?? fallbackSource;
 }
 
 export function useProfileShell({

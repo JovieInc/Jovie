@@ -326,6 +326,7 @@ async function focusComposerInput(page: import('@playwright/test').Page) {
     .locator(
       '[data-testid="subscription-input"], [data-testid="inline-email-input"]'
     )
+    .filter({ visible: true })
     .first();
   await input.waitFor({ state: 'visible', timeout: 15_000 });
   await input.focus();
