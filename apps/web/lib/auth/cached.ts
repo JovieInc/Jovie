@@ -9,6 +9,47 @@ import {
 
 type CachedCurrentUser = Awaited<ReturnType<typeof currentUser>>;
 
+interface NullAuthResult {
+  userId: null;
+  sessionId: null;
+  orgId: null;
+}
+
+const NULL_AUTH_RESULT: NullAuthResult = {
+  userId: null,
+  sessionId: null,
+  orgId: null,
+};
+
+function isMissingAuthRequestContext(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("can't detect usage of clerkmiddleware") ||
+    message.includes('clerkmiddleware') ||
+    message.includes('outside a request scope') ||
+    message.includes('only supported in app router') ||
+    message.includes('only supported in a route handler') ||
+    message.includes('only supported in a server component')
+  );
+}
+
+async function resolveCachedAuth() {
+  const bypassSession = await getCachedDevTestAuthSession();
+  if (bypassSession) {
+    return {
+      userId: bypassSession.clerkUserId,
+      sessionId: 'sess_test_bypass',
+      orgId: undefined,
+    };
+  }
+
+  return auth();
+}
+
 /**
  * Cached version of Clerk's auth() function.
  *
@@ -28,16 +69,22 @@ type CachedCurrentUser = Awaited<ReturnType<typeof currentUser>>;
  * @returns The same AuthObject that Clerk's auth() returns
  */
 export const getCachedAuth = cache(async () => {
-  const bypassSession = await getCachedDevTestAuthSession();
-  if (bypassSession) {
-    return {
-      userId: bypassSession.clerkUserId,
-      sessionId: 'sess_test_bypass',
-      orgId: null,
-    };
-  }
+  return resolveCachedAuth();
+});
 
-  return auth();
+/**
+ * Cached auth helper for public/server-shared code paths.
+ * Returns a signed-out state when Clerk is invoked without request context.
+ */
+export const getOptionalAuth = cache(async () => {
+  try {
+    return await resolveCachedAuth();
+  } catch (error) {
+    if (isMissingAuthRequestContext(error)) {
+      return NULL_AUTH_RESULT;
+    }
+    throw error;
+  }
 });
 
 /**

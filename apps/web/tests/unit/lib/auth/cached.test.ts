@@ -154,6 +154,35 @@ describe('cached auth utilities', () => {
     });
   });
 
+  describe('getOptionalAuth', () => {
+    it('returns signed-out auth when Clerk middleware is missing', async () => {
+      mockAuth.mockRejectedValue(
+        new Error(
+          "Clerk: auth() was called but Clerk can't detect usage of clerkMiddleware()."
+        )
+      );
+
+      const { getOptionalAuth } = await import('@/lib/auth/cached');
+      const result = await getOptionalAuth();
+
+      expect(result).toEqual({
+        userId: null,
+        sessionId: null,
+        orgId: null,
+      });
+    });
+
+    it('rethrows unrelated auth errors', async () => {
+      mockAuth.mockRejectedValue(new Error('Unexpected auth failure'));
+
+      const { getOptionalAuth } = await import('@/lib/auth/cached');
+
+      await expect(getOptionalAuth()).rejects.toThrow(
+        'Unexpected auth failure'
+      );
+    });
+  });
+
   describe('getCachedCurrentUser', () => {
     it('returns the current user from Clerk', async () => {
       const mockUserResult = {

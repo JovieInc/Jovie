@@ -210,6 +210,11 @@ const FRAMEWORK_INTERNAL_ERRORS = [
   'headcachenode',
   'should not already be working',
 ] as const;
+const PLAYWRIGHT_TIMEOUT_PATTERNS = [
+  'page.waitforfunction',
+  'locator.waitfor',
+  'tohaveurl',
+] as const;
 
 /**
  * Checks if an error is an AbortError from request cancellation.
@@ -311,6 +316,31 @@ function isFrameworkInternalError(event: SentryEvent): boolean {
   return FRAMEWORK_INTERNAL_ERRORS.some(pattern => message.includes(pattern));
 }
 
+export function isNonProductionServerNoise(event: SentryEvent): boolean {
+  const requestUrl = event.request?.url?.toLowerCase() ?? '';
+  if (
+    requestUrl.includes('://localhost') ||
+    requestUrl.includes('://127.0.0.1')
+  ) {
+    return true;
+  }
+
+  if (event.tags?.source === 'playwright-ci') {
+    return true;
+  }
+
+  const message = [
+    event.message,
+    event.logentry?.message,
+    event.exception?.values?.[0]?.value,
+  ]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+    .toLowerCase();
+
+  return PLAYWRIGHT_TIMEOUT_PATTERNS.some(pattern => message.includes(pattern));
+}
+
 /**
  * PII Collection Notice (for documentation purposes):
  *
@@ -358,6 +388,10 @@ function scrubUserPii(user: SentryEvent['user']): void {
  * @returns The scrubbed event, or null to drop the event
  */
 export function scrubPii(event: SentryEvent): SentryEvent | null {
+  if (isNonProductionServerNoise(event)) {
+    return null;
+  }
+
   // Filter deployment transition errors (handled by useChunkErrorHandler)
   if (isDeploymentTransitionError(event)) {
     return null;

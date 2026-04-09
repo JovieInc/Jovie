@@ -10,10 +10,9 @@ import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/require-auth';
+import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
 import { discogReleases } from '@/lib/db/schema/content';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -39,7 +38,7 @@ function slugify(title: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const { userId, error } = await requireAuth();
+  const { userId: clerkUserId, error } = await requireAuth();
   if (error) return error;
 
   try {
@@ -63,15 +62,11 @@ export async function POST(request: NextRequest) {
     } = parsed.data;
 
     // Verify user owns this release via their creator profile and has Pro
-    const [profile] = await db
-      .select({
-        id: creatorProfiles.id,
-        isPro: users.isPro,
-      })
-      .from(creatorProfiles)
-      .leftJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(eq(creatorProfiles.userId, userId))
-      .limit(1);
+    const { user, profile } = await getSessionContext({
+      clerkUserId,
+      requireUser: true,
+      requireProfile: false,
+    });
 
     if (!profile) {
       return NextResponse.json(
@@ -80,7 +75,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!profile.isPro) {
+    if (!user.isPro) {
       return NextResponse.json(
         { error: 'Pro plan required' },
         { status: 403, headers: NO_STORE_HEADERS }

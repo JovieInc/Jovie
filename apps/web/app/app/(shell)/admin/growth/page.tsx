@@ -7,10 +7,6 @@ import {
   GtmFunnel,
   GtmFunnelSkeleton,
 } from '@/components/features/admin/leads/GtmFunnel';
-import {
-  GtmSpeedDial,
-  GtmSpeedDialSkeleton,
-} from '@/components/features/admin/leads/GtmSpeedDial';
 import { getLeadFunnelCounts } from '@/components/features/admin/leads/LeadPipelineKpis';
 import { LeadTable } from '@/components/features/admin/leads/LeadTable';
 import { buildAdminGrowthHref } from '@/constants/admin-navigation';
@@ -42,9 +38,6 @@ export default async function AdminGrowthPage({
       testId='admin-growth-page'
       viewTestId='admin-growth-view-leads'
     >
-      <Suspense fallback={<GtmSpeedDialSkeleton />}>
-        <GtmSpeedDial />
-      </Suspense>
       <Suspense fallback={<GtmFunnelSkeleton />}>
         <GtmFunnel counts={counts} />
       </Suspense>

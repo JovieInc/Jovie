@@ -10,8 +10,19 @@ const { dashboardQueryMock, getDashboardDataMock } = vi.hoisted(() => ({
   getDashboardDataMock: vi.fn(),
 }));
 
-vi.mock('@/lib/auth/cached', () => ({
-  getCachedAuth: vi.fn().mockResolvedValue({ userId: 'user-abc' }),
+vi.mock('@/lib/auth/session', () => ({
+  getSessionContext: vi.fn().mockResolvedValue({
+    clerkUserId: 'user_clerk_abc',
+    user: {
+      id: 'db-user-123',
+      clerkId: 'user_clerk_abc',
+      email: 'artist@example.com',
+      isAdmin: false,
+      isPro: true,
+      userStatus: 'active',
+    },
+    profile: null,
+  }),
 }));
 
 // Mock DB with chainable select for the ownership check
