@@ -339,11 +339,32 @@ export async function ensureCreatorProfileRecord(
   database: DbOrTransaction,
   values: SeededCreatorProfileValues
 ): Promise<string> {
-  const [existingProfile] = await database
-    .select({ id: creatorProfiles.id })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
-    .limit(1);
+  const findExistingByUserId = async () => {
+    if (!values.userId) {
+      return null;
+    }
+
+    const [profile] = await database
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.userId, values.userId))
+      .limit(1);
+
+    return profile ?? null;
+  };
+
+  const findExistingByUsername = async () => {
+    const [profile] = await database
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
+      .limit(1);
+
+    return profile ?? null;
+  };
+
+  const existingProfile =
+    (await findExistingByUserId()) ?? (await findExistingByUsername());
 
   if (existingProfile) {
     await database
@@ -364,11 +385,8 @@ export async function ensureCreatorProfileRecord(
       throw error;
     }
 
-    const [racedProfile] = await database
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
-      .limit(1);
+    const racedProfile =
+      (await findExistingByUserId()) ?? (await findExistingByUsername());
 
     if (!racedProfile) {
       throw error;
@@ -523,7 +541,18 @@ export async function invalidateTestUserCaches(
     await invalidateProxyUserStateCache(clerkId);
   }
 
-  revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
+  try {
+    revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
+  } catch (error) {
+    // Playwright global setup seeds data from plain Node.js, where Next's
+    // static generation store is unavailable. Fail open for that test-only path.
+    if (
+      !(error instanceof Error) ||
+      !error.message.includes('static generation store missing')
+    ) {
+      throw error;
+    }
+  }
 
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;

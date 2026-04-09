@@ -7,15 +7,23 @@ import { chatAuditLog } from '@/lib/db/schema/chat';
 import { createExtensionCorsHeaders } from '@/lib/extensions/http';
 import { parseJsonBody } from '@/lib/http/parse-json';
 
-const requestSchema = z.object({
-  action: z.enum(['insert', 'copy', 'sync', 'open']),
-  entityId: z.string().min(1),
-  entityKind: z.enum(['profile', 'release', 'tourDate']),
-  fieldId: z.string().min(1).optional(),
-  pageUrl: z.string().url(),
-  pageTitle: z.string().nullable().optional(),
-  result: z.enum(['pending', 'succeeded', 'failed']),
-});
+const requestSchema = z
+  .object({
+    action: z.enum(['insert', 'copy', 'sync', 'open', 'preview']).optional(),
+    workflowId: z.enum(['distrokid_release_form']).optional(),
+    operation: z.enum(['preview', 'apply', 'undo', 'open']).optional(),
+    entityId: z.string().min(1),
+    entityKind: z.enum(['profile', 'release', 'tourDate']),
+    fieldId: z.string().min(1).optional(),
+    pageUrl: z.string().url(),
+    pageTitle: z.string().nullable().optional(),
+    result: z.enum(['pending', 'succeeded', 'failed']),
+    appliedCount: z.number().int().min(0).optional(),
+    failedTargets: z.array(z.string().min(1)).optional(),
+  })
+  .refine(body => body.action || body.operation, {
+    message: 'Action or operation is required',
+  });
 
 export async function OPTIONS(request: Request) {
   return new NextResponse(null, {
@@ -58,14 +66,15 @@ export async function POST(request: Request) {
       }
 
       const body = validation.data;
+      const operation = body.operation ?? body.action ?? 'open';
 
       const [created] = await db
         .insert(chatAuditLog)
         .values({
           userId: context.user.id,
           creatorProfileId: context.profile.id,
-          action: `extension_${body.action}_${body.result}`,
-          field: body.fieldId ?? 'entity',
+          action: `extension_${operation}_${body.result}`,
+          field: body.fieldId ?? operation,
           previousValue: null,
           newValue: `${body.entityKind}:${body.entityId}`,
           metadata: {
@@ -73,6 +82,10 @@ export async function POST(request: Request) {
             pageUrl: body.pageUrl,
             pageTitle: body.pageTitle ?? null,
             entityKind: body.entityKind,
+            workflowId: body.workflowId ?? null,
+            operation,
+            appliedCount: body.appliedCount ?? null,
+            failedTargets: body.failedTargets ?? [],
           },
         })
         .returning({ id: chatAuditLog.id });

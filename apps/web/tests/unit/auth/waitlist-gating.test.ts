@@ -49,10 +49,10 @@ describe('checkUserStatus', () => {
     vi.resetModules();
 
     // Mock server-only to prevent import error
-    vi.mock('server-only', () => ({}));
+    vi.doMock('server-only', () => ({}));
 
     // Mock database dependencies that gate.ts imports
-    vi.mock('@/lib/db', () => ({
+    vi.doMock('@/lib/db', () => ({
       db: {
         select: vi.fn().mockReturnThis(),
         from: vi.fn().mockReturnThis(),
@@ -68,7 +68,7 @@ describe('checkUserStatus', () => {
       },
     }));
 
-    vi.mock('@/lib/db/schema/auth', () => ({
+    vi.doMock('@/lib/db/schema/auth', () => ({
       users: {
         id: 'id',
         clerkId: 'clerkId',
@@ -81,7 +81,7 @@ describe('checkUserStatus', () => {
       },
     }));
 
-    vi.mock('@/lib/db/schema/profiles', () => ({
+    vi.doMock('@/lib/db/schema/profiles', () => ({
       creatorProfiles: {
         id: 'id',
         userId: 'userId',
@@ -94,7 +94,7 @@ describe('checkUserStatus', () => {
       },
     }));
 
-    vi.mock('@/lib/db/schema/waitlist', () => ({
+    vi.doMock('@/lib/db/schema/waitlist', () => ({
       waitlistEntries: {
         id: 'id',
         email: 'email',
@@ -102,33 +102,33 @@ describe('checkUserStatus', () => {
       },
     }));
 
-    vi.mock('@/lib/error-tracking', () => ({
+    vi.doMock('@/lib/error-tracking', () => ({
       captureError: vi.fn(),
       captureCriticalError: vi.fn(),
       captureWarning: vi.fn(),
     }));
 
-    vi.mock('@/lib/auth/cached', () => ({
+    vi.doMock('@/lib/auth/cached', () => ({
       getCachedAuth: vi.fn().mockResolvedValue({ userId: null }),
       getCachedCurrentUser: vi.fn().mockResolvedValue(null),
     }));
 
-    vi.mock('@/lib/auth/clerk-sync', () => ({
+    vi.doMock('@/lib/auth/clerk-sync', () => ({
       syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
     }));
 
-    vi.mock('@/lib/utils/email', () => ({
+    vi.doMock('@/lib/utils/email', () => ({
       normalizeEmail: (e: string) => e.toLowerCase().trim(),
     }));
 
-    vi.mock('drizzle-orm', () => ({
+    vi.doMock('drizzle-orm', () => ({
       and: (...args: unknown[]) => args,
       eq: (a: unknown, b: unknown) => [a, b],
       isNull: (a: unknown) => a,
       ne: (a: unknown, b: unknown) => [a, b],
     }));
 
-    vi.mock('@sentry/nextjs', () => ({
+    vi.doMock('@sentry/nextjs', () => ({
       getClient: vi.fn(() => undefined),
       captureMessage: vi.fn(),
       captureException: vi.fn(),
@@ -199,8 +199,8 @@ describe('resolveProfileState', () => {
   beforeEach(async () => {
     vi.resetModules();
 
-    vi.mock('server-only', () => ({}));
-    vi.mock('@/lib/db', () => ({
+    vi.doMock('server-only', () => ({}));
+    vi.doMock('@/lib/db', () => ({
       db: {
         select: vi.fn().mockReturnThis(),
         from: vi.fn().mockReturnThis(),
@@ -215,7 +215,7 @@ describe('resolveProfileState', () => {
         set: vi.fn().mockReturnThis(),
       },
     }));
-    vi.mock('@/lib/db/schema/auth', () => ({
+    vi.doMock('@/lib/db/schema/auth', () => ({
       users: {
         id: 'id',
         clerkId: 'clerkId',
@@ -227,7 +227,7 @@ describe('resolveProfileState', () => {
         waitlistEntryId: 'waitlistEntryId',
       },
     }));
-    vi.mock('@/lib/db/schema/profiles', () => ({
+    vi.doMock('@/lib/db/schema/profiles', () => ({
       creatorProfiles: {
         id: 'id',
         userId: 'userId',
@@ -239,31 +239,31 @@ describe('resolveProfileState', () => {
         onboardingCompletedAt: 'onboardingCompletedAt',
       },
     }));
-    vi.mock('@/lib/db/schema/waitlist', () => ({
+    vi.doMock('@/lib/db/schema/waitlist', () => ({
       waitlistEntries: { id: 'id', email: 'email', status: 'status' },
     }));
-    vi.mock('@/lib/error-tracking', () => ({
+    vi.doMock('@/lib/error-tracking', () => ({
       captureError: vi.fn(),
       captureCriticalError: vi.fn(),
       captureWarning: vi.fn(),
     }));
-    vi.mock('@/lib/auth/cached', () => ({
+    vi.doMock('@/lib/auth/cached', () => ({
       getCachedAuth: vi.fn().mockResolvedValue({ userId: null }),
       getCachedCurrentUser: vi.fn().mockResolvedValue(null),
     }));
-    vi.mock('@/lib/auth/clerk-sync', () => ({
+    vi.doMock('@/lib/auth/clerk-sync', () => ({
       syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
     }));
-    vi.mock('@/lib/utils/email', () => ({
+    vi.doMock('@/lib/utils/email', () => ({
       normalizeEmail: (e: string) => e.toLowerCase().trim(),
     }));
-    vi.mock('drizzle-orm', () => ({
+    vi.doMock('drizzle-orm', () => ({
       and: (...args: unknown[]) => args,
       eq: (a: unknown, b: unknown) => [a, b],
       isNull: (a: unknown) => a,
       ne: (a: unknown, b: unknown) => [a, b],
     }));
-    vi.mock('@sentry/nextjs', () => ({
+    vi.doMock('@sentry/nextjs', () => ({
       getClient: vi.fn(() => undefined),
       captureMessage: vi.fn(),
       captureException: vi.fn(),
@@ -498,8 +498,8 @@ describe('gate.ts utility functions', () => {
   beforeEach(async () => {
     vi.resetModules();
 
-    vi.mock('server-only', () => ({}));
-    vi.mock('@/lib/db', () => ({
+    vi.doMock('server-only', () => ({}));
+    vi.doMock('@/lib/db', () => ({
       db: {
         select: vi.fn().mockReturnThis(),
         from: vi.fn().mockReturnThis(),
@@ -514,7 +514,7 @@ describe('gate.ts utility functions', () => {
         set: vi.fn().mockReturnThis(),
       },
     }));
-    vi.mock('@/lib/db/schema/auth', () => ({
+    vi.doMock('@/lib/db/schema/auth', () => ({
       users: {
         id: 'id',
         clerkId: 'clerkId',
@@ -526,7 +526,7 @@ describe('gate.ts utility functions', () => {
         waitlistEntryId: 'waitlistEntryId',
       },
     }));
-    vi.mock('@/lib/db/schema/profiles', () => ({
+    vi.doMock('@/lib/db/schema/profiles', () => ({
       creatorProfiles: {
         id: 'id',
         userId: 'userId',
@@ -538,31 +538,31 @@ describe('gate.ts utility functions', () => {
         onboardingCompletedAt: 'onboardingCompletedAt',
       },
     }));
-    vi.mock('@/lib/db/schema/waitlist', () => ({
+    vi.doMock('@/lib/db/schema/waitlist', () => ({
       waitlistEntries: { id: 'id', email: 'email', status: 'status' },
     }));
-    vi.mock('@/lib/error-tracking', () => ({
+    vi.doMock('@/lib/error-tracking', () => ({
       captureError: vi.fn(),
       captureCriticalError: vi.fn(),
       captureWarning: vi.fn(),
     }));
-    vi.mock('@/lib/auth/cached', () => ({
+    vi.doMock('@/lib/auth/cached', () => ({
       getCachedAuth: vi.fn().mockResolvedValue({ userId: null }),
       getCachedCurrentUser: vi.fn().mockResolvedValue(null),
     }));
-    vi.mock('@/lib/auth/clerk-sync', () => ({
+    vi.doMock('@/lib/auth/clerk-sync', () => ({
       syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
     }));
-    vi.mock('@/lib/utils/email', () => ({
+    vi.doMock('@/lib/utils/email', () => ({
       normalizeEmail: (e: string) => e.toLowerCase().trim(),
     }));
-    vi.mock('drizzle-orm', () => ({
+    vi.doMock('drizzle-orm', () => ({
       and: (...args: unknown[]) => args,
       eq: (a: unknown, b: unknown) => [a, b],
       isNull: (a: unknown) => a,
       ne: (a: unknown, b: unknown) => [a, b],
     }));
-    vi.mock('@sentry/nextjs', () => ({
+    vi.doMock('@sentry/nextjs', () => ({
       getClient: vi.fn(() => undefined),
       captureMessage: vi.fn(),
       captureException: vi.fn(),
@@ -870,8 +870,8 @@ describe('CanonicalUserState enum', () => {
   beforeEach(async () => {
     vi.resetModules();
 
-    vi.mock('server-only', () => ({}));
-    vi.mock('@/lib/db', () => ({
+    vi.doMock('server-only', () => ({}));
+    vi.doMock('@/lib/db', () => ({
       db: {
         select: vi.fn().mockReturnThis(),
         from: vi.fn().mockReturnThis(),
@@ -886,7 +886,7 @@ describe('CanonicalUserState enum', () => {
         set: vi.fn().mockReturnThis(),
       },
     }));
-    vi.mock('@/lib/db/schema/auth', () => ({
+    vi.doMock('@/lib/db/schema/auth', () => ({
       users: {
         id: 'id',
         clerkId: 'clerkId',
@@ -898,7 +898,7 @@ describe('CanonicalUserState enum', () => {
         waitlistEntryId: 'waitlistEntryId',
       },
     }));
-    vi.mock('@/lib/db/schema/profiles', () => ({
+    vi.doMock('@/lib/db/schema/profiles', () => ({
       creatorProfiles: {
         id: 'id',
         userId: 'userId',
@@ -910,31 +910,31 @@ describe('CanonicalUserState enum', () => {
         onboardingCompletedAt: 'onboardingCompletedAt',
       },
     }));
-    vi.mock('@/lib/db/schema/waitlist', () => ({
+    vi.doMock('@/lib/db/schema/waitlist', () => ({
       waitlistEntries: { id: 'id', email: 'email', status: 'status' },
     }));
-    vi.mock('@/lib/error-tracking', () => ({
+    vi.doMock('@/lib/error-tracking', () => ({
       captureError: vi.fn(),
       captureCriticalError: vi.fn(),
       captureWarning: vi.fn(),
     }));
-    vi.mock('@/lib/auth/cached', () => ({
+    vi.doMock('@/lib/auth/cached', () => ({
       getCachedAuth: vi.fn().mockResolvedValue({ userId: null }),
       getCachedCurrentUser: vi.fn().mockResolvedValue(null),
     }));
-    vi.mock('@/lib/auth/clerk-sync', () => ({
+    vi.doMock('@/lib/auth/clerk-sync', () => ({
       syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
     }));
-    vi.mock('@/lib/utils/email', () => ({
+    vi.doMock('@/lib/utils/email', () => ({
       normalizeEmail: (e: string) => e.toLowerCase().trim(),
     }));
-    vi.mock('drizzle-orm', () => ({
+    vi.doMock('drizzle-orm', () => ({
       and: (...args: unknown[]) => args,
       eq: (a: unknown, b: unknown) => [a, b],
       isNull: (a: unknown) => a,
       ne: (a: unknown, b: unknown) => [a, b],
     }));
-    vi.mock('@sentry/nextjs', () => ({
+    vi.doMock('@sentry/nextjs', () => ({
       getClient: vi.fn(() => undefined),
       captureMessage: vi.fn(),
       captureException: vi.fn(),

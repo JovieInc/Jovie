@@ -20,7 +20,7 @@ import type { CompletionResult } from '@/app/onboarding/actions/types';
 import {
   getOnboardingCompletionMethod,
   toDurationMs,
-} from '@/features/dashboard/organisms/apple-style-onboarding/analytics';
+} from '@/features/dashboard/organisms/onboarding-v2/shared/analytics';
 import { identify, track } from '@/lib/analytics';
 import {
   clearSignupClaimValue,
@@ -84,11 +84,6 @@ export function extractSignupClaimArtistSelection(): AutoConnectedArtistSelectio
   }
 }
 
-/**
- * JOV-1340: Auto-connect Spotify from homepage search claim data.
- * Now fully non-blocking — fires connect + enrichment in background,
- * does NOT block step transitions or show staged spinners.
- */
 interface TryAutoConnectSpotifyOptions {
   readonly setSpotifyImportState: Dispatch<SetStateAction<SpotifyImportState>>;
   readonly setEnrichedProfile: Dispatch<
@@ -142,27 +137,34 @@ function tryAutoConnectSpotify({
     track('onboarding_spotify_import_started', { user_id: userId });
     onAutoConnectStarted?.(selection);
 
-    // Set import state to success immediately — actual import is background
+    // Track the real in-flight state until connect finishes.
     if (!signal.aborted) {
       setSpotifyImportState({
-        status: 'success',
-        stage: 2,
-        message: 'Your music is being imported in the background.',
+        status: 'importing',
+        stage: 1,
+        message: 'We are finishing your import and discovery now.',
       });
     }
 
-    // Connect Spotify artist in background — tracked so dashboard redirect
-    // waits for the DB write to complete (fixes empty sidebar/DSPs).
+    // Keep the connect action in-flight so V2 can gate progression on the
+    // actual import/discovery lifecycle instead of optimistic success.
     if (!signal.aborted) setIsConnecting(true);
     void connectOnboardingSpotifyArtist({
       profileId,
       spotifyArtistId: selection.id,
       spotifyArtistUrl: selection.url,
       artistName: selection.name,
-      includeTracks: false,
+      includeTracks: true,
     })
       .then(result => {
         if (result.success) {
+          if (!signal.aborted) {
+            setSpotifyImportState({
+              status: 'success',
+              stage: 2,
+              message: 'Import and discovery are complete.',
+            });
+          }
           track('onboarding_spotify_import_completed', {
             user_id: userId,
             releasesImported: result.importing ? 0 : result.imported,
@@ -196,7 +198,8 @@ function tryAutoConnectSpotify({
         if (!signal.aborted) setIsConnecting(false);
       });
 
-    // Fire-and-forget: enrich profile data in background
+    // Best-effort profile enrichment still runs here for immediate display data,
+    // but onboarding progression now depends on discovery readiness from V2.
     if (!signal.aborted) setIsEnriching(true);
     void enrichProfileFromDsp(selection.id, selection.url)
       .then(enriched => {
@@ -226,6 +229,7 @@ interface UseOnboardingSubmitOptions {
   handle: string;
   handleInput: string;
   handleValidation: HandleValidationState;
+  isHydrated: boolean;
   goToNextStep: () => void;
   setProfileReadyHandle: (handle: string) => void;
   shouldAutoSubmitHandle: boolean;
@@ -261,6 +265,7 @@ export function useOnboardingSubmit({
   handle,
   handleInput,
   handleValidation,
+  isHydrated,
   goToNextStep,
   setProfileReadyHandle,
   shouldAutoSubmitHandle,
@@ -386,6 +391,10 @@ export function useOnboardingSubmit({
     async (e?: FormEvent) => {
       if (e) e.preventDefault();
 
+      if (!isHydrated) {
+        return;
+      }
+
       const resolvedHandle = getResolvedHandle(handle, handleInput);
       const redirectUrl = `/onboarding?handle=${encodeURIComponent(resolvedHandle)}`;
 
@@ -423,6 +432,8 @@ export function useOnboardingSubmit({
         handle: resolvedHandle,
       });
 
+      // Guard against double-submit races before React state updates land.
+      isSubmittingRef.current = true;
       identify(userId, {
         email: userEmail ?? undefined,
         handle: resolvedHandle,
@@ -451,7 +462,13 @@ export function useOnboardingSubmit({
         });
         onCompleted?.(completion);
 
-        setState(prev => ({ ...prev, step: 'complete', progress: 100 }));
+        isSubmittingRef.current = false;
+        setState(prev => ({
+          ...prev,
+          step: 'complete',
+          progress: 100,
+          isSubmitting: false,
+        }));
         setProfileReadyHandle(resolvedHandle);
 
         track('onboarding_completed', {
@@ -472,7 +489,8 @@ export function useOnboardingSubmit({
 
         goToNextStep();
 
-        // Auto-connect Spotify artist from homepage search (JOV-1340: non-blocking)
+        // Auto-connect Spotify artist from homepage search and let V2 gate the
+        // rest of the flow on readiness instead of optimistic background state.
         spotifyAbortRef.current?.abort();
         const controller = new AbortController();
         spotifyAbortRef.current = controller;
@@ -488,6 +506,7 @@ export function useOnboardingSubmit({
           onAutoConnectFailed,
         });
       } catch (error) {
+        isSubmittingRef.current = false;
         handleSubmitError(error, resolvedHandle, redirectUrl);
       }
     },
@@ -498,6 +517,7 @@ export function useOnboardingSubmit({
       handleInput,
       handleSubmitError,
       handleValidation,
+      isHydrated,
       setProfileReadyHandle,
       userEmail,
       userId,
@@ -514,6 +534,7 @@ export function useOnboardingSubmit({
   useEffect(() => {
     if (
       !shouldAutoSubmitHandle ||
+      !isHydrated ||
       state.isSubmitting ||
       isPendingSubmit ||
       Boolean(state.error)
@@ -535,6 +556,7 @@ export function useOnboardingSubmit({
     handleValidation.clientValid,
     isPendingSubmit,
     shouldAutoSubmitHandle,
+    isHydrated,
     state.error,
     state.isSubmitting,
   ]);

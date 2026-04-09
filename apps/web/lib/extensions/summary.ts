@@ -22,28 +22,8 @@ type SupportedPage = {
 function classifyPage(url: URL): SupportedPage {
   const host = url.hostname.toLowerCase();
 
-  if (host === 'mail.google.com') {
-    return { kind: 'email', label: 'Gmail' };
-  }
-  if (host === 'genius.com' || host.endsWith('.genius.com')) {
-    return { kind: 'lyrics', label: 'Lyrics Page' };
-  }
-  if (
-    host === 'eventbrite.com' ||
-    host.endsWith('.eventbrite.com') ||
-    host === 'bandsintown.com' ||
-    host.endsWith('.bandsintown.com')
-  ) {
-    return { kind: 'tour', label: 'Tour Page' };
-  }
-  if (host === 'open.spotify.com' || host.endsWith('.spotify.com')) {
-    return { kind: 'release', label: 'Spotify Page' };
-  }
-  if (host === 'artists.spotify.com') {
-    return { kind: 'artist', label: 'Spotify for Artists' };
-  }
-  if (host === 'instagram.com' || host.endsWith('.instagram.com')) {
-    return { kind: 'discovery', label: 'Instagram Page' };
+  if (host === 'distrokid.com' || host.endsWith('.distrokid.com')) {
+    return { kind: 'release', label: 'DistroKid Release Form' };
   }
 
   return null;
@@ -56,15 +36,15 @@ function getShellCopy(
 ): ExtensionShellCopy {
   if (status === 'unsupported') {
     return {
-      title: 'This Page Is Not Supported Yet',
-      body: 'Jovie is ready to help when you open a supported music workflow page.',
+      title: 'Open A DistroKid Release Form',
+      body: 'This alpha only supports DistroKid release metadata previews from Jovie.',
     };
   }
 
   if (status === 'no_match') {
     return {
-      title: 'Nothing Matched Yet',
-      body: `Open a supported page for ${displayName}, or ask Jovie to pull up the right entity.`,
+      title: 'No Releases Ready Yet',
+      body: `Open a release in Jovie for ${displayName}, then come back here to review the metadata.`,
     };
   }
 
@@ -78,8 +58,8 @@ function getShellCopy(
       body: 'Profile context is ready for this page.',
     },
     release: {
-      title: 'Release Context Is Ready',
-      body: `Jovie pulled your latest release context for ${displayName}.`,
+      title: 'Release Metadata Is Ready',
+      body: `Jovie pulled release details for ${displayName} so you can review them before filling DistroKid.`,
     },
     lyrics: {
       title: 'Lyrics Context Is Ready',
@@ -142,8 +122,8 @@ function buildPrimaryAction(
   }
 
   return {
-    kind: 'insert',
-    label: 'Insert',
+    kind: 'copy',
+    label: 'Copy',
   };
 }
 
@@ -346,11 +326,10 @@ export async function buildExtensionSummary(params: {
     if (supportedPage.kind === 'tour') {
       return [...tourEntities, ...releaseEntities, profileEntity];
     }
-    if (
-      supportedPage.kind === 'release' ||
-      supportedPage.kind === 'lyrics' ||
-      supportedPage.kind === 'email'
-    ) {
+    if (supportedPage.kind === 'release') {
+      return [...releaseEntities];
+    }
+    if (supportedPage.kind === 'lyrics' || supportedPage.kind === 'email') {
       return [...releaseEntities, profileEntity, ...tourEntities];
     }
     return [profileEntity, ...releaseEntities, ...tourEntities];
@@ -371,7 +350,7 @@ export async function buildExtensionSummary(params: {
   }
 
   if (
-    supportedPage.kind === 'release' &&
+    url.hostname.toLowerCase() === 'open.spotify.com' &&
     !hasPlatformLink(activeLinks, 'spotify')
   ) {
     discoverySuggestions.push({

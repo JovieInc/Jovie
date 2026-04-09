@@ -1183,6 +1183,12 @@ Use Clerk's official Playwright testing helpers whenever an E2E test needs auth.
 
 - `apps/web/tests/e2e/onboarding.spec.ts` shows the canonical fresh-user Clerk-authenticated onboarding flow using `setupClerkTestingToken({ page })` plus `createOrReuseTestUserSession(page, email)`.
 - `apps/web/tests/e2e/auth.setup.ts` is the canonical shared auth bootstrap that writes `tests/.auth/user.json`.
+
+#### Next Cache APIs In Shared Test Helpers
+
+- Helpers used by Playwright global setup, `tsx` seed scripts, or any plain Node entrypoint must not call `revalidateTag()` or `revalidatePath()` unguarded.
+- Those Next cache APIs require a Next request/static-generation context and will throw `Invariant: static generation store missing` in plain Node.
+- If cache invalidation is best-effort in a shared helper, catch only that specific missing-context invariant and continue; rethrow all other errors.
 - For manual browse auth outside Playwright, use `doppler run --project jovie-web --config dev -- pnpm tsx scripts/browse-auth.ts --base-url http://localhost:3002 --output /tmp/browse-clerk-cookies.json --persona creator` and import the exported cookies into browse.
 
 **Test user cleanup:**

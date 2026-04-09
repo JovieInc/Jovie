@@ -86,6 +86,34 @@ function sanitizeBoundedNullableInteger(
   return Math.max(min, Math.min(Math.trunc(value), max));
 }
 
+function getMaxReleasesPerImport(): number {
+  return MAX_RELEASES_PER_IMPORT;
+}
+
+function getMaxTracksPerRelease(): number {
+  return MAX_TRACKS_PER_RELEASE;
+}
+
+function getEffectiveMaxReleasesPerImport(
+  override: number | undefined
+): number {
+  return sanitizeBoundedInteger(
+    override,
+    1,
+    MAX_RELEASES_PER_IMPORT,
+    getMaxReleasesPerImport()
+  );
+}
+
+function getEffectiveMaxTracksPerRelease(override: number | undefined): number {
+  return sanitizeBoundedInteger(
+    override,
+    1,
+    MAX_TRACKS_PER_RELEASE,
+    getMaxTracksPerRelease()
+  );
+}
+
 export interface SpotifyImportResult {
   success: boolean;
   imported: number;
@@ -101,6 +129,10 @@ export interface SpotifyImportOptions {
   includeGroups?: ('album' | 'single' | 'compilation' | 'appears_on')[];
   /** Import tracks for each release. Defaults to true to enable ISRC discovery */
   includeTracks?: boolean;
+  /** Override the maximum number of releases imported in this run */
+  maxReleases?: number;
+  /** Override the maximum number of tracks imported per release */
+  maxTracksPerRelease?: number;
   /** Market for availability. Defaults to 'US' */
   market?: string;
   /** Discover cross-platform links after import. Defaults to 'background' */
@@ -167,12 +199,18 @@ async function importAlbumBatch(
   creatorProfileId: string,
   albumsToImport: SpotifyAlbum[],
   fullAlbumMap: Map<string, SpotifyAlbumFull>,
+  maxTracksPerRelease: number,
   result: SpotifyImportResult
 ): Promise<void> {
   for (const album of albumsToImport) {
     try {
       const fullAlbum = fullAlbumMap.get(album.id);
-      await importSingleRelease(creatorProfileId, album, fullAlbum);
+      await importSingleRelease(
+        creatorProfileId,
+        album,
+        fullAlbum,
+        maxTracksPerRelease
+      );
       result.imported++;
     } catch (error) {
       result.failed++;
@@ -262,6 +300,8 @@ export async function importReleasesFromSpotify(
     includeGroups = ['album', 'single', 'compilation'],
     includeTracks = true, // Default to true for ISRC discovery
     discoverLinks: discoverLinksOpt,
+    maxReleases,
+    maxTracksPerRelease,
     market = 'US',
   } = options;
 
@@ -312,6 +352,9 @@ export async function importReleasesFromSpotify(
       span.setAttribute('creator_profile_id', creatorProfileId);
 
       try {
+        const maxReleasesPerImport =
+          getEffectiveMaxReleasesPerImport(maxReleases);
+
         // 1. Fetch all albums from Spotify
         const { albums: spotifyAlbums, total: spotifyTotal } =
           await getSpotifyArtistAlbums(spotifyArtistId, {
@@ -326,12 +369,12 @@ export async function importReleasesFromSpotify(
         }
 
         // Safety limit: cap number of releases
-        const albumsToImport = spotifyAlbums.slice(0, MAX_RELEASES_PER_IMPORT);
-        result.total = Math.min(spotifyTotal, MAX_RELEASES_PER_IMPORT);
-        if (spotifyAlbums.length > MAX_RELEASES_PER_IMPORT) {
+        const albumsToImport = spotifyAlbums.slice(0, maxReleasesPerImport);
+        result.total = Math.min(spotifyTotal, maxReleasesPerImport);
+        if (spotifyAlbums.length > maxReleasesPerImport) {
           captureWarning('Spotify import truncated due to limit', {
             totalReleases: spotifyAlbums.length,
-            limit: MAX_RELEASES_PER_IMPORT,
+            limit: maxReleasesPerImport,
             spotifyArtistId,
           });
         }
@@ -369,8 +412,12 @@ export async function importReleasesFromSpotify(
           ? await getSpotifyAlbums(albumIds, market)
           : [];
 
+        const effectiveMaxTracksPerRelease =
+          getEffectiveMaxTracksPerRelease(maxTracksPerRelease);
         const spotifyTrackIds = fullAlbums.flatMap(album =>
-          album.tracks.items.map(track => track.id)
+          album.tracks.items
+            .slice(0, effectiveMaxTracksPerRelease)
+            .map(track => track.id)
         );
         const fullTracks = includeTracks
           ? await getSpotifyTracks(spotifyTrackIds, market)
@@ -383,7 +430,16 @@ export async function importReleasesFromSpotify(
         const fullAlbumMap = new Map<string, SpotifyAlbumFull>();
         for (const album of fullAlbums) {
           const enrichedAlbum = mergeFullTrackMetadata(album, fullTracksById);
-          logTrackIsrcCoverage(enrichedAlbum);
+          logTrackIsrcCoverage({
+            ...enrichedAlbum,
+            tracks: {
+              ...enrichedAlbum.tracks,
+              items: enrichedAlbum.tracks.items.slice(
+                0,
+                effectiveMaxTracksPerRelease
+              ),
+            },
+          });
           fullAlbumMap.set(album.id, enrichedAlbum);
         }
 
@@ -392,6 +448,7 @@ export async function importReleasesFromSpotify(
           creatorProfileId,
           albumsToImport,
           fullAlbumMap,
+          effectiveMaxTracksPerRelease,
           result
         );
 
@@ -615,12 +672,10 @@ async function processTracksForRelease(
   creatorProfileId: string,
   sanitizedTitle: string,
   slug: string,
-  fullAlbum: SpotifyAlbumFull
+  fullAlbum: SpotifyAlbumFull,
+  maxTracksPerRelease: number
 ): Promise<boolean> {
-  const tracksToImport = fullAlbum.tracks.items.slice(
-    0,
-    MAX_TRACKS_PER_RELEASE
-  );
+  const tracksToImport = fullAlbum.tracks.items.slice(0, maxTracksPerRelease);
   const spotifyTrackIds = tracksToImport.map(t => t.id).filter(Boolean);
   const existingTracksBySpotifyId = await fetchExistingTrackSlugs(
     creatorProfileId,
@@ -752,7 +807,8 @@ async function processTracksForRelease(
 async function importSingleRelease(
   creatorProfileId: string,
   album: SpotifyAlbum,
-  fullAlbum?: SpotifyAlbumFull
+  fullAlbum: SpotifyAlbumFull | undefined,
+  maxTracksPerRelease: number
 ): Promise<void> {
   const metadata = sanitizeAlbumMetadata(album, fullAlbum);
 
@@ -803,7 +859,7 @@ async function importSingleRelease(
     releaseDate,
     label: metadata.sanitizedLabel,
     upc: metadata.sanitizedUpc,
-    totalTracks: Math.min(effectiveTotalTracks, MAX_TRACKS_PER_RELEASE),
+    totalTracks: Math.min(effectiveTotalTracks, maxTracksPerRelease),
     isExplicit: false,
     genres: metadata.genres,
     copyrightLine: metadata.copyrightLine,
@@ -850,7 +906,8 @@ async function importSingleRelease(
       creatorProfileId,
       metadata.sanitizedTitle,
       slug,
-      fullAlbum
+      fullAlbum,
+      maxTracksPerRelease
     );
   }
 }

@@ -69,6 +69,26 @@ const profileSelectColumns = {
   updatedAt: creatorProfiles.updatedAt,
 } as const;
 
+const legacyProfileSelectColumns = {
+  id: creatorProfiles.id,
+  userId: creatorProfiles.userId,
+  username: creatorProfiles.username,
+  usernameNormalized: creatorProfiles.usernameNormalized,
+  displayName: creatorProfiles.displayName,
+  bio: creatorProfiles.bio,
+  avatarUrl: creatorProfiles.avatarUrl,
+  venmoHandle: creatorProfiles.venmoHandle,
+  spotifyUrl: creatorProfiles.spotifyUrl,
+  appleMusicUrl: creatorProfiles.appleMusicUrl,
+  youtubeUrl: creatorProfiles.youtubeUrl,
+  isPublic: creatorProfiles.isPublic,
+  isVerified: creatorProfiles.isVerified,
+  isClaimed: creatorProfiles.isClaimed,
+  claimToken: creatorProfiles.claimToken,
+  createdAt: creatorProfiles.createdAt,
+  updatedAt: creatorProfiles.updatedAt,
+} as const;
+
 // Bounded data retrieval limits to prevent OOM on profiles with many links
 const MAX_SOCIAL_LINKS = 100;
 const MAX_CONTACTS = 50;
@@ -393,13 +413,56 @@ function reviveProfileDates(profile: ProfileWithLinks): ProfileWithLinks {
   };
 }
 
-/**
- * Fetch profile data from the database with parallel queries.
- */
-async function fetchProfileFromDatabase(
+function buildProfileFallbackDefaults(
+  profile: typeof legacyProfileSelectColumns extends infer _T
+    ? {
+        id: string;
+        userId: string | null;
+        username: string;
+        usernameNormalized: string;
+        displayName: string | null;
+        bio: string | null;
+        avatarUrl: string | null;
+        venmoHandle: string | null;
+        spotifyUrl: string | null;
+        appleMusicUrl: string | null;
+        youtubeUrl: string | null;
+        isPublic: boolean | null;
+        isVerified: boolean | null;
+        isClaimed: boolean | null;
+        claimToken: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }
+    : never
+): ProfileWithUser {
+  return {
+    ...profile,
+    creatorType: 'artist',
+    spotifyId: null,
+    appleMusicId: null,
+    youtubeMusicId: null,
+    deezerId: null,
+    tidalId: null,
+    soundcloudId: null,
+    isFeatured: false,
+    marketingOptOut: false,
+    settings: {},
+    theme: {},
+    profileViews: 0,
+    genres: [],
+    location: null,
+    activeSinceYear: null,
+    spotifyPopularity: null,
+    userIsPro: false,
+    userClerkId: null,
+    userEmail: null,
+  };
+}
+
+async function selectProfileWithUser(
   normalizedUsername: string
-): Promise<ProfileWithLinks | null> {
-  // Step 1: Fetch profile first (single query with user JOIN)
+): Promise<ProfileWithUser | null> {
   const [profile] = await db
     .select({
       ...profileSelectColumns,
@@ -411,6 +474,42 @@ async function fetchProfileFromDatabase(
     .leftJoin(users, eq(users.id, creatorProfiles.userId))
     .where(eq(creatorProfiles.usernameNormalized, normalizedUsername))
     .limit(1);
+
+  return profile ?? null;
+}
+
+async function selectProfileWithLegacyFallback(
+  normalizedUsername: string
+): Promise<ProfileWithUser | null> {
+  try {
+    return await selectProfileWithUser(normalizedUsername);
+  } catch (error) {
+    captureWarning(
+      '[profile-service] Falling back to legacy profile query',
+      error,
+      {
+        username: normalizedUsername,
+      }
+    );
+
+    const [legacyProfile] = await db
+      .select(legacyProfileSelectColumns)
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, normalizedUsername))
+      .limit(1);
+
+    return legacyProfile ? buildProfileFallbackDefaults(legacyProfile) : null;
+  }
+}
+
+/**
+ * Fetch profile data from the database with parallel queries.
+ */
+async function fetchProfileFromDatabase(
+  normalizedUsername: string
+): Promise<ProfileWithLinks | null> {
+  // Step 1: Fetch profile first (single query with user JOIN)
+  const profile = await selectProfileWithLegacyFallback(normalizedUsername);
 
   if (!profile) return null;
 

@@ -244,6 +244,7 @@ export function DemoShowcaseSurface({
             title='Choose your handle'
             prompt='This is how fans will find and remember you.'
             handleInput={handleInput}
+            isHydrated
             handleValidation={HANDLE_VALIDATION_MOCK}
             stateError={null}
             isSubmitting={false}

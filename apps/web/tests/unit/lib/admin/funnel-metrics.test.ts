@@ -122,19 +122,20 @@ describe('getAdminFunnelMetrics outreach query', () => {
     );
     expect(activationsSql).toContain(`->>'surface'`);
     expect(activationsSql).toContain(`'onboarding'`);
-    expect(activationsSql).toContain(`in (`);
     expect(copiesSql).toContain(`->>'surface'`);
     expect(copiesSql).toContain(`'onboarding'`);
     expect(copiesSql).toContain(
       `count(distinct "creator_distribution_events"."creator_profile_id")`
     );
-    expect(copiesSql).toContain(`in (`);
     expect(platformOpensSql).toContain(`->>'surface'`);
     expect(platformOpensSql).toContain(`'onboarding'`);
     expect(platformOpensSql).toContain(
       `count(distinct "creator_distribution_events"."creator_profile_id")`
     );
-    expect(platformOpensSql).toContain(`in (`);
+    expect(platformOpensSql).toContain(`select distinct creator_profile_id`);
+    expect(platformOpensSql).toContain(
+      `onboarding_events.event_type = 'step_viewed'`
+    );
     expect(stepViewsSql).toContain(`->>'surface'`);
     expect(stepViewsSql).toContain(`'onboarding'`);
     expect(stepViewsSql).toContain(

@@ -2,7 +2,7 @@
 
 import { Input } from '@jovie/ui';
 import { AlertCircle } from 'lucide-react';
-import type { CSSProperties } from 'react';
+import { type CSSProperties, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
@@ -47,8 +47,8 @@ export function SettingsProfileSection({
     onArtistUpdate,
     onRefresh,
   });
+  const shouldPersistProfileRef = useRef(false);
 
-  /** Handle field changes with debounced save */
   const handleFieldChange = (
     field:
       | 'username'
@@ -59,20 +59,26 @@ export function SettingsProfileSection({
       | 'targetPlaylists',
     value: string
   ) => {
-    setFormData(prev => {
-      const next = { ...prev, [field]: value };
-      setProfileSaveStatus(s => ({ ...s, success: null, error: null }));
-      saveProfile({
-        displayName: next.displayName,
-        username: next.username,
-        location: next.location,
-        hometown: next.hometown,
-        careerHighlights: next.careerHighlights,
-        targetPlaylists: next.targetPlaylists,
-      });
-      return next;
-    });
+    shouldPersistProfileRef.current = true;
+    setFormData(previous => ({ ...previous, [field]: value }));
   };
+
+  useEffect(() => {
+    if (!shouldPersistProfileRef.current) {
+      return;
+    }
+
+    shouldPersistProfileRef.current = false;
+    setProfileSaveStatus(state => ({ ...state, success: null, error: null }));
+    saveProfile({
+      displayName: formData.displayName,
+      username: formData.username,
+      location: formData.location,
+      hometown: formData.hometown,
+      careerHighlights: formData.careerHighlights,
+      targetPlaylists: formData.targetPlaylists,
+    });
+  }, [formData, saveProfile, setProfileSaveStatus]);
 
   return (
     <SettingsPanel

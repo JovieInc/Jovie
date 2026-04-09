@@ -1,7 +1,7 @@
 import { MarketingContainer } from '@/components/marketing';
 import { ClaimHandleForm } from '@/features/home/claim-handle';
 
-export function LandingFinalCTA() {
+export function NewLandingFinalCta() {
   return (
     <section
       aria-labelledby='landing-final-cta-heading'

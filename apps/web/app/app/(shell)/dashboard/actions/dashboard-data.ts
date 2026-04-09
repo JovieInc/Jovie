@@ -41,6 +41,7 @@ import {
   INSTAGRAM_DISTRIBUTION_PLATFORM,
   resolveBioLinkActivationStatus,
 } from '@/lib/distribution/instagram-activation';
+import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
 import {
@@ -359,6 +360,10 @@ function buildProfileCompletion(
  * @returns Dashboard data without isAdmin (added by caller)
  */
 type CoreData = Omit<DashboardData, 'isAdmin'>;
+
+function shouldBypassDashboardCache(): boolean {
+  return isE2EFastOnboardingEnabled();
+}
 
 function applyAdminOnboardingBypass(
   coreData: CoreData,
@@ -966,6 +971,7 @@ async function resolveDashboardDataWith(
   fetchFreshFn: (userId: string) => Promise<CoreData>,
   context: string
 ): Promise<DashboardData> {
+  const bypassCache = shouldBypassDashboardCache();
   const entitlements = await getCurrentUserEntitlements();
   const isAdmin = entitlements.isAdmin;
   const userId = entitlements.userId;
@@ -975,12 +981,13 @@ async function resolveDashboardDataWith(
   }
 
   try {
-    let coreData = await Sentry.startSpan(
-      { op: 'task', name: spanName },
-      async () => fetchFn(userId)
-    );
+    let coreData = bypassCache
+      ? await fetchFreshFn(userId)
+      : await Sentry.startSpan({ op: 'task', name: spanName }, async () =>
+          fetchFn(userId)
+        );
 
-    if (shouldRefreshUnstableDashboardState(coreData)) {
+    if (!bypassCache && shouldRefreshUnstableDashboardState(coreData)) {
       coreData = await fetchFreshFn(userId);
     }
 
@@ -1019,6 +1026,7 @@ async function resolveDashboardDataEssential(): Promise<DashboardData> {
 async function resolveDashboardShellData(
   clerkUserId: string
 ): Promise<DashboardData> {
+  const bypassCache = shouldBypassDashboardCache();
   // noStore() removed: the inner getCachedDashboardShell() uses unstable_cache
   // with a 5-minute TTL. Calling noStore() here was preventing the Data Cache
   // from serving cached results on subsequent requests.
@@ -1026,19 +1034,22 @@ async function resolveDashboardShellData(
   try {
     const [adminResult, cachedCoreData] = await Promise.allSettled([
       checkAdminRole(clerkUserId),
-      Sentry.startSpan(
-        { op: 'task', name: 'dashboard.getShellData' },
-        async () => getCachedDashboardShell(clerkUserId)
-      ),
+      bypassCache
+        ? fetchDashboardShellWithSession(clerkUserId)
+        : Sentry.startSpan(
+            { op: 'task', name: 'dashboard.getShellData' },
+            async () => getCachedDashboardShell(clerkUserId)
+          ),
     ]);
 
     if (cachedCoreData.status === 'rejected') throw cachedCoreData.reason;
 
     const isAdmin =
       adminResult.status === 'fulfilled' ? adminResult.value : false;
-    const coreData = shouldRefreshUnstableDashboardState(cachedCoreData.value)
-      ? await fetchDashboardShellWithSession(clerkUserId)
-      : cachedCoreData.value;
+    const coreData =
+      !bypassCache && shouldRefreshUnstableDashboardState(cachedCoreData.value)
+        ? await fetchDashboardShellWithSession(clerkUserId)
+        : cachedCoreData.value;
 
     return {
       ...applyAdminOnboardingBypass(coreData, isAdmin),

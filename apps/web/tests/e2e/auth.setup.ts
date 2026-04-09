@@ -152,22 +152,12 @@ setup('authenticate', async ({ page, baseURL }) => {
     );
   });
 
-  // 2. Navigate to sign-in page (has ClerkProvider)
-  // Turbopack cold compilation can cause the first navigation to hang even after
-  // warmup in global-setup. Retry with fresh navigations to recover.
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      await page.goto(APP_ROUTES.SIGNIN, {
-        waitUntil: 'domcontentloaded',
-        timeout: 60_000,
-      });
-      break; // Navigation succeeded
-    } catch {
-      if (attempt === 3)
-        throw new Error('Failed to load /signin after 3 attempts');
-      console.log(`  /signin attempt ${attempt} timed out, retrying...`);
-    }
-  }
+  // 2. Navigate to sign-in page (has ClerkProvider).
+  // Cold dev compilation can exceed 60s, so match the more resilient smoke helper.
+  await smokeNavigateWithRetry(page, APP_ROUTES.SIGNIN, {
+    timeout: 60_000,
+    retries: 1,
+  });
 
   // 3. Wait for Clerk JS to load from CDN before calling clerk.signIn()
   // The @clerk/testing library has a hard 30s timeout for window.Clerk.loaded.

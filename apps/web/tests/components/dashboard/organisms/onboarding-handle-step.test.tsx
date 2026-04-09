@@ -7,6 +7,7 @@ describe('OnboardingHandleStep', () => {
     title: 'Claim your handle',
     prompt: 'This is how fans will find you.',
     handleInput: 'artistname',
+    isHydrated: true,
     handleValidation: {
       available: true,
       checking: false,
@@ -37,5 +38,12 @@ describe('OnboardingHandleStep', () => {
     expect(
       screen.queryByText(/We reserved this for you/)
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps the form non-interactive until hydration completes', () => {
+    render(<OnboardingHandleStep {...baseProps} isHydrated={false} />);
+
+    expect(screen.getByLabelText('Enter your desired handle')).toBeDisabled();
+    expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled();
   });
 });

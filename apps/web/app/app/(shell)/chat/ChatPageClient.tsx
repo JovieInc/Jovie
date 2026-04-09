@@ -143,6 +143,12 @@ export function ChatPageClient({
     };
   }, []);
 
+  useEffect(() => {
+    if (needsOnboarding && !selectedProfile && !dashboardLoadError) {
+      router.replace(APP_ROUTES.ONBOARDING);
+    }
+  }, [dashboardLoadError, needsOnboarding, router, selectedProfile]);
+
   // Fetch social links for the selected profile
   const profileId = shouldHydratePreviewPanel ? (activeProfile?.id ?? '') : '';
   const { data: socialLinks } = useDashboardSocialLinksQuery(profileId);
@@ -525,6 +531,21 @@ export function ChatPageClient({
   ]);
 
   if (!activeProfile) {
+    if (needsOnboarding && !dashboardLoadError) {
+      return (
+        <ChatWorkspaceSurface>
+          <div className='flex h-full items-center justify-center p-6'>
+            <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
+              <LoadingSpinner size='lg' tone='muted' />
+              <p className='text-sm text-secondary-token'>
+                Taking you to onboarding…
+              </p>
+            </ContentSurfaceCard>
+          </div>
+        </ChatWorkspaceSurface>
+      );
+    }
+
     const profileMessage = isProfileSetupRace
       ? 'Finishing your dashboard setup…'
       : 'We hit a problem loading your profile. Please retry in a moment.';

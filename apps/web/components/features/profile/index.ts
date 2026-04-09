@@ -1,5 +1,4 @@
 export { ArtistPageShell } from './ArtistPageShell';
-export { AnimatedArtistPage } from './animated-artist-page';
 export type {
   ProfileIdentityFields,
   ProfileMode,
@@ -21,7 +20,6 @@ export {
   profileModes,
 } from './registry';
 export { StaticArtistPage } from './StaticArtistPage';
-export { PublicProfileTemplate } from './templates/PublicProfileTemplate';
 export { extractVenmoUsername, findVenmoLink } from './utils/venmo';
 export {
   buildProfileIdentityFields,

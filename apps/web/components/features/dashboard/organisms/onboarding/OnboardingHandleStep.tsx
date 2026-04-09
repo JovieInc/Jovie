@@ -19,6 +19,7 @@ interface OnboardingHandleStepProps {
   readonly title: string;
   readonly prompt?: string;
   readonly handleInput: string;
+  readonly isHydrated: boolean;
   readonly isReservedHandle?: boolean;
   readonly handleValidation: HandleValidationState;
   readonly stateError: string | null;
@@ -159,6 +160,7 @@ export function OnboardingHandleStep({
   title,
   prompt,
   handleInput,
+  isHydrated,
   isReservedHandle = false,
   handleValidation,
   stateError,
@@ -189,7 +191,10 @@ export function OnboardingHandleStep({
     if (handleValidation.clientValid && handleValidation.available) return null;
     if (handleValidation.error) {
       return (
-        <div className='text-error text-[13px] animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
+        <div
+          data-testid='handle-unavailable'
+          className='text-error text-[13px] animate-in fade-in slide-in-from-top-1 duration-300 text-center'
+        >
           Not available
         </div>
       );
@@ -221,93 +226,99 @@ export function OnboardingHandleStep({
             className={cn(FORM_LAYOUT.formInner, 'space-y-2.5')}
             onSubmit={onSubmit}
           >
-            <div>
-              <div
-                className={cn(
-                  AUTH_SURFACE.fieldShell,
-                  (stateError || handleValidation.error) &&
-                    AUTH_SURFACE.fieldShellError
-                )}
-              >
-                <span className='text-[13px] whitespace-nowrap text-tertiary-token'>
-                  @
-                </span>
-                <input
-                  id='handle-input'
-                  ref={inputRef}
-                  name='username'
-                  aria-label='Enter your desired handle'
-                  type='text'
-                  value={handleInput}
-                  onChange={e =>
-                    onHandleChange(
-                      e.target.value
-                        .toLowerCase()
-                        .replaceAll(/\s+/g, '')
-                        .replace(/^@+/, '')
-                    )
-                  }
-                  placeholder='yourhandle'
-                  autoComplete='username'
-                  autoCapitalize='none'
-                  autoCorrect='off'
-                  spellCheck={false}
-                  aria-invalid={handleValidation.error ? 'true' : undefined}
-                  className={AUTH_SURFACE.fieldInput}
-                />
-                <div className='h-5 w-5 flex items-center justify-center'>
-                  <ValidationIcon
-                    checking={handleValidation.checking}
-                    hasError={Boolean(stateError || handleValidation.error)}
-                    isValid={
-                      Boolean(handleInput) &&
-                      handleValidation.clientValid &&
-                      handleValidation.available
+            <fieldset disabled={!isHydrated} className='min-w-0'>
+              <div>
+                <div
+                  className={cn(
+                    AUTH_SURFACE.fieldShell,
+                    (stateError || handleValidation.error) &&
+                      AUTH_SURFACE.fieldShellError
+                  )}
+                >
+                  <span className='text-[13px] whitespace-nowrap text-tertiary-token'>
+                    @
+                  </span>
+                  <input
+                    id='handle-input'
+                    ref={inputRef}
+                    name='username'
+                    aria-label='Enter your desired handle'
+                    type='text'
+                    value={handleInput}
+                    onChange={e =>
+                      onHandleChange(
+                        e.target.value
+                          .toLowerCase()
+                          .replaceAll(/\s+/g, '')
+                          .replace(/^@+/, '')
+                      )
                     }
+                    placeholder='yourhandle'
+                    autoComplete='username'
+                    autoCapitalize='none'
+                    autoCorrect='off'
+                    spellCheck={false}
+                    aria-invalid={handleValidation.error ? 'true' : undefined}
+                    className={AUTH_SURFACE.fieldInput}
                   />
+                  <div className='h-5 w-5 flex items-center justify-center'>
+                    <ValidationIcon
+                      checking={handleValidation.checking}
+                      hasError={Boolean(stateError || handleValidation.error)}
+                      isValid={
+                        Boolean(handleInput) &&
+                        handleValidation.clientValid &&
+                        handleValidation.available
+                      }
+                    />
+                  </div>
                 </div>
+
+                <output
+                  data-testid='onboarding-handle-validation-status'
+                  className={FORM_LAYOUT.errorContainer}
+                  aria-live='polite'
+                >
+                  {renderValidationStatus()}
+                </output>
+
+                {handleValidation.suggestions.length > 0 && (
+                  <div className='mt-1 flex flex-wrap justify-center gap-2'>
+                    {handleValidation.suggestions.map(suggestion => (
+                      <button
+                        key={suggestion}
+                        type='button'
+                        onClick={() =>
+                          onSuggestionClick
+                            ? onSuggestionClick(suggestion)
+                            : onHandleChange(suggestion)
+                        }
+                        className={AUTH_SURFACE.pillOption}
+                      >
+                        @{suggestion}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <output className={FORM_LAYOUT.errorContainer} aria-live='polite'>
-                {renderValidationStatus()}
-              </output>
-
-              {handleValidation.suggestions.length > 0 && (
-                <div className='mt-1 flex flex-wrap justify-center gap-2'>
-                  {handleValidation.suggestions.map(suggestion => (
-                    <button
-                      key={suggestion}
-                      type='button'
-                      onClick={() =>
-                        onSuggestionClick
-                          ? onSuggestionClick(suggestion)
-                          : onHandleChange(suggestion)
-                      }
-                      className={AUTH_SURFACE.pillOption}
-                    >
-                      @{suggestion}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <AuthButton
-              type='button'
-              disabled={Boolean(ctaDisabledReason) || isTransitioning}
-              aria-describedby={
-                ctaDisabledReason ? disabledReasonId : undefined
-              }
-              onClick={() => onSubmit()}
-              variant='primary'
-            >
-              <ButtonContent
-                isSubmitting={isSubmitting}
-                isPendingSubmit={isPendingSubmit}
-                isChecking={handleValidation.checking}
-                autoSubmitClaimed={autoSubmitClaimed}
-              />
-            </AuthButton>
+              <AuthButton
+                data-testid='onboarding-handle-submit'
+                type='submit'
+                disabled={Boolean(ctaDisabledReason) || isTransitioning}
+                aria-describedby={
+                  ctaDisabledReason ? disabledReasonId : undefined
+                }
+                variant='primary'
+              >
+                <ButtonContent
+                  isSubmitting={isSubmitting}
+                  isPendingSubmit={isPendingSubmit}
+                  isChecking={handleValidation.checking}
+                  autoSubmitClaimed={autoSubmitClaimed}
+                />
+              </AuthButton>
+            </fieldset>
           </form>
         </ContentSurfaceCard>
 

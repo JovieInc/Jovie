@@ -27,33 +27,39 @@ test.describe('Artist Profiles Landing', () => {
   }) => {
     await expect(
       page.getByRole('heading', {
-        name: /the artist page your music deserves/i,
+        name: /a profile that looks like you meant it/i,
       })
     ).toBeVisible();
-    await expect(page.getByTestId('artist-profiles-hero-cta')).toBeVisible();
-    await expect(page.getByTestId('artist-profiles-hero-media')).toBeVisible();
     await expect(
-      page.getByText(/one clean destination for every release/i)
+      page.getByRole('link', { name: /get started free/i })
     ).toBeVisible();
-    await expect(page.getByText('Own Your Audience')).toBeVisible();
-    await expect(page.getByText('One Link')).toBeVisible();
-    await expect(page.getByText('Switch Modes')).toBeVisible();
+    await expect(
+      page.getByTestId('artist-profiles-hero-surface')
+    ).toBeVisible();
+    await expect(
+      page.getByText(/give every fan one clean destination/i)
+    ).toBeVisible();
+    await expect(page.getByText('Own every contact')).toBeVisible();
+    await expect(page.getByText('Show the right release first')).toBeVisible();
+    await expect(page.getByText('One link for every fan action')).toBeVisible();
   });
 
   test('hero stays intact on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
 
     await expect(
-      page.getByRole('heading', { name: /the artist page/i })
+      page.getByRole('heading', {
+        name: /a profile that looks like you meant it/i,
+      })
     ).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    await expect(page.getByTestId('artist-profiles-hero-cta')).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
     await expect(
-      page.getByTestId('artist-profiles-hero-screenshot')
+      page.getByRole('link', { name: /get started free/i })
     ).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+    await expect(page.getByTestId('artist-profiles-hero-surface')).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   });
