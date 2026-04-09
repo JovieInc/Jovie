@@ -445,12 +445,6 @@ class NonCacheableProfileResultError extends Error {
   }
 }
 
-function shouldBypassPublicProfileQaCache() {
-  // Keep the no-auth interaction/a11y sweeps deterministic without forcing
-  // Lighthouse to benchmark the uncached profile path.
-  return process.env.PUBLIC_NOAUTH_SMOKE === '1';
-}
-
 /**
  * Cached profile fetcher. Only caches successful (status: 'ok') results.
  *
