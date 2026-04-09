@@ -35,6 +35,12 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Rule:** For local authenticated testing, keep test-auth redirects app-relative so bypass cookies survive on the original loopback host. When debugging local auth, verify whether the failure is a host mismatch (`localhost` vs `127.0.0.1`) before blaming Clerk or missing test users.
 
+### Next cache invalidation must stay Node-safe in shared test helpers
+
+**Mistake:** `invalidateTestUserCaches()` called `revalidateTag()` during `seedTestData()`, which also runs from `tests/global-setup.ts` in plain Node. That path has no Next static generation store, so E2E seeding crashed before tests even started.
+
+**Rule:** In helpers shared between route handlers and Playwright/global setup scripts, treat `revalidateTag()` and `revalidatePath()` as request-context-dependent. Catch only the specific `static generation store missing` invariant for plain Node entrypoints and rethrow any other cache invalidation error.
+
 ---
 
 ## Marketing Pages

@@ -523,7 +523,18 @@ export async function invalidateTestUserCaches(
     await invalidateProxyUserStateCache(clerkId);
   }
 
-  revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
+  try {
+    revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
+  } catch (error) {
+    // Playwright global setup seeds data from plain Node.js, where Next's
+    // static generation store is unavailable. Fail open for that test-only path.
+    if (
+      !(error instanceof Error) ||
+      !error.message.includes('static generation store missing')
+    ) {
+      throw error;
+    }
+  }
 
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
