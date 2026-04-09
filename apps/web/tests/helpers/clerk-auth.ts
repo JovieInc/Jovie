@@ -214,53 +214,62 @@ export async function waitForAuthenticatedHealth(
     .poll(
       async () => {
         try {
-          let response = await page.request.get(authHealthUrl, {
-            failOnStatusCode: false,
-          });
+          const cookies = await page.context().cookies(baseUrl);
+          const cookieHeader = cookies
+            .map(cookie => `${cookie.name}=${cookie.value}`)
+            .join('; ');
 
-          if (response.status() === 403) {
-            response = await page.request.get(bypassSessionUrl, {
+          const requestHeaders =
+            cookieHeader.length > 0 ? { Cookie: cookieHeader } : undefined;
+
+          const getBypassSessionState = async () => {
+            const bypassResponse = await page.request.get(bypassSessionUrl, {
               failOnStatusCode: false,
+              headers: requestHeaders,
             });
 
-            if (!response.ok()) {
-              return `http-${response.status()}`;
+            if (!bypassResponse.ok()) {
+              return `http-${bypassResponse.status()}`;
             }
 
-            const payload = (await response.json()) as {
+            const bypassPayload = (await bypassResponse.json()) as {
               active?: boolean;
               userId?: string | null;
             };
 
-            if (!payload.active) {
+            if (!bypassPayload.active) {
               return 'anonymous';
             }
 
-            if (expectedUserId && payload.userId !== expectedUserId) {
-              return `user-mismatch:${payload.userId ?? 'unknown'}`;
+            if (expectedUserId && bypassPayload.userId !== expectedUserId) {
+              return `user-mismatch:${bypassPayload.userId ?? 'unknown'}`;
             }
 
             return 'authenticated';
-          }
-
-          if (!response.ok()) {
-            return `http-${response.status()}`;
-          }
-
-          const payload = (await response.json()) as {
-            authenticated?: boolean;
-            userId?: string | null;
           };
 
-          if (!payload.authenticated) {
-            return 'anonymous';
+          const response = await page.request.get(authHealthUrl, {
+            failOnStatusCode: false,
+            headers: requestHeaders,
+          });
+
+          if (response.ok()) {
+            const payload = (await response.json()) as {
+              authenticated?: boolean;
+              active?: boolean;
+              userId?: string | null;
+            };
+
+            if (payload.authenticated) {
+              if (expectedUserId && payload.userId !== expectedUserId) {
+                return `user-mismatch:${payload.userId ?? 'unknown'}`;
+              }
+
+              return 'authenticated';
+            }
           }
 
-          if (expectedUserId && payload.userId !== expectedUserId) {
-            return `user-mismatch:${payload.userId ?? 'unknown'}`;
-          }
-
-          return 'authenticated';
+          return getBypassSessionState();
         } catch (error) {
           if (error instanceof Error) {
             if (

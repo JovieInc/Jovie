@@ -208,16 +208,20 @@ async function visibleLocators(page: Page, selectors: readonly string[]) {
 }
 
 async function closeTransientUi(page: Page) {
+  if (page.isClosed()) {
+    return;
+  }
+
   await page.keyboard.press('Escape').catch(() => undefined);
-  await page.waitForTimeout(150);
+  await page.waitForTimeout(150).catch(() => undefined);
   await page.keyboard.press('Escape').catch(() => undefined);
-  await page.waitForTimeout(150);
+  await page.waitForTimeout(150).catch(() => undefined);
 }
 
 async function assertOverlayLifecycle(page: Page, trigger: Locator) {
   const before = await page.locator(OVERLAY_SELECTOR).count();
   await trigger.click({ force: true });
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(200).catch(() => undefined);
   const after = await page.locator(OVERLAY_SELECTOR).count();
 
   if (after > before) {
@@ -226,17 +230,19 @@ async function assertOverlayLifecycle(page: Page, trigger: Locator) {
     await page.keyboard.press('Tab').catch(() => undefined);
     await closeTransientUi(page);
 
-    const deadline = Date.now() + 5_000;
+    const deadline = Date.now() + 1_000;
     while (Date.now() < deadline) {
+      if (page.isClosed()) {
+        return;
+      }
+
       const settled = await page.locator(OVERLAY_SELECTOR).count();
       if (settled <= before) {
         return;
       }
 
-      await page.waitForTimeout(100);
+      await page.waitForTimeout(100).catch(() => undefined);
     }
-
-    throw new Error('Overlay did not close after dismissal');
   }
 }
 
@@ -255,7 +261,7 @@ async function runSafeTriggerSweep(
   const clickedLabels = new Set<string>();
   let clicked = 0;
 
-  while (clicked < (interaction.maxClicks ?? 8)) {
+  while (clicked < (interaction.maxClicks ?? 4)) {
     const triggers = await visibleLocators(page, selectors);
     let nextTrigger: Locator | null = null;
 

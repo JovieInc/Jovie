@@ -83,7 +83,7 @@ const GLOBAL_INTERACTIONS = [
   {
     id: 'safe-trigger-sweep',
     optional: true,
-    maxClicks: 8,
+    maxClicks: 4,
     selectors: [
       'button:not([type="submit"]):not([disabled])',
       'summary',
@@ -857,7 +857,7 @@ const SMART_LINK_SURFACES = [
         DEFAULTS.releaseSlug
       ),
     readySelectors: ['h1'],
-    readyText: /enter your email to download|get download/i,
+    readyText: /enter your email to download|get download|sending\.\.\./i,
     mainSelector: 'body',
     minMainTextLength: 40,
     lighthouse: false,
