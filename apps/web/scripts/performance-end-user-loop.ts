@@ -219,17 +219,19 @@ async function startServer(
   const logPath = resolve(artifactDir, 'server.log');
   writeFileSync(logPath, '');
 
-  // Use standalone server if available (matches production), fall back to next start
   const standaloneServerPath = resolve(
     repoRoot,
     'apps/web/.next/standalone/apps/web/server.js'
   );
-  const useStandalone = existsSync(standaloneServerPath);
-  const args = useStandalone
-    ? ['run', '--', 'node', standaloneServerPath]
-    : ['run', '--', 'pnpm', '--filter', 'web', 'start'];
+  if (!existsSync(standaloneServerPath)) {
+    throw new Error(
+      'Standalone production server not found at ' +
+        standaloneServerPath +
+        '. Run "doppler run --project jovie-web --config dev -- pnpm --filter web build" before running perf scripts.'
+    );
+  }
 
-  const child = spawn('doppler', args, {
+  const child = spawn('doppler', ['run', '--', 'node', standaloneServerPath], {
     cwd: repoRoot,
     env: {
       ...process.env,

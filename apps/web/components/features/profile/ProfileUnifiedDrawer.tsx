@@ -136,7 +136,10 @@ function ContactList({
   });
 
   return (
-    <div className='flex flex-col gap-0.5'>
+    <div
+      className='flex flex-col gap-0.5'
+      data-testid='profile-mode-drawer-contact'
+    >
       {contacts.map(contact => {
         const primary = primaryChannel(contact);
         const primaryHref = getActionHref(primary);
@@ -449,7 +452,10 @@ export function ProfileUnifiedDrawer({
           )}
 
           {view === 'listen' && (
-            <div className='flex justify-center'>
+            <div
+              className='flex justify-center'
+              data-testid='profile-mode-drawer-listen'
+            >
               <StaticListenInterface
                 artist={artist}
                 handle={artist.handle}
@@ -460,7 +466,7 @@ export function ProfileUnifiedDrawer({
           )}
 
           {view === 'subscribe' && (
-            <div>
+            <div data-testid='profile-mode-drawer-subscribe'>
               {subscribeTwoStep ? (
                 <TwoStepNotificationsCTA artist={artist} startExpanded />
               ) : (
@@ -484,20 +490,28 @@ export function ProfileUnifiedDrawer({
           )}
 
           {view === 'about' && (
-            <AboutSection
-              artist={artist}
-              genres={genres}
-              pressPhotos={pressPhotos}
-              allowPhotoDownloads={allowPhotoDownloads}
-            />
+            <div data-testid='profile-mode-drawer-about'>
+              <AboutSection
+                artist={artist}
+                genres={genres}
+                pressPhotos={pressPhotos}
+                allowPhotoDownloads={allowPhotoDownloads}
+              />
+            </div>
           )}
 
           {view === 'tour' && (
-            <TourDrawerContent artist={artist} tourDates={tourDates} compact />
+            <div data-testid='profile-mode-drawer-tour'>
+              <TourDrawerContent
+                artist={artist}
+                tourDates={tourDates}
+                compact
+              />
+            </div>
           )}
 
           {view === 'tip' && (
-            <div>
+            <div data-testid='profile-mode-drawer-tip'>
               {hasValidVenmoLink ? (
                 <TipSelector
                   amounts={TIP_AMOUNTS}

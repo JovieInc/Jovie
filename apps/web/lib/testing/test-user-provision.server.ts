@@ -1,6 +1,7 @@
 import { createClerkClient } from '@clerk/backend';
 import { Redis } from '@upstash/redis';
 import { and, eq, or } from 'drizzle-orm';
+import { CACHE_TAGS } from '@/lib/cache/tags';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -509,17 +510,31 @@ export async function ensureSocialLinkRecord(
 export async function invalidateTestUserCaches(
   clerkIds: readonly string[]
 ): Promise<void> {
+  if (clerkIds.length === 0) {
+    return;
+  }
+
+  // Keep seed helpers importable from plain tsx/Node entrypoints used by
+  // Playwright global setup. These server-only modules are only needed here.
+  const [{ revalidateTag }, { invalidateProxyUserStateCache }] =
+    await Promise.all([import('next/cache'), import('@/lib/auth/proxy-state')]);
+
+  for (const clerkId of clerkIds) {
+    await invalidateProxyUserStateCache(clerkId);
+  }
+
+  revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
+
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-  if (!url || !token || clerkIds.length === 0) {
+  if (!url || !token) {
     return;
   }
 
   const redis = new Redis({ url, token });
 
   for (const clerkId of clerkIds) {
-    await redis.del(`proxy:user-state:${clerkId}`);
     await redis.del(`admin:role:${clerkId}`);
   }
 }

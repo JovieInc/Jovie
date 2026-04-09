@@ -122,5 +122,8 @@ describe('HomePageNarrative', () => {
 
     const ctaButtons = screen.getAllByText('Get Started');
     expect(ctaButtons.length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByTestId('final-cta-section')).toBeInTheDocument();
+    expect(screen.getByTestId('final-cta-headline')).toBeInTheDocument();
+    expect(screen.getByTestId('final-cta-action')).toBeInTheDocument();
   });
 });

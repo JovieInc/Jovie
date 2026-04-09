@@ -179,20 +179,19 @@ async function startServer(baseUrl: string, artifactDir: string) {
   writeFileSync(logPath, '');
   const { hostname, port } = getBaseUrlServerConfig(baseUrl);
 
-  // Use standalone server if available (production build output), fall back to next start.
-  // The standalone server is the correct target for perf measurement since it matches
-  // production behavior. "next start" warns it doesn't work with output: standalone.
   const standaloneServerPath = resolve(
     repoRoot,
     'apps/web/.next/standalone/apps/web/server.js'
   );
-  const useStandalone = existsSync(standaloneServerPath);
-  const cmd = useStandalone ? 'doppler' : 'doppler';
-  const args = useStandalone
-    ? ['run', '--', 'node', standaloneServerPath]
-    : ['run', '--', 'pnpm', '--filter', 'web', 'start'];
+  if (!existsSync(standaloneServerPath)) {
+    throw new Error(
+      'Standalone production server not found at ' +
+        standaloneServerPath +
+        '. Run "doppler run --project jovie-web --config dev -- pnpm --filter web build" before running perf scripts.'
+    );
+  }
 
-  const child = spawn(cmd, args, {
+  const child = spawn('doppler', ['run', '--', 'node', standaloneServerPath], {
     cwd: repoRoot,
     env: {
       ...process.env,
