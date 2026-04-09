@@ -79,6 +79,27 @@ describe('scrubPii', () => {
     expect(result).toEqual(event);
   });
 
+  it('should filter localhost server noise', () => {
+    const event = {
+      request: {
+        url: 'http://localhost:3000/pricing',
+      },
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should filter playwright-ci tagged noise', () => {
+    const event = {
+      tags: {
+        source: 'playwright-ci',
+      },
+      message: 'TimeoutError: locator.waitFor: Timeout 15000ms exceeded.',
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
   it('should return the event (not null) for valid events', () => {
     const event = { message: 'Test' };
     const result = scrubPii(event as any);

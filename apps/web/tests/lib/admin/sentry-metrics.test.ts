@@ -4,6 +4,8 @@ import {
   getAdminSentryMetrics,
 } from '@/lib/admin/sentry-metrics';
 
+const mockCaptureError = vi.hoisted(() => vi.fn());
+
 vi.mock('@/lib/env-server', () => ({
   env: {
     SENTRY_AUTH_TOKEN: 'sentry-token',
@@ -11,9 +13,14 @@ vi.mock('@/lib/env-server', () => ({
   },
 }));
 
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: mockCaptureError,
+}));
+
 afterEach(() => {
   clearAdminSentryMetricsCache();
   vi.restoreAllMocks();
+  mockCaptureError.mockReset();
 });
 
 describe('getAdminSentryMetrics', () => {
@@ -66,5 +73,6 @@ describe('getAdminSentryMetrics', () => {
     expect(metrics.isConfigured).toBe(true);
     expect(metrics.isAvailable).toBe(false);
     expect(metrics.errorMessage).toContain('401 Unauthorized');
+    expect(mockCaptureError).not.toHaveBeenCalled();
   });
 });
