@@ -24,6 +24,30 @@ const CLERK_REQUIRED_PREFIXES = [
   '/monitoring/',
 ] as const;
 
+const AUTHENTICATED_API_PREFIXES = [
+  '/api/account',
+  '/api/admin',
+  '/api/billing',
+  '/api/chat',
+  '/api/dashboard',
+  '/api/dsp',
+  '/api/images',
+  '/api/metadata-submissions',
+  '/api/onboarding',
+  '/api/pre-save',
+  '/api/promo-downloads',
+  '/api/referrals',
+  '/api/stripe',
+  '/api/suggestions',
+] as const;
+
+const PUBLIC_API_EXACT_PATHS = [
+  '/api/profile/view',
+  '/api/stripe/pricing-options',
+] as const;
+
+const PUBLIC_API_PREFIXES = ['/api/dev/test-auth/'] as const;
+
 function isClerkRequiredPath(pathname: string, pathInfo: ClerkBypassPathInfo) {
   if (
     pathInfo.isProtectedPath ||
@@ -33,12 +57,23 @@ function isClerkRequiredPath(pathname: string, pathInfo: ClerkBypassPathInfo) {
     return true;
   }
 
+  if (
+    PUBLIC_API_EXACT_PATHS.includes(
+      pathname as (typeof PUBLIC_API_EXACT_PATHS)[number]
+    ) ||
+    PUBLIC_API_PREFIXES.some(prefix => pathname.startsWith(prefix))
+  ) {
+    return false;
+  }
+
   // Keep this Clerk-specific subset aligned with categorizePath() in proxy.ts.
   // Duplicating the minimal matcher here avoids coupling this utility to proxy.
   return (
     CLERK_REQUIRED_EXACT_PATHS.includes(
       pathname as (typeof CLERK_REQUIRED_EXACT_PATHS)[number]
-    ) || CLERK_REQUIRED_PREFIXES.some(prefix => pathname.startsWith(prefix))
+    ) ||
+    CLERK_REQUIRED_PREFIXES.some(prefix => pathname.startsWith(prefix)) ||
+    AUTHENTICATED_API_PREFIXES.some(prefix => pathname.startsWith(prefix))
   );
 }
 

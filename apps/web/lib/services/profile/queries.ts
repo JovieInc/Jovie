@@ -96,6 +96,14 @@ const MAX_CONTACTS = 50;
 // Redis edge cache settings
 const PROFILE_CACHE_KEY_PREFIX = 'profile:data:';
 const PROFILE_CACHE_TTL_SECONDS = 300; // 5 minutes - short TTL for freshness
+const KNOWN_PROBE_USERNAMES = new Set([
+  '.env',
+  'phpmyadmin',
+  'wordpress',
+  'wp',
+  'wp-admin',
+  'xmlrpc.php',
+]);
 
 // Query timeout for public profile pages.
 // Neon cold starts can take 10-15s, so production needs enough headroom to
@@ -294,6 +302,9 @@ export async function getProfileWithLinks(
   options?: { skipCache?: boolean }
 ): Promise<ProfileWithLinks | null> {
   const normalizedUsername = username.toLowerCase();
+  if (KNOWN_PROBE_USERNAMES.has(normalizedUsername)) {
+    return null;
+  }
   const cacheKey = `${PROFILE_CACHE_KEY_PREFIX}${normalizedUsername}`;
   const redis = getRedis();
 

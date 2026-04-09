@@ -79,7 +79,8 @@ function parseStackLocation(stack?: string): { file: string; line?: number } {
 
 function isE2eSentryReportingEnabled(): boolean {
   return (
-    process.env.SENTRY_E2E_REPORTING === '1' && Boolean(process.env.SENTRY_DSN)
+    process.env.SENTRY_E2E_REPORTING === '1' &&
+    Boolean(process.env.SENTRY_DSN_DEV ?? process.env.SENTRY_DSN)
   );
 }
 
@@ -92,7 +93,7 @@ class SentryCiReporter implements Reporter {
     }
 
     Sentry.init({
-      dsn: process.env.SENTRY_DSN,
+      dsn: process.env.SENTRY_DSN_DEV ?? process.env.SENTRY_DSN,
       environment: process.env.SENTRY_ENVIRONMENT ?? 'ci-e2e',
       release: process.env.SENTRY_RELEASE,
       tracesSampleRate: 0,
