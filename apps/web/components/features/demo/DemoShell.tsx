@@ -78,6 +78,7 @@ const TAB_LABEL: Record<DemoTab, string> = {
 };
 
 const VIEW_TABS = ['All Releases', 'Active', 'Backlog'] as const;
+const DEMO_ARTIST_NAME = INTERNAL_DJ_DEMO_PERSONA.profile.displayName;
 
 export function DemoShell({
   activeTab,
@@ -117,7 +118,7 @@ export function DemoShell({
                     <div className='flex items-center gap-1.5 w-full'>
                       <BrandLogo size={14} className='rounded-sm' tone='auto' />
                       <span className='truncate flex-1 text-app tracking-tight [font-weight:var(--font-weight-nav)]'>
-                        {INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
+                        {DEMO_ARTIST_NAME}
                       </span>
                       <ChevronDown className='size-3 shrink-0 text-sidebar-item-icon opacity-60' />
                     </div>
@@ -219,9 +220,7 @@ export function DemoShell({
                           className='rounded-sm'
                           tone='auto'
                         />
-                        <span className='font-medium'>
-                          {INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
-                        </span>
+                        <span className='font-medium'>{DEMO_ARTIST_NAME}</span>
                       </SidebarMenuButton>
                       <SidebarMenuSub>
                         <SidebarMenuSubItem>
@@ -334,7 +333,7 @@ export function DemoShell({
             <header className='flex h-[40px] shrink-0 items-center justify-between border-b border-(--linear-app-frame-seam) px-4 md:px-(--linear-app-header-padding-x)'>
               <div className='flex min-w-0 items-center gap-1 text-[13px]'>
                 <span className='truncate text-tertiary-token'>
-                  {INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
+                  {DEMO_ARTIST_NAME}
                 </span>
                 <ChevronRight className='size-3.5 shrink-0 text-quaternary-token' />
                 <span className='truncate font-[510] text-primary-token'>
