@@ -3,6 +3,7 @@ import { isClerkHandshakeUrl } from '../helpers/clerk-auth';
 
 import {
   advanceOnboardingAfterArtistSelection,
+  advanceOnboardingToArtistSelection,
   buildValidOnboardingHandle,
   countPopulatedDspFields,
   createFreshUser,
@@ -169,6 +170,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     // ──────────────────────────────────────────────────────────────────
     // STEP 5: Onboarding — Artist search (Music Fetch)
     // ──────────────────────────────────────────────────────────────────
+    await advanceOnboardingToArtistSelection(page);
     const artistInput = page.getByPlaceholder(/search.*artist.*spotify/i);
     await expect(artistInput).toBeVisible({ timeout: 60_000 });
 
@@ -447,11 +449,14 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
 
     // Find the Pro plan specifically
     const proOption = allOptions.find(
-      o => o.description === 'Pro' && o.priceId
+      o =>
+        o.priceId &&
+        o.amount === 2000 &&
+        (o.description === 'Pro' || o.interval === 'month')
     );
     expect(
       proOption,
-      'Pro pricing option not returned — billing misconfigured'
+      `Pro pricing option not returned — billing misconfigured: ${JSON.stringify(allOptions)}`
     ).toBeTruthy();
 
     const proPriceId = proOption!.priceId!;

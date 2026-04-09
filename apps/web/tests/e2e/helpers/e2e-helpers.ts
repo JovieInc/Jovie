@@ -259,6 +259,39 @@ export async function advanceOnboardingAfterArtistSelection(
   );
 }
 
+export async function advanceOnboardingToArtistSelection(
+  page: Page,
+  timeoutMs = 60_000
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  const artistInput = page.getByPlaceholder(/search.*artist.*spotify/i);
+  const continueButton = page.getByRole('button', { name: /^Continue$/i });
+
+  while (Date.now() < deadline) {
+    if (await artistInput.isVisible().catch(() => false)) {
+      return;
+    }
+
+    const candidate = continueButton.first();
+    if (
+      (await candidate.isVisible().catch(() => false)) &&
+      (await candidate.isEnabled().catch(() => false))
+    ) {
+      try {
+        await candidate.click({ timeout: 3_000 });
+      } catch {
+        // Ignore transient re-render races and keep polling.
+      }
+    }
+
+    await page.waitForTimeout(1_000);
+  }
+
+  throw new Error(
+    `Onboarding did not reach artist selection. Current URL: ${page.url()}`
+  );
+}
+
 export async function getFirstReleaseForUser(
   clerkUserId: string
 ): Promise<DemoReleaseLookup | null> {

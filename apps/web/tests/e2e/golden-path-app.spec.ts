@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   advanceOnboardingAfterArtistSelection,
+  advanceOnboardingToArtistSelection,
   buildValidOnboardingHandle,
   createFreshUser,
   ensureDbUser,
@@ -92,6 +93,7 @@ test.describe('Golden Path: Welcome Message', () => {
     await continueBtn.click();
 
     // Artist search step
+    await advanceOnboardingToArtistSelection(page);
     const artistInput = page.getByPlaceholder(/search.*artist.*spotify/i);
     await expect(artistInput).toBeVisible({ timeout: 60_000 });
     await artistInput.fill(TEST_SPOTIFY_ARTIST.url);
