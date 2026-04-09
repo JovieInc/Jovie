@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { MarketingPageShell } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { LandingFinalCTA } from '@/features/landing/LandingFinalCTA';
@@ -78,7 +79,7 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 
 export default function NewLandingPage() {
   return (
-    <div className='relative min-h-screen'>
+    <MarketingPageShell>
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
@@ -94,6 +95,6 @@ export default function NewLandingPage() {
       <LandingProfileSection />
 
       <LandingFinalCTA />
-    </div>
+    </MarketingPageShell>
   );
 }
