@@ -98,15 +98,28 @@ runs:
       id: set-outputs
       shell: bash
       run: |
+        DIRECT_URL=""
+        POOLED_URL=""
+        BRANCH_ID=""
+
         if [ "${{ steps.create-branch-attempt-1.outcome }}" == "success" ]; then
-          echo "branch_id=${{ steps.create-branch-attempt-1.outputs.branch_id }}" >> $GITHUB_OUTPUT
-          echo "db_url=${{ steps.create-branch-attempt-1.outputs.db_url }}" >> $GITHUB_OUTPUT
-          echo "db_url_pooled=${{ steps.create-branch-attempt-1.outputs.db_url_pooled }}" >> $GITHUB_OUTPUT
+          BRANCH_ID='${{ steps.create-branch-attempt-1.outputs.branch_id }}'
+          DIRECT_URL='${{ steps.create-branch-attempt-1.outputs.db_url }}'
+          POOLED_URL='${{ steps.create-branch-attempt-1.outputs.db_url_pooled }}'
         else
-          echo "branch_id=${{ steps.create-branch-attempt-2.outputs.branch_id }}" >> $GITHUB_OUTPUT
-          echo "db_url=${{ steps.create-branch-attempt-2.outputs.db_url }}" >> $GITHUB_OUTPUT
-          echo "db_url_pooled=${{ steps.create-branch-attempt-2.outputs.db_url_pooled }}" >> $GITHUB_OUTPUT
+          BRANCH_ID='${{ steps.create-branch-attempt-2.outputs.branch_id }}'
+          DIRECT_URL='${{ steps.create-branch-attempt-2.outputs.db_url }}'
+          POOLED_URL='${{ steps.create-branch-attempt-2.outputs.db_url_pooled }}'
         fi
+
+        STABLE_URL="$POOLED_URL"
+        if [ -z "$STABLE_URL" ]; then
+          STABLE_URL="$DIRECT_URL"
+        fi
+
+        echo "branch_id=$BRANCH_ID" >> $GITHUB_OUTPUT
+        echo "db_url=$STABLE_URL" >> $GITHUB_OUTPUT
+        echo "db_url_pooled=$POOLED_URL" >> $GITHUB_OUTPUT
 
     - name: Report Neon branch status
       if: always()

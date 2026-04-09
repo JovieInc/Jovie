@@ -32,6 +32,8 @@ neonConfig.webSocketConstructor = ws;
 
 // Neon URL pattern for cleaning database URLs
 const NEON_URL_PATTERN = /(postgres)(|ql)(\+neon)(.*)/;
+const CI_CONNECT_RETRY_LIMIT = 12;
+const CI_CONNECT_RETRY_DELAY_MS = 5_000;
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const webRootDir = path.resolve(scriptDir, '..');
@@ -86,6 +88,115 @@ function getEnvironment(): 'main' | 'production' | 'development' {
     return 'production';
   }
   return 'development';
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function extractErrorCode(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+
+  const directCode =
+    'code' in error && typeof error.code === 'string' ? error.code : undefined;
+  if (directCode) {
+    return directCode;
+  }
+
+  const cause =
+    'cause' in error && error.cause && typeof error.cause === 'object'
+      ? error.cause
+      : undefined;
+
+  return cause && 'code' in cause && typeof cause.code === 'string'
+    ? cause.code
+    : undefined;
+}
+
+function flattenErrorMessages(error: unknown): string[] {
+  if (!error || typeof error !== 'object') {
+    return [String(error)];
+  }
+
+  const messages: string[] = [];
+  const directMessage =
+    'message' in error && typeof error.message === 'string'
+      ? error.message
+      : undefined;
+  if (directMessage) {
+    messages.push(directMessage);
+  }
+
+  const cause =
+    'cause' in error && error.cause && typeof error.cause === 'object'
+      ? error.cause
+      : undefined;
+  const causeMessage =
+    cause && 'message' in cause && typeof cause.message === 'string'
+      ? cause.message
+      : undefined;
+  if (causeMessage) {
+    messages.push(causeMessage);
+  }
+
+  if (messages.length === 0) {
+    messages.push(String(error));
+  }
+
+  return messages;
+}
+
+function isRetryableConnectionError(error: unknown) {
+  const code = extractErrorCode(error);
+  if (code === 'XX000' || code === '57P03' || code === 'ECONNRESET') {
+    return true;
+  }
+
+  const combinedMessage = flattenErrorMessages(error).join(' ').toLowerCase();
+  return (
+    combinedMessage.includes('requested endpoint could not be found') ||
+    combinedMessage.includes("you don't have access to it") ||
+    combinedMessage.includes('connection terminated unexpectedly') ||
+    combinedMessage.includes('fetch failed')
+  );
+}
+
+async function connectWithRetry(databaseUrl: string) {
+  const maxAttempts = process.env.CI === 'true' ? CI_CONNECT_RETRY_LIMIT : 1;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    let pool: Pool | null = null;
+
+    try {
+      pool = new Pool({ connectionString: databaseUrl, max: 1 });
+      const client = await pool.connect();
+      await client.query("SET app.allow_schema_changes = 'true'");
+      const db = drizzle(client);
+
+      return { client, db, pool };
+    } catch (error) {
+      lastError = error;
+      try {
+        await pool?.end();
+      } catch {
+        // Ignore cleanup errors between retries.
+      }
+
+      if (!isRetryableConnectionError(error) || attempt === maxAttempts) {
+        throw error;
+      }
+
+      log.warning(
+        `Database connection attempt ${attempt}/${maxAttempts} failed with a transient Neon endpoint error. Retrying in ${CI_CONNECT_RETRY_DELAY_MS / 1000}s...`
+      );
+      await sleep(CI_CONNECT_RETRY_DELAY_MS);
+    }
+  }
+
+  throw lastError;
 }
 
 // Validate environment variables
@@ -236,12 +347,10 @@ async function runMigrations() {
     // Clean the URL for Neon (remove the +neon suffix correctly, preserving 'postgres' or 'postgresql')
     const rawUrl = process.env.DATABASE_URL!;
     const databaseUrl = rawUrl.replace(NEON_URL_PATTERN, 'postgres$2$4');
-
-    pool = new Pool({ connectionString: databaseUrl, max: 1 });
-
-    client = await pool.connect();
-    await client.query("SET app.allow_schema_changes = 'true'");
-    db = drizzle(client);
+    const connection = await connectWithRetry(databaseUrl);
+    pool = connection.pool;
+    client = connection.client;
+    db = connection.db;
 
     log.success('Database connection established');
   } catch (error) {
