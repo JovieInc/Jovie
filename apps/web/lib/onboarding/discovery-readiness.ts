@@ -78,14 +78,6 @@ export function buildReadinessState({
     };
   }
 
-  if (releaseCount <= 0) {
-    return {
-      phase: 'importing',
-      canProceedToDashboard: false,
-      blockingReason: 'awaiting_first_release',
-    };
-  }
-
   if (hasPendingDiscoveryJob) {
     return {
       phase: 'discovering',
@@ -97,6 +89,6 @@ export function buildReadinessState({
   return {
     phase: 'ready',
     canProceedToDashboard: true,
-    blockingReason: null,
+    blockingReason: releaseCount <= 0 ? 'awaiting_first_release' : null,
   };
 }

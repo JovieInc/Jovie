@@ -267,16 +267,20 @@ test.describe('Onboarding State Persistence', () => {
     const handle = buildValidOnboardingHandle(seed, user.clerkUserId);
 
     // Navigate to onboarding
-    await smokeNavigateWithRetry(page, '/app', {
+    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD, {
       retries: 2,
       timeout: 120_000,
     });
     await page.waitForURL(/onboarding/, { timeout: 30_000 });
 
-    await smokeNavigateWithRetry(page, `/onboarding?handle=${handle}`, {
-      retries: 2,
-      timeout: 45_000,
-    });
+    await smokeNavigateWithRetry(
+      page,
+      `${APP_ROUTES.ONBOARDING}?handle=${handle}`,
+      {
+        retries: 2,
+        timeout: 45_000,
+      }
+    );
     await expect(
       page.locator('[data-testid="onboarding-form-wrapper"]')
     ).toBeVisible({ timeout: 20_000 });
@@ -291,13 +295,13 @@ test.describe('Onboarding State Persistence', () => {
       .toBe(handle);
 
     // Abandon: navigate away
-    await smokeNavigateWithRetry(page, '/', {
+    await smokeNavigateWithRetry(page, APP_ROUTES.HOME, {
       retries: 2,
       timeout: 60_000,
     });
 
     // Return: should redirect back to onboarding (not completed)
-    await smokeNavigateWithRetry(page, '/app', {
+    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD, {
       retries: 2,
       timeout: 120_000,
     });

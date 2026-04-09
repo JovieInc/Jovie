@@ -450,6 +450,74 @@ describe('Profile Service Queries', () => {
         expect.any(Error)
       );
     });
+
+    it('falls back to the legacy profile query shape when the rich select fails', async () => {
+      mockRedisGet.mockResolvedValue(null);
+      mockGetLatestRelease.mockResolvedValue(null);
+
+      let selectCallCount = 0;
+      mockDbSelect.mockImplementation(() => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: vi.fn().mockReturnThis(),
+            leftJoin: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis(),
+            limit: vi
+              .fn()
+              .mockRejectedValue(new Error('column "theme" does not exist')),
+          };
+        }
+        if (selectCallCount === 2) {
+          return {
+            from: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue([
+              {
+                id: 'profile-123',
+                userId: 'user-456',
+                username: 'testartist',
+                usernameNormalized: 'testartist',
+                displayName: 'Test Artist',
+                bio: 'A test artist bio',
+                avatarUrl: 'https://example.com/avatar.jpg',
+                venmoHandle: 'testartist',
+                spotifyUrl: 'https://open.spotify.com/artist/123',
+                appleMusicUrl: 'https://music.apple.com/artist/123',
+                youtubeUrl: 'https://youtube.com/channel/123',
+                isPublic: true,
+                isVerified: false,
+                isClaimed: true,
+                claimToken: 'hashed-token',
+                createdAt: NOW,
+                updatedAt: NOW,
+              },
+            ]),
+          };
+        }
+        return {
+          from: vi.fn().mockReturnThis(),
+          where: vi.fn().mockReturnThis(),
+          orderBy: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockResolvedValue([]),
+        };
+      });
+
+      const { getProfileWithLinks } = await import(
+        '@/lib/services/profile/queries'
+      );
+      const result = await getProfileWithLinks('testartist');
+
+      expect(result).toBeTruthy();
+      expect(result?.creatorType).toBe('artist');
+      expect(result?.theme).toEqual({});
+      expect(result?.userIsPro).toBe(false);
+      expect(mockCaptureWarning).toHaveBeenCalledWith(
+        '[profile-service] Falling back to legacy profile query',
+        expect.any(Error),
+        { username: 'testartist' }
+      );
+    });
   });
 
   describe('isClaimTokenValid', () => {

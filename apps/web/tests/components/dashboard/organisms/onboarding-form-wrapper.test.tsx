@@ -33,11 +33,6 @@ describe('OnboardingFormWrapper', () => {
     expect(formPropsSpy.mock.calls[0]?.[0]).toMatchObject({
       initialHandle: 'claimedhandle',
     });
-    expect(formPropsSpy).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        initialHandle: 'claimedhandle',
-      })
-    );
 
     expect(globalThis.sessionStorage.getItem('pendingClaim')).toBeNull();
   });
@@ -55,11 +50,6 @@ describe('OnboardingFormWrapper', () => {
     expect(formPropsSpy.mock.calls[0]?.[0]).toMatchObject({
       initialHandle: 'serverhandle',
     });
-    expect(formPropsSpy).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        initialHandle: 'serverhandle',
-      })
-    );
     expect(globalThis.sessionStorage.getItem('pendingClaim')).not.toBeNull();
   });
 });

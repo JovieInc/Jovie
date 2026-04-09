@@ -862,6 +862,7 @@ async function resolveDashboardDataWith(
   fetchFreshFn: (userId: string) => Promise<CoreData>,
   context: string
 ): Promise<DashboardData> {
+  const bypassCache = shouldBypassDashboardCache();
   const entitlements = await getCurrentUserEntitlements();
   const isAdmin = entitlements.isAdmin;
   const userId = entitlements.userId;
@@ -871,16 +872,13 @@ async function resolveDashboardDataWith(
   }
 
   try {
-    let coreData = shouldBypassDashboardCache()
+    let coreData = bypassCache
       ? await fetchFreshFn(userId)
       : await Sentry.startSpan({ op: 'task', name: spanName }, async () =>
           fetchFn(userId)
         );
 
-    if (
-      !shouldBypassDashboardCache() &&
-      shouldRefreshUnstableDashboardState(coreData)
-    ) {
+    if (!bypassCache && shouldRefreshUnstableDashboardState(coreData)) {
       coreData = await fetchFreshFn(userId);
     }
 
@@ -919,6 +917,7 @@ async function resolveDashboardDataEssential(): Promise<DashboardData> {
 async function resolveDashboardShellData(
   clerkUserId: string
 ): Promise<DashboardData> {
+  const bypassCache = shouldBypassDashboardCache();
   // noStore() removed: the inner getCachedDashboardShell() uses unstable_cache
   // with a 5-minute TTL. Calling noStore() here was preventing the Data Cache
   // from serving cached results on subsequent requests.
@@ -926,7 +925,7 @@ async function resolveDashboardShellData(
   try {
     const [adminResult, cachedCoreData] = await Promise.allSettled([
       checkAdminRole(clerkUserId),
-      shouldBypassDashboardCache()
+      bypassCache
         ? fetchDashboardShellWithSession(clerkUserId)
         : Sentry.startSpan(
             { op: 'task', name: 'dashboard.getShellData' },
@@ -939,8 +938,7 @@ async function resolveDashboardShellData(
     const isAdmin =
       adminResult.status === 'fulfilled' ? adminResult.value : false;
     const coreData =
-      !shouldBypassDashboardCache() &&
-      shouldRefreshUnstableDashboardState(cachedCoreData.value)
+      !bypassCache && shouldRefreshUnstableDashboardState(cachedCoreData.value)
         ? await fetchDashboardShellWithSession(clerkUserId)
         : cachedCoreData.value;
 

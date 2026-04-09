@@ -59,6 +59,8 @@ test.describe('Onboarding Handle Taken Prevention', () => {
           test.skip();
         }
       }
+
+      await setupClerkTestingToken({ page });
     } else {
       // Mock the API endpoint to simulate taken handle
       await page.route('/api/handle/check*', async (route, request) => {
@@ -79,7 +81,7 @@ test.describe('Onboarding Handle Taken Prevention', () => {
 
     // Navigate to onboarding page only when running with real auth.
     // In mocked mode, use the public homepage claim form.
-    await page.goto(runWithRealAPI ? APP_ROUTES.ONBOARDING : '/', {
+    await page.goto(runWithRealAPI ? APP_ROUTES.ONBOARDING : APP_ROUTES.HOME, {
       waitUntil: 'domcontentloaded',
     });
 
@@ -109,10 +111,8 @@ test.describe('Onboarding Handle Taken Prevention', () => {
 
     // Setup Clerk testing token for authentication if needed
     if (runWithRealAPI) {
-      await setupClerkTestingToken({ page });
-
       // Load homepage to initialize Clerk
-      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await page.goto(APP_ROUTES.HOME, { waitUntil: 'domcontentloaded' });
 
       // Wait for Clerk to be ready
       await page.waitForFunction(
@@ -124,7 +124,9 @@ test.describe('Onboarding Handle Taken Prevention', () => {
       );
 
       // Navigate to onboarding page
-      await page.goto('/onboarding', { waitUntil: 'domcontentloaded' });
+      await page.goto(APP_ROUTES.ONBOARDING, {
+        waitUntil: 'domcontentloaded',
+      });
     }
 
     const handleInput = page.getByRole('textbox', { name: /handle/i });

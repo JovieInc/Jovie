@@ -281,7 +281,7 @@ export async function connectOnboardingSpotifyArtist(
     );
 
     try {
-      await processDspArtistDiscoveryJobStandalone({
+      const discoveryResult = await processDspArtistDiscoveryJobStandalone({
         creatorProfileId: profile.id,
         spotifyArtistId: params.spotifyArtistId,
         targetProviders: DSP_DISCOVERY_PROVIDERS,
@@ -290,6 +290,18 @@ export async function connectOnboardingSpotifyArtist(
           params.spotifyArtistId
         ),
       });
+
+      if (discoveryResult.errors.length > 0) {
+        void captureError(
+          'DSP artist discovery inline processing completed with errors on connect',
+          new Error(discoveryResult.errors.join('; ')),
+          {
+            action: 'connectOnboardingSpotifyArtist',
+            creatorProfileId: profile.id,
+            spotifyArtistId: params.spotifyArtistId,
+          }
+        );
+      }
     } catch (error) {
       void captureError(
         'DSP artist discovery inline processing failed on connect',

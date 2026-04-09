@@ -7,7 +7,6 @@ import {
   discogReleases,
   discogTracks,
 } from '@/lib/db/schema/content';
-import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import {
   buildSpotifyAlbumUrl,
@@ -56,11 +55,9 @@ import { generateUniqueSlug } from './slug';
 
 /** Maximum number of releases to import in a single operation */
 const MAX_RELEASES_PER_IMPORT = 200;
-const E2E_FAST_MAX_RELEASES_PER_IMPORT = 1;
 
 /** Maximum number of tracks per release */
 const MAX_TRACKS_PER_RELEASE = 100;
-const E2E_FAST_MAX_TRACKS_PER_RELEASE = 6;
 
 const ISRC_REGEX = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
 
@@ -90,15 +87,11 @@ function sanitizeBoundedNullableInteger(
 }
 
 function getMaxReleasesPerImport(): number {
-  return isE2EFastOnboardingEnabled()
-    ? E2E_FAST_MAX_RELEASES_PER_IMPORT
-    : MAX_RELEASES_PER_IMPORT;
+  return MAX_RELEASES_PER_IMPORT;
 }
 
 function getMaxTracksPerRelease(): number {
-  return isE2EFastOnboardingEnabled()
-    ? E2E_FAST_MAX_TRACKS_PER_RELEASE
-    : MAX_TRACKS_PER_RELEASE;
+  return MAX_TRACKS_PER_RELEASE;
 }
 
 function getEffectiveMaxReleasesPerImport(
@@ -437,7 +430,16 @@ export async function importReleasesFromSpotify(
         const fullAlbumMap = new Map<string, SpotifyAlbumFull>();
         for (const album of fullAlbums) {
           const enrichedAlbum = mergeFullTrackMetadata(album, fullTracksById);
-          logTrackIsrcCoverage(enrichedAlbum);
+          logTrackIsrcCoverage({
+            ...enrichedAlbum,
+            tracks: {
+              ...enrichedAlbum.tracks,
+              items: enrichedAlbum.tracks.items.slice(
+                0,
+                effectiveMaxTracksPerRelease
+              ),
+            },
+          });
           fullAlbumMap.set(album.id, enrichedAlbum);
         }
 

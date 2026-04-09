@@ -31,15 +31,14 @@ export function shouldBypassClerk(
     : globalThis.location
 ): boolean {
   const normalizedKey = publishableKey?.trim();
-  const shouldBypassForPrivateLiveOrigin =
-    normalizedKey?.startsWith('pk_live_') &&
+  const shouldBypassForPrivateOrigin =
     shouldDisableClerkProxyForLocation(locationLike);
 
   return (
     !normalizedKey ||
     clerkMockFlag === '1' ||
     isMockPublishableKey(normalizedKey) ||
-    Boolean(shouldBypassForPrivateLiveOrigin)
+    shouldBypassForPrivateOrigin
   );
 }
 

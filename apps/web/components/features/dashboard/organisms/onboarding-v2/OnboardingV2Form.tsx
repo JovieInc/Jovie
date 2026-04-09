@@ -43,6 +43,11 @@ import {
   isPaidIntent,
 } from '@/lib/auth/plan-intent';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import type {
+  OnboardingBlockingReason as DiscoveryBlockingReason,
+  SpotifyImportStatus as DiscoveryImportStatus,
+  OnboardingReadinessPhase as DiscoveryReadinessPhase,
+} from '@/lib/onboarding/discovery-readiness';
 import {
   ONBOARDING_PREVIEW_SNAPSHOT_KEY,
   ONBOARDING_WELCOME_REPLY_KEY,
@@ -125,28 +130,6 @@ interface DiscoveryRelease {
   spotifyPopularity: number | null;
   title: string;
 }
-
-type DiscoveryImportStatus =
-  | 'idle'
-  | 'importing'
-  | 'complete'
-  | 'failed'
-  | 'unknown';
-
-type DiscoveryReadinessPhase =
-  | 'connecting'
-  | 'importing'
-  | 'discovering'
-  | 'ready'
-  | 'failed';
-
-type DiscoveryBlockingReason =
-  | 'missing_spotify_selection'
-  | 'spotify_import_in_progress'
-  | 'spotify_import_failed'
-  | 'discovery_in_progress'
-  | 'awaiting_first_release'
-  | null;
 
 interface DiscoverySnapshot {
   counts: {
@@ -1837,10 +1820,7 @@ export function OnboardingV2Form({
                   Refresh
                 </Button>
                 <Button
-                  disabled={
-                    isReadinessPending(discoverySnapshot) ||
-                    (discoverySnapshot?.counts.releaseCount ?? 0) <= 0
-                  }
+                  disabled={isReadinessPending(discoverySnapshot)}
                   onClick={advanceFromStep}
                 >
                   Continue

@@ -139,8 +139,7 @@ export default async function OnboardingPage({
   const shouldAutoSubmitHandle =
     Boolean(spotifySuggestedHandle) &&
     !resolvedSearchParams?.handle &&
-    !existingProfile?.username &&
-    !initialHandle;
+    !existingProfile?.username;
 
   return (
     <OnboardingFormWrapper

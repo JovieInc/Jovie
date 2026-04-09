@@ -81,7 +81,7 @@ describe('test-user-provision.server', () => {
     ).toBe(true);
   });
 
-  it('updates the existing claimed profile for the same user before checking username', async () => {
+  it('updates the existing claimed profile for the same user when one already exists', async () => {
     const updateValues: Array<Record<string, unknown>> = [];
     const selectQueue = [[{ id: 'profile_existing' }]];
     const database = {
@@ -142,7 +142,7 @@ describe('test-user-provision.server', () => {
     });
   });
 
-  it('recovers duplicate claimed-profile races by retrying user lookup before username lookup', async () => {
+  it('recovers duplicate claimed-profile races by retrying the duplicate lookup path', async () => {
     const duplicateError = new Error(
       'duplicate key value violates unique constraint "creator_profiles_username_normalized_unique"'
     );

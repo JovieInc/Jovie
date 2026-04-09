@@ -531,7 +531,7 @@ describe('Onboarding screen performance budgets', () => {
     ).toBeEnabled();
   });
 
-  it('blocks the releases step when no releases are ready yet', async () => {
+  it('lets creators continue when Spotify import completed without releases', async () => {
     mockDiscoveryResponse(
       createDiscoverySnapshot({
         counts: {
@@ -543,8 +543,8 @@ describe('Onboarding screen performance budgets', () => {
         },
         readiness: {
           blockingReason: 'awaiting_first_release',
-          canProceedToDashboard: false,
-          phase: 'importing',
+          canProceedToDashboard: true,
+          phase: 'ready',
         },
         releases: [],
       })
@@ -563,7 +563,7 @@ describe('Onboarding screen performance budgets', () => {
     );
 
     await screen.findByRole('heading', { name: 'Your release preview' });
-    expect(screen.getByRole('button', { name: /^Continue$/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Continue$/i })).toBeEnabled();
     expect(
       screen.getByText(
         'Your first releases have not landed yet. This is taking longer than usual.'

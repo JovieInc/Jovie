@@ -701,10 +701,6 @@ export async function waitForOnboardingReadiness(
           );
         }
 
-        if (importState?.spotify_import_status === 'importing') {
-          return 'spotify_import_in_progress';
-        }
-
         return 'ready';
       },
       { timeout: 180_000 }

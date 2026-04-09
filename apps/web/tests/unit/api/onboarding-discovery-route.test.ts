@@ -50,6 +50,21 @@ describe('onboarding discovery readiness', () => {
     });
   });
 
+  it('allows creators with no imported releases to continue once import is complete', () => {
+    expect(
+      buildReadinessState({
+        hasPendingDiscoveryJob: false,
+        hasSpotifySelection: true,
+        releaseCount: 0,
+        spotifyImportStatus: 'complete',
+      })
+    ).toEqual({
+      blockingReason: 'awaiting_first_release',
+      canProceedToDashboard: true,
+      phase: 'ready',
+    });
+  });
+
   it('treats failed Spotify import as terminal failure', () => {
     expect(
       buildReadinessState({
