@@ -205,14 +205,43 @@ export async function waitForAuthenticatedHealth(
 ): Promise<void> {
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
   const authHealthUrl = new URL('/api/health/auth', baseUrl).toString();
+  const bypassSessionUrl = new URL(
+    '/api/dev/test-auth/session',
+    baseUrl
+  ).toString();
 
   await expect
     .poll(
       async () => {
         try {
-          const response = await page.request.get(authHealthUrl, {
+          let response = await page.request.get(authHealthUrl, {
             failOnStatusCode: false,
           });
+
+          if (response.status() === 403) {
+            response = await page.request.get(bypassSessionUrl, {
+              failOnStatusCode: false,
+            });
+
+            if (!response.ok()) {
+              return `http-${response.status()}`;
+            }
+
+            const payload = (await response.json()) as {
+              active?: boolean;
+              userId?: string | null;
+            };
+
+            if (!payload.active) {
+              return 'anonymous';
+            }
+
+            if (expectedUserId && payload.userId !== expectedUserId) {
+              return `user-mismatch:${payload.userId ?? 'unknown'}`;
+            }
+
+            return 'authenticated';
+          }
 
           if (!response.ok()) {
             return `http-${response.status()}`;
