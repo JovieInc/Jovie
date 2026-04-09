@@ -59,6 +59,8 @@ export function OnboardingFormWrapper({
   existingBio = null,
   existingGenres = null,
 }: OnboardingFormWrapperProps) {
+  const [isHydrated, setIsHydrated] = useState(false);
+
   // Resolve the handle synchronously on first render to avoid a key-change
   // remount that causes a visible layout shift.  sessionStorage is available
   // during the initial client render (CSR after server HTML hydration), so
@@ -71,6 +73,10 @@ export function OnboardingFormWrapper({
   // Clean up the consumed pendingClaim entry in an effect (not in the
   // useState initializer) to avoid a side effect during render, which
   // React StrictMode would execute twice.
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
   useEffect(() => {
     if (resolvedHandle && resolvedHandle !== initialHandle) {
       try {
@@ -85,11 +91,15 @@ export function OnboardingFormWrapper({
   const formKey = resolvedHandle || '__empty__';
 
   return (
-    <div data-testid='onboarding-form-wrapper'>
+    <div
+      data-testid='onboarding-form-wrapper'
+      data-hydrated={isHydrated ? 'true' : 'false'}
+    >
       <OnboardingV2Form
         key={formKey}
         initialDisplayName={initialDisplayName}
         initialHandle={resolvedHandle}
+        isHydrated={isHydrated}
         isReservedHandle={isReservedHandle}
         userEmail={userEmail}
         userId={userId}

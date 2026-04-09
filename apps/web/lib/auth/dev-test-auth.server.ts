@@ -240,7 +240,7 @@ async function findDevTestAuthSession(
   const persona =
     requestedPersona ?? (matchedUser.isAdmin ? 'admin' : 'creator');
   const config = resolvePersonaSeedConfig(persona);
-  const username = matchedUser.username ?? config.username;
+  const username = matchedUser.username ?? null;
   const fullName =
     matchedUser.displayName ?? matchedUser.fullName ?? config.fullName;
 

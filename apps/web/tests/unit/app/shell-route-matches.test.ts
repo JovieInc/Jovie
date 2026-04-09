@@ -3,6 +3,7 @@ import {
   isReleasesShellRoute,
   resolveAppShellRequestPath,
 } from '@/app/app/(shell)/shell-route-matches';
+import { APP_ROUTES } from '@/constants/routes';
 
 describe('resolveAppShellRequestPath', () => {
   it('uses next-url when it is available', () => {
@@ -35,8 +36,8 @@ describe('resolveAppShellRequestPath', () => {
     ).toBe('/app/dashboard/releases');
   });
 
-  it('returns null when no path-like header is present', () => {
-    expect(resolveAppShellRequestPath(null, null)).toBeNull();
+  it('falls back to the dashboard path when no path-like header is present', () => {
+    expect(resolveAppShellRequestPath(null, null)).toBe(APP_ROUTES.DASHBOARD);
   });
 });
 

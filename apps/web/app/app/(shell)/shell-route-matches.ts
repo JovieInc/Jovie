@@ -36,7 +36,11 @@ export function resolveAppShellRequestPath(
     }
   }
 
-  return null;
+  // Next dev and some test/bypass flows do not always populate the route
+  // headers that the app shell normally relies on. Defaulting to `/app`
+  // preserves the onboarding redirect guard for fresh users instead of
+  // falling through to a broken null-profile shell.
+  return APP_ROUTES.DASHBOARD;
 }
 
 export function isChatShellRoute(pathname: string | null): boolean {

@@ -181,6 +181,7 @@ describe('completeOnboarding', () => {
     vi.clearAllMocks();
 
     mockGetCachedAuth.mockResolvedValue({ userId: 'clerk-user-123' });
+    mockGetCachedCurrentUser.mockResolvedValue({ id: 'clerk-user-123' });
     mockValidateUsername.mockReturnValue({ isValid: true });
     mockNormalizeUsername.mockImplementation((username: string) =>
       username.trim().toLowerCase()
@@ -356,8 +357,10 @@ describe('completeOnboarding', () => {
       'artist'
     );
     expect(mockCaptureError).toHaveBeenCalledWith(
-      'Lead signup attribution failed',
-      expect.any(Error),
+      'attribute_lead_signup failed',
+      expect.objectContaining({
+        message: 'lead attribution down',
+      }),
       expect.objectContaining({
         route: 'onboarding',
         contextData: { userId: 'clerk-user-123' },

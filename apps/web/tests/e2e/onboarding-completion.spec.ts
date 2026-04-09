@@ -1,15 +1,19 @@
 import { expect, test } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 
 import {
   buildValidOnboardingHandle,
   clearOnboardingRateLimits,
+  completeOnboardingV2,
   createFreshUser,
   ensureDbUser,
+  ensureServerAuthenticated,
   hasRealEnv,
   interceptTrackingCalls,
   purgeStaleClerkTestUsers,
   waitForSpotifyImport,
 } from './helpers/e2e-helpers';
+import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 
 /**
  * Onboarding Completion E2E — Fresh User → Dashboard → Empty States
@@ -36,7 +40,9 @@ test.skip(
 test.use({ storageState: { cookies: [], origins: [] } });
 
 const TEST_SPOTIFY_URL =
-  'https://open.spotify.com/artist/59NJtiWq8nISIJjDtITQyt'; // Tim White
+  'https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we'; // Dua Lipa
+
+let completedOnboardingUser: { clerkUserId: string } | null = null;
 
 test.describe('Onboarding Completion & Empty States', () => {
   test.describe.configure({ mode: 'serial' });
@@ -81,95 +87,61 @@ test.describe('Onboarding Completion & Empty States', () => {
 
     const handle = buildValidOnboardingHandle(seed, user.clerkUserId);
     await ensureDbUser(user.clerkUserId, user.email, [
-      '59NJtiWq8nISIJjDtITQyt',
+      '6M2wZ9GZgrQXHCFfjv46we',
     ]);
+    await ensureServerAuthenticated(page, user.clerkUserId);
 
-    // STEP 2: Navigate to signup (already authenticated from createFreshUser)
-    // The user should be redirected to onboarding since profile is incomplete
-    await page.goto('/app', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
+    // STEP 2: The user should be redirected to onboarding since profile is incomplete
+    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD, {
+      retries: 2,
+      timeout: 120_000,
     });
 
-    // Should redirect to onboarding since needsOnboarding=true
     await page.waitForURL(/onboarding/, { timeout: 30_000 });
     console.log('[onboarding-completion] Redirected to onboarding');
 
+    await smokeNavigateWithRetry(
+      page,
+      `${APP_ROUTES.ONBOARDING}?handle=${handle}`,
+      {
+        retries: 2,
+        timeout: 45_000,
+      }
+    );
+    await expect(
+      page.locator('[data-testid="onboarding-form-wrapper"]')
+    ).toBeVisible({ timeout: 20_000 });
+
     // STEP 3: Complete handle entry
-    const handleInput = page.locator(
-      'input[name="handle"], input[placeholder*="handle"], #handle-input'
-    );
-    const isHandleVisible = await handleInput
-      .first()
-      .isVisible({ timeout: 15_000 })
-      .catch(() => false);
-
-    if (isHandleVisible) {
-      await handleInput.first().fill(handle);
-      console.log(`[onboarding-completion] Entered handle: ${handle}`);
-
-      // Wait for handle availability check
-      await page.waitForTimeout(2000);
-
-      // Click continue/next
-      const continueBtn = page
-        .getByRole('button', { name: /continue|next|claim/i })
-        .first();
-      if (await continueBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-        await continueBtn.click();
-      }
-    }
-
-    // STEP 4: Artist search — paste Spotify URL
-    const spotifyInput = page.locator(
-      'input[placeholder*="spotify"], input[placeholder*="Spotify"], input[name*="spotify"], input[type="url"]'
-    );
-    const isSpotifyVisible = await spotifyInput
-      .first()
-      .isVisible({ timeout: 10_000 })
-      .catch(() => false);
-
-    if (isSpotifyVisible) {
-      await spotifyInput.first().fill(TEST_SPOTIFY_URL);
-      console.log('[onboarding-completion] Pasted Spotify URL');
-
-      // Wait for import to start
-      await page.waitForTimeout(3000);
-
-      // Click continue/import
-      const importBtn = page
-        .getByRole('button', {
-          name: /continue|next|import|confirm|connect/i,
-        })
-        .first();
-      if (await importBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-        await importBtn.click();
-      }
-    }
-
-    // STEP 5: Profile review — accept defaults and continue
-    const finishBtn = page
-      .getByRole('button', {
-        name: /finish|complete|done|get started|go to dashboard/i,
+    const handleInput = page.getByLabel('Enter your desired handle');
+    await expect(handleInput).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => (await handleInput.inputValue()).trim(), {
+        timeout: 20_000,
       })
-      .first();
-    const isFinishVisible = await finishBtn
-      .isVisible({ timeout: 30_000 })
-      .catch(() => false);
+      .toBe(handle);
+    console.log(`[onboarding-completion] Entered handle: ${handle}`);
 
-    if (isFinishVisible) {
-      await finishBtn.click();
-      console.log('[onboarding-completion] Clicked finish');
-    }
+    // STEP 4: Complete V2 onboarding flow
+    await completeOnboardingV2(page, TEST_SPOTIFY_URL, {
+      clerkUserId: user.clerkUserId,
+      expectedHandle: handle,
+    });
+    console.log('[onboarding-completion] Completed V2 onboarding flow');
 
-    // STEP 6: Verify dashboard redirect — no redirect loop
+    // STEP 5: Verify dashboard redirect — no redirect loop
+    await ensureServerAuthenticated(page, user.clerkUserId);
+    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD, {
+      retries: 2,
+      timeout: 120_000,
+    });
     await page.waitForURL(/\/app/, { timeout: 30_000 });
     const currentUrl = page.url();
     expect(currentUrl).not.toMatch(/onboarding/);
     expect(currentUrl).not.toMatch(/sign-in/);
     console.log(`[onboarding-completion] Dashboard loaded: ${currentUrl}`);
 
-    // Verify onboarding state via Spotify import readiness
+    // STEP 6: Verify onboarding state via Spotify import readiness
     const importState = await waitForSpotifyImport(user.clerkUserId);
     if (importState) {
       expect(importState.onboarding_completed_at).toBeTruthy();
@@ -197,13 +169,20 @@ test.describe('Onboarding Completion & Empty States', () => {
     console.log(
       `[onboarding-completion] Dashboard has actionable CTA: ${hasActionableCTA}`
     );
+
+    completedOnboardingUser = { clerkUserId: user.clerkUserId };
   });
 
   test('empty releases page shows warmth and action', async ({ page }) => {
-    // This test reuses the session from the previous serial test
-    await page.goto('/app/dashboard/releases', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
+    test.skip(
+      !completedOnboardingUser,
+      'Skipped because the seed onboarding test did not complete'
+    );
+
+    await ensureServerAuthenticated(page, completedOnboardingUser!.clerkUserId);
+    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD_RELEASES, {
+      retries: 2,
+      timeout: 120_000,
     });
 
     // Should not show an error page
@@ -224,9 +203,15 @@ test.describe('Onboarding Completion & Empty States', () => {
   });
 
   test('empty audience page shows onboarding path', async ({ page }) => {
-    await page.goto('/app/dashboard/audience', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
+    test.skip(
+      !completedOnboardingUser,
+      'Skipped because the seed onboarding test did not complete'
+    );
+
+    await ensureServerAuthenticated(page, completedOnboardingUser!.clerkUserId);
+    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD_AUDIENCE, {
+      retries: 2,
+      timeout: 120_000,
     });
 
     const pageText = await page
@@ -275,45 +260,50 @@ test.describe('Onboarding State Persistence', () => {
     }
 
     await ensureDbUser(user.clerkUserId, user.email, [
-      '59NJtiWq8nISIJjDtITQyt',
+      '6M2wZ9GZgrQXHCFfjv46we',
     ]);
+    await ensureServerAuthenticated(page, user.clerkUserId);
+
+    const handle = buildValidOnboardingHandle(seed, user.clerkUserId);
 
     // Navigate to onboarding
-    await page.goto('/app', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
+    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD, {
+      retries: 2,
+      timeout: 120_000,
     });
     await page.waitForURL(/onboarding/, { timeout: 30_000 });
 
-    // Enter handle (partial progress)
-    const handleInput = page.locator(
-      'input[name="handle"], input[placeholder*="handle"], #handle-input'
+    await smokeNavigateWithRetry(
+      page,
+      `${APP_ROUTES.ONBOARDING}?handle=${handle}`,
+      {
+        retries: 2,
+        timeout: 45_000,
+      }
     );
-    const isVisible = await handleInput
-      .first()
-      .isVisible({ timeout: 15_000 })
-      .catch(() => false);
+    await expect(
+      page.locator('[data-testid="onboarding-form-wrapper"]')
+    ).toBeVisible({ timeout: 20_000 });
 
-    if (!isVisible) {
-      console.log(
-        '⚠ Handle input not visible — onboarding UI may have changed. Skipping abandon test.'
-      );
-      return;
-    }
-
-    const handle = buildValidOnboardingHandle(seed, user.clerkUserId);
-    await handleInput.first().fill(handle);
+    // Enter handle (partial progress)
+    const handleInput = page.getByLabel('Enter your desired handle');
+    await expect(handleInput).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => (await handleInput.inputValue()).trim(), {
+        timeout: 20_000,
+      })
+      .toBe(handle);
 
     // Abandon: navigate away
-    await page.goto('/', {
-      waitUntil: 'domcontentloaded',
-      timeout: 15_000,
+    await smokeNavigateWithRetry(page, APP_ROUTES.HOME, {
+      retries: 2,
+      timeout: 60_000,
     });
 
     // Return: should redirect back to onboarding (not completed)
-    await page.goto('/app', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
+    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD, {
+      retries: 2,
+      timeout: 120_000,
     });
 
     // Should be back at onboarding since it wasn't completed

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
-import { discogReleases } from '@/lib/db/schema/content';
+import { discogRecordings, discogReleases } from '@/lib/db/schema/content';
 import {
   dspArtistMatches,
   socialLinkSuggestions,
@@ -14,6 +14,10 @@ import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { isActiveDiscoveryJob } from '@/lib/discovery/is-active-discovery-job';
 import { captureError } from '@/lib/error-tracking';
+import {
+  buildReadinessState,
+  parseSpotifyImportStatus,
+} from '@/lib/onboarding/discovery-readiness';
 import { getHometownFromSettings } from '@/types/db';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -111,6 +115,7 @@ export async function GET(request: Request) {
       pendingSocialSuggestions,
       releaseRows,
       releaseCountResult,
+      recordingCountResult,
       activeSocialCountResult,
       latestDiscoveryJob,
     ] = await Promise.all([
@@ -190,6 +195,10 @@ export async function GET(request: Request) {
         .where(eq(discogReleases.creatorProfileId, validatedProfileId)),
       db
         .select({ value: count() })
+        .from(discogRecordings)
+        .where(eq(discogRecordings.creatorProfileId, validatedProfileId)),
+      db
+        .select({ value: count() })
         .from(socialLinks)
         .where(
           and(
@@ -264,6 +273,28 @@ export async function GET(request: Request) {
           match.status === 'auto_confirmed' ||
           match.status === 'rejected'
       );
+    const hasPendingDiscoveryJob = isActiveDiscoveryJob(
+      latestDiscoveryJob[0],
+      latestMatchUpdatedAt,
+      hasOnlyTerminalMatches
+    );
+    const releaseCount = releaseCountResult[0]?.value ?? 0;
+    const recordingCount = recordingCountResult[0]?.value ?? 0;
+    const activeSocialCount = activeSocialCountResult[0]?.value ?? 0;
+    const hasSpotifySelection = Boolean(
+      profile.spotifyId && profile.spotifyUrl
+    );
+    const spotifyImportStatus = parseSpotifyImportStatus(
+      (profile.settings as Record<string, unknown> | null | undefined)
+        ?.spotifyImportStatus,
+      hasSpotifySelection
+    );
+    const readiness = buildReadinessState({
+      hasPendingDiscoveryJob,
+      hasSpotifySelection,
+      releaseCount,
+      spotifyImportStatus,
+    });
 
     return NextResponse.json(
       {
@@ -315,15 +346,21 @@ export async function GET(request: Request) {
             spotifyPopularity: release.spotifyPopularity,
           })),
           counts: {
-            releaseCount: releaseCountResult[0]?.value ?? 0,
-            activeSocialCount: activeSocialCountResult[0]?.value ?? 0,
+            releaseCount,
+            activeSocialCount,
             dspCount: confirmedDspCount,
           },
-          hasPendingDiscoveryJob: isActiveDiscoveryJob(
-            latestDiscoveryJob[0],
-            latestMatchUpdatedAt,
-            hasOnlyTerminalMatches
-          ),
+          hasPendingDiscoveryJob,
+          importState: {
+            spotifyImportStatus,
+            hasSpotifySelection,
+            hasImportedReleases: releaseCount > 0,
+            releaseCount,
+            recordingCount,
+            activeSocialCount,
+            confirmedDspCount,
+          },
+          readiness,
         },
       },
       { status: 200, headers: NO_STORE_HEADERS }

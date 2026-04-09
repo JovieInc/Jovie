@@ -58,6 +58,7 @@ import {
   type EnrichmentStatusMap,
 } from '@/lib/dsp-enrichment/enrichment-status';
 import { processReleaseEnrichmentJobStandalone } from '@/lib/dsp-enrichment/jobs/release-enrichment';
+import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import {
@@ -1453,6 +1454,7 @@ export async function connectSpotifyArtist(params: {
   spotifyArtistId: string;
   spotifyArtistUrl: string;
   artistName: string;
+  forceInlineImport?: boolean;
   includeTracks?: boolean;
   skipMusicFetchEnrichment?: boolean;
 }): Promise<{
@@ -1496,7 +1498,8 @@ export async function connectSpotifyArtist(params: {
     string,
     unknown
   >;
-  const shouldRunInlineImport = process.env.E2E_FAST_ONBOARDING === '1';
+  const shouldRunInlineImport =
+    Boolean(params.forceInlineImport) || isE2EFastOnboardingEnabled();
 
   // Pre-check: detect if another profile already claims this Spotify artist ID.
   // This gives a clean error path for the common case; the catch block below
