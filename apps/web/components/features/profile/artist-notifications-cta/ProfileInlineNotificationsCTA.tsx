@@ -100,6 +100,10 @@ function birthdayDisplayToStorage(display: string): string {
   return display.replace('/', '-');
 }
 
+function isDrawerElement(element: Element | null): boolean {
+  return element?.closest('[data-testid="profile-menu-drawer"]') !== null;
+}
+
 interface InlineInputStepProps {
   readonly inputRef: React.RefObject<HTMLInputElement | null>;
   readonly inputId: string;
@@ -217,6 +221,8 @@ export function ProfileInlineNotificationsCTA({
   const inputId = useId();
   const prefersReducedMotion = useReducedMotion();
   const { user } = useUserSafe();
+  const lastInteractionWasKeyboardRef = useRef(false);
+  const suppressNextFocusOpenRef = useRef(false);
 
   const nameMutation = useUpdateSubscriberNameMutation();
   const birthdayMutation = useUpdateSubscriberBirthdayMutation();
@@ -269,6 +275,23 @@ export function ProfileInlineNotificationsCTA({
     if (primaryEmail) handleEmailChange(primaryEmail);
   }, [step, emailInput, user, handleEmailChange]);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      lastInteractionWasKeyboardRef.current = event.key === 'Tab';
+    };
+    const handlePointerIntent = () => {
+      lastInteractionWasKeyboardRef.current = false;
+    };
+
+    globalThis.addEventListener('keydown', handleKeyDown);
+    globalThis.addEventListener('pointerdown', handlePointerIntent);
+
+    return () => {
+      globalThis.removeEventListener('keydown', handleKeyDown);
+      globalThis.removeEventListener('pointerdown', handlePointerIntent);
+    };
+  }, []);
+
   const handleReveal = useCallback(() => {
     openSubscription();
     handleChannelChange('email'); // Inline CTA always uses email
@@ -278,6 +301,13 @@ export function ProfileInlineNotificationsCTA({
       source: 'profile_inline_cta',
     });
   }, [artist.handle, openSubscription, handleChannelChange]);
+
+  const handleManageNotifications = useCallback(() => {
+    if (!onManageNotifications) return;
+
+    suppressNextFocusOpenRef.current = true;
+    onManageNotifications();
+  }, [onManageNotifications]);
 
   // Expose the reveal function to external callers (e.g. menu "Get Notified")
   useEffect(() => {
@@ -342,6 +372,34 @@ export function ProfileInlineNotificationsCTA({
       else if (step === 'birthday') handleBirthdaySubmit().catch(() => {});
     },
     [step, handleEmailSubmit, handleNameSubmit, handleBirthdaySubmit]
+  );
+
+  const handleManageButtonFocus = useCallback(() => {
+    if (!lastInteractionWasKeyboardRef.current) return;
+    if (suppressNextFocusOpenRef.current) return;
+
+    handleManageNotifications();
+  }, [handleManageNotifications]);
+
+  const handleManageButtonBlur = useCallback(
+    (event: React.FocusEvent<HTMLButtonElement>) => {
+      if (isDrawerElement(event.relatedTarget as Element | null)) {
+        return;
+      }
+
+      suppressNextFocusOpenRef.current = false;
+    },
+    []
+  );
+
+  const handleManageButtonKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+
+      event.preventDefault();
+      handleManageNotifications();
+    },
+    [handleManageNotifications]
   );
 
   if (hydrationStatus === 'checking') {
@@ -477,18 +535,26 @@ export function ProfileInlineNotificationsCTA({
             initial={enterVariant.initial}
             animate={enterVariant.animate}
           >
-            <div className='flex h-12 items-center justify-center gap-2 rounded-full text-center'>
+            <button
+              type='button'
+              data-testid='inline-notifications-on-button'
+              onClick={handleManageNotifications}
+              onFocus={handleManageButtonFocus}
+              onBlur={handleManageButtonBlur}
+              onKeyDown={handleManageButtonKeyDown}
+              className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+              style={noFontSynthesisStyle}
+              aria-label='Manage notifications'
+              aria-haspopup='dialog'
+            >
               <CheckCircle2
                 className='h-4 w-4 shrink-0 text-green-400'
                 aria-hidden='true'
               />
-              <p
-                className='text-[14px] font-[560] tracking-[-0.015em] text-white/88'
-                style={noFontSynthesisStyle}
-              >
-                We&rsquo;ll notify you when {artist.name} drops something new
-              </p>
-            </div>
+              <span className='text-[14px] font-[560] tracking-[-0.015em] text-white/88'>
+                Notifications on
+              </span>
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
