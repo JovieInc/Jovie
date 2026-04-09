@@ -40,7 +40,7 @@ vi.mock('@/hooks/useClerkSafe', () => ({
 }));
 vi.mock('@/lib/env-public', () => ({
   publicEnv: {
-    NEXT_PUBLIC_CLERK_MOCK: 'true',
+    NEXT_PUBLIC_CLERK_MOCK: '0',
   },
 }));
 vi.mock('@/components/providers/clerkAvailability', () => ({

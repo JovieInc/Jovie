@@ -41,6 +41,14 @@ const DEFAULT_CREATOR_FULL_NAME = 'Browse Test User';
 const DEFAULT_CREATOR_BIO =
   'Stable creator profile for local browse QA and dashboard verification.';
 const DEFAULT_CREATOR_VENMO = 'browse-test-user';
+const DEFAULT_READY_CREATOR_EMAIL = 'browse-ready+clerk_test@jov.ie';
+const DEFAULT_READY_CREATOR_USERNAME = 'browse-ready-user';
+const DEFAULT_READY_CREATOR_FULL_NAME = 'Browse Ready User';
+const DEFAULT_READY_CREATOR_BIO =
+  'Stable creator profile with a publishable baseline for perf measurement.';
+const DEFAULT_READY_CREATOR_VENMO = 'browse-ready-user';
+const DEFAULT_READY_CREATOR_SPOTIFY_URL =
+  'https://open.spotify.com/artist/4NHQUkpP4uKj7LKEMstSxN';
 
 const DEFAULT_ADMIN_EMAIL = 'browse-admin+clerk_test@jov.ie';
 const DEFAULT_ADMIN_USERNAME = 'browse-admin-user';
@@ -107,6 +115,22 @@ function resolvePersonaSeedConfig(
     };
   }
 
+  if (persona === 'creator-ready') {
+    const fullName = DEFAULT_READY_CREATOR_FULL_NAME;
+    const { firstName, lastName } = splitFullName(fullName);
+
+    return {
+      persona,
+      email: DEFAULT_READY_CREATOR_EMAIL,
+      username: DEFAULT_READY_CREATOR_USERNAME,
+      fullName,
+      firstName,
+      lastName,
+      isAdmin: false,
+      profilePath: `/${DEFAULT_READY_CREATOR_USERNAME}`,
+    };
+  }
+
   const fullName = DEFAULT_CREATOR_FULL_NAME;
   const { firstName, lastName } = splitFullName(fullName);
 
@@ -125,7 +149,7 @@ function resolvePersonaSeedConfig(
 export function parseDevTestAuthPersona(
   value: string | null | undefined
 ): DevTestAuthPersona | null {
-  if (value === 'creator' || value === 'admin') {
+  if (value === 'creator' || value === 'creator-ready' || value === 'admin') {
     return value;
   }
 
@@ -238,27 +262,43 @@ async function ensurePersonaProfile(
   config: PersonaSeedConfig
 ) {
   const isAdminPersona = persona === 'admin';
+  const isReadyCreatorPersona = persona === 'creator-ready';
+  const isIncompleteCreatorPersona =
+    persona === 'creator' && !isAdminPersona && !isReadyCreatorPersona;
+  let bio = DEFAULT_CREATOR_BIO;
+  let venmoHandle = DEFAULT_CREATOR_VENMO;
+
+  if (isAdminPersona) {
+    bio = DEFAULT_ADMIN_BIO;
+    venmoHandle = DEFAULT_ADMIN_VENMO;
+  } else if (isReadyCreatorPersona) {
+    bio = DEFAULT_READY_CREATOR_BIO;
+    venmoHandle = DEFAULT_READY_CREATOR_VENMO;
+  }
+
   const profileId = await ensureCreatorProfileRecord(db, {
     userId: dbUserId,
     creatorType: 'artist',
     username: config.username,
     usernameNormalized: config.username.toLowerCase(),
     displayName: config.fullName,
-    bio: isAdminPersona ? DEFAULT_ADMIN_BIO : DEFAULT_CREATOR_BIO,
-    venmoHandle: isAdminPersona ? DEFAULT_ADMIN_VENMO : DEFAULT_CREATOR_VENMO,
+    bio,
+    venmoHandle,
     avatarUrl: DEFAULT_TEST_AVATAR_URL,
-    spotifyUrl: null,
+    spotifyUrl: isReadyCreatorPersona
+      ? DEFAULT_READY_CREATOR_SPOTIFY_URL
+      : null,
     appleMusicUrl: null,
     appleMusicId: null,
     youtubeMusicId: null,
     deezerId: null,
     tidalId: null,
     soundcloudId: null,
-    isPublic: !isAdminPersona,
+    isPublic: isAdminPersona ? false : !isIncompleteCreatorPersona,
     isVerified: false,
     isClaimed: true,
     ingestionStatus: 'idle',
-    onboardingCompletedAt: new Date(),
+    onboardingCompletedAt: isIncompleteCreatorPersona ? null : new Date(),
   });
 
   await ensureUserProfileClaim(db, dbUserId, profileId);
@@ -269,7 +309,11 @@ async function ensurePersonaProfile(
       creatorProfileId: profileId,
       platform: 'venmo',
       platformType: 'payment',
-      url: `https://venmo.com/${DEFAULT_CREATOR_VENMO}`,
+      url: `https://venmo.com/${
+        isReadyCreatorPersona
+          ? DEFAULT_READY_CREATOR_VENMO
+          : DEFAULT_CREATOR_VENMO
+      }`,
       displayText: 'Tip on Venmo',
       isActive: true,
       sortOrder: 1,

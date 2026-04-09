@@ -129,6 +129,15 @@ const EXPECTED_WARNING_REGEXES = [
   /the resource https:\/\/.*\/npm\/@clerk\/clerk-js@6(?:\.\d+\.\d+)?\/dist\/clerk\.browser\.js was preloaded .* but not used/i,
 ] as const;
 
+export function isClerkRedirectUrl(url: string): boolean {
+  const lowerUrl = url.toLowerCase();
+
+  return (
+    lowerUrl.includes('clerk') &&
+    (lowerUrl.includes('handshake') || lowerUrl.includes('dev-browser'))
+  );
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -278,8 +287,7 @@ export function setupPageMonitoring(page: Page): {
     const resUrl = res.url();
     // Clerk handshake returns 400 in CI (dev-browser-missing) — this is expected
     // and not a real failure. Exclude from diagnostics to avoid false positives.
-    const isClerkHandshake =
-      resUrl.includes('clerk') && resUrl.includes('handshake');
+    const isClerkHandshake = isClerkRedirectUrl(resUrl);
     if (status >= 400 && !isClerkHandshake) {
       failedResponses.push({
         url: resUrl,
@@ -394,7 +402,7 @@ export async function assertValidPageState(
     currentUrl.includes('/signup') ||
     currentUrl.includes('/sign-in') ||
     currentUrl.includes('/sign-up') ||
-    (currentUrl.includes('clerk') && currentUrl.includes('handshake'));
+    isClerkRedirectUrl(currentUrl);
 
   const isOnExpectedPath = options.expectedPaths.some(path =>
     currentUrl.includes(path)

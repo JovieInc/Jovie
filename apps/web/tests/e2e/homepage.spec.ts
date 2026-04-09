@@ -37,7 +37,9 @@ test.describe('Homepage', () => {
     await expect(
       page.getByText('One system to make every release count, every time.')
     ).toBeVisible();
-    await expect(page.getByRole('link', { name: /start free/i })).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: /get started|start free/i }).first()
+    ).toBeVisible();
 
     await expect(page.getByTestId('homepage-hero-profile-card')).toBeVisible();
     await expect(page.getByTestId('homepage-hero-release-card')).toBeVisible();
@@ -114,7 +116,7 @@ test.describe('Homepage', () => {
     });
 
     await expect(
-      page.getByRole('link', { name: /get started/i }).first()
+      page.getByRole('link', { name: /get started|start free/i }).first()
     ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
   });
 

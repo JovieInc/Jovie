@@ -1,4 +1,6 @@
+import { revalidatePath } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   buildDevTestAuthCookieDescriptors,
   DEV_TEST_AUTH_COOKIE_NAMES,
@@ -122,6 +124,7 @@ export async function POST(request: NextRequest) {
   }
 
   const actor = await ensureDevTestAuthActor(persona);
+  revalidatePath(APP_ROUTES.DASHBOARD, 'layout');
   const response = NextResponse.json(
     {
       success: true,

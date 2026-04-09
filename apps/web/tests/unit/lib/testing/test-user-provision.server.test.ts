@@ -5,6 +5,13 @@ const { mockCreateUser, mockGetUserList } = vi.hoisted(() => ({
   mockGetUserList: vi.fn(),
 }));
 
+const { mockInvalidateProxyUserStateCache, mockRedisDel, mockRevalidateTag } =
+  vi.hoisted(() => ({
+    mockInvalidateProxyUserStateCache: vi.fn(),
+    mockRedisDel: vi.fn(),
+    mockRevalidateTag: vi.fn(),
+  }));
+
 vi.mock('@clerk/backend', () => ({
   createClerkClient: vi.fn(() => ({
     users: {
@@ -12,6 +19,22 @@ vi.mock('@clerk/backend', () => ({
       getUserList: mockGetUserList,
     },
   })),
+}));
+
+vi.mock('@upstash/redis', () => ({
+  Redis: vi.fn().mockImplementation(function MockRedis() {
+    return {
+      del: mockRedisDel,
+    };
+  }),
+}));
+
+vi.mock('next/cache', () => ({
+  revalidateTag: mockRevalidateTag,
+}));
+
+vi.mock('@/lib/auth/proxy-state', () => ({
+  invalidateProxyUserStateCache: mockInvalidateProxyUserStateCache,
 }));
 
 describe('test-user-provision.server', () => {
@@ -79,5 +102,29 @@ describe('test-user-provision.server', () => {
     expect(
       isAllowlistedPrivilegedTestAccountEmail('e2e+clerk_test@jov.ie')
     ).toBe(true);
+  });
+
+  it('clears proxy-state and dashboard caches for reprovisioned test users', async () => {
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.example.com');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'token');
+
+    const { invalidateTestUserCaches } = await import(
+      '@/lib/testing/test-user-provision.server'
+    );
+
+    await invalidateTestUserCaches(['user_123', 'user_456']);
+
+    expect(mockInvalidateProxyUserStateCache).toHaveBeenCalledTimes(2);
+    expect(mockInvalidateProxyUserStateCache).toHaveBeenNthCalledWith(
+      1,
+      'user_123'
+    );
+    expect(mockInvalidateProxyUserStateCache).toHaveBeenNthCalledWith(
+      2,
+      'user_456'
+    );
+    expect(mockRevalidateTag).toHaveBeenCalledWith('dashboard-data', 'max');
+    expect(mockRedisDel).toHaveBeenCalledWith('admin:role:user_123');
+    expect(mockRedisDel).toHaveBeenCalledWith('admin:role:user_456');
   });
 });

@@ -193,10 +193,16 @@ function ReleaseDestinationsSection() {
 
 function FinalCallToAction() {
   return (
-    <section className='bg-page py-28 sm:py-36 lg:py-44'>
+    <section
+      data-testid='final-cta-section'
+      className='bg-page py-28 sm:py-36 lg:py-44'
+    >
       <Container size='homepage'>
         <div className='mx-auto max-w-[1120px] text-center'>
-          <h2 className='marketing-h1-linear text-primary-token'>
+          <h2
+            data-testid='final-cta-headline'
+            className='marketing-h1-linear text-primary-token'
+          >
             You made the song.
             <br />
             Now make it hit.
@@ -204,6 +210,7 @@ function FinalCallToAction() {
           <div className='mt-10'>
             <Link
               href={APP_ROUTES.SIGNUP}
+              data-testid='final-cta-action'
               className='btn-linear-signup focus-ring-themed inline-flex h-12 items-center px-6 text-[15px]'
             >
               Get Started
