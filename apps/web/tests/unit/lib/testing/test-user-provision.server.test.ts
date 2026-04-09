@@ -127,4 +127,39 @@ describe('test-user-provision.server', () => {
     expect(mockRedisDel).toHaveBeenCalledWith('admin:role:user_123');
     expect(mockRedisDel).toHaveBeenCalledWith('admin:role:user_456');
   });
+
+  it('ignores missing Next cache context during plain Node test seeding', async () => {
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.example.com');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'token');
+    mockRevalidateTag.mockImplementation(() => {
+      throw new Error(
+        'Invariant: static generation store missing in revalidateTag dashboard-data'
+      );
+    });
+
+    const { invalidateTestUserCaches } = await import(
+      '@/lib/testing/test-user-provision.server'
+    );
+
+    await expect(
+      invalidateTestUserCaches(['user_123'])
+    ).resolves.toBeUndefined();
+
+    expect(mockInvalidateProxyUserStateCache).toHaveBeenCalledWith('user_123');
+    expect(mockRedisDel).toHaveBeenCalledWith('admin:role:user_123');
+  });
+
+  it('rethrows unexpected cache invalidation failures', async () => {
+    mockRevalidateTag.mockImplementation(() => {
+      throw new Error('boom');
+    });
+
+    const { invalidateTestUserCaches } = await import(
+      '@/lib/testing/test-user-provision.server'
+    );
+
+    await expect(invalidateTestUserCaches(['user_123'])).rejects.toThrow(
+      'boom'
+    );
+  });
 });
