@@ -28,78 +28,65 @@ interface BannerState {
   readonly message: string;
 }
 
+interface ModeCallbacks {
+  readonly onStart: () => void;
+  readonly onComplete: (message: string) => void;
+  readonly onError: (message: string) => void;
+}
+
 const MODE_OPTIONS = [
   { value: 'single', label: 'Single Profile' },
   { value: 'batch', label: 'Batch URLs' },
   { value: 'queue', label: 'Queue Leads' },
 ] as const;
 
-export function GrowthIntakeComposer({
-  initialMode = 'single',
-}: Readonly<GrowthIntakeComposerProps>) {
-  const router = useRouter();
-  const artistSearch = useArtistSearchQuery({ minQueryLength: 2, limit: 6 });
+function SingleModeForm({
+  onStart,
+  onComplete,
+  onError,
+}: Readonly<ModeCallbacks>) {
   const ingestProfileMutation = useIngestProfileMutation();
-  const batchMutation = useBatchIngestMutation();
-  const queueLeadUrlsMutation = useQueueLeadUrlsMutation();
+  const { results, search, clear } = useArtistSearchQuery({
+    minQueryLength: 2,
+    limit: 6,
+  });
 
-  const [mode, setMode] = useState<GrowthIntakeMode>(initialMode);
-  const [banner, setBanner] = useState<BannerState | null>(null);
-
-  const [singleNetwork, setSingleNetwork] =
-    useState<IngestNetworkId>('instagram');
-  const [singleInput, setSingleInput] = useState('');
-
-  const [batchInput, setBatchInput] = useState('');
-  const [batchSummary, setBatchSummary] = useState<string | null>(null);
-
-  const [queueInput, setQueueInput] = useState('');
-  const [queueSummary, setQueueSummary] = useState<string | null>(null);
-
-  const normalizedSingleUrl = getNormalizedInputUrl(singleNetwork, singleInput);
-  const parsedBatchUrls = parseBatchUrls(batchInput);
-  const queuedUrls = queueInput
-    .split('\n')
-    .map(url => normalizeUrl(url.trim()))
-    .filter(Boolean);
+  const [network, setNetwork] = useState<IngestNetworkId>('instagram');
+  const [inputValue, setInputValue] = useState('');
+  const normalizedUrl = getNormalizedInputUrl(network, inputValue);
 
   useEffect(() => {
-    if (singleNetwork !== 'spotify') {
-      artistSearch.clear();
+    if (network !== 'spotify') {
+      clear();
       return;
     }
 
-    if (singleInput.trim().startsWith('http')) {
-      artistSearch.clear();
+    if (inputValue.trim().startsWith('http')) {
+      clear();
       return;
     }
 
-    artistSearch.search(singleInput);
-  }, [artistSearch, singleInput, singleNetwork]);
+    search(inputValue);
+  }, [clear, inputValue, network, search]);
 
-  async function complete(message: string) {
-    setBanner({ tone: 'success', message });
-    router.refresh();
-  }
-
-  async function submitSingle(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setBanner(null);
+    onStart();
 
-    const trimmed = singleInput.trim();
+    const trimmed = inputValue.trim();
     const isSpotifySearch =
-      singleNetwork === 'spotify' &&
+      network === 'spotify' &&
       !trimmed.startsWith('http') &&
       !/^[a-zA-Z0-9]{22}$/.test(trimmed);
 
     try {
       const url = isSpotifySearch
-        ? getNormalizedInputUrl('spotify', artistSearch.results[0]?.url ?? '')
-        : normalizedSingleUrl;
+        ? getNormalizedInputUrl('spotify', results[0]?.url ?? '')
+        : normalizedUrl;
 
       if (!url) {
         throw new Error(
-          singleNetwork === 'spotify'
+          network === 'spotify'
             ? 'Select a Spotify artist or paste a Spotify artist URL.'
             : 'Enter a profile URL or handle.'
         );
@@ -108,87 +95,246 @@ export function GrowthIntakeComposer({
       const result = await ingestProfileMutation.mutateAsync({ url });
       const username = result.profile?.username;
 
-      setSingleInput('');
-      artistSearch.clear();
-
-      await complete(
+      setInputValue('');
+      clear();
+      onComplete(
         username
           ? `Created creator profile @${username}.`
           : 'Created creator profile.'
       );
     } catch (error) {
-      setBanner({
-        tone: 'error',
-        message:
-          error instanceof Error ? error.message : 'Failed to ingest profile.',
-      });
+      onError(
+        error instanceof Error ? error.message : 'Failed to ingest profile.'
+      );
     }
   }
 
-  async function submitBatch() {
-    setBanner(null);
+  return (
+    <form className='space-y-3' onSubmit={handleSubmit}>
+      <SegmentControl
+        value={network}
+        onValueChange={value => setNetwork(value as IngestNetworkId)}
+        options={INGEST_NETWORKS.map(option => ({
+          value: option.id,
+          label: option.label,
+        }))}
+        size='sm'
+        aria-label='Select single profile network'
+      />
+      <Input
+        type='text'
+        inputSize='sm'
+        value={inputValue}
+        onChange={event => setInputValue(event.target.value)}
+        placeholder={
+          INGEST_NETWORKS.find(option => option.id === network)?.placeholder ??
+          'Paste profile URL'
+        }
+        disabled={ingestProfileMutation.isPending}
+        autoComplete='off'
+        className='text-xs'
+        aria-label='Single profile input'
+      />
+      {network === 'spotify' && results.length > 0 ? (
+        <div className='max-h-44 overflow-auto rounded-md border border-subtle bg-background-elevated p-1'>
+          {results.map(artist => (
+            <button
+              key={artist.id}
+              type='button'
+              className='flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-xs hover:bg-accent/15'
+              onClick={() => setInputValue(artist.url)}
+            >
+              <span>{artist.name}</span>
+              <span className='text-tertiary-token'>Use</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className='text-xs text-tertiary-token'>
+          Paste a URL or handle and it will be normalized before import.
+        </p>
+      )}
+      <div className='flex justify-end'>
+        <Button
+          type='submit'
+          size='sm'
+          disabled={
+            ingestProfileMutation.isPending || inputValue.trim().length === 0
+          }
+        >
+          {ingestProfileMutation.isPending ? 'Creating…' : 'Create Profile'}
+        </Button>
+      </div>
+    </form>
+  );
+}
 
-    if (parsedBatchUrls.length === 0) {
-      setBanner({
-        tone: 'error',
-        message: 'Paste at least one valid URL to run a batch import.',
-      });
+function BatchModeForm({
+  onStart,
+  onComplete,
+  onError,
+}: Readonly<ModeCallbacks>) {
+  const batchMutation = useBatchIngestMutation();
+  const [inputValue, setInputValue] = useState('');
+  const [summary, setSummary] = useState<string | null>(null);
+  const parsedUrls = parseBatchUrls(inputValue);
+
+  async function handleSubmit() {
+    onStart();
+
+    if (parsedUrls.length === 0) {
+      onError('Paste at least one valid URL to run a batch import.');
       return;
     }
 
     try {
-      const result = await batchMutation.mutateAsync({ urls: parsedBatchUrls });
-      setBatchInput('');
-      setBatchSummary(
+      const result = await batchMutation.mutateAsync({ urls: parsedUrls });
+      setInputValue('');
+      setSummary(
         `${result.summary.success} created, ${result.summary.skipped} skipped, ${result.summary.error} errors.`
       );
-      await complete(
+      onComplete(
         `Batch complete: ${result.summary.success} created, ${result.summary.skipped} skipped, ${result.summary.error} errors.`
       );
     } catch (error) {
-      setBanner({
-        tone: 'error',
-        message:
-          error instanceof Error ? error.message : 'Batch ingest failed.',
-      });
+      onError(error instanceof Error ? error.message : 'Batch ingest failed.');
     }
   }
 
-  async function submitQueue() {
-    setBanner(null);
+  return (
+    <div className='space-y-3'>
+      <Textarea
+        rows={5}
+        value={inputValue}
+        onChange={event => setInputValue(event.target.value)}
+        placeholder='https://linktr.ee/artist
+https://open.spotify.com/artist/...
+https://instagram.com/artist'
+        className='text-xs'
+        aria-label='Batch URLs input'
+      />
+      <div className='flex items-center justify-between gap-3 text-[11px] text-tertiary-token'>
+        <span>
+          {parsedUrls.length} URL{parsedUrls.length === 1 ? '' : 's'} parsed
+        </span>
+        <Button
+          type='button'
+          size='sm'
+          onClick={() => {
+            void handleSubmit();
+          }}
+          disabled={batchMutation.isPending || parsedUrls.length === 0}
+        >
+          {batchMutation.isPending ? 'Importing…' : 'Run Batch Import'}
+        </Button>
+      </div>
+      {summary ? (
+        <p className='rounded-[10px] border border-subtle bg-surface-0 px-3 py-2 text-xs text-secondary-token'>
+          {summary}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function QueueModeForm({
+  onStart,
+  onComplete,
+  onError,
+}: Readonly<ModeCallbacks>) {
+  const queueLeadUrlsMutation = useQueueLeadUrlsMutation();
+  const [inputValue, setInputValue] = useState('');
+  const [summary, setSummary] = useState<string | null>(null);
+
+  const queuedUrls = inputValue
+    .split('\n')
+    .map(url => normalizeUrl(url.trim()))
+    .filter(Boolean);
+
+  async function handleSubmit() {
+    onStart();
 
     if (queuedUrls.length === 0) {
-      setBanner({
-        tone: 'error',
-        message: 'Paste at least one URL to start the lead queue.',
-      });
+      onError('Paste at least one URL to start the lead queue.');
       return;
     }
 
     try {
       const result = await queueLeadUrlsMutation.mutateAsync(queuedUrls);
-      setQueueInput('');
-      setQueueSummary(
+      setInputValue('');
+      setSummary(
         `Created ${result.summary.created}, skipped ${result.summary.duplicate} duplicates, rejected ${result.summary.invalid} invalid URLs.`
       );
-      await complete(
+      onComplete(
         `Queued ${result.summary.created} URL${result.summary.created === 1 ? '' : 's'} for lead intake.`
       );
     } catch (error) {
-      setBanner({
-        tone: 'error',
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Lead queue submission failed.',
-      });
+      onError(
+        error instanceof Error ? error.message : 'Lead queue submission failed.'
+      );
     }
   }
 
-  const isBusy =
-    ingestProfileMutation.isPending ||
-    batchMutation.isPending ||
-    queueLeadUrlsMutation.isPending;
+  return (
+    <div className='space-y-3'>
+      <Textarea
+        rows={5}
+        value={inputValue}
+        onChange={event => setInputValue(event.target.value)}
+        placeholder='https://linktr.ee/artist
+https://open.spotify.com/artist/...
+https://instagram.com/artist'
+        className='text-xs'
+        aria-label='Queue URLs input'
+      />
+      <div className='flex items-center justify-between gap-3 text-[11px] text-tertiary-token'>
+        <span>
+          {queuedUrls.length} URL{queuedUrls.length === 1 ? '' : 's'} ready for
+          intake
+        </span>
+        <Button
+          type='button'
+          size='sm'
+          onClick={() => {
+            void handleSubmit();
+          }}
+          disabled={queueLeadUrlsMutation.isPending || queuedUrls.length === 0}
+        >
+          {queueLeadUrlsMutation.isPending ? 'Queueing…' : 'Queue Lead URLs'}
+        </Button>
+      </div>
+      {summary ? (
+        <p className='rounded-[10px] border border-subtle bg-surface-0 px-3 py-2 text-xs text-secondary-token'>
+          {summary}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+export function GrowthIntakeComposer({
+  initialMode = 'single',
+}: GrowthIntakeComposerProps) {
+  const router = useRouter();
+  const [mode, setMode] = useState<GrowthIntakeMode>(initialMode);
+  const [banner, setBanner] = useState<BannerState | null>(null);
+
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
+
+  function clearBanner() {
+    setBanner(null);
+  }
+
+  function handleComplete(message: string) {
+    setBanner({ tone: 'success', message });
+    router.refresh();
+  }
+
+  function handleError(message: string) {
+    setBanner({ tone: 'error', message });
+  }
 
   return (
     <div className='space-y-3' data-testid='admin-growth-view-ingest'>
@@ -204,7 +350,10 @@ export function GrowthIntakeComposer({
 
       <SegmentControl
         value={mode}
-        onValueChange={value => setMode(value as GrowthIntakeMode)}
+        onValueChange={value => {
+          clearBanner();
+          setMode(value as GrowthIntakeMode);
+        }}
         options={MODE_OPTIONS.map(option => ({
           value: option.value,
           label: option.label,
@@ -226,131 +375,27 @@ export function GrowthIntakeComposer({
       ) : null}
 
       {mode === 'single' ? (
-        <form className='space-y-3' onSubmit={submitSingle}>
-          <SegmentControl
-            value={singleNetwork}
-            onValueChange={value => setSingleNetwork(value as IngestNetworkId)}
-            options={INGEST_NETWORKS.map(option => ({
-              value: option.id,
-              label: option.label,
-            }))}
-            size='sm'
-            aria-label='Select single profile network'
-          />
-          <Input
-            type='text'
-            inputSize='sm'
-            value={singleInput}
-            onChange={event => setSingleInput(event.target.value)}
-            placeholder={
-              INGEST_NETWORKS.find(option => option.id === singleNetwork)
-                ?.placeholder ?? 'Paste profile URL'
-            }
-            disabled={isBusy}
-            autoComplete='off'
-            className='text-xs'
-          />
-          {singleNetwork === 'spotify' && artistSearch.results.length > 0 ? (
-            <div className='max-h-44 overflow-auto rounded-md border border-subtle bg-background-elevated p-1'>
-              {artistSearch.results.map(artist => (
-                <button
-                  key={artist.id}
-                  type='button'
-                  className='flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-xs hover:bg-accent/15'
-                  onClick={() => setSingleInput(artist.url)}
-                >
-                  <span>{artist.name}</span>
-                  <span className='text-tertiary-token'>Use</span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className='text-xs text-tertiary-token'>
-              Paste a URL or handle and it will be normalized before import.
-            </p>
-          )}
-          <div className='flex justify-end'>
-            <Button
-              type='submit'
-              size='sm'
-              disabled={isBusy || singleInput.trim().length === 0}
-            >
-              {ingestProfileMutation.isPending ? 'Creating…' : 'Create Profile'}
-            </Button>
-          </div>
-        </form>
+        <SingleModeForm
+          onStart={clearBanner}
+          onComplete={handleComplete}
+          onError={handleError}
+        />
       ) : null}
 
       {mode === 'batch' ? (
-        <div className='space-y-3'>
-          <Textarea
-            rows={5}
-            value={batchInput}
-            onChange={event => setBatchInput(event.target.value)}
-            placeholder='https://linktr.ee/artist
-https://open.spotify.com/artist/...
-https://instagram.com/artist'
-            className='text-xs'
-          />
-          <div className='flex items-center justify-between gap-3 text-[11px] text-tertiary-token'>
-            <span>
-              {parsedBatchUrls.length} URL
-              {parsedBatchUrls.length === 1 ? '' : 's'} parsed
-            </span>
-            <Button
-              type='button'
-              size='sm'
-              onClick={() => {
-                void submitBatch();
-              }}
-              disabled={isBusy || parsedBatchUrls.length === 0}
-            >
-              {batchMutation.isPending ? 'Importing…' : 'Run Batch Import'}
-            </Button>
-          </div>
-          {batchSummary ? (
-            <p className='rounded-[10px] border border-subtle bg-surface-0 px-3 py-2 text-xs text-secondary-token'>
-              {batchSummary}
-            </p>
-          ) : null}
-        </div>
+        <BatchModeForm
+          onStart={clearBanner}
+          onComplete={handleComplete}
+          onError={handleError}
+        />
       ) : null}
 
       {mode === 'queue' ? (
-        <div className='space-y-3'>
-          <Textarea
-            rows={5}
-            value={queueInput}
-            onChange={event => setQueueInput(event.target.value)}
-            placeholder='https://linktr.ee/artist
-https://open.spotify.com/artist/...
-https://instagram.com/artist'
-            className='text-xs'
-          />
-          <div className='flex items-center justify-between gap-3 text-[11px] text-tertiary-token'>
-            <span>
-              {queuedUrls.length} URL{queuedUrls.length === 1 ? '' : 's'} ready
-              for intake
-            </span>
-            <Button
-              type='button'
-              size='sm'
-              onClick={() => {
-                void submitQueue();
-              }}
-              disabled={isBusy || queuedUrls.length === 0}
-            >
-              {queueLeadUrlsMutation.isPending
-                ? 'Queueing…'
-                : 'Queue Lead URLs'}
-            </Button>
-          </div>
-          {queueSummary ? (
-            <p className='rounded-[10px] border border-subtle bg-surface-0 px-3 py-2 text-xs text-secondary-token'>
-              {queueSummary}
-            </p>
-          ) : null}
-        </div>
+        <QueueModeForm
+          onStart={clearBanner}
+          onComplete={handleComplete}
+          onError={handleError}
+        />
       ) : null}
     </div>
   );
