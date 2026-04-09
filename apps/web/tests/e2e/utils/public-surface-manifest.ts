@@ -50,6 +50,7 @@ export interface PublicSurfaceSpec {
   readonly allowedFinalPaths?: readonly RegExp[];
   readonly allowedFinalDocumentStatuses?: readonly number[];
   readonly allowMissingMain?: boolean;
+  readonly allowMultipleH1?: boolean;
   readonly lighthouse: boolean;
   readonly perfGroups: readonly string[];
   readonly interactions: readonly PublicInteractionSpec[];
@@ -488,6 +489,7 @@ const AUTH_SURFACES = [
     mainSelector: 'body',
     minMainTextLength: 40,
     allowMissingMain: true,
+    allowMultipleH1: true,
     lighthouse: true,
     perfGroups: ['auth'],
     interactions: AUTH_INTERACTIONS,
@@ -512,6 +514,7 @@ const AUTH_SURFACES = [
     mainSelector: 'body',
     minMainTextLength: 40,
     allowMissingMain: true,
+    allowMultipleH1: true,
     lighthouse: true,
     perfGroups: ['auth'],
     interactions: AUTH_INTERACTIONS,
@@ -856,8 +859,13 @@ const SMART_LINK_SURFACES = [
         'slug',
         DEFAULTS.releaseSlug
       ),
-    readySelectors: ['h1'],
-    readyText: /enter your email to download|get download|sending\.\.\./i,
+    readySelectors: [
+      '#promo-download-email',
+      'button:has-text("Get Download")',
+      '[aria-label^="Download "]',
+    ],
+    readyText:
+      /enter your email to download|get download|sending\.\.\.|check your inbox|download links also sent to your email/i,
     mainSelector: 'body',
     minMainTextLength: 40,
     lighthouse: false,

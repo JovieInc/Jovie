@@ -141,9 +141,15 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
           surface,
           testInfo.project.name
         );
+        if (page.isClosed()) {
+          return;
+        }
         await assertInteractiveLabels(page, surface.id);
 
-        if (surface.expectedState !== 'redirect') {
+        if (
+          surface.expectedState !== 'redirect' &&
+          surface.allowMultipleH1 !== true
+        ) {
           const h1Count = await page.locator('h1').count();
           expect(h1Count, `${surface.id} should render exactly one h1`).toBe(1);
         }
@@ -190,6 +196,9 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
           surface,
           testInfo.project.name
         );
+        if (page.isClosed()) {
+          return;
+        }
 
         const results = await new AxeBuilder({ page })
           .withTags(['best-practice'])

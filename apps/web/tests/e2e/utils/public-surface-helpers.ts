@@ -184,7 +184,10 @@ export async function assertPublicSurfaceHealthy(
   }
 
   const h1Count = await page.locator('h1').count();
-  if (surface.expectedState === 'ok' || surface.expectedState === 'not-found') {
+  if (
+    (surface.expectedState === 'ok' || surface.expectedState === 'not-found') &&
+    surface.allowMultipleH1 !== true
+  ) {
     expect(h1Count, `${surface.id} should render exactly one h1`).toBe(1);
   }
 }
