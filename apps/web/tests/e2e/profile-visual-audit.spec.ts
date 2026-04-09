@@ -26,6 +26,7 @@ const TEST_PROFILE = 'dualipa';
 const TIP_PROFILE = 'testartist';
 const NOTIFICATIONS_PROFILE = 'testartist';
 const PROFILE_READY_SELECTOR = 'h1, [data-testid="profile-header"]';
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 const BREAKPOINTS: readonly BreakpointConfig[] = [
   { name: 'mobile', width: 390, height: 844 },
   { name: 'tablet', width: 768, height: 1024 },
@@ -102,6 +103,32 @@ const PROFILE_CASES: readonly ProfileAuditCase[] = [
     focusComposerInput: true,
   },
 ];
+
+const FAST_ITERATION_CASE_IDS = new Set<ProfileAuditCase['id']>([
+  // Fast-feedback smoke keeps the historically flaky deep-link and drawer paths.
+  // Base profile/listen coverage already lives in lighter public smoke specs.
+  'subscribe',
+  'subscribe-focus',
+  'contact',
+  'tip',
+  'notifications',
+  'notifications-focus',
+]);
+
+const ACTIVE_PROFILE_CASES = FAST_ITERATION
+  ? PROFILE_CASES.filter(routeCase => FAST_ITERATION_CASE_IDS.has(routeCase.id))
+  : PROFILE_CASES;
+
+const ACTIVE_THEMES: readonly ThemeVariant[] = FAST_ITERATION
+  ? ['dark']
+  : THEMES;
+
+const ACTIVE_BREAKPOINTS: readonly BreakpointConfig[] = FAST_ITERATION
+  ? BREAKPOINTS.filter(
+      breakpoint =>
+        breakpoint.name === 'mobile' || breakpoint.name === 'desktop'
+    )
+  : BREAKPOINTS;
 
 const DEV_OVERLAY_SELECTORS = [
   '[data-sonner-toaster]',
@@ -308,10 +335,10 @@ test.describe('Public profile visual audit @smoke', () => {
         {
           cycle: cycleName,
           generatedAt: new Date().toISOString(),
-          cases: PROFILE_CASES.flatMap(routeCase =>
+          cases: ACTIVE_PROFILE_CASES.flatMap(routeCase =>
             routeCase.shells.flatMap(shell =>
-              THEMES.flatMap(theme =>
-                BREAKPOINTS.map(breakpoint => ({
+              ACTIVE_THEMES.flatMap(theme =>
+                ACTIVE_BREAKPOINTS.map(breakpoint => ({
                   routeId: routeCase.id,
                   shell,
                   theme,
@@ -333,10 +360,10 @@ test.describe('Public profile visual audit @smoke', () => {
     );
   });
 
-  for (const routeCase of PROFILE_CASES) {
+  for (const routeCase of ACTIVE_PROFILE_CASES) {
     for (const shell of routeCase.shells) {
-      for (const theme of THEMES) {
-        for (const breakpoint of BREAKPOINTS) {
+      for (const theme of ACTIVE_THEMES) {
+        for (const breakpoint of ACTIVE_BREAKPOINTS) {
           const filename = screenshotName(
             shell,
             theme,
