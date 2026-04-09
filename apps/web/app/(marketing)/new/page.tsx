@@ -2,16 +2,14 @@ import type { Metadata } from 'next';
 import { MarketingPageShell } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import { LandingFinalCTA } from '@/features/landing/LandingFinalCTA';
-import { LandingHero } from '@/features/landing/LandingHero';
-import { LandingHowItWorks } from '@/features/landing/LandingHowItWorks';
-import { LandingProfileSection } from '@/features/landing/LandingProfileSection';
-import { LandingReleaseSection } from '@/features/landing/LandingReleaseSection';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
+import { NewLandingFinalCta } from './_components/NewLandingFinalCta';
+import { NewLandingHero } from './_components/NewLandingHero';
+import { NewLandingSections } from './_components/NewLandingSections';
 
 export const revalidate = false;
 
@@ -84,17 +82,13 @@ export default function NewLandingPage() {
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <LandingHero />
+      <NewLandingHero />
 
       <div aria-hidden='true' className='section-gradient-divider' />
 
-      <LandingHowItWorks />
+      <NewLandingSections />
 
-      <LandingReleaseSection />
-
-      <LandingProfileSection />
-
-      <LandingFinalCTA />
+      <NewLandingFinalCta />
     </MarketingPageShell>
   );
 }
