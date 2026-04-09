@@ -7,12 +7,9 @@
  */
 
 import { type HandleUploadBody, handleUpload } from '@vercel/blob/client';
-import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getSessionContext } from '@/lib/auth/session';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
@@ -29,32 +26,26 @@ const ALLOWED_MIME_TYPES = new Set([
 ]);
 
 export async function POST(request: NextRequest) {
-  const { userId, error } = await requireAuth();
+  const { userId: clerkUserId, error } = await requireAuth();
   if (error) return error;
 
   try {
     const body = (await request.json()) as HandleUploadBody;
+    const { user, profile } = await getSessionContext({
+      clerkUserId,
+      requireUser: true,
+      requireProfile: false,
+    });
 
     const jsonResponse = await handleUpload({
       body,
       request,
       onBeforeGenerateToken: async _pathname => {
-        // Verify user owns a creator profile and has Pro
-        const [profile] = await db
-          .select({
-            id: creatorProfiles.id,
-            isPro: users.isPro,
-          })
-          .from(creatorProfiles)
-          .leftJoin(users, eq(users.id, creatorProfiles.userId))
-          .where(eq(creatorProfiles.userId, userId))
-          .limit(1);
-
         if (!profile) {
           throw new Error('Creator profile not found');
         }
 
-        if (!profile.isPro) {
+        if (!user.isPro) {
           throw new Error('Pro plan required for promo downloads');
         }
 
@@ -63,7 +54,7 @@ export async function POST(request: NextRequest) {
           maximumSizeInBytes: MAX_FILE_SIZE_BYTES,
           tokenPayload: JSON.stringify({
             creatorProfileId: profile.id,
-            userId,
+            userId: clerkUserId,
           }),
         };
       },
