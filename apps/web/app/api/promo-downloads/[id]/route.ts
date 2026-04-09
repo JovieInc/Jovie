@@ -8,8 +8,8 @@ import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/require-auth';
+import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -27,7 +27,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId, error } = await requireAuth();
+  const { userId: clerkUserId, error } = await requireAuth();
   if (error) return error;
   const { id } = await params;
 
@@ -43,11 +43,11 @@ export async function PATCH(
     }
 
     // Verify ownership
-    const [profile] = await db
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.userId, userId))
-      .limit(1);
+    const { profile } = await getSessionContext({
+      clerkUserId,
+      requireUser: true,
+      requireProfile: false,
+    });
 
     if (!profile) {
       return NextResponse.json(
@@ -91,16 +91,16 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId, error } = await requireAuth();
+  const { userId: clerkUserId, error } = await requireAuth();
   if (error) return error;
   const { id } = await params;
 
   try {
-    const [profile] = await db
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.userId, userId))
-      .limit(1);
+    const { profile } = await getSessionContext({
+      clerkUserId,
+      requireUser: true,
+      requireProfile: false,
+    });
 
     if (!profile) {
       return NextResponse.json(

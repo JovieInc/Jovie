@@ -3,7 +3,7 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getSessionContext } from '@/lib/auth/session';
 import { createAudienceDataTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { audienceBlocks, audienceMembers } from '@/lib/db/schema/analytics';
@@ -18,8 +18,7 @@ export async function blockAudienceMember(
   audienceMemberId: string,
   reason?: string
 ) {
-  const { userId } = await getCachedAuth();
-  if (!userId) throw new Error('Unauthorized');
+  const { user } = await getSessionContext();
 
   // Look up the audience member + verify ownership
   const member = await db
@@ -43,7 +42,7 @@ export async function blockAudienceMember(
     .where(
       and(
         eq(audienceMembers.id, audienceMemberId),
-        eq(creatorProfiles.userId, userId)
+        eq(creatorProfiles.userId, user.id)
       )
     )
     .limit(1);
@@ -87,8 +86,7 @@ export async function blockAudienceMember(
  * to preserve block history.
  */
 export async function unblockAudienceMember(blockId: string) {
-  const { userId } = await getCachedAuth();
-  if (!userId) throw new Error('Unauthorized');
+  const { user } = await getSessionContext();
 
   // Verify ownership via subquery on creator_profiles
   const result = await db
@@ -103,7 +101,7 @@ export async function unblockAudienceMember(blockId: string) {
           db
             .select({ id: creatorProfiles.id })
             .from(creatorProfiles)
-            .where(eq(creatorProfiles.userId, userId))
+            .where(eq(creatorProfiles.userId, user.id))
         )
       )
     )
