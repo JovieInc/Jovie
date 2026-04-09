@@ -4,6 +4,11 @@ import { FunnelMetricsStrip } from '@/features/admin/FunnelMetricsStrip';
 import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
 
 const defaultMetrics: AdminFunnelMetrics = {
+  instagramShareStepViews7d: 20,
+  instagramBioCopies7d: 11,
+  instagramBioOpenRate7d: 0.4,
+  instagramBioActivations7d: 6,
+  instagramBioActivationRate7d: 0.3,
   outreachSent7d: 150,
   claimClicks7d: 30,
   claimRate: 0.2,
@@ -44,6 +49,7 @@ describe('FunnelMetricsStrip', () => {
     expect(screen.getByText('ARR')).toBeInTheDocument();
     expect(screen.getByText('Runway')).toBeInTheDocument();
     expect(screen.getByText('Paying customers')).toBeInTheDocument();
+    expect(screen.getByText('Instagram Activation')).toBeInTheDocument();
     expect(screen.getByText('YC metrics')).toBeInTheDocument();
   });
 

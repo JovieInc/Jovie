@@ -9,7 +9,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
-import { and, asc, sql as drizzleSql, eq, or } from 'drizzle-orm';
+import { and, asc, sql as drizzleSql, eq, inArray, or } from 'drizzle-orm';
 import { unstable_cache as unstableCache } from 'next/cache';
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
@@ -17,13 +17,17 @@ import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { resolveUserState } from '@/lib/auth/gate';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
-import { type DbOrTransaction, db } from '@/lib/db';
+import { type DbOrTransaction, db, doesTableExist } from '@/lib/db';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { userSettings, users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
-import { type CreatorProfile, creatorProfiles } from '@/lib/db/schema/profiles';
+import {
+  type CreatorProfile,
+  creatorDistributionEvents,
+  creatorProfiles,
+} from '@/lib/db/schema/profiles';
 import {
   createEmptyTippingStats,
   profileIsPublishable,
@@ -31,6 +35,12 @@ import {
   type TippingStats,
 } from '@/lib/db/server';
 import { sqlAny } from '@/lib/db/sql-helpers';
+import {
+  type BioLinkActivation,
+  getBioLinkActivationWindowEnd,
+  INSTAGRAM_DISTRIBUTION_PLATFORM,
+  resolveBioLinkActivationStatus,
+} from '@/lib/distribution/instagram-activation';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
 import {
@@ -123,6 +133,8 @@ export interface DashboardData {
     code: string | null;
     errorType: string;
   };
+  /** Instagram bio-link activation state for onboarding and dashboard nudges */
+  bioLinkActivation?: BioLinkActivation | null;
   /** Whether the user appears to be in their first chat session window */
   isFirstSession?: boolean;
 }
@@ -154,6 +166,99 @@ function deriveIsFirstSession(
   if (!selectedProfile?.createdAt) return false;
   const ageMs = now - selectedProfile.createdAt.getTime();
   return ageMs >= 0 && ageMs < windowMs;
+}
+
+function serializeNullableDate(value: Date | null): string | null {
+  return value ? value.toISOString() : null;
+}
+
+const BIO_LINK_ACTIVATION_EVENT_TYPES = [
+  'activated',
+  'link_copied',
+  'platform_opened',
+] as const;
+
+type BioLinkActivationEventType =
+  (typeof BIO_LINK_ACTIVATION_EVENT_TYPES)[number];
+
+async function buildBioLinkActivation(
+  tx: DbOrTransaction,
+  profile: CreatorProfile
+): Promise<BioLinkActivation | null> {
+  const windowEndsAt = getBioLinkActivationWindowEnd(
+    profile.onboardingCompletedAt
+  );
+  if (!windowEndsAt) {
+    return null;
+  }
+
+  const timestamps: Record<
+    'activated' | 'link_copied' | 'platform_opened',
+    Date | null
+  > = {
+    activated: null,
+    link_copied: null,
+    platform_opened: null,
+  };
+
+  const hasDistributionEventsTable = await doesTableExist(
+    'creator_distribution_events'
+  );
+
+  if (hasDistributionEventsTable) {
+    const eventRows = await dashboardQuery(
+      () =>
+        tx
+          .select({
+            createdAt: creatorDistributionEvents.createdAt,
+            eventType: creatorDistributionEvents.eventType,
+          })
+          .from(creatorDistributionEvents)
+          .where(
+            and(
+              eq(creatorDistributionEvents.creatorProfileId, profile.id),
+              eq(
+                creatorDistributionEvents.platform,
+                INSTAGRAM_DISTRIBUTION_PLATFORM
+              ),
+              inArray(
+                creatorDistributionEvents.eventType,
+                BIO_LINK_ACTIVATION_EVENT_TYPES
+              )
+            )
+          )
+          .orderBy(asc(creatorDistributionEvents.createdAt)),
+      'Creator distribution events query'
+    ).catch((error: unknown) => {
+      Sentry.captureException(error, {
+        level: 'warning',
+        tags: {
+          query: 'creator_distribution_events',
+          context: 'dashboard_data_settled',
+        },
+      });
+      return [];
+    });
+
+    for (const eventRow of eventRows) {
+      const eventType = eventRow.eventType as BioLinkActivationEventType;
+      if (timestamps[eventType] === null) {
+        timestamps[eventType] = eventRow.createdAt;
+      }
+    }
+  }
+
+  return {
+    activatedAt: serializeNullableDate(timestamps.activated),
+    copiedAt: serializeNullableDate(timestamps.link_copied),
+    openedAt: serializeNullableDate(timestamps.platform_opened),
+    platform: INSTAGRAM_DISTRIBUTION_PLATFORM,
+    status: resolveBioLinkActivationStatus({
+      activatedAt: timestamps.activated,
+      windowEndsAt,
+    }),
+    windowEndsAt: serializeNullableDate(windowEndsAt),
+  };
 }
 
 function buildProfileCompletion(
@@ -282,6 +387,7 @@ function createEmptyCoreData(overrides?: Partial<CoreData>): CoreData {
     hasMusicLinks: false,
     tippingStats: createEmptyTippingStats(),
     profileCompletion: buildProfileCompletion(null, null, false),
+    bioLinkActivation: null,
     isFirstSession: false,
     ...overrides,
   };
@@ -421,6 +527,7 @@ async function fetchDashboardBaseWithSession(
     hasMusicLinks: false,
     tippingStats: createEmptyTippingStats(),
     profileCompletion: buildProfileCompletion(selected, userData.email, false),
+    bioLinkActivation: null,
     dashboardLoadError: undefined,
     isFirstSession: deriveIsFirstSession(selected),
   };
@@ -526,6 +633,7 @@ async function fetchDashboardCoreWithSession(
           tx,
           selected.id
         );
+        const bioLinkActivation = await buildBioLinkActivation(tx, selected);
 
         const hasMusicLinks = linkCounts.hasMusicLinks;
 
@@ -547,6 +655,7 @@ async function fetchDashboardCoreWithSession(
             userEmail,
             hasMusicLinks
           ),
+          bioLinkActivation,
         };
       },
       { clerkUserId }

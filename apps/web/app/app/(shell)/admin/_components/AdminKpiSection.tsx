@@ -13,6 +13,14 @@ const CORE_KPI_SKELETON_KEYS = [
   'conversion-rate',
 ] as const;
 
+const INSTAGRAM_KPI_SKELETON_KEYS = [
+  'step-views',
+  'copies',
+  'open-rate',
+  'activations',
+  'activation-rate',
+] as const;
+
 const YC_KPI_SKELETON_KEYS = ['week-1', 'week-2', 'week-3', 'week-4'] as const;
 
 export async function AdminKpiSection() {
@@ -36,6 +44,18 @@ export function AdminKpiSectionSkeleton() {
         />
         <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-3'>
           {CORE_KPI_SKELETON_KEYS.map(metricKey => (
+            <ContentMetricCardSkeleton key={metricKey} />
+          ))}
+        </div>
+      </ContentSurfaceCard>
+      <ContentSurfaceCard className='overflow-hidden p-0'>
+        <ContentSectionHeaderSkeleton
+          titleWidth='w-32'
+          descriptionWidth='w-56'
+          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        />
+        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-5'>
+          {INSTAGRAM_KPI_SKELETON_KEYS.map(metricKey => (
             <ContentMetricCardSkeleton key={metricKey} />
           ))}
         </div>

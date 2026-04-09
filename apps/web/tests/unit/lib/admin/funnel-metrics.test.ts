@@ -81,6 +81,67 @@ describe('getAdminFunnelMetrics outreach query', () => {
     );
   });
 
+  it('filters Instagram onboarding metrics to onboarding-surface events', async () => {
+    hoisted.doesTableExist.mockImplementation((tableName: string) =>
+      Promise.resolve(tableName === 'creator_distribution_events')
+    );
+
+    await getAdminFunnelMetrics();
+
+    const selection = hoisted.selectMock.mock.calls
+      .map(([arg]) => arg)
+      .find(
+        (arg): arg is Record<string, unknown> =>
+          typeof arg === 'object' &&
+          arg !== null &&
+          'activations' in arg &&
+          'stepViews' in arg &&
+          'copies' in arg &&
+          'platformOpens' in arg
+      );
+
+    expect(selection).toBeDefined();
+
+    const dialect = new PgDialect();
+    const activationsSql = dialect.sqlToQuery(
+      selection?.activations as never
+    ).sql;
+    const copiesSql = dialect.sqlToQuery(selection?.copies as never).sql;
+    const platformOpensSql = dialect.sqlToQuery(
+      selection?.platformOpens as never
+    ).sql;
+    const stepViewsSql = dialect.sqlToQuery(selection?.stepViews as never).sql;
+
+    expect(activationsSql).toContain(
+      `count(distinct "creator_distribution_events"."creator_profile_id")`
+    );
+    expect(activationsSql).toContain(`"event_type" = 'activated'`);
+    expect(activationsSql).toContain(`select distinct creator_profile_id`);
+    expect(activationsSql).toContain(
+      `onboarding_events.event_type = 'step_viewed'`
+    );
+    expect(activationsSql).toContain(`->>'surface'`);
+    expect(activationsSql).toContain(`'onboarding'`);
+    expect(activationsSql).toContain(`in (`);
+    expect(copiesSql).toContain(`->>'surface'`);
+    expect(copiesSql).toContain(`'onboarding'`);
+    expect(copiesSql).toContain(
+      `count(distinct "creator_distribution_events"."creator_profile_id")`
+    );
+    expect(copiesSql).toContain(`in (`);
+    expect(platformOpensSql).toContain(`->>'surface'`);
+    expect(platformOpensSql).toContain(`'onboarding'`);
+    expect(platformOpensSql).toContain(
+      `count(distinct "creator_distribution_events"."creator_profile_id")`
+    );
+    expect(platformOpensSql).toContain(`in (`);
+    expect(stepViewsSql).toContain(`->>'surface'`);
+    expect(stepViewsSql).toContain(`'onboarding'`);
+    expect(stepViewsSql).toContain(
+      `count(distinct "creator_distribution_events"."creator_profile_id")`
+    );
+  });
+
   it('returns zero when outreach_status is missing during a schema rollout', async () => {
     hoisted.whereMock.mockRejectedValueOnce(
       new Error('column leads.outreach_status does not exist')

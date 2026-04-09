@@ -77,14 +77,21 @@ vi.mock('next/image', () => ({
 }));
 
 // --- Mock lucide-react ---
-vi.mock('lucide-react', () => ({
-  ArrowRight: (props: Record<string, unknown>) =>
-    React.createElement('svg', { 'data-testid': 'arrow-right', ...props }),
-  Sparkles: (props: Record<string, unknown>) =>
-    React.createElement('svg', { 'data-testid': 'sparkles', ...props }),
-  Music: (props: Record<string, unknown>) =>
-    React.createElement('svg', { 'data-testid': 'music-icon', ...props }),
-}));
+vi.mock('lucide-react', async importOriginal => {
+  const actual = await importOriginal<typeof import('lucide-react')>();
+
+  return {
+    ...actual,
+    ArrowRight: (props: Record<string, unknown>) =>
+      React.createElement('svg', { 'data-testid': 'arrow-right', ...props }),
+    Sparkles: (props: Record<string, unknown>) =>
+      React.createElement('svg', { 'data-testid': 'sparkles', ...props }),
+    Music: (props: Record<string, unknown>) =>
+      React.createElement('svg', { 'data-testid': 'music-icon', ...props }),
+    Music2: (props: Record<string, unknown>) =>
+      React.createElement('svg', { 'data-testid': 'music2-icon', ...props }),
+  };
+});
 
 // --- Mock analytics ---
 const mockTrack = vi.fn();

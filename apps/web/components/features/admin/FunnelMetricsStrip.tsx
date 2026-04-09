@@ -2,7 +2,9 @@ import {
   CalendarClock,
   ChartNoAxesCombined,
   CircleDollarSign,
+  Copy,
   CreditCard,
+  ExternalLink,
   Gauge,
   TrendingUp,
   Users,
@@ -178,6 +180,51 @@ export function FunnelMetricsStrip({
             value={`WoW ${formatPercent(metrics.wowGrowthRate)} · MoM ${formatPercent(metrics.momGrowthRate)}`}
             subtitle='Weekly and monthly revenue momentum'
             icon={TrendingUp}
+            iconClassName='text-success'
+          />
+        </div>
+      </ContentSurfaceCard>
+
+      <ContentSurfaceCard className='overflow-hidden p-0'>
+        <ContentSectionHeader
+          title='Instagram Activation'
+          subtitle='First-week bio-link adoption and activation'
+          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        />
+        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-5'>
+          <MetricCard
+            title='Step views'
+            value={metrics.instagramShareStepViews7d.toLocaleString('en-US')}
+            subtitle='Artists who reached the Instagram share step'
+            icon={Users}
+            iconClassName='text-info'
+          />
+          <MetricCard
+            title='Bio copies'
+            value={metrics.instagramBioCopies7d.toLocaleString('en-US')}
+            subtitle='Tagged Instagram bio links copied'
+            icon={Copy}
+            iconClassName='text-primary-token'
+          />
+          <MetricCard
+            title='Open rate'
+            value={formatPercent(metrics.instagramBioOpenRate7d)}
+            subtitle='Share step views that opened Instagram'
+            icon={ExternalLink}
+            iconClassName='text-accent'
+          />
+          <MetricCard
+            title='Activations'
+            value={metrics.instagramBioActivations7d.toLocaleString('en-US')}
+            subtitle='First Instagram-sourced visits within seven days'
+            icon={TrendingUp}
+            iconClassName='text-success'
+          />
+          <MetricCard
+            title='Activation rate'
+            value={formatPercent(metrics.instagramBioActivationRate7d)}
+            subtitle='Share step views that activated'
+            icon={ChartNoAxesCombined}
             iconClassName='text-success'
           />
         </div>

@@ -58,6 +58,18 @@ function coerceDate(value: Date | string | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function parseHostname(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return new URL(value).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
 function getCampaignSeed(profileUrl: string): string {
   try {
     const url = new URL(profileUrl);
@@ -134,16 +146,17 @@ export function resolveBioLinkActivationStatus({
 export function isInstagramReferrer(
   referrer: string | null | undefined
 ): boolean {
-  if (!referrer) {
-    return false;
-  }
+  const hostname = parseHostname(referrer);
+  return hostname !== null && INSTAGRAM_REFERRER_HOSTS.has(hostname);
+}
 
-  try {
-    const hostname = new URL(referrer).hostname.toLowerCase();
-    return INSTAGRAM_REFERRER_HOSTS.has(hostname);
-  } catch {
-    return false;
-  }
+export function getInstagramReferrerHost(
+  referrer: string | null | undefined
+): string | null {
+  const hostname = parseHostname(referrer);
+  return hostname !== null && INSTAGRAM_REFERRER_HOSTS.has(hostname)
+    ? hostname
+    : null;
 }
 
 export function isInstagramActivationSource({
@@ -160,6 +173,12 @@ export function isInstagramActivationSource({
 export async function postDistributionEvent(
   payload: DistributionEventPayload
 ): Promise<boolean> {
+  // This helper relies on a same-origin relative URL and keepalive semantics,
+  // so accidental server-side calls should no-op instead of throwing.
+  if (typeof globalThis.window === 'undefined') {
+    return false;
+  }
+
   try {
     const response = await fetch('/api/onboarding/distribution-event', {
       body: JSON.stringify(payload),
