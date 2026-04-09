@@ -203,41 +203,52 @@ export async function waitForAuthenticatedHealth(
   page: Page,
   expectedUserId?: string | null
 ): Promise<void> {
-  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
-  const authHealthUrl = new URL('/api/health/auth', baseUrl).toString();
-  const bypassSessionUrl = new URL(
-    '/api/dev/test-auth/session',
-    baseUrl
-  ).toString();
-
   await expect
     .poll(
       async () => {
         try {
-          const cookies = await page.context().cookies(baseUrl);
-          const cookieHeader = cookies
-            .map(cookie => `${cookie.name}=${cookie.value}`)
-            .join('; ');
+          const fetchJson = async (path: string) =>
+            page.evaluate(async requestPath => {
+              try {
+                const response = await fetch(requestPath, {
+                  cache: 'no-store',
+                  credentials: 'include',
+                });
 
-          const requestHeaders =
-            cookieHeader.length > 0 ? { Cookie: cookieHeader } : undefined;
+                const payload = (await response
+                  .json()
+                  .catch(() => null)) as Record<string, unknown> | null;
+
+                return {
+                  ok: response.ok,
+                  status: response.status,
+                  payload,
+                };
+              } catch (error) {
+                return {
+                  ok: false,
+                  status: 0,
+                  payload: null,
+                  error: error instanceof Error ? error.message : String(error),
+                };
+              }
+            }, path);
 
           const getBypassSessionState = async () => {
-            const bypassResponse = await page.request.get(bypassSessionUrl, {
-              failOnStatusCode: false,
-              headers: requestHeaders,
-            });
+            const bypassResponse = await fetchJson(
+              '/api/dev/test-auth/session'
+            );
 
-            if (!bypassResponse.ok()) {
-              return `http-${bypassResponse.status()}`;
+            if (!bypassResponse.ok) {
+              return `http-${bypassResponse.status}`;
             }
 
-            const bypassPayload = (await bypassResponse.json()) as {
+            const bypassPayload = bypassResponse.payload as {
               active?: boolean;
               userId?: string | null;
-            };
+            } | null;
 
-            if (!bypassPayload.active) {
+            if (!bypassPayload?.active) {
               return 'anonymous';
             }
 
@@ -248,19 +259,16 @@ export async function waitForAuthenticatedHealth(
             return 'authenticated';
           };
 
-          const response = await page.request.get(authHealthUrl, {
-            failOnStatusCode: false,
-            headers: requestHeaders,
-          });
+          const response = await fetchJson('/api/health/auth');
 
-          if (response.ok()) {
-            const payload = (await response.json()) as {
+          if (response.ok) {
+            const payload = response.payload as {
               authenticated?: boolean;
               active?: boolean;
               userId?: string | null;
-            };
+            } | null;
 
-            if (payload.authenticated) {
+            if (payload?.authenticated) {
               if (expectedUserId && payload.userId !== expectedUserId) {
                 return `user-mismatch:${payload.userId ?? 'unknown'}`;
               }

@@ -860,6 +860,8 @@ const SMART_LINK_SURFACES = [
         DEFAULTS.releaseSlug
       ),
     readySelectors: [
+      'main',
+      'h1',
       '#promo-download-email',
       'button:has-text("Get Download")',
       '[aria-label^="Download "]',
