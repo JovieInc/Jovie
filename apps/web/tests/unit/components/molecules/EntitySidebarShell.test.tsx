@@ -109,6 +109,18 @@ describe('EntitySidebarShell', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('skips rendering an empty sticky rail in standard mode when no header content is provided', () => {
+    render(
+      <EntitySidebarShell isOpen ariaLabel='Empty drawer'>
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    expect(
+      screen.getByTestId('right-drawer').querySelector('[data-variant="card"]')
+    ).not.toBeInTheDocument();
+  });
+
   it('can render a flat pinned footer without card chrome', () => {
     render(
       <EntitySidebarShell

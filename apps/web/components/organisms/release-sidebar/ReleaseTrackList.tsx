@@ -51,8 +51,13 @@ export function ReleaseTrackList({
   let liveAnnouncement = '';
   if (playbackState.playbackStatus === 'error') {
     liveAnnouncement = 'Preview unavailable.';
-  } else if (playbackState.trackTitle) {
+  } else if (
+    playbackState.playbackStatus === 'playing' &&
+    playbackState.trackTitle
+  ) {
     liveAnnouncement = `Now playing ${playbackState.trackTitle}.`;
+  } else if (playbackState.playbackStatus === 'paused') {
+    liveAnnouncement = 'Playback paused.';
   }
 
   if (release.totalTracks === 0) return null;

@@ -116,7 +116,8 @@ export function EntitySidebarShell({
   const renderMinimalTabsInHeader =
     isMinimalHeader && minimalTabsPlacement === 'header';
   const hasTopRailContent =
-    showMinimalHeaderBar ||
+    (showMinimalHeaderBar &&
+      Boolean(title || headerActions || entityHeader || tabs)) ||
     (!isMinimalHeader && Boolean(entityHeader || tabs)) ||
     (renderMinimalTabsInHeader && Boolean(tabs));
   const resolvedHeaderTitle = isMinimalHeader

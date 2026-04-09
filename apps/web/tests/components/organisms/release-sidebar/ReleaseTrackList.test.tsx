@@ -173,6 +173,52 @@ describe('ReleaseTrackList', () => {
     expect(within(control).queryByText('1')).not.toBeInTheDocument();
   });
 
+  it('announces paused playback without repeating a now-playing message', () => {
+    const release = createMockRelease();
+    mockPlaybackState.activeTrackId = 'track_1';
+    mockPlaybackState.isPlaying = false;
+    mockPlaybackState.playbackStatus = 'paused';
+    mockPlaybackState.trackTitle = 'Static Skies';
+
+    render(
+      <ReleaseTrackList
+        release={release}
+        tracksOverride={[
+          {
+            id: 'track_1',
+            releaseId: release.id,
+            releaseSlug: release.slug,
+            title: 'Static Skies',
+            slug: 'static-skies',
+            smartLinkPath: `${release.smartLinkPath}/static-skies`,
+            trackNumber: 1,
+            discNumber: 1,
+            durationMs: 185000,
+            isrc: 'USRC17607839',
+            isExplicit: false,
+            previewUrl: 'https://example.com/preview.mp3',
+            audioUrl: null,
+            audioFormat: null,
+            previewSource: 'spotify',
+            previewVerification: 'verified',
+            providerConfidenceSummary: {
+              canonical: 1,
+              searchFallback: 0,
+              unknown: 0,
+              unresolvedProviders: [],
+            },
+            providers: [],
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('Playback paused.')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Now playing Static Skies.')
+    ).not.toBeInTheDocument();
+  });
+
   it('starts playback from the left slot with the correct track payload', async () => {
     const user = userEvent.setup();
     const release = createMockRelease({
@@ -233,7 +279,9 @@ describe('ReleaseTrackList', () => {
     mockQueryResult.isLoading = true;
     const { rerender } = render(<ReleaseTrackList release={release} />);
 
-    expect(screen.getAllByTestId('release-track-skeleton')).toHaveLength(1);
+    expect(screen.getAllByTestId('release-track-skeleton')).toHaveLength(
+      Math.min(release.totalTracks, 6)
+    );
 
     mockQueryResult.isLoading = false;
     mockQueryResult.isError = true;
