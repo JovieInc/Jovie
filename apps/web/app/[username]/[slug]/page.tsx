@@ -40,26 +40,11 @@ import {
   getCreatorPlan,
   getReleaseTrackList,
 } from './_lib/data';
+import { isMissingPromoDownloadsRelation } from './_lib/promo-download-errors';
 import { generateMusicStructuredData } from './music-structured-data';
 
 // Use ISR with 5-minute revalidation for smart link pages
 export const revalidate = 300;
-
-function isMissingPromoDownloadsRelation(error: unknown): boolean {
-  const message = (
-    error instanceof Error ? error.message : String(error)
-  ).toLowerCase();
-  const code =
-    typeof error === 'object' && error !== null
-      ? ((error as { code?: string; cause?: { code?: string } }).code ??
-        (error as { cause?: { code?: string } }).cause?.code)
-      : undefined;
-
-  return (
-    (code === '42P01' || message.includes('does not exist')) &&
-    message.includes('promo_downloads')
-  );
-}
 
 interface PageProps {
   readonly params: Promise<{ username: string; slug: string }>;

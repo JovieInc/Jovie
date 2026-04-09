@@ -93,14 +93,20 @@ export const APP_ROUTES = {
   // Marketing
   HOME: '/',
   ABOUT: '/about',
+  AI: '/ai',
   ARTIST_PROFILES: '/artist-profiles',
+  BLOG: '/blog',
   DEMO: '/demo',
+  DEMO_VIDEO: '/demo/video',
+  ENGAGEMENT_ENGINE: '/engagement-engine',
+  INVESTORS: '/investors',
   LANDING_NEW: '/new',
   PRICING: '/pricing',
   LAUNCH: '/launch',
   LAUNCH_PRICING: '/launch/pricing',
   CHANGELOG: '/changelog',
   SUPPORT: '/support',
+  TIPS: '/tips',
 
   // Legal
   LEGAL_PRIVACY: '/legal/privacy',

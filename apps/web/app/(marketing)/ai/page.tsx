@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { APP_ROUTES } from '@/constants/routes';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const revalidate = false;
@@ -27,10 +28,10 @@ export default function AiPage() {
             without exposing the private investor portal.
           </p>
           <div className='flex flex-wrap gap-3'>
-            <Link className='btn-linear-primary' href='/pricing'>
+            <Link className='btn-linear-primary' href={APP_ROUTES.PRICING}>
               See Pricing
             </Link>
-            <Link className='btn-linear-secondary' href='/support'>
+            <Link className='btn-linear-secondary' href={APP_ROUTES.SUPPORT}>
               Contact The Team
             </Link>
           </div>
@@ -95,7 +96,10 @@ export default function AiPage() {
               creator-facing offer.
             </p>
             <div className='flex flex-wrap gap-3'>
-              <Link className='btn-linear-secondary' href='/investors'>
+              <Link
+                className='btn-linear-secondary'
+                href={APP_ROUTES.INVESTORS}
+              >
                 Investor Overview
               </Link>
               <Link

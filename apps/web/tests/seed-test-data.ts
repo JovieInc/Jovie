@@ -83,6 +83,13 @@ const REQUIRED_PUBLIC_QA_PROVIDERS = [
   },
 ] as const;
 
+function getFutureReleaseDate(yearsAhead = 10): Date {
+  const releaseDate = new Date();
+  releaseDate.setUTCFullYear(releaseDate.getUTCFullYear() + yearsAhead);
+  releaseDate.setUTCMonth(11, 1);
+  releaseDate.setUTCHours(0, 0, 0, 0);
+  return releaseDate;
+}
 async function withSeedOperationTimeout<T>(
   operation: Promise<T>,
   timeoutMs: number,
@@ -769,7 +776,7 @@ const TEST_RELEASES: TestRelease[] = [
     title: 'Future Glow',
     slug: 'future-glow',
     releaseType: 'single',
-    releaseDate: new Date('2026-12-01'),
+    releaseDate: getFutureReleaseDate(),
     artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
     spotifyUrl: 'https://open.spotify.com/album/2BB4d3cOWNNsVw41Gqt2aa',
     totalTracks: 1,

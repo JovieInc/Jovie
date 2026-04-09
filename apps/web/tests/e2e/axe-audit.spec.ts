@@ -51,6 +51,7 @@ async function assertInteractiveLabels(
     nodes
       .map(node => {
         const element = node as HTMLElement;
+        const input = element as HTMLInputElement;
         const style = window.getComputedStyle(element);
         const rect = element.getBoundingClientRect();
         const isVisible =
@@ -65,11 +66,26 @@ async function assertInteractiveLabels(
           return null;
         }
 
+        const labelledByText =
+          element
+            .getAttribute('aria-labelledby')
+            ?.split(/\s+/)
+            .map(id => document.getElementById(id)?.textContent?.trim() ?? '')
+            .join(' ') ?? '';
+
         const label =
           element.getAttribute('aria-label') ||
+          labelledByText ||
+          element.getAttribute('title') ||
+          ((input.type === 'button' ||
+            input.type === 'submit' ||
+            input.type === 'reset') &&
+          typeof input.value === 'string'
+            ? input.value
+            : '') ||
           element.querySelector('img[alt]')?.getAttribute('alt') ||
           element.textContent ||
-          (element as HTMLInputElement).labels?.[0]?.textContent ||
+          input.labels?.[0]?.textContent ||
           '';
 
         if (label.trim().length > 0) {

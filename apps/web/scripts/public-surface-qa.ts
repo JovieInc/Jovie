@@ -7,8 +7,17 @@ const BASE_URL = process.env.BASE_URL?.trim() || DEFAULT_LOCAL_BASE_URL;
 const IS_EXTERNAL_BASE_URL =
   !BASE_URL.includes('127.0.0.1') && !BASE_URL.includes('localhost');
 
+function parseBaseUrl(baseUrl: string) {
+  const parsed = new URL(baseUrl);
+  return {
+    hostname: parsed.hostname,
+    origin: parsed.origin,
+    port: Number(parsed.port || (parsed.protocol === 'https:' ? '443' : '80')),
+  };
+}
+
 function buildLocalQaEnv(baseUrl = DEFAULT_LOCAL_BASE_URL) {
-  const hostname = new URL(baseUrl).hostname;
+  const { hostname } = parseBaseUrl(baseUrl);
 
   return {
     ...process.env,
@@ -123,15 +132,43 @@ async function freeLocalQaPort(port: number) {
 }
 
 async function stopServer(child: ChildProcess | null) {
-  if (!child || child.killed) {
+  if (!child || child.exitCode !== null) {
     return;
   }
 
+  const waitForExit = (timeoutMs: number) =>
+    new Promise<boolean>(resolve => {
+      if (child.exitCode !== null) {
+        resolve(true);
+        return;
+      }
+
+      const timeoutId = setTimeout(() => {
+        cleanup();
+        resolve(false);
+      }, timeoutMs);
+
+      const handleExit = () => {
+        cleanup();
+        resolve(true);
+      };
+
+      const cleanup = () => {
+        clearTimeout(timeoutId);
+        child.off('exit', handleExit);
+      };
+
+      child.on('exit', handleExit);
+    });
+
   child.kill('SIGTERM');
-  await new Promise(resolve => setTimeout(resolve, 1_000));
-  if (!child.killed) {
-    child.kill('SIGKILL');
+  const exitedAfterTerm = await waitForExit(1_000);
+  if (exitedAfterTerm || child.exitCode !== null) {
+    return;
   }
+
+  child.kill('SIGKILL');
+  await waitForExit(5_000);
 }
 
 async function runCorePublicChecks(baseUrl: string) {
@@ -199,10 +236,11 @@ async function runCorePublicChecks(baseUrl: string) {
 
 async function main() {
   let localServer: ChildProcess | null = null;
+  const { origin: localOrigin, port: localPort } = parseBaseUrl(BASE_URL);
 
   try {
     if (!IS_EXTERNAL_BASE_URL) {
-      const localQaEnv = buildLocalQaEnv(DEFAULT_LOCAL_BASE_URL);
+      const localQaEnv = buildLocalQaEnv(localOrigin);
 
       await runCommand(
         'pnpm',
@@ -229,17 +267,17 @@ async function main() {
         NODE_ENV: 'production',
       });
 
-      await freeLocalQaPort(3100);
+      await freeLocalQaPort(localPort);
       localServer = startServer(
         'node',
         ['.next/standalone/apps/web/server.js'],
         {
           ...localQaEnv,
-          PORT: '3100',
+          PORT: String(localPort),
           NODE_ENV: 'production',
         }
       );
-      await waitForServer(DEFAULT_LOCAL_BASE_URL);
+      await waitForServer(localOrigin);
     }
 
     await runCorePublicChecks(BASE_URL);

@@ -53,7 +53,8 @@ export function shouldBypassImageOptimization(
     const parsed = new URL(url);
     return (
       parsed.hostname === 'blob.vercel-storage.com' ||
-      parsed.hostname.endsWith('.blob.vercel-storage.com')
+      parsed.hostname.endsWith('.blob.vercel-storage.com') ||
+      parsed.pathname.startsWith('/avatars/default-user')
     );
   } catch {
     return (

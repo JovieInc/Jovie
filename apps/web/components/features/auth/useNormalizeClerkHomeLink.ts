@@ -1,6 +1,6 @@
 'use client';
 
-import { type RefObject, useEffect } from 'react';
+import { type RefObject, useEffect, useRef } from 'react';
 
 const HOME_LINK_LABEL = 'Go to homepage';
 const NORMALIZED_ATTR = 'data-jovie-home-link-label';
@@ -64,11 +64,20 @@ function normalizeHomeLinks(root: HTMLElement) {
 export function useNormalizeClerkHomeLink(
   containerRef: RefObject<HTMLElement | null>
 ) {
+  const observedRootRef = useRef<HTMLElement | null>(null);
+  const observerRef = useRef<MutationObserver | null>(null);
+
   useEffect(() => {
     const root = containerRef.current;
     if (!root) {
       return;
     }
+
+    if (observedRootRef.current === root) {
+      return;
+    }
+
+    observerRef.current?.disconnect();
 
     const run = () => normalizeHomeLinks(root);
     run();
@@ -81,6 +90,18 @@ export function useNormalizeClerkHomeLink(
       attributeFilter: ['aria-label', 'aria-labelledby', 'href', 'title'],
     });
 
-    return () => observer.disconnect();
-  }, [containerRef]);
+    observedRootRef.current = root;
+    observerRef.current = observer;
+
+    return () => {
+      if (observerRef.current === observer) {
+        observer.disconnect();
+        observerRef.current = null;
+      }
+
+      if (observedRootRef.current === root) {
+        observedRootRef.current = null;
+      }
+    };
+  });
 }

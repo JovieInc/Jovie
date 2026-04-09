@@ -136,10 +136,7 @@ export default async function TrackDeepLinkPage({
 
   await guardUnreleasedContent(track, creator.id);
 
-  const effectiveProviderLinks =
-    track.providerLinks.length > 0
-      ? track.providerLinks
-      : releaseContent.providerLinks;
+  const effectiveProviderLinks = track.providerLinks;
 
   // If DSP is specified, redirect to the provider URL for this track
   if (dsp) {

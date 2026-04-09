@@ -160,15 +160,15 @@ function resolveReleasePath(
 }
 
 function resolveBlogPostPath(): string {
-  return '/blog/the-contact-problem';
+  return `${APP_ROUTES.BLOG}/the-contact-problem`;
 }
 
 function resolveBlogAuthorPath(): string {
-  return '/blog/authors/tim';
+  return `${APP_ROUTES.BLOG}/authors/tim`;
 }
 
 function resolveBlogCategoryPath(): string {
-  return '/blog/category/artist-management';
+  return `${APP_ROUTES.BLOG}/category/artist-management`;
 }
 
 function resolveAlternativesPath(): string {
@@ -208,7 +208,7 @@ const MARKETING_SURFACES = [
     id: 'marketing-ai',
     family: 'marketing',
     expectedState: 'ok',
-    path: '/ai',
+    path: APP_ROUTES.AI,
     readySelectors: ['h1', 'main'],
     mainSelector: 'main',
     minMainTextLength: 120,
@@ -292,7 +292,7 @@ const MARKETING_SURFACES = [
     id: 'marketing-tips',
     family: 'marketing',
     expectedState: 'ok',
-    path: '/tips',
+    path: APP_ROUTES.TIPS,
     readySelectors: ['h1', 'main'],
     mainSelector: 'main',
     minMainTextLength: 120,
@@ -304,7 +304,7 @@ const MARKETING_SURFACES = [
     id: 'marketing-investors',
     family: 'marketing',
     expectedState: 'ok',
-    path: '/investors',
+    path: APP_ROUTES.INVESTORS,
     readySelectors: ['h1', 'main'],
     mainSelector: 'main',
     minMainTextLength: 120,
@@ -316,7 +316,7 @@ const MARKETING_SURFACES = [
     id: 'marketing-engagement-engine',
     family: 'marketing',
     expectedState: 'ok',
-    path: '/engagement-engine',
+    path: APP_ROUTES.ENGAGEMENT_ENGINE,
     readySelectors: ['h1', 'main'],
     mainSelector: 'main',
     minMainTextLength: 120,
@@ -328,7 +328,7 @@ const MARKETING_SURFACES = [
     id: 'marketing-demo-video',
     family: 'marketing',
     expectedState: 'ok',
-    path: '/demo/video',
+    path: APP_ROUTES.DEMO_VIDEO,
     readySelectors: ['main', 'video, iframe'],
     mainSelector: 'main',
     minMainTextLength: 40,
@@ -340,7 +340,7 @@ const MARKETING_SURFACES = [
     id: 'marketing-blog-index',
     family: 'marketing',
     expectedState: 'ok',
-    path: '/blog',
+    path: APP_ROUTES.BLOG,
     readySelectors: ['h1', 'main'],
     readyText: /thoughts on product|posts coming soon/i,
     mainSelector: 'main',
@@ -924,7 +924,7 @@ export function resolvePublicSurfaceManifestSync() {
   })) as readonly ResolvedPublicSurfaceSpec[];
 }
 
-export async function resolvePublicSurfaceManifest() {
+export function resolvePublicSurfaceManifest() {
   return resolvePublicSurfaceManifestSync();
 }
 
@@ -939,6 +939,6 @@ export function getLighthousePublicSurfaceManifestSync() {
   );
 }
 
-export async function getLighthousePublicSurfaceManifest() {
+export function getLighthousePublicSurfaceManifest() {
   return getLighthousePublicSurfaceManifestSync();
 }

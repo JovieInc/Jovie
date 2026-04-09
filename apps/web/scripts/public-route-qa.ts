@@ -41,6 +41,13 @@ const OUTPUT_ROOT = path.resolve(
 );
 const SCREENSHOT_DIR = path.join(OUTPUT_ROOT, 'screenshots');
 
+try {
+  new URL(BASE_URL);
+} catch {
+  console.error(`Invalid BASE_URL: ${BASE_URL}`);
+  process.exit(1);
+}
+
 function buildAbsoluteUrl(baseUrl: string, resolvedPath: string) {
   return new URL(resolvedPath, baseUrl).toString();
 }
@@ -237,8 +244,6 @@ async function main() {
     baseURL: BASE_URL,
     storageState: { cookies: [], origins: [] },
   });
-  const page = await context.newPage();
-  await installPublicRouteMocks(page);
 
   const filterTerms = FILTER.split(',')
     .map(term => term.trim())
@@ -259,6 +264,8 @@ async function main() {
     console.log(
       `[public-route-qa] checking ${surface.id} ${surface.resolvedPath}`
     );
+    const page = await context.newPage();
+    await installPublicRouteMocks(page);
     const result = await runSurfaceCheck(page, surface);
     console.log(
       `[public-route-qa] ${result.status.toUpperCase()} ${surface.id} -> ${
@@ -266,6 +273,7 @@ async function main() {
       }${result.errorMessage ? ` | ${result.errorMessage}` : ''}`
     );
     results.push(result);
+    await page.close();
   }
 
   await mkdir(OUTPUT_ROOT, { recursive: true });

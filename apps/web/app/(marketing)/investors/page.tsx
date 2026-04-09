@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { APP_ROUTES } from '@/constants/routes';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const revalidate = false;
@@ -14,8 +15,8 @@ export default function InvestorsPage() {
     <main className='bg-base px-6 py-16 text-primary-token sm:px-8 lg:px-12'>
       <div className='mx-auto flex max-w-5xl flex-col gap-10'>
         <section className='max-w-3xl space-y-5'>
-          <p className='text-sm font-medium uppercase tracking-[0.18em] text-muted-token'>
-            Investor Overview
+          <p className='text-sm font-medium tracking-tight text-muted-token'>
+            Investor overview
           </p>
           <h1 className='text-4xl font-semibold tracking-tight sm:text-5xl'>
             Jovie turns creator traffic into measurable fan value
@@ -27,10 +28,18 @@ export default function InvestorsPage() {
             first profile visit onward.
           </p>
           <div className='flex flex-wrap gap-3'>
-            <Link className='btn-linear-primary' href='/support'>
+            <Link
+              className='btn-linear-primary'
+              href={APP_ROUTES.SUPPORT}
+              prefetch={false}
+            >
               Request Access
             </Link>
-            <Link className='btn-linear-secondary' href='/ai'>
+            <Link
+              className='btn-linear-secondary'
+              href={APP_ROUTES.AI}
+              prefetch={false}
+            >
               Read The AI Brief
             </Link>
           </div>
@@ -81,11 +90,16 @@ export default function InvestorsPage() {
             <div className='flex flex-wrap gap-3'>
               <Link
                 className='btn-linear-secondary'
+                prefetch={false}
                 href='/blog/the-contact-problem'
               >
                 Read The Thesis
               </Link>
-              <Link className='btn-linear-secondary' href='/pricing'>
+              <Link
+                className='btn-linear-secondary'
+                href={APP_ROUTES.PRICING}
+                prefetch={false}
+              >
                 View Product Pricing
               </Link>
             </div>

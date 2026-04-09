@@ -637,10 +637,11 @@ jobs:
         id: check_changes
         shell: bash
         run: |
-          # Run when UI/component paths changed (build or test patterns cover a11y-relevant changes).
+          # Run when UI/component paths or public QA inputs changed.
           RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
           RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
-          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]]; then
+          RUN_PUBLIC_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_public_lighthouse }}"
+          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" || "$RUN_PUBLIC_LIGHTHOUSE" == "true" ]]; then
             echo "run_full_ci=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_full_ci=false" >> "$GITHUB_OUTPUT"
@@ -1701,10 +1702,11 @@ jobs:
         id: check_changes
         shell: bash
         run: |
-          # Align with ci-build-public: run when build OR test paths changed.
+          # Align with ci-build-public so public QA config changes still run the blocking lane.
           RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
           RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
-          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]]; then
+          RUN_PUBLIC_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_public_lighthouse }}"
+          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" || "$RUN_PUBLIC_LIGHTHOUSE" == "true" ]]; then
             echo "run_full_ci=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_full_ci=false" >> "$GITHUB_OUTPUT"
@@ -1812,6 +1814,15 @@ jobs:
           name: a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/playwright-report/
           retention-days: 3
+
+      - name: Cleanup ephemeral Neon branch
+        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != ''
+        continue-on-error: true
+        run: |
+          curl -sS -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
 
   ci-e2e-smoke:
     name: E2E Smoke (PR Fast Feedback)

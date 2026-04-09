@@ -414,6 +414,16 @@ export async function ensureCreatorProfileRecord(
           .limit(1)
       : [];
 
+  if (
+    existingProfileByUsername &&
+    existingClaimedProfileForUser &&
+    existingProfileByUsername.id !== existingClaimedProfileForUser.id
+  ) {
+    throw new Error(
+      `Conflicting creator profile matches for ${values.usernameNormalized} and user ${values.userId}`
+    );
+  }
+
   const existingProfile =
     existingProfileByUsername ?? existingClaimedProfileForUser;
 
@@ -455,6 +465,16 @@ export async function ensureCreatorProfileRecord(
             )
             .limit(1)
         : [];
+
+    if (
+      racedProfileByUsername &&
+      racedClaimedProfileForUser &&
+      racedProfileByUsername.id !== racedClaimedProfileForUser.id
+    ) {
+      throw new Error(
+        `Conflicting creator profile matches for ${values.usernameNormalized} and user ${values.userId}`
+      );
+    }
 
     const racedProfile = racedProfileByUsername ?? racedClaimedProfileForUser;
 

@@ -2,8 +2,15 @@ import { spawn } from 'node:child_process';
 import process from 'node:process';
 import { getLighthousePublicSurfaceManifest } from '@/tests/e2e/utils/public-surface-manifest';
 
-const DEFAULT_BASE_URL =
-  process.env.BASE_URL?.trim() || 'http://127.0.0.1:3200';
+const BASE_URL = process.env.BASE_URL?.trim();
+
+function getValidatedBaseUrl(): string {
+  if (!BASE_URL) {
+    throw new Error('BASE_URL is required for public Lighthouse runs');
+  }
+
+  return new URL(BASE_URL).toString();
+}
 
 function runCommand(
   command: string,
@@ -29,9 +36,10 @@ function runCommand(
 }
 
 async function main() {
-  const surfaces = await getLighthousePublicSurfaceManifest();
+  const baseUrl = getValidatedBaseUrl();
+  const surfaces = getLighthousePublicSurfaceManifest();
   const urls = surfaces.map(surface =>
-    new URL(surface.resolvedPath, DEFAULT_BASE_URL).toString()
+    new URL(surface.resolvedPath, baseUrl).toString()
   );
 
   const args = [
