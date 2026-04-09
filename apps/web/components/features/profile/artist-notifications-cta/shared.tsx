@@ -332,7 +332,8 @@ export function SubscriptionSuccess({
 }
 
 /**
- * Pending confirmation state - shown when double opt-in email was sent
+ * Pending confirmation state - shown when an OTP email was sent and the
+ * verification UI is rendered elsewhere.
  */
 export function SubscriptionPendingConfirmation() {
   return (
@@ -345,12 +346,12 @@ export function SubscriptionPendingConfirmation() {
       >
         <Mail className='h-5 w-5 text-primary-token/72' aria-hidden='true' />
         <span className='text-[15px] font-semibold tracking-[-0.015em]'>
-          Check your email
+          Check your inbox
         </span>
       </div>
       <p className={subscriptionDisclaimerClassName}>
-        We sent a confirmation link to your email. Click it to turn on
-        notifications from this artist.
+        Enter the 6-digit code from your email to turn on notifications from
+        this artist.
       </p>
     </div>
   );

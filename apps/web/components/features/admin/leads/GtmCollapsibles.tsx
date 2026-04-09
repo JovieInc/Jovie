@@ -6,6 +6,7 @@ import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AnimatedAccordion } from '@/components/organisms/AnimatedAccordion';
 import { cn } from '@/lib/utils';
+import { GrowthStatusPanel } from './GrowthStatusPanel';
 
 const OutreachOverviewPanel = dynamic(
   () =>
@@ -151,6 +152,8 @@ export function GtmCollapsibles({ initialOpen }: GtmCollapsiblesProps) {
 
   return (
     <div className='space-y-2'>
+      <GrowthStatusPanel />
+
       <AccordionSection
         title='Tools'
         isOpen={openSections.has(0)}
