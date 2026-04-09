@@ -3,6 +3,7 @@ import {
   buildInstagramBioLink,
   getBioLinkActivationWindowEnd,
   isInstagramActivationSource,
+  postDistributionEvent,
   resolveBioLinkActivationStatus,
 } from '@/lib/distribution/instagram-activation';
 
@@ -61,9 +62,27 @@ describe('instagram activation helpers', () => {
     expect(
       resolveBioLinkActivationStatus({
         activatedAt: null,
+        now: windowEndsAt!,
+        windowEndsAt,
+      })
+    ).toBe('pending');
+
+    expect(
+      resolveBioLinkActivationStatus({
+        activatedAt: null,
         now: new Date('2026-04-10T00:00:00.000Z'),
         windowEndsAt,
       })
     ).toBe('expired');
+  });
+
+  it('no-ops if the distribution event helper is called on the server', async () => {
+    await expect(
+      postDistributionEvent({
+        eventType: 'step_viewed',
+        platform: 'instagram',
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+      })
+    ).resolves.toBe(false);
   });
 });

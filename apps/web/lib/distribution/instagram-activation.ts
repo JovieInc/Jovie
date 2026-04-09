@@ -160,6 +160,12 @@ export function isInstagramActivationSource({
 export async function postDistributionEvent(
   payload: DistributionEventPayload
 ): Promise<boolean> {
+  // This helper relies on a same-origin relative URL and keepalive semantics,
+  // so accidental server-side calls should no-op instead of throwing.
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
   try {
     const response = await fetch('/api/onboarding/distribution-event', {
       body: JSON.stringify(payload),

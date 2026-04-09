@@ -15,6 +15,20 @@ export const SESSION_ERRORS = {
   UNAUTHORIZED: 'Unauthorized',
 } as const;
 
+export class UnauthorizedSessionError extends Error {
+  constructor() {
+    super(SESSION_ERRORS.UNAUTHORIZED);
+    this.name = 'UnauthorizedSessionError';
+  }
+}
+
+export function isUnauthorizedSessionError(error: unknown): boolean {
+  return (
+    error instanceof UnauthorizedSessionError ||
+    (error instanceof Error && error.message === SESSION_ERRORS.UNAUTHORIZED)
+  );
+}
+
 /**
  * Validates that a userId is a safe Clerk ID format
  * Clerk IDs follow the pattern: user_[a-zA-Z0-9]+
@@ -47,7 +61,7 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error(SESSION_ERRORS.UNAUTHORIZED);
+    throw new UnauthorizedSessionError();
   }
 
   // Validate userId format to prevent SQL injection
@@ -99,7 +113,7 @@ export async function setupDbSession(clerkUserId?: string) {
     userId = await resolveClerkUserId(clerkUserId);
   } catch (error) {
     // If no authenticated user, skip RLS setup gracefully
-    if (error instanceof Error && error.message === 'Unauthorized') {
+    if (isUnauthorizedSessionError(error)) {
       logDbInfo('setupDbSession', 'Skipping RLS setup — no authenticated user');
       return { userId: null };
     }
@@ -132,7 +146,7 @@ export async function withDbSession<T>(
 ): Promise<T> {
   const { userId } = await setupDbSession(options?.clerkUserId);
   if (!userId) {
-    throw new Error(SESSION_ERRORS.UNAUTHORIZED);
+    throw new UnauthorizedSessionError();
   }
   return operation(userId);
 }
@@ -186,7 +200,7 @@ export async function withDbSessionTx<T>(
 export async function requireAuth() {
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new Error(SESSION_ERRORS.UNAUTHORIZED);
+    throw new UnauthorizedSessionError();
   }
   return userId;
 }
