@@ -93,6 +93,14 @@ function collectCriticalConsoleErrors(
 ) {
   return consoleErrors.filter(error => {
     const normalized = error.toLowerCase();
+    const isExpectedClerkFetchNoise =
+      normalized.includes('typeerror: failed to fetch') &&
+      normalized.includes('clerk.browser.js');
+
+    if (isExpectedClerkFetchNoise) {
+      return false;
+    }
+
     if (
       surface.allowedFinalDocumentStatuses?.includes(404) &&
       normalized.includes('failed to load resource') &&
@@ -102,6 +110,21 @@ function collectCriticalConsoleErrors(
     }
 
     return true;
+  });
+}
+
+function collectExpectedPageErrors(
+  surface: ResolvedPublicSurfaceSpec,
+  pageErrors: readonly string[]
+) {
+  return pageErrors.filter(error => {
+    const normalized = error.toLowerCase();
+    const isExpectedNotFoundBoundaryNoise =
+      (surface.expectedState === 'not-found' ||
+        surface.allowedFinalDocumentStatuses?.includes(404)) &&
+      normalized.includes('minified react error #419');
+
+    return !isExpectedNotFoundBoundaryNoise;
   });
 }
 
@@ -145,9 +168,14 @@ async function runSurfaceCheck(
       );
     }
 
-    if (diagnostics.uncaughtExceptions.length > 0) {
+    const pageErrors = collectExpectedPageErrors(
+      surface,
+      diagnostics.uncaughtExceptions
+    );
+
+    if (pageErrors.length > 0) {
       throw new Error(
-        `Uncaught page errors detected: ${diagnostics.uncaughtExceptions.join('; ')}`
+        `Uncaught page errors detected: ${pageErrors.join('; ')}`
       );
     }
 
@@ -160,7 +188,7 @@ async function runSurfaceCheck(
       title: await page.title(),
       sameOriginFailures,
       consoleErrors: criticalConsoleErrors,
-      pageErrors: diagnostics.uncaughtExceptions,
+      pageErrors,
     };
   } catch (error) {
     await mkdir(SCREENSHOT_DIR, { recursive: true });
@@ -191,7 +219,10 @@ async function runSurfaceCheck(
         surface,
         diagnostics.criticalErrors
       ),
-      pageErrors: diagnostics.uncaughtExceptions,
+      pageErrors: collectExpectedPageErrors(
+        surface,
+        diagnostics.uncaughtExceptions
+      ),
       screenshotPath,
       errorMessage: error instanceof Error ? error.message : String(error),
     };

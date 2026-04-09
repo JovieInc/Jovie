@@ -246,7 +246,7 @@ export function AutomaticReleaseSmartlinksSection() {
 
                   {/* Powered by Jovie */}
                   <div className='mt-3 pt-3 text-center'>
-                    <span className='inline-flex items-center gap-1 text-2xs uppercase tracking-widest text-tertiary-token'>
+                    <span className='inline-flex items-center gap-1 text-2xs uppercase tracking-widest text-secondary-token'>
                       <span>Powered by</span>
                       <span className='font-[var(--linear-font-weight-semibold)]'>
                         Jovie

@@ -38,3 +38,31 @@ export function isExternalDspImage(url: string | null | undefined): boolean {
   if (!url) return false;
   return DSP_CDN_DOMAINS.some(domain => url.includes(domain));
 }
+
+/**
+ * Shared image optimization bypass for sources that do not benefit from
+ * Next's image proxying during QA or production.
+ */
+export function shouldBypassImageOptimization(
+  url: string | null | undefined
+): boolean {
+  if (!url) return false;
+  if (isExternalDspImage(url)) return true;
+
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.hostname === 'blob.vercel-storage.com' ||
+      parsed.hostname.endsWith('.blob.vercel-storage.com')
+    );
+  } catch {
+    return (
+      url.includes('blob.vercel-storage.com') ||
+      url.startsWith('/avatars/default-user')
+    );
+  }
+}
+
+export function isDefaultAvatarUrl(url: string | null | undefined): boolean {
+  return typeof url === 'string' && url.startsWith('/avatars/default-user');
+}

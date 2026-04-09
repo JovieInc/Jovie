@@ -173,6 +173,7 @@ function PricingTier({
       {/* CTA Button */}
       <Link
         href={buttonHref}
+        prefetch={false}
         className='block w-full text-center mt-6 mb-6 md:mt-8 md:mb-8 transition-opacity hover:opacity-90'
         style={{
           fontSize: 'var(--linear-body-sm-size)',
@@ -331,6 +332,7 @@ export default function PricingPage() {
             <div className='mt-8 flex items-center justify-center gap-4'>
               <Link
                 href='/signup'
+                prefetch={false}
                 className='inline-block transition-opacity hover:opacity-90'
                 style={{
                   fontSize: 'var(--linear-body-sm-size)',
@@ -347,6 +349,7 @@ export default function PricingPage() {
               </Link>
               <Link
                 href='/'
+                prefetch={false}
                 className='inline-block transition-opacity hover:opacity-90'
                 style={{
                   fontSize: 'var(--linear-body-sm-size)',

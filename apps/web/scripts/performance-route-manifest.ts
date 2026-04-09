@@ -428,7 +428,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-listen"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-listen"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -449,7 +452,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-tip"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-tip"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -470,7 +476,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-subscribe"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-subscribe"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -491,7 +500,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-about"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-about"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -512,7 +524,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-contact"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-contact"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -533,7 +548,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-tour"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-tour"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },

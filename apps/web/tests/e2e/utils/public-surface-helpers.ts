@@ -23,7 +23,7 @@ const OVERLAY_SELECTOR = [
 ].join(', ');
 
 const SAFE_TRIGGER_DENYLIST =
-  /start free|get started|claim profile|continue|pay|buy|checkout|open in|venmo|spotify|apple music|youtube music|sign in|sign up/i;
+  /start free|get started|claim profile|continue|pay|buy|checkout|open in|venmo|spotify|apple music|youtube music|sign in|sign up|more options|view on mobile|back|close/i;
 
 export function createPublicMonitoring(page: Page) {
   return setupPageMonitoring(page);
@@ -158,15 +158,24 @@ export async function assertPublicSurfaceHealthy(
   if (surface.expectedState !== 'redirect') {
     const finalPath = normalizePathAndSearch(page.url());
     const expectedPath = normalizePathAndSearch(surface.resolvedPath);
-    expect(
-      finalPath,
-      `${surface.id} unexpectedly redirected from ${expectedPath} to ${finalPath}`
-    ).toBe(expectedPath);
+    if (surface.allowedFinalPaths && surface.allowedFinalPaths.length > 0) {
+      expect(
+        surface.allowedFinalPaths.some(pattern => pattern.test(finalPath)),
+        `${surface.id} unexpectedly redirected from ${expectedPath} to ${finalPath}`
+      ).toBe(true);
+    } else {
+      expect(
+        finalPath,
+        `${surface.id} unexpectedly redirected from ${expectedPath} to ${finalPath}`
+      ).toBe(expectedPath);
+    }
   }
 
   if (!surface.allowMissingMain) {
     const main = page.locator(surface.mainSelector ?? 'main').first();
-    await expect(main).toBeVisible({ timeout: 10_000 });
+    await expect(main).toBeVisible({
+      timeout: surface.mainVisibleTimeoutMs ?? 10_000,
+    });
     const mainText = normalizeText(await main.textContent());
     expect(
       mainText.length,
@@ -231,28 +240,64 @@ async function runSafeTriggerSweep(
     '[aria-haspopup="listbox"]',
     '[role="tab"]',
   ];
-  const triggers = await visibleLocators(page, selectors);
+  const clickedLabels = new Set<string>();
   let clicked = 0;
 
-  for (const trigger of triggers) {
-    if (clicked >= (interaction.maxClicks ?? 8)) {
+  while (clicked < (interaction.maxClicks ?? 8)) {
+    const triggers = await visibleLocators(page, selectors);
+    let nextTrigger: Locator | null = null;
+
+    for (const trigger of triggers) {
+      const label = normalizeText(
+        (await trigger.getAttribute('aria-label').catch(() => null)) ??
+          (await trigger.textContent().catch(() => ''))
+      );
+      const isNavigational = await trigger
+        .evaluate(element => {
+          const anchor = element.closest('a[href]');
+          if (!anchor) {
+            return false;
+          }
+
+          const href = anchor.getAttribute('href');
+          if (!href) {
+            return false;
+          }
+
+          const resolved = new URL(href, window.location.href);
+          const current = new URL(window.location.href);
+          return (
+            resolved.origin !== current.origin ||
+            `${resolved.pathname}${resolved.search}` !==
+              `${current.pathname}${current.search}`
+          );
+        })
+        .catch(() => false);
+
+      if (
+        !label ||
+        isNavigational ||
+        SAFE_TRIGGER_DENYLIST.test(label) ||
+        clickedLabels.has(label)
+      ) {
+        continue;
+      }
+
+      const stillVisible = await trigger.isVisible().catch(() => false);
+      if (!stillVisible) {
+        continue;
+      }
+
+      clickedLabels.add(label);
+      nextTrigger = trigger;
       break;
     }
 
-    const label = normalizeText(
-      (await trigger.getAttribute('aria-label').catch(() => null)) ??
-        (await trigger.textContent().catch(() => ''))
-    );
-    if (!label || SAFE_TRIGGER_DENYLIST.test(label)) {
-      continue;
+    if (!nextTrigger) {
+      break;
     }
 
-    const stillVisible = await trigger.isVisible().catch(() => false);
-    if (!stillVisible) {
-      continue;
-    }
-
-    await assertOverlayLifecycle(page, trigger).catch(() => undefined);
+    await assertOverlayLifecycle(page, nextTrigger).catch(() => undefined);
     clicked += 1;
   }
 }
@@ -366,8 +411,14 @@ async function runDspInteraction(page: Page) {
       'a[href*="spotify"]',
       'a[href*="apple"]',
       'a[href*="youtube"]',
-      'button[aria-label*="Open in"]',
-      'button:has-text("Open in")',
+      'a[aria-label^="Open "]',
+      'button[aria-label^="Open "]',
+      'a:has-text("Spotify")',
+      'a:has-text("Apple Music")',
+      'a:has-text("YouTube Music")',
+      'button:has-text("Spotify")',
+      'button:has-text("Apple Music")',
+      'button:has-text("YouTube Music")',
     ].join(', ')
   );
   await expect(

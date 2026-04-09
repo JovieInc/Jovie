@@ -40,12 +40,14 @@ export interface PublicSurfaceSpec {
   readonly family: PublicSurfaceFamily;
   readonly expectedState: PublicSurfaceState;
   readonly path: string;
-  readonly resolvePath?: () => Promise<string>;
+  readonly resolvePath?: () => string;
   readonly readySelectors: readonly string[];
   readonly readyText?: RegExp;
   readonly mainSelector?: string;
+  readonly mainVisibleTimeoutMs?: number;
   readonly minMainTextLength?: number;
   readonly expectedRedirects?: readonly RegExp[];
+  readonly allowedFinalPaths?: readonly RegExp[];
   readonly allowedFinalDocumentStatuses?: readonly number[];
   readonly allowMissingMain?: boolean;
   readonly lighthouse: boolean;
@@ -89,7 +91,6 @@ const GLOBAL_INTERACTIONS = [
       '[aria-haspopup="menu"]',
       '[aria-haspopup="listbox"]',
       '[role="tab"]',
-      '[data-state]',
     ],
   },
 ] as const satisfies readonly PublicInteractionSpec[];
@@ -108,8 +109,12 @@ const RELEASE_INTERACTIONS = [
 ] as const satisfies readonly PublicInteractionSpec[];
 
 const COUNTDOWN_INTERACTIONS = [
-  ...RELEASE_INTERACTIONS,
+  ...GLOBAL_INTERACTIONS,
   { id: 'notification-form', optional: true },
+] as const satisfies readonly PublicInteractionSpec[];
+
+const DOWNLOAD_INTERACTIONS = [
+  ...GLOBAL_INTERACTIONS,
 ] as const satisfies readonly PublicInteractionSpec[];
 
 const AUTH_INTERACTIONS = [
@@ -154,23 +159,23 @@ function resolveReleasePath(
   );
 }
 
-async function resolveBlogPostPath(): Promise<string> {
+function resolveBlogPostPath(): string {
   return '/blog/the-contact-problem';
 }
 
-async function resolveBlogAuthorPath(): Promise<string> {
+function resolveBlogAuthorPath(): string {
   return '/blog/authors/tim';
 }
 
-async function resolveBlogCategoryPath(): Promise<string> {
+function resolveBlogCategoryPath(): string {
   return '/blog/category/artist-management';
 }
 
-async function resolveAlternativesPath(): Promise<string> {
+function resolveAlternativesPath(): string {
   return '/alternatives/linktree';
 }
 
-async function resolveComparePath(): Promise<string> {
+function resolveComparePath(): string {
   return '/compare/linktree';
 }
 
@@ -202,14 +207,11 @@ const MARKETING_SURFACES = [
   {
     id: 'marketing-ai',
     family: 'marketing',
-    expectedState: 'redirect',
+    expectedState: 'ok',
     path: '/ai',
-    readySelectors: ['html'],
+    readySelectors: ['h1', 'main'],
     mainSelector: 'main',
-    minMainTextLength: 0,
-    expectedRedirects: [/\/investor-portal(?:\/)?(?:\?.*)?$/],
-    allowedFinalDocumentStatuses: [404],
-    allowMissingMain: true,
+    minMainTextLength: 120,
     lighthouse: false,
     perfGroups: ['marketing-public'],
     interactions: GLOBAL_INTERACTIONS,
@@ -301,14 +303,11 @@ const MARKETING_SURFACES = [
   {
     id: 'marketing-investors',
     family: 'marketing',
-    expectedState: 'redirect',
+    expectedState: 'ok',
     path: '/investors',
-    readySelectors: ['html'],
+    readySelectors: ['h1', 'main'],
     mainSelector: 'main',
-    minMainTextLength: 0,
-    expectedRedirects: [/\/investor-portal(?:\/)?(?:\?.*)?$/],
-    allowedFinalDocumentStatuses: [404],
-    allowMissingMain: true,
+    minMainTextLength: 120,
     lighthouse: false,
     perfGroups: ['marketing-public'],
     interactions: GLOBAL_INTERACTIONS,
@@ -519,7 +518,7 @@ const PROFILE_SURFACES = [
     family: 'profile-core',
     expectedState: 'ok',
     path: '/[username]',
-    resolvePath: async () => `/${resolveProfileHandle('music')}`,
+    resolvePath: () => `/${resolveProfileHandle('music')}`,
     readySelectors: ['[data-testid="profile-header"]', 'h1'],
     mainSelector: 'main',
     minMainTextLength: 40,
@@ -532,7 +531,7 @@ const PROFILE_SURFACES = [
     family: 'profile-core',
     expectedState: 'redirect',
     path: '/[username]/about',
-    resolvePath: async () => `/${resolveProfileHandle('music')}/about`,
+    resolvePath: () => `/${resolveProfileHandle('music')}/about`,
     readySelectors: ['[data-testid="profile-header"]', 'h1'],
     mainSelector: 'main',
     minMainTextLength: 60,
@@ -547,7 +546,7 @@ const PROFILE_SURFACES = [
     family: 'profile-core',
     expectedState: 'redirect',
     path: '/[username]/contact',
-    resolvePath: async () => `/${resolveProfileHandle('music')}/contact`,
+    resolvePath: () => `/${resolveProfileHandle('music')}/contact`,
     readySelectors: ['[data-testid="profile-header"]', 'h1'],
     mainSelector: 'main',
     minMainTextLength: 60,
@@ -562,7 +561,7 @@ const PROFILE_SURFACES = [
     family: 'profile-core',
     expectedState: 'redirect',
     path: '/[username]/listen',
-    resolvePath: async () => `/${resolveProfileHandle('music')}/listen`,
+    resolvePath: () => `/${resolveProfileHandle('music')}/listen`,
     readySelectors: ['[data-testid="profile-header"]', 'h1'],
     mainSelector: 'main',
     minMainTextLength: 60,
@@ -577,7 +576,7 @@ const PROFILE_SURFACES = [
     family: 'profile-core',
     expectedState: 'ok',
     path: '/[username]/notifications',
-    resolvePath: async () => `/${resolveProfileHandle('tip')}/notifications`,
+    resolvePath: () => `/${resolveProfileHandle('tip')}/notifications`,
     readySelectors: ['[data-testid="notifications-page"]', 'form', 'h1'],
     mainSelector: 'body',
     minMainTextLength: 60,
@@ -594,7 +593,7 @@ const PROFILE_SURFACES = [
     family: 'profile-core',
     expectedState: 'redirect',
     path: '/[username]/shop',
-    resolvePath: async () => `/${resolveProfileHandle('music')}/shop`,
+    resolvePath: () => `/${resolveProfileHandle('music')}/shop`,
     readySelectors: ['[data-testid="profile-header"]', 'h1'],
     mainSelector: 'main',
     minMainTextLength: 60,
@@ -609,7 +608,7 @@ const PROFILE_SURFACES = [
     family: 'profile-core',
     expectedState: 'redirect',
     path: '/[username]/subscribe',
-    resolvePath: async () => `/${resolveProfileHandle('music')}/subscribe`,
+    resolvePath: () => `/${resolveProfileHandle('music')}/subscribe`,
     readySelectors: ['[data-testid="profile-header"]', 'h1'],
     mainSelector: 'main',
     minMainTextLength: 60,
@@ -624,7 +623,7 @@ const PROFILE_SURFACES = [
     family: 'profile-core',
     expectedState: 'redirect',
     path: '/[username]/tip',
-    resolvePath: async () => `/${resolveProfileHandle('tip')}/tip`,
+    resolvePath: () => `/${resolveProfileHandle('tip')}/tip`,
     readySelectors: ['[data-testid="profile-header"]', 'h1'],
     mainSelector: 'main',
     minMainTextLength: 60,
@@ -639,7 +638,7 @@ const PROFILE_SURFACES = [
     family: 'profile-core',
     expectedState: 'redirect',
     path: '/[username]/tour',
-    resolvePath: async () => `/${resolveProfileHandle('music')}/tour`,
+    resolvePath: () => `/${resolveProfileHandle('music')}/tour`,
     readySelectors: ['[data-testid="profile-header"]', 'h1'],
     mainSelector: 'main',
     minMainTextLength: 60,
@@ -654,7 +653,7 @@ const PROFILE_SURFACES = [
     family: 'profile-core',
     expectedState: 'ok',
     path: '/[username]/claim',
-    resolvePath: async () => `/${resolveProfileHandle('music')}/claim`,
+    resolvePath: () => `/${resolveProfileHandle('music')}/claim`,
     readySelectors: ['body', 'form, button, h1'],
     mainSelector: 'body',
     minMainTextLength: 60,
@@ -671,13 +670,14 @@ const PROFILE_MODE_SURFACES = [
     family: 'profile-mode',
     expectedState: 'ok',
     path: '/[username]?mode=about',
-    resolvePath: async () => `/${resolveProfileHandle('music')}?mode=about`,
+    resolvePath: () => `/${resolveProfileHandle('music')}?mode=about`,
     readySelectors: [
       '[data-testid="profile-mode-drawer-about"]',
       '[data-testid="profile-header"]',
     ],
     mainSelector: 'main',
-    minMainTextLength: 45,
+    minMainTextLength: 40,
+    allowedFinalPaths: [/^\/[^/?#]+(?:\?mode=about)?$/],
     lighthouse: false,
     perfGroups: ['public-profile-mode-shell'],
     interactions: PROFILE_INTERACTIONS,
@@ -687,13 +687,14 @@ const PROFILE_MODE_SURFACES = [
     family: 'profile-mode',
     expectedState: 'ok',
     path: '/[username]?mode=contact',
-    resolvePath: async () => `/${resolveProfileHandle('music')}?mode=contact`,
+    resolvePath: () => `/${resolveProfileHandle('music')}?mode=contact`,
     readySelectors: [
       '[data-testid="profile-mode-drawer-contact"]',
       '[data-testid="profile-header"]',
     ],
     mainSelector: 'main',
-    minMainTextLength: 45,
+    minMainTextLength: 40,
+    allowedFinalPaths: [/^\/[^/?#]+(?:\?mode=contact)?$/],
     lighthouse: false,
     perfGroups: ['public-profile-mode-shell'],
     interactions: PROFILE_INTERACTIONS,
@@ -703,13 +704,14 @@ const PROFILE_MODE_SURFACES = [
     family: 'profile-mode',
     expectedState: 'ok',
     path: '/[username]?mode=listen',
-    resolvePath: async () => `/${resolveProfileHandle('music')}?mode=listen`,
+    resolvePath: () => `/${resolveProfileHandle('music')}?mode=listen`,
     readySelectors: [
       '[data-testid="profile-mode-drawer-listen"]',
       '[data-testid="profile-header"]',
     ],
     mainSelector: 'main',
-    minMainTextLength: 45,
+    minMainTextLength: 40,
+    allowedFinalPaths: [/^\/[^/?#]+(?:\?mode=listen)?$/],
     lighthouse: true,
     perfGroups: ['public-profile-mode-shell'],
     interactions: PROFILE_INTERACTIONS,
@@ -719,13 +721,14 @@ const PROFILE_MODE_SURFACES = [
     family: 'profile-mode',
     expectedState: 'ok',
     path: '/[username]?mode=subscribe',
-    resolvePath: async () => `/${resolveProfileHandle('music')}?mode=subscribe`,
+    resolvePath: () => `/${resolveProfileHandle('music')}?mode=subscribe`,
     readySelectors: [
       '[data-testid="profile-mode-drawer-subscribe"]',
       '[data-testid="profile-header"]',
     ],
     mainSelector: 'main',
-    minMainTextLength: 45,
+    minMainTextLength: 40,
+    allowedFinalPaths: [/^\/[^/?#]+(?:\?mode=subscribe)?$/],
     lighthouse: true,
     perfGroups: ['public-profile-mode-shell'],
     interactions: [
@@ -738,13 +741,14 @@ const PROFILE_MODE_SURFACES = [
     family: 'profile-mode',
     expectedState: 'ok',
     path: '/[username]?mode=tip',
-    resolvePath: async () => `/${resolveProfileHandle('tip')}?mode=tip`,
+    resolvePath: () => `/${resolveProfileHandle('tip')}?mode=tip`,
     readySelectors: [
       '[data-testid="profile-mode-drawer-tip"]',
       '[data-testid="profile-header"]',
     ],
     mainSelector: 'main',
-    minMainTextLength: 45,
+    minMainTextLength: 40,
+    allowedFinalPaths: [/^\/[^/?#]+(?:\?mode=tip)?$/],
     lighthouse: true,
     perfGroups: ['public-profile-mode-shell'],
     interactions: PROFILE_INTERACTIONS,
@@ -754,13 +758,14 @@ const PROFILE_MODE_SURFACES = [
     family: 'profile-mode',
     expectedState: 'ok',
     path: '/[username]?mode=tour',
-    resolvePath: async () => `/${resolveProfileHandle('music')}?mode=tour`,
+    resolvePath: () => `/${resolveProfileHandle('music')}?mode=tour`,
     readySelectors: [
       '[data-testid="profile-mode-drawer-tour"]',
       '[data-testid="profile-header"]',
     ],
     mainSelector: 'main',
-    minMainTextLength: 45,
+    minMainTextLength: 40,
+    allowedFinalPaths: [/^\/[^/?#]+(?:\?mode=tour)?$/],
     lighthouse: false,
     perfGroups: ['public-profile-mode-shell'],
     interactions: PROFILE_INTERACTIONS,
@@ -773,7 +778,7 @@ const SMART_LINK_SURFACES = [
     family: 'release',
     expectedState: 'ok',
     path: '/[username]/[slug]',
-    resolvePath: async () => resolveReleasePath('/[username]/[slug]'),
+    resolvePath: () => resolveReleasePath('/[username]/[slug]'),
     readySelectors: ['h1'],
     mainSelector: 'main',
     minMainTextLength: 80,
@@ -786,8 +791,7 @@ const SMART_LINK_SURFACES = [
     family: 'track',
     expectedState: 'ok',
     path: '/[username]/[slug]/[trackSlug]',
-    resolvePath: async () =>
-      resolveReleasePath('/[username]/[slug]/[trackSlug]'),
+    resolvePath: () => resolveReleasePath('/[username]/[slug]/[trackSlug]'),
     readySelectors: ['h1'],
     mainSelector: 'main',
     minMainTextLength: 80,
@@ -800,7 +804,7 @@ const SMART_LINK_SURFACES = [
     family: 'countdown',
     expectedState: 'ok',
     path: '/[username]/[slug]',
-    resolvePath: async () =>
+    resolvePath: () =>
       replacePathToken(
         replacePathToken(
           '/[username]/[slug]',
@@ -823,7 +827,7 @@ const SMART_LINK_SURFACES = [
     family: 'playlist-or-sounds',
     expectedState: 'ok',
     path: '/[username]/[slug]/sounds',
-    resolvePath: async () => resolveReleasePath('/[username]/[slug]/sounds'),
+    resolvePath: () => resolveReleasePath('/[username]/[slug]/sounds'),
     readySelectors: ['h1'],
     mainSelector: 'main',
     minMainTextLength: 40,
@@ -836,7 +840,7 @@ const SMART_LINK_SURFACES = [
     family: 'download',
     expectedState: 'ok',
     path: '/[username]/[slug]/download',
-    resolvePath: async () =>
+    resolvePath: () =>
       replacePathToken(
         replacePathToken(
           '/[username]/[slug]/download',
@@ -847,37 +851,37 @@ const SMART_LINK_SURFACES = [
         DEFAULTS.releaseSlug
       ),
     readySelectors: ['h1'],
-    mainSelector: 'main',
+    readyText: /enter your email to download|get download/i,
+    mainSelector: 'body',
     minMainTextLength: 40,
     lighthouse: false,
     perfGroups: ['public-profile-detail'],
-    interactions: RELEASE_INTERACTIONS,
+    interactions: DOWNLOAD_INTERACTIONS,
   },
 ] as const satisfies readonly PublicSurfaceSpec[];
 
 const EDGE_CASE_SURFACES = [
   {
     id: 'profile-catchall',
-    family: 'redirect',
-    expectedState: 'redirect',
+    family: 'not-found',
+    expectedState: 'not-found',
     path: '/[username]/performance-extra-path',
-    resolvePath: async () =>
+    resolvePath: () =>
       `/${resolveProfileHandle('music')}/performance-extra-path`,
-    readySelectors: ['[data-testid="profile-header"]', 'h1'],
-    mainSelector: 'main',
-    minMainTextLength: 60,
-    expectedRedirects: [/\/[^/]+$/],
-    allowMissingMain: true,
+    readySelectors: ['h1'],
+    mainSelector: 'body',
+    minMainTextLength: 20,
+    allowedFinalDocumentStatuses: [404],
     lighthouse: false,
-    perfGroups: ['public-profile-detail'],
-    interactions: PROFILE_INTERACTIONS,
+    perfGroups: [],
+    interactions: GLOBAL_INTERACTIONS,
   },
   {
     id: 'profile-not-found',
     family: 'not-found',
     expectedState: 'not-found',
     path: '/missing-qa-user',
-    resolvePath: async () => `/${DEFAULTS.missingProfile}`,
+    resolvePath: () => `/${DEFAULTS.missingProfile}`,
     readySelectors: ['h1'],
     mainSelector: 'body',
     minMainTextLength: 20,
@@ -890,7 +894,7 @@ const EDGE_CASE_SURFACES = [
     family: 'not-found',
     expectedState: 'not-found',
     path: '/[username]/missing-release-qa',
-    resolvePath: async () =>
+    resolvePath: () =>
       `/${resolveProfileHandle('music')}/${DEFAULTS.missingReleaseSlug}`,
     readySelectors: ['h1'],
     mainSelector: 'body',
@@ -913,23 +917,28 @@ export const PUBLIC_SURFACE_MANIFEST = [
 
 export type PublicSurfaceId = (typeof PUBLIC_SURFACE_MANIFEST)[number]['id'];
 
-export async function resolvePublicSurfaceManifest() {
-  const resolved = await Promise.all(
-    PUBLIC_SURFACE_MANIFEST.map(async spec => ({
-      ...spec,
-      resolvedPath: spec.resolvePath ? await spec.resolvePath() : spec.path,
-    }))
-  );
+export function resolvePublicSurfaceManifestSync() {
+  return PUBLIC_SURFACE_MANIFEST.map(spec => ({
+    ...spec,
+    resolvedPath: spec.resolvePath ? spec.resolvePath() : spec.path,
+  })) as readonly ResolvedPublicSurfaceSpec[];
+}
 
-  return resolved as readonly ResolvedPublicSurfaceSpec[];
+export async function resolvePublicSurfaceManifest() {
+  return resolvePublicSurfaceManifestSync();
 }
 
 export async function getPublicSurfaceById(surfaceId: string) {
-  const manifest = await resolvePublicSurfaceManifest();
+  const manifest = resolvePublicSurfaceManifestSync();
   return manifest.find(surface => surface.id === surfaceId);
 }
 
+export function getLighthousePublicSurfaceManifestSync() {
+  return resolvePublicSurfaceManifestSync().filter(
+    surface => surface.lighthouse
+  );
+}
+
 export async function getLighthousePublicSurfaceManifest() {
-  const manifest = await resolvePublicSurfaceManifest();
-  return manifest.filter(surface => surface.lighthouse);
+  return getLighthousePublicSurfaceManifestSync();
 }

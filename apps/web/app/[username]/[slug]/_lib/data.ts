@@ -273,7 +273,8 @@ export const getCreatorByUsername = cache(
   async (usernameNormalized: string) => {
     if (
       process.env.NODE_ENV === 'test' ||
-      process.env.NODE_ENV === 'development'
+      process.env.NODE_ENV === 'development' ||
+      process.env.PUBLIC_NOAUTH_SMOKE === '1'
     ) {
       return fetchCreatorByUsername(usernameNormalized);
     }
@@ -617,44 +618,82 @@ export const getTrackBySlugInRelease = cache(
       .limit(1);
 
     if (releaseTrack) {
-      // Fetch recording, release data, and provider links in parallel
-      const [[recording], [releaseData], links] = await Promise.all([
-        db
-          .select({
-            title: discogRecordings.title,
-            previewUrl: discogRecordings.previewUrl,
-            previewMetadata: discogRecordings.metadata,
-            durationMs: discogRecordings.durationMs,
-            isrc: discogRecordings.isrc,
-          })
-          .from(discogRecordings)
-          .where(eq(discogRecordings.id, releaseTrack.recordingId))
-          .limit(1),
-        db
-          .select({
-            artworkUrl: discogReleases.artworkUrl,
-            releaseDate: discogReleases.releaseDate,
-            slug: discogReleases.slug,
-            title: discogReleases.title,
-          })
-          .from(discogReleases)
-          .where(eq(discogReleases.id, releaseId))
-          .limit(1),
-        db
-          .select({
-            providerId: providerLinks.providerId,
-            url: providerLinks.url,
-            sourceType: providerLinks.sourceType,
-            metadata: providerLinks.metadata,
-          })
-          .from(providerLinks)
-          .where(
-            and(
-              eq(providerLinks.ownerType, 'release_track'),
-              eq(providerLinks.releaseTrackId, releaseTrack.id)
+      // Merge release_track links with legacy track links so mixed-model content
+      // still renders complete DSP actions on public track pages.
+      const [[recording], [releaseData], releaseTrackLinks, [legacyTrack]] =
+        await Promise.all([
+          db
+            .select({
+              title: discogRecordings.title,
+              previewUrl: discogRecordings.previewUrl,
+              previewMetadata: discogRecordings.metadata,
+              durationMs: discogRecordings.durationMs,
+              isrc: discogRecordings.isrc,
+            })
+            .from(discogRecordings)
+            .where(eq(discogRecordings.id, releaseTrack.recordingId))
+            .limit(1),
+          db
+            .select({
+              artworkUrl: discogReleases.artworkUrl,
+              releaseDate: discogReleases.releaseDate,
+              slug: discogReleases.slug,
+              title: discogReleases.title,
+            })
+            .from(discogReleases)
+            .where(eq(discogReleases.id, releaseId))
+            .limit(1),
+          db
+            .select({
+              providerId: providerLinks.providerId,
+              url: providerLinks.url,
+              sourceType: providerLinks.sourceType,
+              metadata: providerLinks.metadata,
+            })
+            .from(providerLinks)
+            .where(
+              and(
+                eq(providerLinks.ownerType, 'release_track'),
+                eq(providerLinks.releaseTrackId, releaseTrack.id)
+              )
+            ),
+          db
+            .select({
+              id: discogTracks.id,
+            })
+            .from(discogTracks)
+            .where(
+              and(
+                eq(discogTracks.releaseId, releaseId),
+                eq(discogTracks.slug, trackSlug)
+              )
             )
-          ),
-      ]);
+            .limit(1),
+        ]);
+
+      const legacyTrackLinks = legacyTrack
+        ? await db
+            .select({
+              providerId: providerLinks.providerId,
+              url: providerLinks.url,
+              sourceType: providerLinks.sourceType,
+              metadata: providerLinks.metadata,
+            })
+            .from(providerLinks)
+            .where(
+              and(
+                eq(providerLinks.ownerType, 'track'),
+                eq(providerLinks.trackId, legacyTrack.id)
+              )
+            )
+        : [];
+
+      const links = [...releaseTrackLinks];
+      for (const link of legacyTrackLinks) {
+        if (!links.some(existing => existing.providerId === link.providerId)) {
+          links.push(link);
+        }
+      }
 
       return {
         type: 'track',

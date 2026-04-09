@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from 'node:child_process';
+import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
 import { rm } from 'node:fs/promises';
 import process from 'node:process';
 
@@ -6,6 +6,21 @@ const DEFAULT_LOCAL_BASE_URL = 'http://127.0.0.1:3100';
 const BASE_URL = process.env.BASE_URL?.trim() || DEFAULT_LOCAL_BASE_URL;
 const IS_EXTERNAL_BASE_URL =
   !BASE_URL.includes('127.0.0.1') && !BASE_URL.includes('localhost');
+
+function buildLocalQaEnv(baseUrl = DEFAULT_LOCAL_BASE_URL) {
+  const hostname = new URL(baseUrl).hostname;
+
+  return {
+    ...process.env,
+    BASE_URL: baseUrl,
+    HOSTNAME: hostname,
+    E2E_SKIP_WEB_SERVER: '1',
+    E2E_USE_TEST_AUTH_BYPASS: '1',
+    NEXT_PUBLIC_CLERK_MOCK: '1',
+    NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
+    NEXT_PUBLIC_E2E_MODE: '1',
+  };
+}
 
 function runCommand(
   command: string,
@@ -62,11 +77,49 @@ function startServer(
   });
 }
 
-async function clearNextRuntimeCache() {
-  await rm('.next/cache', {
+async function clearNextBuildArtifacts() {
+  await rm('.next', {
     force: true,
     recursive: true,
   }).catch(() => undefined);
+}
+
+async function freeLocalQaPort(port: number) {
+  let output = '';
+
+  try {
+    output = execFileSync('lsof', ['-ti', `tcp:${String(port)}`], {
+      encoding: 'utf8',
+    });
+  } catch {
+    return;
+  }
+
+  const pids = output
+    .split('\n')
+    .map(value => value.trim())
+    .filter(Boolean);
+
+  for (const pid of pids) {
+    try {
+      process.kill(Number(pid), 'SIGTERM');
+    } catch {
+      // Ignore races where the process already exited.
+    }
+  }
+
+  if (pids.length > 0) {
+    await new Promise(resolve => setTimeout(resolve, 1_000));
+  }
+
+  for (const pid of pids) {
+    try {
+      process.kill(Number(pid), 0);
+      process.kill(Number(pid), 'SIGKILL');
+    } catch {
+      // Process is already gone.
+    }
+  }
 }
 
 async function stopServer(child: ChildProcess | null) {
@@ -83,11 +136,9 @@ async function stopServer(child: ChildProcess | null) {
 
 async function runCorePublicChecks(baseUrl: string) {
   const sharedEnv = {
-    ...process.env,
-    BASE_URL: baseUrl,
-    E2E_SKIP_WEB_SERVER: '1',
-    E2E_USE_TEST_AUTH_BYPASS: '1',
+    ...buildLocalQaEnv(baseUrl),
     E2E_MOBILE_MATRIX: '1',
+    PUBLIC_NOAUTH_SMOKE: '1',
   };
 
   await runCommand('pnpm', ['run', 'public:route-qa'], sharedEnv);
@@ -151,6 +202,8 @@ async function main() {
 
   try {
     if (!IS_EXTERNAL_BASE_URL) {
+      const localQaEnv = buildLocalQaEnv(DEFAULT_LOCAL_BASE_URL);
+
       await runCommand(
         'pnpm',
         [
@@ -160,27 +213,32 @@ async function main() {
           'scripts/ensure-public-qa-schema.sql',
         ],
         {
-          ...process.env,
+          ...localQaEnv,
           NODE_ENV: 'test',
         }
       );
 
       await runCommand('pnpm', ['exec', 'tsx', 'tests/seed-test-data.ts'], {
-        ...process.env,
+        ...localQaEnv,
         NODE_ENV: 'test',
       });
-      await clearNextRuntimeCache();
+      await clearNextBuildArtifacts();
 
       await runCommand('pnpm', ['run', 'build'], {
-        ...process.env,
+        ...localQaEnv,
         NODE_ENV: 'production',
       });
 
-      localServer = startServer('pnpm', ['run', 'start'], {
-        ...process.env,
-        PORT: '3100',
-        NODE_ENV: 'production',
-      });
+      await freeLocalQaPort(3100);
+      localServer = startServer(
+        'node',
+        ['.next/standalone/apps/web/server.js'],
+        {
+          ...localQaEnv,
+          PORT: '3100',
+          NODE_ENV: 'production',
+        }
+      );
       await waitForServer(DEFAULT_LOCAL_BASE_URL);
     }
 

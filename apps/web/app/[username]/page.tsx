@@ -45,7 +45,7 @@ import {
 import type { PressPhoto } from '@/types/press-photos';
 
 /** Max MusicEvent schemas to emit (Google shows ~5 in rich results). */
-const MAX_EVENT_SCHEMAS = 10;
+const MAX_EVENT_SCHEMAS = 5;
 
 /**
  * Map ticketStatus enum to schema.org Event properties.
@@ -444,6 +444,12 @@ class NonCacheableProfileResultError extends Error {
   }
 }
 
+function shouldBypassPublicProfileQaCache() {
+  // Keep the no-auth interaction/a11y sweeps deterministic without forcing
+  // Lighthouse to benchmark the uncached profile path.
+  return process.env.PUBLIC_NOAUTH_SMOKE === '1';
+}
+
 /**
  * Cached profile fetcher. Only caches successful (status: 'ok') results.
  *
@@ -459,7 +465,8 @@ const getCachedProfileAndLinks = async (username: string) => {
   // Skip Next.js cache in test/development environments
   if (
     process.env.NODE_ENV === 'test' ||
-    process.env.NODE_ENV === 'development'
+    process.env.NODE_ENV === 'development' ||
+    shouldBypassPublicProfileQaCache()
   ) {
     return fetchProfileAndLinks(username);
   }
@@ -643,6 +650,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     links,
     tourDates
   );
+  const publicTourDates = tourDates.slice(0, MAX_EVENT_SCHEMAS);
 
   return (
     <>
@@ -675,7 +683,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         pressPhotos={pressPhotos}
         subscribeTwoStep
         genres={genres}
-        tourDates={tourDates}
+        tourDates={publicTourDates}
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}

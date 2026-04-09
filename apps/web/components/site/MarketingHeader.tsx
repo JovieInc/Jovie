@@ -35,6 +35,7 @@ export function MarketingHeader({
           <LogoLink
             logoSize={logoSize}
             variant='word'
+            prefetch={false}
             className='rounded-md'
             data-testid='site-logo'
           />
@@ -42,11 +43,16 @@ export function MarketingHeader({
         <div className='flex-1' aria-hidden='true' />
         {hideAuth ? null : (
           <div className='flex items-center gap-1'>
-            <Link href='/signin' className='btn-linear-login focus-ring-themed'>
+            <Link
+              href='/signin'
+              prefetch={false}
+              className='btn-linear-login focus-ring-themed'
+            >
               Log in
             </Link>
             <Link
               href='/signup'
+              prefetch={false}
               className='btn-linear-signup focus-ring-themed'
             >
               Sign up

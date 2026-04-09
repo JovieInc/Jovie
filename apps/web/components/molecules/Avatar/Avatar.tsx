@@ -5,7 +5,7 @@ import Image from 'next/image';
 import React, { forwardRef, useMemo, useState } from 'react';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
 import { cn } from '@/lib/utils';
-import { isExternalDspImage } from '@/lib/utils/dsp-images';
+import { shouldBypassImageOptimization } from '@/lib/utils/dsp-images';
 
 export interface AvatarProps {
   /** Avatar image source URL */
@@ -120,20 +120,6 @@ const BLUR_DATA_URLS = {
 function generateInitials(name?: string): string {
   if (!name) return '?';
   return getInitials(name);
-}
-
-function shouldBypassImageOptimization(src: string): boolean {
-  if (isExternalDspImage(src)) return true;
-
-  try {
-    const { hostname } = new URL(src);
-    return (
-      hostname === 'blob.vercel-storage.com' ||
-      hostname.endsWith('.blob.vercel-storage.com')
-    );
-  } catch {
-    return src.includes('blob.vercel-storage.com');
-  }
 }
 
 /**

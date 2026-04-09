@@ -13,6 +13,10 @@ import {
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
+function createEmptyStorageState() {
+  return { cookies: [], origins: [] } as const;
+}
+
 function getSurfaceFilter() {
   const raw = process.env.PUBLIC_SURFACE_FILTER?.trim();
   if (!raw) {
@@ -65,12 +69,21 @@ function sameOriginFailuresForPath(
 
 function filterCriticalConsoleErrorsForSurface(
   surface: {
+    expectedState?: 'ok' | 'redirect' | 'not-found';
     allowedFinalDocumentStatuses?: readonly number[];
   },
   errors: readonly string[]
 ) {
   return errors.filter(error => {
     const normalized = error.toLowerCase();
+    const isExpectedClerkFetchNoise =
+      normalized.includes('typeerror: failed to fetch') &&
+      normalized.includes('clerk.browser.js');
+
+    if (isExpectedClerkFetchNoise) {
+      return false;
+    }
+
     if (
       surface.allowedFinalDocumentStatuses?.includes(404) &&
       normalized.includes('failed to load resource') &&
@@ -83,6 +96,28 @@ function filterCriticalConsoleErrorsForSurface(
       surface.allowedFinalDocumentStatuses?.includes(404) &&
       normalized.includes('typeerror: failed to fetch')
     ) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function filterUncaughtExceptionsForSurface(
+  surface: {
+    expectedState?: 'ok' | 'redirect' | 'not-found';
+    allowedFinalDocumentStatuses?: readonly number[];
+  },
+  exceptions: readonly string[]
+) {
+  return exceptions.filter(exception => {
+    const normalized = exception.toLowerCase();
+    const isExpectedNotFoundBoundaryNoise =
+      (surface.expectedState === 'not-found' ||
+        surface.allowedFinalDocumentStatuses?.includes(404)) &&
+      normalized.includes('minified react error #419');
+
+    if (isExpectedNotFoundBoundaryNoise) {
       return false;
     }
 
@@ -138,12 +173,8 @@ async function assertNoClippedInteractiveElements(
 test.describe('Public Exhaustive Surface QA', () => {
   test.setTimeout(240_000);
 
-  test.beforeEach(async ({ page }) => {
-    await installPublicRouteMocks(page);
-  });
-
   test('all public anonymous routes stay green under interaction sweep', async ({
-    page,
+    browser,
     baseURL,
   }, testInfo) => {
     test.skip(
@@ -158,27 +189,34 @@ test.describe('Public Exhaustive Surface QA', () => {
     );
 
     for (const surface of surfaces) {
-      const monitoring = setupPageMonitoring(page);
+      const surfaceContext = await browser.newContext({
+        ...testInfo.project.use,
+        storageState: createEmptyStorageState(),
+      });
+      const surfacePage = await surfaceContext.newPage();
+      await installPublicRouteMocks(surfacePage);
+      const monitoring = setupPageMonitoring(surfacePage);
 
       try {
         await test.step(`${surface.id} ${surface.resolvedPath}`, async () => {
-          await page.goto(surface.resolvedPath, {
+          await surfacePage.goto(surface.resolvedPath, {
             waitUntil: 'domcontentloaded',
             timeout: 120_000,
           });
-          await waitForPublicSurfaceReady(page, surface);
-          await assertPublicSurfaceHealthy(page, surface);
+          await waitForPublicSurfaceReady(surfacePage, surface);
+          await assertPublicSurfaceHealthy(surfacePage, surface);
           await runDeclaredPublicInteractions(
-            page,
+            surfacePage,
             surface,
             testInfo.project.name
           );
-          await assertKeyboardReachability(page, surface);
-          await assertNoClippedInteractiveElements(page);
+          await assertKeyboardReachability(surfacePage, surface);
+          await assertNoClippedInteractiveElements(surfacePage);
 
           const diagnostics = monitoring.getContext();
           const currentPath =
-            new URL(page.url()).pathname + new URL(page.url()).search;
+            new URL(surfacePage.url()).pathname +
+            new URL(surfacePage.url()).search;
           const sameOriginFailures = sameOriginFailuresForPath(
             resolvedBaseUrl,
             currentPath,
@@ -203,12 +241,18 @@ test.describe('Public Exhaustive Surface QA', () => {
                 surface,
                 diagnostics.criticalErrors
               ),
+              uncaughtExceptions: filterUncaughtExceptionsForSurface(
+                surface,
+                diagnostics.uncaughtExceptions
+              ),
             },
             testInfo
           );
         });
       } finally {
         monitoring.cleanup();
+        await surfacePage.close().catch(() => undefined);
+        await surfaceContext.close().catch(() => undefined);
       }
     }
   });

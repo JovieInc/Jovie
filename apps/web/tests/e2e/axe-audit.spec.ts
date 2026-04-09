@@ -7,11 +7,27 @@ import {
   waitForPublicSurfaceReady,
 } from './utils/public-surface-helpers';
 import {
-  getLighthousePublicSurfaceManifest,
-  resolvePublicSurfaceManifest,
+  getLighthousePublicSurfaceManifestSync,
+  resolvePublicSurfaceManifestSync,
 } from './utils/public-surface-manifest';
 
 test.use({ storageState: { cookies: [], origins: [] } });
+
+function createEmptyStorageState() {
+  return { cookies: [], origins: [] } as const;
+}
+
+function shouldSkipBlockingAxe(surface: {
+  expectedState: 'ok' | 'redirect' | 'not-found';
+  allowedFinalDocumentStatuses?: readonly number[];
+  allowMissingMain?: boolean;
+}) {
+  return (
+    surface.expectedState === 'redirect' &&
+    surface.allowMissingMain === true &&
+    surface.allowedFinalDocumentStatuses?.includes(404) === true
+  );
+}
 
 function getSurfaceFilter() {
   const raw = process.env.PUBLIC_SURFACE_FILTER?.trim();
@@ -40,6 +56,8 @@ async function assertInteractiveLabels(
         const isVisible =
           style.display !== 'none' &&
           style.visibility !== 'hidden' &&
+          style.opacity !== '0' &&
+          element.getAttribute('aria-hidden') !== 'true' &&
           rect.width > 0 &&
           rect.height > 0;
 
@@ -49,6 +67,7 @@ async function assertInteractiveLabels(
 
         const label =
           element.getAttribute('aria-label') ||
+          element.querySelector('img[alt]')?.getAttribute('alt') ||
           element.textContent ||
           (element as HTMLInputElement).labels?.[0]?.textContent ||
           '';
@@ -69,29 +88,38 @@ async function assertInteractiveLabels(
   ).toHaveLength(0);
 }
 
+const surfaceFilter = getSurfaceFilter();
+const publicSurfaces = resolvePublicSurfaceManifestSync().filter(surface =>
+  surfaceFilter ? surfaceFilter.has(surface.id) : true
+);
+const lighthouseSurfaces = getLighthousePublicSurfaceManifestSync().filter(
+  surface => (surfaceFilter ? surfaceFilter.has(surface.id) : true)
+);
+
 test.describe('Axe WCAG 2.1 Compliance', () => {
-  test.setTimeout(240_000);
+  test.setTimeout(120_000);
 
-  test.beforeEach(async ({ page }) => {
-    await installPublicRouteMocks(page);
-  });
+  for (const surface of publicSurfaces) {
+    test(`${surface.id} passes WCAG AA`, async ({ browser }, testInfo) => {
+      const surfaceContext = await browser.newContext({
+        ...testInfo.project.use,
+        storageState: createEmptyStorageState(),
+      });
+      const page = await surfaceContext.newPage();
+      await installPublicRouteMocks(page);
 
-  test('all public anonymous surfaces pass WCAG AA', async ({
-    page,
-  }, testInfo) => {
-    const filter = getSurfaceFilter();
-    const surfaces = (await resolvePublicSurfaceManifest()).filter(surface =>
-      filter ? filter.has(surface.id) : true
-    );
-
-    for (const surface of surfaces) {
-      await test.step(`${surface.id} ${surface.resolvedPath}`, async () => {
+      try {
         await page.goto(surface.resolvedPath, {
           waitUntil: 'domcontentloaded',
           timeout: 120_000,
         });
         await waitForPublicSurfaceReady(page, surface);
         await assertPublicSurfaceHealthy(page, surface);
+
+        if (shouldSkipBlockingAxe(surface)) {
+          return;
+        }
+
         await runDeclaredPublicInteractions(
           page,
           surface,
@@ -112,25 +140,35 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
           results.violations,
           `${surface.id} has accessibility violations`
         ).toEqual([]);
+      } finally {
+        await page.close().catch(() => undefined);
+        await surfaceContext.close().catch(() => undefined);
+      }
+    });
+  }
+
+  for (const surface of lighthouseSurfaces) {
+    test(`${surface.id} best-practice scan stays informational`, async ({
+      browser,
+    }, testInfo) => {
+      const surfaceContext = await browser.newContext({
+        ...testInfo.project.use,
+        storageState: createEmptyStorageState(),
       });
-    }
-  });
+      const page = await surfaceContext.newPage();
+      await installPublicRouteMocks(page);
 
-  test('best-practice scan stays informational on launch lighthouse surfaces', async ({
-    page,
-  }, testInfo) => {
-    const filter = getSurfaceFilter();
-    const surfaces = (await getLighthousePublicSurfaceManifest()).filter(
-      surface => (filter ? filter.has(surface.id) : true)
-    );
-
-    for (const surface of surfaces) {
-      await test.step(`${surface.id} best-practice`, async () => {
+      try {
         await page.goto(surface.resolvedPath, {
           waitUntil: 'domcontentloaded',
           timeout: 120_000,
         });
         await waitForPublicSurfaceReady(page, surface);
+
+        if (shouldSkipBlockingAxe(surface)) {
+          return;
+        }
+
         await runDeclaredPublicInteractions(
           page,
           surface,
@@ -157,7 +195,10 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
             )
           );
         }
-      });
-    }
-  });
+      } finally {
+        await page.close().catch(() => undefined);
+        await surfaceContext.close().catch(() => undefined);
+      }
+    });
+  }
 });

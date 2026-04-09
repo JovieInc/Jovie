@@ -339,32 +339,28 @@ export async function ensureCreatorProfileRecord(
   database: DbOrTransaction,
   values: SeededCreatorProfileValues
 ): Promise<string> {
-  const findExistingByUserId = async () => {
-    if (!values.userId) {
-      return null;
-    }
+  const [existingProfileByUsername] = await database
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
+    .limit(1);
 
-    const [profile] = await database
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.userId, values.userId))
-      .limit(1);
-
-    return profile ?? null;
-  };
-
-  const findExistingByUsername = async () => {
-    const [profile] = await database
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
-      .limit(1);
-
-    return profile ?? null;
-  };
+  const [existingClaimedProfileForUser] =
+    values.userId && values.isClaimed
+      ? await database
+          .select({ id: creatorProfiles.id })
+          .from(creatorProfiles)
+          .where(
+            and(
+              eq(creatorProfiles.userId, values.userId),
+              eq(creatorProfiles.isClaimed, true)
+            )
+          )
+          .limit(1)
+      : [];
 
   const existingProfile =
-    (await findExistingByUserId()) ?? (await findExistingByUsername());
+    existingProfileByUsername ?? existingClaimedProfileForUser;
 
   if (existingProfile) {
     await database
@@ -385,8 +381,27 @@ export async function ensureCreatorProfileRecord(
       throw error;
     }
 
-    const racedProfile =
-      (await findExistingByUserId()) ?? (await findExistingByUsername());
+    const [racedProfileByUsername] = await database
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
+      .limit(1);
+
+    const [racedClaimedProfileForUser] =
+      values.userId && values.isClaimed
+        ? await database
+            .select({ id: creatorProfiles.id })
+            .from(creatorProfiles)
+            .where(
+              and(
+                eq(creatorProfiles.userId, values.userId),
+                eq(creatorProfiles.isClaimed, true)
+              )
+            )
+            .limit(1)
+        : [];
+
+    const racedProfile = racedProfileByUsername ?? racedClaimedProfileForUser;
 
     if (!racedProfile) {
       throw error;

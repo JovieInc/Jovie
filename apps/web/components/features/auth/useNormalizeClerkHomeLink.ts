@@ -1,0 +1,86 @@
+'use client';
+
+import { type RefObject, useEffect } from 'react';
+
+const HOME_LINK_LABEL = 'Go to homepage';
+const NORMALIZED_ATTR = 'data-jovie-home-link-label';
+
+function hasAccessibleName(anchor: HTMLAnchorElement): boolean {
+  const ariaLabel = anchor.getAttribute('aria-label')?.trim();
+  if (ariaLabel) {
+    return true;
+  }
+
+  const labelledBy = anchor.getAttribute('aria-labelledby');
+  if (labelledBy) {
+    for (const id of labelledBy.split(/\s+/)) {
+      const text = document.getElementById(id)?.textContent?.trim();
+      if (text) {
+        return true;
+      }
+    }
+  }
+
+  const title = anchor.getAttribute('title')?.trim();
+  if (title) {
+    return true;
+  }
+
+  const imageAlt = anchor
+    .querySelector('img[alt]')
+    ?.getAttribute('alt')
+    ?.trim();
+  if (imageAlt) {
+    return true;
+  }
+
+  return anchor.textContent?.trim().length !== 0;
+}
+
+function isHomepageHref(anchor: HTMLAnchorElement): boolean {
+  try {
+    const url = new URL(anchor.href, globalThis.location.href);
+    return url.origin === globalThis.location.origin && url.pathname === '/';
+  } catch {
+    return false;
+  }
+}
+
+function normalizeHomeLinks(root: HTMLElement) {
+  for (const node of root.querySelectorAll('a[href]')) {
+    if (!(node instanceof HTMLAnchorElement)) {
+      continue;
+    }
+
+    if (!isHomepageHref(node) || hasAccessibleName(node)) {
+      continue;
+    }
+
+    node.setAttribute('aria-label', HOME_LINK_LABEL);
+    node.setAttribute(NORMALIZED_ATTR, 'true');
+  }
+}
+
+export function useNormalizeClerkHomeLink(
+  containerRef: RefObject<HTMLElement | null>
+) {
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) {
+      return;
+    }
+
+    const run = () => normalizeHomeLinks(root);
+    run();
+
+    const observer = new MutationObserver(run);
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-label', 'aria-labelledby', 'href', 'title'],
+    });
+
+    return () => observer.disconnect();
+  }, [containerRef]);
+}

@@ -73,8 +73,8 @@ function handleDspRedirect(
   track: {
     id: string;
     title: string;
-    providerLinks: { providerId: string; url: string }[];
   },
+  providerLinks: { providerId: string; url: string }[],
   creatorId: string,
   utmParams: Record<string, string>
 ): never {
@@ -82,7 +82,7 @@ function handleDspRedirect(
   if (!PROVIDER_CONFIG[providerKey]) {
     notFound();
   }
-  const targetUrl = track.providerLinks.find(
+  const targetUrl = providerLinks.find(
     link => link.providerId === providerKey
   )?.url;
   if (!targetUrl) {
@@ -136,15 +136,26 @@ export default async function TrackDeepLinkPage({
 
   await guardUnreleasedContent(track, creator.id);
 
+  const effectiveProviderLinks =
+    track.providerLinks.length > 0
+      ? track.providerLinks
+      : releaseContent.providerLinks;
+
   // If DSP is specified, redirect to the provider URL for this track
   if (dsp) {
-    handleDspRedirect(dsp, track, creator.id, utmParams);
+    handleDspRedirect(
+      dsp,
+      track,
+      effectiveProviderLinks,
+      creator.id,
+      utmParams
+    );
   }
 
   // Build provider data for the landing page
   const allProviders = (Object.keys(PROVIDER_CONFIG) as ProviderKey[])
     .map(key => {
-      const link = track.providerLinks.find(l => l.providerId === key);
+      const link = effectiveProviderLinks.find(l => l.providerId === key);
       return {
         key,
         label: PROVIDER_CONFIG[key].label,
@@ -158,7 +169,7 @@ export default async function TrackDeepLinkPage({
     audioUrl: null,
     previewUrl: track.previewUrl ?? null,
     metadata: track.previewMetadata ?? null,
-    providerLinks: track.providerLinks,
+    providerLinks: effectiveProviderLinks,
   });
 
   const artistName = creator.displayName ?? creator.username;
@@ -173,7 +184,7 @@ export default async function TrackDeepLinkPage({
       slug: `${slug}/${trackSlug}`,
       artworkUrl: track.artworkUrl,
       releaseDate: track.releaseDate,
-      providerLinks: track.providerLinks,
+      providerLinks: effectiveProviderLinks,
       durationMs: track.durationMs,
       isrc: track.isrc,
       trackNumber: track.trackNumber,

@@ -641,7 +641,6 @@ export function ProfileCompactTemplate({
                     type='button'
                     onClick={handlePlayClick}
                     className={`group flex w-full items-center gap-2.5 rounded-[14px] border ${glass.border} ${glass.bg} px-2.5 py-2 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
-                    aria-label={`Listen to ${latestRelease.title}`}
                   >
                     {latestRelease.artworkUrl ? (
                       <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
@@ -695,7 +694,6 @@ export function ProfileCompactTemplate({
                     type='button'
                     onClick={handlePlayClick}
                     className={`group flex w-full items-center gap-2.5 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-2.5 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
-                    aria-label={`Listen to ${artist.name}`}
                   >
                     <Play className='h-4 w-4 shrink-0 fill-current text-white/60' />
                     <p className='min-w-0 flex-1 text-[13px] font-[510] text-white/80'>
