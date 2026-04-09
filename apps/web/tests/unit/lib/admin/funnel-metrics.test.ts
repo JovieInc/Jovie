@@ -132,6 +132,10 @@ describe('getAdminFunnelMetrics outreach query', () => {
     expect(platformOpensSql).toContain(
       `count(distinct "creator_distribution_events"."creator_profile_id")`
     );
+    expect(platformOpensSql).toContain(`select distinct creator_profile_id`);
+    expect(platformOpensSql).toContain(
+      `onboarding_events.event_type = 'step_viewed'`
+    );
     expect(stepViewsSql).toContain(`->>'surface'`);
     expect(stepViewsSql).toContain(`'onboarding'`);
     expect(stepViewsSql).toContain(

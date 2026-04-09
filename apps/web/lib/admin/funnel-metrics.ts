@@ -315,6 +315,7 @@ async function getInstagramActivationMetrics7d(sevenDaysAgo: Date): Promise<{
         platformOpens: drizzleSql<number>`
           count(distinct ${creatorDistributionEvents.creatorProfileId}) filter (
             where ${creatorDistributionEvents.eventType} = 'platform_opened'
+              and ${creatorDistributionEvents.creatorProfileId} in (${onboardingShareProfiles})
               and coalesce(${creatorDistributionEvents.metadata}->>'surface', '') = 'onboarding'
           )::int
         `,
