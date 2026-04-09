@@ -10,13 +10,17 @@ import {
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
 import { ProfileNavButton } from '@/components/molecules/ProfileNavButton';
 import { SocialLink as SocialLinkComponent } from '@/components/molecules/SocialLink';
 import { ProfileNotificationsButton } from '@/components/organisms/ProfileNotificationsButton';
-import { Container } from '@/components/site/Container';
+import {
+  PublicSurfaceFooter,
+  PublicSurfaceHeader,
+  PublicSurfaceShell,
+  PublicSurfaceStage,
+} from '@/components/organisms/public-surface';
 import { ProfileFooter } from '@/features/profile/ProfileFooter';
 import { extractVenmoUsername } from '@/features/profile/utils/venmo';
 
@@ -180,220 +184,214 @@ export function ProfileShell({
 
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
-      <div
-        id='main-content'
-        className='relative min-h-dvh w-full overflow-hidden bg-[color:var(--profile-stage-bg)] text-primary-token font-medium tracking-tight'
-        data-test='public-profile-root'
-      >
-        <div
-          className='pointer-events-none absolute inset-0 bg-[var(--profile-stage-overlay)]'
-          aria-hidden='true'
-        />
+      <div id='main-content' data-test='public-profile-root'>
+        <PublicSurfaceShell
+          backgroundPattern={backgroundPattern}
+          showGradientBlurs={showGradientBlurs}
+          className='min-h-dvh bg-[color:var(--profile-stage-bg)] text-primary-token font-medium tracking-tight md:min-h-dvh'
+        >
+          <div
+            className='pointer-events-none absolute inset-0 bg-[var(--profile-stage-overlay)]'
+            aria-hidden='true'
+          />
 
-        {backgroundPattern !== 'none' && (
-          <BackgroundPattern variant={backgroundPattern} />
-        )}
-
-        {showGradientBlurs && (
-          <>
-            <div className='pointer-events-none absolute left-[12%] top-[14%] h-56 w-56 rounded-full bg-[color:var(--profile-stage-glow-a)] blur-3xl sm:h-72 sm:w-72 md:h-[26rem] md:w-[26rem]' />
-            <div className='pointer-events-none absolute bottom-[10%] right-[10%] h-56 w-56 rounded-full bg-[color:var(--profile-stage-glow-b)] blur-3xl sm:h-72 sm:w-72 md:h-[24rem] md:w-[24rem]' />
-          </>
-        )}
-
-        <Container>
-          <div className='absolute left-4 top-3.5 z-20 md:top-4'>
-            <ProfileNavButton
-              showBackButton={showBackButton}
-              artistHandle={artist.handle}
+          <PublicSurfaceStage>
+            <PublicSurfaceHeader
+              className='absolute inset-x-4 top-3.5 z-20 md:top-4'
+              leftSlot={
+                <ProfileNavButton
+                  showBackButton={showBackButton}
+                  artistHandle={artist.handle}
+                />
+              }
+              rightSlot={renderNotificationControls()}
             />
-          </div>
 
-          <div className='absolute right-4 top-3.5 z-20 flex items-center gap-2 md:top-4'>
-            {renderNotificationControls()}
-          </div>
-
-          <div className='relative z-10 flex min-h-dvh flex-col pb-4 pt-12 sm:pb-6 sm:pt-14'>
-            <div className='flex flex-1 flex-col items-center px-4'>
-              <div
-                className={`${maxWidthClass} flex min-h-full flex-1 flex-col`}
-              >
+            <div className='relative z-10 flex min-h-full flex-1 flex-col pb-4 pt-12 sm:pb-6 sm:pt-14'>
+              <div className='flex flex-1 flex-col items-center px-4'>
                 <div
-                  className={`${
-                    isCompactMobileHeader
-                      ? 'space-y-3 sm:space-y-4 md:space-y-6'
-                      : 'space-y-4 sm:space-y-5 md:space-y-6'
-                  }`}
+                  className={`${maxWidthClass} flex min-h-full flex-1 flex-col`}
                 >
-                  <div className='hidden md:flex md:justify-center'>
+                  <div
+                    className={`${
+                      isCompactMobileHeader
+                        ? 'space-y-3 sm:space-y-4 md:space-y-6'
+                        : 'space-y-4 sm:space-y-5 md:space-y-6'
+                    }`}
+                  >
+                    <div className='hidden md:flex md:justify-center'>
+                      <ArtistInfo
+                        artist={artist}
+                        subtitle={subtitle}
+                        photoDownloadSizes={photoDownloadSizes}
+                        allowPhotoDownloads={allowPhotoDownloads}
+                        nameSize='xl'
+                        bodyLayout='split'
+                        trailingContent={headerSocialLinks.map(link => (
+                          <SocialLinkComponent
+                            key={link.id}
+                            link={link}
+                            handle={artist.handle}
+                            artistName={artist.name}
+                          />
+                        ))}
+                        className='w-full max-w-[38rem]'
+                      />
+                    </div>
                     <ArtistInfo
                       artist={artist}
                       subtitle={subtitle}
                       photoDownloadSizes={photoDownloadSizes}
                       allowPhotoDownloads={allowPhotoDownloads}
-                      nameSize='xl'
-                      bodyLayout='split'
-                      trailingContent={headerSocialLinks.map(link => (
-                        <SocialLinkComponent
-                          key={link.id}
-                          link={link}
-                          handle={artist.handle}
-                          artistName={artist.name}
-                        />
-                      ))}
-                      className='w-full max-w-[38rem]'
+                      avatarSize={isCompactMobileHeader ? 'md' : 'lg'}
+                      nameSize={isCompactMobileHeader ? 'sm' : 'lg'}
+                      viewport='mobile'
+                      className={`md:hidden ${
+                        isCompactMobileHeader
+                          ? '!space-y-2 sm:!space-y-2.5'
+                          : '!space-y-2.5 sm:!space-y-3'
+                      }`}
                     />
-                  </div>
-                  <ArtistInfo
-                    artist={artist}
-                    subtitle={subtitle}
-                    photoDownloadSizes={photoDownloadSizes}
-                    allowPhotoDownloads={allowPhotoDownloads}
-                    avatarSize={isCompactMobileHeader ? 'md' : 'lg'}
-                    nameSize={isCompactMobileHeader ? 'sm' : 'lg'}
-                    viewport='mobile'
-                    className={`md:hidden ${
-                      isCompactMobileHeader
-                        ? '!space-y-2 sm:!space-y-2.5'
-                        : '!space-y-2.5 sm:!space-y-3'
-                    }`}
-                  />
-                  <div
-                    data-testid='profile-content-stack'
-                    className={isCompactMobileHeader ? 'pt-1' : ''}
-                  >
-                    {children}
-                  </div>
-                </div>
-
-                {(showSocialBar ||
-                  showTourButton ||
-                  hasTipSupport ||
-                  hasContacts ||
-                  showShopButton) && (
-                  <div className='mt-auto pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-6 sm:pt-8'>
-                    <nav
-                      className='mx-auto flex w-full max-w-sm items-center justify-center gap-2 rounded-full border border-[color:var(--profile-dock-border)] bg-[var(--profile-dock-bg)] px-2 py-2 shadow-[var(--profile-dock-shadow)] backdrop-blur-2xl sm:gap-3'
-                      aria-label='Profile modes'
-                      data-testid='profile-mode-nav'
+                    <div
+                      data-testid='profile-content-stack'
+                      className={isCompactMobileHeader ? 'pt-1' : ''}
                     >
-                      <CircleIconButton
-                        size='md'
-                        variant='pearl'
-                        ariaLabel='Profile'
-                        data-testid='profile-trigger'
-                        className={`transition-[background-color,color,box-shadow] ${
-                          !mode || mode === 'profile'
-                            ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
-                            : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
-                        }`}
-                        onClick={() => {
-                          router.push(`/${artist.handle}`);
-                        }}
-                      >
-                        <UserRound className='h-4 w-4' aria-hidden='true' />
-                      </CircleIconButton>
-                      {hasContacts && (
-                        <CircleIconButton
-                          size='md'
-                          variant='pearl'
-                          ariaLabel='Contact'
-                          data-testid='contact-trigger'
-                          className={`transition-[background-color,color,box-shadow] ${
-                            mode === 'contact'
-                              ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
-                              : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
-                          }`}
-                          onClick={() => {
-                            router.push(`/${artist.handle}?mode=contact`);
-                          }}
-                        >
-                          <Mail className='h-4 w-4' aria-hidden='true' />
-                        </CircleIconButton>
-                      )}
-                      {/* Tour */}
-                      {showTourButton && (
-                        <CircleIconButton
-                          size='md'
-                          variant='pearl'
-                          ariaLabel='Tour dates'
-                          data-testid='tour-trigger'
-                          className={`transition-[background-color,color,box-shadow] ${
-                            isTourModeActive
-                              ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
-                              : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
-                          }`}
-                          onClick={() => {
-                            router.push(`/${artist.handle}?mode=tour`);
-                          }}
-                        >
-                          <Calendar className='h-4 w-4' aria-hidden='true' />
-                        </CircleIconButton>
-                      )}
-
-                      {/* Shop */}
-                      {showShopButton && (
-                        <CircleIconButton
-                          size='md'
-                          variant='pearl'
-                          ariaLabel='Shop'
-                          data-testid='shop-trigger'
-                          className='border-transparent bg-transparent text-tertiary-token shadow-none transition-[background-color,color,box-shadow] hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
-                          onClick={() => {
-                            window.open(
-                              `/${artist.handle}/shop`,
-                              '_blank',
-                              'noopener,noreferrer'
-                            );
-                          }}
-                        >
-                          <ShoppingBag className='h-4 w-4' aria-hidden='true' />
-                        </CircleIconButton>
-                      )}
-
-                      {/* Tip */}
-                      {hasTipSupport && venmoLink && (
-                        <CircleIconButton
-                          size='md'
-                          variant='pearl'
-                          ariaLabel='Tip'
-                          data-testid='tip-trigger'
-                          className={`transition-[background-color,color,box-shadow] ${
-                            isTipModeActive
-                              ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
-                              : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
-                          }`}
-                          onClick={() => {
-                            if (isMobile) {
-                              setTipDrawerOpen(true);
-                              return;
-                            }
-                            router.push(`/${artist.handle}?mode=tip`);
-                          }}
-                        >
-                          <DollarSign className='h-4 w-4' aria-hidden='true' />
-                        </CircleIconButton>
-                      )}
-                    </nav>
+                      {children}
+                    </div>
                   </div>
-                )}
+
+                  {(showSocialBar ||
+                    showTourButton ||
+                    hasTipSupport ||
+                    hasContacts ||
+                    showShopButton) && (
+                    <PublicSurfaceFooter className='mt-auto pt-6 sm:pt-8'>
+                      <nav
+                        className='mx-auto flex w-full max-w-sm items-center justify-center gap-2 rounded-full border border-[color:var(--profile-dock-border)] bg-[var(--profile-dock-bg)] px-2 py-2 shadow-[var(--profile-dock-shadow)] backdrop-blur-2xl sm:gap-3'
+                        aria-label='Profile modes'
+                        data-testid='profile-mode-nav'
+                      >
+                        <CircleIconButton
+                          size='md'
+                          variant='pearl'
+                          ariaLabel='Profile'
+                          data-testid='profile-trigger'
+                          className={`transition-[background-color,color,box-shadow] ${
+                            !mode || mode === 'profile'
+                              ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
+                              : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
+                          }`}
+                          onClick={() => {
+                            router.push(`/${artist.handle}`);
+                          }}
+                        >
+                          <UserRound className='h-4 w-4' aria-hidden='true' />
+                        </CircleIconButton>
+                        {hasContacts && (
+                          <CircleIconButton
+                            size='md'
+                            variant='pearl'
+                            ariaLabel='Contact'
+                            data-testid='contact-trigger'
+                            className={`transition-[background-color,color,box-shadow] ${
+                              mode === 'contact'
+                                ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
+                                : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
+                            }`}
+                            onClick={() => {
+                              router.push(`/${artist.handle}?mode=contact`);
+                            }}
+                          >
+                            <Mail className='h-4 w-4' aria-hidden='true' />
+                          </CircleIconButton>
+                        )}
+                        {showTourButton && (
+                          <CircleIconButton
+                            size='md'
+                            variant='pearl'
+                            ariaLabel='Tour dates'
+                            data-testid='tour-trigger'
+                            className={`transition-[background-color,color,box-shadow] ${
+                              isTourModeActive
+                                ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
+                                : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
+                            }`}
+                            onClick={() => {
+                              router.push(`/${artist.handle}?mode=tour`);
+                            }}
+                          >
+                            <Calendar className='h-4 w-4' aria-hidden='true' />
+                          </CircleIconButton>
+                        )}
+
+                        {showShopButton && (
+                          <CircleIconButton
+                            size='md'
+                            variant='pearl'
+                            ariaLabel='Shop'
+                            data-testid='shop-trigger'
+                            className='border-transparent bg-transparent text-tertiary-token shadow-none transition-[background-color,color,box-shadow] hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
+                            onClick={() => {
+                              window.open(
+                                `/${artist.handle}/shop`,
+                                '_blank',
+                                'noopener,noreferrer'
+                              );
+                            }}
+                          >
+                            <ShoppingBag
+                              className='h-4 w-4'
+                              aria-hidden='true'
+                            />
+                          </CircleIconButton>
+                        )}
+
+                        {hasTipSupport && venmoLink && (
+                          <CircleIconButton
+                            size='md'
+                            variant='pearl'
+                            ariaLabel='Tip'
+                            data-testid='tip-trigger'
+                            className={`transition-[background-color,color,box-shadow] ${
+                              isTipModeActive
+                                ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
+                                : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
+                            }`}
+                            onClick={() => {
+                              if (isMobile) {
+                                setTipDrawerOpen(true);
+                                return;
+                              }
+                              router.push(`/${artist.handle}?mode=tip`);
+                            }}
+                          >
+                            <DollarSign
+                              className='h-4 w-4'
+                              aria-hidden='true'
+                            />
+                          </CircleIconButton>
+                        )}
+                      </nav>
+                    </PublicSurfaceFooter>
+                  )}
+                </div>
               </div>
+
+              {hasTipSupport && venmoLink && isMobile ? (
+                <TipDrawer
+                  open={tipDrawerOpen}
+                  onOpenChange={setTipDrawerOpen}
+                  artistName={artist.name}
+                  artistHandle={artist.handle}
+                  venmoLink={venmoLink}
+                  venmoUsername={venmoUsername}
+                />
+              ) : null}
+
+              {showFooter ? <ProfileFooter artist={artist} /> : null}
             </div>
-
-            {hasTipSupport && venmoLink && isMobile ? (
-              <TipDrawer
-                open={tipDrawerOpen}
-                onOpenChange={setTipDrawerOpen}
-                artistName={artist.name}
-                artistHandle={artist.handle}
-                venmoLink={venmoLink}
-                venmoUsername={venmoUsername}
-              />
-            ) : null}
-
-            {showFooter && <ProfileFooter artist={artist} />}
-          </div>
-        </Container>
+          </PublicSurfaceStage>
+        </PublicSurfaceShell>
       </div>
     </ProfileNotificationsContext.Provider>
   );
