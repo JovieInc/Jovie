@@ -167,6 +167,7 @@ describe('GrowthIntakeComposer', () => {
       });
     });
 
+    expect(refreshMock).toHaveBeenCalled();
     expect(
       screen.getByText('2 created, 1 skipped, 0 errors.')
     ).toBeInTheDocument();
