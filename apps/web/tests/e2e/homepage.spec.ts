@@ -91,14 +91,8 @@ test.describe('Homepage', () => {
   });
 
   test('final CTA renders with current actions', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', {
-        name: 'You made the song. Now make it hit.',
-      })
-    ).toBeVisible();
-    await expect(
-      page.getByRole('link', { name: 'Get Started' }).last()
-    ).toBeVisible();
+    await expect(page.getByTestId('final-cta-headline')).toBeVisible();
+    await expect(page.getByTestId('final-cta-action')).toBeVisible();
   });
 
   test('is responsive on mobile', async ({ page }) => {

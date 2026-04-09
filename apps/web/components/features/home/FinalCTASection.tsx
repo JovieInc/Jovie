@@ -4,6 +4,7 @@ import { ClaimHandleForm } from './claim-handle';
 export function FinalCTASection() {
   return (
     <section
+      data-testid='final-cta-section'
       className='section-glow section-glow-cta relative z-10 overflow-hidden'
       style={{
         borderTop: '1px solid var(--linear-border-subtle)',
@@ -40,7 +41,7 @@ export function FinalCTASection() {
             data-testid='final-cta-form'
             className='mx-auto mt-7 w-full max-w-[27rem]'
           >
-            <ClaimHandleForm />
+            <ClaimHandleForm submitButtonTestId='final-cta-action' />
           </div>
 
           <p className='mt-5 text-[11px] tracking-[0.01em] text-quaternary-token'>

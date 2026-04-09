@@ -13,11 +13,7 @@ export default function ProfileLayout({
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   return (
-    <ClientProviders
-      forceBypassClerk
-      publishableKey={publishableKey}
-      skipCoreProviders
-    >
+    <ClientProviders publishableKey={publishableKey} skipCoreProviders>
       {children}
     </ClientProviders>
   );
