@@ -30,7 +30,9 @@ const isAuthRefreshOnly = process.env.E2E_AUTH_REFRESH_ONLY === '1';
 const useStoredAuth = process.env.E2E_USE_STORED_AUTH === '1';
 const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 const shouldSkipSeeding =
-  isAuthRefreshOnly || isFastIteration || process.env.E2E_SKIP_SEED === '1';
+  isAuthRefreshOnly ||
+  (!isCI && isFastIteration) ||
+  process.env.E2E_SKIP_SEED === '1';
 const shouldSkipWarmup =
   isAuthRefreshOnly || process.env.E2E_SKIP_WARMUP === '1';
 const authStatePath = path.join(webRoot, 'tests', '.auth', 'user.json');

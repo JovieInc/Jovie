@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { isClerkRedirectUrl } from './utils/smoke-test-utils';
 
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
@@ -29,13 +30,6 @@ async function blockAnalytics(page: import('@playwright/test').Page) {
   await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
 }
 
-function isClerkRedirect(url: string): boolean {
-  return (
-    url.includes('clerk') &&
-    (url.includes('handshake') || url.includes('dev-browser'))
-  );
-}
-
 test('homepage: hero heading, CTA, final claim CTA', async ({ page }) => {
   test.skip(
     FAST_ITERATION,
@@ -46,7 +40,7 @@ test('homepage: hero heading, CTA, final claim CTA', async ({ page }) => {
 
   await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 120_000 });
 
-  if (isClerkRedirect(page.url())) {
+  if (isClerkRedirectUrl(page.url())) {
     test.skip(true, 'Clerk handshake redirect in CI');
     return;
   }
@@ -87,9 +81,7 @@ test.describe('Public Profile - dualipa', () => {
     await blockAnalytics(page);
   });
 
-  test('default view: artist name in h1, profile identity link, claim banner', async ({
-    page,
-  }) => {
+  test('default view: artist name in h1 and claim banner', async ({ page }) => {
     test.skip(
       FAST_ITERATION,
       'Public smoke coverage runs in content-gate and targeted smoke-public loops'

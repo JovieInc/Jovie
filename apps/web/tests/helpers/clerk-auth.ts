@@ -1,6 +1,7 @@
 import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
 import {
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_COOKIE,
@@ -21,9 +22,13 @@ function getTestAuthBypassUserId(): string | null {
   return userId && userId.length > 0 ? userId : null;
 }
 
-function getRequestedBypassPersona(): 'creator' | 'admin' | null {
+function getRequestedBypassPersona(): DevTestAuthPersona | null {
   const persona = process.env.E2E_TEST_AUTH_PERSONA?.trim();
-  if (persona === 'creator' || persona === 'admin') {
+  if (
+    persona === 'creator' ||
+    persona === 'creator-ready' ||
+    persona === 'admin'
+  ) {
     return persona;
   }
   return null;
@@ -44,7 +49,7 @@ export function canFallbackToBypassUserId(
 async function resolveBypassUserId(
   baseUrl: string,
   fallbackUserId: string,
-  persona: 'creator' | 'admin' | null
+  persona: DevTestAuthPersona | null
 ): Promise<string> {
   if (!persona) {
     return fallbackUserId;
@@ -105,7 +110,9 @@ async function enableTestAuthBypass(page: Page): Promise<void> {
   const requestedPersona = getRequestedBypassPersona();
   const userId = existingUserId?.trim() || defaultUserId;
   const persona =
-    (existingPersona === 'creator' || existingPersona === 'admin'
+    (existingPersona === 'creator' ||
+    existingPersona === 'creator-ready' ||
+    existingPersona === 'admin'
       ? existingPersona
       : null) ?? requestedPersona;
 
@@ -149,7 +156,7 @@ async function enableTestAuthBypass(page: Page): Promise<void> {
 
 export async function setTestAuthBypassSession(
   page: Page,
-  persona: 'creator' | 'admin' | null,
+  persona: DevTestAuthPersona | null,
   overrideUserId?: string | null
 ): Promise<void> {
   const userId = overrideUserId?.trim() || getTestAuthBypassUserId();

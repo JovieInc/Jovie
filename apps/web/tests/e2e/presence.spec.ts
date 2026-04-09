@@ -149,7 +149,7 @@ async function getMatchStatus(
 async function signInAsCreator(page: import('@playwright/test').Page) {
   const context = await resolveCreatorContext();
   await page.goto(
-    `/api/dev/test-auth/enter?persona=creator&redirect=${encodeURIComponent(APP_ROUTES.PRESENCE)}`,
+    `/api/dev/test-auth/enter?persona=creator-ready&redirect=${encodeURIComponent(APP_ROUTES.PRESENCE)}`,
     {
       waitUntil: 'domcontentloaded',
       timeout: 120_000,

@@ -379,11 +379,14 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
 
     // Find the Pro plan specifically
     const proOption = allOptions.find(
-      o => o.description === 'Pro' && o.priceId
+      o =>
+        o.priceId &&
+        o.amount === 2000 &&
+        (o.description === 'Pro' || o.interval === 'month')
     );
     expect(
       proOption,
-      'Pro pricing option not returned — billing misconfigured'
+      `Pro pricing option not returned — billing misconfigured: ${JSON.stringify(allOptions)}`
     ).toBeTruthy();
 
     const proPriceId = proOption!.priceId!;

@@ -272,21 +272,29 @@ async function startServer(
   const baseUrl = `http://127.0.0.1:${port}`;
   const logPath = resolve(artifactDir, 'server.log');
   writeFileSync(logPath, '');
-
-  const child = spawn(
-    'doppler',
-    ['run', '--', 'pnpm', '--filter', 'web', 'start'],
-    {
-      cwd: repoRoot,
-      env: {
-        ...process.env,
-        ...extraEnv,
-        HOSTNAME: '127.0.0.1',
-        PORT: String(port),
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }
+  const standaloneServerPath = resolve(
+    repoRoot,
+    'apps/web/.next/standalone/apps/web/server.js'
   );
+
+  if (!existsSync(standaloneServerPath)) {
+    throw new Error(
+      'Standalone production server not found at ' +
+        standaloneServerPath +
+        '. Run "doppler run --project jovie-web --config dev -- pnpm --filter web build" before running perf scripts.'
+    );
+  }
+
+  const child = spawn('doppler', ['run', '--', 'node', standaloneServerPath], {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      ...extraEnv,
+      HOSTNAME: '127.0.0.1',
+      PORT: String(port),
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 
   const appendOutput = (chunk: Buffer | string) => {
     writeFileSync(logPath, String(chunk), { flag: 'a' });

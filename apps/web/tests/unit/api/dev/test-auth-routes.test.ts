@@ -7,6 +7,7 @@ const {
   mockGetCachedDevTestAuthSession,
   mockGetDevTestAuthAvailability,
   mockParseDevTestAuthPersona,
+  mockRevalidatePath,
   mockSanitizeDevTestAuthRedirectPath,
 } = vi.hoisted(() => ({
   mockBuildDevTestAuthCookieDescriptors: vi.fn(),
@@ -14,6 +15,7 @@ const {
   mockGetCachedDevTestAuthSession: vi.fn(),
   mockGetDevTestAuthAvailability: vi.fn(),
   mockParseDevTestAuthPersona: vi.fn(),
+  mockRevalidatePath: vi.fn(),
   mockSanitizeDevTestAuthRedirectPath: vi.fn(),
 }));
 
@@ -31,6 +33,10 @@ vi.mock('@/lib/auth/dev-test-auth.server', () => ({
   sanitizeDevTestAuthRedirectPath: mockSanitizeDevTestAuthRedirectPath,
 }));
 
+vi.mock('next/cache', () => ({
+  revalidatePath: mockRevalidatePath,
+}));
+
 describe('dev test-auth routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -42,7 +48,9 @@ describe('dev test-auth routes', () => {
       reason: null,
     });
     mockParseDevTestAuthPersona.mockImplementation(value =>
-      value === 'admin' || value === 'creator' ? value : null
+      value === 'admin' || value === 'creator' || value === 'creator-ready'
+        ? value
+        : null
     );
     mockSanitizeDevTestAuthRedirectPath.mockImplementation(value =>
       value?.startsWith('/') && !value.startsWith('//') ? value : null
@@ -158,9 +166,57 @@ describe('dev test-auth routes', () => {
       email: 'browse+clerk_test@jov.ie',
       profilePath: '/browse-test-user',
     });
+    expect(mockRevalidatePath).toHaveBeenCalledWith('/app', 'layout');
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_mode');
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_user_id');
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_persona');
+  });
+
+  it('accepts creator-ready on POST /session', async () => {
+    mockEnsureDevTestAuthActor.mockResolvedValueOnce({
+      persona: 'creator-ready',
+      clerkUserId: 'user_creator_ready',
+      email: 'browse-ready+clerk_test@jov.ie',
+      username: 'browse-ready-user',
+      fullName: 'Browse Ready User',
+      isAdmin: false,
+      profilePath: '/browse-ready-user',
+    });
+    mockBuildDevTestAuthCookieDescriptors.mockReturnValueOnce([
+      {
+        name: '__e2e_test_persona',
+        value: 'creator-ready',
+        httpOnly: true,
+        maxAge: 3600,
+        path: '/',
+        sameSite: 'lax',
+        secure: false,
+      },
+    ]);
+
+    const { POST } = await import('@/app/api/dev/test-auth/session/route');
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/dev/test-auth/session', {
+        method: 'POST',
+        body: JSON.stringify({ persona: 'creator-ready' }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      success: true,
+      persona: 'creator-ready',
+      userId: 'user_creator_ready',
+      email: 'browse-ready+clerk_test@jov.ie',
+      profilePath: '/browse-ready-user',
+    });
+    expect(mockRevalidatePath).toHaveBeenCalledWith('/app', 'layout');
+    expect(response.headers.get('set-cookie')).toContain(
+      '__e2e_test_persona=creator-ready'
+    );
   });
 
   it('rejects non-string persona values on POST /session', async () => {
@@ -225,7 +281,45 @@ describe('dev test-auth routes', () => {
 
     expect(response.status).toBe(303);
     expect(response.headers.get('location')).toBe('/app/dashboard/earnings');
+    expect(mockRevalidatePath).toHaveBeenCalledWith('/app', 'layout');
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_persona');
+  });
+
+  it('redirects through the local auth bootstrap entrypoint for creator-ready', async () => {
+    mockEnsureDevTestAuthActor.mockResolvedValueOnce({
+      persona: 'creator-ready',
+      clerkUserId: 'user_creator_ready',
+      email: 'browse-ready+clerk_test@jov.ie',
+      username: 'browse-ready-user',
+      fullName: 'Browse Ready User',
+      isAdmin: false,
+      profilePath: '/browse-ready-user',
+    });
+    mockBuildDevTestAuthCookieDescriptors.mockReturnValueOnce([
+      {
+        name: '__e2e_test_persona',
+        value: 'creator-ready',
+        httpOnly: true,
+        maxAge: 3600,
+        path: '/',
+        sameSite: 'lax',
+        secure: false,
+      },
+    ]);
+
+    const { GET } = await import('@/app/api/dev/test-auth/enter/route');
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/dashboard/presence'
+      )
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe('/app/dashboard/presence');
+    expect(mockRevalidatePath).toHaveBeenCalledWith('/app', 'layout');
+    expect(response.headers.get('set-cookie')).toContain(
+      '__e2e_test_persona=creator-ready'
+    );
   });
 
   it('rejects external redirect targets on the enter route', async () => {

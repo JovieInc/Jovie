@@ -31,6 +31,7 @@ function renderWithQueryClient(ui: ReactElement) {
 describe('FinalCTASection', () => {
   it('renders headline and form', () => {
     renderWithQueryClient(<FinalCTASection />);
+    expect(screen.getByTestId('final-cta-section')).toBeInTheDocument();
     const headline = screen.getByTestId('final-cta-headline');
     expect(headline).toBeInTheDocument();
     expect(headline.textContent?.trim().length).toBeGreaterThan(0);
@@ -42,6 +43,7 @@ describe('FinalCTASection', () => {
       'Claim your handle.'
     );
     expect(screen.getByTestId('final-cta-form')).toBeInTheDocument();
+    expect(screen.getByTestId('final-cta-action')).toBeInTheDocument();
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 });

@@ -146,8 +146,7 @@ const TEST_PROFILES: TestProfile[] = [
     displayName: 'Dua Lipa',
     bio: 'Pop artist and songwriter',
     spotifyUrl: 'https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we',
-    avatarUrl:
-      'https://i.scdn.co/image/ab6761610000e5eb0bae7cfd3fb1b2866db6bc8d',
+    avatarUrl: '/avatars/default-user.png',
   },
   {
     username: 'taylorswift',
@@ -162,8 +161,7 @@ const TEST_PROFILES: TestProfile[] = [
     displayName: 'Test Artist',
     bio: 'Test artist for E2E tipping tests',
     spotifyUrl: 'https://open.spotify.com/artist/test',
-    avatarUrl:
-      'https://i.scdn.co/image/ab6761610000e5eb0bae7cfd3fb1b2866db6bc8d',
+    avatarUrl: '/avatars/default-user.png',
   },
 ];
 

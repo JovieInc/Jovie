@@ -1,4 +1,4 @@
-export type DevTestAuthPersona = 'creator' | 'admin';
+export type DevTestAuthPersona = 'creator' | 'creator-ready' | 'admin';
 
 export interface DevTestAuthActor {
   readonly persona: DevTestAuthPersona;

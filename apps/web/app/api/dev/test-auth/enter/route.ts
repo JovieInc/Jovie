@@ -1,4 +1,6 @@
+import { revalidatePath } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   buildDevTestAuthCookieDescriptors,
   ensureDevTestAuthActor,
@@ -40,6 +42,7 @@ export async function GET(request: NextRequest) {
   }
 
   const actor = await ensureDevTestAuthActor(persona);
+  revalidatePath(APP_ROUTES.DASHBOARD, 'layout');
   const response = new NextResponse(null, { status: 303 });
 
   response.headers.set('Cache-Control', NO_STORE_HEADERS['Cache-Control']);
