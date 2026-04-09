@@ -94,8 +94,8 @@ export function AdminProfileSidebar({
       contextMenuItems={contextMenuItems}
       isOpen={isOpen}
       ariaLabel='Creator profile'
-      title='Creator profile'
       headerMode='minimal'
+      hideMinimalHeaderBar
       entityHeader={
         <DrawerSurfaceCard variant='card' className='relative overflow-hidden'>
           <div className='space-y-3 p-3'>
