@@ -85,6 +85,9 @@ async function buildFallbackEntries(): Promise<
       title: scenario.title,
       group: scenario.group,
       groupLabel: scenario.groupLabel,
+      canonicalSurfaceId: scenario.canonicalSurfaceId,
+      canonicalSurfaceLabel: scenario.canonicalSurfaceLabel,
+      canonicalSurfaceReviewRoute: scenario.canonicalSurfaceReviewRoute,
       route: scenario.route,
       viewport: scenario.viewport,
       theme: scenario.theme,
@@ -124,6 +127,13 @@ export async function getScreenshotCatalog(): Promise<
     entries.push({
       ...manifestEntry,
       groupLabel: scenario.groupLabel,
+      canonicalSurfaceId:
+        manifestEntry.canonicalSurfaceId ?? scenario.canonicalSurfaceId,
+      canonicalSurfaceLabel:
+        manifestEntry.canonicalSurfaceLabel ?? scenario.canonicalSurfaceLabel,
+      canonicalSurfaceReviewRoute:
+        manifestEntry.canonicalSurfaceReviewRoute ??
+        scenario.canonicalSurfaceReviewRoute,
       consumers: scenario.consumers,
       sizeBytes,
       url: `/api/admin/screenshots/${encodeURIComponent(manifestEntry.id)}`,

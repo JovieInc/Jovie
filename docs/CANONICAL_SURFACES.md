@@ -1,6 +1,6 @@
 # Canonical Surfaces
 
-This document and [apps/web/lib/canonical-surfaces.ts](/Users/timwhite/conductor/workspaces/jovie/west-monroe/apps/web/lib/canonical-surfaces.ts) are the source of truth for the repo's design-system surfaces on current `main`.
+This document and [apps/web/lib/canonical-surfaces.ts](../apps/web/lib/canonical-surfaces.ts) are the source of truth for the repo's design-system surfaces on current `main`.
 
 ## Canonical Surface List
 
@@ -19,10 +19,10 @@ This document and [apps/web/lib/canonical-surfaces.ts](/Users/timwhite/conductor
 
 ## Current Source Files
 
-- [apps/web/lib/canonical-surfaces.ts](/Users/timwhite/conductor/workspaces/jovie/west-monroe/apps/web/lib/canonical-surfaces.ts)
-- [apps/web/lib/screenshots/registry.ts](/Users/timwhite/conductor/workspaces/jovie/west-monroe/apps/web/lib/screenshots/registry.ts)
-- [apps/web/lib/screenshots/catalog.ts](/Users/timwhite/conductor/workspaces/jovie/west-monroe/apps/web/lib/screenshots/catalog.ts)
-- [apps/web/components/features/demo/showcase-surfaces.ts](/Users/timwhite/conductor/workspaces/jovie/west-monroe/apps/web/components/features/demo/showcase-surfaces.ts)
+- [apps/web/lib/canonical-surfaces.ts](../apps/web/lib/canonical-surfaces.ts)
+- [apps/web/lib/screenshots/registry.ts](../apps/web/lib/screenshots/registry.ts)
+- [apps/web/lib/screenshots/catalog.ts](../apps/web/lib/screenshots/catalog.ts)
+- [apps/web/components/features/demo/showcase-surfaces.ts](../apps/web/components/features/demo/showcase-surfaces.ts)
 
 ## Next Slice
 
