@@ -112,6 +112,9 @@ describe('getAdminFunnelMetrics outreach query', () => {
     ).sql;
     const stepViewsSql = dialect.sqlToQuery(selection?.stepViews as never).sql;
 
+    expect(activationsSql).toContain(
+      `count(distinct "creator_distribution_events"."creator_profile_id")`
+    );
     expect(activationsSql).toContain(`"event_type" = 'activated'`);
     expect(activationsSql).toContain(`select distinct creator_profile_id`);
     expect(activationsSql).toContain(
@@ -121,10 +124,19 @@ describe('getAdminFunnelMetrics outreach query', () => {
     expect(activationsSql).toContain(`'onboarding'`);
     expect(copiesSql).toContain(`->>'surface'`);
     expect(copiesSql).toContain(`'onboarding'`);
+    expect(copiesSql).toContain(
+      `count(distinct "creator_distribution_events"."creator_profile_id")`
+    );
     expect(platformOpensSql).toContain(`->>'surface'`);
     expect(platformOpensSql).toContain(`'onboarding'`);
+    expect(platformOpensSql).toContain(
+      `count(distinct "creator_distribution_events"."creator_profile_id")`
+    );
     expect(stepViewsSql).toContain(`->>'surface'`);
     expect(stepViewsSql).toContain(`'onboarding'`);
+    expect(stepViewsSql).toContain(
+      `count(distinct "creator_distribution_events"."creator_profile_id")`
+    );
   });
 
   it('returns zero when outreach_status is missing during a schema rollout', async () => {

@@ -67,11 +67,11 @@ function isMissingLeadAttributionColumnError(error: unknown): boolean {
 export interface AdminFunnelMetrics {
   /** Onboarding completion step views for Instagram share flow in the last 7 days */
   instagramShareStepViews7d: number;
-  /** Deduped creator bio-link copy events in the last 7 days (one per creator profile) */
+  /** Distinct creators who copied the Instagram bio link in the last 7 days */
   instagramBioCopies7d: number;
   /** Instagram open rate from the share step in the last 7 days (0-1) */
   instagramBioOpenRate7d: number | null;
-  /** Deduped creator activations from the onboarding Instagram share funnel in the last 7 days */
+  /** Distinct creators activated from the onboarding Instagram share funnel in the last 7 days */
   instagramBioActivations7d: number;
   /** Activation rate from share-step view to activated visit in the last 7 days (0-1) */
   instagramBioActivationRate7d: number | null;
@@ -301,25 +301,25 @@ async function getInstagramActivationMetrics7d(sevenDaysAgo: Date): Promise<{
     const [row] = await db
       .select({
         activations: drizzleSql<number>`
-          count(*) filter (
+          count(distinct ${creatorDistributionEvents.creatorProfileId}) filter (
             where ${creatorDistributionEvents.eventType} = 'activated'
               and ${creatorDistributionEvents.creatorProfileId} in (${onboardingShareProfiles})
           )::int
         `,
         copies: drizzleSql<number>`
-          count(*) filter (
+          count(distinct ${creatorDistributionEvents.creatorProfileId}) filter (
             where ${creatorDistributionEvents.eventType} = 'link_copied'
               and coalesce(${creatorDistributionEvents.metadata}->>'surface', '') = 'onboarding'
           )::int
         `,
         platformOpens: drizzleSql<number>`
-          count(*) filter (
+          count(distinct ${creatorDistributionEvents.creatorProfileId}) filter (
             where ${creatorDistributionEvents.eventType} = 'platform_opened'
               and coalesce(${creatorDistributionEvents.metadata}->>'surface', '') = 'onboarding'
           )::int
         `,
         stepViews: drizzleSql<number>`
-          count(*) filter (
+          count(distinct ${creatorDistributionEvents.creatorProfileId}) filter (
             where ${creatorDistributionEvents.eventType} = 'step_viewed'
               and coalesce(${creatorDistributionEvents.metadata}->>'surface', '') = 'onboarding'
           )::int
