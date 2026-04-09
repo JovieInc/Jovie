@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useProfileNotificationsController } from '@/components/organisms/hooks/useProfileNotificationsController';
 import {
@@ -8,7 +8,10 @@ import {
   useProfileVisitTracking,
   useTipPageTracking,
 } from '@/components/organisms/hooks/useProfileTracking';
-import type { ProfileMode } from '@/features/profile/contracts';
+import {
+  PROFILE_MODE_KEYS,
+  type ProfileMode,
+} from '@/features/profile/contracts';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { applyPublicProfileLinkCaps } from '@/lib/profile/social-link-limits';
 import { sortSocialLinksByGeoPopularity } from '@/lib/utils/context-aware-links';
@@ -64,6 +67,32 @@ export interface UseProfileShellReturn {
   hasContacts: boolean;
 }
 
+function resolveModeFromLocation(fallbackMode: ProfileMode): ProfileMode {
+  if (typeof globalThis.window === 'undefined') {
+    return fallbackMode;
+  }
+
+  const modeParam = new URLSearchParams(globalThis.location.search).get('mode');
+  if (
+    modeParam &&
+    PROFILE_MODE_KEYS.includes(modeParam as (typeof PROFILE_MODE_KEYS)[number])
+  ) {
+    return modeParam as ProfileMode;
+  }
+
+  return fallbackMode;
+}
+
+function resolveSourceFromLocation(
+  fallbackSource: string | null
+): string | null {
+  if (typeof globalThis.window === 'undefined') {
+    return fallbackSource;
+  }
+
+  return new URLSearchParams(globalThis.location.search).get('source');
+}
+
 export function useProfileShell({
   artist,
   socialLinks,
@@ -87,22 +116,33 @@ export function useProfileShell({
 }): UseProfileShellReturn {
   const [isTipNavigating, setIsTipNavigating] = useState(false);
   const { success: showSuccess, error: showError } = useNotifications();
-  const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
-
-  // Memoize extracted search params to avoid downstream re-renders
-  // when unrelated URL parameters change
-  const { mode, source } = useMemo(
-    () => ({
-      mode:
-        modeOverride ??
-        (searchParams?.get('mode') as ProfileMode | null) ??
-        'profile',
-      source: sourceOverride ?? searchParams?.get('source') ?? null,
-    }),
-    [modeOverride, searchParams, sourceOverride]
+  const [locationMode, setLocationMode] = useState<ProfileMode>(() =>
+    resolveModeFromLocation('profile')
   );
+  const [locationSource, setLocationSource] = useState<string | null>(() =>
+    resolveSourceFromLocation(null)
+  );
+
+  useEffect(() => {
+    if (modeOverride !== undefined) {
+      return;
+    }
+
+    setLocationMode(resolveModeFromLocation('profile'));
+  }, [modeOverride, pathname]);
+
+  useEffect(() => {
+    if (sourceOverride !== undefined) {
+      return;
+    }
+
+    setLocationSource(resolveSourceFromLocation(null));
+  }, [pathname, sourceOverride]);
+
+  const mode = modeOverride ?? locationMode;
+  const source = sourceOverride ?? locationSource;
 
   // Notifications CTA is always enabled (previously gated by preview=1 param)
   const notificationsEnabled = true;

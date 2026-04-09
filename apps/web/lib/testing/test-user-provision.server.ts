@@ -103,6 +103,30 @@ function isClerkIdentificationExistsError(error: unknown): boolean {
   );
 }
 
+function isClerkUnauthorizedError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const candidate = error as {
+    readonly status?: number;
+    readonly clerkTraceId?: string;
+    readonly errors?: ReadonlyArray<{ readonly code?: string }>;
+  };
+
+  return (
+    candidate.status === 401 ||
+    candidate.status === 403 ||
+    Boolean(candidate.clerkTraceId) ||
+    Boolean(
+      candidate.errors?.some(
+        ({ code }) =>
+          code === 'unauthorized' || code === 'authentication_invalid'
+      )
+    )
+  );
+}
+
 export function isAllowlistedTestAccountEmail(
   email: string | null | undefined
 ): email is string {
@@ -193,9 +217,18 @@ export async function resolveClerkTestUserId(
   }
 
   const clerk = createClerkClient({ secretKey });
-  const existingUsers = await clerk.users.getUserList({
-    emailAddress: [normalizedEmail],
-  });
+  let existingUsers;
+  try {
+    existingUsers = await clerk.users.getUserList({
+      emailAddress: [normalizedEmail],
+    });
+  } catch (error) {
+    if (!isClerkUnauthorizedError(error)) {
+      throw error;
+    }
+
+    return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+  }
 
   return (
     existingUsers.data[0]?.id ??
@@ -224,10 +257,19 @@ export async function ensureClerkTestUser({
   }
 
   const clerk = createClerkClient({ secretKey });
-  const existingUsers = await clerk.users.getUserList({
-    emailAddress: [normalizedEmail],
-  });
-  const existingUser = existingUsers.data[0];
+  let existingUser: { id: string } | undefined;
+  try {
+    const existingUsers = await clerk.users.getUserList({
+      emailAddress: [normalizedEmail],
+    });
+    existingUser = existingUsers.data[0];
+  } catch (error) {
+    if (!isClerkUnauthorizedError(error)) {
+      throw error;
+    }
+
+    return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+  }
 
   if (existingUser) {
     return existingUser.id;
@@ -245,14 +287,27 @@ export async function ensureClerkTestUser({
 
     return createdUser.id;
   } catch (error) {
+    if (isClerkUnauthorizedError(error)) {
+      return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+    }
+
     if (!isClerkIdentificationExistsError(error)) {
       throw error;
     }
 
-    const racedUsers = await clerk.users.getUserList({
-      emailAddress: [normalizedEmail],
-    });
-    const racedUser = racedUsers.data[0];
+    let racedUser: { id: string } | undefined;
+    try {
+      const racedUsers = await clerk.users.getUserList({
+        emailAddress: [normalizedEmail],
+      });
+      racedUser = racedUsers.data[0];
+    } catch (raceError) {
+      if (!isClerkUnauthorizedError(raceError)) {
+        throw raceError;
+      }
+
+      return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+    }
 
     if (!racedUser) {
       throw error;
