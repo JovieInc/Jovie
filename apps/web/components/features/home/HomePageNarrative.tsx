@@ -7,6 +7,7 @@ import { BentoFeatureGrid } from '@/features/home/BentoFeatureGrid';
 import { HomeHeroSurfaceCluster } from '@/features/home/HomeHeroSurfaceCluster';
 import { HomepageLabelLogoMark } from '@/features/home/HomepageLabelLogoMark';
 import { type HomepageLabelPartner } from '@/features/home/home-surface-seed';
+import { SharedMarketingHero } from '@/features/landing/SharedMarketingHero';
 
 const TRUST_LABELS: readonly HomepageLabelPartner[] = [
   'orchard',
@@ -35,58 +36,24 @@ function SectionHeader({ eyebrow, title, body }: Readonly<SectionHeaderProps>) {
 
 function HomeHero() {
   return (
-    <section
-      className='relative overflow-hidden pb-12 pt-[5.75rem] md:pb-16 md:pt-[6.25rem] lg:pb-20'
-      aria-labelledby='home-hero-heading'
-    >
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-0'
-        style={{ background: 'var(--linear-hero-backdrop)' }}
-      />
-      <div className='hero-glow pointer-events-none absolute inset-x-0 top-0 h-[36rem]' />
-
-      <Container size='homepage'>
-        <div className='mx-auto max-w-[1120px]'>
-          <div className='grid items-center gap-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-8'>
-            <div>
-              <p className='homepage-section-eyebrow'>
-                The release system for independent artists
-              </p>
-              <h1
-                id='home-hero-heading'
-                className='marketing-h1-linear mt-5 text-primary-token'
-              >
-                <span className='block'>Drop more music.</span>
-                <span className='block'>Crush every release.</span>
-              </h1>
-              <p className='mt-5 max-w-[33rem] text-[17px] leading-[1.7] text-secondary-token sm:text-[18px]'>
-                One system to make every release count, every time.
-              </p>
-
-              <div className='mt-8 flex flex-wrap items-center gap-3'>
-                <Link
-                  href={APP_ROUTES.SIGNUP}
-                  className='btn-linear-signup focus-ring-themed inline-flex h-10 items-center px-4'
-                >
-                  Get Started
-                </Link>
-                <Link
-                  href={APP_ROUTES.DEMO}
-                  className='inline-flex h-10 items-center rounded-full border border-subtle px-4 text-sm font-medium text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
-                >
-                  See Demo
-                </Link>
-              </div>
-            </div>
-
-            <div className='lg:justify-self-center xl:justify-self-end'>
-              <HomeHeroSurfaceCluster />
-            </div>
-          </div>
-        </div>
-      </Container>
-    </section>
+    <SharedMarketingHero
+      eyebrow='The release system for independent artists'
+      headingId='home-hero-heading'
+      primaryCtaLabel='Get Started'
+      primaryCtaTestId='homepage-primary-cta'
+      secondaryCtaLabel='See Demo'
+      secondaryCtaHref={APP_ROUTES.DEMO}
+      proofPoints={['Artist Page', 'Release Pages', 'Audience Ownership']}
+      title={
+        <>
+          <span className='block'>Drop more music.</span>{' '}
+          <span className='block'>Crush every release.</span>
+        </>
+      }
+      body='Your artist page, every release page, and the launch workflow behind them all run in one system.'
+      media={<HomeHeroSurfaceCluster />}
+      gridClassName='lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-8'
+    />
   );
 }
 
