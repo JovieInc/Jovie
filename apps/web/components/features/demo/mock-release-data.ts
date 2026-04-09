@@ -77,6 +77,8 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] =
     isExplicit: Boolean(release.tracks?.some(track => track.isExplicit)),
     totalTracks: release.totalTracks,
     totalDurationMs: release.totalDurationMs,
+    upc: release.upc,
+    label: release.label ?? null,
     primaryIsrc: release.primaryIsrc,
     genres: [...release.genres],
     providers: makeProviders(release),

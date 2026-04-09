@@ -17,27 +17,16 @@ const PLATFORM_CONNECTIONS = [
 ];
 
 export function DemoSettingsPanel() {
+  const profile = INTERNAL_DJ_DEMO_PERSONA.profile;
   return (
     <div className='h-full overflow-y-auto'>
       <ContentSurfaceCard className='overflow-hidden p-0'>
         <SettingsSection title='Artist Profile'>
           <div className='space-y-3 px-4 py-3'>
-            <SettingsRow
-              label='Name'
-              value={INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
-            />
-            <SettingsRow
-              label='Bio'
-              value={INTERNAL_DJ_DEMO_PERSONA.profile.bio}
-            />
-            <SettingsRow
-              label='Genres'
-              value={INTERNAL_DJ_DEMO_PERSONA.profile.genres.join(', ')}
-            />
-            <SettingsRow
-              label='Handle'
-              value={`@${INTERNAL_DJ_DEMO_PERSONA.profile.handle}`}
-            />
+            <SettingsRow label='Name' value={profile.displayName} />
+            <SettingsRow label='Bio' value={profile.bio} />
+            <SettingsRow label='Genres' value={profile.genres.join(', ')} />
+            <SettingsRow label='Handle' value={`@${profile.handle}`} />
           </div>
         </SettingsSection>
 
