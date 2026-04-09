@@ -67,6 +67,16 @@ interface DevTestAuthSession extends DevTestAuthActor {
   readonly dbUserId: string;
 }
 
+interface MatchedDevTestAuthUser {
+  readonly dbUserId: string;
+  readonly clerkUserId: string;
+  readonly email: string | null;
+  readonly fullName: string | null;
+  readonly isAdmin: boolean;
+  readonly username: string | null;
+  readonly displayName: string | null;
+}
+
 interface PersonaSeedConfig {
   readonly persona: DevTestAuthPersona;
   readonly email: string;
@@ -215,20 +225,53 @@ async function findDevTestAuthSession(
   clerkUserId: string,
   requestedPersona: DevTestAuthPersona | null
 ): Promise<DevTestAuthSession> {
-  const [matchedUser] = await db
-    .select({
-      dbUserId: users.id,
-      clerkUserId: users.clerkId,
-      email: users.email,
-      fullName: users.name,
-      isAdmin: users.isAdmin,
-      username: creatorProfiles.username,
-      displayName: creatorProfiles.displayName,
-    })
-    .from(users)
-    .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
-    .where(eq(users.clerkId, clerkUserId))
-    .limit(1);
+  let matchedUser: MatchedDevTestAuthUser | undefined;
+
+  try {
+    [matchedUser] = await db
+      .select({
+        dbUserId: users.id,
+        clerkUserId: users.clerkId,
+        email: users.email,
+        fullName: users.name,
+        isAdmin: users.isAdmin,
+        username: creatorProfiles.username,
+        displayName: creatorProfiles.displayName,
+      })
+      .from(users)
+      .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1);
+  } catch (error) {
+    logger.warn(
+      'Failed to query dev test auth session with active profile join; retrying without profile join',
+      {
+        clerkUserId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'dev-test-auth'
+    );
+
+    const [fallbackUser] = await db
+      .select({
+        dbUserId: users.id,
+        clerkUserId: users.clerkId,
+        email: users.email,
+        fullName: users.name,
+        isAdmin: users.isAdmin,
+      })
+      .from(users)
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1);
+
+    matchedUser = fallbackUser
+      ? {
+          ...fallbackUser,
+          username: null,
+          displayName: null,
+        }
+      : undefined;
+  }
 
   if (!matchedUser) {
     return getFallbackActorFromPersona(

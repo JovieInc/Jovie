@@ -169,4 +169,19 @@ describe('AuthClientProviders', () => {
       });
     }
   });
+
+  it('honors an explicit forceBypassClerk flag during server-side fallback flows', () => {
+    render(
+      <AuthClientProviders
+        forceBypassClerk
+        forceEnableClerk
+        publishableKey='pk_live_example'
+      >
+        <div data-testid='child'>child</div>
+      </AuthClientProviders>
+    );
+
+    expect(screen.getByTestId('child')).toBeInTheDocument();
+    expect(clerkProviderMock).not.toHaveBeenCalled();
+  });
 });

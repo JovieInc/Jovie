@@ -31,8 +31,22 @@ async function renderAuthRouteLayout({
   }));
 
   vi.doMock('@/components/providers/AuthClientProviders', () => ({
-    AuthClientProviders: ({ children }: { children: ReactNode }) => (
-      <div data-testid='auth-client-providers'>{children}</div>
+    AuthClientProviders: ({
+      children,
+      forceBypassClerk,
+      forceEnableClerk,
+    }: {
+      children: ReactNode;
+      forceBypassClerk?: boolean;
+      forceEnableClerk?: boolean;
+    }) => (
+      <div
+        data-testid='auth-client-providers'
+        data-force-bypass={forceBypassClerk ? '1' : '0'}
+        data-force-enable={forceEnableClerk ? '1' : '0'}
+      >
+        {children}
+      </div>
     ),
   }));
 
@@ -89,6 +103,14 @@ describe('auth route layout', () => {
 
     expect(screen.getByTestId('auth-client-providers')).toBeInTheDocument();
     expect(screen.getByTestId('auth-child')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-client-providers')).toHaveAttribute(
+      'data-force-bypass',
+      '1'
+    );
+    expect(screen.getByTestId('auth-client-providers')).toHaveAttribute(
+      'data-force-enable',
+      '0'
+    );
     expect(
       screen.queryByTestId('auth-clerk-unavailable')
     ).not.toBeInTheDocument();
@@ -99,6 +121,14 @@ describe('auth route layout', () => {
 
     expect(screen.getByTestId('auth-client-providers')).toBeInTheDocument();
     expect(screen.getByTestId('auth-child')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-client-providers')).toHaveAttribute(
+      'data-force-bypass',
+      '0'
+    );
+    expect(screen.getByTestId('auth-client-providers')).toHaveAttribute(
+      'data-force-enable',
+      '1'
+    );
     expect(
       screen.queryByTestId('auth-clerk-unavailable')
     ).not.toBeInTheDocument();

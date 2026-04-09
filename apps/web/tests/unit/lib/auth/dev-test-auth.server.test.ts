@@ -1,27 +1,40 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  mockCookies,
+  mockDbSelect,
   mockEnsureClerkTestUser,
   mockEnsureCreatorProfileRecord,
   mockEnsureSocialLinkRecord,
   mockEnsureUserProfileClaim,
   mockEnsureUserRecord,
+  mockHeaders,
   mockInvalidateTestUserCaches,
   mockLoggerWarn,
   mockSetActiveProfileForUser,
 } = vi.hoisted(() => ({
+  mockCookies: vi.fn(),
+  mockDbSelect: vi.fn(),
   mockEnsureClerkTestUser: vi.fn(),
   mockEnsureCreatorProfileRecord: vi.fn(),
   mockEnsureSocialLinkRecord: vi.fn(),
   mockEnsureUserProfileClaim: vi.fn(),
   mockEnsureUserRecord: vi.fn(),
+  mockHeaders: vi.fn(),
   mockInvalidateTestUserCaches: vi.fn(),
   mockLoggerWarn: vi.fn(),
   mockSetActiveProfileForUser: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
-  db: {},
+  db: {
+    select: mockDbSelect,
+  },
+}));
+
+vi.mock('next/headers', () => ({
+  cookies: mockCookies,
+  headers: mockHeaders,
 }));
 
 vi.mock('@/lib/testing/test-user-provision.server', () => ({
@@ -41,6 +54,31 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
+function createJoinedUserSelectChain(results: unknown[] | Error) {
+  return {
+    from: vi.fn().mockReturnValue({
+      leftJoin: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit:
+            results instanceof Error
+              ? vi.fn().mockRejectedValue(results)
+              : vi.fn().mockResolvedValue(results),
+        }),
+      }),
+    }),
+  };
+}
+
+function createUserOnlySelectChain(results: unknown[]) {
+  return {
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue(results),
+      }),
+    }),
+  };
+}
+
 describe('dev-test-auth.server', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -58,6 +96,24 @@ describe('dev-test-auth.server', () => {
     mockEnsureUserProfileClaim.mockResolvedValue(undefined);
     mockSetActiveProfileForUser.mockResolvedValue(undefined);
     mockEnsureSocialLinkRecord.mockResolvedValue(undefined);
+    mockDbSelect.mockReset();
+    mockHeaders.mockResolvedValue({
+      get: (name: string) => {
+        if (name === 'host') {
+          return 'localhost:3000';
+        }
+        if (name === 'x-test-mode') {
+          return 'bypass-auth';
+        }
+        if (name === 'x-test-user-id') {
+          return 'user_clerk';
+        }
+        return null;
+      },
+    });
+    mockCookies.mockResolvedValue({
+      get: () => undefined,
+    });
   });
 
   it('enables local browse auth on trusted hosts when bypass mode is enabled', async () => {
@@ -268,6 +324,48 @@ describe('dev-test-auth.server', () => {
     });
 
     expect(currentUser.username).toBeNull();
+  });
+
+  it('falls back to a users-only lookup when the active profile join query fails', async () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    mockDbSelect
+      .mockReturnValueOnce(
+        createJoinedUserSelectChain(new Error('join unavailable'))
+      )
+      .mockReturnValueOnce(
+        createUserOnlySelectChain([
+          {
+            dbUserId: 'db_user',
+            clerkUserId: 'user_clerk',
+            email: 'browse+clerk_test@jov.ie',
+            fullName: 'Browse Test User',
+            isAdmin: false,
+          },
+        ])
+      );
+
+    const { getCachedDevTestAuthSession } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    await expect(getCachedDevTestAuthSession()).resolves.toEqual({
+      dbUserId: 'db_user',
+      persona: 'creator',
+      clerkUserId: 'user_clerk',
+      email: 'browse+clerk_test@jov.ie',
+      username: null,
+      fullName: 'Browse Test User',
+      isAdmin: false,
+      profilePath: null,
+    });
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      'Failed to query dev test auth session with active profile join; retrying without profile join',
+      expect.objectContaining({
+        clerkUserId: 'user_clerk',
+        error: 'join unavailable',
+      }),
+      'dev-test-auth'
+    );
   });
 
   it('does not fail bootstrap when cache invalidation fails', async () => {

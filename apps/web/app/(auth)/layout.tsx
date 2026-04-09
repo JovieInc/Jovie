@@ -1,7 +1,11 @@
 import './auth-utilities.css';
 import { headers } from 'next/headers';
 import { AuthClientProviders } from '@/components/providers/AuthClientProviders';
-import { isMockPublishableKey } from '@/components/providers/clerkAvailability';
+import {
+  getRequestLocationFromHeaders,
+  isMockPublishableKey,
+  shouldBypassClerk,
+} from '@/components/providers/clerkAvailability';
 import {
   AuthLayout as AuthShellLayout,
   AuthUnavailableCard,
@@ -18,7 +22,13 @@ export default async function AuthLayout({
   children: React.ReactNode;
 }>) {
   const publishableKey = await resolvePublishableKeyFromHeaders();
-  await headers();
+  const hdrs = await headers();
+  const requestLocation = getRequestLocationFromHeaders(hdrs);
+  const forceBypassClerk = shouldBypassClerk(
+    publishableKey,
+    publicEnv.NEXT_PUBLIC_CLERK_MOCK,
+    requestLocation
+  );
   const isClerkUnavailable =
     !publishableKey ||
     publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
@@ -41,7 +51,11 @@ export default async function AuthLayout({
   }
 
   return (
-    <AuthClientProviders forceEnableClerk publishableKey={publishableKey}>
+    <AuthClientProviders
+      forceBypassClerk={forceBypassClerk}
+      forceEnableClerk={!forceBypassClerk}
+      publishableKey={publishableKey}
+    >
       <FeatureFlagsProvider>
         <main id='main-content'>{children}</main>
       </FeatureFlagsProvider>
