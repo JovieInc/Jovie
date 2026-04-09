@@ -11,6 +11,10 @@ interface PublicProfileTemplateProps {
   readonly children: ReactNode;
 }
 
+/**
+ * @deprecated Legacy: not used by live routes. Production profile rendering
+ * goes through StaticArtistPage -> ProfileCompactTemplate.
+ */
 export function PublicProfileTemplate({
   viewModel,
   viewerCountryCode,

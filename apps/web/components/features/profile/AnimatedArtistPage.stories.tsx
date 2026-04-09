@@ -4,7 +4,7 @@ import { Artist, LegacySocialLink } from '@/types/db';
 import { AnimatedArtistPage } from './animated-artist-page/AnimatedArtistPage';
 
 const meta: Meta<typeof AnimatedArtistPage> = {
-  title: 'Profile/AnimatedArtistPage',
+  title: 'Profile/Legacy/AnimatedArtistPage',
   component: AnimatedArtistPage,
   parameters: {
     layout: 'fullscreen',

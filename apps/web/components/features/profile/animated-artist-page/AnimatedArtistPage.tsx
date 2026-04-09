@@ -40,6 +40,10 @@ const ArtistNotificationsCTA = dynamic(
   }
 );
 
+/**
+ * @deprecated Legacy: not used by live routes. Production profile rendering
+ * stays on StaticArtistPage -> ProfileCompactTemplate.
+ */
 export function AnimatedArtistPage({
   mode,
   artist,
