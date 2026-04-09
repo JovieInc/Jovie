@@ -1,7 +1,11 @@
 import { Check } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MarketingContainer, MarketingHero } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHero,
+  MarketingPageShell,
+} from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
 import {
@@ -220,7 +224,7 @@ function PricingTier({
 
 export default function PricingPage() {
   return (
-    <div className='min-h-screen'>
+    <MarketingPageShell>
       {/* Structured Data for SEO */}
       <script type='application/ld+json'>
         {safeJsonLdStringify(PRICING_SCHEMA)}
@@ -361,6 +365,6 @@ export default function PricingPage() {
           </div>
         </MarketingContainer>
       </div>
-    </div>
+    </MarketingPageShell>
   );
 }
