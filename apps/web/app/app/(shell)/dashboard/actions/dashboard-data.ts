@@ -31,6 +31,7 @@ import {
   type TippingStats,
 } from '@/lib/db/server';
 import { sqlAny } from '@/lib/db/sql-helpers';
+import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
 import {
@@ -256,7 +257,7 @@ function buildProfileCompletion(
 type CoreData = Omit<DashboardData, 'isAdmin'>;
 
 function shouldBypassDashboardCache(): boolean {
-  return process.env.NEXT_PUBLIC_E2E_MODE === '1';
+  return isE2EFastOnboardingEnabled();
 }
 
 function applyAdminOnboardingBypass(

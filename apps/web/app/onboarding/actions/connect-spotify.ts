@@ -27,6 +27,11 @@ import { trackServerEvent } from '@/lib/server-analytics';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
   'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
+const DSP_DISCOVERY_PROVIDERS = [
+  'apple_music',
+  'deezer',
+  'musicbrainz',
+] as const;
 
 export interface ConnectOnboardingSpotifyArtistParams {
   artistName: string;
@@ -80,6 +85,29 @@ function deriveSpotifyImportStatus(result: SpotifyImportResult) {
   }
 
   return 'failed' as const;
+}
+
+function buildInlineDspDiscoveryDedupKey(
+  creatorProfileId: string,
+  spotifyArtistId: string
+): string {
+  return [
+    'inline_dsp_discovery',
+    creatorProfileId,
+    spotifyArtistId,
+    [...DSP_DISCOVERY_PROVIDERS].join('|'),
+  ].join(':');
+}
+
+function buildInlineMusicFetchDedupKey(
+  creatorProfileId: string,
+  spotifyArtistId: string
+): string {
+  return [
+    'inline_musicfetch_enrichment',
+    creatorProfileId,
+    spotifyArtistId,
+  ].join(':');
 }
 
 async function markSpotifyImportFailed(profileId: string): Promise<void> {
@@ -256,8 +284,11 @@ export async function connectOnboardingSpotifyArtist(
       await processDspArtistDiscoveryJobStandalone({
         creatorProfileId: profile.id,
         spotifyArtistId: params.spotifyArtistId,
-        targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
-        dedupKey: `inline_dsp_discovery:${profile.id}:${Date.now()}`,
+        targetProviders: DSP_DISCOVERY_PROVIDERS,
+        dedupKey: buildInlineDspDiscoveryDedupKey(
+          profile.id,
+          params.spotifyArtistId
+        ),
       });
     } catch (error) {
       void captureError(
@@ -278,7 +309,10 @@ export async function connectOnboardingSpotifyArtist(
       await processMusicFetchEnrichmentJob(db, {
         creatorProfileId: profile.id,
         spotifyUrl: spotifyUrlForEnrichment,
-        dedupKey: `inline_musicfetch_enrichment:${profile.id}:${Date.now()}`,
+        dedupKey: buildInlineMusicFetchDedupKey(
+          profile.id,
+          params.spotifyArtistId
+        ),
       });
     } catch (error) {
       void captureError(

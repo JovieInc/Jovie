@@ -206,12 +206,18 @@ async function importAlbumBatch(
   creatorProfileId: string,
   albumsToImport: SpotifyAlbum[],
   fullAlbumMap: Map<string, SpotifyAlbumFull>,
+  maxTracksPerRelease: number,
   result: SpotifyImportResult
 ): Promise<void> {
   for (const album of albumsToImport) {
     try {
       const fullAlbum = fullAlbumMap.get(album.id);
-      await importSingleRelease(creatorProfileId, album, fullAlbum);
+      await importSingleRelease(
+        creatorProfileId,
+        album,
+        fullAlbum,
+        maxTracksPerRelease
+      );
       result.imported++;
     } catch (error) {
       result.failed++;
@@ -440,6 +446,7 @@ export async function importReleasesFromSpotify(
           creatorProfileId,
           albumsToImport,
           fullAlbumMap,
+          effectiveMaxTracksPerRelease,
           result
         );
 
@@ -663,9 +670,9 @@ async function processTracksForRelease(
   creatorProfileId: string,
   sanitizedTitle: string,
   slug: string,
-  fullAlbum: SpotifyAlbumFull
+  fullAlbum: SpotifyAlbumFull,
+  maxTracksPerRelease: number
 ): Promise<boolean> {
-  const maxTracksPerRelease = getMaxTracksPerRelease();
   const tracksToImport = fullAlbum.tracks.items.slice(0, maxTracksPerRelease);
   const spotifyTrackIds = tracksToImport.map(t => t.id).filter(Boolean);
   const existingTracksBySpotifyId = await fetchExistingTrackSlugs(
@@ -798,7 +805,8 @@ async function processTracksForRelease(
 async function importSingleRelease(
   creatorProfileId: string,
   album: SpotifyAlbum,
-  fullAlbum?: SpotifyAlbumFull
+  fullAlbum: SpotifyAlbumFull | undefined,
+  maxTracksPerRelease: number
 ): Promise<void> {
   const metadata = sanitizeAlbumMetadata(album, fullAlbum);
 
@@ -849,7 +857,7 @@ async function importSingleRelease(
     releaseDate,
     label: metadata.sanitizedLabel,
     upc: metadata.sanitizedUpc,
-    totalTracks: Math.min(effectiveTotalTracks, getMaxTracksPerRelease()),
+    totalTracks: Math.min(effectiveTotalTracks, maxTracksPerRelease),
     isExplicit: false,
     genres: metadata.genres,
     copyrightLine: metadata.copyrightLine,
@@ -896,7 +904,8 @@ async function importSingleRelease(
       creatorProfileId,
       metadata.sanitizedTitle,
       slug,
-      fullAlbum
+      fullAlbum,
+      maxTracksPerRelease
     );
   }
 }

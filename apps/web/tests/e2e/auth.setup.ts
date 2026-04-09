@@ -121,8 +121,8 @@ setup('authenticate', async ({ page, baseURL }) => {
   // 2. Navigate to sign-in page (has ClerkProvider).
   // Cold dev compilation can exceed 60s, so match the more resilient smoke helper.
   await smokeNavigateWithRetry(page, APP_ROUTES.SIGNIN, {
-    timeout: 120_000,
-    retries: 2,
+    timeout: 60_000,
+    retries: 1,
   });
 
   // 3. Wait for Clerk JS to load from CDN before calling clerk.signIn()

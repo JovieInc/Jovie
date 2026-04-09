@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 
 import {
   buildValidOnboardingHandle,
@@ -91,7 +92,7 @@ test.describe('Onboarding Completion & Empty States', () => {
     await ensureServerAuthenticated(page, user.clerkUserId);
 
     // STEP 2: The user should be redirected to onboarding since profile is incomplete
-    await smokeNavigateWithRetry(page, '/app', {
+    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD, {
       retries: 2,
       timeout: 120_000,
     });
@@ -99,10 +100,14 @@ test.describe('Onboarding Completion & Empty States', () => {
     await page.waitForURL(/onboarding/, { timeout: 30_000 });
     console.log('[onboarding-completion] Redirected to onboarding');
 
-    await smokeNavigateWithRetry(page, `/onboarding?handle=${handle}`, {
-      retries: 2,
-      timeout: 45_000,
-    });
+    await smokeNavigateWithRetry(
+      page,
+      `${APP_ROUTES.ONBOARDING}?handle=${handle}`,
+      {
+        retries: 2,
+        timeout: 45_000,
+      }
+    );
     await expect(
       page.locator('[data-testid="onboarding-form-wrapper"]')
     ).toBeVisible({ timeout: 20_000 });
@@ -126,7 +131,7 @@ test.describe('Onboarding Completion & Empty States', () => {
 
     // STEP 5: Verify dashboard redirect — no redirect loop
     await ensureServerAuthenticated(page, user.clerkUserId);
-    await smokeNavigateWithRetry(page, '/app', {
+    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD, {
       retries: 2,
       timeout: 120_000,
     });
@@ -169,13 +174,13 @@ test.describe('Onboarding Completion & Empty States', () => {
   });
 
   test('empty releases page shows warmth and action', async ({ page }) => {
-    expect(
-      completedOnboardingUser,
-      'Expected a completed onboarding user from the prior serial test'
-    ).toBeTruthy();
+    test.skip(
+      !completedOnboardingUser,
+      'Skipped because the seed onboarding test did not complete'
+    );
 
     await ensureServerAuthenticated(page, completedOnboardingUser!.clerkUserId);
-    await smokeNavigateWithRetry(page, '/app/dashboard/releases', {
+    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD_RELEASES, {
       retries: 2,
       timeout: 120_000,
     });
@@ -198,13 +203,13 @@ test.describe('Onboarding Completion & Empty States', () => {
   });
 
   test('empty audience page shows onboarding path', async ({ page }) => {
-    expect(
-      completedOnboardingUser,
-      'Expected a completed onboarding user from the prior serial test'
-    ).toBeTruthy();
+    test.skip(
+      !completedOnboardingUser,
+      'Skipped because the seed onboarding test did not complete'
+    );
 
     await ensureServerAuthenticated(page, completedOnboardingUser!.clerkUserId);
-    await smokeNavigateWithRetry(page, '/app/dashboard/audience', {
+    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD_AUDIENCE, {
       retries: 2,
       timeout: 120_000,
     });

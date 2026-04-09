@@ -233,19 +233,19 @@ async function globalSetup() {
             `/${testProfile}?mode=listen`,
             `/${testProfile}?mode=subscribe`,
             '/testartist?mode=tip',
-            '/signin',
-            '/signup',
+            APP_ROUTES.SIGNIN,
+            APP_ROUTES.SIGNUP,
             '/nonexistent-handle-xyz-123',
           ]
       : isFastIteration
         ? useStoredAuth && hasStoredAuthState
           ? [APP_ROUTES.AUDIENCE, APP_ROUTES.RELEASES]
-          : ['/signin', APP_ROUTES.AUDIENCE, APP_ROUTES.RELEASES]
+          : [APP_ROUTES.SIGNIN, APP_ROUTES.AUDIENCE, APP_ROUTES.RELEASES]
         : [
             '/',
             '/api/stripe/pricing-options',
-            '/signin',
-            '/signup',
+            APP_ROUTES.SIGNIN,
+            APP_ROUTES.SIGNUP,
             APP_ROUTES.ONBOARDING,
             APP_ROUTES.DASHBOARD,
             APP_ROUTES.CHAT,

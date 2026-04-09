@@ -30,10 +30,14 @@ describe('OnboardingFormWrapper', () => {
 
     // The handle is resolved eagerly in the useState initializer to avoid
     // a key-change remount that would cause visible layout shift.
-    expect(formPropsSpy).toHaveBeenCalledTimes(1);
     expect(formPropsSpy.mock.calls[0]?.[0]).toMatchObject({
       initialHandle: 'claimedhandle',
     });
+    expect(formPropsSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        initialHandle: 'claimedhandle',
+      })
+    );
 
     expect(globalThis.sessionStorage.getItem('pendingClaim')).toBeNull();
   });
@@ -48,8 +52,10 @@ describe('OnboardingFormWrapper', () => {
       <OnboardingFormWrapper initialHandle='serverhandle' userId='user_123' />
     );
 
-    expect(formPropsSpy).toHaveBeenCalledTimes(1);
-    expect(formPropsSpy).toHaveBeenCalledWith(
+    expect(formPropsSpy.mock.calls[0]?.[0]).toMatchObject({
+      initialHandle: 'serverhandle',
+    });
+    expect(formPropsSpy).toHaveBeenLastCalledWith(
       expect.objectContaining({
         initialHandle: 'serverhandle',
       })

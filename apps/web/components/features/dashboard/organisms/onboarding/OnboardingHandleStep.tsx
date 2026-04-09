@@ -191,7 +191,10 @@ export function OnboardingHandleStep({
     if (handleValidation.clientValid && handleValidation.available) return null;
     if (handleValidation.error) {
       return (
-        <div className='text-error text-[13px] animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
+        <div
+          data-testid='handle-unavailable'
+          className='text-error text-[13px] animate-in fade-in slide-in-from-top-1 duration-300 text-center'
+        >
           Not available
         </div>
       );
@@ -272,6 +275,7 @@ export function OnboardingHandleStep({
                 </div>
 
                 <output
+                  data-testid='onboarding-handle-validation-status'
                   className={FORM_LAYOUT.errorContainer}
                   aria-live='polite'
                 >
@@ -299,6 +303,7 @@ export function OnboardingHandleStep({
               </div>
 
               <AuthButton
+                data-testid='onboarding-handle-submit'
                 type='submit'
                 disabled={Boolean(ctaDisabledReason) || isTransitioning}
                 aria-describedby={

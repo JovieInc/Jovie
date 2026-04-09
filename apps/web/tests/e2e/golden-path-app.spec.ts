@@ -307,12 +307,16 @@ test.describe('Golden Path: Chat', { tag: '@golden-path' }, () => {
     await chatInput.fill('Hello, can you help me?');
     const sendButton = page.getByRole('button', { name: /send message/i });
     await expect(sendButton).toBeEnabled({ timeout: 5_000 });
+    const assistantMessages = page.locator('[data-role="assistant"]');
+    const previousAssistantCount = await assistantMessages.count();
     await sendButton.click();
 
-    const assistantResponse = page.locator(
-      '[data-index="1"], [class*="animate-bounce"], [data-role="assistant"]'
-    );
-    await expect(assistantResponse.first()).toBeVisible({ timeout: 60_000 });
+    await expect
+      .poll(() => assistantMessages.count(), { timeout: 60_000 })
+      .toBeGreaterThan(previousAssistantCount);
+    await expect(assistantMessages.nth(previousAssistantCount)).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test('audio dictation toggle is present', async ({ page }) => {

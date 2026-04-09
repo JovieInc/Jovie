@@ -144,7 +144,7 @@ describe('test-user-provision.server', () => {
 
   it('recovers duplicate claimed-profile races by retrying user lookup before username lookup', async () => {
     const duplicateError = new Error(
-      'duplicate key value violates unique constraint "idx_creator_profiles_one_claimed_per_user"'
+      'duplicate key value violates unique constraint "creator_profiles_username_normalized_unique"'
     );
     const selectQueue = [[], [], [{ id: 'profile_raced' }]];
     const database = {

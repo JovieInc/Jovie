@@ -111,16 +111,32 @@ const DISCOVERY_SNAPSHOT = {
 function createDiscoverySnapshot(
   overrides: Partial<typeof DISCOVERY_SNAPSHOT> = {}
 ) {
+  const releaseCount =
+    overrides.importState?.releaseCount ??
+    overrides.counts?.releaseCount ??
+    DISCOVERY_SNAPSHOT.counts.releaseCount;
+  const activeSocialCount =
+    overrides.importState?.activeSocialCount ??
+    overrides.counts?.activeSocialCount ??
+    DISCOVERY_SNAPSHOT.counts.activeSocialCount;
+  const hasImportedReleases =
+    overrides.importState?.hasImportedReleases ?? releaseCount > 0;
+
   return {
     ...DISCOVERY_SNAPSHOT,
     ...overrides,
     counts: {
       ...DISCOVERY_SNAPSHOT.counts,
       ...overrides.counts,
+      activeSocialCount,
+      releaseCount,
     },
     importState: {
       ...DISCOVERY_SNAPSHOT.importState,
       ...overrides.importState,
+      activeSocialCount,
+      hasImportedReleases,
+      releaseCount,
     },
     profile: {
       ...DISCOVERY_SNAPSHOT.profile,

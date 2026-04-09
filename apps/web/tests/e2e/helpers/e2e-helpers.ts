@@ -411,20 +411,18 @@ export async function completeOnboardingV2(
       )
       .toMatch(/spotify|handle-ready|handle-loading|unexpected-handle:.+/);
 
-    if (await spotifyHeading.isVisible().catch(() => false)) {
-      return;
+    if (!(await spotifyHeading.isVisible().catch(() => false))) {
+      await expect(handleInput).toBeVisible({ timeout: 20_000 });
+      if (options.expectedHandle) {
+        await expect
+          .poll(async () => (await handleInput.inputValue()).trim(), {
+            timeout: 20_000,
+          })
+          .toBe(options.expectedHandle);
+      }
+      await expect(handleSubmitButton).toBeEnabled({ timeout: 20_000 });
+      await handleSubmitButton.click();
     }
-
-    await expect(handleInput).toBeVisible({ timeout: 20_000 });
-    if (options.expectedHandle) {
-      await expect
-        .poll(async () => (await handleInput.inputValue()).trim(), {
-          timeout: 20_000,
-        })
-        .toBe(options.expectedHandle);
-    }
-    await expect(handleSubmitButton).toBeEnabled({ timeout: 20_000 });
-    await handleSubmitButton.click();
   }
 
   await expect(spotifyHeading).toBeVisible({ timeout: 60_000 });

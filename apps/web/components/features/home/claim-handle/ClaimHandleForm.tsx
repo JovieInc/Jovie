@@ -347,6 +347,7 @@ export function ClaimHandleForm({
             autoCorrect='off'
             autoComplete='off'
             aria-label='Choose your handle'
+            aria-invalid={unavailable ? 'true' : undefined}
             aria-describedby={helperState.text ? 'handle-hint' : undefined}
             className={`min-w-0 flex-1 bg-transparent focus-visible:outline-none ${isHeroLike ? 'placeholder:text-quaternary-token' : 'placeholder:text-tertiary-token'}`}
             style={inputStyle}
@@ -385,6 +386,7 @@ export function ClaimHandleForm({
       {!hideHelperText && helperState.text && (
         <p
           id='handle-hint'
+          data-testid='claim-handle-status'
           className={cn(
             'mt-2 pl-1 transition-colors duration-200',
             helperToneClass
