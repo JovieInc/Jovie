@@ -35,6 +35,7 @@ export function ProfileDrawerShell({
         <div className='fixed inset-x-0 bottom-0 z-50 flex justify-center'>
           <Drawer.Content
             className={`flex max-h-[86dvh] w-full flex-col overflow-hidden rounded-t-[24px] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:max-w-[430px] md:rounded-t-[20px] ${contentClassName ?? ''}`}
+            data-profile-drawer-root
             data-testid={dataTestId}
             aria-describedby={undefined}
           >

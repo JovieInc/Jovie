@@ -170,7 +170,7 @@ describe('ProfileInlineNotificationsCTA', () => {
   it('does not create a reopen loop when focus returns after closing the drawer', () => {
     const onManageNotifications = vi.fn();
     const drawer = document.createElement('div');
-    drawer.setAttribute('data-testid', 'profile-menu-drawer');
+    drawer.setAttribute('data-profile-drawer-root', '');
     const drawerButton = document.createElement('button');
     drawer.appendChild(drawerButton);
     document.body.appendChild(drawer);

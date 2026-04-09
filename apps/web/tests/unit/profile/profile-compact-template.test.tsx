@@ -19,23 +19,19 @@ const {
 }));
 
 vi.mock('next/dynamic', () => ({
-  default: (() => {
-    let callCount = 0;
+  default: (loader: () => Promise<unknown>) => {
+    const source = loader.toString();
 
-    return () => {
-      callCount += 1;
+    if (source.includes('ProfileUnifiedDrawer')) {
+      return (props: unknown) => mockProfileUnifiedDrawer(props);
+    }
 
-      if (callCount === 1) {
-        return (props: unknown) => mockProfileUnifiedDrawer(props);
-      }
+    if (source.includes('artist-notifications-cta')) {
+      return (props: unknown) => mockProfileInlineNotificationsCTA(props);
+    }
 
-      if (callCount === 2) {
-        return (props: unknown) => mockProfileInlineNotificationsCTA(props);
-      }
-
-      return () => null;
-    };
-  })(),
+    return () => null;
+  },
 }));
 
 vi.mock('next/link', () => ({

@@ -101,7 +101,7 @@ function birthdayDisplayToStorage(display: string): string {
 }
 
 function isDrawerElement(element: Element | null): boolean {
-  return element?.closest('[data-testid="profile-menu-drawer"]') !== null;
+  return element?.closest('[data-profile-drawer-root]') !== null;
 }
 
 interface InlineInputStepProps {
