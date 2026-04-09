@@ -4,11 +4,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 interface RenderAuthLayoutOptions {
   readonly clerkMockFlag?: string;
+  readonly forwardedHost?: string;
+  readonly forwardedProto?: string;
   readonly publishableKey?: string;
 }
 
 async function renderAuthRouteLayout({
   clerkMockFlag = '0',
+  forwardedHost = 'staging.jov.ie',
+  forwardedProto = 'https',
   publishableKey,
 }: RenderAuthLayoutOptions) {
   vi.resetModules();
@@ -30,6 +34,15 @@ async function renderAuthRouteLayout({
     AuthClientProviders: ({ children }: { children: ReactNode }) => (
       <div data-testid='auth-client-providers'>{children}</div>
     ),
+  }));
+
+  vi.doMock('next/headers', () => ({
+    headers: async () =>
+      new Headers({
+        host: forwardedHost,
+        'x-forwarded-host': forwardedHost,
+        'x-forwarded-proto': forwardedProto,
+      }),
   }));
 
   vi.doMock('@/features/auth', () => ({
@@ -65,6 +78,20 @@ describe('auth route layout', () => {
       screen.queryByTestId('auth-client-providers')
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId('auth-child')).not.toBeInTheDocument();
+  });
+
+  it('renders auth children for private http forwarded locations when real Clerk keys exist', async () => {
+    await renderAuthRouteLayout({
+      publishableKey: 'pk_test_example',
+      forwardedHost: '[::1]:3000, localhost:3000',
+      forwardedProto: 'HTTP, https',
+    });
+
+    expect(screen.getByTestId('auth-client-providers')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-child')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('auth-clerk-unavailable')
+    ).not.toBeInTheDocument();
   });
 
   it('renders auth children through AuthClientProviders when Clerk is available', async () => {

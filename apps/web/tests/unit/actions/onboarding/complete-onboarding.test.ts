@@ -7,7 +7,6 @@ const {
   mockCaptureError,
   mockCreateProfileForExistingUser,
   mockCreateUserAndProfile,
-  mockCurrentUser,
   mockDeactivateOrphanedProfiles,
   mockEnforceOnboardingRateLimit,
   mockEnsureEmailAvailable,
@@ -40,7 +39,6 @@ const {
   mockCaptureError: vi.fn(),
   mockCreateProfileForExistingUser: vi.fn(),
   mockCreateUserAndProfile: vi.fn(),
-  mockCurrentUser: vi.fn(),
   mockDeactivateOrphanedProfiles: vi.fn(),
   mockEnforceOnboardingRateLimit: vi.fn(),
   mockEnsureEmailAvailable: vi.fn(),
@@ -70,10 +68,6 @@ const {
   mockWithDbSessionTx: vi.fn(),
   mockWithRetry: vi.fn(),
   mockRevalidatePath: vi.fn(),
-}));
-
-vi.mock('@clerk/nextjs/server', () => ({
-  currentUser: mockCurrentUser,
 }));
 
 vi.mock('next/cache', () => ({
@@ -195,7 +189,7 @@ describe('completeOnboarding', () => {
     mockHeaders.mockResolvedValue({
       get: vi.fn((name: string) => (name === 'cookie' ? 'session=test' : null)),
     });
-    mockCurrentUser.mockResolvedValue({ id: 'clerk-user-123' });
+    mockGetCachedCurrentUser.mockResolvedValue({ id: 'clerk-user-123' });
     mockResolveClerkIdentity.mockReturnValue({
       avatarUrl: 'https://images.test/avatar.png',
       email: 'artist@example.com',
@@ -388,6 +382,7 @@ describe('completeOnboarding', () => {
       'layout'
     );
     expect(mockRedirect).not.toHaveBeenCalled();
+    expect(mockGetCachedCurrentUser).toHaveBeenCalled();
   });
 
   it('updates an existing incomplete profile and deactivates orphaned profiles', async () => {

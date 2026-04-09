@@ -15,6 +15,7 @@ import { QueryProvider } from './QueryProvider';
 
 interface AuthClientProvidersProps {
   readonly children: ReactNode;
+  readonly forceEnableClerk?: boolean;
   readonly publishableKey: string | undefined;
 }
 
@@ -24,13 +25,16 @@ function wrapChildren(children: ReactNode) {
 
 export function AuthClientProviders({
   children,
+  forceEnableClerk = false,
   publishableKey,
 }: AuthClientProvidersProps) {
-  const shouldSkipClerk = shouldBypassClerk(
-    publishableKey,
-    publicEnv.NEXT_PUBLIC_CLERK_MOCK,
-    globalThis.location
-  );
+  const shouldSkipClerk =
+    !forceEnableClerk &&
+    shouldBypassClerk(
+      publishableKey,
+      publicEnv.NEXT_PUBLIC_CLERK_MOCK,
+      globalThis.location
+    );
 
   if (shouldSkipClerk) {
     return (

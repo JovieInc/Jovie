@@ -17,6 +17,8 @@ import {
   claimInviteStatusEnum,
   contactChannelEnum,
   contactRoleEnum,
+  creatorDistributionEventTypeEnum,
+  creatorDistributionPlatformEnum,
   creatorTypeEnum,
   ingestionSourceTypeEnum,
   ingestionStatusEnum,
@@ -54,6 +56,10 @@ export interface DiscoveredPixels {
   facebook?: DiscoveredPixelPlatform;
   tiktok?: DiscoveredPixelPlatform;
   google?: DiscoveredPixelPlatform;
+}
+
+export interface CreatorDistributionEventMetadata {
+  [key: string]: unknown;
 }
 
 /**
@@ -478,6 +484,37 @@ export const profileOwnershipLog = pgTable(
   })
 );
 
+export const creatorDistributionEvents = pgTable(
+  'creator_distribution_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    platform: creatorDistributionPlatformEnum('platform').notNull(),
+    eventType: creatorDistributionEventTypeEnum('event_type').notNull(),
+    metadata: jsonb('metadata')
+      .$type<CreatorDistributionEventMetadata>()
+      .notNull()
+      .default({}),
+    dedupeKey: text('dedupe_key'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    profilePlatformCreatedIdx: index(
+      'idx_creator_distribution_events_profile_platform_created'
+    ).on(table.creatorProfileId, table.platform, table.createdAt),
+    profileEventCreatedIdx: index(
+      'idx_creator_distribution_events_profile_event_created'
+    ).on(table.creatorProfileId, table.eventType, table.createdAt),
+    dedupeKeyUnique: uniqueIndex(
+      'creator_distribution_events_dedupe_key_unique'
+    )
+      .on(table.dedupeKey)
+      .where(drizzleSql`dedupe_key IS NOT NULL`),
+  })
+);
+
 // Schema validations
 export const insertCreatorProfileSchema = createInsertSchema(creatorProfiles);
 export const selectCreatorProfileSchema = createSelectSchema(creatorProfiles);
@@ -506,6 +543,12 @@ export const insertCreatorClaimInviteSchema =
   createInsertSchema(creatorClaimInvites);
 export const selectCreatorClaimInviteSchema =
   createSelectSchema(creatorClaimInvites);
+export const insertCreatorDistributionEventSchema = createInsertSchema(
+  creatorDistributionEvents
+);
+export const selectCreatorDistributionEventSchema = createSelectSchema(
+  creatorDistributionEvents
+);
 
 // Types
 export type CreatorProfile = typeof creatorProfiles.$inferSelect;
@@ -529,6 +572,11 @@ export type NewCreatorProfileAttribute =
 
 export type CreatorClaimInvite = typeof creatorClaimInvites.$inferSelect;
 export type NewCreatorClaimInvite = typeof creatorClaimInvites.$inferInsert;
+
+export type CreatorDistributionEvent =
+  typeof creatorDistributionEvents.$inferSelect;
+export type NewCreatorDistributionEvent =
+  typeof creatorDistributionEvents.$inferInsert;
 
 export type UserProfileClaim = typeof userProfileClaims.$inferSelect;
 export type NewUserProfileClaim = typeof userProfileClaims.$inferInsert;

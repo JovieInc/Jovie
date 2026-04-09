@@ -9,11 +9,11 @@
 
 import 'server-only';
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull, or } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 
 /**
  * Result type for authenticated profile queries.
@@ -31,9 +31,8 @@ export interface AuthenticatedProfile {
 /**
  * Get a creator profile with ownership verification.
  *
- * Joins creatorProfiles with users table to verify the profile belongs
- * to the authenticated user. This is the standard pattern for all
- * authenticated profile operations.
+ * Verifies canonical ownership via userProfileClaims with a legacy fallback
+ * to creatorProfiles.userId while older rows are still being migrated.
  *
  * Security: Returns null if profile doesn't exist OR user doesn't own it.
  *
@@ -65,9 +64,22 @@ export async function getAuthenticatedProfile(
       displayNameLocked: creatorProfiles.displayNameLocked,
     })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.activeProfileId, creatorProfiles.id))
+    .innerJoin(users, eq(users.clerkId, clerkUserId))
+    .leftJoin(
+      userProfileClaims,
+      and(
+        eq(userProfileClaims.creatorProfileId, creatorProfiles.id),
+        eq(userProfileClaims.userId, users.id)
+      )
+    )
     .where(
-      and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
+      and(
+        eq(creatorProfiles.id, profileId),
+        or(
+          isNotNull(userProfileClaims.id),
+          eq(creatorProfiles.userId, users.id)
+        )
+      )
     )
     .limit(1);
 
@@ -213,7 +225,7 @@ export async function getUserByClerkId(
  * authenticated user owns the specified profile. Use this when you only
  * need to verify ownership and don't need other profile fields.
  *
- * Security: Returns null if profile doesn't exist OR user doesn't own it.
+ * Security: Returns null if profile doesn't exist OR the user does not own it.
  *
  * @param tx - Database transaction or connection
  * @param profileId - Profile ID to verify
@@ -237,9 +249,22 @@ export async function verifyProfileOwnership(
   const [profile] = await tx
     .select({ id: creatorProfiles.id })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.activeProfileId, creatorProfiles.id))
+    .innerJoin(users, eq(users.clerkId, clerkUserId))
+    .leftJoin(
+      userProfileClaims,
+      and(
+        eq(userProfileClaims.creatorProfileId, creatorProfiles.id),
+        eq(userProfileClaims.userId, users.id)
+      )
+    )
     .where(
-      and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
+      and(
+        eq(creatorProfiles.id, profileId),
+        or(
+          isNotNull(userProfileClaims.id),
+          eq(creatorProfiles.userId, users.id)
+        )
+      )
     )
     .limit(1);
 

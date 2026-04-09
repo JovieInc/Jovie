@@ -433,6 +433,7 @@ export function ProfileCompactTemplate({
       return;
     }
 
+    suppressNextHistorySyncRef.current = true;
     setDrawerView(nextView);
     setDrawerOpen(true);
   }, []);
@@ -453,6 +454,7 @@ export function ProfileCompactTemplate({
       return;
     }
 
+    suppressNextHistorySyncRef.current = true;
     setDrawerView(nextView);
     setDrawerOpen(true);
   }, []);

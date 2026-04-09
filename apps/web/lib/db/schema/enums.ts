@@ -47,6 +47,16 @@ export const socialAccountStatusEnum = pgEnum('social_account_status', [
   'rejected',
 ]);
 
+export const creatorDistributionPlatformEnum = pgEnum(
+  'creator_distribution_platform',
+  ['instagram']
+);
+
+export const creatorDistributionEventTypeEnum = pgEnum(
+  'creator_distribution_event_type',
+  ['step_viewed', 'link_copied', 'platform_opened', 'skipped', 'activated']
+);
+
 // Provider & Content Enums
 export const providerKindEnum = pgEnum('provider_kind', [
   'music_streaming',

@@ -21,6 +21,7 @@ import { QueryProvider } from './QueryProvider';
 interface ClientProvidersProps {
   readonly children: React.ReactNode;
   readonly authBootstrap?: ClientAuthBootstrap | null;
+  readonly forceBypassClerk?: boolean;
   readonly initialThemeMode?: ThemeMode;
   readonly publishableKey: string | undefined;
   readonly skipCoreProviders?: boolean;
@@ -54,15 +55,18 @@ function wrapWithCoreProviders({
 export function ClientProviders({
   children,
   authBootstrap = null,
+  forceBypassClerk = false,
   initialThemeMode = 'dark',
   publishableKey,
   skipCoreProviders = false,
 }: ClientProvidersProps) {
-  const shouldSkipClerk = shouldBypassClerk(
-    publishableKey,
-    publicEnv.NEXT_PUBLIC_CLERK_MOCK,
-    globalThis.location
-  );
+  const shouldSkipClerk =
+    forceBypassClerk ||
+    shouldBypassClerk(
+      publishableKey,
+      publicEnv.NEXT_PUBLIC_CLERK_MOCK,
+      globalThis.location
+    );
 
   if (shouldSkipClerk) {
     const wrappedChildren = wrapWithCoreProviders({
