@@ -4,6 +4,7 @@ import {
   getAuthenticatedProfile,
   verifyProfileOwnership,
 } from '@/lib/db/queries/shared';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 function createQueryChain<T>(rows: T[]) {
   const limit = vi.fn().mockResolvedValue(rows);
@@ -41,6 +42,7 @@ describe('shared ownership queries', () => {
     const result = await getAuthenticatedProfile(tx, 'profile_123', 'user_abc');
 
     const dialect = new PgDialect();
+    const selectArgs = mocks.select.mock.calls[0][0];
     const innerJoinSql = dialect.sqlToQuery(
       mocks.innerJoin.mock.calls[0][1]
     ).sql;
@@ -48,6 +50,7 @@ describe('shared ownership queries', () => {
     const whereSql = dialect.sqlToQuery(mocks.where.mock.calls[0][0]).sql;
 
     expect(result?.id).toBe('profile_123');
+    expect(selectArgs.userId).toBe(creatorProfiles.userId);
     expect(innerJoinSql).toContain('"users"."clerk_id" =');
     expect(leftJoinSql).toContain('"user_profile_claims"."creator_profile_id"');
     expect(leftJoinSql).toContain('"user_profile_claims"."user_id"');
