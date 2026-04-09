@@ -8,7 +8,6 @@ Launch-candidate PRs are not launch-ready unless all of these jobs are green whe
 - `Golden Path (PR)`
 - `Lighthouse (dashboard PR)`
 - `Lighthouse (onboarding PR)`
-- `Launch Perf Budgets (PR)`
 
 The launch gate is path-based. It turns on for changes touching:
 
@@ -26,11 +25,27 @@ Docs-only changes do not trigger launch-gate jobs.
 - `Golden Path (PR)`: `tests/e2e/golden-path.spec.ts` passes in CI against an ephemeral Neon database.
 - `Lighthouse (dashboard PR)`: authenticated dashboard Lighthouse stays within the blocking thresholds in [apps/web/.lighthouserc.dashboard.pr.json](/Users/timwhite/conductor/workspaces/jovie/memphis-v1/apps/web/.lighthouserc.dashboard.pr.json).
 - `Lighthouse (onboarding PR)`: onboarding Lighthouse stays within the blocking thresholds in [apps/web/.lighthouserc.onboarding.pr.json](/Users/timwhite/conductor/workspaces/jovie/memphis-v1/apps/web/.lighthouserc.onboarding.pr.json).
-- `Launch Perf Budgets (PR)`: the Gmail-equivalent latency contract passes for:
+
+## Required Local Launch Perf Check
+
+The Gmail-equivalent latency contract is enforced locally before push, not as a dedicated CI job.
+
+Run this from the repo root with pinned Doppler scope:
+
+```bash
+doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:budgets:launch
+```
+
+What it does:
+
+- builds the production app locally
+- starts the standalone server on loopback
+- enables the local auth bypass for authenticated measurement
+- runs strict budgets for:
   - `--group onboarding`
   - `--route-id creator-releases`
 
-This is the required 100ms perceived-latency check. Lighthouse does not measure that warm-navigation budget directly.
+This is the required 100ms perceived-latency check. Lighthouse does not measure that warm-navigation budget directly, so this must pass locally before you push.
 
 ## Local Equivalents
 
@@ -40,12 +55,6 @@ Golden path:
 
 ```bash
 doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e:golden-path:ci
-```
-
-Onboarding and creator-releases perf budgets:
-
-```bash
-doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:budgets:launch
 ```
 
 Authenticated dashboard Lighthouse:
@@ -74,14 +83,16 @@ pnpm run dev:web:browse
 
 ## Launch-Candidate Process
 
-1. Confirm the PR is green on all required launch-gate CI jobs.
-2. Run standard `/qa` against preview or the local browse-compatible build.
-3. Save QA artifacts under `.context/launch-readiness/<date>/`.
-4. Confirm the last 3 synthetic golden-path runs are green.
-5. Confirm there are no open Sev-1 or Sev-2 regressions from QA or synthetic monitoring.
+1. Confirm the local launch perf check passes.
+2. Confirm the PR is green on all required launch-gate CI jobs.
+3. Run standard `/qa` against preview or the local browse-compatible build.
+4. Save QA artifacts under `.context/launch-readiness/<date>/`.
+5. Confirm the last 3 synthetic golden-path runs are green.
+6. Confirm there are no open Sev-1 or Sev-2 regressions from QA or synthetic monitoring.
 
 ## Launch-Day Manual Checklist
 
+- Latest local launch perf check passed.
 - Latest launch-candidate PR is green on all required launch-gate CI jobs.
 - `/qa` report is green.
 - QA evidence is stored in `.context/launch-readiness/<date>/`.

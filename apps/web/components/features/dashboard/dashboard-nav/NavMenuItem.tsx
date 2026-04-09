@@ -9,7 +9,9 @@ import {
 } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { type MouseEvent, type ReactNode, useCallback, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { toast } from 'sonner';
 import {
   SidebarMenuBadge,
@@ -97,6 +99,7 @@ export function NavMenuItem({
   renderAsButton = false,
   onPrefetch,
 }: NavMenuItemProps) {
+  const router = useRouter();
   // Memoize tooltip to prevent creating new objects on every render,
   // which would cause unnecessary re-renders in SidebarMenuButton
   const tooltip = useMemo(
@@ -137,21 +140,50 @@ export function NavMenuItem({
     </>
   );
 
+  const showPendingShell = useCallback(() => {
+    if (!onNavigate) {
+      return;
+    }
+
+    flushSync(() => {
+      onNavigate();
+    });
+  }, [onNavigate]);
+
   const handleButtonClick = useCallback(() => {
-    onNavigate?.();
+    showPendingShell();
     onClick?.();
-  }, [onClick, onNavigate]);
+  }, [onClick, showPendingShell]);
 
   const handleLinkClick = useCallback(
     (event: MouseEvent<HTMLAnchorElement>) => {
       if (preventNavigation) {
         event.preventDefault();
       }
-      onNavigate?.();
+      showPendingShell();
       onClick?.();
+
+      if (!preventNavigation && onNavigate) {
+        event.preventDefault();
+        requestAnimationFrame(() => {
+          router.push(item.href);
+        });
+      }
     },
-    [onClick, onNavigate, preventNavigation]
+    [
+      item.href,
+      onClick,
+      onNavigate,
+      preventNavigation,
+      router,
+      showPendingShell,
+    ]
   );
+
+  const handlePressStart = useCallback(() => {
+    showPendingShell();
+    onPrefetch?.();
+  }, [onPrefetch, showPendingShell]);
 
   return (
     <ContextMenu>
@@ -162,7 +194,7 @@ export function NavMenuItem({
               <button
                 type='button'
                 onClick={handleButtonClick}
-                onMouseDown={onPrefetch}
+                onMouseDown={handlePressStart}
                 onMouseEnter={onPrefetch}
                 onFocus={onPrefetch}
                 aria-pressed={isActive}
@@ -175,7 +207,7 @@ export function NavMenuItem({
                 href={item.href}
                 prefetch={prefetch}
                 onClick={handleLinkClick}
-                onMouseDown={onPrefetch}
+                onMouseDown={handlePressStart}
                 onMouseEnter={onPrefetch}
                 onFocus={onPrefetch}
                 aria-current={isActive ? 'page' : undefined}

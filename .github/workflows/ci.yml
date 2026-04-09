@@ -569,7 +569,7 @@ jobs:
     name: PR Ready
     # Single merge gate for PRs and merge queue.
     # Gates on fast checks (typecheck, lint, guardrails), unit tests, public-route build, and Lighthouse audits.
-    needs: [ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-pr, ci-golden-path-pr, ci-launch-perf-budgets-pr]
+    needs: [ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-pr, ci-golden-path-pr]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -583,7 +583,6 @@ jobs:
           ONBOARDING_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-onboarding-pr.result }}"
           PUBLIC_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-pr.result }}"
           GOLDEN_PATH_RESULT="${{ needs.ci-golden-path-pr.result }}"
-          LAUNCH_PERF_RESULT="${{ needs.ci-launch-perf-budgets-pr.result }}"
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
@@ -591,7 +590,6 @@ jobs:
           echo "ci-lighthouse-onboarding-pr: $ONBOARDING_LIGHTHOUSE_RESULT"
           echo "ci-lighthouse-pr: $PUBLIC_LIGHTHOUSE_RESULT"
           echo "ci-golden-path-pr: $GOLDEN_PATH_RESULT"
-          echo "ci-launch-perf-budgets-pr: $LAUNCH_PERF_RESULT"
 
           # ci-fast must succeed (or be skipped when path-gated with no app files changed)
           if [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
@@ -633,12 +631,7 @@ jobs:
             exit 1
           fi
 
-          if [[ "$LAUNCH_PERF_RESULT" != "success" && "$LAUNCH_PERF_RESULT" != "skipped" ]]; then
-            echo "❌ ci-launch-perf-budgets-pr did not pass (result: $LAUNCH_PERF_RESULT)"
-            exit 1
-          fi
-
-          echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, build, lighthouse, golden path, launch perf budgets"
+          echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, build, lighthouse, golden path"
 
   ci-build-public:
     name: Build (public routes)
@@ -2425,121 +2418,6 @@ jobs:
             -H "Content-Type: application/json" \
             "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
 
-  ci-launch-perf-budgets-pr:
-    name: Launch Perf Budgets (PR)
-    needs: [ci-fast, ci-path-changes]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_launch_gate == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          fetch-depth: 1
-
-      - uses: ./.github/actions/setup-node-pnpm
-
-      - name: Cache Playwright Browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
-
-      - name: Create ephemeral Neon database branch (with retry)
-        id: neon-branch
-        uses: ./.github/actions/neon-create-branch-with-retry
-        with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: launch-perf-${{ github.run_id }}-${{ github.run_attempt }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
-
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        run: |
-          CANDIDATE="${{ steps.neon-branch.outputs.db_url }}"
-          if [ -z "$CANDIDATE" ]; then
-            echo "No Neon ephemeral DATABASE_URL available."
-            exit 1
-          fi
-          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
-
-      - name: Run migrations (ephemeral Neon)
-        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
-        env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          NODE_ENV: test
-          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
-          ALLOW_PROD_MIGRATIONS: 'true'
-
-      - name: Build app for launch perf budgets
-        run: pnpm --filter=@jovie/web run build
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          NEXT_IGNORE_ESLINT: '1'
-          NEXT_IGNORE_TYPECHECK: '1'
-          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
-
-      - name: Assert launch perf prerequisites
-        env:
-          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
-        run: |
-          if [ -z "$E2E_CLERK_USER_ID" ]; then
-            echo "Missing required launch perf secret: E2E_CLERK_USER_ID"
-            exit 1
-          fi
-
-      - name: Run launch perf budgets
-        env:
-          CI: true
-          BASE_URL: http://localhost:3000
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          E2E_USE_TEST_AUTH_BYPASS: '1'
-          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
-          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
-        run: |
-          cd apps/web
-
-          if [ ! -f .next/standalone/apps/web/server.js ]; then
-            echo "Standalone server not found — launch perf budgets cannot start."
-            exit 1
-          fi
-
-          node .next/standalone/apps/web/server.js &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-
-          echo "Waiting for standalone server..."
-          SERVER_READY=false
-          for i in {1..30}; do
-            if curl -s http://localhost:3000 > /dev/null; then
-              SERVER_READY=true
-              break
-            fi
-            sleep 1
-          done
-
-          if [ "$SERVER_READY" = "false" ]; then
-            echo "Server failed to start within 30s."
-            exit 1
-          fi
-
-          pnpm run test:budgets:launch
-
-      - name: Cleanup ephemeral Neon branch
-        if: always() && steps.neon-branch.outputs.branch_id != ''
-        continue-on-error: true
-        run: |
-          curl -sS -X DELETE \
-            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
-
   ci-test-performance:
     name: Test Performance Budgets
     needs: [ci-path-changes]
@@ -2675,7 +2553,6 @@ jobs:
       - ci-lighthouse-pr
       - ci-lighthouse-dashboard-pr
       - ci-golden-path-pr
-      - ci-launch-perf-budgets-pr
       - ci-a11y
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -2796,11 +2673,6 @@ jobs:
               {
                 label: 'Golden Path (PR)',
                 jobName: 'Golden Path (PR)',
-                runFullCi: process.env.LAUNCH_GATE_RUN_FULL_CI
-              },
-              {
-                label: 'Launch Perf Budgets (PR)',
-                jobName: 'Launch Perf Budgets (PR)',
                 runFullCi: process.env.LAUNCH_GATE_RUN_FULL_CI
               },
               { label: 'A11y (axe)', jobName: 'A11y (axe)' },

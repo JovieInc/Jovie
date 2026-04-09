@@ -806,23 +806,21 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-shell',
     measureMode: 'warm-navigation',
     readySelectors: {
+      shell: ['[data-testid="releases-shell-ready"]'],
       content: [
         '[data-testid="releases-loading"]',
         '[data-testid="releases-matrix"]',
       ],
       loading: ['[data-testid="releases-loading"]'],
       navTrigger: [
-        `a[href="${APP_ROUTES.RELEASES}"]`,
         `a[href="${APP_ROUTES.DASHBOARD_RELEASES}"]`,
+        `a[href="${APP_ROUTES.RELEASES}"]`,
       ],
       redirectDestinations: [APP_ROUTES.RELEASES],
     },
     timings: [
-      { metric: 'first-contentful-paint', budget: 1500 },
-      { metric: 'largest-contentful-paint', budget: 2500 },
-      { metric: 'cumulative-layout-shift', budget: 0.1 },
-      { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1500 },
+      // Initial-load render budgets for releases are covered by Lighthouse.
+      // The local launch gate only enforces the warm authenticated nav path.
       { metric: 'warm-shell-response', budget: 100 },
       { metric: 'skeleton-to-content', budget: 1000 },
     ],

@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
-import { getDashboardData } from '@/app/app/(shell)/dashboard/actions';
+import { getDashboardDataEssential } from '@/app/app/(shell)/dashboard/actions';
 import { APP_ROUTES } from '@/constants/routes';
 import { OnboardingFormWrapper } from '@/features/dashboard/organisms/OnboardingFormWrapper';
 import { getCachedCurrentUser } from '@/lib/auth/cached';
@@ -54,6 +54,9 @@ export default async function OnboardingPage({
   const hasOnboardingContinuationSignal = Boolean(
     resolvedSearchParams?.handle || resolvedSearchParams?.resume
   );
+  const shouldLoadExistingProfile = Boolean(
+    authResult.profileId || hasOnboardingContinuationSignal
+  );
 
   // ACTIVE guard: break redirect loops caused by stale proxy cache or
   // direct navigation. V2 intentionally allows explicit resume targets
@@ -84,30 +87,33 @@ export default async function OnboardingPage({
 
   const profilePrefetchPromise = shouldSkipDashboardPrefetch
     ? Promise.resolve(null)
-    : getDashboardData()
-        .then(d => d.selectedProfile)
-        .catch((error: unknown) => {
-          const errorMessage = extractErrorMessage(error, 'Unknown error');
-          if (
-            errorMessage.includes('database') ||
-            errorMessage.includes('connection') ||
-            errorMessage.includes('timeout')
-          ) {
-            Sentry.captureException(error, {
-              tags: { context: 'onboarding_profile_load' },
-              extra: { clerkUserId: authResult.clerkUserId },
-            });
-          }
-          return null;
-        });
+    : !shouldLoadExistingProfile
+      ? Promise.resolve(null)
+      : getDashboardDataEssential()
+          .then(d => d.selectedProfile)
+          .catch((error: unknown) => {
+            const errorMessage = extractErrorMessage(error, 'Unknown error');
+            if (
+              errorMessage.includes('database') ||
+              errorMessage.includes('connection') ||
+              errorMessage.includes('timeout')
+            ) {
+              Sentry.captureException(error, {
+                tags: { context: 'onboarding_profile_load' },
+                extra: { clerkUserId: authResult.clerkUserId },
+              });
+            }
+            return null;
+          });
 
   // Start handle reservation early with what we know now (display name from Clerk)
   const earlyDisplayName = clerkIdentity.displayName || '';
   const earlyProvidedHandle =
     resolvedSearchParams?.handle || user?.username || spotifySuggestedHandle;
-  const handleReservationPromise = !earlyProvidedHandle
-    ? reserveOnboardingHandle(earlyDisplayName)
-    : Promise.resolve(null);
+  const handleReservationPromise =
+    shouldLoadExistingProfile && !earlyProvidedHandle
+      ? reserveOnboardingHandle(earlyDisplayName)
+      : Promise.resolve(null);
 
   // Await both in parallel
   const [existingProfile, earlyReservedHandle] = await Promise.all([
@@ -128,6 +134,7 @@ export default async function OnboardingPage({
   // existingProfile.username) — otherwise isReservedHandle would incorrectly be true.
   let reservedHandle = !providedHandle ? earlyReservedHandle : null;
   if (
+    shouldLoadExistingProfile &&
     !providedHandle &&
     !reservedHandle &&
     initialDisplayName !== earlyDisplayName

@@ -3,23 +3,19 @@ import { APP_ROUTES } from '@/constants/routes';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
-import { queryKeys } from '@/lib/queries';
-import { HydrateClient } from '@/lib/queries/HydrateClient';
-import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
 import { getDashboardShellData } from '../actions';
-import { loadReleaseMatrix } from './actions';
 import { ReleasesClientBoundary } from './ReleasesClientBoundary';
 import { ReleasesPageClient } from './ReleasesPageClient';
 
 export const runtime = 'nodejs';
 
 /**
- * Releases page — client-first with server prefetch.
+ * Releases page — client-first with shell-only server work.
  *
- * Auth check via getCachedAuth (Clerk JWT, no DB) runs first. On first visit,
- * the release matrix is prefetched into TanStack Query cache and hydrated to
- * the client. On subsequent navigations, the client component renders from
- * cache instantly (no skeleton), with background refetch if stale.
+ * Auth check via getCachedAuth (Clerk JWT, no DB) runs first. The shared shell
+ * and /app route warm the release matrix cache ahead of navigation, so this
+ * page avoids an extra blocking server prefetch on warm transitions. Cold
+ * loads still fall back to the client skeleton while the query resolves.
  */
 export default async function ReleasesPage() {
   const { userId } = await getCachedAuth();
@@ -47,22 +43,9 @@ export default async function ReleasesPage() {
     redirect(APP_ROUTES.ONBOARDING);
   }
 
-  // Prefetch release matrix into TanStack cache — must await to guarantee
-  // the data is included in getDehydratedState() (no loading skeleton).
-  const profileId = dashboardData.selectedProfile?.id;
-  if (profileId) {
-    const queryClient = getQueryClient();
-    await queryClient.prefetchQuery({
-      queryKey: queryKeys.releases.matrix(profileId),
-      queryFn: () => loadReleaseMatrix(profileId),
-    });
-  }
-
   return (
     <ReleasesClientBoundary>
-      <HydrateClient state={getDehydratedState()}>
-        <ReleasesPageClient />
-      </HydrateClient>
+      <ReleasesPageClient />
     </ReleasesClientBoundary>
   );
 }
