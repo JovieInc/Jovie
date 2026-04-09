@@ -6,11 +6,36 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import type { Artist } from '@/types/db';
 
-const mockCanonicalProfileDSPs = vi.fn(() => []);
-const mockUseProfileShell = vi.fn();
+const {
+  mockCanonicalProfileDSPs,
+  mockUseProfileShell,
+  mockProfileInlineNotificationsCTA,
+  mockProfileUnifiedDrawer,
+} = vi.hoisted(() => ({
+  mockCanonicalProfileDSPs: vi.fn(() => []),
+  mockUseProfileShell: vi.fn(),
+  mockProfileInlineNotificationsCTA: vi.fn(),
+  mockProfileUnifiedDrawer: vi.fn(),
+}));
 
 vi.mock('next/dynamic', () => ({
-  default: () => () => null,
+  default: (() => {
+    let callCount = 0;
+
+    return () => {
+      callCount += 1;
+
+      if (callCount === 1) {
+        return (props: unknown) => mockProfileUnifiedDrawer(props);
+      }
+
+      if (callCount === 2) {
+        return (props: unknown) => mockProfileInlineNotificationsCTA(props);
+      }
+
+      return () => null;
+    };
+  })(),
 }));
 
 vi.mock('next/link', () => ({
@@ -108,6 +133,31 @@ describe('ProfileCompactTemplate', () => {
   beforeEach(() => {
     mockCanonicalProfileDSPs.mockReturnValue([]);
     mockUseProfileShell.mockReset();
+    mockProfileInlineNotificationsCTA.mockClear();
+    mockProfileUnifiedDrawer.mockClear();
+    mockProfileInlineNotificationsCTA.mockImplementation(
+      (props: {
+        readonly onManageNotifications?: () => void;
+        readonly onRegisterReveal?: (reveal: () => void) => void;
+      }) => (
+        <button
+          type='button'
+          data-testid='mock-inline-notifications-cta'
+          onClick={() => props.onManageNotifications?.()}
+        >
+          Inline notifications
+        </button>
+      )
+    );
+    mockProfileUnifiedDrawer.mockImplementation(
+      (props: { readonly open: boolean; readonly view: string }) => (
+        <div
+          data-testid='mock-profile-unified-drawer'
+          data-open={String(props.open)}
+          data-view={props.view}
+        />
+      )
+    );
     mockUseProfileShell.mockImplementation(() => ({
       notificationsContextValue: {
         subscribedChannels: {},
@@ -297,6 +347,45 @@ describe('ProfileCompactTemplate', () => {
         })
       );
     });
+  });
+
+  it('opens the notifications drawer when the inline subscribed CTA manages notifications', async () => {
+    mockUseProfileShell.mockImplementation(() => ({
+      notificationsContextValue: {
+        subscribedChannels: { email: true },
+        subscriptionDetails: { email: 'fan@example.com' },
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+
+    const { ProfileCompactTemplate } = await import(
+      '@/features/profile/templates/ProfileCompactTemplate'
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('mock-inline-notifications-cta'));
+
+    expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+      'data-open',
+      'true'
+    );
+    expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+      'data-view',
+      'notifications'
+    );
   });
 
   it('does not rewrite the URL when a non-mode drawer opens over a deep-linked mode', async () => {
