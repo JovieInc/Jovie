@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetReleaseById = vi.hoisted(() => vi.fn());
+const mockGetTracksForReleaseWithProviders = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/discography/queries', () => ({
   getReleaseById: mockGetReleaseById,
+  getTracksForReleaseWithProviders: mockGetTracksForReleaseWithProviders,
 }));
 
 import { buildExtensionFillPreview } from '@/lib/extensions/fill-preview';
@@ -11,6 +13,7 @@ import { buildExtensionFillPreview } from '@/lib/extensions/fill-preview';
 describe('buildExtensionFillPreview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetTracksForReleaseWithProviders.mockResolvedValue({ tracks: [] });
   });
 
   it('falls back when the page variant is not supported yet', async () => {
@@ -54,6 +57,15 @@ describe('buildExtensionFillPreview', () => {
       label: null,
       upc: null,
     });
+    mockGetTracksForReleaseWithProviders.mockResolvedValue({
+      tracks: [
+        {
+          title: 'Night Drive',
+          isrc: 'USABC2600001',
+          isExplicit: false,
+        },
+      ],
+    });
 
     const preview = await buildExtensionFillPreview(
       {
@@ -82,6 +94,13 @@ describe('buildExtensionFillPreview', () => {
             currentValue: null,
             groupIndex: 0,
           },
+          {
+            targetId: 'explicit_0',
+            targetKey: 'explicit',
+            targetLabel: 'Track 1 Explicit',
+            currentValue: null,
+            groupIndex: 0,
+          },
         ],
       },
       'profile_1'
@@ -94,11 +113,7 @@ describe('buildExtensionFillPreview', () => {
           label: 'Release Date',
         }),
       ],
-      unsupportedTargets: [
-        expect.objectContaining({
-          targetId: 'track_title_0',
-        }),
-      ],
+      unsupportedTargets: [],
     });
     expect(preview?.mappings).toEqual(
       expect.arrayContaining([
@@ -110,6 +125,16 @@ describe('buildExtensionFillPreview', () => {
         expect.objectContaining({
           targetId: 'release_date',
           status: 'blocked',
+        }),
+        expect.objectContaining({
+          targetId: 'track_title_0',
+          status: 'ready',
+          value: 'Night Drive',
+        }),
+        expect.objectContaining({
+          targetId: 'explicit_0',
+          status: 'ready',
+          value: 'Clean',
         }),
       ])
     );

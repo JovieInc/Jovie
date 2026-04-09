@@ -8,7 +8,10 @@ import type {
   ExtensionTargetKey,
 } from '@jovie/extension-contracts';
 import { APP_ROUTES } from '@/constants/routes';
-import { getReleaseById } from '@/lib/discography/queries';
+import {
+  getReleaseById,
+  getTracksForReleaseWithProviders,
+} from '@/lib/discography/queries';
 
 const REQUIRED_TARGETS = new Set<ExtensionTargetKey>([
   'release_title',
@@ -25,6 +28,11 @@ const RELEASE_TARGET_KEYS = new Set<ExtensionTargetKey>([
   'primary_genre',
   'secondary_genre',
   'label_name',
+]);
+
+const REQUIRED_TRACK_TARGETS = new Set<ExtensionTargetKey>([
+  'track_title',
+  'explicit',
 ]);
 
 function formatDateForForm(value: string | Date | null | undefined) {
@@ -46,6 +54,11 @@ function buildSubmissionPacket(params: {
   upc: string | null;
   genres: readonly string[];
   labelName: string | null;
+  tracks: readonly {
+    title: string;
+    isrc: string | null;
+    isExplicit: boolean;
+  }[];
 }): ExtensionSubmissionPacket {
   return {
     title: `Manual Submission Packet: ${params.releaseTitle}`,
@@ -70,6 +83,21 @@ function buildSubmissionPacket(params: {
           { label: 'Secondary Genre', value: params.genres[1] ?? 'Not Set' },
           { label: 'Label Name', value: params.labelName ?? 'Not Set' },
         ],
+      },
+      {
+        id: 'tracks',
+        title: 'Track Rows',
+        lines: params.tracks.flatMap((track, index) => [
+          { label: `Track ${index + 1} Title`, value: track.title },
+          {
+            label: `Track ${index + 1} ISRC`,
+            value: track.isrc ?? 'Auto-Generate In DistroKid',
+          },
+          {
+            label: `Track ${index + 1} Explicit`,
+            value: track.isExplicit ? 'Explicit' : 'Clean',
+          },
+        ]),
       },
     ],
   };
@@ -112,12 +140,46 @@ function getSourceValue(
   }
 }
 
+function getTrackSource(
+  targetKey: ExtensionTargetKey,
+  track:
+    | {
+        title: string;
+        isrc: string | null;
+        isExplicit: boolean;
+      }
+    | undefined,
+  groupIndex: number | undefined
+) {
+  if (groupIndex === undefined) return null;
+  if (!track) {
+    return { sourceKey: `tracks[${groupIndex}]`, value: null };
+  }
+
+  switch (targetKey) {
+    case 'track_title':
+      return { sourceKey: `tracks[${groupIndex}].title`, value: track.title };
+    case 'track_isrc':
+      return { sourceKey: `tracks[${groupIndex}].isrc`, value: track.isrc };
+    case 'explicit':
+      return {
+        sourceKey: `tracks[${groupIndex}].isExplicit`,
+        value: track.isExplicit ? 'Explicit' : 'Clean',
+      };
+    default:
+      return null;
+  }
+}
+
 export async function buildExtensionFillPreview(
   request: ExtensionFillPreviewRequest,
   profileId: string
 ): Promise<ExtensionFillPreviewResponse | null> {
   const release = await getReleaseById(request.entityId);
   if (!release || release.creatorProfileId !== profileId) return null;
+  const { tracks } = await getTracksForReleaseWithProviders(request.entityId, {
+    limit: 50,
+  });
 
   const releaseTitle = release.title.trim();
   const artistName =
@@ -134,6 +196,11 @@ export async function buildExtensionFillPreview(
     upc,
     genres,
     labelName,
+    tracks: tracks.map(track => ({
+      title: track.title,
+      isrc: track.isrc,
+      isExplicit: track.isExplicit,
+    })),
   });
 
   if (
@@ -156,7 +223,24 @@ export async function buildExtensionFillPreview(
   const unsupportedTargets: ExtensionAvailableTarget[] = [];
   const mappings: ExtensionFieldMapping[] = request.availableTargets.map(
     target => {
-      if (!RELEASE_TARGET_KEYS.has(target.targetKey)) {
+      const source = RELEASE_TARGET_KEYS.has(target.targetKey)
+        ? getSourceValue(target.targetKey, {
+            releaseTitle,
+            artistName,
+            releaseDate,
+            upc,
+            genres,
+            labelName,
+          })
+        : getTrackSource(
+            target.targetKey,
+            target.groupIndex === undefined
+              ? undefined
+              : tracks[target.groupIndex],
+            target.groupIndex
+          );
+
+      if (!source) {
         unsupportedTargets.push(target);
         return {
           targetId: target.targetId,
@@ -168,21 +252,15 @@ export async function buildExtensionFillPreview(
           required: false,
           confidence: 'unsupported',
           status: 'unsupported',
-          reason: 'Track-row and fallback-only targets land in the next slice.',
+          reason: 'This field is fallback-only in the alpha.',
         };
       }
 
-      const source = getSourceValue(target.targetKey, {
-        releaseTitle,
-        artistName,
-        releaseDate,
-        upc,
-        genres,
-        labelName,
-      });
-
       if (!source?.value) {
-        if (REQUIRED_TARGETS.has(target.targetKey)) {
+        if (
+          REQUIRED_TARGETS.has(target.targetKey) ||
+          REQUIRED_TRACK_TARGETS.has(target.targetKey)
+        ) {
           blockers.push({
             code: source?.sourceKey ?? target.targetKey,
             label: target.targetLabel,
@@ -193,6 +271,7 @@ export async function buildExtensionFillPreview(
             targetId: target.targetId,
             targetKey: target.targetKey,
             targetLabel: target.targetLabel,
+            groupIndex: target.groupIndex,
             sourceKey: source?.sourceKey ?? target.targetKey,
             value: '',
             required: true,
@@ -207,6 +286,7 @@ export async function buildExtensionFillPreview(
           targetId: target.targetId,
           targetKey: target.targetKey,
           targetLabel: target.targetLabel,
+          groupIndex: target.groupIndex,
           sourceKey: source?.sourceKey ?? target.targetKey,
           value: '',
           required: false,
@@ -220,9 +300,12 @@ export async function buildExtensionFillPreview(
         targetId: target.targetId,
         targetKey: target.targetKey,
         targetLabel: target.targetLabel,
+        groupIndex: target.groupIndex,
         sourceKey: source.sourceKey,
         value: source.value,
-        required: REQUIRED_TARGETS.has(target.targetKey),
+        required:
+          REQUIRED_TARGETS.has(target.targetKey) ||
+          REQUIRED_TRACK_TARGETS.has(target.targetKey),
         confidence: 'exact',
         status: 'ready',
       };
