@@ -4,7 +4,6 @@ import {
   isUnauthorizedSessionError,
   withDbSessionTx,
 } from '@/lib/auth/session';
-import { db } from '@/lib/db';
 import { unwrapPgError } from '@/lib/db/errors';
 import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
 import { creatorDistributionEvents } from '@/lib/db/schema/profiles';
@@ -26,11 +25,9 @@ const distributionEventSchema = z.object({
   profileId: uuidSchema,
 });
 
-type DistributionEventRequest = z.infer<typeof distributionEventSchema>;
-
 type DistributionEventResolution =
   | { kind: 'response'; response: Response }
-  | { kind: 'event'; payload: DistributionEventRequest };
+  | { kind: 'success' };
 
 function isMissingCreatorDistributionEventsTableError(error: unknown): boolean {
   return unwrapPgError(error).code === '42P01';
@@ -74,43 +71,50 @@ export async function POST(request: Request) {
           };
         }
 
-        return { kind: 'event', payload: parsed.data };
+        const { eventType, metadata, platform, profileId } = parsed.data;
+
+        try {
+          await tx
+            .insert(creatorDistributionEvents)
+            .values({
+              createdAt: new Date(),
+              creatorProfileId: profileId,
+              dedupeKey: buildDistributionDedupeKey(
+                profileId,
+                platform,
+                eventType
+              ),
+              eventType,
+              metadata: metadata ?? {},
+              platform,
+            })
+            .onConflictDoNothing();
+        } catch (error) {
+          if (isMissingCreatorDistributionEventsTableError(error)) {
+            await captureWarning(
+              '[onboarding/distribution-event] creator_distribution_events table missing; skipping event write',
+              error,
+              { eventType, platform, profileId }
+            );
+
+            return {
+              kind: 'response',
+              response: NextResponse.json(
+                { ok: false, skipped: 'missing_table' },
+                { headers: NO_STORE_HEADERS, status: 202 }
+              ),
+            };
+          }
+
+          throw error;
+        }
+
+        return { kind: 'success' };
       }
     );
 
     if (result.kind === 'response') {
       return result.response;
-    }
-
-    const { eventType, metadata, platform, profileId } = result.payload;
-
-    try {
-      await db
-        .insert(creatorDistributionEvents)
-        .values({
-          createdAt: new Date(),
-          creatorProfileId: profileId,
-          dedupeKey: buildDistributionDedupeKey(profileId, platform, eventType),
-          eventType,
-          metadata: metadata ?? {},
-          platform,
-        })
-        .onConflictDoNothing();
-    } catch (error) {
-      if (isMissingCreatorDistributionEventsTableError(error)) {
-        await captureWarning(
-          '[onboarding/distribution-event] creator_distribution_events table missing; skipping event write',
-          error,
-          { eventType, platform, profileId }
-        );
-
-        return NextResponse.json(
-          { ok: false, skipped: 'missing_table' },
-          { headers: NO_STORE_HEADERS, status: 202 }
-        );
-      }
-
-      throw error;
     }
 
     return NextResponse.json(

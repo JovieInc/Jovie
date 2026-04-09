@@ -261,6 +261,45 @@ describe('onboarding page', () => {
     expect(redirectMock).not.toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
   });
 
+  it('does not fall back to the dev test-auth username for fresh onboarding handles', async () => {
+    const { resolveUserState } = await import('@/lib/auth/gate');
+    const { getCachedCurrentUser } = await import('@/lib/auth/cached');
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions'
+    );
+
+    vi.mocked(resolveUserState).mockResolvedValueOnce({
+      state: 'NEEDS_ONBOARDING',
+      clerkUserId: 'clerk_123',
+      dbUserId: 'db_123',
+      profileId: null,
+      redirectTo: APP_ROUTES.ONBOARDING,
+      context: {
+        isAdmin: false,
+        isPro: false,
+        email: 'artist@example.com',
+      },
+    });
+    vi.mocked(getCachedCurrentUser).mockResolvedValueOnce({
+      username: 'browse-test-user',
+    } as never);
+    vi.mocked(getDashboardData).mockResolvedValueOnce({
+      selectedProfile: null,
+    });
+
+    const page = await OnboardingPage({
+      searchParams: Promise.resolve({}),
+    });
+    render(page);
+
+    expect(page).toBeTruthy();
+    expect(onboardingWrapperPropsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialHandle: '',
+      })
+    );
+  });
+
   it('redirects banned users to the unavailable page', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
 

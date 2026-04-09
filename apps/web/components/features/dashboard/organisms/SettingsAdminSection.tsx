@@ -10,6 +10,7 @@ import { adminSettingsNavigationSections } from '@/components/features/dashboard
 import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
+import { APP_ROUTES } from '@/constants/routes';
 
 const DEV_TOOLBAR_COOKIE = '__dev_toolbar';
 
@@ -60,20 +61,14 @@ function AdminLink({ href, icon: Icon, title, description }: AdminLinkProps) {
 
 const quickLinkSections = adminSettingsNavigationSections;
 
-/**
- * Admin settings section - only visible to admin users.
- *
- * Consolidates platform configuration (dev toolbar, waitlist controls,
- * campaign targeting/throttling) with quick links to admin dashboards.
- */
 export function SettingsAdminSection() {
   const devToolbar = useDevToolbarCookie();
 
   return (
     <div className='space-y-6'>
       <SettingsPanel
-        title='Developer tools'
-        description='Controls for the on-screen dev toolbar.'
+        title='Platform & Environment'
+        description='Set durable admin defaults here, then move into the operator workspaces when it is time to run them.'
       >
         <div className='px-4 py-4 sm:px-5'>
           <SettingsToggleRow
@@ -87,15 +82,20 @@ export function SettingsAdminSection() {
         </div>
       </SettingsPanel>
 
-      {/* Waitlist settings */}
       <WaitlistSettingsPanel />
-
-      {/* Campaign targeting & throttling */}
       <CampaignSettingsPanel />
 
       <SettingsPanel
-        title='Admin dashboards'
-        description='Quick links to admin data views and operational tools.'
+        title='Admin Workspaces'
+        description='Jump into the admin surfaces once the defaults above are set.'
+        actions={
+          <Button size='sm' variant='outline' asChild>
+            <Link href={APP_ROUTES.ADMIN_GROWTH}>
+              Open Growth Ops
+              <ExternalLink className='ml-1.5 h-3.5 w-3.5' />
+            </Link>
+          </Button>
+        }
       >
         <div className='space-y-4 px-4 py-4 sm:px-5'>
           {quickLinkSections.map(section => (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { PROFILE_REVIEW_STEP_INDEX } from '@/features/dashboard/organisms/apple-style-onboarding/types';
 import { resolveInitialStep } from '@/features/dashboard/organisms/onboarding/profile-review-guards';
+import { PROFILE_REVIEW_STEP_INDEX } from '@/features/dashboard/organisms/onboarding-v2/shared/types';
 
 /**
  * Tests for step-resume logic in onboarding.

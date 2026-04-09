@@ -5,12 +5,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { OnboardingExperienceShell } from '@/components/features/onboarding/OnboardingExperienceShell';
 import { APP_ROUTES } from '@/constants/routes';
 import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding';
-import { useHandleValidation } from './apple-style-onboarding/useHandleValidation';
-import { useOnboardingSubmit } from './apple-style-onboarding/useOnboardingSubmit';
+import { useHandleValidation } from './onboarding-v2/shared/useHandleValidation';
+import { useOnboardingSubmit } from './onboarding-v2/shared/useOnboardingSubmit';
 
 interface OnboardingHandleOnlyFormProps {
   readonly initialDisplayName?: string;
   readonly initialHandle?: string;
+  readonly isHydrated: boolean;
   readonly isReservedHandle?: boolean;
   readonly shouldAutoSubmitHandle?: boolean;
   readonly userEmail?: string | null;
@@ -61,6 +62,7 @@ function HandleSidebar() {
 export function OnboardingHandleOnlyForm({
   initialDisplayName = '',
   initialHandle = '',
+  isHydrated,
   isReservedHandle = false,
   shouldAutoSubmitHandle = false,
   userEmail = null,
@@ -103,6 +105,7 @@ export function OnboardingHandleOnlyForm({
       handle,
       handleInput,
       handleValidation,
+      isHydrated,
       isReservedHandle,
       onboardingStartedAtMs: onboardingStartedAtRef.current,
       setProfileReadyHandle,
@@ -161,6 +164,7 @@ export function OnboardingHandleOnlyForm({
         handleInput={handleInput}
         handleValidation={handleValidation}
         inputRef={handleInputRef}
+        isHydrated={isHydrated}
         isPendingSubmit={isPendingSubmit}
         isReservedHandle={isReservedHandle}
         isSubmitting={state.isSubmitting}

@@ -3,14 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockCaptureError,
   mockCaptureWarning,
-  mockDbInsert,
   mockGetAuthenticatedProfile,
   mockLoggerError,
   mockWithDbSessionTx,
 } = vi.hoisted(() => ({
   mockCaptureError: vi.fn(),
   mockCaptureWarning: vi.fn(),
-  mockDbInsert: vi.fn(),
   mockGetAuthenticatedProfile: vi.fn(),
   mockLoggerError: vi.fn(),
   mockWithDbSessionTx: vi.fn(),
@@ -25,17 +23,6 @@ vi.mock('@/lib/auth/session', async () => {
   return {
     ...actual,
     withDbSessionTx: mockWithDbSessionTx,
-  };
-});
-
-vi.mock('@/lib/db', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/db')>('@/lib/db');
-
-  return {
-    ...actual,
-    db: {
-      insert: mockDbInsert,
-    },
   };
 });
 
@@ -70,6 +57,12 @@ function createDbInsertChain() {
   };
 }
 
+function createTransactionWithInsert(insert = createDbInsertChain().insert) {
+  return {
+    insert,
+  } as never;
+}
+
 describe('POST /api/onboarding/distribution-event', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -79,10 +72,9 @@ describe('POST /api/onboarding/distribution-event', () => {
   });
 
   it('returns 404 when the authenticated user does not own the profile', async () => {
-    mockDbInsert.mockImplementation(createDbInsertChain().insert);
     mockGetAuthenticatedProfile.mockResolvedValueOnce(null);
     mockWithDbSessionTx.mockImplementationOnce(async callback =>
-      callback({} as never, 'user_123')
+      callback(createTransactionWithInsert(), 'user_123')
     );
 
     const { POST } = await import(
@@ -104,14 +96,12 @@ describe('POST /api/onboarding/distribution-event', () => {
     await expect(response.json()).resolves.toEqual({
       error: 'Profile not found',
     });
-    expect(mockDbInsert).not.toHaveBeenCalled();
   });
 
   it('writes a deduped creator distribution event for valid payloads', async () => {
     const dbInsertChain = createDbInsertChain();
-    mockDbInsert.mockImplementation(dbInsertChain.insert);
     mockWithDbSessionTx.mockImplementationOnce(async callback =>
-      callback({} as never, 'user_123')
+      callback(createTransactionWithInsert(dbInsertChain.insert), 'user_123')
     );
 
     const { POST } = await import(
@@ -180,9 +170,8 @@ describe('POST /api/onboarding/distribution-event', () => {
       },
     });
     dbInsertChain.onConflictDoNothing.mockRejectedValueOnce(missingTableError);
-    mockDbInsert.mockImplementation(dbInsertChain.insert);
     mockWithDbSessionTx.mockImplementationOnce(async callback =>
-      callback({} as never, 'user_123')
+      callback(createTransactionWithInsert(dbInsertChain.insert), 'user_123')
     );
 
     const { POST } = await import(
@@ -219,9 +208,8 @@ describe('POST /api/onboarding/distribution-event', () => {
     const dbInsertChain = createDbInsertChain();
     const insertError = new Error('boom');
     dbInsertChain.onConflictDoNothing.mockRejectedValueOnce(insertError);
-    mockDbInsert.mockImplementation(dbInsertChain.insert);
     mockWithDbSessionTx.mockImplementationOnce(async callback =>
-      callback({} as never, 'user_123')
+      callback(createTransactionWithInsert(dbInsertChain.insert), 'user_123')
     );
 
     const { POST } = await import(

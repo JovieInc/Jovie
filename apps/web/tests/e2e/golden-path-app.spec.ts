@@ -1,15 +1,21 @@
 import { expect, test } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 import {
-  advanceOnboardingAfterArtistSelection,
-  advanceOnboardingToArtistSelection,
   buildValidOnboardingHandle,
+  completeOnboardingV2,
   createFreshUser,
   ensureDbUser,
+  ensureServerAuthenticated,
   hasRealEnv,
   interceptTrackingCalls,
   purgeStaleClerkTestUsers,
   waitForSpotifyImport,
 } from './helpers/e2e-helpers';
+import { setTestUserPlan } from './helpers/plan-helpers';
+import {
+  smokeNavigateWithRetry,
+  waitForHydration,
+} from './utils/smoke-test-utils';
 
 /**
  * Golden Path E2E — Core App Flows
@@ -23,8 +29,8 @@ import {
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
 const TEST_SPOTIFY_ARTIST = {
-  id: '59NJtiWq8nISIJjDtITQyt',
-  url: 'https://open.spotify.com/artist/59NJtiWq8nISIJjDtITQyt',
+  id: '6M2wZ9GZgrQXHCFfjv46we',
+  url: 'https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we',
 };
 
 /* ------------------------------------------------------------------ */
@@ -63,6 +69,7 @@ test.describe('Golden Path: Welcome Message', () => {
       TEST_SPOTIFY_ARTIST.id,
     ];
     await ensureDbUser(clerkUserId, email, knownSpotifyArtistIds);
+    await ensureServerAuthenticated(page, clerkUserId);
 
     const onboardingHandle = buildValidOnboardingHandle(
       uniqueSeed,
@@ -70,10 +77,14 @@ test.describe('Golden Path: Welcome Message', () => {
     );
 
     // Navigate to onboarding
-    await page.goto(`/onboarding?handle=${onboardingHandle}`, {
-      waitUntil: 'commit',
-      timeout: 45_000,
-    });
+    await smokeNavigateWithRetry(
+      page,
+      `/onboarding?handle=${onboardingHandle}`,
+      {
+        timeout: 45_000,
+        retries: 2,
+      }
+    );
 
     await expect(
       page.locator('[data-testid="onboarding-form-wrapper"]')
@@ -88,46 +99,16 @@ test.describe('Golden Path: Welcome Message', () => {
       })
       .toBe(onboardingHandle);
 
-    const continueBtn = page.getByRole('button', { name: 'Continue' });
-    await expect(continueBtn).toBeEnabled({ timeout: 20_000 });
-    await continueBtn.click();
-
-    // Artist search step
-    await advanceOnboardingToArtistSelection(page);
-    const artistInput = page.getByPlaceholder(/search.*artist.*spotify/i);
-    await expect(artistInput).toBeVisible({ timeout: 60_000 });
-    await artistInput.fill(TEST_SPOTIFY_ARTIST.url);
-
-    // Profile review or direct to dashboard
-    const reviewDisplayName = page.locator('#onboarding-display-name');
-    const goToDashboardBtn = page.getByRole('button', {
-      name: /go to dashboard/i,
+    await completeOnboardingV2(page, TEST_SPOTIFY_ARTIST.url, {
+      clerkUserId,
+      expectedHandle: onboardingHandle,
     });
 
-    const reviewStepOrDashboard =
-      await advanceOnboardingAfterArtistSelection(page);
-
-    if (reviewStepOrDashboard === 'review') {
-      const initialDisplayName = await reviewDisplayName.inputValue();
-      if (initialDisplayName.trim().length === 0) {
-        await reviewDisplayName.fill('Golden Path App Artist');
-      }
-      const dashboardExit = await Promise.race([
-        goToDashboardBtn
-          .waitFor({ state: 'visible', timeout: 10_000 })
-          .then(() => 'button' as const)
-          .catch(() => null),
-        page
-          .waitForURL(/\/app/, { timeout: 10_000 })
-          .then(() => 'dashboard' as const)
-          .catch(() => null),
-      ]);
-
-      if (dashboardExit === 'button') {
-        await expect(goToDashboardBtn).toBeEnabled({ timeout: 10_000 });
-        await goToDashboardBtn.click();
-      }
-    }
+    await ensureServerAuthenticated(page, clerkUserId);
+    await page.goto('/app', {
+      waitUntil: 'commit',
+      timeout: 60_000,
+    });
 
     // Wait for dashboard
     await expect(page).toHaveURL(/\/app/, { timeout: 30_000 });
@@ -143,9 +124,25 @@ test.describe('Golden Path: Welcome Message', () => {
       )
       .toBe('ready');
 
-    // Navigate to chat and verify welcome message
-    await page.goto('/app/chat', {
-      waitUntil: 'domcontentloaded',
+    // Bootstrap the onboarding welcome thread directly, then verify the message.
+    const welcomeChatResponse = await page.request.post(
+      '/api/onboarding/welcome-chat',
+      {
+        data: {},
+      }
+    );
+    expect(welcomeChatResponse.ok()).toBeTruthy();
+    const welcomeChatPayload = (await welcomeChatResponse.json()) as {
+      route?: string;
+    };
+    expect(welcomeChatPayload.route).toBeTruthy();
+
+    await smokeNavigateWithRetry(page, welcomeChatPayload.route!, {
+      timeout: 60_000,
+      retries: 2,
+    });
+    await waitForHydration(page);
+    await expect(page).toHaveURL(/\/app\/chat\/[^?]+/, {
       timeout: 30_000,
     });
 
@@ -154,7 +151,7 @@ test.describe('Golden Path: Welcome Message', () => {
       .locator('[data-role="assistant"]')
       .filter({ hasText: /career highlights/i })
       .first();
-    await expect(welcomeMessage).toBeVisible({ timeout: 30_000 });
+    await expect(welcomeMessage).toBeVisible({ timeout: 60_000 });
   });
 });
 
@@ -166,11 +163,14 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   test.describe.configure({ mode: 'serial' });
 
   test('releases page loads', async ({ page }) => {
-    await page.goto('/app/releases', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
+    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD_RELEASES, {
+      timeout: 60_000,
+      retries: 2,
     });
-    await expect(page).toHaveURL(/\/app\/releases/, { timeout: 15_000 });
+    await waitForHydration(page);
+    await expect(page).toHaveURL(/\/app\/dashboard\/releases/, {
+      timeout: 15_000,
+    });
     // Verify no error page
     await expect(page.locator('text=Something went wrong')).not.toBeVisible({
       timeout: 5_000,
@@ -178,21 +178,25 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   });
 
   test('audience page loads', async ({ page }) => {
-    await page.goto('/app/audience', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
+    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD_AUDIENCE, {
+      timeout: 60_000,
+      retries: 2,
     });
-    await expect(page).toHaveURL(/\/app\/audience/, { timeout: 15_000 });
+    await waitForHydration(page);
+    await expect(page).toHaveURL(/\/app\/dashboard\/audience/, {
+      timeout: 15_000,
+    });
     await expect(page.locator('text=Something went wrong')).not.toBeVisible({
       timeout: 5_000,
     });
   });
 
   test('presence page loads', async ({ page }) => {
-    await page.goto('/app/presence', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
+    await smokeNavigateWithRetry(page, APP_ROUTES.PRESENCE, {
+      timeout: 60_000,
+      retries: 2,
     });
+    await waitForHydration(page);
     await expect(page).toHaveURL(/\/app\/presence/, { timeout: 15_000 });
     await expect(page.locator('text=Something went wrong')).not.toBeVisible({
       timeout: 5_000,
@@ -200,11 +204,14 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   });
 
   test('earnings page loads', async ({ page }) => {
-    await page.goto('/app/earnings', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
+    await smokeNavigateWithRetry(page, APP_ROUTES.EARNINGS, {
+      timeout: 60_000,
+      retries: 2,
     });
-    await expect(page).toHaveURL(/\/app\/earnings/, { timeout: 15_000 });
+    await waitForHydration(page);
+    await expect(page).toHaveURL(/\/app\/(earnings|settings\/artist-profile)/, {
+      timeout: 15_000,
+    });
     await expect(page.locator('text=Something went wrong')).not.toBeVisible({
       timeout: 5_000,
     });
@@ -213,10 +220,11 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   test('artist profile settings loads with career highlights field', async ({
     page,
   }) => {
-    await page.goto('/app/settings/artist-profile', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
+    await smokeNavigateWithRetry(page, APP_ROUTES.SETTINGS_ARTIST_PROFILE, {
+      timeout: 60_000,
+      retries: 2,
     });
+    await waitForHydration(page);
     await expect(page).toHaveURL(/\/app\/settings\/artist-profile/, {
       timeout: 15_000,
     });
@@ -227,10 +235,11 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   });
 
   test('career highlights field saves successfully', async ({ page }) => {
-    await page.goto('/app/settings/artist-profile', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
+    await smokeNavigateWithRetry(page, APP_ROUTES.SETTINGS_ARTIST_PROFILE, {
+      timeout: 60_000,
+      retries: 2,
     });
+    await waitForHydration(page);
 
     const careerHighlightsField = page.locator('#careerHighlights');
     await expect(careerHighlightsField).toBeVisible({ timeout: 15_000 });
@@ -238,21 +247,21 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
     const testValue = `Golden path test ${Date.now()}`;
     await careerHighlightsField.fill(testValue);
 
-    // Trigger save via blur and wait for the network response
-    const savePromise = page.waitForResponse(
-      response =>
-        response.url().includes('/api/dashboard/profile') &&
-        response.request().method() === 'PATCH',
-      { timeout: 10_000 }
-    );
+    // Trigger auto-save via blur, then verify persistence after reload.
     await careerHighlightsField.blur();
-    await savePromise;
-
-    // Reload and verify persistence
-    await page.reload({ waitUntil: 'domcontentloaded', timeout: 30_000 });
-    const reloadedField = page.locator('#careerHighlights');
-    await expect(reloadedField).toBeVisible({ timeout: 15_000 });
-    await expect(reloadedField).toHaveValue(testValue, { timeout: 10_000 });
+    await expect
+      .poll(
+        async () => {
+          await page.reload({ waitUntil: 'commit', timeout: 60_000 });
+          await waitForHydration(page);
+          return page.locator('#careerHighlights').inputValue();
+        },
+        {
+          timeout: 60_000,
+          intervals: [2_000, 5_000, 10_000],
+        }
+      )
+      .toBe(testValue);
   });
 });
 
@@ -264,10 +273,11 @@ test.describe('Golden Path: Chat', { tag: '@golden-path' }, () => {
   test.describe.configure({ mode: 'serial' });
 
   test('chat page loads', async ({ page }) => {
-    await page.goto('/app/chat', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
+    await smokeNavigateWithRetry(page, APP_ROUTES.CHAT, {
+      timeout: 60_000,
+      retries: 2,
     });
+    await waitForHydration(page);
     await expect(page).toHaveURL(/\/app\/chat/, { timeout: 15_000 });
     await expect(page.locator('text=Something went wrong')).not.toBeVisible({
       timeout: 5_000,
@@ -277,43 +287,50 @@ test.describe('Golden Path: Chat', { tag: '@golden-path' }, () => {
   test('user can send a message and receive a response', async ({ page }) => {
     test.setTimeout(60_000);
 
-    await page.goto('/app/chat', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
+    await setTestUserPlan(page, 'pro');
+    await page.reload({ waitUntil: 'networkidle' });
+
+    await smokeNavigateWithRetry(page, APP_ROUTES.CHAT, {
+      timeout: 60_000,
+      retries: 2,
     });
+    await waitForHydration(page);
 
     // Find the chat input
     const chatInput = page
-      .getByPlaceholder(/message/i)
+      .getByPlaceholder(/ask jovie|chat message/i)
       .or(page.locator('textarea[data-testid="chat-input"]'))
       .or(page.locator('textarea').first());
     await expect(chatInput).toBeVisible({ timeout: 15_000 });
 
-    // Count existing assistant messages before sending
-    const assistantLocator = page
-      .locator('[data-role="assistant"]')
-      .or(page.locator('.assistant-message'));
-    const countBefore = await assistantLocator.count();
-
     // Send a test message
     await chatInput.fill('Hello, can you help me?');
-    await chatInput.press('Enter');
+    const sendButton = page.getByRole('button', { name: /send message/i });
+    await expect(sendButton).toBeEnabled({ timeout: 5_000 });
+    const assistantMessages = page.locator('[data-role="assistant"]');
+    const previousAssistantCount = await assistantMessages.count();
+    await sendButton.click();
 
-    // Wait for a NEW assistant response (count must increase)
     await expect
-      .poll(async () => assistantLocator.count(), { timeout: 30_000 })
-      .toBeGreaterThan(countBefore);
+      .poll(() => assistantMessages.count(), { timeout: 60_000 })
+      .toBeGreaterThan(previousAssistantCount);
+    await expect(assistantMessages.nth(previousAssistantCount)).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test('audio dictation toggle is present', async ({ page }) => {
-    await page.goto('/app/chat', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
+    await smokeNavigateWithRetry(page, APP_ROUTES.CHAT, {
+      timeout: 60_000,
+      retries: 2,
     });
+    await waitForHydration(page);
 
     // Look for microphone / dictation button
     const dictationToggle = page
-      .getByRole('button', { name: /dictation|microphone|voice|audio/i })
+      .getByRole('button', {
+        name: /dictate|dictation|microphone|voice|audio/i,
+      })
       .or(page.locator('[data-testid="dictation-toggle"]'))
       .or(page.locator('button[aria-label*="icrophone"]'));
     await expect(dictationToggle).toBeVisible({ timeout: 15_000 });

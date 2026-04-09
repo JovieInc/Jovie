@@ -199,6 +199,86 @@ export async function setTestAuthBypassSession(
   }
 }
 
+export async function waitForAuthenticatedHealth(
+  page: Page,
+  expectedUserId?: string | null
+): Promise<void> {
+  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  const authHealthUrl = new URL('/api/health/auth', baseUrl).toString();
+  const bypassSessionUrl = new URL(
+    '/api/dev/test-auth/session',
+    baseUrl
+  ).toString();
+
+  await expect
+    .poll(
+      async () => {
+        try {
+          let response = await page.request.get(authHealthUrl, {
+            failOnStatusCode: false,
+          });
+
+          if (response.status() === 403) {
+            response = await page.request.get(bypassSessionUrl, {
+              failOnStatusCode: false,
+            });
+
+            if (!response.ok()) {
+              return `http-${response.status()}`;
+            }
+
+            const payload = (await response.json()) as {
+              active?: boolean;
+              userId?: string | null;
+            };
+
+            if (!payload.active) {
+              return 'anonymous';
+            }
+
+            if (expectedUserId && payload.userId !== expectedUserId) {
+              return `user-mismatch:${payload.userId ?? 'unknown'}`;
+            }
+
+            return 'authenticated';
+          }
+
+          if (!response.ok()) {
+            return `http-${response.status()}`;
+          }
+
+          const payload = (await response.json()) as {
+            authenticated?: boolean;
+            userId?: string | null;
+          };
+
+          if (!payload.authenticated) {
+            return 'anonymous';
+          }
+
+          if (expectedUserId && payload.userId !== expectedUserId) {
+            return `user-mismatch:${payload.userId ?? 'unknown'}`;
+          }
+
+          return 'authenticated';
+        } catch (error) {
+          if (error instanceof Error) {
+            if (
+              error.message.includes('Execution context was destroyed') ||
+              error.message.includes('ECONNRESET') ||
+              error.message.includes('socket hang up')
+            ) {
+              return 'retrying';
+            }
+          }
+          throw error;
+        }
+      },
+      { timeout: 30_000 }
+    )
+    .toBe('authenticated');
+}
+
 async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
   await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
     timeout: 120_000,

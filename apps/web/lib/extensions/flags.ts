@@ -5,38 +5,8 @@ import type {
 
 const BASE_DOMAINS: readonly ExtensionDomainFlag[] = [
   {
-    host: 'mail.google.com',
-    label: 'Gmail',
-    mode: 'write',
-  },
-  {
-    host: 'genius.com',
-    label: 'Genius',
-    mode: 'write',
-  },
-  {
-    host: 'eventbrite.com',
-    label: 'Eventbrite',
-    mode: 'write',
-  },
-  {
-    host: 'bandsintown.com',
-    label: 'Bandsintown',
-    mode: 'write',
-  },
-  {
-    host: 'open.spotify.com',
-    label: 'Spotify',
-    mode: 'read',
-  },
-  {
-    host: 'artists.spotify.com',
-    label: 'Spotify for Artists',
-    mode: 'read',
-  },
-  {
-    host: 'instagram.com',
-    label: 'Instagram',
+    host: 'distrokid.com',
+    label: 'DistroKid',
     mode: 'read',
   },
 ] as const;
@@ -58,7 +28,7 @@ export function getExtensionFlags(signedIn: boolean): ExtensionFlagsResponse {
 
   return {
     signedIn,
-    chatPromptEnabled: true,
+    chatPromptEnabled: false,
     domains: BASE_DOMAINS.map(domain =>
       disabled.has(domain.host.toLowerCase())
         ? { ...domain, mode: 'off' as const }

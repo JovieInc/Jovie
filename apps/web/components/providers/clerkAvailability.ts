@@ -31,15 +31,15 @@ export function shouldBypassClerk(
     : globalThis.location
 ): boolean {
   const normalizedKey = publishableKey?.trim();
-  if (!normalizedKey || clerkMockFlag === '1') {
-    return true;
-  }
+  const shouldBypassForPrivateOrigin =
+    shouldDisableClerkProxyForLocation(locationLike);
 
-  if (isMockPublishableKey(normalizedKey)) {
-    return true;
-  }
-
-  return shouldDisableClerkProxyForLocation(locationLike);
+  return (
+    !normalizedKey ||
+    clerkMockFlag === '1' ||
+    isMockPublishableKey(normalizedKey) ||
+    shouldBypassForPrivateOrigin
+  );
 }
 
 function normalizeForwardedHeaderValue(value: string | null): string | null {
@@ -79,7 +79,6 @@ function extractHostnameFromHeaderValue(value: string | null): string | null {
   ) {
     return normalizedValue.slice(0, lastColonIndex).toLowerCase();
   }
-
   return normalizedValue.toLowerCase();
 }
 

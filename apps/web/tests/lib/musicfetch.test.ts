@@ -285,9 +285,8 @@ describe('musicfetch client', () => {
         },
       });
 
-      const { fetchArtistBySpotifyUrl } = await import(
-        '@/lib/dsp-enrichment/providers/musicfetch'
-      );
+      const { fetchArtistBySpotifyUrl, MUSICFETCH_ARTIST_LOOKUP_SERVICES } =
+        await import('@/lib/dsp-enrichment/providers/musicfetch');
 
       await fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123');
 
@@ -298,17 +297,15 @@ describe('musicfetch client', () => {
       expect(params).toBeInstanceOf(URLSearchParams);
       expect(params?.get('services')).toBeTruthy();
 
-      const requestedServices = new Set(
-        params?.get('services')?.split(',').filter(Boolean)
+      const requestedServices =
+        params?.get('services')?.split(',').filter(Boolean) ?? [];
+      expect(requestedServices.sort()).toEqual(
+        [...MUSICFETCH_ARTIST_LOOKUP_SERVICES].sort()
       );
-      expect(requestedServices.has('soundcloud')).toBe(true);
-      expect(requestedServices.has('netease')).toBe(true);
-      expect(requestedServices.has('telmoreMusik')).toBe(true);
-      expect(requestedServices.has('youseeMusik')).toBe(true);
-      expect(requestedServices.has('soundCloud')).toBe(false);
-      expect(requestedServices.has('netEase')).toBe(false);
-      expect(requestedServices.has('telmorMusik')).toBe(false);
-      expect(requestedServices.has('youSeeMusik')).toBe(false);
+      expect(requestedServices).not.toContain('soundCloud');
+      expect(requestedServices).not.toContain('netEase');
+      expect(requestedServices).not.toContain('telmoreMusik');
+      expect(requestedServices).not.toContain('napster');
     });
 
     it('returns null on a permanent 400 response', async () => {

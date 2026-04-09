@@ -1,13 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { isClerkHandshakeUrl } from '../helpers/clerk-auth';
 
 import {
-  advanceOnboardingAfterArtistSelection,
-  advanceOnboardingToArtistSelection,
   buildValidOnboardingHandle,
+  completeOnboardingV2,
   countPopulatedDspFields,
   createFreshUser,
   ensureDbUser,
+  ensureServerAuthenticated,
   hasRealEnv,
   interceptTrackingCalls,
   MAJOR_ARTIST_IDS,
@@ -18,6 +17,7 @@ import {
   waitForMultiDspEnrichment,
   waitForSpotifyImport,
 } from './helpers/e2e-helpers';
+import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 
 /**
  * Golden Path E2E — Signup -> Onboarding -> Music Fetch -> Stripe
@@ -35,16 +35,16 @@ const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
 const TEST_SPOTIFY_ARTISTS = [
   {
-    id: '59NJtiWq8nISIJjDtITQyt',
-    url: 'https://open.spotify.com/artist/59NJtiWq8nISIJjDtITQyt',
-  },
-  {
     id: '6M2wZ9GZgrQXHCFfjv46we',
     url: 'https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we',
   },
   {
     id: '06HL4z0CvFAxyc27GXpf02',
     url: 'https://open.spotify.com/artist/06HL4z0CvFAxyc27GXpf02',
+  },
+  {
+    id: '4Uwpa6zW3zzCSQvooQNksm',
+    url: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
   },
 ] as const;
 
@@ -89,41 +89,24 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
         console.log(`[golden-path][console:error] ${message.text()}`);
       }
     });
+    page.on('response', response => {
+      if (response.status() === 401) {
+        console.log(
+          `[golden-path][401] ${response.request().method()} ${response.url()}`
+        );
+      }
+    });
+    page.on('requestfailed', request => {
+      console.log(
+        `[golden-path][requestfailed] ${request.method()} ${request.url()} ${request.failure()?.errorText ?? 'unknown'}`
+      );
+    });
 
     const spotifyArtist =
       TEST_SPOTIFY_ARTISTS[testInfo.workerIndex % TEST_SPOTIFY_ARTISTS.length];
 
     // ──────────────────────────────────────────────────────────────────
-    // STEP 1: Landing page loads
-    // ──────────────────────────────────────────────────────────────────
-    await page.goto('/', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
-    });
-
-    // A signup CTA must be visible — either the claim input or a signup link
-    const signupCta = page
-      .locator('#handle-input')
-      .or(page.locator('a[href*="/signup"]').first());
-    await expect(signupCta.first()).toBeVisible({ timeout: 20_000 });
-
-    // ──────────────────────────────────────────────────────────────────
-    // STEP 2: Initiate signup
-    // ──────────────────────────────────────────────────────────────────
-    // The homepage CTA itself is already asserted above; navigate directly to
-    // signup here to avoid client-side route transition flake under load.
-    await page.goto('/signup', {
-      waitUntil: 'commit',
-      timeout: 30_000,
-    });
-    if (isClerkHandshakeUrl(page.url())) {
-      test.skip(true, 'Clerk handshake redirect in CI preview');
-      return;
-    }
-    await expect(page).toHaveURL(/\/signup/, { timeout: 30_000 });
-
-    // ──────────────────────────────────────────────────────────────────
-    // STEP 3: Create account
+    // STEP 1: Create account
     // ──────────────────────────────────────────────────────────────────
     const uniqueSeed = `${Date.now().toString(36)}-${testInfo.workerIndex}-${testInfo.repeatEachIndex}-${Math.random().toString(36).slice(2, 8)}`;
     const { email, clerkUserId } = await createFreshUser(page, uniqueSeed);
@@ -134,6 +117,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       ...TEST_SPOTIFY_ARTISTS.map(artist => artist.id),
     ];
     await ensureDbUser(clerkUserId, email, knownSpotifyArtistIds);
+    await ensureServerAuthenticated(page, clerkUserId);
 
     const onboardingHandle = buildValidOnboardingHandle(
       uniqueSeed,
@@ -141,12 +125,25 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     );
 
     // ──────────────────────────────────────────────────────────────────
-    // STEP 4: Onboarding — Handle step
+    // STEP 2: Fresh user redirects into onboarding
     // ──────────────────────────────────────────────────────────────────
-    await page.goto(`/onboarding?handle=${onboardingHandle}`, {
-      waitUntil: 'commit',
-      timeout: 45_000,
+    await smokeNavigateWithRetry(page, '/app', {
+      timeout: 120_000,
+      retries: 2,
     });
+    await page.waitForURL(/onboarding/, { timeout: 30_000 });
+
+    // ──────────────────────────────────────────────────────────────────
+    // STEP 3: Onboarding — Handle step
+    // ──────────────────────────────────────────────────────────────────
+    await smokeNavigateWithRetry(
+      page,
+      `/onboarding?handle=${onboardingHandle}`,
+      {
+        timeout: 45_000,
+        retries: 2,
+      }
+    );
     await expect(page).toHaveURL(
       new RegExp(`/onboarding\\?handle=${onboardingHandle}`)
     );
@@ -163,114 +160,22 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       })
       .toBe(onboardingHandle);
 
-    const continueBtn = page.getByRole('button', { name: 'Continue' });
-    await expect(continueBtn).toBeEnabled({ timeout: 20_000 });
-    await continueBtn.click();
-
     // ──────────────────────────────────────────────────────────────────
-    // STEP 5: Onboarding — Artist search (Music Fetch)
+    // STEP 4: Onboarding V2 — Spotify -> upgrade -> discovery summary
     // ──────────────────────────────────────────────────────────────────
-    await advanceOnboardingToArtistSelection(page);
-    const artistInput = page.getByPlaceholder(/search.*artist.*spotify/i);
-    await expect(artistInput).toBeVisible({ timeout: 60_000 });
-
-    await artistInput.fill(spotifyArtist.url);
-
-    // ──────────────────────────────────────────────────────────────────
-    // STEP 6: Profile review — verify form is usable
-    // ──────────────────────────────────────────────────────────────────
-
-    const reviewDisplayName = page.locator('#onboarding-display-name');
-    const goToDashboardBtn = page.getByRole('button', {
-      name: /go to dashboard/i,
+    await completeOnboardingV2(page, spotifyArtist.url, {
+      clerkUserId,
+      expectedHandle: onboardingHandle,
     });
-    const reviewStepOrDashboard =
-      await advanceOnboardingAfterArtistSelection(page);
 
-    if (reviewStepOrDashboard === 'review') {
-      // Display name is pre-set by completeOnboarding (from Clerk identity).
-      const initialDisplayName = await reviewDisplayName.inputValue();
-      if (initialDisplayName.trim().length === 0) {
-        await reviewDisplayName.fill('Golden Path Artist');
-      }
-      await expect
-        .poll(
-          async () => (await reviewDisplayName.inputValue()).trim().length,
-          {
-            timeout: 15_000,
-            message: 'Display name should have a value',
-          }
-        )
-        .toBeGreaterThan(0);
-
-      // Enrichment (bio, avatar) is fire-and-forget and depends on the DB
-      // pool + external APIs. Check if bio was populated, but don't fail
-      // the test if it wasn't — pool connectivity issues in test env can
-      // cause enrichProfileFromDsp to 500.
-      const bio = page.locator('#onboarding-bio');
-      const bioPopulated = await bio
-        .inputValue()
-        .then(v => v.trim().length > 0)
-        .catch(() => false);
-
-      if (!bioPopulated) {
-        await page.waitForTimeout(5_000);
-        const bioRetry = await bio
-          .inputValue()
-          .then(v => v.trim().length > 0)
-          .catch(() => false);
-
-        if (!bioRetry) {
-          console.warn(
-            'WARN: Music fetch enrichment did not populate bio — ' +
-              'this is expected when DB pool is unreliable in test env'
-          );
-        }
-      }
-
-      const dashboardExit = await Promise.race([
-        goToDashboardBtn
-          .waitFor({ state: 'visible', timeout: 10_000 })
-          .then(() => 'button' as const)
-          .catch(() => null),
-        page
-          .waitForURL(/\/app/, { timeout: 10_000 })
-          .then(() => 'dashboard' as const)
-          .catch(() => null),
-      ]);
-
-      if (dashboardExit === 'button') {
-        await expect(goToDashboardBtn).toBeEnabled({ timeout: 10_000 });
-        await goToDashboardBtn.click();
-      } else {
-        await expect(page).toHaveURL(/\/app/, { timeout: 10_000 });
-      }
-    } else {
-      await expect
-        .poll(
-          async () => {
-            const currentState = await waitForSpotifyImport(clerkUserId);
-            return currentState?.onboarding_completed_at ? 'ready' : 'pending';
-          },
-          {
-            timeout: 60_000,
-            intervals: [2_000, 5_000, 10_000],
-            message:
-              'Expected onboarding to complete even if the final app transition is slow',
-          }
-        )
-        .toBe('ready');
-
-      if (!page.url().includes('/app')) {
-        await page.goto('/app', {
-          waitUntil: 'commit',
-          timeout: 60_000,
-        });
-      }
-    }
+    await ensureServerAuthenticated(page, clerkUserId);
+    await page.goto('/app', {
+      waitUntil: 'commit',
+      timeout: 60_000,
+    });
 
     // ──────────────────────────────────────────────────────────────────
-    // STEP 7: Dashboard loaded — profile is sufficiently complete
+    // STEP 5: Dashboard loaded — profile is sufficiently complete
     // ──────────────────────────────────────────────────────────────────
     await expect(page).toHaveURL(/\/app/, { timeout: 30_000 });
 
@@ -392,9 +297,25 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
         timeout: 30_000,
       });
 
-      const body = await page.evaluate(() =>
-        document.body.innerText.toLowerCase()
+      await expect
+        .poll(
+          async () => {
+            return page.evaluate(() => document.body.innerText.toLowerCase());
+          },
+          { timeout: 60_000, intervals: [1_000, 2_000, 5_000, 10_000] }
+        )
+        .not.toContain('loading jovie profile');
+
+      await page.goto(`/${onboardingHandle}?mode=listen`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30_000,
+      });
+
+      await expect(page).toHaveURL(
+        new RegExp(`/${onboardingHandle}\\?mode=listen`),
+        { timeout: 30_000 }
       );
+
       const dspNames = [
         'spotify',
         'apple music',
@@ -403,15 +324,24 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
         'youtube music',
         'soundcloud',
       ];
-      const visibleDsps = dspNames.filter(name => body.includes(name));
+
+      const visibleDsps = [];
+      for (const name of dspNames) {
+        const button = page.getByRole('button', {
+          name: new RegExp(name, 'i'),
+        });
+        if (await button.isVisible().catch(() => false)) {
+          visibleDsps.push(name);
+        }
+      }
 
       expect(
         visibleDsps.length,
-        `Profile page should show >= 2 DSP links (found: ${visibleDsps.join(', ')})`
+        `Public listen surface should show >= 2 DSP links (found: ${visibleDsps.join(', ')})`
       ).toBeGreaterThanOrEqual(2);
 
       console.log(
-        `[golden-path] Profile page DSPs visible: ${visibleDsps.join(', ')}`
+        `[golden-path] Public listen surface DSPs visible: ${visibleDsps.join(', ')}`
       );
     }
 

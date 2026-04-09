@@ -169,7 +169,10 @@ describe('GET /api/onboarding/discovery', () => {
             bio: 'Bio',
             genres: ['pop'],
             location: 'Los Angeles',
-            settings: { hometown: 'Nashville' },
+            settings: {
+              hometown: 'Nashville',
+              spotifyImportStatus: 'complete',
+            },
             activeSinceYear: 2020,
             spotifyId: 'spotify_1',
             spotifyUrl: 'https://open.spotify.com/artist/spotify_1',
@@ -235,6 +238,7 @@ describe('GET /api/onboarding/discovery', () => {
         ])
       )
       .mockImplementationOnce(() => whereChain([{ value: 12 }]))
+      .mockImplementationOnce(() => whereChain([{ value: 1 }]))
       .mockImplementationOnce(() => whereChain([{ value: 1 }]))
       .mockImplementationOnce(() =>
         limitChain([
@@ -302,6 +306,20 @@ describe('GET /api/onboarding/discovery', () => {
       releaseCount: 12,
       activeSocialCount: 1,
       dspCount: 2,
+    });
+    expect(payload.snapshot.importState).toEqual({
+      spotifyImportStatus: 'complete',
+      releaseCount: 12,
+      recordingCount: 1,
+      activeSocialCount: 1,
+      confirmedDspCount: 2,
+      hasSpotifySelection: true,
+      hasImportedReleases: true,
+    });
+    expect(payload.snapshot.readiness).toEqual({
+      phase: 'discovering',
+      canProceedToDashboard: false,
+      blockingReason: 'discovery_in_progress',
     });
     expect(payload.snapshot.hasPendingDiscoveryJob).toBe(true);
     expect(mockIsActiveDiscoveryJob).toHaveBeenCalledWith(

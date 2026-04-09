@@ -6,6 +6,7 @@ import { OnboardingFormWrapper } from '@/features/dashboard/organisms/Onboarding
 import { getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
+import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
@@ -31,8 +32,7 @@ export default async function OnboardingPage({
 }: Readonly<OnboardingPageProps>) {
   const resolvedSearchParams = await searchParams;
   const shouldSkipDashboardPrefetch =
-    process.env.E2E_FAST_ONBOARDING === '1' &&
-    Boolean(resolvedSearchParams?.handle);
+    isE2EFastOnboardingEnabled() && Boolean(resolvedSearchParams?.handle);
 
   const authResult = await resolveUserState();
 
@@ -109,11 +109,10 @@ export default async function OnboardingPage({
   // Start handle reservation early with what we know now (display name from Clerk)
   const earlyDisplayName = clerkIdentity.displayName || '';
   const earlyProvidedHandle =
-    resolvedSearchParams?.handle || user?.username || spotifySuggestedHandle;
-  const handleReservationPromise =
-    shouldLoadExistingProfile && !earlyProvidedHandle
-      ? reserveOnboardingHandle(earlyDisplayName)
-      : Promise.resolve(null);
+    resolvedSearchParams?.handle || spotifySuggestedHandle;
+  const handleReservationPromise = !earlyProvidedHandle
+    ? reserveOnboardingHandle(earlyDisplayName)
+    : Promise.resolve(null);
 
   // Await both in parallel
   const [existingProfile, earlyReservedHandle] = await Promise.all([
@@ -127,7 +126,6 @@ export default async function OnboardingPage({
   const providedHandle =
     resolvedSearchParams?.handle ||
     existingProfile?.username ||
-    user?.username ||
     spotifySuggestedHandle;
 
   // Discard the early reservation if a providedHandle is now available (e.g. from
@@ -147,8 +145,7 @@ export default async function OnboardingPage({
   const shouldAutoSubmitHandle =
     Boolean(spotifySuggestedHandle) &&
     !resolvedSearchParams?.handle &&
-    !existingProfile?.username &&
-    !user?.username;
+    !existingProfile?.username;
 
   return (
     <OnboardingFormWrapper

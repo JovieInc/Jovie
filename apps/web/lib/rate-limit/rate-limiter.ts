@@ -8,6 +8,7 @@
 import * as Sentry from '@sentry/nextjs';
 import type { Ratelimit } from '@upstash/ratelimit';
 import { env } from '@/lib/env-server';
+import { withTimeout } from '@/lib/resilience/primitives';
 import { parseWindowToMs } from './config';
 import { MemoryRateLimiter } from './memory-limiter';
 import { createRedisRateLimiter, isRedisAvailable } from './redis-limiter';
@@ -18,6 +19,8 @@ import type {
 } from './types';
 
 export type RateLimiterBackend = 'redis' | 'memory';
+
+const REDIS_RATE_LIMIT_TIMEOUT_MS = 750;
 
 /**
  * Options for creating a rate limiter
@@ -88,7 +91,11 @@ export class RateLimiter {
     // Try Redis first if available
     if (this.redisLimiter) {
       try {
-        const result = await this.redisLimiter.limit(identifier);
+        const result = await withTimeout(this.redisLimiter.limit(identifier), {
+          timeoutMs: REDIS_RATE_LIMIT_TIMEOUT_MS,
+          context: `rate-limit:${this.config.name}`,
+          timeoutMessage: `[RateLimit:${this.config.name}] Redis timeout`,
+        });
         return {
           success: result.success,
           limit: result.limit,
