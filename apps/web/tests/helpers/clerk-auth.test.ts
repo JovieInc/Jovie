@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canFallbackToBypassUserId,
   hasClerkOriginMismatchSignal,
   isClerkHandshakeUrl,
   isClerkOriginMismatchMessage,
@@ -47,5 +48,11 @@ describe('clerk-auth helpers', () => {
         'Some unrelated warning',
       ])
     ).toBe(false);
+  });
+
+  it('only allows creator persona fallback for bypass auth', () => {
+    expect(canFallbackToBypassUserId('creator')).toBe(true);
+    expect(canFallbackToBypassUserId('admin')).toBe(false);
+    expect(canFallbackToBypassUserId(null)).toBe(false);
   });
 });

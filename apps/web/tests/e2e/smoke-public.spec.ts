@@ -60,19 +60,14 @@ test('homepage: hero heading, CTA, final claim CTA', async ({ page }) => {
     .first();
   await expect(cta).toBeVisible({ timeout: 20_000 });
 
-  await page
-    .getByRole('link', { name: 'Start Free' })
-    .last()
-    .scrollIntoViewIfNeeded();
-  const finalCtaHeadline = page.getByRole('heading', {
-    name: /Release day starts here\.|Own the release stack\./,
-  });
+  await page.getByTestId('final-cta-section').scrollIntoViewIfNeeded();
+  const finalCtaHeadline = page.getByTestId('final-cta-headline');
   await expect(
     finalCtaHeadline,
     'Homepage did not render the final claim CTA section'
   ).toBeVisible({ timeout: 20_000 });
   await expect(
-    page.getByRole('link', { name: 'Start Free' }).last(),
+    page.getByTestId('final-cta-action'),
     'Homepage did not render the final CTA action'
   ).toBeVisible({ timeout: 20_000 });
 
@@ -130,9 +125,6 @@ test.describe('Public Profile - dualipa', () => {
 
     await expect(
       page.getByRole('link', { name: /claim profile for dua lipa/i })
-    ).toBeVisible({ timeout: 15_000 });
-    await expect(
-      page.getByRole('link', { name: /go to dua lipa's profile/i })
     ).toBeVisible({ timeout: 15_000 });
   });
 

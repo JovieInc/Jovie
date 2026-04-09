@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getClerkProxyUrl,
+  getRequestLocationFromHeaders,
   isMockPublishableKey,
   shouldBypassClerk,
   shouldDisableClerkProxyForLocation,
@@ -11,29 +12,39 @@ describe('clerkAvailability', () => {
     expect(shouldBypassClerk('   ', '0')).toBe(true);
   });
 
-  it('keeps Clerk enabled for live Clerk keys on insecure private origins', () => {
+  it('bypasses Clerk for live Clerk keys on insecure private origins', () => {
     expect(
       shouldBypassClerk(
         'pk_live_example',
         '0',
         new URL('http://localhost:3100')
       )
-    ).toBe(false);
+    ).toBe(true);
     expect(
       shouldBypassClerk(
         'pk_live_example',
         '0',
         new URL('http://127.0.0.1:3100')
       )
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it('keeps Clerk enabled for test keys on insecure private origins', () => {
+  it('bypasses Clerk for test keys on insecure private origins', () => {
     expect(
       shouldBypassClerk(
         'pk_test_example',
         '0',
         new URL('http://localhost:3100')
+      )
+    ).toBe(true);
+  });
+
+  it('keeps Clerk enabled for real keys on secure public origins', () => {
+    expect(
+      shouldBypassClerk(
+        'pk_live_example',
+        '0',
+        new URL('https://staging.jov.ie')
       )
     ).toBe(false);
   });
@@ -42,6 +53,31 @@ describe('clerkAvailability', () => {
     expect(isMockPublishableKey('mock-publishable-key')).toBe(true);
     expect(isMockPublishableKey('dummy')).toBe(true);
     expect(isMockPublishableKey('pk_test_example')).toBe(false);
+  });
+
+  describe('getRequestLocationFromHeaders', () => {
+    it('normalizes comma-separated hosts, uppercase proto, and IPv6 ports', () => {
+      const headers = new Headers({
+        'x-forwarded-host': '[::1]:3000, localhost:3000',
+        'x-forwarded-proto': 'HTTP, https',
+      });
+
+      expect(getRequestLocationFromHeaders(headers)).toEqual({
+        hostname: '::1',
+        protocol: 'http:',
+      });
+    });
+
+    it('defaults missing proto headers to http for private hosts', () => {
+      const headers = new Headers({
+        host: 'localhost:3000',
+      });
+
+      expect(getRequestLocationFromHeaders(headers)).toEqual({
+        hostname: 'localhost',
+        protocol: 'http:',
+      });
+    });
   });
 
   describe('getClerkProxyUrl', () => {

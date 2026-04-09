@@ -13,12 +13,22 @@ import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 const AUTH_FILE = 'tests/.auth/user.json';
 const AUTH_READY_ROUTE = APP_ROUTES.DASHBOARD;
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolveSleep => {
+    setTimeout(resolveSleep, ms);
+  });
+}
+
 function getRequestedBypassPersona(): 'creator' | 'admin' | null {
   const persona = process.env.E2E_TEST_AUTH_PERSONA?.trim();
   if (persona === 'creator' || persona === 'admin') {
     return persona;
   }
   return null;
+}
+
+function canFallbackToBypassUserId(persona: 'creator' | 'admin' | null) {
+  return persona === 'creator';
 }
 
 async function resolveBypassUserId(
@@ -30,21 +40,40 @@ async function resolveBypassUserId(
     return fallbackUserId;
   }
 
-  const response = await fetch(
-    new URL('/api/dev/test-auth/session', cookieBaseUrl),
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ persona }),
-    }
-  );
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(
+        new URL('/api/dev/test-auth/session', cookieBaseUrl),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persona }),
+        }
+      );
 
-  if (!response.ok) {
-    throw new Error(`Failed to resolve ${persona} test-auth session`);
+      if (!response.ok) {
+        throw new Error(`Failed to resolve ${persona} test-auth session`);
+      }
+
+      const payload = (await response.json()) as { userId?: string | null };
+      return payload.userId?.trim() || fallbackUserId;
+    } catch (error) {
+      if (attempt === 3) {
+        if (canFallbackToBypassUserId(persona)) {
+          console.warn(
+            `[auth.setup] Falling back to configured bypass user for ${persona} persona after session bootstrap failed`
+          );
+          return fallbackUserId;
+        }
+
+        throw error;
+      }
+
+      await sleep(500 * attempt);
+    }
   }
 
-  const payload = (await response.json()) as { userId?: string | null };
-  return payload.userId?.trim() || fallbackUserId;
+  return fallbackUserId;
 }
 
 setup.describe.configure({ mode: 'serial' });

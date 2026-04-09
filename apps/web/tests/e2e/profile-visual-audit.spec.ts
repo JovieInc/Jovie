@@ -258,17 +258,26 @@ async function ensureComposerVisible(page: import('@playwright/test').Page) {
     }
   }
 
-  const revealButton = page
-    .getByRole('button', {
-      name: /turn on notifications|get notified/i,
-    })
-    .first();
+  const revealCandidates = [
+    page.getByRole('button', {
+      name: /turn on notifications|get notified|manage notification preferences/i,
+    }),
+    page.locator('[data-testid="subscribe-cta-container"] button'),
+    page.locator('[data-testid="notifications-page"] button'),
+  ];
 
-  if (await revealButton.isVisible().catch(() => false)) {
-    await revealButton.click();
+  for (const candidate of revealCandidates) {
+    const trigger = candidate.first();
+    if (await trigger.isVisible().catch(() => false)) {
+      await trigger.click();
+      break;
+    }
   }
 
-  await composer.first().waitFor({ state: 'visible', timeout: 15_000 });
+  await waitForVisibleSelector(
+    page,
+    '[data-testid="subscription-pearl-composer"]'
+  );
 }
 
 async function focusComposerInput(page: import('@playwright/test').Page) {

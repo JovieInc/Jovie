@@ -10,7 +10,13 @@
  * @see apps/web/components/providers/ClientProviders.tsx
  */
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { availabilityState } = vi.hoisted(() => ({
+  availabilityState: {
+    shouldBypass: true,
+  },
+}));
 
 // Mock Clerk and env to avoid real auth setup
 vi.mock('@clerk/nextjs', () => ({
@@ -38,7 +44,7 @@ vi.mock('@/lib/env-public', () => ({
   },
 }));
 vi.mock('@/components/providers/clerkAvailability', () => ({
-  shouldBypassClerk: () => true,
+  shouldBypassClerk: () => availabilityState.shouldBypass,
   getClerkProxyUrl: () => '/__clerk',
 }));
 
@@ -79,6 +85,23 @@ function TestChild() {
 }
 
 describe('ClientProviders composition', () => {
+  beforeEach(() => {
+    availabilityState.shouldBypass = true;
+  });
+
+  it('supports route-level forced Clerk bypass for public surfaces', () => {
+    availabilityState.shouldBypass = false;
+
+    render(
+      <ClientProviders publishableKey='pk_live_example' forceBypassClerk>
+        <TestChild />
+      </ClientProviders>
+    );
+
+    expect(screen.queryByTestId('clerk-provider')).not.toBeInTheDocument();
+    expect(screen.getByTestId('clerk-safe-defaults')).toBeInTheDocument();
+  });
+
   describe('skipCoreProviders=false (default)', () => {
     it('renders CoreProviders wrapping children', () => {
       render(

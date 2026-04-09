@@ -35,6 +35,12 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
+export function canFallbackToBypassUserId(
+  persona: 'creator' | 'admin' | null
+): boolean {
+  return persona === 'creator';
+}
+
 async function resolveBypassUserId(
   baseUrl: string,
   fallbackUserId: string,
@@ -56,17 +62,24 @@ async function resolveBypassUserId(
       );
 
       if (!response.ok) {
-        throw new ClerkTestError(
-          `Failed to resolve ${persona} test auth persona.`,
-          'CLERK_SETUP_FAILED'
-        );
+        throw new Error(`Failed to resolve ${persona} test auth persona.`);
       }
 
       const payload = (await response.json()) as { userId?: string | null };
       return payload.userId?.trim() || fallbackUserId;
-    } catch (error) {
-      if (error instanceof ClerkTestError || attempt === 3) {
-        throw error;
+    } catch {
+      if (attempt === 3) {
+        if (canFallbackToBypassUserId(persona)) {
+          console.warn(
+            `[clerk-auth] Falling back to configured bypass user for ${persona} persona after session bootstrap failed`
+          );
+          return fallbackUserId;
+        }
+
+        throw new ClerkTestError(
+          `Failed to resolve ${persona} test auth persona.`,
+          'CLERK_SETUP_FAILED'
+        );
       }
 
       await sleep(500 * attempt);

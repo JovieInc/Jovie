@@ -70,6 +70,18 @@ const DEMO_PUBLIC_SOCIAL_LINKS: readonly LegacySocialLink[] = [
     clicks: 512,
     created_at: DEMO_PUBLIC_ARTIST.created_at,
   },
+  ...(DEMO_PUBLIC_ARTIST.venmo_handle
+    ? [
+        {
+          id: 'demo-social-venmo',
+          artist_id: DEMO_PUBLIC_ARTIST.id,
+          platform: 'venmo',
+          url: `https://venmo.com/${DEMO_PUBLIC_ARTIST.venmo_handle.replace(/^@/, '')}`,
+          clicks: 276,
+          created_at: DEMO_PUBLIC_ARTIST.created_at,
+        } satisfies LegacySocialLink,
+      ]
+    : []),
 ] as const;
 
 export function DemoPublicProfileSurface() {
