@@ -676,6 +676,89 @@ describe('POST /api/audience/visit', () => {
     ).toBe(false);
   });
 
+  it('skips the activated event write when creator_distribution_events is missing', async () => {
+    const insideActivationWindow = new Date(
+      Date.now() - (BIO_LINK_ACTIVATION_WINDOW_DAYS - 1) * MS_PER_DAY
+    );
+    const missingTableError = new Error('Failed query');
+    Object.assign(missingTableError, {
+      cause: {
+        code: '42P01',
+        message: 'undefined table',
+      },
+    });
+
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([
+            {
+              id: 'profile_123',
+              isPublic: true,
+              onboardingCompletedAt: insideActivationWindow,
+            },
+          ]),
+        }),
+      }),
+    });
+
+    mockWithSystemIngestionSession.mockImplementation(async callback => {
+      const mockInsert = vi.fn().mockReturnValue({
+        values: vi
+          .fn()
+          .mockImplementation((value: Record<string, unknown>) => ({
+            onConflictDoNothing:
+              value.eventType === 'activated'
+                ? vi.fn().mockRejectedValueOnce(missingTableError)
+                : vi.fn().mockResolvedValue(undefined),
+            onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+          })),
+      });
+
+      await callback({
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        insert: mockInsert,
+        update: vi.fn().mockReturnValue({
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      });
+    });
+
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+        referrer:
+          'https://l.instagram.com/?u=https%3A%2F%2Fjov.ie%2Fartist-profile',
+        utmParams: {
+          content: 'bio',
+          medium: 'social',
+          source: 'instagram',
+        },
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(mockCaptureWarning).toHaveBeenCalledWith(
+      '[audience/visit] creator_distribution_events table missing; skipping activation write',
+      expect.any(Error),
+      { profileId: '123e4567-e89b-12d3-a456-426614174000' }
+    );
+  });
+
   it('skips the aggregate write when daily_profile_views is missing', async () => {
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({

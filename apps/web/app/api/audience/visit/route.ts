@@ -165,10 +165,7 @@ async function incrementDailyProfileViews(
 }
 
 function isMissingDailyProfileViewsTableError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message
-    .toLowerCase()
-    .includes('relation "daily_profile_views" does not exist');
+  return unwrapPgError(error).code === '42P01';
 }
 
 function isMissingCreatorDistributionEventsTableError(error: unknown): boolean {
