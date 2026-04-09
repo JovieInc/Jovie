@@ -272,27 +272,23 @@ async function waitForVisibleSelector(
     .toBe(true);
 }
 
-async function hasVisibleComposer(page: import('@playwright/test').Page) {
-  const composer = page.locator('[data-testid="subscription-pearl-composer"]');
-  const count = await composer.count();
-
-  for (let index = 0; index < count; index += 1) {
-    if (
-      await composer
-        .nth(index)
-        .isVisible()
-        .catch(() => false)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 async function ensureComposerVisible(page: import('@playwright/test').Page) {
-  if (await hasVisibleComposer(page)) {
-    return;
+  const composerSelectors = [
+    '[data-testid="subscription-pearl-composer"]',
+    '[data-testid="inline-email-input-composer"]',
+  ] as const;
+
+  for (const selector of composerSelectors) {
+    const composer = page.locator(selector);
+    if ((await composer.count()) > 0) {
+      const visible = await composer
+        .first()
+        .isVisible()
+        .catch(() => false);
+      if (visible) {
+        return;
+      }
+    }
   }
 
   const revealCandidates = [
@@ -311,14 +307,26 @@ async function ensureComposerVisible(page: import('@playwright/test').Page) {
       break;
     }
   }
+
+  for (const selector of composerSelectors) {
+    const composer = page.locator(selector).first();
+    const visible = await composer.isVisible().catch(() => false);
+    if (visible) {
+      return;
+    }
+  }
   await waitForVisibleSelector(
     page,
-    '[data-testid="subscription-pearl-composer"]'
+    '[data-testid="subscription-pearl-composer"], [data-testid="inline-email-input-composer"]'
   );
 }
 
 async function focusComposerInput(page: import('@playwright/test').Page) {
-  const input = page.locator('[data-testid="subscription-input"]').first();
+  const input = page
+    .locator(
+      '[data-testid="subscription-input"], [data-testid="inline-email-input"]'
+    )
+    .first();
   await input.waitFor({ state: 'visible', timeout: 15_000 });
   await input.focus();
 }

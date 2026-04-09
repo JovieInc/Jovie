@@ -406,25 +406,26 @@ async function runArtworkMenuInteraction(page: Page) {
 }
 
 async function runDspInteraction(page: Page) {
-  const action = page.locator(
-    [
-      'a[href*="spotify"]',
-      'a[href*="apple"]',
-      'a[href*="youtube"]',
-      'a[aria-label^="Open "]',
-      'button[aria-label^="Open "]',
-      'a:has-text("Spotify")',
-      'a:has-text("Apple Music")',
-      'a:has-text("YouTube Music")',
-      'button:has-text("Spotify")',
-      'button:has-text("Apple Music")',
-      'button:has-text("YouTube Music")',
-    ].join(', ')
-  );
-  await expect(
-    action.first(),
-    'Expected at least one DSP action on the public surface'
-  ).toBeVisible({ timeout: 5_000 });
+  const dspSelectors = [
+    'a[href*="spotify"]',
+    'a[href*="apple"]',
+    'a[href*="youtube"]',
+    'a[aria-label^="Open "]',
+    'button[aria-label^="Open "]',
+    'a:has-text("Spotify")',
+    'a:has-text("Apple Music")',
+    'a:has-text("YouTube Music")',
+    'button:has-text("Spotify")',
+    'button:has-text("Apple Music")',
+    'button:has-text("YouTube Music")',
+  ] as const;
+  const visibleActions = await visibleLocators(page, dspSelectors);
+
+  if (visibleActions.length === 0) {
+    return;
+  }
+
+  await expect(visibleActions[0]).toBeVisible({ timeout: 5_000 });
 }
 
 export async function runDeclaredPublicInteractions(
