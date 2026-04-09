@@ -23,10 +23,10 @@ const InviteCampaignManager = dynamic(
   { ssr: false }
 );
 
-const UnifiedUrlIntake = dynamic(
+const GrowthIntakeComposer = dynamic(
   () =>
-    import('@/features/admin/leads/UnifiedUrlIntake').then(
-      m => m.UnifiedUrlIntake
+    import('@/features/admin/leads/GrowthIntakeComposer').then(
+      m => m.GrowthIntakeComposer
     ),
   { ssr: false }
 );
@@ -158,7 +158,9 @@ export function GtmCollapsibles({ initialOpen }: GtmCollapsiblesProps) {
       >
         {everOpened.has(0) && (
           <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
-            <UnifiedUrlIntake />
+            <GrowthIntakeComposer
+              initialMode={initialOpen === 'ingest' ? 'queue' : 'single'}
+            />
             <LeadKeywordsManager />
           </div>
         )}
