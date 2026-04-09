@@ -116,11 +116,7 @@ test.describe('Homepage', () => {
     });
 
     await expect(
-<<<<<<< HEAD
-      page.getByRole('link', { name: /get started/i }).first()
-=======
       page.getByRole('link', { name: /get started|start free/i }).first()
->>>>>>> e97bb62ce (fix(e2e): stabilize smoke route checks)
     ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
   });
 
