@@ -30,6 +30,32 @@ describe('shouldBypassClerkForRequest', () => {
         pathname: '/api/dev/test-auth/enter',
       })
     ).toBe(true);
+
+    expect(
+      shouldBypassClerkForRequest({
+        cookies: [],
+        pathInfo: PUBLIC_PATH_INFO,
+        pathname: '/api/profile/view',
+      })
+    ).toBe(true);
+  });
+
+  it('keeps Clerk enabled for authenticated API families', () => {
+    expect(
+      shouldBypassClerkForRequest({
+        cookies: [],
+        pathInfo: PUBLIC_PATH_INFO,
+        pathname: '/api/dsp/matches',
+      })
+    ).toBe(false);
+
+    expect(
+      shouldBypassClerkForRequest({
+        cookies: [],
+        pathInfo: PUBLIC_PATH_INFO,
+        pathname: '/api/promo-downloads/confirm',
+      })
+    ).toBe(false);
   });
 
   it('keeps Clerk enabled for API requests with an active session', () => {

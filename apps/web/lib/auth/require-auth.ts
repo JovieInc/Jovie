@@ -1,7 +1,7 @@
 import 'server-only';
-import { auth } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { getOptionalAuth } from '@/lib/auth/cached';
 import {
   isTestAuthBypassEnabled,
   resolveTestBypassUserId,
@@ -74,7 +74,7 @@ export async function requireAuth(options?: {
     }
   }
 
-  const { userId } = await auth();
+  const { userId } = await getOptionalAuth();
 
   if (!userId) {
     return {
@@ -117,7 +117,7 @@ export async function getAuthUserId(): Promise<string | null> {
     }
   }
 
-  const { userId } = await auth();
+  const { userId } = await getOptionalAuth();
   return userId;
 }
 
