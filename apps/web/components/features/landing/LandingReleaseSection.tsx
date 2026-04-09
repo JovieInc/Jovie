@@ -102,6 +102,7 @@ export function LandingReleaseSection() {
                 height={1800}
                 title='Release workspace'
                 chrome='minimal'
+                priority
                 skipCheck
                 testId='landing-release-screenshot'
                 className='rounded-[1.15rem]'

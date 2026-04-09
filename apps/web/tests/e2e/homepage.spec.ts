@@ -35,17 +35,29 @@ test.describe('Homepage', () => {
       'Drop more music. Crush every release.'
     );
     await expect(
-      page.getByText('One system to make every release count, every time.')
+      page.getByText(
+        'Your artist page, every release page, and the launch workflow behind them all run in one system.'
+      )
     ).toBeVisible();
     await expect(
       page.getByRole('link', { name: /get started|start free/i }).first()
     ).toBeVisible();
 
-    await expect(page.getByTestId('homepage-hero-profile-card')).toBeVisible();
-    await expect(page.getByTestId('homepage-hero-release-card')).toBeVisible();
-    await expect(page.getByTestId('homepage-hero-task-card-1')).toBeVisible();
-    await expect(page.getByTestId('homepage-hero-task-card-2')).toBeVisible();
-    await expect(page.getByTestId('homepage-hero-task-card-3')).toBeVisible();
+    await expect(
+      page.getByTestId('homepage-hero-profile-card').last()
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('homepage-hero-release-card').last()
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('homepage-hero-task-card-1').last()
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('homepage-hero-task-card-2').last()
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('homepage-hero-task-card-3').last()
+    ).toBeVisible();
   });
 
   test('header shows auth actions without marketing nav links', async ({
@@ -77,7 +89,7 @@ test.describe('Homepage', () => {
     ).toHaveCount(0);
     await expect(
       page.getByRole('heading', {
-        name: 'Your release operating system.',
+        name: 'A command center for your career.',
       })
     ).toBeVisible();
 
@@ -88,7 +100,7 @@ test.describe('Homepage', () => {
       page.getByTestId('homepage-release-destination-live').first()
     ).toBeVisible();
     await expect(
-      page.getByTestId('homepage-release-operating-system-surface')
+      page.getByRole('heading', { name: 'A command center for your career.' })
     ).toBeVisible();
   });
 
