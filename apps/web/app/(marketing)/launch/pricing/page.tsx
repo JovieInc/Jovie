@@ -1,7 +1,11 @@
 import { Check } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MarketingContainer, MarketingHero } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHero,
+  MarketingPageShell,
+} from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
@@ -58,7 +62,7 @@ function FeatureList({ features }: FeatureListProps) {
 
 export default function PricingPage() {
   return (
-    <div>
+    <MarketingPageShell>
       <MarketingHero variant='centered'>
         <h1 id='pricing-heading' className='marketing-h2-linear max-w-[680px]'>
           Simple pricing.{' '}
@@ -153,6 +157,6 @@ export default function PricingPage() {
           )}
         </div>
       </MarketingContainer>
-    </div>
+    </MarketingPageShell>
   );
 }

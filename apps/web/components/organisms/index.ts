@@ -49,6 +49,18 @@ export {
   useProfileShell,
 } from './profile-shell';
 export type {
+  PublicSurfaceFooterProps,
+  PublicSurfaceHeaderProps,
+  PublicSurfaceShellProps,
+  PublicSurfaceStageProps,
+} from './public-surface';
+export {
+  PublicSurfaceFooter,
+  PublicSurfaceHeader,
+  PublicSurfaceShell,
+  PublicSurfaceStage,
+} from './public-surface';
+export type {
   HandleValidationState,
   SmartHandleInputProps,
 } from './SmartHandleInput';

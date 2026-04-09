@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MarketingContainer, MarketingHero } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHero,
+  MarketingPageShell,
+} from '@/components/marketing';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -177,7 +181,7 @@ function Divider() {
 
 export default function LaunchPage() {
   return (
-    <div className='relative min-h-screen'>
+    <MarketingPageShell>
       <AuthRedirectHandler />
 
       {/* Structured Data */}
@@ -1871,6 +1875,6 @@ export default function LaunchPage() {
           </div>
         </div>
       </section>
-    </div>
+    </MarketingPageShell>
   );
 }
