@@ -94,6 +94,7 @@ describe('getAdminFunnelMetrics outreach query', () => {
         (arg): arg is Record<string, unknown> =>
           typeof arg === 'object' &&
           arg !== null &&
+          'activations' in arg &&
           'stepViews' in arg &&
           'copies' in arg &&
           'platformOpens' in arg
@@ -102,12 +103,22 @@ describe('getAdminFunnelMetrics outreach query', () => {
     expect(selection).toBeDefined();
 
     const dialect = new PgDialect();
+    const activationsSql = dialect.sqlToQuery(
+      selection?.activations as never
+    ).sql;
     const copiesSql = dialect.sqlToQuery(selection?.copies as never).sql;
     const platformOpensSql = dialect.sqlToQuery(
       selection?.platformOpens as never
     ).sql;
     const stepViewsSql = dialect.sqlToQuery(selection?.stepViews as never).sql;
 
+    expect(activationsSql).toContain(`"event_type" = 'activated'`);
+    expect(activationsSql).toContain(`select distinct creator_profile_id`);
+    expect(activationsSql).toContain(
+      `onboarding_events.event_type = 'step_viewed'`
+    );
+    expect(activationsSql).toContain(`->>'surface'`);
+    expect(activationsSql).toContain(`'onboarding'`);
     expect(copiesSql).toContain(`->>'surface'`);
     expect(copiesSql).toContain(`'onboarding'`);
     expect(platformOpensSql).toContain(`->>'surface'`);

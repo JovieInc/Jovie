@@ -67,11 +67,11 @@ function isMissingLeadAttributionColumnError(error: unknown): boolean {
 export interface AdminFunnelMetrics {
   /** Onboarding completion step views for Instagram share flow in the last 7 days */
   instagramShareStepViews7d: number;
-  /** Distinct creators who copied the Instagram bio link in the last 7 days */
+  /** Deduped creator bio-link copy events in the last 7 days (one per creator profile) */
   instagramBioCopies7d: number;
   /** Instagram open rate from the share step in the last 7 days (0-1) */
   instagramBioOpenRate7d: number | null;
-  /** Distinct creators activated by Instagram traffic in the last 7 days */
+  /** Deduped creator activations from the onboarding Instagram share funnel in the last 7 days */
   instagramBioActivations7d: number;
   /** Activation rate from share-step view to activated visit in the last 7 days (0-1) */
   instagramBioActivationRate7d: number | null;
@@ -289,10 +289,22 @@ async function getInstagramActivationMetrics7d(sevenDaysAgo: Date): Promise<{
       return empty;
     }
 
+    const onboardingShareProfiles = drizzleSql`
+      select distinct creator_profile_id
+      from creator_distribution_events as onboarding_events
+      where onboarding_events.platform = 'instagram'
+        and onboarding_events.event_type = 'step_viewed'
+        and onboarding_events.created_at >= ${sevenDaysAgo}
+        and coalesce(onboarding_events.metadata->>'surface', '') = 'onboarding'
+    `;
+
     const [row] = await db
       .select({
         activations: drizzleSql<number>`
-          count(*) filter (where ${creatorDistributionEvents.eventType} = 'activated')::int
+          count(*) filter (
+            where ${creatorDistributionEvents.eventType} = 'activated'
+              and ${creatorDistributionEvents.creatorProfileId} in (${onboardingShareProfiles})
+          )::int
         `,
         copies: drizzleSql<number>`
           count(*) filter (
