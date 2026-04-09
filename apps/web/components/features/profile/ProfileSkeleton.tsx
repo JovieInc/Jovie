@@ -18,8 +18,8 @@ export function ProfileSkeleton() {
       </div>
 
       {/* Viewport shell */}
-      <div className='relative mx-auto flex min-h-[100dvh] w-full max-w-[680px] items-stretch justify-center md:px-6 md:py-8'>
-        <div className='relative flex w-full flex-col overflow-hidden bg-white/[0.02] md:min-h-[min(920px,calc(100dvh-64px))] md:rounded-[30px] md:border md:border-white/[0.06]'>
+      <div className='relative mx-auto flex min-h-[100dvh] w-full max-w-[680px] items-stretch justify-center md:items-center md:px-6 md:py-8'>
+        <div className='relative flex w-full flex-col overflow-hidden bg-white/[0.02] md:min-h-0 md:rounded-[30px] md:border md:border-white/[0.06]'>
           {/* Hero placeholder — matches ArtistHero height */}
           <div
             className={`relative w-full h-[48dvh] min-h-[420px] max-h-[620px] md:h-[56dvh] md:min-h-[520px] md:rounded-t-[30px] overflow-hidden ${pulse}`}

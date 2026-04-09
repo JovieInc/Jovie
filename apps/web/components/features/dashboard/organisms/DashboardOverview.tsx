@@ -24,6 +24,7 @@ import {
 import { GetStartedChecklistCard } from '@/features/dashboard/organisms/GetStartedChecklistCard';
 import { LinkClicksCard } from '@/features/dashboard/organisms/LinkClicksCard';
 import { StarterEmptyState } from '@/features/feedback/StarterEmptyState';
+import type { BioLinkActivation } from '@/lib/distribution/instagram-activation';
 import { GLYPH_ARROW_RIGHT } from '@/lib/keyboard-shortcuts';
 import {
   trimLeadingSlashes,
@@ -48,6 +49,7 @@ function getGreetingName(artistName: string | null | undefined): string {
 
 interface DashboardOverviewProps {
   readonly artist: Artist | null;
+  readonly bioLinkActivation?: BioLinkActivation | null;
   readonly hasSocialLinks: boolean;
   readonly hasMusicLinks?: boolean;
   readonly linkClickStats?: { platform: string; clicks: number }[];
@@ -102,6 +104,7 @@ function SetupTaskItem({
 
 export function DashboardOverview({
   artist,
+  bioLinkActivation = null,
   hasSocialLinks,
   hasMusicLinks = false,
   linkClickStats = [],
@@ -248,7 +251,11 @@ export function DashboardOverview({
         )}
 
         {profileUrl && (
-          <SocialBioNudge profileId={artist.id} profileUrl={profileUrl} />
+          <SocialBioNudge
+            bioLinkActivation={bioLinkActivation}
+            profileId={artist.id}
+            profileUrl={profileUrl}
+          />
         )}
 
         <DashboardOverviewMetricsClient

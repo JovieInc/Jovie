@@ -35,6 +35,7 @@ export async function DashboardOverviewSection() {
   return (
     <DashboardOverview
       artist={artist}
+      bioLinkActivation={dashboardData.bioLinkActivation}
       hasSocialLinks={dashboardData.hasSocialLinks}
       hasMusicLinks={dashboardData.hasMusicLinks}
       linkClickStats={linkClickStats.stats}

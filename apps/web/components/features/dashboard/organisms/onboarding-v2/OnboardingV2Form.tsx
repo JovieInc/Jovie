@@ -28,6 +28,7 @@ import { enrichProfileFromDsp } from '@/app/onboarding/actions/enrich-profile';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { OnboardingExperienceShell } from '@/components/features/onboarding/OnboardingExperienceShell';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { getProfileUrl } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthBackButton } from '@/features/auth';
 import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding';
@@ -37,11 +38,17 @@ import {
   extractSignupClaimArtistSelection,
   useOnboardingSubmit,
 } from '@/features/dashboard/organisms/onboarding-v2/shared/useOnboardingSubmit';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import {
   DEFAULT_UPSELL_PLAN,
   getPlanIntent,
   isPaidIntent,
 } from '@/lib/auth/plan-intent';
+import {
+  buildInstagramBioLinkFromHandle,
+  INSTAGRAM_EDIT_PROFILE_URL,
+  postDistributionEvent,
+} from '@/lib/distribution/instagram-activation';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type {
   OnboardingBlockingReason as DiscoveryBlockingReason,
@@ -714,6 +721,8 @@ export function OnboardingV2Form({
   const [lateArrivals, setLateArrivals] = useState<LateArrival[]>([]);
   const [searchInput, setSearchInput] = useState('');
   const [anythingElse, setAnythingElse] = useState('');
+  const [didCopyInstagramBioLink, setDidCopyInstagramBioLink] = useState(false);
+  const [didOpenInstagram, setDidOpenInstagram] = useState(false);
   const handleInputRef = useRef<HTMLInputElement | null>(null);
   const selectedArtistRef = useRef<SelectedArtist | null>(selectedArtist);
   const currentStepRef = useRef<StepId>(currentStep);
@@ -722,6 +731,7 @@ export function OnboardingV2Form({
   const lateArrivalIdsRef = useRef<Set<string>>(new Set());
   const didResolveInitialResumeRef = useRef(false);
   const handledUpgradeStatusRef = useRef<string | null>(null);
+  const didTrackProfileReadyStepViewRef = useRef(false);
   const predictedAutoConnectSelectionRef = useRef<SelectedArtist | null>(
     normalizeSelectedArtist(extractSignupClaimArtistSelection())
   );
@@ -1370,8 +1380,89 @@ export function OnboardingV2Form({
     profileHandle,
     selectedArtist,
   ]);
+  const publicProfileUrl = useMemo(() => {
+    if (!profileHandle) {
+      return null;
+    }
+
+    return getProfileUrl(profileHandle);
+  }, [profileHandle]);
+  const instagramBioLink = useMemo(() => {
+    if (!profileHandle) {
+      return null;
+    }
+
+    return buildInstagramBioLinkFromHandle(profileHandle);
+  }, [profileHandle]);
+
+  useEffect(() => {
+    if (
+      currentStep !== 'profile-ready' ||
+      !profileId ||
+      didTrackProfileReadyStepViewRef.current
+    ) {
+      return;
+    }
+
+    didTrackProfileReadyStepViewRef.current = true;
+    void postDistributionEvent({
+      eventType: 'step_viewed',
+      metadata: { surface: 'onboarding' },
+      platform: 'instagram',
+      profileId,
+    });
+  }, [currentStep, profileId]);
+
+  const handleCopyInstagramBioLink = useCallback(async () => {
+    if (!instagramBioLink || !profileId) {
+      return;
+    }
+
+    const didCopy = await copyToClipboard(instagramBioLink);
+    if (!didCopy) {
+      notifications.error('Failed to copy link');
+      return;
+    }
+
+    setDidCopyInstagramBioLink(true);
+    notifications.success('Instagram bio link copied', { duration: 2000 });
+    void postDistributionEvent({
+      eventType: 'link_copied',
+      metadata: { surface: 'onboarding' },
+      platform: 'instagram',
+      profileId,
+    });
+  }, [instagramBioLink, notifications, profileId]);
+
+  const handleOpenInstagram = useCallback(() => {
+    if (!profileId) {
+      return;
+    }
+
+    setDidOpenInstagram(true);
+    void postDistributionEvent({
+      eventType: 'platform_opened',
+      metadata: { surface: 'onboarding' },
+      platform: 'instagram',
+      profileId,
+    });
+    globalThis.open(
+      INSTAGRAM_EDIT_PROFILE_URL,
+      '_blank',
+      'noopener,noreferrer'
+    );
+  }, [profileId]);
 
   const handleOpenDashboard = useCallback(() => {
+    if (profileId && !didCopyInstagramBioLink && !didOpenInstagram) {
+      void postDistributionEvent({
+        eventType: 'skipped',
+        metadata: { surface: 'onboarding' },
+        platform: 'instagram',
+        profileId,
+      });
+    }
+
     try {
       globalThis.sessionStorage?.setItem(
         ONBOARDING_PREVIEW_SNAPSHOT_KEY,
@@ -1407,7 +1498,14 @@ export function OnboardingV2Form({
     }
 
     router.push(nextUrl);
-  }, [anythingElse, previewSnapshot, router]);
+  }, [
+    anythingElse,
+    didCopyInstagramBioLink,
+    didOpenInstagram,
+    previewSnapshot,
+    profileId,
+    router,
+  ]);
 
   const handleGoBack = useCallback(() => {
     if (currentStep === 'spotify') {
@@ -1900,44 +1998,87 @@ export function OnboardingV2Form({
       case 'profile-ready':
         return (
           <StepFrame
-            title='Your profile is ready'
-            prompt='The dashboard is next. We will carry your preview straight through the route transition.'
+            title='Your Link Is Live'
+            prompt='Put your Jovie link where fans already look. We will count activation when the first Instagram visitor lands on it.'
             actions={
-              <Button
-                disabled={!canProceedToDashboard(discoverySnapshot)}
-                onClick={handleOpenDashboard}
-              >
-                Open dashboard
-                <ArrowRight className='ml-1 h-4 w-4' />
-              </Button>
+              <>
+                <Button onClick={handleCopyInstagramBioLink}>
+                  Copy Instagram Bio Link
+                </Button>
+                <Button onClick={handleOpenInstagram} variant='secondary'>
+                  Open Instagram
+                </Button>
+                <Button
+                  disabled={!canProceedToDashboard(discoverySnapshot)}
+                  onClick={handleOpenDashboard}
+                  variant='ghost'
+                >
+                  Open dashboard
+                  <ArrowRight className='ml-1 h-4 w-4' />
+                </Button>
+              </>
             }
           >
             <FlatPanel>
-              <div className='grid gap-4 sm:grid-cols-3'>
+              <div className='space-y-4'>
                 <div>
                   <p className='text-[11px] font-[560] text-tertiary-token'>
-                    Releases
+                    Your public link
                   </p>
-                  <p className='mt-1 text-2xl font-[620] text-primary-token'>
-                    {discoverySnapshot?.counts.releaseCount ?? 0}
+                  <p className='mt-1 text-base font-[580] text-primary-token'>
+                    {publicProfileUrl ?? 'Your Jovie link will appear here'}
                   </p>
-                </div>
-                <div>
-                  <p className='text-[11px] font-[560] text-tertiary-token'>
-                    DSPs
-                  </p>
-                  <p className='mt-1 text-2xl font-[620] text-primary-token'>
-                    {discoverySnapshot?.counts.dspCount ?? 0}
+                  <p className='mt-2 text-sm leading-6 text-secondary-token'>
+                    We copy a tagged Instagram bio link so your first visit gets
+                    attributed even when referrers are weak.
                   </p>
                 </div>
-                <div>
-                  <p className='text-[11px] font-[560] text-tertiary-token'>
-                    Social
-                  </p>
-                  <p className='mt-1 text-2xl font-[620] text-primary-token'>
-                    {discoverySnapshot?.counts.activeSocialCount ?? 0}
-                  </p>
-                </div>
+                <ol className='space-y-3'>
+                  <li className='flex items-start gap-3'>
+                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-[11px] font-[560] text-primary-token'>
+                      1
+                    </span>
+                    <div className='min-w-0'>
+                      <p className='text-sm font-[560] text-primary-token'>
+                        Copy your Instagram bio link
+                      </p>
+                      <p className='text-sm leading-6 text-secondary-token'>
+                        {didCopyInstagramBioLink
+                          ? 'Copied. Paste this version so Instagram traffic stays attributable.'
+                          : 'Use the primary action above to copy the tagged version.'}
+                      </p>
+                    </div>
+                  </li>
+                  <li className='flex items-start gap-3'>
+                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-[11px] font-[560] text-primary-token'>
+                      2
+                    </span>
+                    <div className='min-w-0'>
+                      <p className='text-sm font-[560] text-primary-token'>
+                        Open Instagram
+                      </p>
+                      <p className='text-sm leading-6 text-secondary-token'>
+                        {didOpenInstagram
+                          ? 'Instagram is open. Head to Edit Profile.'
+                          : 'Open your profile settings and go to Edit Profile.'}
+                      </p>
+                    </div>
+                  </li>
+                  <li className='flex items-start gap-3'>
+                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-[11px] font-[560] text-primary-token'>
+                      3
+                    </span>
+                    <div className='min-w-0'>
+                      <p className='text-sm font-[560] text-primary-token'>
+                        Paste it into your bio
+                      </p>
+                      <p className='text-sm leading-6 text-secondary-token'>
+                        Put the copied link in the website field. Activation
+                        happens on the first Instagram-sourced visit.
+                      </p>
+                    </div>
+                  </li>
+                </ol>
               </div>
             </FlatPanel>
 

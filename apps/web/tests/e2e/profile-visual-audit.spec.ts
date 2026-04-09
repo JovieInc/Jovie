@@ -435,3 +435,44 @@ test.describe('Public profile visual audit @smoke', () => {
     }
   }
 });
+
+test.describe('Public profile compact shell sizing', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('demo desktop shell stays materially below viewport height', async ({
+    page,
+  }) => {
+    await blockAnalytics(page);
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.setViewportSize({ width: 1280, height: 900 });
+
+    await page.goto('/demo/showcase/public-profile', {
+      waitUntil: 'domcontentloaded',
+      timeout: 120_000,
+    });
+
+    await waitForHydration(page);
+    await waitForVisibleSelector(
+      page,
+      '[data-testid="demo-showcase-public-profile"]'
+    );
+    await waitForImages(page);
+    await waitForSettle(page);
+
+    const shell = page.getByTestId('profile-compact-shell');
+    await expect(shell).toBeVisible();
+
+    const shellBox = await shell.boundingBox();
+    expect(shellBox).not.toBeNull();
+
+    if (!shellBox) {
+      return;
+    }
+
+    // At 1280x900 with md:py-8, the compact card should sit well inside the
+    // viewport instead of stretching close to full height again.
+    expect(shellBox.height).toBeLessThan(780);
+    expect(shellBox.y).toBeGreaterThanOrEqual(24);
+    expect(shellBox.y + shellBox.height).toBeLessThanOrEqual(876);
+  });
+});
