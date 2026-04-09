@@ -40,6 +40,7 @@ jobs:
     outputs:
       run_build: ${{ steps.detect.outputs.run_build }}
       run_test: ${{ steps.detect.outputs.run_test }}
+      run_launch_gate: ${{ steps.detect.outputs.run_launch_gate }}
       run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse }}
       run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse }}
       run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse }}
@@ -60,7 +61,7 @@ jobs:
           # Force run all if the 'testing' label is present
           if [[ "$FULL_CI_LABEL" == "true" ]]; then
             echo "Forcing full CI run due to 'testing' label"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_launch_gate run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -73,7 +74,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_launch_gate run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -84,7 +85,7 @@ jobs:
           # Check if only docs changed (exclude .github/ — workflow changes must run CI)
           if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
             echo "Only documentation files changed"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_launch_gate run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -112,6 +113,15 @@ jobs:
             echo "run_test=false" >> "$GITHUB_OUTPUT"
           fi
 
+          LAUNCH_GATE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.(dashboard|onboarding)\.pr\.json|apps/web/package.*\.json|package.*\.json|apps/web/playwright\.config(\..+)?\.ts|apps/web/scripts/lighthouse-dashboard-auth\.cjs|apps/web/scripts/performance-budgets-guard\.ts|apps/web/scripts/performance-route-manifest\.ts|apps/web/tests/global-setup\.ts|apps/web/tests/e2e/auth\.setup\.ts|apps/web/tests/e2e/golden-path\.spec\.ts|apps/web/tests/e2e/helpers/e2e-helpers\.ts|apps/web/app/onboarding/|apps/web/app/\(auth\)/(signin|signup)/|apps/web/app/billing/|apps/web/app/app/\(shell\)/dashboard/|apps/web/app/api/stripe/checkout/route\.ts|apps/web/app/api/tips/create-checkout/route\.ts|apps/web/app/api/onboarding/|apps/web/components/features/onboarding/|apps/web/components/features/auth/|apps/web/components/features/dashboard/|apps/web/components/organisms/billing/|apps/web/components/organisms/release-sidebar/|apps/web/lib/onboarding/|apps/web/lib/auth/|apps/web/lib/billing/|apps/web/lib/stripe/|apps/web/lib/discography/|apps/web/lib/spotify/|apps/web/lib/services/onboarding/|apps/web/lib/validation/schemas/onboarding\.ts)'
+          if echo "$CHANGED_FILES" | grep -q -E "$LAUNCH_GATE_PATTERN"; then
+            RUN_LAUNCH_GATE=true
+            echo "run_launch_gate=true" >> "$GITHUB_OUTPUT"
+          else
+            RUN_LAUNCH_GATE=false
+            echo "run_launch_gate=false" >> "$GITHUB_OUTPUT"
+          fi
+
           PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.pr\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
           if echo "$CHANGED_FILES" | grep -q -E "$PUBLIC_LIGHTHOUSE_PATTERN"; then
             echo "run_public_lighthouse=true" >> "$GITHUB_OUTPUT"
@@ -120,14 +130,14 @@ jobs:
           fi
 
           DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.dashboard\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs)$'
-          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$DASHBOARD_LIGHTHOUSE_PATTERN"; then
+          if [[ "$RUN_LAUNCH_GATE" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$DASHBOARD_LIGHTHOUSE_PATTERN"; then
             echo "run_dashboard_lighthouse=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_dashboard_lighthouse=false" >> "$GITHUB_OUTPUT"
           fi
 
           ONBOARDING_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.onboarding\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs|apps/web/app/onboarding/|apps/web/components/features/dashboard/organisms/onboarding|apps/web/components/features/dashboard/organisms/apple-style-onboarding|apps/web/components/features/onboarding/|apps/web/lib/onboarding/)'
-          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$ONBOARDING_LIGHTHOUSE_PATTERN"; then
+          if [[ "$RUN_LAUNCH_GATE" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$ONBOARDING_LIGHTHOUSE_PATTERN"; then
             echo "run_onboarding_lighthouse=true" >> $GITHUB_OUTPUT
           else
             echo "run_onboarding_lighthouse=false" >> $GITHUB_OUTPUT
@@ -154,6 +164,7 @@ jobs:
             echo "Fork PR: disabling e2e and build"
             echo "run_e2e=false" >> "$GITHUB_OUTPUT"
             echo "run_build=false" >> "$GITHUB_OUTPUT"
+            echo "run_launch_gate=false" >> "$GITHUB_OUTPUT"
             echo "run_public_lighthouse=false" >> "$GITHUB_OUTPUT"
             echo "run_dashboard_lighthouse=false" >> "$GITHUB_OUTPUT"
             echo "run_test=false" >> "$GITHUB_OUTPUT"
@@ -547,7 +558,7 @@ jobs:
     name: PR Ready
     # Single merge gate for PRs and merge queue.
     # Gates on fast checks (typecheck, lint, guardrails), unit tests, public-route build, and Lighthouse audits.
-    needs: [ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-pr]
+    needs: [ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-pr, ci-golden-path-pr, ci-launch-perf-budgets-pr]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -560,12 +571,16 @@ jobs:
           DASHBOARD_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-dashboard-pr.result }}"
           ONBOARDING_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-onboarding-pr.result }}"
           PUBLIC_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-pr.result }}"
+          GOLDEN_PATH_RESULT="${{ needs.ci-golden-path-pr.result }}"
+          LAUNCH_PERF_RESULT="${{ needs.ci-launch-perf-budgets-pr.result }}"
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
           echo "ci-lighthouse-dashboard-pr: $DASHBOARD_LIGHTHOUSE_RESULT"
           echo "ci-lighthouse-onboarding-pr: $ONBOARDING_LIGHTHOUSE_RESULT"
           echo "ci-lighthouse-pr: $PUBLIC_LIGHTHOUSE_RESULT"
+          echo "ci-golden-path-pr: $GOLDEN_PATH_RESULT"
+          echo "ci-launch-perf-budgets-pr: $LAUNCH_PERF_RESULT"
 
           # ci-fast must succeed (or be skipped when path-gated with no app files changed)
           if [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
@@ -602,7 +617,17 @@ jobs:
             exit 1
           fi
 
-          echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, build, lighthouse"
+          if [[ "$GOLDEN_PATH_RESULT" != "success" && "$GOLDEN_PATH_RESULT" != "skipped" ]]; then
+            echo "❌ ci-golden-path-pr did not pass (result: $GOLDEN_PATH_RESULT)"
+            exit 1
+          fi
+
+          if [[ "$LAUNCH_PERF_RESULT" != "success" && "$LAUNCH_PERF_RESULT" != "skipped" ]]; then
+            echo "❌ ci-launch-perf-budgets-pr did not pass (result: $LAUNCH_PERF_RESULT)"
+            exit 1
+          fi
+
+          echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, build, lighthouse, golden path, launch perf budgets"
 
   ci-build-public:
     name: Build (public routes)
@@ -835,7 +860,7 @@ jobs:
   ci-lighthouse-dashboard-pr:
     name: Lighthouse (dashboard PR)
     needs: [ci-fast, ci-path-changes]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_launch_gate == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -849,8 +874,8 @@ jobs:
         run: |
           RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
           RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
-          RUN_DASHBOARD_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_dashboard_lighthouse }}"
-          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" || "$RUN_DASHBOARD_LIGHTHOUSE" == "true" ]]; then
+          RUN_LAUNCH_GATE="${{ needs.ci-path-changes.outputs.run_launch_gate }}"
+          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" || "$RUN_LAUNCH_GATE" == "true" ]]; then
             echo "run_full_ci=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_full_ci=false" >> "$GITHUB_OUTPUT"
@@ -920,8 +945,8 @@ jobs:
           cd apps/web
 
           if [ -z "$E2E_CLERK_USER_ID" ]; then
-            echo "E2E_CLERK_USER_ID not set — skipping dashboard Lighthouse."
-            exit 0
+            echo "E2E_CLERK_USER_ID not set — dashboard Lighthouse cannot run."
+            exit 1
           fi
 
           export E2E_USE_TEST_AUTH_BYPASS=1
@@ -987,7 +1012,7 @@ jobs:
   ci-lighthouse-onboarding-pr:
     name: Lighthouse (onboarding PR)
     needs: [ci-fast, ci-path-changes]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_launch_gate == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -1047,8 +1072,8 @@ jobs:
           cd apps/web
 
           if [ -z "$E2E_CLERK_USER_ID" ]; then
-            echo "E2E_CLERK_USER_ID not set — skipping onboarding Lighthouse."
-            exit 0
+            echo "E2E_CLERK_USER_ID not set — onboarding Lighthouse cannot run."
+            exit 1
           fi
 
           export E2E_USE_TEST_AUTH_BYPASS=1
@@ -2296,6 +2321,236 @@ jobs:
           path: apps/web/test-results/
           retention-days: 7
 
+  ci-golden-path-pr:
+    name: Golden Path (PR)
+    needs: [ci-fast, ci-path-changes]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_launch_gate == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Create ephemeral Neon database branch (with retry)
+        id: neon-branch
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: golden-path-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Resolve DATABASE_URL (Neon ephemeral)
+        run: |
+          CANDIDATE="${{ steps.neon-branch.outputs.db_url }}"
+          if [ -z "$CANDIDATE" ]; then
+            echo "No Neon ephemeral DATABASE_URL available."
+            exit 1
+          fi
+          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
+
+      - name: Run migrations (ephemeral Neon)
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+
+      - name: Assert golden-path prerequisites
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        run: |
+          for key in NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY CLERK_SECRET_KEY E2E_CLERK_USER_USERNAME STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required golden-path secret: $key"
+              exit 1
+            fi
+          done
+
+      - name: Run golden path E2E
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          CI: true
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
+        run: cd apps/web && pnpm run test:e2e:golden-path:ci
+
+      - name: Fail if golden path did not execute
+        run: |
+          RESULTS_FILE="apps/web/test-results/results.json"
+          if [ ! -f "$RESULTS_FILE" ]; then
+            echo "Golden path results file missing: $RESULTS_FILE"
+            exit 1
+          fi
+
+          PASSED=$(jq '[.. | objects | select((.location?.file? // "" | endswith("tests/e2e/golden-path.spec.ts")) and (.results? | type == "array")) | .results[] | select(.status == "passed")] | length' "$RESULTS_FILE")
+
+          if [ "$PASSED" -lt 1 ]; then
+            echo "Golden path did not record a passing test execution."
+            exit 1
+          fi
+
+      - name: Upload Playwright Artifacts on Failure
+        if: failure()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 3
+
+      - name: Cleanup ephemeral Neon branch
+        if: always() && steps.neon-branch.outputs.branch_id != ''
+        continue-on-error: true
+        run: |
+          curl -sS -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
+
+  ci-launch-perf-budgets-pr:
+    name: Launch Perf Budgets (PR)
+    needs: [ci-fast, ci-path-changes]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_launch_gate == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+
+      - name: Create ephemeral Neon database branch (with retry)
+        id: neon-branch
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: launch-perf-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Resolve DATABASE_URL (Neon ephemeral)
+        run: |
+          CANDIDATE="${{ steps.neon-branch.outputs.db_url }}"
+          if [ -z "$CANDIDATE" ]; then
+            echo "No Neon ephemeral DATABASE_URL available."
+            exit 1
+          fi
+          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
+
+      - name: Run migrations (ephemeral Neon)
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Build app for launch perf budgets
+        run: pnpm --filter=@jovie/web run build
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+      - name: Assert launch perf prerequisites
+        env:
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+        run: |
+          if [ -z "$E2E_CLERK_USER_ID" ]; then
+            echo "Missing required launch perf secret: E2E_CLERK_USER_ID"
+            exit 1
+          fi
+
+      - name: Run launch perf budgets
+        env:
+          CI: true
+          BASE_URL: http://localhost:3000
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+        run: |
+          cd apps/web
+
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "Standalone server not found — launch perf budgets cannot start."
+            exit 1
+          fi
+
+          node .next/standalone/apps/web/server.js &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+
+          echo "Waiting for standalone server..."
+          SERVER_READY=false
+          for i in {1..30}; do
+            if curl -s http://localhost:3000 > /dev/null; then
+              SERVER_READY=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$SERVER_READY" = "false" ]; then
+            echo "Server failed to start within 30s."
+            exit 1
+          fi
+
+          pnpm run test:budgets:launch
+
+      - name: Cleanup ephemeral Neon branch
+        if: always() && steps.neon-branch.outputs.branch_id != ''
+        continue-on-error: true
+        run: |
+          curl -sS -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
+
   ci-test-performance:
     name: Test Performance Budgets
     needs: [ci-path-changes]
@@ -2408,6 +2663,7 @@ jobs:
       pull-requests: write
       contents: read
     needs:
+      - ci-path-changes
       - ci-env-example-guard
       - ci-guardrails
       - ci-typecheck
@@ -2429,6 +2685,8 @@ jobs:
       - ci-layout-guard
       - ci-lighthouse-pr
       - ci-lighthouse-dashboard-pr
+      - ci-golden-path-pr
+      - ci-launch-perf-budgets-pr
       - ci-a11y
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -2443,6 +2701,7 @@ jobs:
           MIGRATION_GUARD_RUN_FULL_CI: ${{ needs.drizzle-migration-guard.outputs.run_full_ci }}
           PR_MIGRATE_RUN_FULL_CI: ${{ needs.ci-pr-neon-migrate.outputs.run_full_ci }}
           UNIT_RUN_FULL_CI: ${{ needs.ci-unit-tests.outputs.run_full_ci }}
+          LAUNCH_GATE_RUN_FULL_CI: ${{ needs.ci-path-changes.outputs.run_launch_gate }}
           PR_PREVIEW_URL: ${{ needs.ci-pr-vercel-preview.outputs.deployment_url }}
         with:
           script: |
@@ -2534,7 +2793,27 @@ jobs:
               },
               { label: 'Build (public routes)', jobName: 'Build (public routes)' },
               { label: 'Layout Guard', jobName: 'Layout Guard (informational)' },
-              { label: 'Lighthouse (PR)', jobName: 'Lighthouse (PR, informational)' },
+              {
+                label: 'Lighthouse (dashboard PR)',
+                jobName: 'Lighthouse (dashboard PR)',
+                runFullCi: process.env.LAUNCH_GATE_RUN_FULL_CI
+              },
+              {
+                label: 'Lighthouse (onboarding PR)',
+                jobName: 'Lighthouse (onboarding PR)',
+                runFullCi: process.env.LAUNCH_GATE_RUN_FULL_CI
+              },
+              { label: 'Lighthouse (public routes PR)', jobName: 'Lighthouse (public routes PR)' },
+              {
+                label: 'Golden Path (PR)',
+                jobName: 'Golden Path (PR)',
+                runFullCi: process.env.LAUNCH_GATE_RUN_FULL_CI
+              },
+              {
+                label: 'Launch Perf Budgets (PR)',
+                jobName: 'Launch Perf Budgets (PR)',
+                runFullCi: process.env.LAUNCH_GATE_RUN_FULL_CI
+              },
               { label: 'A11y (axe)', jobName: 'A11y (axe)' },
               {
                 label: 'Unit Tests',
