@@ -158,7 +158,7 @@ export async function getProfileWithUser(
       userEmail: users.email,
     })
     .from(creatorProfiles)
-    .leftJoin(users, eq(users.activeProfileId, creatorProfiles.id))
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
     .where(eq(creatorProfiles.usernameNormalized, username.toLowerCase()))
     .limit(1);
 
@@ -471,7 +471,7 @@ async function selectProfileWithUser(
       userEmail: users.email,
     })
     .from(creatorProfiles)
-    .leftJoin(users, eq(users.activeProfileId, creatorProfiles.id))
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
     .where(eq(creatorProfiles.usernameNormalized, normalizedUsername))
     .limit(1);
 

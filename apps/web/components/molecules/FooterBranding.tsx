@@ -96,7 +96,7 @@ export function FooterBranding({
       <Link
         href={logoHref}
         prefetch={false}
-        aria-label={mark === 'icon' ? 'Jovie home' : undefined}
+        aria-label={mark === 'icon' ? 'Jovie home' : 'Jovie'}
         className={logoLinkClass}
       >
         {renderLogoMark(mark, size, isLinear, logoClass)}

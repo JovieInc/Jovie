@@ -274,7 +274,8 @@ export const getCreatorByUsername = cache(
     if (
       process.env.NODE_ENV === 'test' ||
       process.env.NODE_ENV === 'development' ||
-      process.env.PUBLIC_NOAUTH_SMOKE === '1'
+      (process.env.NODE_ENV !== 'production' &&
+        process.env.PUBLIC_NOAUTH_SMOKE === '1')
     ) {
       return fetchCreatorByUsername(usernameNormalized);
     }

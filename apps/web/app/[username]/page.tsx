@@ -434,6 +434,15 @@ const fetchProfileAndLinks = async (
 
 const PROFILE_SUCCESS_CACHE_TTL_SECONDS = 3600; // 1 hour
 
+<<<<<<< HEAD
+function shouldBypassPublicProfileQaCache() {
+  // Keep the no-auth interaction/a11y sweeps deterministic without forcing
+  // Lighthouse to benchmark the uncached profile path.
+  return (
+    process.env.NODE_ENV !== 'production' &&
+    process.env.PUBLIC_NOAUTH_SMOKE === '1'
+  );
+}
 class NonCacheableProfileResultError extends Error {
   readonly result: Awaited<ReturnType<typeof fetchProfileAndLinks>>;
 
