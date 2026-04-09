@@ -8,6 +8,10 @@ const PRIVATE_IPV4_BLOCKS = [
   /^172\.(1[6-9]|2\d|3[0-1])\./,
 ] as const;
 
+interface HeaderReader {
+  get(name: string): string | null;
+}
+
 export function isMockPublishableKey(publishableKey: string): boolean {
   const normalizedKey = publishableKey.trim().toLowerCase();
 
@@ -27,11 +31,56 @@ export function shouldBypassClerk(
     : globalThis.location
 ): boolean {
   const normalizedKey = publishableKey?.trim();
-  return (
-    !normalizedKey ||
-    clerkMockFlag === '1' ||
-    isMockPublishableKey(normalizedKey)
-  );
+  if (!normalizedKey || clerkMockFlag === '1') {
+    return true;
+  }
+
+  if (isMockPublishableKey(normalizedKey)) {
+    return true;
+  }
+
+  return shouldDisableClerkProxyForLocation(locationLike);
+}
+
+function normalizeForwardedHeaderValue(value: string | null): string | null {
+  return value?.split(',')[0]?.trim() || null;
+}
+
+function extractHostnameFromHeaderValue(value: string | null): string | null {
+  const normalizedValue = normalizeForwardedHeaderValue(value);
+  if (!normalizedValue) {
+    return null;
+  }
+
+  if (
+    normalizedValue.startsWith('http://') ||
+    normalizedValue.startsWith('https://')
+  ) {
+    try {
+      return new URL(normalizedValue).hostname.toLowerCase();
+    } catch {
+      return null;
+    }
+  }
+
+  if (normalizedValue.startsWith('[')) {
+    const closingBracketIndex = normalizedValue.indexOf(']');
+    if (closingBracketIndex > 1) {
+      return normalizedValue.slice(1, closingBracketIndex).toLowerCase();
+    }
+  }
+
+  const lastColonIndex = normalizedValue.lastIndexOf(':');
+  const firstColonIndex = normalizedValue.indexOf(':');
+  if (
+    lastColonIndex > 0 &&
+    firstColonIndex === lastColonIndex &&
+    /^\d+$/.test(normalizedValue.slice(lastColonIndex + 1))
+  ) {
+    return normalizedValue.slice(0, lastColonIndex).toLowerCase();
+  }
+
+  return normalizedValue.toLowerCase();
 }
 
 function isPrivateHostname(hostname: string): boolean {
@@ -48,6 +97,28 @@ function isPrivateHostname(hostname: string): boolean {
   }
 
   return PRIVATE_IPV4_BLOCKS.some(pattern => pattern.test(normalizedHostname));
+}
+
+export function getRequestLocationFromHeaders(
+  headerReader: HeaderReader
+): Pick<URL, 'hostname' | 'protocol'> | undefined {
+  const hostname =
+    extractHostnameFromHeaderValue(headerReader.get('x-forwarded-host')) ??
+    extractHostnameFromHeaderValue(headerReader.get('host'));
+
+  if (!hostname) {
+    return undefined;
+  }
+
+  const normalizedProtocol =
+    normalizeForwardedHeaderValue(headerReader.get('x-forwarded-proto'))
+      ?.toLowerCase()
+      .replace(/:$/, '') ?? (isPrivateHostname(hostname) ? 'http' : 'https');
+
+  return {
+    hostname,
+    protocol: `${normalizedProtocol}:`,
+  };
 }
 
 export function shouldDisableClerkProxyForLocation(

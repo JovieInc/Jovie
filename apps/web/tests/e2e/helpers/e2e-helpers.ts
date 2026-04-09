@@ -8,6 +8,8 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { neon } from '@neondatabase/serverless';
 import type { Page } from '@playwright/test';
+import { ensureClerkTestUser } from '@/lib/testing/test-user-provision.server';
+import { setTestAuthBypassSession } from '@/tests/helpers/clerk-auth';
 
 /* ------------------------------------------------------------------ */
 /*  Environment gates                                                   */
@@ -94,6 +96,21 @@ export function spotifyImportIsReady(
   return hasSpotifyProfile && releaseCount > 0 && releaseLinkCount > 0;
 }
 
+export function onboardingProfileIsReady(
+  state: SpotifyImportStateRow | null | undefined
+): boolean {
+  if (!state) {
+    return false;
+  }
+
+  return Boolean(
+    state.spotify_id &&
+      state.spotify_url &&
+      state.is_public &&
+      state.onboarding_completed_at
+  );
+}
+
 export function countPopulatedDspFields(
   state: MultiDspEnrichmentState
 ): number {
@@ -176,6 +193,70 @@ export async function waitForMultiDspEnrichment(clerkUserId: string) {
   `) as MultiDspEnrichmentState[];
 
   return state ?? null;
+}
+
+export async function advanceOnboardingAfterArtistSelection(
+  page: Page,
+  timeoutMs = 120_000
+): Promise<'checkout' | 'dashboard' | 'importing' | 'review'> {
+  const deadline = Date.now() + timeoutMs;
+  const reviewDisplayName = page.locator('#onboarding-display-name');
+  const reviewGoToDashboard = page.getByRole('button', {
+    name: /go to dashboard/i,
+  });
+  const actionButtons = [
+    page.getByRole('button', { name: /^Continue$/i }),
+    page.getByRole('button', { name: /^Continue free$/i }),
+    page.getByRole('button', { name: /^Finish setup$/i }),
+    page.getByRole('button', { name: /^Open dashboard$/i }),
+  ];
+
+  while (Date.now() < deadline) {
+    if (/\/app(?:\/|$|\?)/.test(page.url())) {
+      return 'dashboard';
+    }
+
+    if (/\/onboarding\/checkout(?:\/|$|\?)/.test(page.url())) {
+      return 'checkout';
+    }
+
+    if (
+      (await reviewDisplayName.isVisible().catch(() => false)) ||
+      (await reviewGoToDashboard.isVisible().catch(() => false))
+    ) {
+      return 'review';
+    }
+
+    let clicked = false;
+    for (const button of actionButtons) {
+      const candidate = button.first();
+      if (
+        (await candidate.isVisible().catch(() => false)) &&
+        (await candidate.isEnabled().catch(() => false))
+      ) {
+        try {
+          await candidate.click({ timeout: 3_000 });
+          clicked = true;
+          break;
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    await page.waitForTimeout(clicked ? 500 : 1_000);
+  }
+
+  if (
+    page.url().includes('/onboarding') &&
+    page.url().includes('resume=spotify')
+  ) {
+    return 'importing';
+  }
+
+  throw new Error(
+    `Onboarding did not reach review or dashboard after artist selection. Current URL: ${page.url()}`
+  );
 }
 
 export async function getFirstReleaseForUser(
@@ -435,6 +516,29 @@ export async function ensureDbUser(
     `;
   }
 
+  // Bypass mode authenticates via test cookies, but the server only knows the
+  // unique per-run email if we seed the matching DB row up front. Without
+  // this, getCachedCurrentUser() falls back to the shared browse test persona
+  // and onboarding submits against a mismatched identity.
+  if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
+    const [user] = (await sql`
+      INSERT INTO users (clerk_id, email, name, user_status)
+      VALUES (${clerkUserId}, ${email}, 'Golden Path', 'waitlist_approved')
+      ON CONFLICT (clerk_id) DO UPDATE SET
+        email = ${email},
+        name = 'Golden Path',
+        user_status = 'waitlist_approved',
+        updated_at = NOW()
+      RETURNING id
+    `) as EnsuredUserRow[];
+
+    if (!user?.id) {
+      throw new Error(`Failed to ensure DB user for Clerk user ${clerkUserId}`);
+    }
+
+    return;
+  }
+
   const [user] = (await sql`
     INSERT INTO users (clerk_id, email, user_status)
     VALUES (${clerkUserId}, ${email}, 'waitlist_approved')
@@ -476,6 +580,21 @@ export async function interceptTrackingCalls(page: Page) {
  * with the magic code 424242 before a session is created.
  */
 export async function createFreshUser(page: Page, uniqueSeed: string) {
+  const email = `gp-${uniqueSeed}+clerk_test@test.jovie.com`;
+
+  if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
+    const clerkUserId = await ensureClerkTestUser({
+      email,
+      username: `gp-${uniqueSeed}`.replaceAll(/[^a-z0-9-]/gi, '').slice(0, 32),
+      firstName: 'Golden',
+      lastName: 'Path',
+      metadata: { source: 'e2e-smoke-bypass' },
+    });
+
+    await setTestAuthBypassSession(page, null, clerkUserId);
+    return { email, clerkUserId };
+  }
+
   await setupClerkTestingToken({ page });
 
   const loadClerk = async () => {
@@ -511,8 +630,6 @@ export async function createFreshUser(page: Page, uniqueSeed: string) {
   if (!loaded) {
     throw new Error('Clerk JS failed to load — cannot create test user');
   }
-
-  const email = `gp-${uniqueSeed}+clerk_test@test.jovie.com`;
 
   const clerkUserId = await page.evaluate(async (targetEmail: string) => {
     const clerkInstance = (window as any).Clerk;

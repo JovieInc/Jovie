@@ -1,4 +1,5 @@
 import { headers } from 'next/headers';
+import { getRequestLocationFromHeaders } from '@/components/providers/clerkAvailability';
 import { publicEnv } from '@/lib/env-public';
 
 /**
@@ -56,7 +57,6 @@ export async function resolvePublishableKeyFromHeaders(): Promise<
   const preResolved = hdrs.get('x-clerk-publishable-key');
   if (preResolved) return preResolved;
   // Fallback: resolve from the Host header directly
-  const host = hdrs.get('host') || hdrs.get('x-forwarded-host') || '';
-  const hostname = host.split(':')[0];
+  const hostname = getRequestLocationFromHeaders(hdrs)?.hostname ?? '';
   return resolveClerkKeys(hostname).publishableKey;
 }

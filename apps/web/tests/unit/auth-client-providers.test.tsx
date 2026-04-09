@@ -78,31 +78,45 @@ describe('AuthClientProviders', () => {
   });
 
   it('passes the expected Clerk provider props for a real publishable key', async () => {
-    render(
-      <AuthClientProviders publishableKey='pk_test_example'>
-        <div data-testid='child'>child</div>
-      </AuthClientProviders>
-    );
+    const originalLocation = globalThis.location;
 
-    await waitFor(() => {
-      expect(screen.getByTestId('clerk-provider')).toBeInTheDocument();
-    });
-    expect(screen.getByTestId('child')).toBeInTheDocument();
-    expect(clerkProviderMock).toHaveBeenCalledTimes(1);
+    try {
+      Object.defineProperty(globalThis, 'location', {
+        configurable: true,
+        value: new URL('https://staging.jov.ie/signin'),
+      });
 
-    const props = clerkProviderMock.mock.calls[0]?.[0];
-    expect(props).toMatchObject({
-      publishableKey: 'pk_test_example',
-      proxyUrl: undefined,
-      signInUrl: APP_ROUTES.SIGNIN,
-      signUpUrl: APP_ROUTES.SIGNUP,
-      signInFallbackRedirectUrl: APP_ROUTES.DASHBOARD,
-      signUpFallbackRedirectUrl: APP_ROUTES.WAITLIST,
-      appearance: authClerkAppearance,
-    });
+      render(
+        <AuthClientProviders publishableKey='pk_test_example'>
+          <div data-testid='child'>child</div>
+        </AuthClientProviders>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('clerk-provider')).toBeInTheDocument();
+      });
+      expect(screen.getByTestId('child')).toBeInTheDocument();
+      expect(clerkProviderMock).toHaveBeenCalledTimes(1);
+
+      const props = clerkProviderMock.mock.calls[0]?.[0];
+      expect(props).toMatchObject({
+        publishableKey: 'pk_test_example',
+        proxyUrl: '/__clerk',
+        signInUrl: APP_ROUTES.SIGNIN,
+        signUpUrl: APP_ROUTES.SIGNUP,
+        signInFallbackRedirectUrl: APP_ROUTES.DASHBOARD,
+        signUpFallbackRedirectUrl: APP_ROUTES.WAITLIST,
+        appearance: authClerkAppearance,
+      });
+    } finally {
+      Object.defineProperty(globalThis, 'location', {
+        configurable: true,
+        value: originalLocation,
+      });
+    }
   });
 
-  it('keeps Clerk enabled for live keys on localhost and only disables the proxy', async () => {
+  it('bypasses Clerk for live keys on localhost', () => {
     const originalLocation = globalThis.location;
 
     try {
@@ -118,17 +132,36 @@ describe('AuthClientProviders', () => {
         </AuthClientProviders>
       );
 
+      expect(screen.getByTestId('child')).toBeInTheDocument();
+      expect(clerkProviderMock).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(globalThis, 'location', {
+        configurable: true,
+        value: originalLocation,
+      });
+    }
+  });
+
+  it('can force-enable Clerk for auth pages on localhost', async () => {
+    const originalLocation = globalThis.location;
+
+    try {
+      globalThis.history.replaceState(null, '', '/signin');
+      Object.defineProperty(globalThis, 'location', {
+        configurable: true,
+        value: new URL('http://localhost:3100/signin'),
+      });
+
+      render(
+        <AuthClientProviders forceEnableClerk publishableKey='pk_live_example'>
+          <div data-testid='child'>child</div>
+        </AuthClientProviders>
+      );
+
       await waitFor(() => {
         expect(screen.getByTestId('clerk-provider')).toBeInTheDocument();
       });
-
-      const props = clerkProviderMock.mock.calls[0]?.[0];
-      expect(props).toMatchObject({
-        publishableKey: 'pk_live_example',
-        proxyUrl: undefined,
-        signInUrl: APP_ROUTES.SIGNIN,
-        signUpUrl: APP_ROUTES.SIGNUP,
-      });
+      expect(clerkProviderMock).toHaveBeenCalledTimes(1);
     } finally {
       Object.defineProperty(globalThis, 'location', {
         configurable: true,

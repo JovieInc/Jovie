@@ -155,7 +155,7 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
     tidalArtistId: null,
     soundcloudArtistId: null,
     bandsintownArtistName: 'Calvin Harris',
-    venmoHandle: null,
+    venmoHandle: 'calvin-demo',
     activeSinceYear: 2007,
     spotifyFollowers: 23099798,
     spotifyPopularity: 88,
