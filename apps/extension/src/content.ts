@@ -6,6 +6,7 @@ import {
   getActiveEditableElement,
   getMatchingTarget,
 } from './content-adapters';
+import { buildWorkflowPreviewResponse } from './distrokid-workflow';
 
 export {};
 
@@ -18,7 +19,11 @@ type PreviewMessage = {
   readonly type: 'jovie:get-insert-preview';
 };
 
-type RuntimeMessage = InsertMessage | PreviewMessage;
+type WorkflowPreviewMessage = {
+  readonly type: 'jovie:get-workflow-preview';
+};
+
+type RuntimeMessage = InsertMessage | PreviewMessage | WorkflowPreviewMessage;
 
 function insertIntoInput(
   element: HTMLInputElement | HTMLTextAreaElement,
@@ -95,6 +100,7 @@ function isRuntimeMessage(value: unknown): value is RuntimeMessage {
   }
 
   return (
+    value.type === 'jovie:get-workflow-preview' ||
     value.type === 'jovie:get-insert-preview' ||
     (value.type === 'jovie:insert-text' &&
       'value' in value &&
@@ -114,6 +120,13 @@ chrome?.runtime?.onMessage.addListener(
 
     if (message.type === 'jovie:get-insert-preview') {
       sendResponse(buildPreviewResponse(window.location.hostname, document));
+      return true;
+    }
+
+    if (message.type === 'jovie:get-workflow-preview') {
+      sendResponse(
+        buildWorkflowPreviewResponse(window.location.hostname, document)
+      );
       return true;
     }
 
