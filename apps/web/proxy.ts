@@ -1329,8 +1329,29 @@ export default async function middleware(
   // Select the correct Clerk middleware based on hostname.
   // Staging uses a separate Clerk instance with its own keys.
   const selectedMiddleware = isStagingHost(hostname)
-    ? (getClerkStagingMiddleware() ?? clerkProductionMiddleware)
+    ? getClerkStagingMiddleware()
     : clerkProductionMiddleware;
+
+  if (!selectedMiddleware) {
+    if (!pathInfo.isProtectedPath) {
+      return handleRequest(req, null);
+    }
+
+    return new NextResponse(
+      JSON.stringify({
+        error: 'Service temporarily unavailable',
+        message: 'Authentication service is initializing. Please try again.',
+      }),
+      {
+        status: 503,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': '5',
+        },
+      }
+    );
+  }
+
   return selectedMiddleware(req, event);
 }
 

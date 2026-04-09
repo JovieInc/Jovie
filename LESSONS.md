@@ -18,6 +18,11 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ## Testing
 
+### Staging auth must never fall back to production Clerk keys
+**Mistake:** Staging auth routes were allowed to resolve production Clerk keys when `CLERK_PUBLISHABLE_KEY_STAGING` / `CLERK_SECRET_KEY_STAGING` were missing at runtime. That produced `500`s on `staging.jov.ie/signin` and `staging.jov.ie/signup` while `main` kept passing earlier checks.
+
+**Rule:** Treat `staging.jov.ie` and `main.jov.ie` as strict staging hosts. They must use only the staging Clerk pair. If the staging pair is incomplete during deploys or cold starts, fail closed to the auth-unavailable path instead of silently falling back to production keys.
+
 ### Stale test mocks after UI removal
 **Mistake:** Tests for `ClaimHandleForm` were asserting behavior for a "suggestions" UI that had been removed from the component. Tests failed with cryptic errors rather than cleanly.
 

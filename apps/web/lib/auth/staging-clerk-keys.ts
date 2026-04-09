@@ -25,15 +25,22 @@ interface ClerkKeys {
 /**
  * Resolve Clerk keys for a given hostname.
  * Returns staging keys when on a staging host and staging keys are configured.
+ * Staging must never silently fall back to production keys.
  */
 export function resolveClerkKeys(hostname: string): ClerkKeys {
   if (isStagingHost(hostname)) {
     const stagingPk = process.env.CLERK_PUBLISHABLE_KEY_STAGING;
     const stagingSk = process.env.CLERK_SECRET_KEY_STAGING;
-    if (stagingPk && stagingSk) {
-      return { publishableKey: stagingPk, secretKey: stagingSk };
+    if (!stagingPk || !stagingSk) {
+      return {
+        publishableKey: undefined,
+        secretKey: undefined,
+      };
     }
+
+    return { publishableKey: stagingPk, secretKey: stagingSk };
   }
+
   return {
     publishableKey: publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
     secretKey: process.env.CLERK_SECRET_KEY || undefined,

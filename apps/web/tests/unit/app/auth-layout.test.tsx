@@ -7,15 +7,34 @@ interface RenderAuthLayoutOptions {
   readonly forwardedHost?: string;
   readonly forwardedProto?: string;
   readonly publishableKey?: string;
+  readonly stagingPublishableKey?: string;
+  readonly stagingSecretKey?: string;
 }
+
+const originalStagingPublishableKey = process.env.CLERK_PUBLISHABLE_KEY_STAGING;
+const originalStagingSecretKey = process.env.CLERK_SECRET_KEY_STAGING;
 
 async function renderAuthRouteLayout({
   clerkMockFlag = '0',
-  forwardedHost = 'staging.jov.ie',
+  forwardedHost = 'jov.ie',
   forwardedProto = 'https',
   publishableKey,
+  stagingPublishableKey,
+  stagingSecretKey,
 }: RenderAuthLayoutOptions) {
   vi.resetModules();
+
+  if (stagingPublishableKey === undefined) {
+    delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
+  } else {
+    process.env.CLERK_PUBLISHABLE_KEY_STAGING = stagingPublishableKey;
+  }
+
+  if (stagingSecretKey === undefined) {
+    delete process.env.CLERK_SECRET_KEY_STAGING;
+  } else {
+    process.env.CLERK_SECRET_KEY_STAGING = stagingSecretKey;
+  }
 
   vi.doMock('@/lib/env-public', () => ({
     publicEnv: {
@@ -64,6 +83,18 @@ async function renderAuthRouteLayout({
 }
 
 afterEach(() => {
+  if (originalStagingPublishableKey === undefined) {
+    delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
+  } else {
+    process.env.CLERK_PUBLISHABLE_KEY_STAGING = originalStagingPublishableKey;
+  }
+
+  if (originalStagingSecretKey === undefined) {
+    delete process.env.CLERK_SECRET_KEY_STAGING;
+  } else {
+    process.env.CLERK_SECRET_KEY_STAGING = originalStagingSecretKey;
+  }
+
   vi.resetModules();
   vi.clearAllMocks();
 });
@@ -96,6 +127,34 @@ describe('auth route layout', () => {
 
   it('renders auth children through AuthClientProviders when Clerk is available', async () => {
     await renderAuthRouteLayout({ publishableKey: 'pk_test_example' });
+
+    expect(screen.getByTestId('auth-client-providers')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-child')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('auth-clerk-unavailable')
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the unavailable fallback on staging when staging runtime keys are missing', async () => {
+    await renderAuthRouteLayout({
+      forwardedHost: 'staging.jov.ie',
+      publishableKey: 'pk_live_prod_example',
+    });
+
+    expect(screen.getByTestId('auth-layout')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-clerk-unavailable')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('auth-client-providers')
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders auth children on staging when staging runtime keys exist', async () => {
+    await renderAuthRouteLayout({
+      forwardedHost: 'staging.jov.ie',
+      publishableKey: 'pk_live_prod_example',
+      stagingPublishableKey: 'pk_live_staging_example',
+      stagingSecretKey: 'sk_live_staging_example',
+    });
 
     expect(screen.getByTestId('auth-client-providers')).toBeInTheDocument();
     expect(screen.getByTestId('auth-child')).toBeInTheDocument();

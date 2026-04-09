@@ -317,6 +317,49 @@ describe('proxy.ts middleware', () => {
     });
   });
 
+  describe('staging Clerk contract', () => {
+    it('fails closed on staging auth routes when staging Clerk keys are missing', async () => {
+      mocks.isStagingHost.mockReturnValue(true);
+      mocks.resolveClerkKeys.mockReturnValue({
+        publishableKey: undefined,
+        secretKey: undefined,
+      });
+
+      const req = createUnauthenticatedRequest({
+        hostname: 'staging.jov.ie',
+        pathname: '/signup',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(200);
+      expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
+    });
+
+    it('returns 503 for protected staging routes when staging Clerk keys are missing', async () => {
+      mocks.isStagingHost.mockReturnValue(true);
+      mocks.resolveClerkKeys.mockReturnValue({
+        publishableKey: undefined,
+        secretKey: undefined,
+      });
+      const originalNodeEnv = process.env.NODE_ENV;
+
+      try {
+        process.env.NODE_ENV = 'production';
+
+        const req = createUnauthenticatedRequest({
+          hostname: 'staging.jov.ie',
+          pathname: '/app',
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBe(503);
+        expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+    });
+  });
+
   describe('auth redirects for authenticated users', () => {
     it('redirects authenticated user on /signin to /app', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.active);
