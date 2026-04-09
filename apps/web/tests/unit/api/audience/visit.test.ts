@@ -586,6 +586,7 @@ describe('POST /api/audience/visit', () => {
           eventType: 'activated',
           metadata: expect.objectContaining({
             referrerHost: 'l.instagram.com',
+            surface: 'onboarding',
             utmContent: 'bio',
             utmSource: 'instagram',
           }),

@@ -10,6 +10,7 @@ import {
 } from '@/lib/analytics/tracking-token';
 import { isVisitorBlocked } from '@/lib/audience/block-check';
 import { type DbOrTransaction, db, doesTableExist } from '@/lib/db';
+import { unwrapPgError } from '@/lib/db/errors';
 import { audienceMembers, dailyProfileViews } from '@/lib/db/schema/analytics';
 import {
   creatorDistributionEvents,
@@ -171,10 +172,7 @@ function isMissingDailyProfileViewsTableError(error: unknown): boolean {
 }
 
 function isMissingCreatorDistributionEventsTableError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message
-    .toLowerCase()
-    .includes('relation "creator_distribution_events" does not exist');
+  return unwrapPgError(error).code === '42P01';
 }
 
 export async function POST(request: NextRequest) {
@@ -433,6 +431,7 @@ export async function POST(request: NextRequest) {
               eventType: 'activated',
               metadata: {
                 referrerHost: instagramReferrerHost,
+                surface: 'onboarding',
                 utmContent: utmParams?.content ?? null,
                 utmMedium: utmParams?.medium ?? null,
                 utmSource: utmParams?.source ?? null,

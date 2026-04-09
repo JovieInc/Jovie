@@ -193,21 +193,21 @@ export function FunnelMetricsStrip({
         />
         <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-5'>
           <MetricCard
-            title='Step views'
+            title='Step Views'
             value={metrics.instagramShareStepViews7d.toLocaleString('en-US')}
             subtitle='Artists who reached the Instagram share step'
             icon={Users}
             iconClassName='text-info'
           />
           <MetricCard
-            title='Bio copies'
+            title='Bio Copies'
             value={metrics.instagramBioCopies7d.toLocaleString('en-US')}
             subtitle='Tagged Instagram bio links copied'
             icon={Copy}
             iconClassName='text-primary-token'
           />
           <MetricCard
-            title='Open rate'
+            title='Open Rate'
             value={formatPercent(metrics.instagramBioOpenRate7d)}
             subtitle='Share step views that opened Instagram'
             icon={ExternalLink}
@@ -221,7 +221,7 @@ export function FunnelMetricsStrip({
             iconClassName='text-success'
           />
           <MetricCard
-            title='Activation rate'
+            title='Activation Rate'
             value={formatPercent(metrics.instagramBioActivationRate7d)}
             subtitle='Share step views that activated'
             icon={ChartNoAxesCombined}
