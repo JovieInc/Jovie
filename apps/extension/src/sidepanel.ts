@@ -193,26 +193,8 @@ function getOptionalOriginsForUrl(tabUrl: string | null) {
     const url = new URL(tabUrl);
     const host = url.hostname.toLowerCase();
 
-    if (host === 'mail.google.com') {
-      return ['https://mail.google.com/*'];
-    }
-    if (host === 'genius.com' || host.endsWith('.genius.com')) {
-      return ['https://genius.com/*', 'https://*.genius.com/*'];
-    }
-    if (host === 'eventbrite.com' || host.endsWith('.eventbrite.com')) {
-      return ['https://eventbrite.com/*', 'https://*.eventbrite.com/*'];
-    }
-    if (host === 'bandsintown.com' || host.endsWith('.bandsintown.com')) {
-      return ['https://bandsintown.com/*', 'https://*.bandsintown.com/*'];
-    }
-    if (host === 'open.spotify.com') {
-      return ['https://open.spotify.com/*'];
-    }
-    if (host === 'artists.spotify.com') {
-      return ['https://artists.spotify.com/*'];
-    }
-    if (host === 'instagram.com' || host.endsWith('.instagram.com')) {
-      return ['https://instagram.com/*', 'https://*.instagram.com/*'];
+    if (host === 'distrokid.com' || host.endsWith('.distrokid.com')) {
+      return ['https://distrokid.com/*', 'https://*.distrokid.com/*'];
     }
   } catch {
     return [];
@@ -418,7 +400,10 @@ function renderShell(children: HTMLElement[]) {
   }
 
   shell.appendChild(main);
-  shell.appendChild(renderPromptDock());
+  const promptDock = renderPromptDock();
+  if (promptDock) {
+    shell.appendChild(promptDock);
+  }
   root.appendChild(shell);
 }
 
@@ -568,6 +553,9 @@ function startInsertPreview(
 function renderEntityDetail(entity: ExtensionEntitySummary) {
   const section = document.createElement('section');
   section.className = 'card stack-md';
+  const canInsert =
+    getMatchingDomainMode(state.flags, state.summary?.context.host ?? '') ===
+    'write';
 
   const header = document.createElement('div');
   header.className = 'entity-detail-header';
@@ -618,26 +606,28 @@ function renderEntityDetail(entity: ExtensionEntitySummary) {
       })
     );
 
-    actions.appendChild(
-      createButton('Insert', 'ghost', async () => {
-        if (state.currentTabId === null) {
-          setState({ statusMessage: 'No active tab available.' });
-          return;
-        }
+    if (canInsert) {
+      actions.appendChild(
+        createButton('Insert', 'ghost', async () => {
+          if (state.currentTabId === null) {
+            setState({ statusMessage: 'No active tab available.' });
+            return;
+          }
 
-        try {
-          const preview = await getInsertPreview(state.currentTabId);
-          startInsertPreview(entity, field, preview);
-        } catch (error) {
-          setState({
-            statusMessage:
-              error instanceof Error
-                ? error.message
-                : 'Unable to build an insert preview.',
-          });
-        }
-      })
-    );
+          try {
+            const preview = await getInsertPreview(state.currentTabId);
+            startInsertPreview(entity, field, preview);
+          } catch (error) {
+            setState({
+              statusMessage:
+                error instanceof Error
+                  ? error.message
+                  : 'Unable to build an insert preview.',
+            });
+          }
+        })
+      );
+    }
 
     row.appendChild(actions);
     fields.appendChild(row);
@@ -731,7 +721,7 @@ function renderPermissionCard(host: string) {
   const body = document.createElement('p');
   body.className = 'section-body';
   body.textContent =
-    'Grant access for this domain so Jovie can safely read the page and insert into supported fields.';
+    'Grant access for this domain so Jovie can safely read the page and show release metadata for this workflow.';
 
   const actions = document.createElement('div');
   actions.className = 'permission-actions';
@@ -752,6 +742,10 @@ function renderPermissionCard(host: string) {
 }
 
 function renderPromptDock() {
+  if (!state.statusMessage && !state.flags?.chatPromptEnabled) {
+    return null;
+  }
+
   const dock = document.createElement('div');
   dock.className = 'prompt-dock';
 
@@ -762,18 +756,21 @@ function renderPromptDock() {
     dock.appendChild(status);
   }
 
-  const prompt = document.createElement('button');
-  prompt.type = 'button';
-  prompt.className = 'prompt-button';
-  prompt.textContent = 'Ask Jovie about this page';
-  prompt.addEventListener('click', () => {
-    setState({
-      statusMessage:
-        'Chat expansion is the next layer. The prompt dock is already wired into the shell.',
+  if (state.flags?.chatPromptEnabled) {
+    const prompt = document.createElement('button');
+    prompt.type = 'button';
+    prompt.className = 'prompt-button';
+    prompt.textContent = 'Ask Jovie about this page';
+    prompt.addEventListener('click', () => {
+      setState({
+        statusMessage:
+          'Chat expansion is the next layer. The prompt dock is already wired into the shell.',
+      });
     });
-  });
 
-  dock.appendChild(prompt);
+    dock.appendChild(prompt);
+  }
+
   return dock;
 }
 
@@ -832,7 +829,11 @@ function getMatchingDomainMode(
   flags: ExtensionFlagsResponse | null,
   host: string
 ) {
-  return flags?.domains.find(domain => domain.host === host)?.mode ?? 'off';
+  return (
+    flags?.domains.find(
+      domain => host === domain.host || host.endsWith(`.${domain.host}`)
+    )?.mode ?? 'off'
+  );
 }
 
 async function load() {
