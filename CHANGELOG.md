@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.138] - 2026-04-08
+
+> Finish the remaining design-system audit work by consolidating marketing surfaces, extracting shared public-surface shell primitives, and locking the live public profile path to the canonical compact template.
+
+### Added
+
+- Shared marketing primitives for page shells, section intros, metric cards, and surface cards
+- Route-local `/new` marketing sections built on the shared marketing layer
+- Shared public-surface shell primitives for ambient background, stage framing, header layout, and footer safe-area spacing
+- Focused regression coverage for the canonical `ProgressiveArtistPage -> StaticArtistPage` path
+
+### Changed
+
+- Normalized `/new`, `/artist-profiles`, `/pricing`, `/launch`, and `/launch/pricing` onto the shared marketing page shell
+- Moved `SmartLinkShell` and `ProfileShell` onto the shared public-surface shell family
+- Kept live public profile rendering on `StaticArtistPage -> ProfileCompactTemplate` and soft-demoted legacy animated and V2 profile templates
+- Updated design-token and component-architecture docs to describe the real surface families and canonical route contract
+- [internal] Synced the canonical version file, `version.json`, and workspace package versions to `26.4.138`
+
 ## [26.4.137] - 2026-04-08
 
 > Add a repo-owned canonical surface contract for the four design-system surfaces that actually exist on fresh `main`.

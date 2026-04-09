@@ -328,8 +328,9 @@ jobs:
 
   neon-db:
     name: Neon DB
-    # Only run for push to main or PRs with testing label
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    needs: [ci-path-changes]
+    # Run for push to main, risky PRs with the testing label, or schema PRs that need a shared Neon branch.
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-path-changes.outputs.run_drizzle == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -412,6 +413,12 @@ jobs:
           if [ -z "$DB_URL" ]; then
             echo "Neon branch creation did not return db_url."
             echo "This indicates NEON_PROJECT_ID/NEON_API_KEY or the create-branch action is failing."
+            exit 1
+          fi
+
+          if [ -z "$DB_URL_POOLED" ]; then
+            echo "Neon branch creation did not return db_url_pooled."
+            echo "The pooled URL is required for stable cross-job CI consumers."
             exit 1
           fi
 
@@ -508,24 +515,28 @@ jobs:
           echo "To force a full CI run, add the 'testing' label to the PR."
           exit 0
 
-      - name: Resolve Neon DB URL (job-local, with retry)
-        id: resolve_neon
-        uses: ./.github/actions/neon-create-branch-with-retry
+      - name: Download Neon DB connection artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: ${{ needs.neon-db.outputs.branch_name }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
+          name: neon-db-connection-${{ github.run_id }}
+          path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
-          CANDIDATE="${{ steps.resolve_neon.outputs.db_url }}"
+          CONNECTION_FILE="/tmp/neon-db-connection/connection.json"
+          if [ ! -f "$CONNECTION_FILE" ]; then
+            echo "Neon DB connection artifact missing."
+            exit 1
+          fi
+
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
           if [ -n "$CANDIDATE" ]; then
-            echo "Using Neon DB URL from neon-db job outputs"
+            echo "Using Neon DB URL from neon-db artifact"
             echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
           else
-            echo "No Neon ephemeral DB URL available from neon-db job."
+            echo "No Neon ephemeral DB URL available from neon-db artifact."
           fi
 
       - name: Fail if Neon DB URL is missing
@@ -1138,7 +1149,7 @@ jobs:
 
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
-    needs: [ci-path-changes]
+    needs: [neon-db, ci-path-changes]
     # Only run when drizzle/schema paths changed — skip entirely otherwise to save runners
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_drizzle == 'true' }}
     runs-on: ubuntu-latest
@@ -1149,15 +1160,6 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
-
-      - name: Cleanup old Neon branches (prevent limit errors)
-        uses: ./.github/actions/neon-branch-cleanup
-        with:
-          neon_api_key: ${{ secrets.NEON_API_KEY }}
-          neon_project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_limit: '10'
-          protected_branches: 'main,development,preview,br-main,br-production'
-          cleanup_threshold: '7'
 
       - name: Check for relevant changes
         id: check_changes
@@ -1170,38 +1172,25 @@ jobs:
           echo "Skipping DB migrate check: no DB/schema/migration paths were changed."
           exit 0
 
-      - name: Determine sanitized Neon branch name
-        id: sanitize-branch
+      - name: Download Neon DB connection artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        env:
-          RAW_REF: ${{ github.head_ref }}
-          RUN_ID: ${{ github.run_id }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
-        run: |
-          RAW="$RAW_REF"
-          SANITIZED=$(printf '%s' "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
-          BASE=$(printf '%s' "$SANITIZED" | cut -c1-40)
-          SUFFIX="${RUN_ID}-${RUN_ATTEMPT}"
-          FINAL="${BASE}-${SUFFIX}"
-          echo "Using sanitized branch name: $FINAL"
-          echo "name=$FINAL" >> "$GITHUB_OUTPUT"
-
-      - name: Create or reuse Neon branch (with retry)
-        id: create-branch
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: ./.github/actions/neon-create-branch-with-retry
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: ${{ steps.sanitize-branch.outputs.name }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
+          name: neon-db-connection-${{ github.run_id }}
+          path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
-          CANDIDATE="${{ steps.create-branch.outputs.db_url }}"
+          CONNECTION_FILE="/tmp/neon-db-connection/connection.json"
+          if [ ! -f "$CONNECTION_FILE" ]; then
+            echo "Neon DB connection artifact missing."
+            exit 1
+          fi
+
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
           if [ -z "$CANDIDATE" ]; then
-            echo "No Neon ephemeral DATABASE_URL available."
+            echo "No Neon ephemeral DATABASE_URL available from neon-db artifact."
             exit 1
           fi
           echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
@@ -2078,7 +2067,7 @@ jobs:
             exit 1
           fi
 
-          CANDIDATE=$(jq -r '.db_url // empty' "$CONNECTION_FILE")
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
           if [ -n "$CANDIDATE" ]; then
             echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
           else
@@ -2142,7 +2131,7 @@ jobs:
             exit 1
           fi
 
-          CANDIDATE=$(jq -r '.db_url // empty' "$CONNECTION_FILE")
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
           SRC=""
           if [ -n "$CANDIDATE" ]; then
             echo "Using Neon DB URL from neon-db artifact"
@@ -2928,7 +2917,7 @@ jobs:
             exit 1
           fi
 
-          CANDIDATE=$(jq -r '.db_url // empty' "$CONNECTION_FILE")
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
           if [ -z "$CANDIDATE" ]; then
             echo "No Neon ephemeral DB URL available from neon-db artifact."
             exit 1
