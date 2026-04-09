@@ -432,6 +432,8 @@ test.describe('Public profile compact shell sizing', () => {
       return;
     }
 
+    // At 1280x900 with md:py-8, the compact card should sit well inside the
+    // viewport instead of stretching close to full height again.
     expect(shellBox.height).toBeLessThan(780);
     expect(shellBox.y).toBeGreaterThanOrEqual(24);
     expect(shellBox.y + shellBox.height).toBeLessThanOrEqual(876);
