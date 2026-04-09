@@ -68,8 +68,8 @@ export function CampaignSettingsPanel() {
   if (loading) {
     return (
       <SettingsPanel
-        title='Campaign targeting'
-        description='Control who receives invites and pacing for anti-spam compliance.'
+        title='Growth Defaults'
+        description='Set campaign qualification and send pacing defaults. Day-to-day operation lives in Admin Growth.'
       >
         <div className='flex items-center gap-2 px-4 py-4 text-[13px] text-secondary-token sm:px-5'>
           <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
@@ -82,8 +82,8 @@ export function CampaignSettingsPanel() {
   if (isError) {
     return (
       <SettingsPanel
-        title='Campaign targeting'
-        description='Control who receives invites and pacing for anti-spam compliance.'
+        title='Growth Defaults'
+        description='Set campaign qualification and send pacing defaults. Day-to-day operation lives in Admin Growth.'
       >
         <div className='px-4 py-4 text-[13px] text-destructive sm:px-5'>
           {error instanceof Error
@@ -101,8 +101,8 @@ export function CampaignSettingsPanel() {
 
   return (
     <SettingsPanel
-      title='Campaign targeting'
-      description='Control who receives invites and pacing for anti-spam compliance.'
+      title='Growth Defaults'
+      description='Set campaign qualification and send pacing defaults. Day-to-day operation lives in Admin Growth.'
       actions={
         <div className='flex flex-wrap items-center gap-3'>
           <Button
@@ -144,7 +144,7 @@ export function CampaignSettingsPanel() {
                 htmlFor='settings-fit-score'
                 className='text-[13px] font-[510] text-primary-token'
               >
-                Minimum Fit Score
+                Minimum fit score
               </label>
               <div className='flex items-center gap-4'>
                 <input
@@ -172,7 +172,7 @@ export function CampaignSettingsPanel() {
                 htmlFor='settings-batch-size'
                 className='text-[13px] font-[510] text-primary-token'
               >
-                Batch Size
+                Batch size
               </label>
               <Input
                 id='settings-batch-size'
@@ -200,7 +200,7 @@ export function CampaignSettingsPanel() {
                 htmlFor='settings-min-delay'
                 className='text-[13px] font-[510] text-primary-token'
               >
-                Min Delay (seconds)
+                Min delay (seconds)
               </label>
               <Input
                 id='settings-min-delay'
@@ -229,7 +229,7 @@ export function CampaignSettingsPanel() {
                 htmlFor='settings-max-delay'
                 className='text-[13px] font-[510] text-primary-token'
               >
-                Max Delay (seconds)
+                Max delay (seconds)
               </label>
               <Input
                 id='settings-max-delay'

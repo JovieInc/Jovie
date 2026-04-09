@@ -61,14 +61,17 @@ describe('WaitlistSettingsPanel', () => {
     renderWithQueryClient(<WaitlistSettingsPanel />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          'Control approvals, auto-accept behavior, and daily intake limits.'
-        )
-      ).toBeInTheDocument();
+      expect(screen.getByText('People Intake Defaults')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Today: 3 approvals')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Set the approval rules for new people entering the pipeline.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Today: 3 people auto-approved')
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
   });
 
