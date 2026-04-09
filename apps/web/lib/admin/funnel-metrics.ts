@@ -303,6 +303,7 @@ async function getInstagramActivationMetrics7d(sevenDaysAgo: Date): Promise<{
         activations: drizzleSql<number>`
           count(distinct ${creatorDistributionEvents.creatorProfileId}) filter (
             where ${creatorDistributionEvents.eventType} = 'activated'
+              and coalesce(${creatorDistributionEvents.metadata}->>'surface', '') = 'onboarding'
               and ${creatorDistributionEvents.creatorProfileId} in (${onboardingShareProfiles})
           )::int
         `,
@@ -310,12 +311,14 @@ async function getInstagramActivationMetrics7d(sevenDaysAgo: Date): Promise<{
           count(distinct ${creatorDistributionEvents.creatorProfileId}) filter (
             where ${creatorDistributionEvents.eventType} = 'link_copied'
               and coalesce(${creatorDistributionEvents.metadata}->>'surface', '') = 'onboarding'
+              and ${creatorDistributionEvents.creatorProfileId} in (${onboardingShareProfiles})
           )::int
         `,
         platformOpens: drizzleSql<number>`
           count(distinct ${creatorDistributionEvents.creatorProfileId}) filter (
             where ${creatorDistributionEvents.eventType} = 'platform_opened'
               and coalesce(${creatorDistributionEvents.metadata}->>'surface', '') = 'onboarding'
+              and ${creatorDistributionEvents.creatorProfileId} in (${onboardingShareProfiles})
           )::int
         `,
         stepViews: drizzleSql<number>`

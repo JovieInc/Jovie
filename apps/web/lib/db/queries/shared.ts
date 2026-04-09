@@ -58,7 +58,7 @@ export async function getAuthenticatedProfile(
     .select({
       id: creatorProfiles.id,
       usernameNormalized: creatorProfiles.usernameNormalized,
-      userId: creatorProfiles.userId,
+      userId: users.id,
       avatarUrl: creatorProfiles.avatarUrl,
       avatarLockedByUser: creatorProfiles.avatarLockedByUser,
       displayNameLocked: creatorProfiles.displayNameLocked,

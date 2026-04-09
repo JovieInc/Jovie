@@ -5,7 +5,7 @@ import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
 
 const defaultMetrics: AdminFunnelMetrics = {
   instagramShareStepViews7d: 20,
-  instagramBioCopies7d: 12,
+  instagramBioCopies7d: 11,
   instagramBioOpenRate7d: 0.4,
   instagramBioActivations7d: 6,
   instagramBioActivationRate7d: 0.3,
@@ -56,7 +56,7 @@ describe('FunnelMetricsStrip', () => {
   it('displays paying customer count', () => {
     render(<FunnelMetricsStrip metrics={defaultMetrics} />);
 
-    expect(screen.getAllByText('12').length).toBeGreaterThan(0);
+    expect(screen.getByText('12')).toBeInTheDocument();
   });
 
   it('displays growth rates summary', () => {

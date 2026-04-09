@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BIO_LINK_ACTIVATION_WINDOW_DAYS } from '@/lib/distribution/instagram-activation';
 
 const mockPublicVisitLimiterGetStatus = vi.hoisted(() => vi.fn());
 const mockPublicVisitLimiterLimit = vi.hoisted(() => vi.fn());
@@ -62,6 +63,8 @@ vi.mock('@/lib/audience/block-check', () => ({
 }));
 
 const { POST } = await import('@/app/api/audience/visit/route');
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 describe('POST /api/audience/visit', () => {
   beforeEach(() => {
@@ -496,6 +499,10 @@ describe('POST /api/audience/visit', () => {
   });
 
   it('writes one activated event for Instagram-sourced visits inside the activation window', async () => {
+    const insideActivationWindow = new Date(
+      Date.now() - (BIO_LINK_ACTIVATION_WINDOW_DAYS - 1) * MS_PER_DAY
+    );
+
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -503,7 +510,7 @@ describe('POST /api/audience/visit', () => {
             {
               id: 'profile_123',
               isPublic: true,
-              onboardingCompletedAt: new Date('2026-04-03T00:00:00.000Z'),
+              onboardingCompletedAt: insideActivationWindow,
             },
           ]),
         }),
@@ -589,6 +596,10 @@ describe('POST /api/audience/visit', () => {
   });
 
   it('does not write an activated event after the seven-day window expires', async () => {
+    const expiredActivationWindow = new Date(
+      Date.now() - (BIO_LINK_ACTIVATION_WINDOW_DAYS + 5) * MS_PER_DAY
+    );
+
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -596,7 +607,7 @@ describe('POST /api/audience/visit', () => {
             {
               id: 'profile_123',
               isPublic: true,
-              onboardingCompletedAt: new Date('2026-03-20T00:00:00.000Z'),
+              onboardingCompletedAt: expiredActivationWindow,
             },
           ]),
         }),

@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { CheckCircle2, Clock3, Copy, ExternalLink } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Clock3, Copy } from 'lucide-react';
 import Link from 'next/link';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -75,6 +75,33 @@ function MilestoneRow({
   );
 }
 
+function getBioLinkDescription(
+  status: BioLinkActivation['status'],
+  windowEndLabel: string | null
+): string {
+  if (status !== 'expired') {
+    return 'Copy your tagged Jovie link, open Instagram, and paste it into your bio. We will mark activation on the first Instagram-sourced visit.';
+  }
+
+  const suffix = windowEndLabel ? ` by ${windowEndLabel}` : '';
+  return `No Instagram visitor landed in the first seven days${suffix}. Copy the tagged link again and paste it into your bio.`;
+}
+
+function getCopyButtonLabel(
+  isSuccess: boolean,
+  isError: boolean
+): 'Copied' | 'Retry Copy' | 'Copy Instagram Bio Link' {
+  if (isSuccess) {
+    return 'Copied';
+  }
+
+  if (isError) {
+    return 'Retry Copy';
+  }
+
+  return 'Copy Instagram Bio Link';
+}
+
 export const SocialBioNudge = memo(function SocialBioNudge({
   bioLinkActivation,
   profileId,
@@ -85,11 +112,21 @@ export const SocialBioNudge = memo(function SocialBioNudge({
     () => buildInstagramBioLink(profileUrl),
     [profileUrl]
   );
+  const resolvedBioLinkActivation =
+    bioLinkActivation ??
+    ({
+      activatedAt: null,
+      copiedAt: null,
+      openedAt: null,
+      platform: 'instagram',
+      status: 'pending',
+      windowEndsAt: null,
+    } satisfies BioLinkActivation);
   const [didCopyLink, setDidCopyLink] = useState(
-    Boolean(bioLinkActivation?.copiedAt)
+    Boolean(resolvedBioLinkActivation.copiedAt)
   );
   const [didOpenInstagram, setDidOpenInstagram] = useState(
-    Boolean(bioLinkActivation?.openedAt)
+    Boolean(resolvedBioLinkActivation.openedAt)
   );
 
   const { copy, isError, isSuccess } = useClipboard({
@@ -128,16 +165,15 @@ export const SocialBioNudge = memo(function SocialBioNudge({
     void copy(instagramBioUrl);
   }, [copy, instagramBioUrl]);
 
-  if (!bioLinkActivation) {
-    return null;
-  }
+  const hasCopiedLink =
+    didCopyLink || Boolean(resolvedBioLinkActivation.copiedAt);
+  const hasOpenedLink =
+    didOpenInstagram || Boolean(resolvedBioLinkActivation.openedAt);
+  const activatedAtLabel = formatDate(resolvedBioLinkActivation.activatedAt);
+  const windowEndLabel = formatDate(resolvedBioLinkActivation.windowEndsAt);
+  const copyButtonLabel = getCopyButtonLabel(isSuccess, isError);
 
-  const hasCopiedLink = didCopyLink || Boolean(bioLinkActivation.copiedAt);
-  const hasOpenedLink = didOpenInstagram || Boolean(bioLinkActivation.openedAt);
-  const activatedAtLabel = formatDate(bioLinkActivation.activatedAt);
-  const windowEndLabel = formatDate(bioLinkActivation.windowEndsAt);
-
-  if (bioLinkActivation.status === 'activated') {
+  if (resolvedBioLinkActivation.status === 'activated') {
     return (
       <div className='rounded-xl border border-success/20 bg-success/5 p-4'>
         <div className='flex items-start gap-3'>
@@ -158,7 +194,7 @@ export const SocialBioNudge = memo(function SocialBioNudge({
               <Button asChild size='sm' variant='secondary'>
                 <Link href={APP_ROUTES.DASHBOARD_AUDIENCE}>
                   View Analytics
-                  <ExternalLink className='ml-1 h-3.5 w-3.5' />
+                  <ArrowRight className='ml-1 h-3.5 w-3.5' />
                 </Link>
               </Button>
             </div>
@@ -169,13 +205,13 @@ export const SocialBioNudge = memo(function SocialBioNudge({
   }
 
   const title =
-    bioLinkActivation.status === 'expired'
+    resolvedBioLinkActivation.status === 'expired'
       ? 'Try Instagram again'
       : 'Activate your Instagram bio link';
-  const description =
-    bioLinkActivation.status === 'expired'
-      ? `No Instagram visitor landed in the first seven days${windowEndLabel ? ` by ${windowEndLabel}` : ''}. Copy the tagged link again and paste it into your bio.`
-      : 'Copy your tagged Jovie link, open Instagram, and paste it into your bio. We will mark activation on the first Instagram-sourced visit.';
+  const description = getBioLinkDescription(
+    resolvedBioLinkActivation.status,
+    windowEndLabel
+  );
 
   return (
     <div className='rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-4'>
@@ -210,7 +246,7 @@ export const SocialBioNudge = memo(function SocialBioNudge({
             />
             <MilestoneRow
               description={
-                bioLinkActivation.status === 'expired'
+                resolvedBioLinkActivation.status === 'expired'
                   ? 'The activation window expired before the first Instagram visit arrived.'
                   : 'Activation happens after the first Instagram-sourced visit lands on your profile.'
               }
@@ -222,11 +258,7 @@ export const SocialBioNudge = memo(function SocialBioNudge({
           <div className='flex flex-wrap gap-2'>
             <Button onClick={handleCopyLink} size='sm'>
               <Copy className='mr-1.5 h-3.5 w-3.5' aria-hidden='true' />
-              {isSuccess
-                ? 'Copied'
-                : isError
-                  ? 'Retry Copy'
-                  : 'Copy Instagram Bio Link'}
+              {copyButtonLabel}
             </Button>
             <Button onClick={handleOpenInstagram} size='sm' variant='secondary'>
               Open Instagram

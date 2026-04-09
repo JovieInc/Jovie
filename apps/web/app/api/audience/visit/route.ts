@@ -18,9 +18,9 @@ import {
 import {
   buildDistributionDedupeKey,
   getBioLinkActivationWindowEnd,
+  getInstagramReferrerHost,
   INSTAGRAM_DISTRIBUTION_PLATFORM,
   isInstagramActivationSource,
-  isInstagramReferrer,
 } from '@/lib/distribution/instagram-activation';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -401,15 +401,7 @@ export async function POST(request: NextRequest) {
       const resolvedUtmParams = hasUtmParams
         ? utmParams
         : (existing?.utmParams ?? {});
-      const referrerHost = resolvedReferrer
-        ? (() => {
-            try {
-              return new URL(resolvedReferrer).hostname.toLowerCase();
-            } catch {
-              return null;
-            }
-          })()
-        : null;
+      const instagramReferrerHost = getInstagramReferrerHost(resolvedReferrer);
       if (hasDailyProfileViewsTable && !isBotAudienceMember) {
         try {
           await incrementDailyProfileViews(tx, profileId, viewDate, now);
@@ -440,9 +432,7 @@ export async function POST(request: NextRequest) {
               ),
               eventType: 'activated',
               metadata: {
-                referrerHost: isInstagramReferrer(resolvedReferrer)
-                  ? referrerHost
-                  : null,
+                referrerHost: instagramReferrerHost,
                 utmContent: utmParams?.content ?? null,
                 utmMedium: utmParams?.medium ?? null,
                 utmSource: utmParams?.source ?? null,

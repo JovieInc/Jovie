@@ -5,23 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.138] - 2026-04-08
-
-> Made onboarding point artists to their Instagram-ready Jovie link, track the first Instagram visit that lands, and show that activation progress back inside Jovie.
-
-### Added
-
-- [internal] A durable creator distribution event pipeline for Instagram share-step views, bio-link copies, Instagram opens, skips, and first-visit activations
-
-### Changed
-
-- Onboarding now ends with an Instagram-first “Your Link Is Live” step that copies a tagged bio link, opens Instagram profile edit, and keeps the existing continue path intact
-- The dashboard share nudge now shows pending, activated, and expired Instagram bio-link states so artists can see whether their first Instagram visitor has landed yet
-- Admin KPIs now include Instagram activation step views, tagged-link copies, Instagram opens, and first-visit activations
-- The self-serve sharing guide now recommends the tagged Instagram bio link instead of the bare profile URL
-- [internal] Profile ownership checks for distribution events now honor canonical profile claims with the legacy fallback instead of only the current active profile
-- [internal] Synced the canonical version file, `version.json`, and workspace package versions to `26.4.138`
-
 ## [26.4.137] - 2026-04-08
 
 > Add a repo-owned canonical surface contract for the four design-system surfaces that actually exist on fresh `main`.

@@ -9,7 +9,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
-import { and, asc, sql as drizzleSql, eq, or } from 'drizzle-orm';
+import { and, asc, sql as drizzleSql, eq, inArray, or } from 'drizzle-orm';
 import { unstable_cache as unstableCache } from 'next/cache';
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
@@ -172,6 +172,15 @@ function serializeNullableDate(value: Date | null): string | null {
   return value ? value.toISOString() : null;
 }
 
+const BIO_LINK_ACTIVATION_EVENT_TYPES = [
+  'activated',
+  'link_copied',
+  'platform_opened',
+] as const;
+
+type BioLinkActivationEventType =
+  (typeof BIO_LINK_ACTIVATION_EVENT_TYPES)[number];
+
 async function buildBioLinkActivation(
   tx: DbOrTransaction,
   profile: CreatorProfile
@@ -211,6 +220,10 @@ async function buildBioLinkActivation(
               eq(
                 creatorDistributionEvents.platform,
                 INSTAGRAM_DISTRIBUTION_PLATFORM
+              ),
+              inArray(
+                creatorDistributionEvents.eventType,
+                BIO_LINK_ACTIVATION_EVENT_TYPES
               )
             )
           )
@@ -228,22 +241,9 @@ async function buildBioLinkActivation(
     });
 
     for (const eventRow of eventRows) {
-      if (eventRow.eventType === 'activated' && timestamps.activated === null) {
-        timestamps.activated = eventRow.createdAt;
-      }
-
-      if (
-        eventRow.eventType === 'link_copied' &&
-        timestamps.link_copied === null
-      ) {
-        timestamps.link_copied = eventRow.createdAt;
-      }
-
-      if (
-        eventRow.eventType === 'platform_opened' &&
-        timestamps.platform_opened === null
-      ) {
-        timestamps.platform_opened = eventRow.createdAt;
+      const eventType = eventRow.eventType as BioLinkActivationEventType;
+      if (timestamps[eventType] === null) {
+        timestamps[eventType] = eventRow.createdAt;
       }
     }
   }
