@@ -184,7 +184,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           className={cn(
             sizeClass,
             roundedClass,
-            'flex items-center justify-center bg-surface-2 text-secondary-token',
+            'flex items-center justify-center bg-surface-2 text-primary-token',
             BORDER_RING,
             'shadow-sm transition-colors duration-200'
           )}

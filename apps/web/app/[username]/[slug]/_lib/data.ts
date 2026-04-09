@@ -23,6 +23,7 @@ import {
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { toISOStringOrNull } from '@/lib/utils/date';
+import { shouldBypassPublicProfileQaCache } from '../../_lib/public-profile-qa';
 
 export type ContentType = 'release' | 'track';
 type HiddenCreditRole = 'vs' | 'with';
@@ -274,8 +275,7 @@ export const getCreatorByUsername = cache(
     if (
       process.env.NODE_ENV === 'test' ||
       process.env.NODE_ENV === 'development' ||
-      (process.env.NODE_ENV !== 'production' &&
-        process.env.PUBLIC_NOAUTH_SMOKE === '1')
+      shouldBypassPublicProfileQaCache()
     ) {
       return fetchCreatorByUsername(usernameNormalized);
     }

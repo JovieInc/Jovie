@@ -110,14 +110,12 @@ function isClerkUnauthorizedError(error: unknown): boolean {
 
   const candidate = error as {
     readonly status?: number;
-    readonly clerkTraceId?: string;
     readonly errors?: ReadonlyArray<{ readonly code?: string }>;
   };
 
   return (
     candidate.status === 401 ||
     candidate.status === 403 ||
-    Boolean(candidate.clerkTraceId) ||
     Boolean(
       candidate.errors?.some(
         ({ code }) =>
@@ -223,11 +221,10 @@ export async function resolveClerkTestUserId(
       emailAddress: [normalizedEmail],
     });
   } catch (error) {
-    if (!isClerkUnauthorizedError(error)) {
-      throw error;
+    if (isClerkUnauthorizedError(error) && fallbackClerkId) {
+      return fallbackClerkId;
     }
-
-    return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+    throw error;
   }
 
   return (
@@ -264,11 +261,10 @@ export async function ensureClerkTestUser({
     });
     existingUser = existingUsers.data[0];
   } catch (error) {
-    if (!isClerkUnauthorizedError(error)) {
-      throw error;
+    if (isClerkUnauthorizedError(error) && fallbackClerkId) {
+      return fallbackClerkId;
     }
-
-    return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+    throw error;
   }
 
   if (existingUser) {
@@ -287,8 +283,8 @@ export async function ensureClerkTestUser({
 
     return createdUser.id;
   } catch (error) {
-    if (isClerkUnauthorizedError(error)) {
-      return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+    if (isClerkUnauthorizedError(error) && fallbackClerkId) {
+      return fallbackClerkId;
     }
 
     if (!isClerkIdentificationExistsError(error)) {
@@ -302,11 +298,10 @@ export async function ensureClerkTestUser({
       });
       racedUser = racedUsers.data[0];
     } catch (raceError) {
-      if (!isClerkUnauthorizedError(raceError)) {
-        throw raceError;
+      if (isClerkUnauthorizedError(raceError) && fallbackClerkId) {
+        return fallbackClerkId;
       }
-
-      return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+      throw raceError;
     }
 
     if (!racedUser) {

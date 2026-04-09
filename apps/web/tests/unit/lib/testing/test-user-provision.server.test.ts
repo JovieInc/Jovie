@@ -87,6 +87,30 @@ describe('test-user-provision.server', () => {
     expect(mockCreateUser).not.toHaveBeenCalled();
   });
 
+  it('does not treat non-auth Clerk errors with trace ids as fallback cases', async () => {
+    mockGetUserList.mockRejectedValue({
+      status: 429,
+      clerkTraceId: 'trace_123',
+      errors: [{ code: 'rate_limit_exceeded' }],
+    });
+
+    const { ensureClerkTestUser } = await import(
+      '@/lib/testing/test-user-provision.server'
+    );
+
+    await expect(
+      ensureClerkTestUser({
+        email: 'browse+clerk_test@jov.ie',
+        username: 'browse-test-user',
+        firstName: 'Browse',
+        lastName: 'Test',
+      })
+    ).rejects.toMatchObject({
+      status: 429,
+      clerkTraceId: 'trace_123',
+    });
+  });
+
   it('keeps privileged seeding narrower than the generic browse allowlist', async () => {
     const {
       isAllowlistedPrivilegedTestAccountEmail,

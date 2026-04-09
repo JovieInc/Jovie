@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useProfileNotificationsController } from '@/components/organisms/hooks/useProfileNotificationsController';
 import {
   usePopstateReset,
@@ -67,12 +67,68 @@ export interface UseProfileShellReturn {
   hasContacts: boolean;
 }
 
-function resolveModeFromLocation(fallbackMode: ProfileMode): ProfileMode {
-  if (typeof globalThis.window === 'undefined') {
+const LOCATION_SEARCH_CHANGE_EVENT = 'jovie:location-search-change';
+let historyPatched = false;
+
+function patchHistoryEvents() {
+  if (historyPatched || globalThis.history === undefined) {
+    return;
+  }
+
+  const { pushState, replaceState } = globalThis.history;
+  const dispatchChange = () => {
+    globalThis.dispatchEvent(new Event(LOCATION_SEARCH_CHANGE_EVENT));
+  };
+
+  globalThis.history.pushState = function patchedPushState(
+    ...args: Parameters<History['pushState']>
+  ) {
+    pushState.apply(this, args);
+    dispatchChange();
+  };
+
+  globalThis.history.replaceState = function patchedReplaceState(
+    ...args: Parameters<History['replaceState']>
+  ) {
+    replaceState.apply(this, args);
+    dispatchChange();
+  };
+
+  historyPatched = true;
+}
+
+function subscribeToLocationSearch(onStoreChange: () => void): () => void {
+  if (globalThis.location === undefined) {
+    return () => undefined;
+  }
+
+  patchHistoryEvents();
+  globalThis.addEventListener('popstate', onStoreChange);
+  globalThis.addEventListener(LOCATION_SEARCH_CHANGE_EVENT, onStoreChange);
+
+  return () => {
+    globalThis.removeEventListener('popstate', onStoreChange);
+    globalThis.removeEventListener(LOCATION_SEARCH_CHANGE_EVENT, onStoreChange);
+  };
+}
+
+function getLocationSearchSnapshot(): string {
+  if (globalThis.location === undefined) {
+    return '';
+  }
+
+  return globalThis.location.search;
+}
+
+function resolveModeFromSearch(
+  search: string,
+  fallbackMode: ProfileMode
+): ProfileMode {
+  if (!search) {
     return fallbackMode;
   }
 
-  const modeParam = new URLSearchParams(globalThis.location.search).get('mode');
+  const modeParam = new URLSearchParams(search).get('mode');
   if (
     modeParam &&
     PROFILE_MODE_KEYS.includes(modeParam as (typeof PROFILE_MODE_KEYS)[number])
@@ -83,14 +139,15 @@ function resolveModeFromLocation(fallbackMode: ProfileMode): ProfileMode {
   return fallbackMode;
 }
 
-function resolveSourceFromLocation(
+function resolveSourceFromSearch(
+  search: string,
   fallbackSource: string | null
 ): string | null {
-  if (typeof globalThis.window === 'undefined') {
+  if (!search) {
     return fallbackSource;
   }
 
-  return new URLSearchParams(globalThis.location.search).get('source');
+  return new URLSearchParams(search).get('source');
 }
 
 export function useProfileShell({
@@ -118,28 +175,19 @@ export function useProfileShell({
   const { success: showSuccess, error: showError } = useNotifications();
   const pathname = usePathname();
   const router = useRouter();
-  const [locationMode, setLocationMode] = useState<ProfileMode>(() =>
-    resolveModeFromLocation('profile')
+  const locationSearch = useSyncExternalStore(
+    subscribeToLocationSearch,
+    getLocationSearchSnapshot,
+    () => ''
   );
-  const [locationSource, setLocationSource] = useState<string | null>(() =>
-    resolveSourceFromLocation(null)
+  const locationMode = useMemo(
+    () => resolveModeFromSearch(locationSearch, 'profile'),
+    [locationSearch]
   );
-
-  useEffect(() => {
-    if (modeOverride !== undefined) {
-      return;
-    }
-
-    setLocationMode(resolveModeFromLocation('profile'));
-  }, [modeOverride, pathname]);
-
-  useEffect(() => {
-    if (sourceOverride !== undefined) {
-      return;
-    }
-
-    setLocationSource(resolveSourceFromLocation(null));
-  }, [pathname, sourceOverride]);
+  const locationSource = useMemo(
+    () => resolveSourceFromSearch(locationSearch, null),
+    [locationSearch]
+  );
 
   const mode = modeOverride ?? locationMode;
   const source = sourceOverride ?? locationSource;

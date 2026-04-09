@@ -43,6 +43,7 @@ import {
   LegacySocialLink,
 } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
+import { shouldBypassPublicProfileQaCache } from './_lib/public-profile-qa';
 
 /** Max MusicEvent schemas to emit (Google shows ~5 in rich results). */
 const MAX_EVENT_SCHEMAS = 5;
@@ -434,14 +435,6 @@ const fetchProfileAndLinks = async (
 
 const PROFILE_SUCCESS_CACHE_TTL_SECONDS = 3600; // 1 hour
 
-function shouldBypassPublicProfileQaCache() {
-  // Keep the no-auth interaction/a11y sweeps deterministic without forcing
-  // Lighthouse to benchmark the uncached profile path.
-  return (
-    process.env.NODE_ENV !== 'production' &&
-    process.env.PUBLIC_NOAUTH_SMOKE === '1'
-  );
-}
 class NonCacheableProfileResultError extends Error {
   readonly result: Awaited<ReturnType<typeof fetchProfileAndLinks>>;
 
@@ -549,6 +542,7 @@ interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 async function getPublicTourDates(
@@ -565,8 +559,12 @@ async function getPublicTourDates(
   }
 }
 
-export default async function ArtistPage({ params }: Readonly<Props>) {
+export default async function ArtistPage({
+  params,
+  searchParams,
+}: Readonly<Props>) {
   const { username } = await params;
+  const resolvedSearchParams = await searchParams;
 
   // Early reject obviously invalid usernames before hitting the database
   if (
@@ -577,7 +575,10 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     notFound();
   }
 
-  const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
+  const isPublicNoAuthSmoke = shouldBypassPublicProfileQaCache();
+  const requestedMode = Array.isArray(resolvedSearchParams.mode)
+    ? resolvedSearchParams.mode[0]
+    : resolvedSearchParams.mode;
   const viewerCountryCode = null;
 
   const profileResult = await getProfileAndLinks(username);
@@ -691,7 +692,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         pressPhotos={pressPhotos}
         subscribeTwoStep
         genres={genres}
-        tourDates={publicTourDates}
+        tourDates={requestedMode === 'tour' ? tourDates : publicTourDates}
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}

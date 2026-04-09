@@ -24,7 +24,7 @@ export async function getCreatorEntitlements(
   const [result] = await db
     .select({ plan: users.plan })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.activeProfileId, creatorProfiles.id))
+    .innerJoin(users, eq(users.id, creatorProfiles.userId))
     .where(eq(creatorProfiles.id, creatorProfileId))
     .limit(1);
 
@@ -49,7 +49,7 @@ export async function getBatchCreatorEntitlements(
       plan: users.plan,
     })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.activeProfileId, creatorProfiles.id))
+    .innerJoin(users, eq(users.id, creatorProfiles.userId))
     .where(inArray(creatorProfiles.id, creatorProfileIds));
 
   const map = new Map<
