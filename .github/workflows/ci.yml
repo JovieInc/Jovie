@@ -863,6 +863,7 @@ jobs:
 
   ci-lighthouse-dashboard-pr:
     name: Lighthouse (dashboard PR)
+    environment: Preview – jovie
     needs: [ci-fast, ci-path-changes]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_launch_gate == 'true' }}
     runs-on: ubuntu-latest
@@ -1015,6 +1016,7 @@ jobs:
 
   ci-lighthouse-onboarding-pr:
     name: Lighthouse (onboarding PR)
+    environment: Preview – jovie
     needs: [ci-fast, ci-path-changes]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_launch_gate == 'true' }}
     runs-on: ubuntu-latest
@@ -2305,6 +2307,7 @@ jobs:
 
   ci-golden-path-pr:
     name: Golden Path (PR)
+    environment: Preview – jovie
     needs: [ci-fast, ci-path-changes]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_launch_gate == 'true' }}
     runs-on: ubuntu-latest
