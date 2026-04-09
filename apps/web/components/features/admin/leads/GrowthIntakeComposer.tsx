@@ -46,7 +46,12 @@ function SingleModeForm({
   onError,
 }: Readonly<ModeCallbacks>) {
   const ingestProfileMutation = useIngestProfileMutation();
-  const { results, search, clear } = useArtistSearchQuery({
+  const {
+    results,
+    search,
+    clear,
+    state: searchState,
+  } = useArtistSearchQuery({
     minQueryLength: 2,
     limit: 6,
   });
@@ -54,20 +59,6 @@ function SingleModeForm({
   const [network, setNetwork] = useState<IngestNetworkId>('instagram');
   const [inputValue, setInputValue] = useState('');
   const normalizedUrl = getNormalizedInputUrl(network, inputValue);
-
-  useEffect(() => {
-    if (network !== 'spotify') {
-      clear();
-      return;
-    }
-
-    if (inputValue.trim().startsWith('http')) {
-      clear();
-      return;
-    }
-
-    search(inputValue);
-  }, [clear, inputValue, network, search]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -78,6 +69,11 @@ function SingleModeForm({
       network === 'spotify' &&
       !trimmed.startsWith('http') &&
       !/^[a-zA-Z0-9]{22}$/.test(trimmed);
+
+    if (isSpotifySearch && searchState !== 'success') {
+      onError('Wait for Spotify search results before creating the profile.');
+      return;
+    }
 
     try {
       const url = isSpotifySearch
@@ -125,7 +121,22 @@ function SingleModeForm({
         type='text'
         inputSize='sm'
         value={inputValue}
-        onChange={event => setInputValue(event.target.value)}
+        onChange={event => {
+          const value = event.target.value;
+          setInputValue(value);
+
+          if (network !== 'spotify') {
+            clear();
+            return;
+          }
+
+          if (value.trim().startsWith('http')) {
+            clear();
+            return;
+          }
+
+          search(value);
+        }}
         placeholder={
           INGEST_NETWORKS.find(option => option.id === network)?.placeholder ??
           'Paste profile URL'
@@ -248,8 +259,9 @@ function QueueModeForm({
 
   const queuedUrls = inputValue
     .split('\n')
-    .map(url => normalizeUrl(url.trim()))
-    .filter(Boolean);
+    .map(url => url.trim())
+    .filter(Boolean)
+    .map(url => normalizeUrl(url));
 
   async function handleSubmit() {
     onStart();

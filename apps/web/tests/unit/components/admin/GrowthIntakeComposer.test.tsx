@@ -74,6 +74,7 @@ vi.mock('@/lib/queries', () => ({
         url: 'https://open.spotify.com/artist/2p89gzrWQ9x04sXIs2WnUm',
       },
     ],
+    state: 'success',
     search: artistSearchMock,
     clear: artistClearMock,
   }),
@@ -123,6 +124,23 @@ describe('GrowthIntakeComposer', () => {
     expect(
       screen.getByText('Queued 1 URL for lead intake.')
     ).toBeInTheDocument();
+  });
+
+  it('does not queue when input is blank or whitespace only', async () => {
+    const user = userEvent.setup();
+    render(<GrowthIntakeComposer initialMode='queue' />);
+
+    await user.type(screen.getByLabelText('Queue URLs input'), '   {enter}   ');
+    await user.click(screen.getByRole('button', { name: 'Queue Lead URLs' }));
+
+    await waitFor(() => {
+      expect(queueMutateAsyncMock).not.toHaveBeenCalled();
+    });
+
+    expect(refreshMock).not.toHaveBeenCalled();
+    expect(
+      screen.queryByText('Queued 1 URL for lead intake.')
+    ).not.toBeInTheDocument();
   });
 
   it('runs batch imports and shows the parsed batch summary', async () => {

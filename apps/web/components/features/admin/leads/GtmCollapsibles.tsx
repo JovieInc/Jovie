@@ -88,9 +88,10 @@ function AccordionSection({
 function viewToAccordionIndex(view?: string): number | null {
   if (!view) return null;
   switch (view) {
+    case 'ingest':
+      return 0;
     case 'outreach':
     case 'campaigns':
-    case 'ingest':
       return 2;
     default:
       return null;
