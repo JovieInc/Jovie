@@ -416,8 +416,54 @@ export async function ensureCreatorProfileRecord(
   database: DbOrTransaction,
   values: SeededCreatorProfileValues
 ): Promise<string> {
+  function resolveExistingProfileMatch(
+    existingProfileByUsername:
+      | {
+          id: string;
+          userId: string | null;
+          isClaimed: boolean | null;
+        }
+      | undefined,
+    existingClaimedProfileForUser:
+      | {
+          id: string;
+        }
+      | undefined
+  ) {
+    if (
+      existingProfileByUsername &&
+      existingClaimedProfileForUser &&
+      existingProfileByUsername.id !== existingClaimedProfileForUser.id
+    ) {
+      throw new Error(
+        `Conflicting creator profile matches for ${values.usernameNormalized} and user ${values.userId}`
+      );
+    }
+
+    if (existingClaimedProfileForUser) {
+      return existingClaimedProfileForUser;
+    }
+
+    if (
+      existingProfileByUsername &&
+      values.userId &&
+      existingProfileByUsername.userId &&
+      existingProfileByUsername.userId !== values.userId
+    ) {
+      throw new Error(
+        `Conflicting creator profile matches for ${values.usernameNormalized} and user ${values.userId}`
+      );
+    }
+
+    return existingProfileByUsername;
+  }
+
   const [existingProfileByUsername] = await database
-    .select({ id: creatorProfiles.id })
+    .select({
+      id: creatorProfiles.id,
+      userId: creatorProfiles.userId,
+      isClaimed: creatorProfiles.isClaimed,
+    })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
     .limit(1);
@@ -443,19 +489,10 @@ export async function ensureCreatorProfileRecord(
   }
 
   const existingClaimedProfileForUser = existingClaimedProfilesForUser[0];
-
-  if (
-    existingProfileByUsername &&
-    existingClaimedProfileForUser &&
-    existingProfileByUsername.id !== existingClaimedProfileForUser.id
-  ) {
-    throw new Error(
-      `Conflicting creator profile matches for ${values.usernameNormalized} and user ${values.userId}`
-    );
-  }
-
-  const existingProfile =
-    existingProfileByUsername ?? existingClaimedProfileForUser;
+  const existingProfile = resolveExistingProfileMatch(
+    existingProfileByUsername,
+    existingClaimedProfileForUser
+  );
 
   if (existingProfile) {
     await database
@@ -477,7 +514,11 @@ export async function ensureCreatorProfileRecord(
     }
 
     const [racedProfileByUsername] = await database
-      .select({ id: creatorProfiles.id })
+      .select({
+        id: creatorProfiles.id,
+        userId: creatorProfiles.userId,
+        isClaimed: creatorProfiles.isClaimed,
+      })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
       .limit(1);
@@ -503,18 +544,10 @@ export async function ensureCreatorProfileRecord(
     }
 
     const racedClaimedProfileForUser = racedClaimedProfilesForUser[0];
-
-    if (
-      racedProfileByUsername &&
-      racedClaimedProfileForUser &&
-      racedProfileByUsername.id !== racedClaimedProfileForUser.id
-    ) {
-      throw new Error(
-        `Conflicting creator profile matches for ${values.usernameNormalized} and user ${values.userId}`
-      );
-    }
-
-    const racedProfile = racedProfileByUsername ?? racedClaimedProfileForUser;
+    const racedProfile = resolveExistingProfileMatch(
+      racedProfileByUsername,
+      racedClaimedProfileForUser
+    );
 
     if (!racedProfile) {
       throw error;

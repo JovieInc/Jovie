@@ -146,7 +146,7 @@ describe('test-user-provision.server', () => {
 
   it('updates the existing claimed profile for the same user when one already exists', async () => {
     const updateValues: Array<Record<string, unknown>> = [];
-    const selectQueue = [[{ id: 'profile_existing' }]];
+    const selectQueue = [[{ id: 'profile_existing', userId: 'user_123' }]];
     const database = {
       select: vi.fn(() => ({
         from: vi.fn(() => ({
@@ -209,7 +209,7 @@ describe('test-user-provision.server', () => {
     const duplicateError = new Error(
       'duplicate key value violates unique constraint "creator_profiles_username_normalized_unique"'
     );
-    const selectQueue = [[], [], [{ id: 'profile_raced' }]];
+    const selectQueue = [[], [], [{ id: 'profile_raced', userId: 'user_123' }]];
     const database = {
       select: vi.fn(() => ({
         from: vi.fn(() => ({
@@ -266,7 +266,7 @@ describe('test-user-provision.server', () => {
   });
 
   it('recovers duplicate claimed-profile races when drizzle wraps the postgres duplicate error', async () => {
-    const selectQueue = [[], [], [{ id: 'profile_raced' }]];
+    const selectQueue = [[], [], [{ id: 'profile_raced', userId: 'user_123' }]];
     const database = {
       select: vi.fn(() => ({
         from: vi.fn(() => ({
@@ -329,6 +329,136 @@ describe('test-user-provision.server', () => {
 
     expect(database.insert).toHaveBeenCalledTimes(1);
     expect(database.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects username matches that already belong to a different user', async () => {
+    const updateValues: Array<Record<string, unknown>> = [];
+    const selectQueue = [
+      [{ id: 'profile_taken', userId: 'user_other', isClaimed: true }],
+      [],
+    ];
+    const database = {
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn(async () => selectQueue.shift() ?? []),
+          })),
+        })),
+      })),
+      update: vi.fn(() => ({
+        set: vi.fn((values: Record<string, unknown>) => {
+          updateValues.push(values);
+          return {
+            where: vi.fn(async () => undefined),
+          };
+        }),
+      })),
+      insert: vi.fn(),
+    };
+
+    const { ensureCreatorProfileRecord } = await import(
+      '@/lib/testing/test-user-provision.server'
+    );
+
+    await expect(
+      ensureCreatorProfileRecord(database as never, {
+        userId: 'user_123',
+        creatorType: 'artist',
+        username: 'next-name',
+        usernameNormalized: 'next-name',
+        displayName: 'Next Name',
+        bio: null,
+        venmoHandle: null,
+        avatarUrl: null,
+        spotifyUrl: null,
+        appleMusicUrl: null,
+        appleMusicId: null,
+        youtubeMusicId: null,
+        deezerId: null,
+        tidalId: null,
+        soundcloudId: null,
+        isPublic: true,
+        isVerified: false,
+        isClaimed: true,
+        ingestionStatus: 'idle',
+        onboardingCompletedAt: null,
+      })
+    ).rejects.toThrow(
+      'Conflicting creator profile matches for next-name and user user_123'
+    );
+
+    expect(database.insert).not.toHaveBeenCalled();
+    expect(updateValues).toHaveLength(0);
+  });
+
+  it('rejects duplicate-race username matches that belong to a different user', async () => {
+    const duplicateError = new Error(
+      'duplicate key value violates unique constraint "creator_profiles_username_normalized_unique"'
+    );
+    const selectQueue = [
+      [],
+      [],
+      [{ id: 'profile_taken', userId: 'user_other', isClaimed: true }],
+      [],
+    ];
+    const updateValues: Array<Record<string, unknown>> = [];
+    const database = {
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn(async () => selectQueue.shift() ?? []),
+          })),
+        })),
+      })),
+      update: vi.fn(() => ({
+        set: vi.fn((values: Record<string, unknown>) => {
+          updateValues.push(values);
+          return {
+            where: vi.fn(async () => undefined),
+          };
+        }),
+      })),
+      insert: vi.fn(() => ({
+        values: vi.fn(() => ({
+          returning: vi.fn(async () => {
+            throw duplicateError;
+          }),
+        })),
+      })),
+    };
+
+    const { ensureCreatorProfileRecord } = await import(
+      '@/lib/testing/test-user-provision.server'
+    );
+
+    await expect(
+      ensureCreatorProfileRecord(database as never, {
+        userId: 'user_123',
+        creatorType: 'artist',
+        username: 'next-name',
+        usernameNormalized: 'next-name',
+        displayName: 'Next Name',
+        bio: null,
+        venmoHandle: null,
+        avatarUrl: null,
+        spotifyUrl: null,
+        appleMusicUrl: null,
+        appleMusicId: null,
+        youtubeMusicId: null,
+        deezerId: null,
+        tidalId: null,
+        soundcloudId: null,
+        isPublic: true,
+        isVerified: false,
+        isClaimed: true,
+        ingestionStatus: 'idle',
+        onboardingCompletedAt: null,
+      })
+    ).rejects.toThrow(
+      'Conflicting creator profile matches for next-name and user user_123'
+    );
+
+    expect(updateValues).toHaveLength(0);
   });
 
   it('clears proxy-state and dashboard caches for reprovisioned test users', async () => {
