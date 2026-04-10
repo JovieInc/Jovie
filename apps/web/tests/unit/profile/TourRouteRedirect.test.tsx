@@ -15,13 +15,19 @@ describe('profile mode route redirects', () => {
   });
 
   it('redirects to the canonical tour mode URL', async () => {
-    await redirectToProfileMode(Promise.resolve({ username: 'testartist' }), 'tour');
+    await redirectToProfileMode(
+      Promise.resolve({ username: 'testartist' }),
+      'tour'
+    );
 
     expect(redirectMock).toHaveBeenCalledWith('/testartist?mode=tour');
   });
 
   it('redirects to the canonical tip mode URL without server search params', async () => {
-    await redirectToProfileMode(Promise.resolve({ username: 'testartist' }), 'tip');
+    await redirectToProfileMode(
+      Promise.resolve({ username: 'testartist' }),
+      'tip'
+    );
 
     expect(redirectMock).toHaveBeenCalledWith('/testartist?mode=tip');
   });

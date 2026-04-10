@@ -38,9 +38,7 @@ interface PageProps {
   readonly params: Promise<{ username: string; slug: string }>;
 }
 
-export default async function SoundsPage({
-  params,
-}: Readonly<PageProps>) {
+export default async function SoundsPage({ params }: Readonly<PageProps>) {
   const { username, slug } = await params;
 
   if (!username || !slug) {

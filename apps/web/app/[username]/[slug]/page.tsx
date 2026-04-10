@@ -276,7 +276,9 @@ async function resolveContentOrRedirect(
 
   const redirectInfo = await findRedirectByOldSlug(creator.id, slug);
   if (redirectInfo) {
-    permanentRedirect(`/${creator.usernameNormalized}/${redirectInfo.currentSlug}`);
+    permanentRedirect(
+      `/${creator.usernameNormalized}/${redirectInfo.currentSlug}`
+    );
   }
   notFound();
 }

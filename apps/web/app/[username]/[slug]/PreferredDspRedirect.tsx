@@ -43,9 +43,8 @@ export function PreferredDspRedirect({
       ?.split('=')[1]
       ?.trim();
 
-    const providerKey = (
-      explicitProvider ?? (shouldSkipPreferredRedirect ? null : cookieValue)
-    ) as ProviderKey | null;
+    const providerKey = (explicitProvider ??
+      (shouldSkipPreferredRedirect ? null : cookieValue)) as ProviderKey | null;
     if (!providerKey) return;
 
     // Validate the provider exists in our config and is available for this content
