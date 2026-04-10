@@ -277,6 +277,66 @@ export function TouringCityCell({ row }: CellContext<AudienceMember, unknown>) {
   );
 }
 
+type SubtitlePart = { key: string; text: string; className?: string };
+
+function buildUserSubtitleParts(
+  m: AudienceMember,
+  hiddenMetadataColumns: {
+    readonly location: boolean;
+    readonly engagement: boolean;
+    readonly lastSeen: boolean;
+  }
+): SubtitlePart[] {
+  const parts: SubtitlePart[] = [];
+
+  if (hiddenMetadataColumns.engagement) {
+    if (m.intentLevel === 'high') {
+      parts.push({
+        key: 'intent',
+        text: 'High',
+        className: 'font-[510] text-emerald-600 dark:text-emerald-400',
+      });
+    } else if (m.intentLevel === 'medium') {
+      parts.push({
+        key: 'intent',
+        text: 'Medium',
+        className: 'font-[510] text-amber-600 dark:text-amber-400',
+      });
+    }
+
+    if (m.visits > 0) {
+      parts.push({
+        key: 'visits',
+        text: `${m.visits} ${m.visits === 1 ? 'visit' : 'visits'}`,
+      });
+    }
+  }
+
+  if (hiddenMetadataColumns.location) {
+    const locationCity = m.geoCity ?? m.geoCountry ?? null;
+    if (locationCity) {
+      try {
+        parts.push({
+          key: 'location',
+          text: decodeURIComponent(locationCity),
+        });
+      } catch {
+        parts.push({ key: 'location', text: locationCity });
+      }
+    }
+  }
+
+  if (hiddenMetadataColumns.lastSeen && m.lastSeenAt) {
+    parts.push({
+      key: 'last-seen',
+      text: formatTimeAgo(m.lastSeenAt),
+      className: 'tabular-nums',
+    });
+  }
+
+  return parts;
+}
+
 /**
  * Renders the user cell with type dot, inline touring badge,
  * and a metadata subtitle that ensures info density at every breakpoint.
@@ -292,58 +352,7 @@ export function UserCellWithTouring({
     useAudienceTableStableContext();
   const touringInfo = getTouringCity(row.original);
   const m = row.original;
-
-  // Build subtitle tokens for the metadata that is hidden in the current layout.
-  const subtitleParts: {
-    key: string;
-    text: string;
-    className?: string;
-  }[] = [];
-
-  if (hiddenMetadataColumns.engagement) {
-    if (m.intentLevel === 'high') {
-      subtitleParts.push({
-        key: 'intent',
-        text: 'High',
-        className: 'font-[510] text-emerald-600 dark:text-emerald-400',
-      });
-    } else if (m.intentLevel === 'medium') {
-      subtitleParts.push({
-        key: 'intent',
-        text: 'Medium',
-        className: 'font-[510] text-amber-600 dark:text-amber-400',
-      });
-    }
-
-    if (m.visits > 0) {
-      subtitleParts.push({
-        key: 'visits',
-        text: `${m.visits} ${m.visits === 1 ? 'visit' : 'visits'}`,
-      });
-    }
-  }
-
-  if (hiddenMetadataColumns.location) {
-    const locationCity = m.geoCity ?? m.geoCountry ?? null;
-    if (locationCity) {
-      try {
-        subtitleParts.push({
-          key: 'location',
-          text: decodeURIComponent(locationCity),
-        });
-      } catch {
-        subtitleParts.push({ key: 'location', text: locationCity });
-      }
-    }
-  }
-
-  if (hiddenMetadataColumns.lastSeen && m.lastSeenAt) {
-    subtitleParts.push({
-      key: 'last-seen',
-      text: formatTimeAgo(m.lastSeenAt),
-      className: 'tabular-nums',
-    });
-  }
+  const subtitleParts = buildUserSubtitleParts(m, hiddenMetadataColumns);
 
   return (
     <div className='flex items-center gap-2 min-w-0'>

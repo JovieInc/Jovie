@@ -126,6 +126,17 @@ export function getProfileMonetizationPrimaryActionLabel(
   }
 }
 
+function resolveProvider(
+  stripeReady: boolean,
+  stripeIncomplete: boolean,
+  hasVenmoSetup: boolean,
+  hasProfileUrl: boolean
+): ProfileMonetizationSummaryResponse['provider'] {
+  if (stripeReady || stripeIncomplete) return 'stripe';
+  if (hasVenmoSetup && hasProfileUrl) return 'venmo';
+  return 'none';
+}
+
 export function isProfileMonetizationShareable(
   paymentState: ProfilePaymentState
 ): boolean {
@@ -163,14 +174,12 @@ export function resolveProfileMonetizationSummary(
     paymentState = 'not_setup';
   }
 
-  let provider: ProfileMonetizationSummaryResponse['provider'];
-  if (stripeReady || stripeIncomplete) {
-    provider = 'stripe';
-  } else if (hasVenmoSetup && hasProfileUrl) {
-    provider = 'venmo';
-  } else {
-    provider = 'none';
-  }
+  const provider = resolveProvider(
+    stripeReady,
+    stripeIncomplete,
+    hasVenmoSetup,
+    hasProfileUrl
+  );
 
   const manageHref: AppRoute =
     input.stripeConnectEnabled && paymentState !== 'needs_profile_url'

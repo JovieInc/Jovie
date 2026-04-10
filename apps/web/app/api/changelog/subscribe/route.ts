@@ -2,7 +2,10 @@ import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { productUpdateSubscribers } from '@/lib/db/schema/product-update-subscribers';
+import {
+  type ProductUpdateSubscriber,
+  productUpdateSubscribers,
+} from '@/lib/db/schema/product-update-subscribers';
 import { sendEmail } from '@/lib/email/send';
 import { getChangelogVerifyEmail } from '@/lib/email/templates/changelog-verify';
 import { captureError } from '@/lib/error-tracking';
@@ -114,6 +117,53 @@ async function sendVerificationEmail(
   });
 }
 
+async function handleExistingSubscriber(
+  existing: ProductUpdateSubscriber,
+  email: string,
+  source: string | undefined
+): Promise<NextResponse> {
+  if (existing.verified && !existing.unsubscribedAt) {
+    return NextResponse.json(
+      { message: 'Already subscribed!' },
+      { status: 200, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  const verificationToken = crypto.randomUUID();
+  const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  await db
+    .update(productUpdateSubscribers)
+    .set({
+      verified: false,
+      verificationToken,
+      tokenExpiresAt,
+      unsubscribeToken: crypto.randomUUID(),
+      unsubscribedAt: null,
+      source: source ?? 'changelog_page',
+      updatedAt: new Date(),
+    })
+    .where(eq(productUpdateSubscribers.id, existing.id));
+
+  try {
+    await sendVerificationEmail(email, verificationToken);
+  } catch (error) {
+    await captureError('Failed to send changelog verification email', error, {
+      route: '/api/changelog/subscribe',
+      email,
+    });
+    return NextResponse.json(
+      { error: 'Confirmation email unavailable. Please try again.' },
+      { status: 502, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  return NextResponse.json(
+    { message: 'Check your email to confirm your subscription!' },
+    { status: 201, headers: NO_STORE_HEADERS }
+  );
+}
+
 export async function POST(request: NextRequest) {
   const ip = getClientIP(request);
 
@@ -178,46 +228,7 @@ export async function POST(request: NextRequest) {
     .limit(1);
 
   if (existing) {
-    if (existing.verified && !existing.unsubscribedAt) {
-      return NextResponse.json(
-        { message: 'Already subscribed!' },
-        { status: 200, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const verificationToken = crypto.randomUUID();
-    const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-    await db
-      .update(productUpdateSubscribers)
-      .set({
-        verified: false,
-        verificationToken,
-        tokenExpiresAt,
-        unsubscribeToken: crypto.randomUUID(),
-        unsubscribedAt: null,
-        source: body.source ?? 'changelog_page',
-        updatedAt: new Date(),
-      })
-      .where(eq(productUpdateSubscribers.id, existing.id));
-
-    try {
-      await sendVerificationEmail(email, verificationToken);
-    } catch (error) {
-      await captureError('Failed to send changelog verification email', error, {
-        route: '/api/changelog/subscribe',
-        email,
-      });
-      return NextResponse.json(
-        { error: 'Confirmation email unavailable. Please try again.' },
-        { status: 502, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    return NextResponse.json(
-      { message: 'Check your email to confirm your subscription!' },
-      { status: 201, headers: NO_STORE_HEADERS }
-    );
+    return handleExistingSubscriber(existing, email, body.source);
   }
 
   const verificationToken = crypto.randomUUID();

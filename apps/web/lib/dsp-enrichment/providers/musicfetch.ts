@@ -122,6 +122,35 @@ export function isMusicFetchAvailable(): boolean {
  * service list with an invalid-services 400 detected by
  * isMusicfetchInvalidServicesError().
  */
+function handleMusicfetchLookupError(error: unknown, spotifyUrl: string): null {
+  if (error instanceof MusicfetchRequestError) {
+    logger.warn('MusicFetch request failed', {
+      spotifyUrl,
+      statusCode: error.statusCode,
+      retryAfterSeconds: error.retryAfterSeconds,
+      details: error.details,
+      budgetScope:
+        error instanceof MusicfetchBudgetExceededError
+          ? error.budgetScope
+          : undefined,
+      message: error.message,
+    });
+
+    if (error.statusCode === 400 && !isMusicfetchInvalidServicesError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+
+  logger.warn('MusicFetch request failed', {
+    spotifyUrl,
+    error: error instanceof Error ? error.message : 'Unknown error',
+  });
+
+  throw error instanceof Error ? error : new Error('MusicFetch request failed');
+}
+
 export async function fetchArtistBySpotifyUrl(
   spotifyUrl: string
 ): Promise<MusicFetchArtistResult | null> {
@@ -171,38 +200,7 @@ export async function fetchArtistBySpotifyUrl(
         return data.result;
       } catch (error) {
         span.setStatus({ code: 2, message: 'error' });
-
-        if (error instanceof MusicfetchRequestError) {
-          logger.warn('MusicFetch request failed', {
-            spotifyUrl,
-            statusCode: error.statusCode,
-            retryAfterSeconds: error.retryAfterSeconds,
-            details: error.details,
-            budgetScope:
-              error instanceof MusicfetchBudgetExceededError
-                ? error.budgetScope
-                : undefined,
-            message: error.message,
-          });
-
-          if (error.statusCode === 400) {
-            if (isMusicfetchInvalidServicesError(error)) {
-              throw error;
-            }
-            return null;
-          }
-
-          throw error;
-        }
-
-        logger.warn('MusicFetch request failed', {
-          spotifyUrl,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-
-        throw error instanceof Error
-          ? error
-          : new Error('MusicFetch request failed');
+        return handleMusicfetchLookupError(error, spotifyUrl);
       }
     }
   );
