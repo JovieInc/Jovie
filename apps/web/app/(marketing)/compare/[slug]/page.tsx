@@ -75,7 +75,7 @@ export default async function ComparePage({ params }: ComparePageProps) {
       <MarketingContainer width='prose' className='pb-16'>
         <section>
           <h2 className='text-2xl font-semibold text-primary-token'>
-            Feature comparison
+            Feature Comparison
           </h2>
           <div className='mt-8 overflow-x-auto'>
             <table className='w-full text-sm'>
@@ -141,7 +141,7 @@ export default async function ComparePage({ params }: ComparePageProps) {
       <MarketingContainer width='prose' className='pb-16'>
         <section>
           <h2 className='text-2xl font-semibold text-primary-token'>
-            The bottom line
+            The Bottom Line
           </h2>
           <p className='mt-4 text-base leading-relaxed text-secondary-token'>
             {data.bottomLine}
@@ -151,7 +151,7 @@ export default async function ComparePage({ params }: ComparePageProps) {
               href={APP_ROUTES.SIGNUP}
               className='inline-flex items-center rounded-lg bg-accent-token px-6 py-3 text-sm font-medium text-white transition-colors hover:opacity-90'
             >
-              Try {APP_NAME} free
+              Try {APP_NAME} Free
             </Link>
           </div>
         </section>

@@ -14,20 +14,14 @@ describe('PublicTableOfContents', () => {
       <section id="details">Details heading</section>
     `;
 
-    Object.defineProperty(globalThis, 'IntersectionObserver', {
-      writable: true,
-      value: vi.fn().mockImplementation(() => ({
+    vi.stubGlobal(
+      'IntersectionObserver',
+      vi.fn().mockImplementation(() => ({
         observe: vi.fn(),
         disconnect: vi.fn(),
-      })),
-    });
-
-    Object.defineProperty(globalThis, 'history', {
-      writable: true,
-      value: {
-        replaceState: vi.fn(),
-      },
-    });
+      }))
+    );
+    vi.spyOn(globalThis.history, 'replaceState').mockImplementation(() => {});
 
     for (const entry of TOC) {
       const element = document.getElementById(entry.id);
@@ -39,6 +33,7 @@ describe('PublicTableOfContents', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     document.body.innerHTML = '';
   });
 

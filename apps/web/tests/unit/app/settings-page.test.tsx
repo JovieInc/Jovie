@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 
 const { captureExceptionMock, getDashboardDataMock, redirectMock } = vi.hoisted(
   () => ({
@@ -55,7 +56,7 @@ async function renderSettingsPage({
 
 describe('settings page', () => {
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     vi.resetModules();
   });
 
@@ -89,7 +90,7 @@ describe('settings page', () => {
     );
 
     expect(redirectMock).toHaveBeenCalledWith(
-      `${'/signin'}?redirect_url=/app/settings`
+      `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.SETTINGS}`
     );
     expect(getDashboardDataMock).not.toHaveBeenCalled();
   });

@@ -1,4 +1,5 @@
 import { desc, eq } from 'drizzle-orm';
+import { Play } from 'lucide-react';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -318,14 +319,7 @@ export default async function PlaylistPage({
                       <span className='sr-only'>
                         Play {track.trackName} on Spotify
                       </span>
-                      <svg
-                        className='h-4 w-4'
-                        viewBox='0 0 24 24'
-                        fill='currentColor'
-                        aria-hidden='true'
-                      >
-                        <path d='M8 5v14l11-7z' />
-                      </svg>
+                      <Play className='h-4 w-4' aria-hidden='true' />
                     </a>
                   )}
                 </li>
