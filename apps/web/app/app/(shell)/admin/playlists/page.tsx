@@ -2,6 +2,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import { revalidatePath } from 'next/cache';
 import { AdminWorkspacePage } from '@/components/features/admin/layout/AdminWorkspacePage';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth } from '@/lib/auth/cached';
@@ -241,10 +242,7 @@ export default async function AdminPlaylistsPage({
       ) : (
         <div className='space-y-3'>
           {playlists.map(playlist => (
-            <div
-              key={playlist.id}
-              className='rounded-lg border border-white/[0.06] bg-white/[0.02] p-4'
-            >
+            <ContentSurfaceCard key={playlist.id} className='p-4'>
               <div className='flex items-start justify-between'>
                 <div>
                   <h3 className='text-[15px] font-[510] text-white'>
@@ -302,7 +300,7 @@ export default async function AdminPlaylistsPage({
                   </a>
                 )}
               </div>
-            </div>
+            </ContentSurfaceCard>
           ))}
         </div>
       )}

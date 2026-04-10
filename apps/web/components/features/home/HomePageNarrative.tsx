@@ -180,7 +180,7 @@ function FinalCallToAction() {
             <Link
               href={APP_ROUTES.SIGNUP}
               data-testid='final-cta-action'
-              className='btn-linear-signup focus-ring-themed inline-flex h-12 items-center px-6 text-[15px]'
+              className='public-action-primary focus-ring-themed'
             >
               Get Started
             </Link>

@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation';
 import { MarketingContainer } from '@/components/marketing';
-import { Container } from '@/components/site/Container';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getBlogPosts } from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
@@ -118,11 +117,11 @@ export default async function AuthorPage({
 
       <div className='min-h-screen'>
         {/* Author Hero */}
-        <Container size='lg' className='pt-16 sm:pt-24 pb-12'>
+        <MarketingContainer width='page' className='pb-12 pt-16 sm:pt-24'>
           <div className='mx-auto max-w-3xl'>
             <BlogAuthorCard author={author} variant='hero' />
           </div>
-        </Container>
+        </MarketingContainer>
 
         {/* Author Posts */}
         <MarketingContainer width='page' className='pb-20 sm:pb-28'>

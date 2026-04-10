@@ -94,7 +94,7 @@ function ProfileModeFallback({
 }) {
   return (
     <div
-      className='rounded-[24px] border border-white/8 bg-white/[0.035] px-4 py-5 text-center'
+      className='rounded-[var(--profile-drawer-radius-mobile)] border border-white/8 bg-white/[0.035] px-4 py-5 text-center'
       data-testid='profile-mode-drawer-fallback'
     >
       <p className='text-sm font-[590] text-white/88'>{title}</p>
