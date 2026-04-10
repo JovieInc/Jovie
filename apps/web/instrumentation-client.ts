@@ -36,7 +36,7 @@ import { getSdkMode, isApiRoute } from './lib/sentry/route-detector';
 export function onRouterTransitionStart(
   ...args: Parameters<typeof captureRouterTransitionStart>
 ) {
-  if (process.env.CI === 'true') {
+  if (process.env.NEXT_PUBLIC_CI === 'true') {
     return;
   }
 
@@ -61,7 +61,7 @@ export function onRouterTransitionStart(
   }
 
   // CI preview health checks should not emit client monitoring traffic.
-  if (process.env.CI === 'true') {
+  if (process.env.NEXT_PUBLIC_CI === 'true') {
     return;
   }
 

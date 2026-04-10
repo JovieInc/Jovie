@@ -1,9 +1,16 @@
-import * as Sentry from '@sentry/nextjs';
-
 // Track instrumentation lifecycle for cold start detection
 const INSTRUMENTATION_START_TIME = Date.now();
 let firstValidationAttemptTime: number | null = null;
 let validationResolvedTime: number | null = null;
+type SentryModule = typeof import('@sentry/nextjs');
+type OnRequestErrorArgs = Parameters<SentryModule['captureRequestError']>;
+
+let sentryModulePromise: Promise<SentryModule> | null = null;
+
+function loadSentry(): Promise<SentryModule> {
+  sentryModulePromise ??= import('@sentry/nextjs');
+  return sentryModulePromise;
+}
 
 /**
  * Determine if an environment issue should be reported to Sentry.
@@ -137,6 +144,7 @@ export async function register() {
     const shouldSkipServerInstrumentation = isDev || isCi;
 
     if (!shouldSkipServerInstrumentation) {
+      const Sentry = await loadSentry();
       await import('./sentry.server.config');
       // Run environment validation at startup to detect issues early
       // This catches build-time vs runtime environment differences on Vercel
@@ -226,10 +234,21 @@ export async function register() {
   }
 
   if (process.env.NEXT_RUNTIME === 'edge') {
-    if (process.env.NODE_ENV !== 'development') {
+    const isCi = process.env.CI === 'true';
+    if (process.env.NODE_ENV !== 'development' && !isCi) {
       await import('./sentry.edge.config');
     }
   }
 }
 
-export const onRequestError = Sentry.captureRequestError;
+export async function onRequestError(...args: OnRequestErrorArgs) {
+  const isDev = process.env.NODE_ENV === 'development';
+  const isCi = process.env.CI === 'true';
+
+  if (isDev || isCi) {
+    return;
+  }
+
+  const Sentry = await loadSentry();
+  return Sentry.captureRequestError(...args);
+}
