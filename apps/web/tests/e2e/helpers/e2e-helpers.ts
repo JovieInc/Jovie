@@ -552,7 +552,11 @@ export async function completeOnboardingV2(
   const upgradeHeading = page.getByRole('heading', {
     name: 'Want the full profile from day one?',
   });
+  const lateArrivalsHeading = page.getByRole('heading', {
+    name: 'A few more things showed up',
+  });
   const artistConfirmContinue = page.getByRole('button', { name: 'Continue' });
+  const lateArrivalsFinish = page.getByRole('button', { name: 'Finish setup' });
   const profileReadyHeading = page.getByRole('heading', {
     name: /^(Your profile is ready|Your Link Is Live)$/i,
   });
@@ -603,20 +607,52 @@ export async function completeOnboardingV2(
           return 'upgrade';
         }
 
+        if (await lateArrivalsHeading.isVisible().catch(() => false)) {
+          return 'late-arrivals';
+        }
+
         return 'waiting';
       },
       { timeout: 30_000 }
     )
-    .toMatch(/profile-ready|upgrade/)
+    .toMatch(/profile-ready|upgrade|late-arrivals/)
     .then(async () =>
       (await profileReadyHeading.isVisible().catch(() => false))
         ? 'profile-ready'
-        : 'upgrade'
+        : (await lateArrivalsHeading.isVisible().catch(() => false))
+          ? 'late-arrivals'
+          : 'upgrade'
     );
 
   if (postConfirmStep === 'upgrade') {
     await page.getByRole('button', { name: 'Continue free' }).click();
   }
+
+  if (postConfirmStep === 'late-arrivals') {
+    await lateArrivalsFinish.click();
+  }
+
+  await expect
+    .poll(
+      async () => {
+        if (await profileReadyHeading.isVisible().catch(() => false)) {
+          return 'profile-ready';
+        }
+
+        if (
+          (await lateArrivalsHeading.isVisible().catch(() => false)) &&
+          (await lateArrivalsFinish.isVisible().catch(() => false)) &&
+          (await lateArrivalsFinish.isEnabled().catch(() => false))
+        ) {
+          await lateArrivalsFinish.click();
+          return 'late-arrivals';
+        }
+
+        return 'waiting';
+      },
+      { timeout: 120_000 }
+    )
+    .toMatch(/profile-ready|late-arrivals/);
 
   if (options.clerkUserId) {
     await expect
