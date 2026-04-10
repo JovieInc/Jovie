@@ -108,35 +108,40 @@ install_ripgrep_standalone() {
   esac
 
   tmp_dir="$(mktemp -d)"
-  trap 'rm -rf "$tmp_dir"' RETURN
-  archive_path="$tmp_dir/$(basename "$download_url")"
-  checksum_path="$tmp_dir/$(basename "$checksum_url")"
-  curl -fsSL "$download_url" -o "$archive_path" || return 1
-  curl -fsSL "$checksum_url" -o "$checksum_path" || return 1
-  (
-    cd "$tmp_dir" || exit 1
-    if command -v sha256sum &>/dev/null; then
-      sha256sum -c "$(basename "$checksum_path")"
-    elif command -v shasum &>/dev/null; then
-      shasum -a 256 -c "$(basename "$checksum_path")"
-    else
-      warn "sha256sum or shasum is required to verify standalone ripgrep downloads"
+  if ! (
+    trap 'rm -rf "$tmp_dir"' EXIT
+    archive_path="$tmp_dir/$(basename "$download_url")"
+    checksum_path="$tmp_dir/$(basename "$checksum_url")"
+    curl -fsSL "$download_url" -o "$archive_path"
+    curl -fsSL "$checksum_url" -o "$checksum_path"
+    (
+      cd "$tmp_dir" || exit 1
+      if command -v sha256sum &>/dev/null; then
+        sha256sum -c "$(basename "$checksum_path")"
+      elif command -v shasum &>/dev/null; then
+        shasum -a 256 -c "$(basename "$checksum_path")"
+      else
+        warn "sha256sum or shasum is required to verify standalone ripgrep downloads"
+        exit 1
+      fi
+    ) >/dev/null || {
+      warn "Standalone ripgrep checksum verification failed"
+      exit 1
+    }
+    tar -xzf "$archive_path" -C "$tmp_dir"
+
+    extracted_rg="$(find "$tmp_dir" -type f -path '*/rg' | head -1)"
+    if [[ -z "$extracted_rg" ]]; then
+      warn "Standalone ripgrep archive did not contain an rg binary"
       exit 1
     fi
-  ) >/dev/null || {
-    warn "Standalone ripgrep checksum verification failed"
-    return 1
-  }
-  tar -xzf "$archive_path" -C "$tmp_dir" || return 1
 
-  extracted_rg="$(find "$tmp_dir" -type f -path '*/rg' | head -1)"
-  if [[ -z "$extracted_rg" ]]; then
-    warn "Standalone ripgrep archive did not contain an rg binary"
+    mkdir -p "$HOME/.local/bin"
+    install -m 0755 "$extracted_rg" "$HOME/.local/bin/rg"
+  ); then
     return 1
   fi
 
-  mkdir -p "$HOME/.local/bin"
-  install -m 0755 "$extracted_rg" "$HOME/.local/bin/rg"
   export PATH="$HOME/.local/bin:$PATH"
   success "ripgrep installed to $HOME/.local/bin/rg"
   if [[ "$path_already_contains_local_bin" != "true" ]]; then
