@@ -55,6 +55,12 @@ const LOADING_SELECTORS = [
 const TRANSITION_VEIL_ID = 'demo-transition-veil';
 const TRANSITION_STORAGE_KEY = 'demo-transition-visible';
 const TRANSITION_FADE_MS = 140;
+const TOTAL_CLICKS_METRIC_TEST_ID = 'drawer-analytics-metric-total-clicks';
+const TOTAL_CLICKS_METRIC_VALUE_TEST_ID =
+  'drawer-analytics-metric-value-total-clicks';
+const LAST_7_DAYS_METRIC_TEST_ID = 'drawer-analytics-metric-last-7-days-clicks';
+const LAST_7_DAYS_METRIC_VALUE_TEST_ID =
+  'drawer-analytics-metric-value-last-7-days-clicks';
 
 interface DemoSceneReadyOptions {
   readonly readyLocator: Locator;
@@ -405,9 +411,33 @@ async function waitForReleaseAnalyticsReady(page: Page, releaseId: string) {
             return 'error';
           }
 
-          return /Total clicks/i.test(text) && /Last 7 days/i.test(text)
+          const totalClicksMetric = node.querySelector<HTMLElement>(
+            `[data-testid="${TOTAL_CLICKS_METRIC_TEST_ID}"]`
+          );
+          const totalClicksValue = node.querySelector<HTMLElement>(
+            `[data-testid="${TOTAL_CLICKS_METRIC_VALUE_TEST_ID}"]`
+          );
+          const last7DaysMetric = node.querySelector<HTMLElement>(
+            `[data-testid="${LAST_7_DAYS_METRIC_TEST_ID}"]`
+          );
+          const last7DaysValue = node.querySelector<HTMLElement>(
+            `[data-testid="${LAST_7_DAYS_METRIC_VALUE_TEST_ID}"]`
+          );
+
+          if (
+            !totalClicksMetric ||
+            !totalClicksValue ||
+            !last7DaysMetric ||
+            !last7DaysValue
+          ) {
+            return 'missing-metrics';
+          }
+
+          const numericMetricPattern = /^[\d,]+$/u;
+          return numericMetricPattern.test(totalClicksValue.innerText.trim()) &&
+            numericMetricPattern.test(last7DaysValue.innerText.trim())
             ? 'ready'
-            : 'missing-metrics';
+            : 'invalid-metric-values';
         });
       },
       { timeout: 30_000 }
@@ -498,9 +528,9 @@ async function getSeededReleaseRow(page: Page, releaseTitle: string) {
   const row = page
     .locator('tbody tr')
     .filter({
-      has: page
-        .locator('button[aria-label]')
-        .filter({ hasText: new RegExp(`^Open\\s+${escapedTitle}$`) }),
+      has: page.getByRole('button', {
+        name: new RegExp(`^Open\\s+${escapedTitle}$`),
+      }),
     })
     .first();
 

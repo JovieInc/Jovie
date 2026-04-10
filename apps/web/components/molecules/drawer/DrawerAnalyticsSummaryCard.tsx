@@ -28,13 +28,20 @@ function MetricTile({
   label,
   value,
   hint,
+  id,
 }: Readonly<DrawerAnalyticsSummaryMetric>) {
   return (
-    <div className={METRIC_TILE_CLASSNAME}>
+    <div
+      className={METRIC_TILE_CLASSNAME}
+      data-testid={`drawer-analytics-metric-${id}`}
+    >
       <p className='text-[10.5px] font-[510] leading-[14px] text-tertiary-token'>
         {label}
       </p>
-      <p className='mt-1 tabular-nums text-[20px] font-[620] leading-none tracking-[-0.03em] text-primary-token'>
+      <p
+        className='mt-1 tabular-nums text-[20px] font-[620] leading-none tracking-[-0.03em] text-primary-token'
+        data-testid={`drawer-analytics-metric-value-${id}`}
+      >
         {value}
       </p>
       {hint ? (

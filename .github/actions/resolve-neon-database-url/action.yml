@@ -96,11 +96,14 @@ runs:
         const candidate = new URL(process.env.CANDIDATE);
         const source = new URL(process.env.CREDENTIAL_SOURCE);
 
-        if (source.username) {
+        // Preserve credentials baked into the Neon branch URL. Branch-specific
+        // passwords can differ from the long-lived main DB secret, and replacing
+        // them causes auth and endpoint failures across downstream CI jobs.
+        if (!candidate.username && source.username) {
           candidate.username = source.username;
         }
 
-        if (source.password) {
+        if (!candidate.password && source.password) {
           candidate.password = source.password;
         }
 
