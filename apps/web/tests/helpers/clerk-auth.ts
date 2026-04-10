@@ -245,15 +245,14 @@ export async function waitForAuthenticatedHealth(
     '/api/dev/test-auth/session',
     baseUrl
   ).toString();
+  const shouldPreferBypassSession =
+    isTestAuthBypassEnabled() ||
+    process.env.E2E_ATTACH_TEST_AUTH_BYPASS_AFTER_SIGNUP === '1';
 
   await expect
     .poll(
       async () => {
         try {
-          const response = await fetchJsonInBrowserContext<{
-            authenticated?: boolean;
-            userId?: string | null;
-          }>(page, authHealthUrl);
           const contextCookies = await page.context().cookies(baseUrl);
           const bypassCookieHeader = contextCookies
             .map(cookie => `${cookie.name}=${cookie.value}`)
@@ -265,6 +264,32 @@ export async function waitForAuthenticatedHealth(
               ? { [TEST_USER_ID_HEADER]: expectedUserId }
               : {}),
           };
+
+          if (shouldPreferBypassSession) {
+            const bypassResponse = await fetchJsonInBrowserContext<{
+              active?: boolean;
+              userId?: string | null;
+            }>(page, bypassSessionUrl);
+
+            if (bypassResponse.ok) {
+              const payload = bypassResponse.payload;
+
+              if (!payload?.active) {
+                return 'anonymous';
+              }
+
+              if (expectedUserId && payload.userId !== expectedUserId) {
+                return `user-mismatch:${payload.userId ?? 'unknown'}`;
+              }
+
+              return 'authenticated';
+            }
+          }
+
+          const response = await fetchJsonInBrowserContext<{
+            authenticated?: boolean;
+            userId?: string | null;
+          }>(page, authHealthUrl);
 
           if (response.status === 403) {
             const bypassResponse = await fetchJsonInBrowserContext<{

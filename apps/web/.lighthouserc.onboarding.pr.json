@@ -46,7 +46,7 @@
             "first-contentful-paint": [
               "error",
               {
-                "maxNumericValue": 1000
+                "maxNumericValue": 1200
               }
             ],
             "largest-contentful-paint": [

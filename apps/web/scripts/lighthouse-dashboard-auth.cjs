@@ -190,6 +190,22 @@ function ensureAuthState(baseUrl) {
   return authStatePath;
 }
 
+async function waitForPathname(page, pathname, timeout = 60_000) {
+  await page
+    .waitForFunction(
+      expectedPathname => window.location.pathname === expectedPathname,
+      { timeout },
+      pathname
+    )
+    .catch(async error => {
+      const currentPathname = new URL(page.url()).pathname;
+      if (currentPathname === pathname) {
+        return;
+      }
+      throw error;
+    });
+}
+
 async function seedDashboardAuth(browser, { url }) {
   const origin = new URL(url).origin;
   const pathname = new URL(url).pathname;
@@ -270,9 +286,7 @@ async function seedDashboardAuth(browser, { url }) {
         waitUntil: 'domcontentloaded',
         timeout: 60_000,
       });
-      await page.waitForURL(new RegExp(`${pathname.replace(/\//g, '\\/')}`), {
-        timeout: 60_000,
-      });
+      await waitForPathname(page, pathname);
       await warmRouteRepeatedly();
       await page.close();
       return;
