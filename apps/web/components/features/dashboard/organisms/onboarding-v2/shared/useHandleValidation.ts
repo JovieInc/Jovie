@@ -68,6 +68,8 @@ export function useHandleValidation({
 
   // TanStack Pacer hook for API validation with debouncing and caching
   const latestRequestedHandleRef = useRef(normalizedInitialHandle);
+  const abortRetryCountRef = useRef(new Map<string, number>());
+  const abortRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     handleRef.current = handle;
@@ -104,6 +106,8 @@ export function useHandleValidation({
         return;
       }
 
+      abortRetryCountRef.current.delete(input);
+
       if (result.available) {
         setHandleValidation({
           available: true,
@@ -133,6 +137,25 @@ export function useHandleValidation({
       }
 
       if (isAbortError(error)) {
+        const currentHandle = latestRequestedHandleRef.current;
+        const currentRetryCount =
+          abortRetryCountRef.current.get(currentHandle) ?? 0;
+
+        if (currentHandle && currentRetryCount < 1) {
+          abortRetryCountRef.current.set(currentHandle, currentRetryCount + 1);
+          if (abortRetryTimerRef.current) {
+            clearTimeout(abortRetryTimerRef.current);
+          }
+          abortRetryTimerRef.current = setTimeout(() => {
+            setHandleValidation(prev => ({
+              ...prev,
+              checking: true,
+            }));
+            validateApiRef.current(currentHandle);
+          }, 250);
+          return;
+        }
+
         // Reset local checking flag. If Pacer still has a pending request,
         // isChecking (isPending || isValidating) keeps the combined state true.
         // If nothing is pending (e.g. timeout abort), this unblocks the UI.
@@ -167,6 +190,14 @@ export function useHandleValidation({
   useEffect(() => {
     validateApiRef.current = validateApi;
   }, [validateApi]);
+
+  useEffect(() => {
+    return () => {
+      if (abortRetryTimerRef.current) {
+        clearTimeout(abortRetryTimerRef.current);
+      }
+    };
+  }, []);
 
   // Safety valve: reset checking after max duration to prevent infinite "Checking..."
   // This catches edge cases where Pacer state or callbacks don't resolve.
@@ -205,6 +236,7 @@ export function useHandleValidation({
       const normalizedInput = input.trim().toLowerCase();
 
       latestRequestedHandleRef.current = normalizedInput;
+      abortRetryCountRef.current.delete(normalizedInput);
 
       // Fast path: if input matches initial handle, mark as valid immediately
       if (

@@ -210,6 +210,7 @@ async function connectWithRetry(databaseUrl: string) {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     let pool: Pool | null = null;
+    let client: PoolClient | null = null;
 
     try {
       pool = new Pool({ connectionString: databaseUrl, max: 1 });
@@ -225,13 +226,30 @@ async function connectWithRetry(databaseUrl: string) {
           `Unexpected Neon pool error during migrate bootstrap: ${flattenErrorMessages(error).join(' ')}`
         );
       });
-      const client = await connectClientWithRetryableBootstrap(pool);
+      client = await connectClientWithRetryableBootstrap(pool);
+      client.on('error', error => {
+        if (isRetryableConnectionError(error)) {
+          log.warning(
+            `Ignoring transient Neon client error during migrate bootstrap: ${flattenErrorMessages(error).join(' ')}`
+          );
+          return;
+        }
+
+        log.error(
+          `Unexpected Neon client error during migrate bootstrap: ${flattenErrorMessages(error).join(' ')}`
+        );
+      });
       await client.query("SET app.allow_schema_changes = 'true'");
       const db = drizzle(client);
 
       return { client, db, pool };
     } catch (error) {
       lastError = error;
+      try {
+        client?.release();
+      } catch {
+        // Ignore release errors during retry cleanup.
+      }
       try {
         await pool?.end();
       } catch {
