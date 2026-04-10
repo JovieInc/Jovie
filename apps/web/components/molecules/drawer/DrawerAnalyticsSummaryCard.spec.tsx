@@ -27,6 +27,12 @@ describe('DrawerAnalyticsSummaryCard', () => {
 
     expect(screen.getByText('Profile views')).toBeInTheDocument();
     expect(screen.getByText('120')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('drawer-analytics-metric-profile-views')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('drawer-analytics-metric-value-profile-views')
+    ).toHaveTextContent('120');
     expect(screen.getByRole('button', { name: 'Last 30 days' })).toBeVisible();
   });
 
