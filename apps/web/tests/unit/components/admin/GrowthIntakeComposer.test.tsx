@@ -120,10 +120,12 @@ describe('GrowthIntakeComposer', () => {
       ]);
     });
 
-    expect(refreshMock).toHaveBeenCalled();
-    expect(
-      screen.getByText('Queued 1 URL for lead intake.')
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(refreshMock).toHaveBeenCalled();
+      expect(
+        screen.getByText('Queued 1 URL for lead intake.')
+      ).toBeInTheDocument();
+    });
   });
 
   it('does not queue when input is blank or whitespace only', async () => {
@@ -167,10 +169,12 @@ describe('GrowthIntakeComposer', () => {
       });
     });
 
-    expect(refreshMock).toHaveBeenCalled();
-    expect(
-      screen.getByText('2 created, 1 skipped, 0 errors.')
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(refreshMock).toHaveBeenCalled();
+      expect(
+        screen.getByText('2 created, 1 skipped, 0 errors.')
+      ).toBeInTheDocument();
+    });
   });
 
   it('uses the selected Spotify result for single-profile ingest', async () => {
