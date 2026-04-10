@@ -8,7 +8,7 @@
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 
@@ -92,6 +92,8 @@ export interface UseDspEnrichmentStatusQueryOptions {
 
 /** Default polling interval while processing */
 const DEFAULT_POLLING_INTERVAL_MS = 5000;
+const BACKOFF_POLLING_INTERVAL_MS = 10000;
+const IDLE_POLLS_BEFORE_BACKOFF = 3;
 
 /** Active phases that should trigger polling */
 const ACTIVE_PHASES = new Set<EnrichmentPhase>([
@@ -149,6 +151,11 @@ export function useDspEnrichmentStatusQuery({
   onComplete,
 }: UseDspEnrichmentStatusQueryOptions) {
   const queryClient = useQueryClient();
+  const [pollIntervalMs, setPollIntervalMs] = useState(
+    DEFAULT_POLLING_INTERVAL_MS
+  );
+  const stagnantPollCountRef = useRef(0);
+  const lastPhaseRef = useRef<EnrichmentPhase | null>(null);
 
   // Skip refetch on mount when polling is already handling freshness
   const cachedData = queryClient.getQueryData<EnrichmentStatus>(
@@ -179,7 +186,7 @@ export function useDspEnrichmentStatusQuery({
 
       // Poll only during active phases
       if (ACTIVE_PHASES.has(status.overallPhase)) {
-        return DEFAULT_POLLING_INTERVAL_MS;
+        return pollIntervalMs;
       }
 
       return false;
@@ -189,6 +196,45 @@ export function useDspEnrichmentStatusQuery({
     retry: 3,
     retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
+
+  useEffect(() => {
+    if (!enabled || !profileId) {
+      return;
+    }
+
+    setPollIntervalMs(DEFAULT_POLLING_INTERVAL_MS);
+    stagnantPollCountRef.current = 0;
+    lastPhaseRef.current = null;
+  }, [enabled, profileId]);
+
+  useEffect(() => {
+    const currentPhase = query.data?.overallPhase;
+    if (currentPhase == null || !ACTIVE_PHASES.has(currentPhase)) {
+      stagnantPollCountRef.current = 0;
+      lastPhaseRef.current = null;
+      if (pollIntervalMs !== DEFAULT_POLLING_INTERVAL_MS) {
+        setPollIntervalMs(DEFAULT_POLLING_INTERVAL_MS);
+      }
+      return;
+    }
+
+    if (currentPhase === lastPhaseRef.current) {
+      stagnantPollCountRef.current += 1;
+    } else {
+      lastPhaseRef.current = currentPhase;
+      stagnantPollCountRef.current = 0;
+      if (pollIntervalMs !== DEFAULT_POLLING_INTERVAL_MS) {
+        setPollIntervalMs(DEFAULT_POLLING_INTERVAL_MS);
+      }
+    }
+
+    if (
+      stagnantPollCountRef.current >= IDLE_POLLS_BEFORE_BACKOFF &&
+      pollIntervalMs !== BACKOFF_POLLING_INTERVAL_MS
+    ) {
+      setPollIntervalMs(BACKOFF_POLLING_INTERVAL_MS);
+    }
+  }, [query.data?.overallPhase, pollIntervalMs]);
 
   // Track phase transitions: fire callback when enrichment finishes or new data appears.
   // Triggers on: active → complete, discovering → non-discovering (new matches found)
