@@ -43,6 +43,7 @@ import {
   LegacySocialLink,
 } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
+import { getProfileStaticParams } from './_lib/profile-static-params';
 
 /** Max MusicEvent schemas to emit (Google shows ~5 in rich results). */
 const MAX_EVENT_SCHEMAS = 10;
@@ -507,27 +508,7 @@ const getProfileAndLinks = cache(async (username: string) => {
  * Limited to 100 profiles to keep build times reasonable.
  */
 export async function generateStaticParams() {
-  try {
-    const { db } = await import('@/lib/db');
-    const { creatorProfiles } = await import('@/lib/db/schema/profiles');
-    const { eq, and } = await import('drizzle-orm');
-
-    const featured = await db
-      .select({ username: creatorProfiles.username })
-      .from(creatorProfiles)
-      .where(
-        and(
-          eq(creatorProfiles.isPublic, true),
-          eq(creatorProfiles.isFeatured, true)
-        )
-      )
-      .limit(100);
-
-    return featured.map(row => ({ username: row.username }));
-  } catch {
-    // Build-time DB failures should not block deployment
-    return [];
-  }
+  return getProfileStaticParams(100);
 }
 
 interface Props {

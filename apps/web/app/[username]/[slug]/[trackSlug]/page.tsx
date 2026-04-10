@@ -8,7 +8,8 @@
  */
 
 import type { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
+import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { generateMusicStructuredData } from '@/app/[username]/[slug]/page';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { BASE_URL } from '@/constants/app';
@@ -19,18 +20,21 @@ import {
 } from '@/lib/discography/audio-qa';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
-import { trackServerEvent } from '@/lib/server-analytics';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
-import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
 import {
   getContentBySlug,
   getCreatorByUsername,
   getCreatorPlan,
+  getFeaturedTrackStaticParams,
   getTrackBySlugInRelease,
 } from '../_lib/data';
 
 export const revalidate = 300;
+
+export async function generateStaticParams() {
+  return await getFeaturedTrackStaticParams();
+}
 
 interface PageProps {
   readonly params: Promise<{
@@ -38,20 +42,6 @@ interface PageProps {
     slug: string;
     trackSlug: string;
   }>;
-  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
-}
-
-function toURLSearchParams(
-  allSearchParams: Record<string, string | string[] | undefined>
-): URLSearchParams {
-  return new URLSearchParams(
-    Object.entries(allSearchParams).flatMap(([key, value]) => {
-      if (Array.isArray(value)) {
-        return value.map(v => [key, v]);
-      }
-      return typeof value === 'string' ? [[key, value]] : [];
-    })
-  );
 }
 
 async function guardUnreleasedContent(
@@ -68,48 +58,10 @@ async function guardUnreleasedContent(
   }
 }
 
-function handleDspRedirect(
-  dsp: string,
-  track: {
-    id: string;
-    title: string;
-    providerLinks: { providerId: string; url: string }[];
-  },
-  creatorId: string,
-  utmParams: Record<string, string>
-): never {
-  const providerKey = dsp as ProviderKey;
-  if (!PROVIDER_CONFIG[providerKey]) {
-    notFound();
-  }
-  const targetUrl = track.providerLinks.find(
-    link => link.providerId === providerKey
-  )?.url;
-  if (!targetUrl) {
-    notFound();
-  }
-
-  void trackServerEvent('smart_link_clicked', {
-    contentType: 'track',
-    contentId: track.id,
-    profileId: creatorId,
-    provider: providerKey,
-    contentTitle: track.title,
-    utmParams,
-  });
-
-  redirect(appendUTMParamsToUrl(targetUrl, utmParams));
-}
-
 export default async function TrackDeepLinkPage({
   params,
-  searchParams,
 }: Readonly<PageProps>) {
   const { username, slug, trackSlug } = await params;
-  const allSearchParams = await searchParams;
-  const dspParam = allSearchParams.dsp;
-  const dsp = typeof dspParam === 'string' ? dspParam : undefined;
-  const utmParams = extractUTMParams(toURLSearchParams(allSearchParams));
 
   if (!username || !slug || !trackSlug) {
     notFound();
@@ -136,11 +88,6 @@ export default async function TrackDeepLinkPage({
 
   await guardUnreleasedContent(track, creator.id);
 
-  // If DSP is specified, redirect to the provider URL for this track
-  if (dsp) {
-    handleDspRedirect(dsp, track, creator.id, utmParams);
-  }
-
   // Build provider data for the landing page
   const allProviders = (Object.keys(PROVIDER_CONFIG) as ProviderKey[])
     .map(key => {
@@ -164,6 +111,8 @@ export default async function TrackDeepLinkPage({
   const artistName = creator.displayName ?? creator.username;
   const trackUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}/${trackSlug}`;
   const releaseUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}`;
+  const isUnreleased =
+    track.releaseDate && new Date(track.releaseDate) > new Date();
 
   // Reuse shared structured data generator with track-specific fields
   const structuredData = generateMusicStructuredData(
@@ -204,6 +153,18 @@ export default async function TrackDeepLinkPage({
         {safeJsonLdStringify(structuredData)}
       </script>
 
+      {!isUnreleased && (
+        <PreferredDspRedirect
+          providerLinks={track.providerLinks}
+          artistHandle={creator.usernameNormalized}
+          tracking={{
+            contentType: 'track',
+            contentId: track.id,
+            smartLinkSlug: trackSlug,
+          }}
+        />
+      )}
+
       <ReleaseLandingPage
         release={{
           title: track.title,
@@ -220,7 +181,6 @@ export default async function TrackDeepLinkPage({
           avatarUrl: creator.avatarUrl,
         }}
         providers={allProviders}
-        utmParams={utmParams}
         tracking={{
           contentType: 'track',
           contentId: track.id,
