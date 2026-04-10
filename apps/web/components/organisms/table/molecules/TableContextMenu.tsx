@@ -7,6 +7,7 @@ import {
   type MouseEventHandler,
   type ReactElement,
   type ReactNode,
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -67,7 +68,9 @@ export interface TableContextMenuProps {
   /** Array of menu items to display in the context menu */
   readonly items?: ContextMenuItemType[];
   /** Lazily resolve menu items when the context menu is opened */
-  readonly getItems?: () => ContextMenuItemType[];
+  readonly getItems?: () =>
+    | ContextMenuItemType[]
+    | Promise<ContextMenuItemType[]>;
   /** Whether the context menu is disabled */
   readonly disabled?: boolean;
 }
@@ -78,6 +81,10 @@ function isSeparator(item: ContextMenuItemType): item is { type: 'separator' } {
 
 function isSubmenu(item: ContextMenuItemType): item is ContextMenuSubmenu {
   return 'items' in item && Array.isArray(item.items);
+}
+
+function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
+  return typeof (value as PromiseLike<T>).then === 'function';
 }
 
 function normalizeContextMenuItems(
@@ -244,6 +251,38 @@ export function TableContextMenu({
     }
   }, [getItems, items]);
 
+  const resolveItems = useCallback(() => {
+    if (!getItems) {
+      setResolvedItems(items ?? []);
+      return;
+    }
+
+    const nextItems = getItems();
+
+    if (isPromiseLike(nextItems)) {
+      setResolvedItems([
+        {
+          id: 'loading',
+          label: 'Loading...',
+          onClick: () => {},
+          disabled: true,
+        },
+      ]);
+
+      void Promise.resolve(nextItems)
+        .then(loadedItems => {
+          setResolvedItems(loadedItems);
+        })
+        .catch(() => {
+          setResolvedItems([]);
+        });
+
+      return;
+    }
+
+    setResolvedItems(nextItems);
+  }, [getItems, items]);
+
   // Memoize conversion to prevent recalculation on every render
   const convertedItems = useMemo(
     () => convertContextMenuItems(resolvedItems),
@@ -254,21 +293,20 @@ export function TableContextMenu({
     return <>{children}</>;
   }
 
-  const triggerChild =
-    getItems && isValidElement(children)
-      ? (() => {
-          const contextMenuChild = children as ReactElement<{
-            onContextMenuCapture?: MouseEventHandler<Element>;
-          }>;
+  let triggerChild = children;
 
-          return cloneElement(contextMenuChild, {
-            onContextMenuCapture: event => {
-              contextMenuChild.props.onContextMenuCapture?.(event);
-              setResolvedItems(getItems());
-            },
-          });
-        })()
-      : children;
+  if (getItems && isValidElement(children)) {
+    const contextMenuChild = children as ReactElement<{
+      onContextMenuCapture?: MouseEventHandler<Element>;
+    }>;
+
+    triggerChild = cloneElement(contextMenuChild, {
+      onContextMenuCapture: event => {
+        contextMenuChild.props.onContextMenuCapture?.(event);
+        resolveItems();
+      },
+    });
+  }
 
   return (
     <TableActionMenu items={convertedItems} trigger='context'>

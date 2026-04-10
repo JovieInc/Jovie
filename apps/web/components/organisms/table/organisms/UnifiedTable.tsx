@@ -126,7 +126,9 @@ export interface UnifiedTableProps<TData> {
   /**
    * Get context menu items for a row
    */
-  readonly getContextMenuItems?: (row: TData) => ContextMenuItemType[];
+  readonly getContextMenuItems?: (
+    row: TData
+  ) => ContextMenuItemType[] | Promise<ContextMenuItemType[]>;
 
   /**
    * Get custom class names for a row

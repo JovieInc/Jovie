@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { TableContextMenu } from '@/components/organisms/table/molecules/TableContextMenu';
@@ -68,5 +68,32 @@ describe('TableContextMenu', () => {
     );
 
     expect(screen.getByTestId('context-items')).toHaveTextContent('copy');
+  });
+
+  it('supports async getItems resolution', async () => {
+    const getItems = vi.fn(
+      async () =>
+        [
+          {
+            id: 'delete',
+            label: 'Delete',
+            onClick: vi.fn(),
+          },
+        ] as const
+    );
+
+    render(
+      <TableContextMenu getItems={getItems}>
+        <div>Async Row</div>
+      </TableContextMenu>
+    );
+
+    fireEvent.contextMenu(screen.getByText('Async Row'));
+
+    expect(screen.getByTestId('context-items')).toHaveTextContent('loading');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('context-items')).toHaveTextContent('delete');
+    });
   });
 });
