@@ -8,6 +8,12 @@ This directory contains the App Router auth pages for Jovie. The primary auth UI
 - `/signup` renders Clerk `<SignUp />` inside the existing `AuthLayout`.
 - Auth pages use the bundled Core 3 Clerk UI via `AuthClientProviders`, rather than relying on the CDN-loaded default auth styling path.
 - Auth pages use an auth-only Clerk appearance config with the Core 3 `simple` theme baseline, while non-auth Clerk surfaces keep the shared base appearance.
+- Host-to-instance mapping is strict:
+  - local/dev uses the account A development instance from Doppler `jovie-web/dev`
+  - `staging.jov.ie` uses the account B production instance via `CLERK_PUBLISHABLE_KEY_STAGING` + `CLERK_SECRET_KEY_STAGING`
+  - `jov.ie` uses the account A production instance via `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY`
+- Staging auth must never fall back to production Clerk keys. If the staging pair is unavailable at runtime, auth pages must render the auth-unavailable state instead of a `500`.
+- Clerk traffic stays on the current origin and proxies through `/__clerk`; do not switch auth pages to direct `clerk.*` URLs.
 - Both pages use:
   - `routing="hash"`
   - `oauthFlow="redirect"`
@@ -25,6 +31,7 @@ This directory contains the App Router auth pages for Jovie. The primary auth UI
   - Shows a compatibility banner for `?oauth_error=` and removes only that query param after render.
   - Preserves a valid `redirect_url` when linking onward to `/signin`.
 - Missing-key or mock-mode auth environments render an explicit auth-unavailable card instead of trying to mount Clerk UI without `ClerkProvider`.
+- On staging hosts, “missing key” means the staging runtime pair is incomplete, even if production Clerk keys are present.
 - Legacy `/sso-callback` auth routes remain in place as compatibility shims for stale redirects and old bookmarks.
 
 ## Redirects And Onboarding
@@ -42,3 +49,4 @@ This directory contains the App Router auth pages for Jovie. The primary auth UI
 
 - Signed-out auth-page QA can use `/browse` directly against `/signin` and `/signup`.
 - Signed-in dashboard or onboarding QA through gstack browse should first import cookies with `/setup-browser-cookies`, then reopen the app in the browse session.
+- For staging verification, always check both `/signin` and `/signup` on `staging.jov.ie`; a healthy `/api/health` response is not enough to prove auth is working.

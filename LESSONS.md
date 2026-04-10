@@ -18,6 +18,12 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ## Testing
 
+### Staging auth must never fall back to production Clerk keys
+
+**Mistake:** Staging auth routes were allowed to resolve production Clerk keys when `CLERK_PUBLISHABLE_KEY_STAGING` / `CLERK_SECRET_KEY_STAGING` were missing at runtime. That produced `500`s on `staging.jov.ie/signin` and `staging.jov.ie/signup` while `main` kept passing earlier checks.
+
+**Rule:** Treat `staging.jov.ie` and `main.jov.ie` as strict staging hosts. They must use only the staging Clerk pair. If the staging pair is incomplete during deploys or cold starts, fail closed: public auth routes should render the auth-unavailable UI, and protected routes should return `503`, instead of silently falling back to production keys.
+
 ### Stale test mocks after UI removal
 **Mistake:** Tests for `ClaimHandleForm` were asserting behavior for a "suggestions" UI that had been removed from the component. Tests failed with cryptic errors rather than cleanly.
 
@@ -64,6 +70,16 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 **Mistake:** Homepage demos mixed old local Tim White images with a different blob-hosted avatar and used the wrong Spotify artist identifier in mock links.
 
 **Rule:** If the homepage uses Tim White, use a single canonical source for founder identity data across all homepage demos and mocks. Do not guess or hardcode alternate photos. Tim White's Spotify artist ID is `4u`, and sibling homepage references must be updated together.
+
+---
+
+## Email Personalization
+
+### Outbound greetings must fail safe instead of guessing names
+
+**Mistake:** Claim-invite emails tried to personalize the greeting from arbitrary creator strings. That risks obvious bad mail-merge output like `timwhite!`, `tim<3!`, emoji names, or smashed-together handles, which makes the outreach feel fake immediately.
+
+**Rule:** Only personalize outbound greetings when the source clearly looks like a conventional two-word human name. If there is any doubt, use a generic opener instead. When tightening one risky email template, audit sibling templates that interpolate the same creator/user fields and apply the same guard there too.
 
 ---
 

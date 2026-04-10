@@ -1,0 +1,116 @@
+name: Resolve Neon Database URL
+description: Normalize an ephemeral Neon branch URL with stable database credentials
+
+inputs:
+  candidate_url:
+    description: Primary Neon connection string candidate
+    required: false
+    default: ''
+  fallback_candidate_url:
+    description: Fallback Neon connection string candidate
+    required: false
+    default: ''
+  credential_source_url:
+    description: Preferred stable database URL to source username/password from
+    required: false
+    default: ''
+  credential_fallback_url:
+    description: Fallback stable database URL to source username/password from
+    required: false
+    default: ''
+  connection_file:
+    description: Optional path to a JSON artifact containing db_url / db_url_pooled
+    required: false
+    default: ''
+  candidate_json_key:
+    description: Preferred JSON key to read from connection_file when candidate_url is empty
+    required: false
+    default: ''
+  fallback_json_key:
+    description: Fallback JSON key to read from connection_file when fallback_candidate_url is empty
+    required: false
+    default: ''
+
+outputs:
+  database_url:
+    description: Resolved Neon database URL
+    value: ${{ steps.resolve.outputs.database_url }}
+
+runs:
+  using: composite
+  steps:
+    - id: resolve
+      shell: bash
+      env:
+        INPUT_CANDIDATE: ${{ inputs.candidate_url }}
+        INPUT_FALLBACK_CANDIDATE: ${{ inputs.fallback_candidate_url }}
+        INPUT_CREDENTIAL_SOURCE: ${{ inputs.credential_source_url }}
+        INPUT_CREDENTIAL_FALLBACK: ${{ inputs.credential_fallback_url }}
+        INPUT_CONNECTION_FILE: ${{ inputs.connection_file }}
+        INPUT_CANDIDATE_JSON_KEY: ${{ inputs.candidate_json_key }}
+        INPUT_FALLBACK_JSON_KEY: ${{ inputs.fallback_json_key }}
+      run: |
+        set -euo pipefail
+
+        CANDIDATE="$INPUT_CANDIDATE"
+        FALLBACK_CANDIDATE="$INPUT_FALLBACK_CANDIDATE"
+        CONNECTION_FILE="$INPUT_CONNECTION_FILE"
+
+        if [ -n "$CONNECTION_FILE" ]; then
+          if [ ! -f "$CONNECTION_FILE" ]; then
+            echo "Neon DB connection artifact missing: $CONNECTION_FILE"
+            exit 1
+          fi
+
+          if [ -z "$CANDIDATE" ] && [ -n "$INPUT_CANDIDATE_JSON_KEY" ]; then
+            CANDIDATE=$(jq -r --arg key "$INPUT_CANDIDATE_JSON_KEY" '.[$key] // empty' "$CONNECTION_FILE")
+          fi
+
+          if [ -z "$FALLBACK_CANDIDATE" ] && [ -n "$INPUT_FALLBACK_JSON_KEY" ]; then
+            FALLBACK_CANDIDATE=$(jq -r --arg key "$INPUT_FALLBACK_JSON_KEY" '.[$key] // empty' "$CONNECTION_FILE")
+          fi
+        fi
+
+        if [ -z "$CANDIDATE" ]; then
+          CANDIDATE="$FALLBACK_CANDIDATE"
+        fi
+
+        if [ -z "$CANDIDATE" ]; then
+          echo "No candidate Neon DATABASE_URL available."
+          exit 1
+        fi
+
+        CREDENTIAL_SOURCE="$INPUT_CREDENTIAL_SOURCE"
+        if [ -z "$CREDENTIAL_SOURCE" ]; then
+          CREDENTIAL_SOURCE="$INPUT_CREDENTIAL_FALLBACK"
+        fi
+
+        if [ -z "$CREDENTIAL_SOURCE" ]; then
+          echo "No stable credential source provided. Using candidate Neon URL as-is."
+          echo "database_url=$CANDIDATE" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        RESOLVED_URL="$(
+          CANDIDATE="$CANDIDATE" CREDENTIAL_SOURCE="$CREDENTIAL_SOURCE" node <<'NODE'
+        const candidate = new URL(process.env.CANDIDATE);
+        const source = new URL(process.env.CREDENTIAL_SOURCE);
+
+        if (source.username) {
+          candidate.username = source.username;
+        }
+
+        if (source.password) {
+          candidate.password = source.password;
+        }
+
+        console.log(candidate.toString());
+        NODE
+        )"
+
+        if [ -z "$RESOLVED_URL" ]; then
+          echo "Failed to resolve Neon DATABASE_URL."
+          exit 1
+        fi
+
+        echo "database_url=$RESOLVED_URL" >> "$GITHUB_OUTPUT"

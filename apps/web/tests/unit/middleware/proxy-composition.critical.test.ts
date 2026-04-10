@@ -114,6 +114,7 @@ vi.mock('@/constants/app', () => ({
 vi.mock('@/constants/domains', () => ({
   BASE_URL: 'https://jov.ie',
   HOSTNAME: 'jov.ie',
+  STAGING_HOSTNAMES: new Set(['staging.jov.ie', 'main.jov.ie']),
 }));
 
 import middleware from '@/proxy';
@@ -130,6 +131,10 @@ function resetMocks() {
   for (const mock of Object.values(mocks)) {
     if (typeof mock.mockClear === 'function') mock.mockClear();
   }
+  mocks.resolveClerkKeys.mockReturnValue({
+    publishableKey: 'pk_test_real-key-123',
+    secretKey: 'sk_test_real-key-456',
+  });
   mocks.resolveTestBypassUserId.mockReturnValue(null);
   mocks.isCookieBannerRequired.mockReturnValue(false);
   mocks.getUserState.mockResolvedValue(null);
