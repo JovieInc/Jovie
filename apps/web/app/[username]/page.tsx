@@ -564,7 +564,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     notFound();
   }
 
-  const isPublicNoAuthSmoke = shouldBypassPublicProfileQaCache();
+  const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
   const viewerCountryCode = null;
 
   const profileResult = await getProfileAndLinks(username);

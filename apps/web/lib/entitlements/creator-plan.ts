@@ -22,17 +22,30 @@ export async function getCreatorEntitlements(
   creatorProfileId: string
 ): Promise<{ plan: PlanId; entitlements: PlanEntitlements }> {
   const [result] = await db
-    .select({ plan: users.plan })
+    .select({
+      claimedUserId: userProfileClaims.userId,
+      legacyUserId: creatorProfiles.userId,
+    })
     .from(creatorProfiles)
-    .innerJoin(
+    .leftJoin(
       userProfileClaims,
       eq(userProfileClaims.creatorProfileId, creatorProfiles.id)
     )
-    .innerJoin(users, eq(users.id, userProfileClaims.userId))
     .where(eq(creatorProfiles.id, creatorProfileId))
     .limit(1);
 
-  const plan = (result?.plan as PlanId) ?? 'free';
+  const ownerUserId = result?.claimedUserId ?? result?.legacyUserId ?? null;
+  if (!ownerUserId) {
+    return { plan: 'free', entitlements: getEntitlements('free') };
+  }
+
+  const [userRecord] = await db
+    .select({ plan: users.plan })
+    .from(users)
+    .where(eq(users.id, ownerUserId))
+    .limit(1);
+
+  const plan = (userRecord?.plan as PlanId | undefined) ?? 'free';
   return { plan, entitlements: getEntitlements(plan) };
 }
 
@@ -47,25 +60,48 @@ export async function getBatchCreatorEntitlements(
 ): Promise<Map<string, { plan: PlanId; entitlements: PlanEntitlements }>> {
   if (creatorProfileIds.length === 0) return new Map();
 
-  const results = await db
+  const ownershipRows = await db
     .select({
       creatorProfileId: creatorProfiles.id,
-      plan: users.plan,
+      claimedUserId: userProfileClaims.userId,
+      legacyUserId: creatorProfiles.userId,
     })
     .from(creatorProfiles)
-    .innerJoin(
+    .leftJoin(
       userProfileClaims,
       eq(userProfileClaims.creatorProfileId, creatorProfiles.id)
     )
-    .innerJoin(users, eq(users.id, userProfileClaims.userId))
     .where(inArray(creatorProfiles.id, creatorProfileIds));
+
+  const ownerIds = Array.from(
+    new Set(
+      ownershipRows
+        .map(row => row.claimedUserId ?? row.legacyUserId)
+        .filter((userId): userId is string => Boolean(userId))
+    )
+  );
+
+  const userPlans =
+    ownerIds.length === 0
+      ? []
+      : await db
+          .select({ id: users.id, plan: users.plan })
+          .from(users)
+          .where(inArray(users.id, ownerIds));
+
+  const planByUserId = new Map(
+    userPlans.map(row => [row.id, (row.plan as PlanId | undefined) ?? 'free'])
+  );
 
   const map = new Map<
     string,
     { plan: PlanId; entitlements: PlanEntitlements }
   >();
-  for (const row of results) {
-    const plan = (row.plan as PlanId) ?? 'free';
+  for (const row of ownershipRows) {
+    const ownerUserId = row.claimedUserId ?? row.legacyUserId;
+    const plan = ownerUserId
+      ? (planByUserId.get(ownerUserId) ?? 'free')
+      : 'free';
     map.set(row.creatorProfileId, {
       plan,
       entitlements: getEntitlements(plan),

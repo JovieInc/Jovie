@@ -237,11 +237,13 @@ export interface CachedContentData {
   totalTracks?: number | null;
   previewUrl?: string | null;
   previewMetadata?: Record<string, unknown> | null;
+  durationMs?: number | null;
   isrc?: string | null;
   releaseId?: string | null;
   releaseSlug?: string | null;
   releaseTitle?: string | null;
   credits?: SmartLinkCreditGroup[];
+  trackNumber?: number | null;
 }
 
 /**
@@ -396,6 +398,7 @@ const fetchContentBySlug = async (
       slug: discogRecordings.slug,
       previewUrl: discogRecordings.previewUrl,
       previewMetadata: discogRecordings.metadata,
+      durationMs: discogRecordings.durationMs,
       isrc: discogRecordings.isrc,
     })
     .from(discogRecordings)
@@ -415,6 +418,7 @@ const fetchContentBySlug = async (
       .select({
         id: discogReleaseTracks.id,
         releaseId: discogReleaseTracks.releaseId,
+        trackNumber: discogReleaseTracks.trackNumber,
       })
       .from(discogReleaseTracks)
       .innerJoin(
@@ -470,10 +474,12 @@ const fetchContentBySlug = async (
       providerLinks: links,
       previewUrl: recording.previewUrl,
       previewMetadata: recording.previewMetadata ?? null,
+      durationMs: recording.durationMs ?? null,
       isrc: recording.isrc,
       releaseId: releaseId ?? null,
       releaseSlug: releaseData?.slug ?? null,
       releaseTitle: releaseData?.title ?? null,
+      trackNumber: rt?.trackNumber ?? null,
       credits,
     };
   }
