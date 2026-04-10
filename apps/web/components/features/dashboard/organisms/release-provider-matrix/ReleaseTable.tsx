@@ -10,12 +10,12 @@ import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
+import { getReleaseContextMenuItems } from './utils/release-context-actions';
 import {
   createExpandableReleaseCellRenderer,
   createReleaseCellRenderer,
   createRightMetaCellRenderer,
-} from './utils/column-renderers';
-import { getReleaseContextMenuItems } from './utils/release-context-actions';
+} from './utils/release-table-renderers';
 
 const MobileReleaseList = lazy(() =>
   import('./MobileReleaseList').then(m => ({

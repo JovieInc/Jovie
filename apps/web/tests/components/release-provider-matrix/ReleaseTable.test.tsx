@@ -49,7 +49,7 @@ vi.mock(
 );
 
 vi.mock(
-  '@/features/dashboard/organisms/release-provider-matrix/utils/column-renderers',
+  '@/features/dashboard/organisms/release-provider-matrix/utils/release-table-renderers',
   () => ({
     createExpandableReleaseCellRenderer: () => () => null,
     createReleaseCellRenderer: () => () => null,
