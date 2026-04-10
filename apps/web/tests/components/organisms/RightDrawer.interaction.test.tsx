@@ -51,6 +51,7 @@ describe('RightDrawer', () => {
     expect(aside).not.toHaveClass('bg-surface-0');
     expect(aside).not.toHaveClass('lg:border');
     expect(aside).not.toHaveClass('shadow-[var(--linear-app-drawer-shadow)]');
+    expect(aside).toHaveClass('outline-none', 'focus:outline-none');
   });
 
   it('handles Escape while open even when focus remains outside the drawer', () => {
@@ -146,7 +147,8 @@ describe('RightDrawer', () => {
       'fixed',
       'inset-0',
       'translate-x-full',
-      'bg-(--linear-app-content-surface)'
+      'bg-(--linear-app-content-surface)',
+      'outline-none'
     );
 
     rerender(

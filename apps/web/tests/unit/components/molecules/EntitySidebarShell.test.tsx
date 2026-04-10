@@ -88,4 +88,58 @@ describe('EntitySidebarShell', () => {
     expect(screen.getByText('Drawer tabs')).toBeInTheDocument();
     expect(screen.getByText('Body content')).toBeInTheDocument();
   });
+
+  it('skips rendering an empty sticky rail when the minimal utility bar is hidden', () => {
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Add release'
+        headerMode='minimal'
+        hideMinimalHeaderBar
+      >
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    expect(
+      screen.queryByTestId('entity-sidebar-entity-header')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('right-drawer').querySelector('[data-variant="card"]')
+    ).not.toBeInTheDocument();
+  });
+
+  it('skips rendering an empty sticky rail in standard mode when no header content is provided', () => {
+    render(
+      <EntitySidebarShell isOpen ariaLabel='Empty drawer'>
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    expect(
+      screen.getByTestId('right-drawer').querySelector('[data-variant="card"]')
+    ).not.toBeInTheDocument();
+  });
+
+  it('can render a flat pinned footer without card chrome', () => {
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Add release'
+        headerMode='minimal'
+        hideMinimalHeaderBar
+        footerSurface='flat'
+        footer={<button type='button'>Create Release</button>}
+      >
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    const footerButton = screen.getByRole('button', { name: 'Create Release' });
+    const footerContainer = footerButton.parentElement;
+
+    expect(footerButton).toBeInTheDocument();
+    expect(footerContainer).not.toHaveAttribute('data-variant', 'card');
+    expect(footerContainer).toHaveClass('px-3', 'py-2.5');
+  });
 });

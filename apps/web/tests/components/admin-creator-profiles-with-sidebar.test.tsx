@@ -300,11 +300,7 @@ describe('AdminCreatorProfilesWithSidebar', () => {
     await user.click(getProfileRow('alice'));
     const sidebar = await expectSidebarOpen();
 
-    // Close is now in the overflow dropdown menu
-    await user.click(
-      within(sidebar).getAllByRole('button', { name: /more actions/i })[0]
-    );
-    await user.click(screen.getByText('Close'));
+    await user.click(within(sidebar).getByRole('button', { name: 'Close' }));
 
     await waitFor(() => {
       expect(screen.queryByTestId('contact-sidebar')).not.toBeInTheDocument();

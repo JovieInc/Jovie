@@ -15,8 +15,8 @@ import { Icon } from '@/components/atoms/Icon';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import {
   DrawerButton,
+  DrawerCardActionBar,
   DrawerFormField,
-  DrawerSection,
   DrawerSettingsToggle,
   DrawerSurfaceCard,
   EntityHeaderCard,
@@ -25,9 +25,7 @@ import {
 import { GenrePicker } from '@/components/molecules/GenrePicker';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { ReleaseFields } from '@/components/organisms/release-sidebar/ReleaseFields';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ReleaseViewModel } from '@/lib/discography/types';
-import { cn } from '@/lib/utils';
 
 const RELEASE_TYPE_OPTIONS = [
   { value: 'single', label: 'Single' },
@@ -36,11 +34,6 @@ const RELEASE_TYPE_OPTIONS = [
   { value: 'compilation', label: 'Compilation' },
   { value: 'live', label: 'Live' },
 ] as const;
-
-const ADD_RELEASE_CARD_CLASSNAME = cn(
-  LINEAR_SURFACE.sidebarCard,
-  'overflow-hidden'
-);
 
 type ReleaseType = (typeof RELEASE_TYPE_OPTIONS)[number]['value'];
 
@@ -214,9 +207,10 @@ export function AddReleaseSidebar({
       isOpen={isOpen}
       ariaLabel='Add release'
       data-testid='add-release-sidebar'
-      title='New Release'
       onClose={handleClose}
       headerMode='minimal'
+      hideMinimalHeaderBar
+      footerSurface='flat'
       footer={
         <DrawerButton
           tone='secondary'
@@ -236,7 +230,8 @@ export function AddReleaseSidebar({
       }
       entityHeader={
         <DrawerSurfaceCard
-          className={ADD_RELEASE_CARD_CLASSNAME}
+          variant='card'
+          className='overflow-hidden'
           testId='add-release-header-card'
         >
           <div className='p-3'>
@@ -258,6 +253,15 @@ export function AddReleaseSidebar({
               subtitle={
                 artistName ? <span>{artistName}</span> : 'No artist selected'
               }
+              actions={
+                <DrawerCardActionBar
+                  primaryActions={[]}
+                  onClose={handleClose}
+                  overflowTriggerPlacement='card-top-right'
+                  overflowTriggerIcon='vertical'
+                  className='border-0 bg-transparent px-0 py-0'
+                />
+              }
               meta={
                 <ReleaseFields
                   releaseDate={releaseDate || undefined}
@@ -266,101 +270,102 @@ export function AddReleaseSidebar({
                 />
               }
               className='min-w-0 flex-1'
-              bodyClassName='pr-0'
+              bodyClassName='pr-9'
               data-testid='entity-header-card'
             />
           </div>
         </DrawerSurfaceCard>
       }
     >
-      <DrawerSection
-        title='Details'
-        surface='card'
-        collapsible={false}
-        surfaceClassName='space-y-3.5'
-      >
-        <DrawerFormField label='Title' htmlFor='release-title'>
-          <Input
-            id='release-title'
-            value={title}
-            onChange={event => setTitle(event.target.value)}
-            placeholder='My New Release'
-            autoFocus
-            className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
-          />
-        </DrawerFormField>
+      <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+        <div className='space-y-3.5 p-3' data-testid='add-release-details-card'>
+          <p className='text-[11px] font-[560] leading-none tracking-[-0.01em] text-tertiary-token'>
+            Details
+          </p>
 
-        <DrawerFormField label='Release Type' htmlFor='release-type'>
-          <Select
-            value={releaseType}
-            onValueChange={value => setReleaseType(value as ReleaseType)}
-          >
-            <SelectTrigger
-              id='release-type'
+          <DrawerFormField label='Title' htmlFor='release-title'>
+            <Input
+              id='release-title'
+              value={title}
+              onChange={event => setTitle(event.target.value)}
+              placeholder='My New Release'
+              autoFocus
               className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
+            />
+          </DrawerFormField>
+
+          <DrawerFormField label='Release Type' htmlFor='release-type'>
+            <Select
+              value={releaseType}
+              onValueChange={value => setReleaseType(value as ReleaseType)}
             >
-              <SelectValue>{releaseTypeLabel}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {RELEASE_TYPE_OPTIONS.map(option => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </DrawerFormField>
-
-        <DrawerFormField label='Release Date' htmlFor='release-date'>
-          <Input
-            id='release-date'
-            type='date'
-            value={releaseDate}
-            onChange={event => setReleaseDate(event.target.value)}
-            className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
-          />
-        </DrawerFormField>
-
-        <DrawerFormField label='Genres'>
-          <GenrePicker
-            selected={genres}
-            onChange={setGenres}
-            trigger={
-              <button
-                type='button'
-                className='flex min-h-[32px] w-full items-center justify-between gap-2 rounded-[8px] border border-subtle bg-surface-0 px-3 py-1.5 text-left text-[12px] text-primary-token transition-[border-color,background-color,color] duration-150 hover:border-default hover:bg-surface-1'
+              <SelectTrigger
+                id='release-type'
+                className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
               >
-                <span className='flex min-w-0 flex-1 flex-wrap gap-1.5'>
-                  {genres.length > 0 ? (
-                    genres.map(genre => (
-                      <span
-                        key={genre}
-                        className='rounded-full bg-surface-1 px-2 py-0.5 text-[10.5px] capitalize text-secondary-token'
-                      >
-                        {genre}
-                      </span>
-                    ))
-                  ) : (
-                    <span className='text-tertiary-token'>Add genres...</span>
-                  )}
-                </span>
-                <Icon
-                  name='ChevronDown'
-                  className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
-                  aria-hidden='true'
-                />
-              </button>
-            }
-          />
-        </DrawerFormField>
+                <SelectValue>{releaseTypeLabel}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {RELEASE_TYPE_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DrawerFormField>
 
-        <DrawerSettingsToggle
-          label='Explicit'
-          checked={isExplicit}
-          onCheckedChange={setIsExplicit}
-          ariaLabel='Mark release as explicit'
-        />
-      </DrawerSection>
+          <DrawerFormField label='Release Date' htmlFor='release-date'>
+            <Input
+              id='release-date'
+              type='date'
+              value={releaseDate}
+              onChange={event => setReleaseDate(event.target.value)}
+              className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
+            />
+          </DrawerFormField>
+
+          <DrawerFormField label='Genres'>
+            <GenrePicker
+              selected={genres}
+              onChange={setGenres}
+              trigger={
+                <button
+                  type='button'
+                  className='flex min-h-[32px] w-full items-center justify-between gap-2 rounded-[8px] border border-subtle bg-surface-0 px-3 py-1.5 text-left text-[12px] text-primary-token transition-[border-color,background-color,color] duration-150 hover:border-default hover:bg-surface-1'
+                >
+                  <span className='flex min-w-0 flex-1 flex-wrap gap-1.5'>
+                    {genres.length > 0 ? (
+                      genres.map(genre => (
+                        <span
+                          key={genre}
+                          className='rounded-full bg-surface-1 px-2 py-0.5 text-[10.5px] capitalize text-secondary-token'
+                        >
+                          {genre}
+                        </span>
+                      ))
+                    ) : (
+                      <span className='text-tertiary-token'>Add genres...</span>
+                    )}
+                  </span>
+                  <Icon
+                    name='ChevronDown'
+                    className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+                    aria-hidden='true'
+                  />
+                </button>
+              }
+            />
+          </DrawerFormField>
+
+          <DrawerSettingsToggle
+            label='Explicit'
+            checked={isExplicit}
+            onCheckedChange={setIsExplicit}
+            ariaLabel='Mark release as explicit'
+          />
+        </div>
+      </DrawerSurfaceCard>
     </EntitySidebarShell>
   );
 }
