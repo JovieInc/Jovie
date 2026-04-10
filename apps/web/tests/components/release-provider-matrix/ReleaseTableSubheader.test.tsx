@@ -52,29 +52,20 @@ vi.mock('@/components/atoms/AppSegmentControl', () => ({
   AppSegmentControl: () => <div data-testid='segment-control' />,
 }));
 
-vi.mock('@/components/atoms/AppIconButton', () => ({
-  AppIconButton: ({ children }: { children: ReactNode }) => (
-    <button type='button'>{children}</button>
-  ),
-}));
-
-vi.mock('@radix-ui/react-popover', () => ({
-  Close: ({ children }: { children: ReactNode }) => <>{children}</>,
-}));
-
 vi.mock('@jovie/ui', () => ({
   Button: ({ children, ...props }: Record<string, unknown>) => (
     <button type='button' {...props}>
       {children as ReactNode}
     </button>
   ),
-  Popover: ({ children }: { children: ReactNode }) => <>{children}</>,
-  PopoverTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
-  PopoverContent: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  TooltipShortcut: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
+
+vi.mock(
+  '@/features/dashboard/organisms/release-provider-matrix/ReleaseTableDisplayMenu',
+  () => ({
+    ReleaseTableDisplayMenu: () => <button type='button'>Display</button>,
+  })
+);
 
 vi.mock('@/components/organisms/table', () => ({
   PAGE_TOOLBAR_ACTION_ACTIVE_CLASS: 'active',
