@@ -143,6 +143,20 @@ export function EntitySidebarShell({
         {entityHeader}
       </DrawerSurfaceCard>
     ) : null;
+  let footerNode: ReactNode = null;
+  if (footer) {
+    footerNode =
+      footerSurface === 'card' ? (
+        <DrawerSurfaceCard
+          variant='card'
+          className='shrink-0 px-3 py-2.5 lg:mx-0'
+        >
+          {footer}
+        </DrawerSurfaceCard>
+      ) : (
+        <div className='shrink-0 px-3 py-2.5 lg:mx-0'>{footer}</div>
+      );
+  }
   return (
     <RightDrawer
       isOpen={isOpen}
@@ -226,18 +240,7 @@ export function EntitySidebarShell({
               <div className='space-y-2.5'>{children}</div>
             </div>
 
-            {footer ? (
-              footerSurface === 'card' ? (
-                <DrawerSurfaceCard
-                  variant='card'
-                  className='shrink-0 px-3 py-2.5 lg:mx-0'
-                >
-                  {footer}
-                </DrawerSurfaceCard>
-              ) : (
-                <div className='shrink-0 px-3 py-2.5 lg:mx-0'>{footer}</div>
-              )
-            ) : null}
+            {footerNode}
           </>
         )}
       </div>

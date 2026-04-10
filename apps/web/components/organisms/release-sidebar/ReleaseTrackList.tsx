@@ -65,21 +65,22 @@ export function ReleaseTrackList({
   if (isLoading || (isFetching && !tracks)) {
     return (
       <div className='space-y-1' data-testid='tracklist'>
-        {(['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'] as const)
-          .slice(0, Math.min(release.totalTracks, 6))
-          .map(id => (
-            <div
-              key={id}
-              className='flex items-center gap-3 rounded-[12px] px-1 py-2.5'
-              data-testid='release-track-skeleton'
-            >
-              <div className='h-8 w-8 rounded-full skeleton' />
-              <div className='min-w-0 flex-1 space-y-1.5'>
-                <div className='h-4 w-1/2 rounded skeleton' />
-                <div className='h-3 w-16 rounded skeleton' />
-              </div>
+        {Array.from(
+          { length: Math.min(release.totalTracks, 6) },
+          (_, index) => `sk${index}`
+        ).map(id => (
+          <div
+            key={id}
+            className='flex items-center gap-3 rounded-[12px] px-1 py-2.5'
+            data-testid='release-track-skeleton'
+          >
+            <div className='h-8 w-8 rounded-full skeleton' />
+            <div className='min-w-0 flex-1 space-y-1.5'>
+              <div className='h-4 w-1/2 rounded skeleton' />
+              <div className='h-3 w-16 rounded skeleton' />
             </div>
-          ))}
+          </div>
+        ))}
       </div>
     );
   }
@@ -184,12 +185,15 @@ function TrackListRow({
     track.title,
   ]);
 
-  const controlLabel =
-    !playableUrl && !isActiveTrack
-      ? `No preview available for ${track.title}`
-      : isTrackPlaying
-        ? `Pause ${track.title}`
-        : `Play ${track.title}`;
+  function getControlLabel(): string {
+    if (!playableUrl && !isActiveTrack) {
+      return `No preview available for ${track.title}`;
+    }
+
+    return isTrackPlaying ? `Pause ${track.title}` : `Play ${track.title}`;
+  }
+
+  const controlLabel = getControlLabel();
 
   return (
     <div
