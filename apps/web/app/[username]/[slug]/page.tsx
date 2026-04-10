@@ -8,8 +8,9 @@
  */
 
 import { Metadata } from 'next';
-import { notFound, permanentRedirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
+import { PreserveSearchRedirect } from '@/app/[username]/[slug]/PreserveSearchRedirect';
 import {
   type FeaturedArtist,
   ReleaseLandingPage,
@@ -262,6 +263,9 @@ interface PageProps {
 
 type Creator = NonNullable<Awaited<ReturnType<typeof getCreatorByUsername>>>;
 type Content = NonNullable<Awaited<ReturnType<typeof getContentBySlug>>>;
+type ContentResolution =
+  | { type: 'content'; content: Content }
+  | { type: 'redirect'; href: string };
 
 /**
  * Resolves content by slug, handling old-slug redirects.
@@ -270,15 +274,21 @@ type Content = NonNullable<Awaited<ReturnType<typeof getContentBySlug>>>;
 async function resolveContentOrRedirect(
   creator: Creator,
   slug: string
-): Promise<Content> {
+): Promise<ContentResolution> {
   const content = await getContentBySlug(creator.id, slug);
-  if (content) return content;
+  if (content) {
+    return {
+      type: 'content',
+      content,
+    };
+  }
 
   const redirectInfo = await findRedirectByOldSlug(creator.id, slug);
   if (redirectInfo) {
-    permanentRedirect(
-      `/${creator.usernameNormalized}/${redirectInfo.currentSlug}`
-    );
+    return {
+      type: 'redirect',
+      href: `/${creator.usernameNormalized}/${redirectInfo.currentSlug}`,
+    };
   }
   notFound();
 }
@@ -299,13 +309,20 @@ export default async function ContentSmartLinkPage({
     notFound();
   }
 
-  const content = await resolveContentOrRedirect(creator, slug);
+  const contentResolution = await resolveContentOrRedirect(creator, slug);
+  if (contentResolution.type === 'redirect') {
+    return <PreserveSearchRedirect href={contentResolution.href} />;
+  }
+
+  const { content } = contentResolution;
 
   // If this is a track with a known parent release, permanently redirect to the nested URL.
   // Tracks should be deep links of releases: /{handle}/{releaseSlug}/{trackSlug}
   if (content.type === 'track' && content.releaseSlug) {
-    permanentRedirect(
-      `/${creator.usernameNormalized}/${content.releaseSlug}/${content.slug}`
+    return (
+      <PreserveSearchRedirect
+        href={`/${creator.usernameNormalized}/${content.releaseSlug}/${content.slug}`}
+      />
     );
   }
 

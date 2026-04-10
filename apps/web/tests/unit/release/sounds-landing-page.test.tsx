@@ -124,6 +124,7 @@ describe('SoundsLandingPage', () => {
 
   it('fires click tracking via sendBeacon when provider button is clicked', () => {
     render(<SoundsLandingPage {...defaultProps} />);
+    sendBeaconSpy.mockClear();
 
     const tiktokLink = screen.getByRole('link', {
       name: /open tiktok/i,

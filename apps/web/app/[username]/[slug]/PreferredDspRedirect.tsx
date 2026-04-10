@@ -31,17 +31,16 @@ export function PreferredDspRedirect({
   tracking,
 }: PreferredDspRedirectProps) {
   useEffect(() => {
-    if (typeof document === 'undefined') return;
-
     const searchParams = new URLSearchParams(globalThis.location.search);
     const explicitProvider = searchParams.get('dsp');
     const shouldSkipPreferredRedirect = searchParams.get('noredirect') === '1';
 
-    const cookieValue = document.cookie
+    const cookieEntry = document.cookie
       .split(';')
-      .find(cookie => cookie.trim().startsWith(`${LISTEN_COOKIE}=`))
-      ?.split('=')[1]
-      ?.trim();
+      .find(cookie => cookie.trim().startsWith(`${LISTEN_COOKIE}=`));
+    const cookieValue = cookieEntry
+      ? cookieEntry.slice(cookieEntry.indexOf('=') + 1).trim()
+      : undefined;
 
     const providerKey = (explicitProvider ??
       (shouldSkipPreferredRedirect ? null : cookieValue)) as ProviderKey | null;

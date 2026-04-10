@@ -9,7 +9,8 @@ import { joviePlaylists, joviePlaylistTracks } from '@/lib/db/schema/playlists';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
-export const revalidate = 300;
+export const dynamicParams = false;
+export const revalidate = false;
 
 export async function generateStaticParams() {
   try {
@@ -17,8 +18,7 @@ export async function generateStaticParams() {
       .select({ slug: joviePlaylists.slug })
       .from(joviePlaylists)
       .where(eq(joviePlaylists.status, 'published'))
-      .orderBy(desc(joviePlaylists.publishedAt), joviePlaylists.slug)
-      .limit(100);
+      .orderBy(desc(joviePlaylists.publishedAt), joviePlaylists.slug);
 
     return playlists.map(playlist => ({
       slug: playlist.slug,

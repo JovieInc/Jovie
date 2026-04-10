@@ -8,7 +8,7 @@
  */
 
 import type { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { BASE_URL } from '@/constants/app';
 import type { VideoProviderKey } from '@/lib/discography/types';
 import {
@@ -21,6 +21,7 @@ import {
   getCreatorByUsername,
   getFeaturedSmartLinkStaticParams,
 } from '../_lib/data';
+import { PreserveSearchRedirect } from '../PreserveSearchRedirect';
 import { SoundsLandingPage } from './SoundsLandingPage';
 
 export const revalidate = 300;
@@ -64,7 +65,11 @@ export default async function SoundsPage({ params }: Readonly<PageProps>) {
 
   // No video links — redirect to the main smart link
   if (videoLinks.length === 0) {
-    redirect(`/${creator.usernameNormalized}/${content.slug}`);
+    return (
+      <PreserveSearchRedirect
+        href={`/${creator.usernameNormalized}/${content.slug}`}
+      />
+    );
   }
 
   // Build video provider data for the page

@@ -69,7 +69,13 @@ export function SoundsLandingPage({
       return utmParams;
     }
 
-    return extractUTMParams(new URLSearchParams(globalThis.location.search));
+    const currentUtmParams = extractUTMParams(
+      new URLSearchParams(globalThis.location.search)
+    );
+
+    return Object.keys(currentUtmParams).length > 0
+      ? currentUtmParams
+      : utmParams;
   }, [utmParams]);
 
   const handleProviderClick = useCallback(

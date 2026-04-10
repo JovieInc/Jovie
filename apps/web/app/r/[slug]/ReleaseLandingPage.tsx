@@ -239,7 +239,13 @@ export function ReleaseLandingPage({
       return utmParams;
     }
 
-    return extractUTMParams(new URLSearchParams(globalThis.location.search));
+    const currentUtmParams = extractUTMParams(
+      new URLSearchParams(globalThis.location.search)
+    );
+
+    return Object.keys(currentUtmParams).length > 0
+      ? currentUtmParams
+      : utmParams;
   }, [utmParams]);
   // All providers rendered as a flat list — no canonical/fallback distinction for fans
   const sizes = buildArtworkSizes(artworkSizes, release.artworkUrl);

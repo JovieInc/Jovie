@@ -814,7 +814,7 @@ export async function getFeaturedSmartLinkStaticParams(
 ): Promise<SmartLinkStaticParam[]> {
   const rows = await db
     .select({
-      username: creatorProfiles.username,
+      username: creatorProfiles.usernameNormalized,
       slug: discogReleases.slug,
     })
     .from(discogReleases)
@@ -849,7 +849,7 @@ export async function getFeaturedTrackStaticParams(
 ): Promise<SmartLinkTrackStaticParam[]> {
   const rows = await db
     .select({
-      username: creatorProfiles.username,
+      username: creatorProfiles.usernameNormalized,
       slug: discogReleases.slug,
       trackSlug: discogReleaseTracks.slug,
     })
@@ -865,7 +865,8 @@ export async function getFeaturedTrackStaticParams(
     .where(
       and(
         eq(creatorProfiles.isPublic, true),
-        eq(creatorProfiles.isFeatured, true)
+        eq(creatorProfiles.isFeatured, true),
+        isNotNull(discogReleaseTracks.slug)
       )
     )
     .orderBy(
