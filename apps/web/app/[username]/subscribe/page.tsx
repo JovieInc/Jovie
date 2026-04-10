@@ -1,12 +1,10 @@
-import { redirectToProfileMode } from '../_lib/mode-route-redirect';
+import { getProfileModeHref } from '@/features/profile/registry';
 import { getProfileStaticParams } from '../_lib/profile-static-params';
+import { PreserveSearchRedirect } from '../[slug]/PreserveSearchRedirect';
 
 interface Props {
   readonly params: Promise<{
     readonly username: string;
-  }>;
-  readonly searchParams?: Promise<{
-    readonly source?: string | string[];
   }>;
 }
 
@@ -14,6 +12,10 @@ export async function generateStaticParams() {
   return getProfileStaticParams(100);
 }
 
-export default async function SubscribePage({ params, searchParams }: Props) {
-  await redirectToProfileMode(params, searchParams, 'subscribe');
+export default async function SubscribePage({ params }: Props) {
+  const { username } = await params;
+
+  return (
+    <PreserveSearchRedirect href={getProfileModeHref(username, 'subscribe')} />
+  );
 }
