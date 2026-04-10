@@ -63,7 +63,14 @@ vi.mock('@/features/auth/atoms/otp-input', () => ({
       data-testid='mock-otp-input'
       aria-label={props['aria-label'] ?? 'otp'}
       value={props.value}
-      onChange={e => props.onChange?.(e.target.value)}
+      onChange={e => {
+        const value = e.target.value;
+        props.onChange?.(value);
+        if (value.length === 6) {
+          props.onComplete?.();
+        }
+      }}
+      disabled={props.disabled}
     />
   ),
 }));

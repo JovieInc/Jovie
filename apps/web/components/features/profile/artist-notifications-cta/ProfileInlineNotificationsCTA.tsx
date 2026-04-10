@@ -496,7 +496,7 @@ export function ProfileInlineNotificationsCTA({
               action={
                 <CircularSubmitButton
                   onClick={() => {
-                    handleVerifyOtp();
+                    handleVerifyOtp().catch(() => {});
                   }}
                   disabled={otpCode.length !== 6 || isSubmitting}
                   submitting={isSubmitting}
@@ -508,7 +508,7 @@ export function ProfileInlineNotificationsCTA({
                   value={otpCode}
                   onChange={handleOtpChange}
                   onComplete={() => {
-                    handleVerifyOtp();
+                    handleVerifyOtp().catch(() => {});
                   }}
                   autoFocus
                   aria-label='Enter 6-digit verification code'
