@@ -98,26 +98,30 @@ export default async function OnboardingPage({
   // Run profile prefetch and handle reservation in parallel (they're independent)
   const spotifySuggestedHandle = clerkIdentity.spotifyUsername ?? '';
 
-  const profilePrefetchPromise = shouldSkipDashboardPrefetch
-    ? Promise.resolve(null)
-    : !shouldLoadExistingProfile
-      ? Promise.resolve(null)
-      : getOnboardingBootstrapProfile(authResult.profileId!).catch(
-          (error: unknown) => {
-            const errorMessage = extractErrorMessage(error, 'Unknown error');
-            if (
-              errorMessage.includes('database') ||
-              errorMessage.includes('connection') ||
-              errorMessage.includes('timeout')
-            ) {
-              Sentry.captureException(error, {
-                tags: { context: 'onboarding_profile_load' },
-                extra: { clerkUserId: authResult.clerkUserId },
-              });
-            }
-            return null;
-          }
-        );
+  const profilePrefetchPromise = createProfilePrefetchPromise();
+
+  function createProfilePrefetchPromise() {
+    if (shouldSkipDashboardPrefetch || !shouldLoadExistingProfile) {
+      return Promise.resolve(null);
+    }
+
+    return getOnboardingBootstrapProfile(authResult.profileId!).catch(
+      (error: unknown) => {
+        const errorMessage = extractErrorMessage(error, 'Unknown error');
+        if (
+          errorMessage.includes('database') ||
+          errorMessage.includes('connection') ||
+          errorMessage.includes('timeout')
+        ) {
+          Sentry.captureException(error, {
+            tags: { context: 'onboarding_profile_load' },
+            extra: { clerkUserId: authResult.clerkUserId },
+          });
+        }
+        return null;
+      }
+    );
+  }
 
   // Start handle reservation early with what we know now (display name from Clerk)
   const earlyDisplayName = clerkIdentity.displayName || '';

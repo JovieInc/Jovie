@@ -199,12 +199,25 @@ export function NavMenuItem({
       if (preventNavigation) {
         event.preventDefault();
       }
-      if (!hadPendingPointerNavigation) {
+      const shouldInterceptNavigation =
+        !preventNavigation &&
+        Boolean(onNavigate) &&
+        event.button === 0 &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.shiftKey &&
+        !event.altKey;
+
+      if (!hadPendingPointerNavigation && shouldInterceptNavigation) {
         showPendingShell();
       }
       onClick?.();
 
-      if (!preventNavigation && onNavigate) {
+      if (!shouldInterceptNavigation && onNavigate) {
+        onCancelNavigate?.();
+      }
+
+      if (shouldInterceptNavigation) {
         event.preventDefault();
         requestAnimationFrame(() => {
           router.push(item.href);
@@ -214,6 +227,7 @@ export function NavMenuItem({
     [
       item.href,
       clearPendingNavigationListeners,
+      onCancelNavigate,
       onClick,
       onNavigate,
       preventNavigation,

@@ -82,8 +82,9 @@ jobs:
             CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
           fi
 
-          # Check if only docs changed (exclude .github/ — workflow changes must run CI)
-          if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
+          # Check if only docs changed (.github workflow edits must still run CI)
+          NON_DOC_FILES=$(printf '%s\n' "$CHANGED_FILES" | grep -v -E '^\s*$' | grep -v -E '\.(md|txt)$' || true)
+          if [[ -z "$NON_DOC_FILES" ]]; then
             echo "Only documentation files changed"
             for t in run_build run_test run_launch_gate run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
@@ -2160,7 +2161,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
+          DATABASE_URL: ${{ env.DATABASE_URL_DIRECT }}
           NODE_ENV: test
           GIT_BRANCH: ${{ github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'
@@ -2908,7 +2909,7 @@ jobs:
       - name: Run migrations for Smoke DB
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
+          DATABASE_URL: ${{ env.DATABASE_URL_DIRECT }}
           NODE_ENV: test
           GIT_BRANCH: ${{ github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'

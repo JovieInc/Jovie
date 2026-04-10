@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
@@ -108,6 +108,23 @@ describe('DashboardNav interactions', () => {
 
     expect(mockShowPendingShell).not.toHaveBeenCalled();
     expect(mockClearPendingShell).not.toHaveBeenCalled();
+  });
+
+  it('does not hijack modified releases link clicks', async () => {
+    renderDashboardNav({ renderFn: render });
+
+    const releasesLink = screen.getByRole('link', { name: 'Releases' });
+    fireEvent.pointerDown(releasesLink, {
+      button: 0,
+      metaKey: true,
+    });
+    fireEvent.click(releasesLink, {
+      button: 0,
+      metaKey: true,
+    });
+
+    expect(mockShowPendingShell).toHaveBeenCalledTimes(1);
+    expect(mockClearPendingShell).toHaveBeenCalledTimes(1);
   });
 
   it('keeps demo-disabled items as links on nested demo routes', async () => {

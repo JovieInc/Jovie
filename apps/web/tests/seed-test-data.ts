@@ -97,13 +97,15 @@ export function isRetryableSeedDatabaseError(error: unknown): boolean {
 
   let current: unknown = error;
   while (current) {
-    if (current instanceof Error) {
-      messages.push(current.message);
-    } else {
-      messages.push(String(current));
-    }
+    if (typeof current === 'object') {
+      const message =
+        current instanceof Error
+          ? current.message
+          : typeof (current as { message?: unknown }).message === 'string'
+            ? (current as { message: string }).message
+            : String(current);
+      messages.push(message);
 
-    if (current && typeof current === 'object') {
       const code = (current as { code?: string }).code;
       if (typeof code === 'string' && code.length > 0) {
         codes.add(code);
@@ -112,6 +114,8 @@ export function isRetryableSeedDatabaseError(error: unknown): boolean {
       current = 'cause' in current ? current.cause : undefined;
       continue;
     }
+
+    messages.push(String(current));
 
     break;
   }

@@ -7,6 +7,7 @@ const path = require('node:path');
 // so importing the TypeScript source directly is not a safe option here.
 const TEST_MODE_COOKIE = '__e2e_test_mode';
 const TEST_USER_ID_COOKIE = '__e2e_test_user_id';
+const TEST_PERSONA_COOKIE = '__e2e_test_persona';
 const TEST_AUTH_BYPASS_MODE = 'bypass-auth';
 
 const webRoot = path.resolve(__dirname, '..');
@@ -261,33 +262,6 @@ async function seedDashboardAuth(browser, { url }) {
   };
 
   if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1' && testUserId) {
-    if (pathname.startsWith('/app')) {
-      const bootstrapUrl = new URL('/api/dev/test-auth/enter', origin);
-      bootstrapUrl.searchParams.set('persona', 'creator-ready');
-      bootstrapUrl.searchParams.set('redirect', pathname);
-
-      await page.goto(bootstrapUrl.toString(), {
-        waitUntil: 'domcontentloaded',
-        timeout: 60_000,
-      });
-      if (new URL(page.url()).pathname !== pathname) {
-        await page.goto(url, {
-          waitUntil: 'domcontentloaded',
-          timeout: 60_000,
-        });
-      }
-      const landedPath = new URL(page.url()).pathname;
-      if (!landedPath.startsWith('/app')) {
-        await page.close();
-        throw new Error(
-          `Auth bypass bootstrap failed for ${url}; landed on ${landedPath}`
-        );
-      }
-      await warmRouteRepeatedly();
-      await page.close();
-      return;
-    }
-
     const authCookies = [
       {
         name: TEST_MODE_COOKIE,
@@ -301,12 +275,52 @@ async function seedDashboardAuth(browser, { url }) {
         url: origin,
         sameSite: 'Lax',
       },
+      {
+        name: TEST_PERSONA_COOKIE,
+        value: 'creator-ready',
+        url: origin,
+        sameSite: 'Lax',
+      },
     ];
+
     if (browserContext?.setCookie) {
       await browserContext.setCookie(...authCookies);
     } else {
       await page.setCookie(...authCookies);
     }
+
+    if (pathname.startsWith('/app')) {
+      const bootstrapUrl = new URL('/api/dev/test-auth/session', origin);
+      const bootstrapResponse = await page.request.post(
+        bootstrapUrl.toString(),
+        {
+          failOnStatusCode: false,
+          data: { persona: 'creator-ready' },
+        }
+      );
+
+      if (!bootstrapResponse.ok()) {
+        throw new Error(
+          `Auth bypass bootstrap failed for ${url}; session endpoint returned ${bootstrapResponse.status()}`
+        );
+      }
+
+      await page.goto(url, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60_000,
+      });
+      const landedPath = new URL(page.url()).pathname;
+      if (!landedPath.startsWith('/app')) {
+        await page.close();
+        throw new Error(
+          `Auth bypass bootstrap failed for ${url}; landed on ${landedPath}`
+        );
+      }
+      await warmRouteRepeatedly();
+      await page.close();
+      return;
+    }
+
     await warmRouteRepeatedly();
     await page.close();
     return;

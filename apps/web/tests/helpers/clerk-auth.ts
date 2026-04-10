@@ -1,5 +1,5 @@
 import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
-import { expect, Page } from '@playwright/test';
+import { APIResponse, expect, Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
 import {
@@ -79,6 +79,19 @@ async function fetchJsonInBrowserContext<T>(
     };
   } finally {
     await probePage.close().catch(() => undefined);
+  }
+}
+
+async function parseJsonSafely<T>(response: APIResponse): Promise<T | null> {
+  const rawBody = await response.text();
+  if (rawBody.trim().length === 0) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawBody) as T;
+  } catch {
+    return null;
   }
 }
 
@@ -298,10 +311,14 @@ export async function waitForAuthenticatedHealth(
             );
 
             if (bypassSessionResponse.ok()) {
-              const payload = (await bypassSessionResponse.json()) as {
+              const payload = await parseJsonSafely<{
                 active?: boolean;
                 userId?: string | null;
-              };
+              }>(bypassSessionResponse);
+
+              if (!payload) {
+                return `http-${bypassSessionResponse.status()}`;
+              }
 
               if (!payload.active) {
                 return 'anonymous';
@@ -352,10 +369,14 @@ export async function waitForAuthenticatedHealth(
               return `http-${bypassSessionResponse.status()}`;
             }
 
-            const payload = (await bypassSessionResponse.json()) as {
+            const payload = await parseJsonSafely<{
               active?: boolean;
               userId?: string | null;
-            };
+            }>(bypassSessionResponse);
+
+            if (!payload) {
+              return `http-${bypassSessionResponse.status()}`;
+            }
 
             if (!payload.active) {
               return 'anonymous';
@@ -400,10 +421,14 @@ export async function waitForAuthenticatedHealth(
               return `http-${bypassSessionResponse.status()}`;
             }
 
-            const payload = (await bypassSessionResponse.json()) as {
+            const payload = await parseJsonSafely<{
               active?: boolean;
               userId?: string | null;
-            };
+            }>(bypassSessionResponse);
+
+            if (!payload) {
+              return `http-${bypassSessionResponse.status()}`;
+            }
 
             if (!payload.active) {
               return 'anonymous';
@@ -420,10 +445,14 @@ export async function waitForAuthenticatedHealth(
             return `http-${fallbackResponse.status()}`;
           }
 
-          const payload = (await fallbackResponse.json()) as {
+          const payload = await parseJsonSafely<{
             authenticated?: boolean;
             userId?: string | null;
-          };
+          }>(fallbackResponse);
+
+          if (!payload) {
+            return `http-${fallbackResponse.status()}`;
+          }
 
           if (!payload.authenticated) {
             return 'anonymous';

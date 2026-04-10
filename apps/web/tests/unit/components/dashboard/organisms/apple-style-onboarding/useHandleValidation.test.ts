@@ -51,6 +51,7 @@ vi.mock('@/lib/error-tracking', () => ({
 
 vi.mock('@/lib/pacer/errors', () => ({
   isAbortError: (error: Error) => error.name === 'AbortError',
+  isNetworkError: (error: Error) => error.message === 'Failed to fetch',
 }));
 
 import { useHandleValidation } from '@/features/dashboard/organisms/onboarding-v2/shared/useHandleValidation';
@@ -171,6 +172,34 @@ describe('useHandleValidation', () => {
     });
 
     expect(retryValidate).toHaveBeenCalledTimes(3);
+    expect(retryValidate).toHaveBeenLastCalledWith('prefilled-handle');
+  });
+
+  it('retries transient network failures for the current handle within the retry budget', async () => {
+    vi.useFakeTimers();
+    const retryValidate = vi.fn().mockResolvedValue(undefined);
+    validateApiState.current = retryValidate;
+
+    const { result } = renderHook(() =>
+      useHandleValidation({
+        assumeInitialHandleAvailable: false,
+        normalizedInitialHandle: 'prefilled-handle',
+        fullName: 'Taylor Swift',
+      })
+    );
+
+    await act(async () => {
+      result.current.validateHandle('prefilled-handle');
+    });
+
+    expect(retryValidate).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      validateApiState.callbacks.onError?.(new Error('Failed to fetch'));
+      vi.advanceTimersByTime(250);
+    });
+
+    expect(retryValidate).toHaveBeenCalledTimes(2);
     expect(retryValidate).toHaveBeenLastCalledWith('prefilled-handle');
   });
 });

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { captureWarning } from '@/lib/error-tracking';
-import { isAbortError } from '@/lib/pacer/errors';
+import { isAbortError, isNetworkError } from '@/lib/pacer/errors';
 import { PACER_TIMING, useAsyncValidation } from '@/lib/pacer/hooks';
 import {
   generateUsernameSuggestions,
@@ -43,7 +43,7 @@ const CHECKING_SAFETY_TIMEOUT_MS =
  * Cold dev-server compiles can abort the first couple of availability checks.
  * Allow a small bounded retry budget before surfacing an error to the user.
  */
-const MAX_ABORT_RETRIES = 2;
+const MAX_TRANSIENT_RETRIES = 3;
 
 /**
  * Hook to manage handle validation state and API checks.
@@ -141,12 +141,12 @@ export function useHandleValidation({
         return;
       }
 
-      if (isAbortError(error)) {
+      if (isAbortError(error) || isNetworkError(error)) {
         const currentHandle = latestRequestedHandleRef.current;
         const currentRetryCount =
           abortRetryCountRef.current.get(currentHandle) ?? 0;
 
-        if (currentHandle && currentRetryCount < MAX_ABORT_RETRIES) {
+        if (currentHandle && currentRetryCount < MAX_TRANSIENT_RETRIES) {
           abortRetryCountRef.current.set(currentHandle, currentRetryCount + 1);
           if (abortRetryTimerRef.current) {
             clearTimeout(abortRetryTimerRef.current);

@@ -318,15 +318,6 @@ async function main() {
   const artifactDir = resolve(perfRoot, `launch-check-${timestampLabel()}`);
   ensureDir(artifactDir);
 
-  if (
-    !process.env.E2E_CLERK_USER_ID?.trim() &&
-    !process.env.CLERK_SESSION_COOKIE?.trim()
-  ) {
-    throw new Error(
-      'Launch perf requires E2E_CLERK_USER_ID or CLERK_SESSION_COOKIE in the environment so creator-releases can be measured.'
-    );
-  }
-
   buildProject();
 
   const port = await findFreePort();
@@ -347,10 +338,23 @@ async function main() {
       'creator-ready'
     );
 
-    const onboardingUserId = readBypassUserId(onboardingAuthPath);
-    if (onboardingUserId) {
-      process.env.E2E_CLERK_USER_ID = onboardingUserId;
-    }
+    const requireBypassUserId = (
+      authPath: string,
+      persona: 'creator' | 'creator-ready'
+    ) => {
+      const userId = readBypassUserId(authPath);
+      if (!userId) {
+        throw new Error(
+          `Auth bootstrap for ${persona} did not persist __e2e_test_user_id in ${authPath}.`
+        );
+      }
+      return userId;
+    };
+
+    process.env.E2E_CLERK_USER_ID = requireBypassUserId(
+      onboardingAuthPath,
+      'creator'
+    );
     const onboardingSummary = await runPerformanceBudgetsGuard({
       authPath: onboardingAuthPath,
       baseUrl,
@@ -362,10 +366,10 @@ async function main() {
       runs: 3,
     });
 
-    const creatorReadyUserId = readBypassUserId(creatorReadyAuthPath);
-    if (creatorReadyUserId) {
-      process.env.E2E_CLERK_USER_ID = creatorReadyUserId;
-    }
+    process.env.E2E_CLERK_USER_ID = requireBypassUserId(
+      creatorReadyAuthPath,
+      'creator-ready'
+    );
 
     const releasesSummary = await runPerformanceBudgetsGuard({
       authPath: creatorReadyAuthPath,
