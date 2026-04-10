@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { getProfileAvatarUrl } from '@/app/onboarding/actions/update-profile';
 
 const AVATAR_POLL_INTERVAL_MS = 2000;
+const AVATAR_BACKOFF_POLL_INTERVAL_MS = 5000;
+const IDLE_POLLS_BEFORE_BACKOFF = 3;
 const AVATAR_POLL_TIMEOUT_MS = 30_000;
 
 interface UseAvatarPollingParams {
@@ -26,7 +28,9 @@ export function useAvatarPolling({ enabled }: UseAvatarPollingParams): {
 } {
   const [polledAvatarUrl, setPolledAvatarUrl] = useState<string | null>(null);
   const [isComplete, setIsComplete] = useState(false);
+  const [pollIntervalMs, setPollIntervalMs] = useState(AVATAR_POLL_INTERVAL_MS);
   const pollStartRef = useRef<number>(0);
+  const stagnantPollCountRef = useRef(0);
 
   useEffect(() => {
     if (enabled && !isComplete) {
@@ -34,15 +38,23 @@ export function useAvatarPolling({ enabled }: UseAvatarPollingParams): {
     }
   }, [enabled, isComplete]);
 
+  useEffect(() => {
+    if (enabled) {
+      setPollIntervalMs(AVATAR_POLL_INTERVAL_MS);
+      stagnantPollCountRef.current = 0;
+    }
+  }, [enabled]);
+
   const isPolling = enabled && !isComplete && !polledAvatarUrl;
 
   const { data } = useQuery({
     queryKey: ['avatar-polling'],
     queryFn: ({ signal: _signal }) => getProfileAvatarUrl(),
     enabled: isPolling,
-    refetchInterval: isPolling ? AVATAR_POLL_INTERVAL_MS : false,
+    refetchInterval: isPolling ? pollIntervalMs : false,
     gcTime: 0,
     staleTime: 0,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
   });
 
@@ -55,6 +67,14 @@ export function useAvatarPolling({ enabled }: UseAvatarPollingParams): {
       return;
     }
 
+    stagnantPollCountRef.current += 1;
+    if (
+      stagnantPollCountRef.current >= IDLE_POLLS_BEFORE_BACKOFF &&
+      pollIntervalMs !== AVATAR_BACKOFF_POLL_INTERVAL_MS
+    ) {
+      setPollIntervalMs(AVATAR_BACKOFF_POLL_INTERVAL_MS);
+    }
+
     const timedOut =
       pollStartRef.current > 0 &&
       Date.now() - pollStartRef.current > AVATAR_POLL_TIMEOUT_MS;
@@ -62,7 +82,7 @@ export function useAvatarPolling({ enabled }: UseAvatarPollingParams): {
     if (timedOut) {
       setIsComplete(true);
     }
-  }, [data, isPolling]);
+  }, [data, isPolling, pollIntervalMs]);
 
   return { polledAvatarUrl };
 }
