@@ -15,34 +15,14 @@ describe('profile mode route redirects', () => {
   });
 
   it('redirects to the canonical tour mode URL', async () => {
-    await redirectToProfileMode(
-      Promise.resolve({ username: 'testartist' }),
-      Promise.resolve({}),
-      'tour'
-    );
+    await redirectToProfileMode(Promise.resolve({ username: 'testartist' }), 'tour');
 
     expect(redirectMock).toHaveBeenCalledWith('/testartist?mode=tour');
   });
 
-  it('preserves source query params for server redirects', async () => {
-    await redirectToProfileMode(
-      Promise.resolve({ username: 'testartist' }),
-      Promise.resolve({ source: 'qr' }),
-      'tip'
-    );
+  it('redirects to the canonical tip mode URL without server search params', async () => {
+    await redirectToProfileMode(Promise.resolve({ username: 'testartist' }), 'tip');
 
-    expect(redirectMock).toHaveBeenCalledWith('/testartist?mode=tip&source=qr');
-  });
-
-  it('uses the first non-empty source value from repeated params', async () => {
-    await redirectToProfileMode(
-      Promise.resolve({ username: 'testartist' }),
-      Promise.resolve({ source: ['', 'campaign'] }),
-      'listen'
-    );
-
-    expect(redirectMock).toHaveBeenCalledWith(
-      '/testartist?mode=listen&source=campaign'
-    );
+    expect(redirectMock).toHaveBeenCalledWith('/testartist?mode=tip');
   });
 });

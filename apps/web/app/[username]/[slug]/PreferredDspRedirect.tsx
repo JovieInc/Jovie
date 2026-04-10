@@ -4,12 +4,20 @@ import { useEffect } from 'react';
 import { LISTEN_COOKIE } from '@/constants/app';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
+import { postJsonBeacon } from '@/lib/tracking/json-beacon';
+import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
 
 interface PreferredDspRedirectProps {
   /** Provider links available for this content, used to validate the preference */
   readonly providerLinks: ReadonlyArray<{ providerId: string; url: string }>;
-  /** Base path for the DSP redirect (e.g. /artist/release) */
-  readonly redirectBasePath: string;
+  /** Artist handle for analytics tracking */
+  readonly artistHandle: string | null;
+  /** Tracking context for analytics */
+  readonly tracking?: {
+    readonly contentType: 'release' | 'track';
+    readonly contentId: string;
+    readonly smartLinkSlug?: string | null;
+  };
 }
 
 /**
@@ -19,10 +27,15 @@ interface PreferredDspRedirectProps {
  */
 export function PreferredDspRedirect({
   providerLinks,
-  redirectBasePath,
+  artistHandle,
+  tracking,
 }: PreferredDspRedirectProps) {
   useEffect(() => {
     if (typeof document === 'undefined') return;
+
+    const searchParams = new URLSearchParams(globalThis.location.search);
+    const explicitProvider = searchParams.get('dsp');
+    const shouldSkipPreferredRedirect = searchParams.get('noredirect') === '1';
 
     const cookieValue = document.cookie
       .split(';')
@@ -30,9 +43,10 @@ export function PreferredDspRedirect({
       ?.split('=')[1]
       ?.trim();
 
-    if (!cookieValue) return;
-
-    const providerKey = cookieValue as ProviderKey;
+    const providerKey = (
+      explicitProvider ?? (shouldSkipPreferredRedirect ? null : cookieValue)
+    ) as ProviderKey | null;
+    if (!providerKey) return;
 
     // Validate the provider exists in our config and is available for this content
     if (!PROVIDER_CONFIG[providerKey]) return;
@@ -42,11 +56,29 @@ export function PreferredDspRedirect({
     );
     if (!matchingLink?.url) return;
 
-    // Redirect to the DSP via the server-side redirect endpoint
+    if (artistHandle && tracking?.contentId && tracking?.contentType) {
+      postJsonBeacon(
+        '/api/track',
+        {
+          handle: artistHandle,
+          linkType: 'listen',
+          target: providerKey,
+          source: explicitProvider ? 'redirect' : 'preferred_dsp',
+          context: {
+            contentType: tracking.contentType,
+            contentId: tracking.contentId,
+            provider: providerKey,
+            smartLinkSlug: tracking.smartLinkSlug ?? undefined,
+          },
+        },
+        () => {}
+      );
+    }
+
     globalThis.location.replace(
-      `${redirectBasePath}?dsp=${encodeURIComponent(providerKey)}`
+      appendUTMParamsToUrl(matchingLink.url, extractUTMParams(searchParams))
     );
-  }, [providerLinks, redirectBasePath]);
+  }, [artistHandle, providerLinks, tracking]);
 
   return null;
 }

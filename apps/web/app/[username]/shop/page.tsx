@@ -10,14 +10,21 @@ import {
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
 } from '@/lib/validation/username-core';
+import { getProfileStaticParams } from '../_lib/profile-static-params';
 import { ShopRedirectClient } from './ShopRedirectClient';
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+export const revalidate = 3600;
+
 interface Props {
   readonly params: Promise<{ readonly username: string }>;
+}
+
+export async function generateStaticParams() {
+  return getProfileStaticParams(100);
 }
 
 export default async function ShopPage({ params }: Readonly<Props>) {

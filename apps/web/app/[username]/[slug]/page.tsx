@@ -8,7 +8,7 @@
  */
 
 import { Metadata } from 'next';
-import { notFound, permanentRedirect, redirect } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import {
   type FeaturedArtist,
@@ -35,24 +35,32 @@ import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import type { ProviderKey } from '@/lib/discography/types';
 import { isVideoProviderKey } from '@/lib/discography/video-providers';
 import { generateArtworkImageObject } from '@/lib/images/seo';
-import { trackServerEvent } from '@/lib/server-analytics';
 import {
   msToIsoDuration,
   toDateOnlySafe,
   toISOStringOrNull,
 } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
-import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
 import {
   getContentBySlug,
   getCreatorByUsername,
   getCreatorPlan,
+  getFeaturedSmartLinkStaticParams,
   getReleaseTrackList,
   type SmartLinkCreditGroup,
 } from './_lib/data';
 
 // Use ISR with 5-minute revalidation for smart link pages
 export const revalidate = 300;
+
+export async function generateStaticParams() {
+  try {
+    return await getFeaturedSmartLinkStaticParams();
+  } catch {
+    // Build-time DB failures should not block deployment.
+    return [];
+  }
+}
 
 /** Maps release type enum to schema.org MusicAlbumReleaseType values */
 const RELEASE_TYPE_SCHEMA_MAP: Record<string, string> = {
@@ -250,27 +258,6 @@ export function generateMusicStructuredData(
 
 interface PageProps {
   readonly params: Promise<{ username: string; slug: string }>;
-  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
-}
-
-/**
- * Pick the best provider URL based on priority.
- */
-function pickProviderUrl(
-  links: Array<{ providerId: string; url: string }>,
-  forcedProvider?: ProviderKey | null
-): string | null {
-  if (forcedProvider) {
-    return links.find(link => link.providerId === forcedProvider)?.url ?? null;
-  }
-
-  for (const key of PRIMARY_PROVIDER_KEYS) {
-    const match = links.find(link => link.providerId === key);
-    if (match?.url) return match.url;
-  }
-
-  const fallback = links.find(link => link.url);
-  return fallback?.url ?? null;
 }
 
 type Creator = NonNullable<Awaited<ReturnType<typeof getCreatorByUsername>>>;
@@ -282,76 +269,22 @@ type Content = NonNullable<Awaited<ReturnType<typeof getContentBySlug>>>;
  */
 async function resolveContentOrRedirect(
   creator: Creator,
-  slug: string,
-  searchParams: URLSearchParams
+  slug: string
 ): Promise<Content> {
   const content = await getContentBySlug(creator.id, slug);
   if (content) return content;
 
   const redirectInfo = await findRedirectByOldSlug(creator.id, slug);
   if (redirectInfo) {
-    const queryString = searchParams.toString();
-    const suffix = queryString ? `?${queryString}` : '';
-    permanentRedirect(
-      `/${creator.usernameNormalized}/${redirectInfo.currentSlug}${suffix}`
-    );
+    permanentRedirect(`/${creator.usernameNormalized}/${redirectInfo.currentSlug}`);
   }
   notFound();
 }
 
-/**
- * Handles direct DSP redirect when ?dsp= param is present.
- * Calls notFound() for invalid providers or redirect() on success.
- */
-function handleDspRedirect(
-  dsp: string,
-  content: Content,
-  creator: Creator,
-  utmParams: ReturnType<typeof extractUTMParams>
-): never {
-  const providerKey = dsp as ProviderKey;
-
-  if (!PROVIDER_CONFIG[providerKey]) {
-    notFound();
-  }
-
-  const targetUrl = pickProviderUrl(content.providerLinks, providerKey);
-  if (!targetUrl) {
-    notFound();
-  }
-
-  void trackServerEvent('smart_link_clicked', {
-    contentType: content.type,
-    contentId: content.id,
-    profileId: creator.id,
-    provider: providerKey,
-    contentTitle: content.title,
-    utmParams,
-  });
-
-  redirect(appendUTMParamsToUrl(targetUrl, utmParams));
-}
-
 export default async function ContentSmartLinkPage({
   params,
-  searchParams,
 }: Readonly<PageProps>) {
   const { username, slug } = await params;
-  const allSearchParams = await searchParams;
-  const dspParam = allSearchParams.dsp;
-  const dsp = typeof dspParam === 'string' ? dspParam : undefined;
-  const noredirectParam = allSearchParams.noredirect;
-  const noredirect =
-    typeof noredirectParam === 'string' ? noredirectParam : undefined;
-  const requestSearchParams = new URLSearchParams(
-    Object.entries(allSearchParams).flatMap(([key, value]) => {
-      if (Array.isArray(value)) {
-        return value.map(v => [key, v]);
-      }
-      return typeof value === 'string' ? [[key, value]] : [];
-    })
-  );
-  const utmParams = extractUTMParams(requestSearchParams);
 
   if (!username || !slug) {
     notFound();
@@ -364,25 +297,14 @@ export default async function ContentSmartLinkPage({
     notFound();
   }
 
-  const content = await resolveContentOrRedirect(
-    creator,
-    slug,
-    requestSearchParams
-  );
+  const content = await resolveContentOrRedirect(creator, slug);
 
   // If this is a track with a known parent release, permanently redirect to the nested URL.
   // Tracks should be deep links of releases: /{handle}/{releaseSlug}/{trackSlug}
   if (content.type === 'track' && content.releaseSlug) {
-    const queryString = requestSearchParams.toString();
-    const suffix = queryString ? `?${queryString}` : '';
     permanentRedirect(
-      `/${creator.usernameNormalized}/${content.releaseSlug}/${content.slug}${suffix}`
+      `/${creator.usernameNormalized}/${content.releaseSlug}/${content.slug}`
     );
-  }
-
-  // If DSP is specified, redirect immediately
-  if (dsp) {
-    handleDspRedirect(dsp, content, creator, utmParams);
   }
 
   // Build provider data for the landing page
@@ -492,10 +414,15 @@ export default async function ContentSmartLinkPage({
       </script>
 
       {/* Client-side auto-redirect to preferred DSP (preserves ISR caching) */}
-      {!isUnreleased && noredirect !== '1' && (
+      {!isUnreleased && (
         <PreferredDspRedirect
           providerLinks={content.providerLinks}
-          redirectBasePath={`/${creator.usernameNormalized}/${content.slug}`}
+          artistHandle={creator.usernameNormalized}
+          tracking={{
+            contentType: content.type,
+            contentId: content.id,
+            smartLinkSlug: content.slug,
+          }}
         />
       )}
 
@@ -506,7 +433,6 @@ export default async function ContentSmartLinkPage({
         creator={creator}
         allProviders={allProviders}
         previewState={previewState}
-        utmParams={utmParams}
         soundsUrl={soundsUrl}
         downloadUrl={downloadUrl}
       />
@@ -521,7 +447,6 @@ function ContentPageBody({
   creator,
   allProviders,
   previewState,
-  utmParams,
   soundsUrl,
   downloadUrl,
 }: Readonly<{
@@ -537,7 +462,6 @@ function ContentPageBody({
     confidence?: import('@/lib/discography/types').ProviderConfidence;
   }>;
   previewState: ReturnType<typeof derivePreviewState>;
-  utmParams: ReturnType<typeof extractUTMParams>;
   soundsUrl: string | null;
   downloadUrl: string | null;
 }>) {
@@ -613,7 +537,6 @@ function ContentPageBody({
       featuredArtists={featuredArtists}
       providers={allProviders}
       credits={content.credits}
-      utmParams={utmParams}
       artworkSizes={content.artworkSizes}
       allowDownloads={
         (creator.settings as Record<string, unknown> | null)

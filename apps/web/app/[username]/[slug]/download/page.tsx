@@ -19,10 +19,23 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
-import { getContentBySlug, getCreatorByUsername } from '../_lib/data';
+import {
+  getContentBySlug,
+  getCreatorByUsername,
+  getFeaturedSmartLinkStaticParams,
+} from '../_lib/data';
 import { PromoDownloadGate } from './PromoDownloadGate';
 
 export const revalidate = 300; // ISR: 5 minutes
+
+export async function generateStaticParams() {
+  try {
+    return await getFeaturedSmartLinkStaticParams();
+  } catch {
+    // Build-time DB failures should not block deployment.
+    return [];
+  }
+}
 
 interface PageProps {
   readonly params: Promise<{ username: string; slug: string }>;

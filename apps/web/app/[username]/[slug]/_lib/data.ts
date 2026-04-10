@@ -5,7 +5,7 @@
  * Used by both the main smart link page and the /sounds page.
  */
 
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, desc, eq, isNotNull } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { db } from '@/lib/db';
@@ -793,3 +793,92 @@ export const getCreatorPlan = cache(async (creatorProfileId: string) => {
     canAccessFutureReleases: entitlements.booleans.canAccessFutureReleases,
   };
 });
+
+const DEFAULT_STATIC_SMARTLINK_LIMIT = 200;
+
+export interface SmartLinkStaticParam {
+  username: string;
+  slug: string;
+}
+
+export interface SmartLinkTrackStaticParam extends SmartLinkStaticParam {
+  trackSlug: string;
+}
+
+/**
+ * Pre-render a bounded set of featured/public release smart links at build time.
+ * Keeps build time under control while converting the route to ISR for hot paths.
+ */
+export async function getFeaturedSmartLinkStaticParams(
+  limit = DEFAULT_STATIC_SMARTLINK_LIMIT
+): Promise<SmartLinkStaticParam[]> {
+  const rows = await db
+    .select({
+      username: creatorProfiles.username,
+      slug: discogReleases.slug,
+    })
+    .from(discogReleases)
+    .innerJoin(
+      creatorProfiles,
+      eq(discogReleases.creatorProfileId, creatorProfiles.id)
+    )
+    .where(
+      and(
+        eq(creatorProfiles.isPublic, true),
+        eq(creatorProfiles.isFeatured, true)
+      )
+    )
+    .orderBy(
+      desc(discogReleases.releaseDate),
+      creatorProfiles.username,
+      discogReleases.slug
+    )
+    .limit(limit);
+
+  return rows.map(row => ({
+    username: row.username,
+    slug: row.slug,
+  }));
+}
+
+/**
+ * Pre-render a bounded set of featured/public track deep links at build time.
+ */
+export async function getFeaturedTrackStaticParams(
+  limit = DEFAULT_STATIC_SMARTLINK_LIMIT
+): Promise<SmartLinkTrackStaticParam[]> {
+  const rows = await db
+    .select({
+      username: creatorProfiles.username,
+      slug: discogReleases.slug,
+      trackSlug: discogReleaseTracks.slug,
+    })
+    .from(discogReleaseTracks)
+    .innerJoin(
+      discogReleases,
+      eq(discogReleaseTracks.releaseId, discogReleases.id)
+    )
+    .innerJoin(
+      creatorProfiles,
+      eq(discogReleases.creatorProfileId, creatorProfiles.id)
+    )
+    .where(
+      and(
+        eq(creatorProfiles.isPublic, true),
+        eq(creatorProfiles.isFeatured, true)
+      )
+    )
+    .orderBy(
+      desc(discogReleases.releaseDate),
+      creatorProfiles.username,
+      discogReleases.slug,
+      discogReleaseTracks.trackNumber
+    )
+    .limit(limit);
+
+  return rows.map(row => ({
+    username: row.username,
+    slug: row.slug,
+    trackSlug: row.trackSlug,
+  }));
+}
