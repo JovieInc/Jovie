@@ -71,9 +71,36 @@ interface EnsureClerkTestUserOptions {
   readonly metadata?: Record<string, string>;
 }
 
-function isDuplicateKeyError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes('duplicate key value');
+function isDuplicateKeyError(
+  error: unknown,
+  seen = new Set<unknown>()
+): boolean {
+  if (!error || (typeof error !== 'object' && !(error instanceof Error))) {
+    return String(error).includes('duplicate key value');
+  }
+
+  if (seen.has(error)) {
+    return false;
+  }
+  seen.add(error);
+
+  const candidate = error as {
+    readonly cause?: unknown;
+    readonly code?: string;
+    readonly message?: string;
+  };
+
+  if (candidate.code === '23505') {
+    return true;
+  }
+
+  if (typeof candidate.message === 'string') {
+    if (candidate.message.includes('duplicate key value')) {
+      return true;
+    }
+  }
+
+  return isDuplicateKeyError(candidate.cause, seen);
 }
 
 function isClerkIdentificationExistsError(error: unknown): boolean {
