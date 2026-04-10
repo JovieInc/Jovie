@@ -372,6 +372,33 @@ jobs:
 
           echo "✅ Signup renders correctly"
 
+          # Verify signin still renders because staging auth must stay healthy.
+          echo "Checking signin route renders..."
+          signin_url="${deployment_url%/}/signin"
+          signin_response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${signin_url}$( [[ "$signin_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
+          signin_code="${signin_response##*$'\n'}"
+          signin_body="${signin_response%$'\n'*}"
+
+          if [ "$signin_code" != "200" ]; then
+            echo "❌ Canary failed: /signin returned HTTP $signin_code"
+            echo "canary_status=failed_signin" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if [ ${#signin_body} -lt 500 ]; then
+            echo "❌ Canary failed: /signin body too short (${#signin_body} chars) - likely broken"
+            echo "canary_status=failed_signin" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if echo "$signin_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred\|this page could not be found"; then
+            echo "❌ Canary failed: /signin contains error message"
+            echo "canary_status=failed_signin" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          echo "✅ Signin renders correctly"
+
           # Verify the public profile route renders without a server error.
           # "Profile not found" with HTTP 200 is a valid app response (data issue,
           # not a code regression), so only block on 5xx or actual error pages.

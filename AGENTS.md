@@ -840,7 +840,7 @@ Name tests by behavior: `describe('ComponentName')` → `it('shows error when in
 | Language | TypeScript (strict mode) |
 | Styling | Tailwind CSS v4 |
 | Database | Neon PostgreSQL + Drizzle ORM |
-| Auth | Clerk (single instance, proxy via `/__clerk`) |
+| Auth | Clerk (three instances, proxy via `/__clerk`) |
 | Payments | Stripe |
 | Linting | Biome |
 | Package Manager | pnpm 9.15.4 |
@@ -851,30 +851,33 @@ Name tests by behavior: `describe('ComponentName')` → `it('shows error when in
 
 **CRITICAL — read this before touching anything Clerk-related.**
 
-Each environment has its own Clerk instance with its own publishable key (set in Doppler):
-- **Production** (`prd`): `pk_live_...LmllJA` → FAPI host `clerk.jov.ie`
-- **Staging** (`stg`): `pk_live_...aWUk` → FAPI host `clerk.staging.jov.ie`
-- **Dev** (`dev`): `pk_test_...ZGlzdGluY3Q...` → FAPI host `distinct-giraffe-5.clerk.accounts.dev`
+Jovie uses three distinct Clerk key pairs:
+- **Dev** (`dev`, account A development instance): local/dev worktrees use the `pk_test_...` + dev secret pair from Doppler `jovie-web/dev`
+- **Staging** (`stg`, account B production instance): `staging.jov.ie` uses `CLERK_PUBLISHABLE_KEY_STAGING` + `CLERK_SECRET_KEY_STAGING`
+- **Production** (`prd`, account A production instance): `jov.ie` uses `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY`
 
 The proxy path is `/__clerk`. ClerkProvider sets `proxyUrl="/__clerk"`. All Clerk JS requests go to `/__clerk/*` on the current origin. Dev mode doesn't use the proxy — ClerkProvider talks directly to Clerk.
 
 **How the proxy works:**
 - Middleware in `proxy.ts` intercepts `/__clerk/*` and `/clerk/*` paths
-- Decodes the FAPI host from `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` at runtime
+- Decodes the FAPI host from the active publishable key at runtime
 - Uses `fetch()` to proxy with the correct `Host` header set to the decoded FAPI host
-- Each environment automatically routes to the correct Clerk instance via Doppler
+- Uses strict host routing: `staging.jov.ie` must use the staging key pair and must never fall back to production keys
 
 **DO NOT:**
 - Use `NextResponse.rewrite()` for clerk paths — Vercel doesn't set the Host header correctly, causing Clerk 400 "Invalid host"
 - Use `vercel.json` rewrites as the primary mechanism — same Host header problem
-- Hardcode FAPI hosts — always decode from the publishable key
+- Hardcode FAPI hosts — always decode from the resolved publishable key
 - Use `clerk.jov.ie` or `clerk.staging.jov.ie` as public-facing URLs — traffic goes through `/__clerk` path proxy only
 - Add satellite/custom proxy domains — they cost money and are unnecessary with the fetch proxy
 
 **If Clerk auth breaks:**
-1. Check the `fetch()` proxy in `proxy.ts` decodes the FAPI host from the publishable key
-2. Check the publishable key in Doppler (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`) for each env
+1. Check the `fetch()` proxy in `proxy.ts` decodes the FAPI host from the resolved publishable key
+2. Check the active runtime exposes the correct key pair for that host:
+   production uses `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY`
+   staging uses `CLERK_PUBLISHABLE_KEY_STAGING` + `CLERK_SECRET_KEY_STAGING`
 3. Check CSP allows the decoded FAPI host in connect-src, script-src, frame-src
+4. If staging auth is broken, do not let `staging.jov.ie` fall back to production Clerk keys; fail closed to the auth-unavailable state instead
 
 ### API Runtime
 
