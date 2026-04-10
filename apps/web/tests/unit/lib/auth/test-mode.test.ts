@@ -105,6 +105,27 @@ describe('test-mode auth bypass', () => {
     ).toBe('user_private_host');
   });
 
+  it('allows bypass markers on trusted preview hosts', () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+
+    expect(
+      resolveTestBypassUserId({
+        get: (name: string) => {
+          if (name === 'host') {
+            return 'jovie-git-feature-123-jovie.vercel.app';
+          }
+          if (name === TEST_MODE_HEADER) {
+            return TEST_AUTH_BYPASS_MODE;
+          }
+          if (name === TEST_USER_ID_HEADER) {
+            return 'user_preview_host';
+          }
+          return null;
+        },
+      })
+    ).toBe('user_preview_host');
+  });
+
   it('prefers request headers over cookies when both are present', () => {
     vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
     expect(
@@ -160,14 +181,14 @@ describe('test-mode auth bypass', () => {
     ).toBeNull();
   });
 
-  it('ignores bypass markers on non-loopback hosts', () => {
+  it('ignores bypass markers on untrusted public hosts', () => {
     vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
 
     expect(
       resolveTestBypassUserId({
         get: (name: string) => {
           if (name === 'host') {
-            return 'preview.jov.ie';
+            return 'attacker.example.com';
           }
           if (name === TEST_MODE_HEADER) {
             return TEST_AUTH_BYPASS_MODE;

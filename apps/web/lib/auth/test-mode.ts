@@ -6,6 +6,7 @@ export const TEST_AUTH_BYPASS_MODE = 'bypass-auth';
 export const TEST_MODE_COOKIE = '__e2e_test_mode';
 export const TEST_USER_ID_COOKIE = '__e2e_test_user_id';
 export const TEST_PERSONA_COOKIE = '__e2e_test_persona';
+const TRUSTED_PREVIEW_HOSTS = new Set(['preview.jov.ie']);
 
 const PRIVATE_IPV4_BLOCKS = [
   /^10\./,
@@ -65,6 +66,10 @@ export function isTrustedTestBypassHostname(hostname: string | null): boolean {
     normalizedHostname === '[::1]' ||
     Boolean(normalizedHostname?.endsWith('.localhost')) ||
     Boolean(normalizedHostname?.endsWith('.local')) ||
+    Boolean(normalizedHostname?.endsWith('.vercel.app')) ||
+    Boolean(
+      normalizedHostname && TRUSTED_PREVIEW_HOSTS.has(normalizedHostname)
+    ) ||
     isPrivateIpv4Literal(normalizedHostname)
   );
 }

@@ -73,7 +73,7 @@ describe('dev-test-auth.server', () => {
     });
   });
 
-  it('rejects non-loopback and non-private hosts', async () => {
+  it('allows trusted preview hosts when bypass mode is enabled', async () => {
     vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
     const { getDevTestAuthAvailability } = await import(
       '@/lib/auth/dev-test-auth.server'
@@ -81,8 +81,15 @@ describe('dev-test-auth.server', () => {
 
     expect(getDevTestAuthAvailability('preview.jov.ie')).toEqual({
       enabled: true,
-      trustedHost: false,
-      reason: 'Only available on loopback and private dev hosts',
+      trustedHost: true,
+      reason: null,
+    });
+    expect(
+      getDevTestAuthAvailability('jovie-git-feature-123-jovie.vercel.app')
+    ).toEqual({
+      enabled: true,
+      trustedHost: true,
+      reason: null,
     });
   });
 
