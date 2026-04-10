@@ -27,12 +27,7 @@ import { SoundsLandingPage } from './SoundsLandingPage';
 export const revalidate = 300;
 
 export async function generateStaticParams() {
-  try {
-    return await getFeaturedSmartLinkStaticParams();
-  } catch {
-    // Build-time DB failures should not block deployment.
-    return [];
-  }
+  return await getFeaturedSmartLinkStaticParams();
 }
 
 interface PageProps {
@@ -140,7 +135,12 @@ export async function generateMetadata({
   }
 
   const artistName = creator.displayName ?? creator.username;
-  const canonicalUrl = `${BASE_URL}/${creator.usernameNormalized}/${content.slug}/sounds`;
+  const hasVideoLinks = content.providerLinks.some(link =>
+    isVideoProviderKey(link.providerId)
+  );
+  const canonicalUrl = hasVideoLinks
+    ? `${BASE_URL}/${creator.usernameNormalized}/${content.slug}/sounds`
+    : `${BASE_URL}/${creator.usernameNormalized}/${content.slug}`;
 
   const title = `Use "${content.title}" by ${artistName} — Create with this sound`;
   const description = `Create short-form videos with "${content.title}" by ${artistName}. Use this sound on TikTok, Instagram Reels, and YouTube Shorts.`;

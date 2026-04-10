@@ -8,7 +8,7 @@
  */
 
 import { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { PreserveSearchRedirect } from '@/app/[username]/[slug]/PreserveSearchRedirect';
 import {
@@ -55,12 +55,7 @@ import {
 export const revalidate = 300;
 
 export async function generateStaticParams() {
-  try {
-    return await getFeaturedSmartLinkStaticParams();
-  } catch {
-    // Build-time DB failures should not block deployment.
-    return [];
-  }
+  return await getFeaturedSmartLinkStaticParams();
 }
 
 /** Maps release type enum to schema.org MusicAlbumReleaseType values */
@@ -263,9 +258,6 @@ interface PageProps {
 
 type Creator = NonNullable<Awaited<ReturnType<typeof getCreatorByUsername>>>;
 type Content = NonNullable<Awaited<ReturnType<typeof getContentBySlug>>>;
-type ContentResolution =
-  | { type: 'content'; content: Content }
-  | { type: 'redirect'; href: string };
 
 /**
  * Resolves content by slug, handling old-slug redirects.
@@ -274,21 +266,15 @@ type ContentResolution =
 async function resolveContentOrRedirect(
   creator: Creator,
   slug: string
-): Promise<ContentResolution> {
+): Promise<Content> {
   const content = await getContentBySlug(creator.id, slug);
-  if (content) {
-    return {
-      type: 'content',
-      content,
-    };
-  }
+  if (content) return content;
 
   const redirectInfo = await findRedirectByOldSlug(creator.id, slug);
   if (redirectInfo) {
-    return {
-      type: 'redirect',
-      href: `/${creator.usernameNormalized}/${redirectInfo.currentSlug}`,
-    };
+    permanentRedirect(
+      `/${creator.usernameNormalized}/${redirectInfo.currentSlug}`
+    );
   }
   notFound();
 }
@@ -309,15 +295,11 @@ export default async function ContentSmartLinkPage({
     notFound();
   }
 
-  const contentResolution = await resolveContentOrRedirect(creator, slug);
-  if (contentResolution.type === 'redirect') {
-    return <PreserveSearchRedirect href={contentResolution.href} />;
-  }
+  const content = await resolveContentOrRedirect(creator, slug);
 
-  const { content } = contentResolution;
-
-  // If this is a track with a known parent release, permanently redirect to the nested URL.
-  // Tracks should be deep links of releases: /{handle}/{releaseSlug}/{trackSlug}
+  // Tracks use a client redirect here to preserve query params like dsp/UTM
+  // while keeping this route prerendered. Metadata points crawlers at the
+  // nested canonical path.
   if (content.type === 'track' && content.releaseSlug) {
     return (
       <PreserveSearchRedirect
@@ -678,7 +660,10 @@ export async function generateMetadata({
 
   const artistName = creator.displayName ?? creator.username;
   const contentType = content.type === 'release' ? 'album' : 'song';
-  const canonicalUrl = `${BASE_URL}/${creator.usernameNormalized}/${content.slug}`;
+  const canonicalUrl =
+    content.type === 'track' && content.releaseSlug
+      ? `${BASE_URL}/${creator.usernameNormalized}/${content.releaseSlug}/${content.slug}`
+      : `${BASE_URL}/${creator.usernameNormalized}/${content.slug}`;
 
   const isUnreleased =
     content.releaseDate && new Date(content.releaseDate) > new Date();

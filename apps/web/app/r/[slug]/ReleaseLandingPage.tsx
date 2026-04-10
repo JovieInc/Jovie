@@ -235,7 +235,7 @@ export function ReleaseLandingPage({
     (provider): provider is Provider & { url: string } => Boolean(provider.url)
   );
   const resolvedUtmParams = useMemo(() => {
-    if (typeof window === 'undefined') {
+    if (typeof globalThis.window === 'undefined') {
       return utmParams;
     }
 

@@ -65,7 +65,7 @@ export function SoundsLandingPage({
 }: Readonly<SoundsLandingPageProps>) {
   const [menuOpen, setMenuOpen] = useState(false);
   const resolvedUtmParams = useMemo(() => {
-    if (typeof window === 'undefined') {
+    if (typeof globalThis.window === 'undefined') {
       return utmParams;
     }
 
@@ -113,7 +113,7 @@ export function SoundsLandingPage({
         handle: artist.handle,
         linkType: 'listen',
         target: 'sounds_page',
-        source: 'sounds',
+        source: 'link',
         context: {
           contentType: tracking.contentType,
           contentId: tracking.contentId,

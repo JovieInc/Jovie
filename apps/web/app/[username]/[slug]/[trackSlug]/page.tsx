@@ -33,12 +33,7 @@ import {
 export const revalidate = 300;
 
 export async function generateStaticParams() {
-  try {
-    return await getFeaturedTrackStaticParams();
-  } catch {
-    // Build-time DB failures should not block deployment.
-    return [];
-  }
+  return await getFeaturedTrackStaticParams();
 }
 
 interface PageProps {
@@ -116,6 +111,8 @@ export default async function TrackDeepLinkPage({
   const artistName = creator.displayName ?? creator.username;
   const trackUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}/${trackSlug}`;
   const releaseUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}`;
+  const isUnreleased =
+    track.releaseDate && new Date(track.releaseDate) > new Date();
 
   // Reuse shared structured data generator with track-specific fields
   const structuredData = generateMusicStructuredData(
@@ -156,15 +153,17 @@ export default async function TrackDeepLinkPage({
         {safeJsonLdStringify(structuredData)}
       </script>
 
-      <PreferredDspRedirect
-        providerLinks={track.providerLinks}
-        artistHandle={creator.usernameNormalized}
-        tracking={{
-          contentType: 'track',
-          contentId: track.id,
-          smartLinkSlug: trackSlug,
-        }}
-      />
+      {!isUnreleased && (
+        <PreferredDspRedirect
+          providerLinks={track.providerLinks}
+          artistHandle={creator.usernameNormalized}
+          tracking={{
+            contentType: 'track',
+            contentId: track.id,
+            smartLinkSlug: trackSlug,
+          }}
+        />
+      )}
 
       <ReleaseLandingPage
         release={{

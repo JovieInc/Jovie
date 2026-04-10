@@ -29,7 +29,7 @@ export interface ValidatedTrackRequest {
   linkType: LinkType;
   target: string;
   linkId?: string;
-  source?: 'qr' | 'link';
+  source?: 'qr' | 'link' | 'redirect' | 'preferred_dsp' | 'sounds';
   context?: TrackClickContext;
   utmParams?: {
     utm_source?: string;
@@ -178,11 +178,16 @@ export function validateTarget(target: string): ValidationError | null {
 /**
  * Normalize source to valid type
  */
-export function normalizeSource(source: unknown): 'qr' | 'link' | undefined {
+export function normalizeSource(
+  source: unknown
+): ValidatedTrackRequest['source'] {
   if (typeof source !== 'string') return undefined;
   const normalized = source.trim().toLowerCase();
   if (normalized === 'qr') return 'qr';
   if (normalized === 'link') return 'link';
+  if (normalized === 'redirect') return 'redirect';
+  if (normalized === 'preferred_dsp') return 'preferred_dsp';
+  if (normalized === 'sounds') return 'sounds';
   return undefined;
 }
 

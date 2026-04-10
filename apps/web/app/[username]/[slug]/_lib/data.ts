@@ -880,6 +880,6 @@ export async function getFeaturedTrackStaticParams(
   return rows.map(row => ({
     username: row.username,
     slug: row.slug,
-    trackSlug: row.trackSlug,
+    trackSlug: row.trackSlug!,
   }));
 }

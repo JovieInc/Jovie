@@ -29,12 +29,7 @@ import { PromoDownloadGate } from './PromoDownloadGate';
 export const revalidate = 300; // ISR: 5 minutes
 
 export async function generateStaticParams() {
-  try {
-    return await getFeaturedSmartLinkStaticParams();
-  } catch {
-    // Build-time DB failures should not block deployment.
-    return [];
-  }
+  return await getFeaturedSmartLinkStaticParams();
 }
 
 interface PageProps {
