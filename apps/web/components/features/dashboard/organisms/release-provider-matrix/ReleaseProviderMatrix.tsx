@@ -26,7 +26,6 @@ import {
 } from '@/components/molecules/drawer';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
-import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import {
   Dialog,
   DialogActions,
@@ -87,6 +86,13 @@ const TrackSidebar = lazy(() =>
 const SpotifyConnectDialog = lazy(() =>
   import('./SpotifyConnectDialog').then(m => ({
     default: m.SpotifyConnectDialog,
+  }))
+);
+
+// Lazy load Apple Music search palette - only used from the sync banner flow.
+const ArtistSearchCommandPalette = lazy(() =>
+  import('@/components/organisms/artist-search-palette').then(m => ({
+    default: m.ArtistSearchCommandPalette,
   }))
 );
 
@@ -914,13 +920,27 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         )}
       </div>
 
-      {/* Apple Music artist search command palette */}
-      <ArtistSearchCommandPalette
-        open={amPaletteOpen}
-        onOpenChange={setAmPaletteOpen}
-        provider='apple_music'
-        onArtistSelect={handleAppleMusicConnect}
-      />
+      <Suspense
+        fallback={
+          amPaletteOpen ? (
+            <DialogLoadingSkeleton
+              open={amPaletteOpen}
+              onClose={() => setAmPaletteOpen(false)}
+              size='lg'
+              rows={3}
+            />
+          ) : null
+        }
+      >
+        {amPaletteOpen ? (
+          <ArtistSearchCommandPalette
+            open={amPaletteOpen}
+            onOpenChange={setAmPaletteOpen}
+            provider='apple_music'
+            onArtistSelect={handleAppleMusicConnect}
+          />
+        ) : null}
+      </Suspense>
 
       <Suspense
         fallback={
