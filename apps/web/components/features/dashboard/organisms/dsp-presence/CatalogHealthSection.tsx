@@ -29,6 +29,26 @@ interface ScanResultsData {
   mismatches: CatalogMismatch[];
 }
 
+const SCAN_POLL_FAST_INTERVAL_MS = 2_000;
+const SCAN_POLL_BACKOFF_INTERVAL_MS = 5_000;
+const SCAN_POLL_FAST_WINDOW_MS = SCAN_POLL_FAST_INTERVAL_MS * 3;
+const SCAN_POLL_TIMEOUT_MS = 2 * 60 * 1000;
+
+function getCatalogScanPollDelayMs(
+  pollStartedAt: number,
+  currentTime: number
+): number | false {
+  const elapsed = currentTime - pollStartedAt;
+
+  if (elapsed >= SCAN_POLL_TIMEOUT_MS) {
+    return false;
+  }
+
+  return elapsed < SCAN_POLL_FAST_WINDOW_MS
+    ? SCAN_POLL_FAST_INTERVAL_MS
+    : SCAN_POLL_BACKOFF_INTERVAL_MS;
+}
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -85,14 +105,20 @@ export function CatalogHealthSection({
 
   const pollScanStatus = useCallback(
     (scanId: string) => {
-      let attempts = 0;
-      const MAX_ATTEMPTS = 60; // ~2 min at 2s cadence
+      const pollStartedAt = Date.now();
+
       const poll = async () => {
-        if (attempts++ >= MAX_ATTEMPTS) {
+        const nextDelayMs = getCatalogScanPollDelayMs(
+          pollStartedAt,
+          Date.now()
+        );
+
+        if (nextDelayMs === false) {
           setIsScanning(false);
           setScanError('Scan timed out. Please retry.');
           return;
         }
+
         try {
           const res = await fetch(
             `/api/dsp/catalog-scan/status?scanId=${scanId}`
@@ -117,9 +143,12 @@ export function CatalogHealthSection({
             }
             return;
           }
-          pollTimerRef.current = setTimeout(poll, 2000);
+          pollTimerRef.current = globalThis.setTimeout(poll, nextDelayMs);
         } catch {
-          pollTimerRef.current = setTimeout(poll, 3000);
+          pollTimerRef.current = globalThis.setTimeout(
+            poll,
+            Math.max(nextDelayMs, SCAN_POLL_BACKOFF_INTERVAL_MS)
+          );
         }
       };
       poll();
