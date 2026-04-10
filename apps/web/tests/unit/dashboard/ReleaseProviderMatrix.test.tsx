@@ -274,6 +274,72 @@ vi.mock(
 );
 
 vi.mock(
+  '@/features/dashboard/organisms/release-provider-matrix/ReleasePlanPromptDialog',
+  () => ({
+    ReleasePlanPromptDialog: ({
+      open,
+      releaseTitle,
+      isGateLoading,
+      canGenerateReleasePlans,
+      isGeneratingReleasePlan,
+      onClose,
+      onGenerateReleasePlan,
+    }: {
+      open: boolean;
+      releaseTitle: string | null;
+      isGateLoading: boolean;
+      canGenerateReleasePlans: boolean;
+      isGeneratingReleasePlan: boolean;
+      onClose: () => void;
+      onGenerateReleasePlan: () => void;
+    }) =>
+      open ? (
+        <div role='dialog' aria-modal='true'>
+          <h2>
+            {isGateLoading
+              ? 'Release Plan'
+              : canGenerateReleasePlans
+                ? 'Generate Release Plan'
+                : 'Upgrade To Generate A Release Plan'}
+          </h2>
+          <p>
+            {isGateLoading
+              ? 'Checking whether this workspace can generate tasks for the release plan.'
+              : canGenerateReleasePlans
+                ? 'Create the step-by-step tasks for this release and jump straight into the plan.'
+                : 'Upgrade to turn this release into a step-by-step plan with tasks you can assign to Jovie AI.'}
+          </p>
+          <p>{releaseTitle ?? 'This release'} is ready.</p>
+          <button
+            type='button'
+            onClick={onClose}
+            disabled={isGeneratingReleasePlan}
+          >
+            Maybe Later
+          </button>
+          {isGateLoading ? (
+            <button type='button' disabled>
+              Loading...
+            </button>
+          ) : canGenerateReleasePlans ? (
+            <button
+              type='button'
+              onClick={onGenerateReleasePlan}
+              disabled={isGeneratingReleasePlan}
+            >
+              {isGeneratingReleasePlan
+                ? 'Generating...'
+                : 'Generate Release Plan'}
+            </button>
+          ) : (
+            <button type='button'>Upgrade to Pro</button>
+          )}
+        </div>
+      ) : null,
+  })
+);
+
+vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/hooks/useReleaseTablePreferences',
   () => ({
     useReleaseTablePreferences: () => ({
@@ -505,7 +571,7 @@ describe('ReleaseProviderMatrix', () => {
   });
 
   describe('conditional rendering', () => {
-    it('shows empty state when not connected and no releases', () => {
+    it('shows empty state when not connected and no releases', async () => {
       renderWithProviders(
         <ReleaseProviderMatrix
           releases={[]}
@@ -514,7 +580,9 @@ describe('ReleaseProviderMatrix', () => {
           spotifyConnected={false}
         />
       );
-      expect(screen.getByTestId('releases-empty-state')).toBeInTheDocument();
+      expect(
+        await screen.findByTestId('releases-empty-state')
+      ).toBeInTheDocument();
     });
 
     it('shows importing state when importing with no releases', () => {
@@ -575,7 +643,7 @@ describe('ReleaseProviderMatrix', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('shows spotify import banner when import is active', () => {
+    it('shows spotify import banner when import is active', async () => {
       renderWithProviders(
         <ReleaseProviderMatrix
           releases={[makeRelease()]}
@@ -586,7 +654,9 @@ describe('ReleaseProviderMatrix', () => {
         />
       );
 
-      const banner = screen.getByTestId('spotify-import-progress-banner');
+      const banner = await screen.findByTestId(
+        'spotify-import-progress-banner'
+      );
       expect(banner).toHaveAttribute('aria-hidden', 'false');
       expect(banner).toHaveStyle({ visibility: 'visible', opacity: '1' });
     });

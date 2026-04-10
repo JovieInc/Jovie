@@ -87,7 +87,9 @@ export interface VirtualizedTableBodyProps<TData> {
   /**
    * Get context menu items for a row
    */
-  readonly getContextMenuItems?: (row: TData) => ContextMenuItemType[];
+  readonly getContextMenuItems?: (
+    row: TData
+  ) => ContextMenuItemType[] | Promise<ContextMenuItemType[]>;
 
   /**
    * Get custom class names for a row
@@ -259,7 +261,10 @@ export function VirtualizedTableBody<TData>({
 
         // Apply context menu wrapper if needed
         const wrappedRow = getContextMenuItems ? (
-          <TableContextMenu key={row.id} items={getContextMenuItems(rowData)}>
+          <TableContextMenu
+            key={row.id}
+            getItems={() => getContextMenuItems(rowData)}
+          >
             {rowElement}
           </TableContextMenu>
         ) : (
