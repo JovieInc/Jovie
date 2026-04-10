@@ -17,6 +17,7 @@ import { defineConfig } from '@playwright/test';
 import baseConfig from './playwright.config';
 
 const port = Number(process.env.PORT ?? '3100');
+const baseUrl = process.env.BASE_URL ?? `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   ...baseConfig,
@@ -27,7 +28,7 @@ export default defineConfig({
   retries: 0,
   use: {
     ...baseConfig.use,
-    baseURL: `http://localhost:${port}`,
+    baseURL: baseUrl,
     video: {
       mode: 'on',
       size: { width: 1280, height: 720 },

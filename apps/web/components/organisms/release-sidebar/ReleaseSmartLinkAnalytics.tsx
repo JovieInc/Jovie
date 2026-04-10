@@ -13,13 +13,64 @@ import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
 import type { Release, ReleaseSidebarAnalytics } from './types';
 
+const TEST_MODE_HEADER = 'x-test-mode';
+const TEST_USER_ID_HEADER = 'x-test-user-id';
+const TEST_MODE_COOKIE = '__e2e_test_mode';
+const TEST_USER_ID_COOKIE = '__e2e_test_user_id';
+const TEST_AUTH_BYPASS_MODE = 'bypass-auth';
+
+function readCookieValue(cookieName: string): string | null {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  const cookie = document.cookie
+    .split(';')
+    .map(entry => entry.trim())
+    .find(entry => entry.startsWith(`${cookieName}=`));
+
+  if (!cookie) {
+    return null;
+  }
+
+  return decodeURIComponent(cookie.slice(cookieName.length + 1));
+}
+
+function getTestBypassHeaders(): Record<string, string> | undefined {
+  const isDemoBypassEnabled =
+    process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
+    process.env.NEXT_PUBLIC_DEMO_RECORDING === '1';
+
+  if (!isDemoBypassEnabled) {
+    return undefined;
+  }
+
+  const mode = readCookieValue(TEST_MODE_COOKIE);
+  const userId = readCookieValue(TEST_USER_ID_COOKIE);
+
+  if (mode !== TEST_AUTH_BYPASS_MODE || !userId) {
+    return undefined;
+  }
+
+  return {
+    [TEST_MODE_HEADER]: mode,
+    [TEST_USER_ID_HEADER]: userId,
+  };
+}
+
 async function fetchReleaseAnalytics(
   releaseId: string,
   signal?: AbortSignal
 ): Promise<ReleaseSidebarAnalytics> {
+  const testBypassHeaders = getTestBypassHeaders();
   const res = await fetch(
     `/api/dashboard/releases/${encodeURIComponent(releaseId)}/analytics`,
-    { signal }
+    {
+      cache: 'no-store',
+      credentials: 'include',
+      headers: testBypassHeaders,
+      signal,
+    }
   );
 
   if (!res.ok) {
