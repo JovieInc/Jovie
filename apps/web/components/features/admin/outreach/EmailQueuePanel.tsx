@@ -64,9 +64,7 @@ export function EmailQueuePanel() {
 
   const fetchCampaignSettings = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/outreach/settings', {
-        cache: 'no-store',
-      });
+      const res = await fetch('/api/admin/outreach/settings');
       if (res.ok) {
         const data = (await res.json()) as { campaignsEnabled: boolean };
         setCampaignsEnabled(data.campaignsEnabled);
@@ -105,9 +103,7 @@ export function EmailQueuePanel() {
         page: String(page),
         limit: String(limit),
       });
-      const res = await fetch(`/api/admin/outreach?${params}`, {
-        cache: 'no-store',
-      });
+      const res = await fetch(`/api/admin/outreach?${params}`);
       if (!res.ok) {
         throw new Error('Failed to load email queue');
       }
