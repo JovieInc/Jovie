@@ -322,44 +322,60 @@ async function waitForReleaseAnalyticsRoute(page: Page, releaseId: string) {
   await expect
     .poll(
       async () => {
-        return page.evaluate(async id => {
-          const readCookieValue = (cookieName: string) => {
-            const cookie = document.cookie
-              .split(';')
-              .map(entry => entry.trim())
-              .find(entry => entry.startsWith(`${cookieName}=`));
-
-            if (!cookie) {
-              return null;
-            }
-
-            return decodeURIComponent(cookie.slice(cookieName.length + 1));
-          };
-
-          const mode = readCookieValue(TEST_MODE_COOKIE);
-          const userId = readCookieValue(TEST_USER_ID_COOKIE);
-
-          try {
-            const response = await fetch(
-              `/api/dashboard/releases/${encodeURIComponent(id)}/analytics`,
-              {
-                cache: 'no-store',
-                credentials: 'include',
-                headers:
-                  mode === TEST_AUTH_BYPASS_MODE && userId
-                    ? {
-                        [TEST_MODE_HEADER]: mode,
-                        [TEST_USER_ID_HEADER]: userId,
-                      }
-                    : undefined,
+        return page.evaluate(
+          async ({
+            id,
+            testAuthBypassMode,
+            testModeCookie,
+            testModeHeader,
+            testUserIdCookie,
+            testUserIdHeader,
+          }) => {
+            const readCookieValue = (cookieName: string) => {
+              const cookie = document.cookie
+                .split(';')
+                .map(entry => entry.trim())
+                .find(entry => entry.startsWith(`${cookieName}=`));
+              if (!cookie) {
+                return null;
               }
-            );
 
-            return response.status;
-          } catch {
-            return 0;
+              return decodeURIComponent(cookie.slice(cookieName.length + 1));
+            };
+
+            const mode = readCookieValue(testModeCookie);
+            const userId = readCookieValue(testUserIdCookie);
+
+            try {
+              const response = await fetch(
+                `/api/dashboard/releases/${encodeURIComponent(id)}/analytics`,
+                {
+                  cache: 'no-store',
+                  credentials: 'include',
+                  headers:
+                    mode === testAuthBypassMode && userId
+                      ? {
+                          [testModeHeader]: mode,
+                          [testUserIdHeader]: userId,
+                        }
+                      : undefined,
+                }
+              );
+
+              return response.status;
+            } catch {
+              return 0;
+            }
+          },
+          {
+            id: releaseId,
+            testAuthBypassMode: TEST_AUTH_BYPASS_MODE,
+            testModeCookie: TEST_MODE_COOKIE,
+            testModeHeader: TEST_MODE_HEADER,
+            testUserIdCookie: TEST_USER_ID_COOKIE,
+            testUserIdHeader: TEST_USER_ID_HEADER,
           }
-        }, releaseId);
+        );
       },
       { timeout: 30_000 }
     )
