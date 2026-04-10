@@ -13,9 +13,7 @@ export function LegalHero({
 }: LegalHeroProps) {
   return (
     <header className='max-w-2xl'>
-      <p className='text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-3'>
-        {eyebrow}
-      </p>
+      <p className='public-doc-label mb-3'>{eyebrow}</p>
       <h1 className='text-3xl font-semibold tracking-tight text-neutral-900 dark:text-white sm:text-4xl'>
         {title}
       </h1>

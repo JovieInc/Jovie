@@ -1,16 +1,16 @@
 'use client';
 
-import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 import { SettingsTouringSection } from '@/features/dashboard/organisms/SettingsTouringSection';
 import { useSettingsContext } from '@/features/dashboard/organisms/useSettingsContext';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
 
 export function TouringContent() {
   const { artist } = useSettingsContext();
 
   if (!artist) {
     return (
-      <SettingsErrorState message='Unable to load your profile settings. Please refresh the page.' />
+      <PageErrorState message='Unable to load your profile settings. Please refresh the page.' />
     );
   }
 

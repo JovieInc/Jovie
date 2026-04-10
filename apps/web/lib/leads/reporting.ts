@@ -85,6 +85,15 @@ function isMissingLeadReportingSchemaError(error: unknown): boolean {
   ].some(pattern => message.includes(pattern));
 }
 
+function addToGroup(map: Map<string, LeadRow[]>, key: string, lead: LeadRow) {
+  const group = map.get(key);
+  if (group) {
+    group.push(lead);
+  } else {
+    map.set(key, [lead]);
+  }
+}
+
 function buildLeadGroups(filteredLeads: LeadRow[]) {
   const sourceGroups = new Map<string, LeadRow[]>();
   const pixelGroups = new Map<string, LeadRow[]>();
@@ -94,39 +103,24 @@ function buildLeadGroups(filteredLeads: LeadRow[]) {
   const toolGroups = new Map<string, LeadRow[]>();
 
   for (const lead of filteredLeads) {
-    sourceGroups.set(lead.sourcePlatform, [
-      ...(sourceGroups.get(lead.sourcePlatform) ?? []),
-      lead,
-    ]);
-    pixelGroups.set(lead.hasTrackingPixels ? 'tracking_pixels' : 'no_pixels', [
-      ...(pixelGroups.get(
-        lead.hasTrackingPixels ? 'tracking_pixels' : 'no_pixels'
-      ) ?? []),
-      lead,
-    ]);
-    verifiedGroups.set(lead.isLinktreeVerified ? 'verified' : 'not_verified', [
-      ...(verifiedGroups.get(
-        lead.isLinktreeVerified ? 'verified' : 'not_verified'
-      ) ?? []),
-      lead,
-    ]);
-    paidTierGroups.set(lead.hasPaidTier ? 'paid_tier' : 'free_tier', [
-      ...(paidTierGroups.get(lead.hasPaidTier ? 'paid_tier' : 'free_tier') ??
-        []),
-      lead,
-    ]);
-    keywordGroups.set(lead.discoveryQuery ?? 'unknown', [
-      ...(keywordGroups.get(lead.discoveryQuery ?? 'unknown') ?? []),
-      lead,
-    ]);
+    const pixelKey = lead.hasTrackingPixels ? 'tracking_pixels' : 'no_pixels';
+    const verifiedKey = lead.isLinktreeVerified ? 'verified' : 'not_verified';
+    const paidKey = lead.hasPaidTier ? 'paid_tier' : 'free_tier';
+    const queryKey = lead.discoveryQuery ?? 'unknown';
+
+    addToGroup(sourceGroups, lead.sourcePlatform, lead);
+    addToGroup(pixelGroups, pixelKey, lead);
+    addToGroup(verifiedGroups, verifiedKey, lead);
+    addToGroup(paidTierGroups, paidKey, lead);
+    addToGroup(keywordGroups, queryKey, lead);
 
     if (lead.musicToolsDetected.length === 0) {
-      toolGroups.set('none', [...(toolGroups.get('none') ?? []), lead]);
+      addToGroup(toolGroups, 'none', lead);
       continue;
     }
 
     for (const tool of lead.musicToolsDetected) {
-      toolGroups.set(tool, [...(toolGroups.get(tool) ?? []), lead]);
+      addToGroup(toolGroups, tool, lead);
     }
   }
 
