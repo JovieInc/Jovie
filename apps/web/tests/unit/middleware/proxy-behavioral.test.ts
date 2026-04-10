@@ -605,52 +605,75 @@ describe('proxy.ts middleware', () => {
     it('routes staging Clerk proxy traffic to the staging FAPI host', async () => {
       const stagingFapiHost = 'staging-fapi.clerk.example';
       const productionFapiHost = 'production-fapi.clerk.example';
+      const previousPublishableKey =
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_live_${Buffer.from(`${productionFapiHost}$`).toString('base64')}`;
-      mocks.resolveClerkKeys.mockReturnValue({
-        publishableKey: `pk_live_${Buffer.from(`${stagingFapiHost}$`).toString('base64')}`,
-        secretKey: 'sk_live_staging_example',
-      });
+      try {
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_live_${Buffer.from(`${productionFapiHost}$`).toString('base64')}`;
+        mocks.resolveClerkKeys.mockReturnValue({
+          publishableKey: `pk_live_${Buffer.from(`${stagingFapiHost}$`).toString('base64')}`,
+          secretKey: 'sk_live_staging_example',
+        });
 
-      const req = createUnauthenticatedRequest({
-        hostname: 'staging.jov.ie',
-        pathname: '/__clerk/v1/client',
-      });
-      const res = await callMiddleware(req);
+        const req = createUnauthenticatedRequest({
+          hostname: 'staging.jov.ie',
+          pathname: '/__clerk/v1/client',
+        });
+        const res = await callMiddleware(req);
 
-      expect(res.status).toBe(200);
-      expect(mocks.fetch).toHaveBeenCalledTimes(1);
-      const [targetUrl, init] = mocks.fetch.mock.calls[0] as [
-        string,
-        RequestInit,
-      ];
+        expect(res.status).toBe(200);
+        expect(mocks.fetch).toHaveBeenCalledTimes(1);
+        const [targetUrl, init] = mocks.fetch.mock.calls[0] as [
+          string,
+          RequestInit,
+        ];
 
-      expect(targetUrl).toBe(`https://${stagingFapiHost}/v1/client`);
-      expect(init.method).toBe('GET');
-      expect(init.redirect).toBe('manual');
-      const headers = init.headers as Headers;
-      expect(headers.get('host')).toBe(stagingFapiHost);
-      expect(headers.get('origin')).toBe(`https://${stagingFapiHost}`);
+        expect(targetUrl).toBe(`https://${stagingFapiHost}/v1/client`);
+        expect(init.method).toBe('GET');
+        expect(init.redirect).toBe('manual');
+        const headers = init.headers as Headers;
+        expect(headers.get('host')).toBe(stagingFapiHost);
+        expect(headers.get('origin')).toBe(`https://${stagingFapiHost}`);
+      } finally {
+        if (previousPublishableKey === undefined) {
+          delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+        } else {
+          process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
+            previousPublishableKey;
+        }
+      }
     });
 
     it('returns 503 for staging Clerk proxy traffic when staging keys are missing', async () => {
-      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_live_${Buffer.from('production-fapi.clerk.example$').toString('base64')}`;
-      mocks.resolveClerkKeys.mockReturnValue({
-        publishableKey: undefined,
-        secretKey: undefined,
-      });
+      const previousPublishableKey =
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-      const req = createUnauthenticatedRequest({
-        hostname: 'staging.jov.ie',
-        pathname: '/__clerk/v1/client',
-      });
-      const res = await callMiddleware(req);
+      try {
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_live_${Buffer.from('production-fapi.clerk.example$').toString('base64')}`;
+        mocks.resolveClerkKeys.mockReturnValue({
+          publishableKey: undefined,
+          secretKey: undefined,
+        });
 
-      expect(res.status).toBe(503);
-      expect(mocks.fetch).not.toHaveBeenCalled();
-      await expect(res.json()).resolves.toEqual({
-        error: 'Clerk proxy unavailable: missing or invalid publishable key',
-      });
+        const req = createUnauthenticatedRequest({
+          hostname: 'staging.jov.ie',
+          pathname: '/__clerk/v1/client',
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBe(503);
+        expect(mocks.fetch).not.toHaveBeenCalled();
+        await expect(res.json()).resolves.toEqual({
+          error: 'Clerk proxy unavailable: missing or invalid publishable key',
+        });
+      } finally {
+        if (previousPublishableKey === undefined) {
+          delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+        } else {
+          process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
+            previousPublishableKey;
+        }
+      }
     });
   });
 

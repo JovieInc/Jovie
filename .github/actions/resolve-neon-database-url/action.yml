@@ -41,12 +41,20 @@ runs:
   steps:
     - id: resolve
       shell: bash
+      env:
+        INPUT_CANDIDATE: ${{ inputs.candidate_url }}
+        INPUT_FALLBACK_CANDIDATE: ${{ inputs.fallback_candidate_url }}
+        INPUT_CREDENTIAL_SOURCE: ${{ inputs.credential_source_url }}
+        INPUT_CREDENTIAL_FALLBACK: ${{ inputs.credential_fallback_url }}
+        INPUT_CONNECTION_FILE: ${{ inputs.connection_file }}
+        INPUT_CANDIDATE_JSON_KEY: ${{ inputs.candidate_json_key }}
+        INPUT_FALLBACK_JSON_KEY: ${{ inputs.fallback_json_key }}
       run: |
         set -euo pipefail
 
-        CANDIDATE="${{ inputs.candidate_url }}"
-        FALLBACK_CANDIDATE="${{ inputs.fallback_candidate_url }}"
-        CONNECTION_FILE="${{ inputs.connection_file }}"
+        CANDIDATE="$INPUT_CANDIDATE"
+        FALLBACK_CANDIDATE="$INPUT_FALLBACK_CANDIDATE"
+        CONNECTION_FILE="$INPUT_CONNECTION_FILE"
 
         if [ -n "$CONNECTION_FILE" ]; then
           if [ ! -f "$CONNECTION_FILE" ]; then
@@ -54,12 +62,12 @@ runs:
             exit 1
           fi
 
-          if [ -z "$CANDIDATE" ] && [ -n "${{ inputs.candidate_json_key }}" ]; then
-            CANDIDATE=$(jq -r --arg key "${{ inputs.candidate_json_key }}" '.[$key] // empty' "$CONNECTION_FILE")
+          if [ -z "$CANDIDATE" ] && [ -n "$INPUT_CANDIDATE_JSON_KEY" ]; then
+            CANDIDATE=$(jq -r --arg key "$INPUT_CANDIDATE_JSON_KEY" '.[$key] // empty' "$CONNECTION_FILE")
           fi
 
-          if [ -z "$FALLBACK_CANDIDATE" ] && [ -n "${{ inputs.fallback_json_key }}" ]; then
-            FALLBACK_CANDIDATE=$(jq -r --arg key "${{ inputs.fallback_json_key }}" '.[$key] // empty' "$CONNECTION_FILE")
+          if [ -z "$FALLBACK_CANDIDATE" ] && [ -n "$INPUT_FALLBACK_JSON_KEY" ]; then
+            FALLBACK_CANDIDATE=$(jq -r --arg key "$INPUT_FALLBACK_JSON_KEY" '.[$key] // empty' "$CONNECTION_FILE")
           fi
         fi
 
@@ -72,9 +80,9 @@ runs:
           exit 1
         fi
 
-        CREDENTIAL_SOURCE="${{ inputs.credential_source_url }}"
+        CREDENTIAL_SOURCE="$INPUT_CREDENTIAL_SOURCE"
         if [ -z "$CREDENTIAL_SOURCE" ]; then
-          CREDENTIAL_SOURCE="${{ inputs.credential_fallback_url }}"
+          CREDENTIAL_SOURCE="$INPUT_CREDENTIAL_FALLBACK"
         fi
 
         if [ -z "$CREDENTIAL_SOURCE" ]; then
