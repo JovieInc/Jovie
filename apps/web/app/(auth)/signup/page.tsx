@@ -208,7 +208,7 @@ function SignUpPageContent() {
           fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
         />
       </div>
-      <p className='mt-4 text-center text-[11px] leading-relaxed text-tertiary-token'>
+      <p className='mt-4 text-center text-[11px] leading-relaxed text-secondary-token'>
         By signing up, you agree to our{' '}
         <Link
           href={APP_ROUTES.LEGAL_TERMS}

@@ -19,6 +19,7 @@ import {
   ensureCreatorProfileRecord as ensureCreatorProfile,
   ensureSocialLinkRecord as ensureSocialLink,
   ensureUserRecord as ensureUser,
+  ensureUserProfileClaim,
   getDeterministicTestClerkId as getSeedDeterministicClerkId,
   isAllowlistedPrivilegedTestAccountEmail,
   resolveClerkTestUserId as resolveSeedUserClerkId,
@@ -35,6 +36,7 @@ const {
   providers,
   providerLinks,
   tourDates,
+  users,
 } = schema;
 
 interface TestProfile {
@@ -1193,8 +1195,31 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
                 soundcloudId: null,
               };
 
+        let ownerUserId: string | null = null;
+        if (profile.username === 'dualipa') {
+          const publicOwnerEmail = normalizeEmail('dualipa-public@jov.ie');
+          const { id: userId } = await ensureUser(db, {
+            clerkId: getSeedDeterministicClerkId(publicOwnerEmail),
+            email: publicOwnerEmail,
+            name: profile.displayName,
+            userStatus: 'active',
+            isAdmin: false,
+          });
+
+          await db
+            .update(users)
+            .set({
+              isPro: true,
+              plan: 'pro',
+              updatedAt: new Date(),
+            })
+            .where(eq(users.id, userId));
+
+          ownerUserId = userId;
+        }
+
         const createdProfileId = await ensureCreatorProfile(db, {
-          userId: null,
+          userId: ownerUserId,
           username: profile.username,
           usernameNormalized: profile.username.toLowerCase(),
           displayName: profile.displayName,
@@ -1204,11 +1229,15 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           creatorType: 'artist',
           isPublic: true,
           isVerified: false,
-          isClaimed: false,
+          isClaimed: ownerUserId !== null,
           ingestionStatus: 'idle',
           onboardingCompletedAt: null,
           ...dspFields,
         });
+
+        if (ownerUserId) {
+          await ensureUserProfileClaim(db, ownerUserId, createdProfileId);
+        }
 
         console.log(
           `    ✓ Ensured profile ${profile.username} (ID: ${createdProfileId})`
