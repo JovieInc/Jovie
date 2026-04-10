@@ -52,6 +52,11 @@ export const onRouterTransitionStart = captureRouterTransitionStart;
     return;
   }
 
+  // CI preview health checks should not emit client monitoring traffic.
+  if (process.env.CI === 'true') {
+    return;
+  }
+
   // Skip initialization if not in a browser environment
   if (typeof window === 'undefined') {
     return;

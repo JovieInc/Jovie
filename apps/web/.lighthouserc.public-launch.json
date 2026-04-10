@@ -24,7 +24,7 @@
           }
         },
         {
-          "matchingUrlPattern": "https?://[^/]+/[^/?#]+(\\?mode=(listen|subscribe|tip))?$",
+          "matchingUrlPattern": "https?://[^/]+/(?!(pricing|support|signin|signup)$)[^/?#]+(\\?mode=(listen|subscribe|tip))?$",
           "assertions": {
             "categories:performance": ["error", { "minScore": 0.68 }],
             "categories:accessibility": ["error", { "minScore": 0.95 }],
