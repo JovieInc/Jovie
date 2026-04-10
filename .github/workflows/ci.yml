@@ -912,7 +912,7 @@ jobs:
 
       - name: Install Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+        run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Create ephemeral Neon database branch (with retry)
         id: neon-branch
@@ -1049,7 +1049,7 @@ jobs:
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+        run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Create ephemeral Neon database branch (with retry)
         id: neon-branch
@@ -1453,7 +1453,7 @@ jobs:
 
       - name: Install Playwright (Chromium only)
         if: steps.check-creds.outputs.skip != 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+        run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Wait for CDN propagation
         if: steps.check-creds.outputs.skip != 'true'
@@ -1781,7 +1781,7 @@ jobs:
 
       - name: Install Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+        run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Download build artifact
         id: download
@@ -1930,7 +1930,7 @@ jobs:
 
       - name: Install Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+        run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Run E2E Smoke (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -2040,7 +2040,7 @@ jobs:
 
       - name: Install Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+        run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Load quarantined E2E specs
         id: quarantine
@@ -2236,7 +2236,7 @@ jobs:
         if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         run: |
           # Always Chrome-only for speed; Firefox runs weekly via e2e-full-matrix workflow
-          pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+          pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Load quarantined E2E specs
         if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
@@ -2756,7 +2756,7 @@ jobs:
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright (Chromium only)
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+        run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Download build artifact from ci-build
         id: download-build

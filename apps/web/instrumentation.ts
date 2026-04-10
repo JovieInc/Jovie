@@ -129,12 +129,14 @@ async function runEnvironmentValidationWithRetry() {
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    // Skip Sentry server SDK and startup validation in dev — env vars are
-    // immediately available via `doppler run --`, and Sentry in dev only
-    // produces warnings and adds overhead (100% trace sampling).
+    // Skip Sentry server SDK and startup validation in local/dev and CI.
+    // CI public-route jobs boot production builds for smoke/a11y/Lighthouse, and
+    // the server SDK adds no signal there while increasing startup fragility.
     const isDev = process.env.NODE_ENV === 'development';
+    const isCi = process.env.CI === 'true';
+    const shouldSkipServerInstrumentation = isDev || isCi;
 
-    if (!isDev) {
+    if (!shouldSkipServerInstrumentation) {
       await import('./sentry.server.config');
       // Run environment validation at startup to detect issues early
       // This catches build-time vs runtime environment differences on Vercel

@@ -554,7 +554,7 @@ export async function completeOnboardingV2(
   });
   const artistConfirmContinue = page.getByRole('button', { name: 'Continue' });
   const profileReadyHeading = page.getByRole('heading', {
-    name: 'Your profile is ready',
+    name: /^(Your profile is ready|Your Link Is Live)$/i,
   });
 
   if (options.clerkUserId) {
