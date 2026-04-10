@@ -5,7 +5,7 @@
  * Used by both the main smart link page and the /sounds page.
  */
 
-import { and, desc, eq, isNotNull } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, isNotNull } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { db } from '@/lib/db';
@@ -23,6 +23,7 @@ import {
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 import { toISOStringOrNull } from '@/lib/utils/date';
 
 export type ContentType = 'release' | 'track';
@@ -817,33 +818,44 @@ export async function getFeaturedSmartLinkStaticParams(
     return [];
   }
 
-  const rows = await db
-    .select({
-      username: creatorProfiles.usernameNormalized,
-      slug: discogReleases.slug,
-    })
-    .from(discogReleases)
-    .innerJoin(
-      creatorProfiles,
-      eq(discogReleases.creatorProfileId, creatorProfiles.id)
-    )
-    .where(
-      and(
-        eq(creatorProfiles.isPublic, true),
-        eq(creatorProfiles.isFeatured, true)
+  try {
+    const rows = await db
+      .select({
+        username: creatorProfiles.usernameNormalized,
+        slug: discogReleases.slug,
+      })
+      .from(discogReleases)
+      .innerJoin(
+        creatorProfiles,
+        eq(discogReleases.creatorProfileId, creatorProfiles.id)
       )
-    )
-    .orderBy(
-      desc(discogReleases.releaseDate),
-      creatorProfiles.username,
-      discogReleases.slug
-    )
-    .limit(limit);
+      .where(
+        and(
+          eq(creatorProfiles.isPublic, true),
+          eq(creatorProfiles.isFeatured, true)
+        )
+      )
+      .orderBy(
+        drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`,
+        creatorProfiles.username,
+        discogReleases.slug
+      )
+      .limit(limit);
 
-  return rows.map(row => ({
-    username: row.username,
-    slug: row.slug,
-  }));
+    return rows.map(row => ({
+      username: row.username,
+      slug: row.slug,
+    }));
+  } catch (error) {
+    void captureError('Failed to load smart-link static params', error, {
+      helper: 'getFeaturedSmartLinkStaticParams',
+      limit,
+      route: '/[username]/[slug]',
+    }).catch(() => {
+      // Ignore telemetry failures so build-time fallback stays resilient.
+    });
+    return [];
+  }
 }
 
 /**
@@ -856,39 +868,50 @@ export async function getFeaturedTrackStaticParams(
     return [];
   }
 
-  const rows = await db
-    .select({
-      username: creatorProfiles.usernameNormalized,
-      slug: discogReleases.slug,
-      trackSlug: discogReleaseTracks.slug,
-    })
-    .from(discogReleaseTracks)
-    .innerJoin(
-      discogReleases,
-      eq(discogReleaseTracks.releaseId, discogReleases.id)
-    )
-    .innerJoin(
-      creatorProfiles,
-      eq(discogReleases.creatorProfileId, creatorProfiles.id)
-    )
-    .where(
-      and(
-        eq(creatorProfiles.isPublic, true),
-        eq(creatorProfiles.isFeatured, true),
-        isNotNull(discogReleaseTracks.slug)
+  try {
+    const rows = await db
+      .select({
+        username: creatorProfiles.usernameNormalized,
+        slug: discogReleases.slug,
+        trackSlug: discogReleaseTracks.slug,
+      })
+      .from(discogReleaseTracks)
+      .innerJoin(
+        discogReleases,
+        eq(discogReleaseTracks.releaseId, discogReleases.id)
       )
-    )
-    .orderBy(
-      desc(discogReleases.releaseDate),
-      creatorProfiles.username,
-      discogReleases.slug,
-      discogReleaseTracks.trackNumber
-    )
-    .limit(limit);
+      .innerJoin(
+        creatorProfiles,
+        eq(discogReleases.creatorProfileId, creatorProfiles.id)
+      )
+      .where(
+        and(
+          eq(creatorProfiles.isPublic, true),
+          eq(creatorProfiles.isFeatured, true),
+          isNotNull(discogReleaseTracks.slug)
+        )
+      )
+      .orderBy(
+        drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`,
+        creatorProfiles.username,
+        discogReleases.slug,
+        discogReleaseTracks.trackNumber
+      )
+      .limit(limit);
 
-  return rows.map(row => ({
-    username: row.username,
-    slug: row.slug,
-    trackSlug: row.trackSlug!,
-  }));
+    return rows.map(row => ({
+      username: row.username,
+      slug: row.slug,
+      trackSlug: row.trackSlug!,
+    }));
+  } catch (error) {
+    void captureError('Failed to load track static params', error, {
+      helper: 'getFeaturedTrackStaticParams',
+      limit,
+      route: '/[username]/[slug]/[trackSlug]',
+    }).catch(() => {
+      // Ignore telemetry failures so build-time fallback stays resilient.
+    });
+    return [];
+  }
 }

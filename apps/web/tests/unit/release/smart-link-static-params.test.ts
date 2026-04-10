@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { selectMock } = vi.hoisted(() => ({
+const { captureErrorMock, selectMock } = vi.hoisted(() => ({
+  captureErrorMock: vi.fn().mockResolvedValue(undefined),
   selectMock: vi.fn(),
 }));
 
@@ -10,10 +11,15 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: captureErrorMock,
+}));
+
 describe('smart link static params', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.unstubAllEnvs();
+    captureErrorMock.mockClear();
     selectMock.mockReset();
   });
 
@@ -41,5 +47,47 @@ describe('smart link static params', () => {
 
     await expect(getFeaturedTrackStaticParams()).resolves.toEqual([]);
     expect(selectMock).not.toHaveBeenCalled();
+  });
+
+  it('falls back when release static-param query fails', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test@localhost/test');
+    selectMock.mockImplementation(() => {
+      throw new Error('db unavailable');
+    });
+
+    const { getFeaturedSmartLinkStaticParams } = await import(
+      '@/app/[username]/[slug]/_lib/data'
+    );
+
+    await expect(getFeaturedSmartLinkStaticParams()).resolves.toEqual([]);
+    expect(captureErrorMock).toHaveBeenCalledWith(
+      'Failed to load smart-link static params',
+      expect.any(Error),
+      expect.objectContaining({
+        helper: 'getFeaturedSmartLinkStaticParams',
+        route: '/[username]/[slug]',
+      })
+    );
+  });
+
+  it('falls back when track static-param query fails', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test@localhost/test');
+    selectMock.mockImplementation(() => {
+      throw new Error('db unavailable');
+    });
+
+    const { getFeaturedTrackStaticParams } = await import(
+      '@/app/[username]/[slug]/_lib/data'
+    );
+
+    await expect(getFeaturedTrackStaticParams()).resolves.toEqual([]);
+    expect(captureErrorMock).toHaveBeenCalledWith(
+      'Failed to load track static params',
+      expect.any(Error),
+      expect.objectContaining({
+        helper: 'getFeaturedTrackStaticParams',
+        route: '/[username]/[slug]/[trackSlug]',
+      })
+    );
   });
 });
