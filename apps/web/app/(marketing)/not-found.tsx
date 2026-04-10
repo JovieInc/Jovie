@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Container } from '@/components/site/Container';
+import { MarketingContainer } from '@/components/marketing';
 
 export const revalidate = false;
 
@@ -11,7 +11,10 @@ export const revalidate = false;
  */
 export default function NotFound() {
   return (
-    <Container className='flex min-h-[calc(100vh-8rem)] items-center justify-center'>
+    <MarketingContainer
+      width='page'
+      className='flex min-h-[calc(100vh-8rem)] items-center justify-center'
+    >
       <div className='w-full max-w-md mx-auto text-center px-4 py-16'>
         {/* Error code — oversized, muted */}
         <div className='mb-8 select-none'>
@@ -33,14 +36,11 @@ export default function NotFound() {
             removed.
           </p>
 
-          <Link
-            href='/'
-            className='inline-flex items-center justify-center h-8 px-4 text-[13px] font-medium rounded-lg bg-[var(--color-btn-primary-bg)] text-[var(--color-btn-primary-fg)] hover:bg-[var(--color-btn-primary-hover)] transition-colors duration-100'
-          >
+          <Link href='/' className='public-action-primary'>
             Return home
           </Link>
         </div>
       </div>
-    </Container>
+    </MarketingContainer>
   );
 }

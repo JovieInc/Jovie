@@ -174,22 +174,11 @@ function PricingTier({
       <Link
         href={buttonHref}
         prefetch={false}
-        className='block w-full text-center mt-6 mb-6 md:mt-8 md:mb-8 transition-opacity hover:opacity-90'
-        style={{
-          fontSize: 'var(--linear-body-sm-size)',
-          fontWeight: 'var(--linear-font-weight-medium)',
-          height: 'var(--linear-button-height-sm)',
-          lineHeight: 'var(--linear-button-height-sm)',
-          borderRadius: 'var(--linear-radius-sm)',
-          backgroundColor:
-            buttonVariant === 'primary'
-              ? 'var(--linear-btn-primary-bg)'
-              : 'var(--linear-bg-button)',
-          color:
-            buttonVariant === 'primary'
-              ? 'var(--linear-btn-primary-fg)'
-              : 'var(--linear-text-primary)',
-        }}
+        className={`mt-6 mb-6 block w-full text-center md:mt-8 md:mb-8 ${
+          buttonVariant === 'primary'
+            ? 'public-action-primary'
+            : 'public-action-secondary'
+        }`}
       >
         {buttonLabel}
       </Link>
@@ -330,38 +319,10 @@ export default function PricingPage() {
               Start free, upgrade anytime. No credit card required.
             </p>
             <div className='mt-8 flex items-center justify-center gap-4'>
-              <Link
-                href='/signup'
-                prefetch={false}
-                className='inline-block transition-opacity hover:opacity-90'
-                style={{
-                  fontSize: 'var(--linear-body-sm-size)',
-                  fontWeight: 'var(--linear-font-weight-medium)',
-                  height: 'var(--linear-button-height-sm)',
-                  lineHeight: 'var(--linear-button-height-sm)',
-                  borderRadius: 'var(--linear-radius-sm)',
-                  backgroundColor: 'var(--linear-btn-primary-bg)',
-                  color: 'var(--linear-btn-primary-fg)',
-                  padding: '0 20px',
-                }}
-              >
+              <Link href='/signup' prefetch={false} className='public-action-primary'>
                 Get started
               </Link>
-              <Link
-                href='/'
-                prefetch={false}
-                className='inline-block transition-opacity hover:opacity-90'
-                style={{
-                  fontSize: 'var(--linear-body-sm-size)',
-                  fontWeight: 'var(--linear-font-weight-medium)',
-                  height: 'var(--linear-button-height-sm)',
-                  lineHeight: 'var(--linear-button-height-sm)',
-                  borderRadius: 'var(--linear-radius-sm)',
-                  backgroundColor: 'var(--linear-bg-button)',
-                  color: 'var(--linear-text-primary)',
-                  padding: '0 20px',
-                }}
-              >
+              <Link href='/' prefetch={false} className='public-action-secondary'>
                 Learn more
               </Link>
             </div>

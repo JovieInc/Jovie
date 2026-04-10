@@ -539,7 +539,7 @@ export function ProfileCompactTemplate({
         <div className='relative mx-auto flex h-[100dvh] w-full max-w-[680px] items-stretch justify-center md:h-auto md:min-h-[100dvh] md:items-center md:px-6 md:py-8'>
           <main className='relative flex w-full items-stretch md:items-center'>
             <div
-              className='relative flex h-full w-full max-w-[430px] flex-col overflow-clip bg-[color:var(--profile-content-bg)] md:h-auto md:min-h-0 md:mx-auto md:overflow-hidden md:rounded-[30px] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
+              className='relative flex h-full w-full max-w-(--profile-shell-max-width) flex-col overflow-clip bg-[color:var(--profile-content-bg)] md:h-auto md:min-h-0 md:mx-auto md:overflow-hidden md:rounded-[var(--profile-shell-card-radius)] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
               data-testid='profile-compact-shell'
             >
               <div className='pointer-events-none absolute inset-0 bg-[var(--profile-panel-gradient)]' />
@@ -640,7 +640,8 @@ export function ProfileCompactTemplate({
                   <button
                     type='button'
                     onClick={handlePlayClick}
-                    className={`group flex w-full items-center gap-2.5 rounded-[14px] border ${glass.border} ${glass.bg} px-2.5 py-2 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                    className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-2.5 py-2 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                    aria-label={`Listen to ${latestRelease.title}`}
                   >
                     {latestRelease.artworkUrl ? (
                       <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
@@ -668,7 +669,7 @@ export function ProfileCompactTemplate({
                     rel={
                       nextTourDate.ticketUrl ? 'noopener noreferrer' : undefined
                     }
-                    className={`group flex w-full items-center gap-2.5 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-2.5 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                    className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-3 py-2.5 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
                   >
                     <div className='flex shrink-0 flex-col items-center leading-none'>
                       <span className='text-[10px] font-[590] uppercase tracking-[0.1em] text-white/45'>
@@ -693,7 +694,8 @@ export function ProfileCompactTemplate({
                   <button
                     type='button'
                     onClick={handlePlayClick}
-                    className={`group flex w-full items-center gap-2.5 rounded-[14px] border ${glass.border} ${glass.bg} px-3 py-2.5 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                    className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-3 py-2.5 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                    aria-label={`Listen to ${artist.name}`}
                   >
                     <Play className='h-4 w-4 shrink-0 fill-current text-white/60' />
                     <p className='min-w-0 flex-1 text-[13px] font-[510] text-white/80'>

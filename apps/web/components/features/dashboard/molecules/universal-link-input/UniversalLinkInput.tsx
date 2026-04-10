@@ -156,6 +156,17 @@ const PROCESSING_DELAY_MS = 900;
 const DONE_DELAY_MS = 700;
 const SHORTCUT_MICROPHONE_KEY = 'm';
 
+function computeWaveformBands(data: Uint8Array): number[] {
+  return Array.from({ length: WAVEFORM_BAND_COUNT }, (_, index) => {
+    const start = Math.floor((index / WAVEFORM_BAND_COUNT) * data.length);
+    const end = Math.floor(((index + 1) / WAVEFORM_BAND_COUNT) * data.length);
+    const range = data.slice(start, Math.max(end, start + 1));
+    const total = range.reduce((sum, value) => sum + value, 0);
+    const average = total / range.length / 255;
+    return Math.max(MIN_WAVEFORM_LEVEL, average);
+  });
+}
+
 type DictationState =
   | 'idle'
   | 'listening'
@@ -322,18 +333,6 @@ export const UniversalLinkInput = forwardRef<
       analyserRef.current = analyser;
       frequencyDataRef.current = frequencyData;
 
-      const computeBands = (data: Uint8Array) =>
-        Array.from({ length: WAVEFORM_BAND_COUNT }, (_, index) => {
-          const start = Math.floor((index / WAVEFORM_BAND_COUNT) * data.length);
-          const end = Math.floor(
-            ((index + 1) / WAVEFORM_BAND_COUNT) * data.length
-          );
-          const range = data.slice(start, Math.max(end, start + 1));
-          const total = range.reduce((sum, value) => sum + value, 0);
-          const average = total / range.length / 255;
-          return Math.max(MIN_WAVEFORM_LEVEL, average);
-        });
-
       const animate = () => {
         const activeAnalyser = analyserRef.current;
         const activeFrequencyData = frequencyDataRef.current;
@@ -342,7 +341,7 @@ export const UniversalLinkInput = forwardRef<
         }
 
         activeAnalyser.getByteFrequencyData(activeFrequencyData);
-        setWaveformLevels(computeBands(activeFrequencyData));
+        setWaveformLevels(computeWaveformBands(activeFrequencyData));
         animationFrameRef.current = globalThis.requestAnimationFrame(animate);
       };
 

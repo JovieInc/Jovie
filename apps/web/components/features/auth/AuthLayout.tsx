@@ -50,7 +50,7 @@ export function AuthLayout({
   logoutRedirectUrl = '/signin',
 }: Readonly<AuthLayoutProps>) {
   const { isKeyboardVisible } = useMobileKeyboard();
-  const formRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLElement>(null);
 
   // Scroll form into view when keyboard appears on mobile
   useEffect(() => {
@@ -166,9 +166,14 @@ export function AuthLayout({
           </h1>
         )}
 
-        <div ref={formRef} id='auth-form' className='w-full scroll-mt-4'>
+        <main
+          ref={formRef}
+          id='auth-form'
+          tabIndex={-1}
+          className='w-full scroll-mt-4'
+        >
           {children}
-        </div>
+        </main>
       </div>
 
       {/* Footer - hide when keyboard is visible, mt-auto pushes to bottom */}

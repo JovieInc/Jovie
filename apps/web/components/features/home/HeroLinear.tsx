@@ -47,7 +47,7 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
             <div className='mt-6'>
               <Link
                 href={APP_ROUTES.SIGNUP}
-                className='btn-linear-signup focus-ring-themed h-9 px-4'
+                className='public-action-primary focus-ring-themed'
               >
                 Get Started Free
               </Link>

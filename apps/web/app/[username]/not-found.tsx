@@ -1,10 +1,14 @@
 import Link from 'next/link';
-import { Container } from '@/components/site/Container';
+import { MarketingContainer } from '@/components/marketing';
+import { PublicPageShell } from '@/components/site/PublicPageShell';
 
 export default function NotFound() {
   return (
-    <div className='min-h-screen bg-base'>
-      <Container className='flex min-h-screen items-center justify-center'>
+    <PublicPageShell mainClassName='bg-base'>
+      <MarketingContainer
+        width='page'
+        className='flex min-h-[calc(100vh-var(--public-shell-header-offset))] items-center justify-center py-16'
+      >
         <div className='w-full max-w-md mx-auto text-center px-4 py-16'>
           {/* Error code — oversized, ghosted */}
           <div className='mb-8 select-none'>
@@ -34,7 +38,7 @@ export default function NotFound() {
             </Link>
           </div>
         </div>
-      </Container>
-    </div>
+      </MarketingContainer>
+    </PublicPageShell>
   );
 }

@@ -42,6 +42,105 @@ export interface BuildReleaseActionsOptions {
   readonly qrCodeIcon?: ReactNode;
 }
 
+function buildShareItems(
+  opts: Pick<
+    BuildReleaseActionsOptions,
+    'release' | 'onCopy' | 'artistName' | 'onCopyQrCode' | 'qrCodeIcon'
+  > & {
+    locked: boolean;
+    lockReason: 'scheduled' | 'cap' | null;
+    smartLinkUrl: string;
+  }
+): ContextMenuItemType[] {
+  const {
+    release,
+    onCopy,
+    artistName,
+    onCopyQrCode,
+    qrCodeIcon,
+    locked,
+    lockReason,
+    smartLinkUrl,
+  } = opts;
+
+  if (locked) {
+    return [
+      {
+        id: 'copy-smart-link',
+        label:
+          lockReason === 'scheduled'
+            ? 'Scheduled smart link (Pro)'
+            : 'Smart link (Pro)',
+        icon: menuIcon(lockReason === 'scheduled' ? 'Clock' : 'Lock'),
+        disabled: true,
+        onClick: () => {},
+      },
+    ];
+  }
+
+  const items: ContextMenuItemType[] = [
+    {
+      id: 'copy-smart-link',
+      label: 'Copy smart link',
+      icon: menuIcon('Copy'),
+      onClick: () => {
+        void onCopy(
+          release.smartLinkPath,
+          `${release.title} smart link`,
+          `smart-link-copy-${release.id}`
+        );
+      },
+    },
+  ];
+
+  const utmShareItems = getUTMShareContextMenuItems({
+    smartLinkUrl,
+    context: buildUTMContext({
+      smartLinkUrl,
+      releaseSlug: release.slug,
+      releaseTitle: release.title,
+      artistName,
+      releaseDate: release.releaseDate,
+    }),
+  });
+
+  if (utmShareItems.length > 0) {
+    items.push({ type: 'separator' }, ...utmShareItems);
+  }
+
+  if (release.hasVideoLinks) {
+    items.push(
+      { type: 'separator' },
+      {
+        id: 'copy-sounds-link',
+        label: 'Copy Use Sound link',
+        icon: menuIcon('Music'),
+        onClick: () => {
+          void onCopy(
+            `${release.smartLinkPath}/sounds`,
+            `${release.title} sounds link`,
+            `sounds-link-copy-${release.id}`
+          );
+        },
+      }
+    );
+  }
+
+  if (onCopyQrCode) {
+    items.push(
+      { type: 'separator' },
+      {
+        id: 'copy-qr-code',
+        label: 'Copy QR code',
+        icon: qrCodeIcon,
+        onClick: onCopyQrCode,
+      }
+    );
+  }
+
+  return items;
+}
+
 /**
  * Canonical builder for release action menus.
  *
@@ -64,78 +163,16 @@ export function buildReleaseActions({
   const locked = isSmartLinkLocked?.(release.id) ?? false;
   const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
   const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
-  const shareItems: ContextMenuItemType[] = [];
-
-  if (locked) {
-    shareItems.push({
-      id: 'copy-smart-link',
-      label:
-        lockReason === 'scheduled'
-          ? 'Scheduled smart link (Pro)'
-          : 'Smart link (Pro)',
-      icon: menuIcon(lockReason === 'scheduled' ? 'Clock' : 'Lock'),
-      disabled: true,
-      onClick: () => {},
-    });
-  } else {
-    shareItems.push({
-      id: 'copy-smart-link',
-      label: 'Copy smart link',
-      icon: menuIcon('Copy'),
-      onClick: () => {
-        void onCopy(
-          release.smartLinkPath,
-          `${release.title} smart link`,
-          `smart-link-copy-${release.id}`
-        );
-      },
-    });
-
-    const utmShareItems = getUTMShareContextMenuItems({
-      smartLinkUrl,
-      context: buildUTMContext({
-        smartLinkUrl,
-        releaseSlug: release.slug,
-        releaseTitle: release.title,
-        artistName,
-        releaseDate: release.releaseDate,
-      }),
-    });
-
-    if (utmShareItems.length > 0) {
-      shareItems.push({ type: 'separator' }, ...utmShareItems);
-    }
-
-    if (release.hasVideoLinks) {
-      shareItems.push(
-        { type: 'separator' },
-        {
-          id: 'copy-sounds-link',
-          label: 'Copy Use Sound link',
-          icon: menuIcon('Music'),
-          onClick: () => {
-            void onCopy(
-              `${release.smartLinkPath}/sounds`,
-              `${release.title} sounds link`,
-              `sounds-link-copy-${release.id}`
-            );
-          },
-        }
-      );
-    }
-
-    if (onCopyQrCode) {
-      shareItems.push(
-        { type: 'separator' },
-        {
-          id: 'copy-qr-code',
-          label: 'Copy QR code',
-          icon: qrCodeIcon,
-          onClick: onCopyQrCode,
-        }
-      );
-    }
-  }
+  const shareItems = buildShareItems({
+    release,
+    onCopy,
+    artistName,
+    onCopyQrCode,
+    qrCodeIcon,
+    locked,
+    lockReason,
+    smartLinkUrl,
+  });
 
   const metadataItems = buildCopyMenuItems([
     { id: 'release-id', label: 'Release ID', value: release.id },

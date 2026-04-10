@@ -142,7 +142,7 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 });
 
 /* ─── Shared inline style helpers ─── */
-const WRAP = 'mx-auto max-w-[1100px] px-6';
+const WRAP = 'mx-auto w-full max-w-[1120px] px-6 sm:px-8 lg:px-10';
 
 const LOGOS = [
   'Spotify',
@@ -1850,7 +1850,7 @@ export default function LaunchPage() {
         </h2>
         <Link
           href={APP_ROUTES.LAUNCH_PRICING}
-          className='marketing-cta focus-ring mt-8 inline-block'
+          className='public-action-primary focus-ring mt-8'
         >
           View pricing
         </Link>
@@ -1869,12 +1869,15 @@ export default function LaunchPage() {
             Your music deserves better than a stack of links.
           </h2>
           <div className='flex flex-col sm:flex-row gap-3 justify-center'>
-            <Link href={APP_ROUTES.SIGNUP} className='marketing-cta focus-ring'>
+            <Link
+              href={APP_ROUTES.SIGNUP}
+              className='public-action-primary focus-ring'
+            >
               Get started free
             </Link>
             <a
               href='mailto:hello@jov.ie'
-              className='focus-ring inline-flex items-center justify-center px-6 py-3 rounded-md font-medium text-sm transition-colors bg-surface-1 border border-subtle hover:bg-white/[0.04]'
+              className='public-action-secondary focus-ring'
             >
               Contact us
             </a>
