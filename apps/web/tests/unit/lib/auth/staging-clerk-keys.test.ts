@@ -83,6 +83,19 @@ describe('staging Clerk key resolution', () => {
     });
   });
 
+  it('does not fall back to production keys when only the staging secret key is set', () => {
+    process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';
+
+    expect(resolveClerkKeys('staging.jov.ie')).toEqual({
+      publishableKey: undefined,
+      secretKey: undefined,
+    });
+    expect(resolveClerkKeys('main.jov.ie')).toEqual({
+      publishableKey: undefined,
+      secretKey: undefined,
+    });
+  });
+
   it('keeps non-staging hosts on the default production pair', () => {
     process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_live_staging_example';
     process.env.CLERK_SECRET_KEY_STAGING = 'sk_live_staging_example';

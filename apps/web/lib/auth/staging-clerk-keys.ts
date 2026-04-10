@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { getRequestLocationFromHeaders } from '@/components/providers/clerkAvailability';
+import { STAGING_HOSTNAMES } from '@/constants/domains';
 import { publicEnv } from '@/lib/env-public';
 
 /**
@@ -10,11 +11,8 @@ import { publicEnv } from '@/lib/env-public';
  * Staging uses separate Clerk instance keys stored as server-only runtime env vars.
  */
 
-// Keep in sync with STAGING_HOSTNAMES in proxy.ts and constants/domains.ts
-const STAGING_HOSTS = new Set(['staging.jov.ie', 'main.jov.ie']);
-
 export function isStagingHost(hostname: string): boolean {
-  return STAGING_HOSTS.has(hostname);
+  return STAGING_HOSTNAMES.has(hostname);
 }
 
 interface ClerkKeys {

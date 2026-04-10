@@ -52,6 +52,7 @@ const mocks = vi.hoisted(() => ({
       `${authPage}?redirect_url=${encodeURIComponent(pathname + search)}`
   ),
   sanitizeRedirectUrl: vi.fn().mockImplementation((url: string | null) => url),
+  fetch: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/proxy-state', () => ({
@@ -115,6 +116,7 @@ vi.mock('@/constants/app', () => ({
 vi.mock('@/constants/domains', () => ({
   BASE_URL: 'https://jov.ie',
   HOSTNAME: 'jov.ie',
+  STAGING_HOSTNAMES: new Set(['staging.jov.ie', 'main.jov.ie']),
 }));
 
 // Import the middleware under test — used by callMiddleware()
@@ -163,16 +165,27 @@ function resetMocks() {
     if (typeof mock.mockClear === 'function') mock.mockClear();
   }
   // Re-apply defaults (mockClear keeps implementations, just clears call history)
+  mocks.resolveClerkKeys.mockReturnValue({
+    publishableKey: 'pk_test_real-key-123',
+    secretKey: 'sk_test_real-key-456',
+  });
   mocks.resolveTestBypassUserId.mockReturnValue(null);
   mocks.isCookieBannerRequired.mockReturnValue(false);
   mocks.getUserState.mockResolvedValue(null);
   mocks.isKnownActiveUser.mockReturnValue(false);
   mocks.isStagingHost.mockReturnValue(false);
   mocks.createBotResponse.mockReturnValue(undefined);
+  mocks.fetch.mockResolvedValue(
+    new Response('ok', {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  );
   mocks.clerkMiddleware.mockImplementation(
     (handler: Function) => async (req: unknown, event: unknown) =>
       handler(req, event)
   );
+  vi.stubGlobal('fetch', mocks.fetch);
 }
 
 describe('proxy.ts middleware', () => {
@@ -587,6 +600,37 @@ describe('proxy.ts middleware', () => {
       const rewrites = cfg.rewrites ?? [];
       const clerkRewrites = rewrites.filter(r => r.source.includes('clerk'));
       expect(clerkRewrites).toEqual([]);
+    });
+
+    it('routes staging Clerk proxy traffic to the staging FAPI host', async () => {
+      const stagingFapiHost = 'staging-fapi.clerk.example';
+      const productionFapiHost = 'production-fapi.clerk.example';
+
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_live_${Buffer.from(`${productionFapiHost}$`).toString('base64')}`;
+      mocks.resolveClerkKeys.mockReturnValue({
+        publishableKey: `pk_live_${Buffer.from(`${stagingFapiHost}$`).toString('base64')}`,
+        secretKey: 'sk_live_staging_example',
+      });
+
+      const req = createUnauthenticatedRequest({
+        hostname: 'staging.jov.ie',
+        pathname: '/__clerk/v1/client',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(200);
+      expect(mocks.fetch).toHaveBeenCalledTimes(1);
+      const [targetUrl, init] = mocks.fetch.mock.calls[0] as [
+        string,
+        RequestInit,
+      ];
+
+      expect(targetUrl).toBe(`https://${stagingFapiHost}/v1/client`);
+      expect(init.method).toBe('GET');
+      expect(init.redirect).toBe('manual');
+      const headers = init.headers as Headers;
+      expect(headers.get('host')).toBe(stagingFapiHost);
+      expect(headers.get('origin')).toBe(`https://${stagingFapiHost}`);
     });
   });
 
