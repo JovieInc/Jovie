@@ -276,6 +276,13 @@ async function seedDashboardAuth(browser, { url }) {
           timeout: 60_000,
         });
       }
+      const landedPath = new URL(page.url()).pathname;
+      if (!landedPath.startsWith('/app')) {
+        await page.close();
+        throw new Error(
+          `Auth bypass bootstrap failed for ${url}; landed on ${landedPath}`
+        );
+      }
       await warmRouteRepeatedly();
       await page.close();
       return;

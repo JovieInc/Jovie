@@ -50,20 +50,20 @@ export default async function ReleasesPage() {
   const profileId = dashboardData.selectedProfile?.id;
   if (profileId) {
     const queryClient = getQueryClient();
-    await queryClient
-      .prefetchQuery({
+    try {
+      await queryClient.fetchQuery({
         queryKey: queryKeys.releases.matrix(profileId),
         queryFn: () => loadReleaseMatrix(profileId),
-      })
-      .catch(error => {
-        void captureError(
-          'Release matrix prefetch failed on releases page',
-          error,
-          {
-            route: APP_ROUTES.DASHBOARD_RELEASES,
-          }
-        );
       });
+    } catch (error) {
+      void captureError(
+        'Release matrix prefetch failed on releases page',
+        error,
+        {
+          route: APP_ROUTES.DASHBOARD_RELEASES,
+        }
+      );
+    }
   }
 
   return (

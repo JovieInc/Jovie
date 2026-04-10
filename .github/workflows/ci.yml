@@ -2485,7 +2485,17 @@ jobs:
             exit 1
           fi
 
+          if ! jq empty "$RESULTS_FILE" >/dev/null 2>&1; then
+            echo "Golden path results file is not valid JSON: $RESULTS_FILE"
+            exit 1
+          fi
+
           PASSED=$(jq '[.. | objects | select((.location?.file? // "" | endswith("tests/e2e/golden-path.spec.ts")) and (.results? | type == "array")) | .results[] | select(.status == "passed")] | length' "$RESULTS_FILE")
+
+          if ! [[ "$PASSED" =~ ^[0-9]+$ ]]; then
+            echo "Golden path results parsing returned an invalid count: ${PASSED:-<empty>}"
+            exit 1
+          fi
 
           if [ "$PASSED" -lt 1 ]; then
             echo "Golden path did not record a passing test execution."

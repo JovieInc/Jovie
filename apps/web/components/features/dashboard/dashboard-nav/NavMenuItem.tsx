@@ -223,7 +223,7 @@ export function NavMenuItem({
   );
 
   const handlePressStart = useCallback(() => {
-    if (onNavigate && typeof window !== 'undefined') {
+    if (onNavigate && globalThis.window !== undefined) {
       pendingNavigationRef.current = true;
       clearPendingNavigationListeners();
 
@@ -238,13 +238,17 @@ export function NavMenuItem({
         cancelPendingNavigation();
       };
 
-      window.addEventListener('pointerup', handlePointerUp, true);
-      window.addEventListener('pointercancel', handlePointerCancel, true);
-      window.addEventListener('blur', handlePointerCancel);
+      globalThis.addEventListener('pointerup', handlePointerUp, true);
+      globalThis.addEventListener('pointercancel', handlePointerCancel, true);
+      globalThis.addEventListener('blur', handlePointerCancel);
       clearPendingNavigationListenersRef.current = () => {
-        window.removeEventListener('pointerup', handlePointerUp, true);
-        window.removeEventListener('pointercancel', handlePointerCancel, true);
-        window.removeEventListener('blur', handlePointerCancel);
+        globalThis.removeEventListener('pointerup', handlePointerUp, true);
+        globalThis.removeEventListener(
+          'pointercancel',
+          handlePointerCancel,
+          true
+        );
+        globalThis.removeEventListener('blur', handlePointerCancel);
       };
     }
 

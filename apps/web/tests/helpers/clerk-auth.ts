@@ -63,8 +63,14 @@ async function fetchJsonInBrowserContext<T>(
         .locator('body')
         .textContent()
         .catch(() => null)) ?? '';
-    const payload =
-      rawBody.trim().length > 0 ? (JSON.parse(rawBody) as T) : null;
+    let payload: T | null = null;
+    if (rawBody.trim().length > 0) {
+      try {
+        payload = JSON.parse(rawBody) as T;
+      } catch {
+        payload = null;
+      }
+    }
 
     return {
       ok: status >= 200 && status < 300,

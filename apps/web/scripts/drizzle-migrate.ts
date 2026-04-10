@@ -34,6 +34,7 @@ neonConfig.webSocketConstructor = ws;
 const NEON_URL_PATTERN = /(postgres)(|ql)(\+neon)(.*)/;
 const CI_CONNECT_RETRY_LIMIT = 12;
 const CI_CONNECT_RETRY_DELAY_MS = 5_000;
+const CONNECT_BOOTSTRAP_TIMEOUT_MS = 15_000;
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const webRootDir = path.resolve(scriptDir, '..');
@@ -159,6 +160,7 @@ function isRetryableConnectionError(error: unknown) {
     combinedMessage.includes('requested endpoint could not be found') ||
     combinedMessage.includes("you don't have access to it") ||
     combinedMessage.includes('connection terminated unexpectedly') ||
+    combinedMessage.includes('timed out waiting for database connection') ||
     combinedMessage.includes('fetch failed')
   );
 }
@@ -166,11 +168,9 @@ function isRetryableConnectionError(error: unknown) {
 async function connectClientWithRetryableBootstrap(pool: Pool) {
   return await new Promise<PoolClient>((resolve, reject) => {
     let settled = false;
-
-    const cleanup = () => {
-      process.off('uncaughtException', handleBootstrapFailure);
-      process.off('unhandledRejection', handleBootstrapFailure);
-    };
+    const timeout = setTimeout(() => {
+      rejectOnce(new Error('Timed out waiting for database connection.'));
+    }, CONNECT_BOOTSTRAP_TIMEOUT_MS);
 
     const rejectOnce = (error: unknown) => {
       if (settled) {
@@ -178,7 +178,7 @@ async function connectClientWithRetryableBootstrap(pool: Pool) {
       }
 
       settled = true;
-      cleanup();
+      clearTimeout(timeout);
       reject(error);
     };
 
@@ -189,18 +189,11 @@ async function connectClientWithRetryableBootstrap(pool: Pool) {
       }
 
       settled = true;
-      cleanup();
+      clearTimeout(timeout);
       resolve(client);
     };
 
-    const handleBootstrapFailure = (error: unknown) => {
-      rejectOnce(error);
-    };
-
-    process.on('uncaughtException', handleBootstrapFailure);
-    process.on('unhandledRejection', handleBootstrapFailure);
-
-    pool.connect().then(resolveOnce).catch(rejectOnce);
+    void pool.connect().then(resolveOnce).catch(rejectOnce);
   });
 }
 

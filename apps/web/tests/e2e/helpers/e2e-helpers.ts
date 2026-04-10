@@ -1045,7 +1045,7 @@ export async function createFreshUser(page: Page, uniqueSeed: string) {
     const shouldUseLoopbackBypassFallback =
       isLoopbackHost &&
       (process.env.CI === 'true' ||
-        Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim()));
+        process.env.E2E_ENABLE_CLERK_BYPASS === 'true');
 
     if (shouldUseLoopbackBypassFallback) {
       const clerkUserId = await ensureClerkTestUser({

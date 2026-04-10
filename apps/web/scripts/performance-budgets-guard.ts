@@ -646,13 +646,13 @@ async function measureWarmNavigationRoute(
     routeReadyPromise = waitForExpectedUrl(page, expectedPaths);
   }
 
+  await routeReadyPromise;
   const warmShellResponse = await waitForWarmShellReady(
     page,
     route,
     startedAt,
     true
   );
-  await routeReadyPromise;
   const skeletonToContent = hasTimingBudget(route, 'skeleton-to-content')
     ? await waitForContentReady(page, route, startedAt, true)
     : 0;

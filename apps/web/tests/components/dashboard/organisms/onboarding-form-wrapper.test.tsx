@@ -68,7 +68,7 @@ describe('OnboardingFormWrapper', () => {
     expect(globalThis.sessionStorage.getItem('pendingClaim')).not.toBeNull();
   });
 
-  it('renders the full onboarding form for existing profiles without a resume param', () => {
+  it('renders the full onboarding form for existing profiles without a resume param', async () => {
     render(
       <OnboardingFormWrapper
         initialHandle='existing-handle'
@@ -79,5 +79,6 @@ describe('OnboardingFormWrapper', () => {
 
     expect(handleOnlyFormPropsSpy).not.toHaveBeenCalled();
     expect(screen.getByTestId('onboarding-loading-shell')).toBeTruthy();
+    expect(await screen.findByTestId('mock-onboarding-v2-form')).toBeTruthy();
   });
 });

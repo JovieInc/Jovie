@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Note: For tests using vi.hoisted(), we inline the mock creation.
 // For tests that don't need hoisting, use the shared utilities:
@@ -101,7 +101,7 @@ vi.mock('@/lib/validation/username', () => ({
   validateUsername: vi.fn(() => ({ isValid: true })),
 }));
 
-const routeModulePromise = import('@/app/api/waitlist/route');
+let routeModulePromise: Promise<typeof import('@/app/api/waitlist/route')>;
 
 // Helper to create a standard transaction mock
 // This pattern is also available in test-utils/db/drizzle-query-mock.ts
@@ -137,6 +137,11 @@ function createTransactionMock(
 }
 
 describe('Waitlist API', () => {
+  beforeAll(() => {
+    process.env.DATABASE_URL = 'postgres://test@localhost/test';
+    routeModulePromise = import('@/app/api/waitlist/route');
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.DATABASE_URL = 'postgres://test@localhost/test';

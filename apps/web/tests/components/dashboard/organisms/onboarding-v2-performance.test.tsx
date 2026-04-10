@@ -358,10 +358,10 @@ afterEach(() => {
 });
 
 async function measureRenderTime(ui: ReactNode, heading: RegExp | string) {
-  let mountDuration = 0;
+  let renderDuration = 0;
   const handleRender: ProfilerOnRenderCallback = (_, phase, actualDuration) => {
-    if (phase === 'mount') {
-      mountDuration += actualDuration;
+    if (phase === 'mount' || phase === 'update') {
+      renderDuration += actualDuration;
     }
   };
 
@@ -371,7 +371,7 @@ async function measureRenderTime(ui: ReactNode, heading: RegExp | string) {
     </Profiler>
   );
   await screen.findByRole('heading', { name: heading });
-  return mountDuration;
+  return renderDuration;
 }
 
 describe('Onboarding screen performance budgets', () => {

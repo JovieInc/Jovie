@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +14,13 @@ interface CommandResult {
   readonly code: number;
   readonly stderr: string;
   readonly stdout: string;
+}
+
+interface StorageStateLike {
+  readonly cookies?: Array<{
+    readonly name: string;
+    readonly value: string;
+  }>;
 }
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -61,6 +68,14 @@ function assertSuccess(result: CommandResult, message: string) {
     [message, result.stdout.trim(), result.stderr.trim()]
       .filter(Boolean)
       .join('\n')
+  );
+}
+
+function readBypassUserId(filePath: string) {
+  const state = JSON.parse(readFileSync(filePath, 'utf8')) as StorageStateLike;
+  return (
+    state.cookies?.find(cookie => cookie.name === '__e2e_test_user_id')
+      ?.value ?? null
   );
 }
 
@@ -299,6 +314,7 @@ function printSummary(summary: GuardSummary) {
 async function main() {
   const originalCi = process.env.CI;
   const hadBypass = process.env.E2E_USE_TEST_AUTH_BYPASS;
+  const originalUserId = process.env.E2E_CLERK_USER_ID;
   const artifactDir = resolve(perfRoot, `launch-check-${timestampLabel()}`);
   ensureDir(artifactDir);
 
@@ -331,6 +347,10 @@ async function main() {
       'creator-ready'
     );
 
+    const onboardingUserId = readBypassUserId(onboardingAuthPath);
+    if (onboardingUserId) {
+      process.env.E2E_CLERK_USER_ID = onboardingUserId;
+    }
     const onboardingSummary = await runPerformanceBudgetsGuard({
       authPath: onboardingAuthPath,
       baseUrl,
@@ -341,6 +361,11 @@ async function main() {
       routeIds: [],
       runs: 3,
     });
+
+    const creatorReadyUserId = readBypassUserId(creatorReadyAuthPath);
+    if (creatorReadyUserId) {
+      process.env.E2E_CLERK_USER_ID = creatorReadyUserId;
+    }
 
     const releasesSummary = await runPerformanceBudgetsGuard({
       authPath: creatorReadyAuthPath,
@@ -376,6 +401,12 @@ async function main() {
       delete process.env.E2E_USE_TEST_AUTH_BYPASS;
     } else {
       process.env.E2E_USE_TEST_AUTH_BYPASS = hadBypass;
+    }
+
+    if (originalUserId === undefined) {
+      delete process.env.E2E_CLERK_USER_ID;
+    } else {
+      process.env.E2E_CLERK_USER_ID = originalUserId;
     }
 
     await stopServer(child);

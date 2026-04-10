@@ -137,7 +137,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
         message:
           'Fresh signup should land on an authenticated app surface before onboarding continues',
       })
-      .toMatch(/\/(app|onboarding)(\?|$)/);
+      .toMatch(/\/(?:app(?:\/|$)|onboarding(?:\/|\?|$))/);
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 3: Onboarding — Handle step

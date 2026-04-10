@@ -158,7 +158,7 @@ export function DashboardNav(_: DashboardNavProps) {
 
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const releasesPrefetchedRef = useRef(false);
+  const releasesPrefetchedProfileIdRef = useRef<string | null>(null);
   useEffect(
     () => () => {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
@@ -168,19 +168,19 @@ export function DashboardNav(_: DashboardNavProps) {
 
   useEffect(() => {
     if (
-      releasesPrefetchedRef.current ||
       isDemo ||
       !profileId ||
+      releasesPrefetchedProfileIdRef.current === profileId ||
       pathname !== APP_ROUTES.DASHBOARD
     ) {
       return;
     }
 
-    releasesPrefetchedRef.current = true;
+    releasesPrefetchedProfileIdRef.current = profileId;
     router.prefetch(APP_ROUTES.DASHBOARD_RELEASES);
     void import('@/features/dashboard/organisms/release-provider-matrix').catch(
       () => {
-        releasesPrefetchedRef.current = false;
+        releasesPrefetchedProfileIdRef.current = null;
       }
     );
     void import('@/lib/queries/prefetch-dashboard')
@@ -188,7 +188,7 @@ export function DashboardNav(_: DashboardNavProps) {
         prefetchForRoute('releases', queryClient, profileId)
       )
       .catch(() => {
-        releasesPrefetchedRef.current = false;
+        releasesPrefetchedProfileIdRef.current = null;
       });
   }, [isDemo, pathname, profileId, queryClient, router]);
 

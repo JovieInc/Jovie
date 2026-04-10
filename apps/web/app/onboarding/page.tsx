@@ -125,10 +125,22 @@ export default async function OnboardingPage({
     resolvedSearchParams?.handle || spotifySuggestedHandle;
   const reservedHandlePromise =
     !earlyProvidedHandle && earlyDisplayName
-      ? reserveOnboardingHandle(earlyDisplayName).catch(() => {
-          return buildHandleCandidates(earlyDisplayName)[0] ?? null;
-        })
-      : Promise.resolve<string | null>(null);
+      ? reserveOnboardingHandle(earlyDisplayName)
+          .then(handle => ({
+            handle,
+            isReserved: true,
+          }))
+          .catch(() => ({
+            handle: buildHandleCandidates(earlyDisplayName)[0] ?? null,
+            isReserved: false,
+          }))
+      : Promise.resolve<{
+          handle: string | null;
+          isReserved: boolean;
+        }>({
+          handle: null,
+          isReserved: false,
+        });
 
   const [existingProfile, earlyReservedHandle] = await Promise.all([
     profilePrefetchPromise,
@@ -145,7 +157,8 @@ export default async function OnboardingPage({
 
   // Discard the early reservation if a providedHandle is now available (e.g. from
   // existingProfile.username) — otherwise isReservedHandle would incorrectly be true.
-  let reservedHandle = !providedHandle ? earlyReservedHandle : null;
+  let reservedHandle = !providedHandle ? earlyReservedHandle.handle : null;
+  let isReservedHandle = !providedHandle && earlyReservedHandle.isReserved;
   if (
     shouldLoadExistingProfile &&
     !providedHandle &&
@@ -154,6 +167,7 @@ export default async function OnboardingPage({
     initialDisplayName !== earlyDisplayName
   ) {
     reservedHandle = buildHandleCandidates(initialDisplayName)[0] ?? null;
+    isReservedHandle = false;
   }
 
   const initialHandle = providedHandle || reservedHandle || '';
@@ -167,7 +181,7 @@ export default async function OnboardingPage({
     <OnboardingFormWrapper
       initialDisplayName={initialDisplayName}
       initialHandle={initialHandle}
-      isReservedHandle={Boolean(reservedHandle)}
+      isReservedHandle={isReservedHandle}
       userEmail={userEmail}
       userId={userId}
       shouldAutoSubmitHandle={shouldAutoSubmitHandle}
