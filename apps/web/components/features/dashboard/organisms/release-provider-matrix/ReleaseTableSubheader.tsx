@@ -6,7 +6,6 @@ import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
 import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import {
-  ExportCSVButton,
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
   PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
   PAGE_TOOLBAR_END_GROUP_CLASS,
@@ -20,10 +19,6 @@ import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { useCodeFlag } from '@/lib/feature-flags/client';
 import { cn } from '@/lib/utils';
 import { useReleaseFilterCounts } from './hooks/useReleaseFilterCounts';
-import {
-  getReleasesForExport,
-  RELEASES_CSV_COLUMNS,
-} from './utils/exportReleases';
 
 const ReleaseFilterDropdown = lazy(() =>
   import('./ReleaseFilterDropdown').then(m => ({
@@ -34,6 +29,12 @@ const ReleaseFilterDropdown = lazy(() =>
 const ReleaseTableDisplayMenu = lazy(() =>
   import('./ReleaseTableDisplayMenu').then(m => ({
     default: m.ReleaseTableDisplayMenu,
+  }))
+);
+
+const ReleaseTableExportButton = lazy(() =>
+  import('./ReleaseTableExportButton').then(m => ({
+    default: m.ReleaseTableExportButton,
   }))
 );
 
@@ -230,18 +231,33 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
               />
             </Suspense>
           )}
-          <ExportCSVButton
-            getData={() => getReleasesForExport(releases, selectedIds)}
-            columns={RELEASES_CSV_COLUMNS}
-            filename='releases'
-            label='Export'
-            variant='ghost'
-            size='sm'
-            chrome='page-toolbar'
-            iconOnly
-            tooltipLabel='Export'
-            className='h-7 w-7 rounded-full px-0 [&_svg]:h-3 [&_svg]:w-3'
-          />
+          <Suspense
+            fallback={
+              <Button
+                variant='ghost'
+                size='sm'
+                className={cn(
+                  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+                  PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+                  'h-7 w-7 rounded-full px-0 [&_svg]:h-3 [&_svg]:w-3'
+                )}
+                aria-label='Export'
+                disabled
+              >
+                <Icon
+                  name='Download'
+                  className={PAGE_TOOLBAR_ICON_CLASS}
+                  strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+                />
+                <span className='sr-only'>Export</span>
+              </Button>
+            }
+          >
+            <ReleaseTableExportButton
+              releases={releases}
+              selectedIds={selectedIds}
+            />
+          </Suspense>
           <DrawerToggleButton
             chrome='page-toolbar'
             ariaLabel='Toggle release preview'

@@ -67,6 +67,13 @@ vi.mock(
   })
 );
 
+vi.mock(
+  '@/features/dashboard/organisms/release-provider-matrix/ReleaseTableExportButton',
+  () => ({
+    ReleaseTableExportButton: () => <button type='button'>Export</button>,
+  })
+);
+
 vi.mock('@/components/organisms/table', () => ({
   PAGE_TOOLBAR_ACTION_ACTIVE_CLASS: 'active',
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS: 'action-button',
@@ -105,7 +112,6 @@ vi.mock('@/components/organisms/table', () => ({
       {label}
     </button>
   ),
-  ExportCSVButton: () => <button type='button'>Export</button>,
   PageToolbarActionButton: ({
     label,
     onClick,
