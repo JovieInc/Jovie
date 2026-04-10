@@ -103,7 +103,7 @@ export function isRetryableSeedDatabaseError(error: unknown): boolean {
       messages.push(String(current));
     }
 
-    if (typeof current === 'object' && current !== null) {
+    if (current && typeof current === 'object') {
       const code = (current as { code?: string }).code;
       if (typeof code === 'string' && code.length > 0) {
         codes.add(code);
