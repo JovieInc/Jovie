@@ -274,7 +274,30 @@ export async function waitForAuthenticatedHealth(
             if (bypassResponse.ok) {
               const payload = bypassResponse.payload;
 
-              if (!payload?.active) {
+              if (payload?.active) {
+                if (expectedUserId && payload.userId !== expectedUserId) {
+                  return `user-mismatch:${payload.userId ?? 'unknown'}`;
+                }
+
+                return 'authenticated';
+              }
+            }
+
+            const bypassSessionResponse = await page.request.get(
+              bypassSessionUrl,
+              {
+                failOnStatusCode: false,
+                headers: bypassHeaders,
+              }
+            );
+
+            if (bypassSessionResponse.ok()) {
+              const payload = (await bypassSessionResponse.json()) as {
+                active?: boolean;
+                userId?: string | null;
+              };
+
+              if (!payload.active) {
                 return 'anonymous';
               }
 
