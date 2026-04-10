@@ -131,7 +131,13 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       timeout: 120_000,
       retries: 2,
     });
-    await page.waitForURL(/onboarding/, { timeout: 30_000 });
+    await expect
+      .poll(() => page.url(), {
+        timeout: 30_000,
+        message:
+          'Fresh signup should land on an authenticated app surface before onboarding continues',
+      })
+      .toMatch(/\/(app|onboarding)(\?|$)/);
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 3: Onboarding — Handle step

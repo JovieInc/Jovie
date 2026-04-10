@@ -505,7 +505,7 @@ describe('ReleaseProviderMatrix', () => {
   });
 
   describe('conditional rendering', () => {
-    it('shows empty state when not connected and no releases', () => {
+    it('shows empty state when not connected and no releases', async () => {
       renderWithProviders(
         <ReleaseProviderMatrix
           releases={[]}
@@ -514,7 +514,9 @@ describe('ReleaseProviderMatrix', () => {
           spotifyConnected={false}
         />
       );
-      expect(screen.getByTestId('releases-empty-state')).toBeInTheDocument();
+      expect(
+        await screen.findByTestId('releases-empty-state')
+      ).toBeInTheDocument();
     });
 
     it('shows importing state when importing with no releases', () => {
@@ -575,7 +577,7 @@ describe('ReleaseProviderMatrix', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('shows spotify import banner when import is active', () => {
+    it('shows spotify import banner when import is active', async () => {
       renderWithProviders(
         <ReleaseProviderMatrix
           releases={[makeRelease()]}
@@ -586,7 +588,9 @@ describe('ReleaseProviderMatrix', () => {
         />
       );
 
-      const banner = screen.getByTestId('spotify-import-progress-banner');
+      const banner = await screen.findByTestId(
+        'spotify-import-progress-banner'
+      );
       expect(banner).toHaveAttribute('aria-hidden', 'false');
       expect(banner).toHaveStyle({ visibility: 'visible', opacity: '1' });
     });

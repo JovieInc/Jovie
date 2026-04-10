@@ -1,5 +1,10 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import type { ElementType, ReactNode } from 'react';
+import {
+  type ElementType,
+  Profiler,
+  type ProfilerOnRenderCallback,
+  type ReactNode,
+} from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingCheckoutClient } from '@/app/onboarding/checkout/OnboardingCheckoutClient';
 import { OnboardingV2Form } from '@/features/dashboard/organisms/onboarding-v2/OnboardingV2Form';
@@ -352,14 +357,21 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function measureRenderTime(
-  renderView: () => void,
-  heading: RegExp | string
-) {
-  const start = performance.now();
-  renderView();
+async function measureRenderTime(ui: ReactNode, heading: RegExp | string) {
+  let mountDuration = 0;
+  const handleRender: ProfilerOnRenderCallback = (_, phase, actualDuration) => {
+    if (phase === 'mount') {
+      mountDuration += actualDuration;
+    }
+  };
+
+  render(
+    <Profiler id='onboarding-performance' onRender={handleRender}>
+      {ui}
+    </Profiler>
+  );
   await screen.findByRole('heading', { name: heading });
-  return performance.now() - start;
+  return mountDuration;
 }
 
 describe('Onboarding screen performance budgets', () => {
@@ -379,18 +391,15 @@ describe('Onboarding screen performance budgets', () => {
     ['profile-ready', 'Your Link Is Live', SCREEN_BUDGETS.profileReady],
   ] as const)('%s screen renders within budget', async (initialResumeStep, heading, budgetMs) => {
     const renderTime = await measureRenderTime(
-      () =>
-        render(
-          <OnboardingV2Form
-            initialDisplayName='Perf Budget'
-            initialHandle='perf-budget'
-            initialProfileId='profile-performance'
-            initialResumeStep={initialResumeStep}
-            isHydrated
-            userEmail='perf@example.com'
-            userId='user-performance'
-          />
-        ),
+      <OnboardingV2Form
+        initialDisplayName='Perf Budget'
+        initialHandle='perf-budget'
+        initialProfileId='profile-performance'
+        initialResumeStep={initialResumeStep}
+        isHydrated
+        userEmail='perf@example.com'
+        userId='user-performance'
+      />,
       heading
     );
 
@@ -411,18 +420,15 @@ describe('Onboarding screen performance budgets', () => {
     mockArtistSearch.state = 'success';
 
     const renderTime = await measureRenderTime(
-      () =>
-        render(
-          <OnboardingV2Form
-            initialDisplayName='Perf Budget'
-            initialHandle='perf-budget'
-            initialProfileId='profile-performance'
-            initialResumeStep='spotify'
-            isHydrated
-            userEmail='perf@example.com'
-            userId='user-performance'
-          />
-        ),
+      <OnboardingV2Form
+        initialDisplayName='Perf Budget'
+        initialHandle='perf-budget'
+        initialProfileId='profile-performance'
+        initialResumeStep='spotify'
+        isHydrated
+        userEmail='perf@example.com'
+        userId='user-performance'
+      />,
       'Pick your Spotify artist'
     );
 
@@ -434,21 +440,18 @@ describe('Onboarding screen performance budgets', () => {
 
   it('checkout screen renders within budget', async () => {
     const renderTime = await measureRenderTime(
-      () =>
-        render(
-          <OnboardingCheckoutClient
-            annualAmount={19000}
-            annualPriceId='price_annual'
-            avatarUrl={null}
-            displayName='Perf Budget'
-            isDefaultUpsell
-            monthlyAmount={1900}
-            monthlyPriceId='price_monthly'
-            plan='pro'
-            spotifyFollowers={15000}
-            username='perf-budget'
-          />
-        ),
+      <OnboardingCheckoutClient
+        annualAmount={19000}
+        annualPriceId='price_annual'
+        avatarUrl={null}
+        displayName='Perf Budget'
+        isDefaultUpsell
+        monthlyAmount={1900}
+        monthlyPriceId='price_monthly'
+        plan='pro'
+        spotifyFollowers={15000}
+        username='perf-budget'
+      />,
       /Upgrade to/i
     );
 

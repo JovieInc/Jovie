@@ -134,7 +134,7 @@ describe('useHandleValidation', () => {
     expect(result.current.handleValidation.available).toBe(true);
   });
 
-  it('retries a transient abort once for the current handle', async () => {
+  it('retries transient aborts for the current handle within the retry budget', async () => {
     vi.useFakeTimers();
     const retryValidate = vi.fn().mockResolvedValue(undefined);
     validateApiState.current = retryValidate;
@@ -161,6 +161,16 @@ describe('useHandleValidation', () => {
     });
 
     expect(retryValidate).toHaveBeenCalledTimes(2);
+    expect(retryValidate).toHaveBeenLastCalledWith('prefilled-handle');
+
+    act(() => {
+      validateApiState.callbacks.onError?.(
+        Object.assign(new Error('aborted again'), { name: 'AbortError' })
+      );
+      vi.advanceTimersByTime(250);
+    });
+
+    expect(retryValidate).toHaveBeenCalledTimes(3);
     expect(retryValidate).toHaveBeenLastCalledWith('prefilled-handle');
   });
 });

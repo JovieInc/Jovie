@@ -39,6 +39,11 @@ interface HandleValidationResponse {
 /** Maximum time (ms) to stay in "checking" state before resetting */
 const CHECKING_SAFETY_TIMEOUT_MS =
   PACER_TIMING.VALIDATION_TIMEOUT_MS + PACER_TIMING.VALIDATION_DEBOUNCE_MS;
+/**
+ * Cold dev-server compiles can abort the first couple of availability checks.
+ * Allow a small bounded retry budget before surfacing an error to the user.
+ */
+const MAX_ABORT_RETRIES = 2;
 
 /**
  * Hook to manage handle validation state and API checks.
@@ -141,7 +146,7 @@ export function useHandleValidation({
         const currentRetryCount =
           abortRetryCountRef.current.get(currentHandle) ?? 0;
 
-        if (currentHandle && currentRetryCount < 1) {
+        if (currentHandle && currentRetryCount < MAX_ABORT_RETRIES) {
           abortRetryCountRef.current.set(currentHandle, currentRetryCount + 1);
           if (abortRetryTimerRef.current) {
             clearTimeout(abortRetryTimerRef.current);
