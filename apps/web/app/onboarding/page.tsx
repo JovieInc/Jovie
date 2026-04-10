@@ -1,11 +1,13 @@
 import * as Sentry from '@sentry/nextjs';
+import { eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
-import { getDashboardDataEssential } from '@/app/app/(shell)/dashboard/actions';
 import { APP_ROUTES } from '@/constants/routes';
 import { OnboardingFormWrapper } from '@/features/dashboard/organisms/OnboardingFormWrapper';
 import { getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
+import { db } from '@/lib/db';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
@@ -17,6 +19,15 @@ interface OnboardingPageProps {
     readonly handle?: string;
     readonly resume?: string;
   }>;
+}
+
+interface OnboardingBootstrapProfile {
+  readonly id: string;
+  readonly username: string | null;
+  readonly displayName: string | null;
+  readonly avatarUrl: string | null;
+  readonly bio: string | null;
+  readonly genres: string[] | null;
 }
 
 /**
@@ -51,12 +62,11 @@ export default async function OnboardingPage({
     redirect(APP_ROUTES.WAITLIST);
   }
 
+  const hasResumeSignal = Boolean(resolvedSearchParams?.resume);
   const hasOnboardingContinuationSignal = Boolean(
     resolvedSearchParams?.handle || resolvedSearchParams?.resume
   );
-  const shouldLoadExistingProfile = Boolean(
-    authResult.profileId || hasOnboardingContinuationSignal
-  );
+  const shouldLoadExistingProfile = Boolean(authResult.profileId);
 
   // ACTIVE guard: break redirect loops caused by stale proxy cache or
   // direct navigation. V2 intentionally allows explicit resume targets
@@ -89,9 +99,8 @@ export default async function OnboardingPage({
     ? Promise.resolve(null)
     : !shouldLoadExistingProfile
       ? Promise.resolve(null)
-      : getDashboardDataEssential()
-          .then(d => d.selectedProfile)
-          .catch((error: unknown) => {
+      : getOnboardingBootstrapProfile(authResult.profileId!).catch(
+          (error: unknown) => {
             const errorMessage = extractErrorMessage(error, 'Unknown error');
             if (
               errorMessage.includes('database') ||
@@ -104,7 +113,8 @@ export default async function OnboardingPage({
               });
             }
             return null;
-          });
+          }
+        );
 
   // Start handle reservation early with what we know now (display name from Clerk)
   const earlyDisplayName = clerkIdentity.displayName || '';
@@ -134,6 +144,7 @@ export default async function OnboardingPage({
   if (
     shouldLoadExistingProfile &&
     !providedHandle &&
+    !hasResumeSignal &&
     !reservedHandle &&
     initialDisplayName !== earlyDisplayName
   ) {
@@ -162,6 +173,25 @@ export default async function OnboardingPage({
       existingGenres={existingProfile?.genres ?? null}
     />
   );
+}
+
+async function getOnboardingBootstrapProfile(
+  profileId: string
+): Promise<OnboardingBootstrapProfile | null> {
+  const [profile] = await db
+    .select({
+      id: creatorProfiles.id,
+      username: creatorProfiles.username,
+      displayName: creatorProfiles.displayName,
+      avatarUrl: creatorProfiles.avatarUrl,
+      bio: creatorProfiles.bio,
+      genres: creatorProfiles.genres,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+
+  return profile ?? null;
 }
 
 function reportMissingClerkUserId(authResult: {
