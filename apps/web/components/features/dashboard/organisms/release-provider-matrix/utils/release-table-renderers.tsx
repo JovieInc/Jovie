@@ -7,6 +7,10 @@ import {
   ReleaseCell,
   SmartLinkCell,
 } from '@/features/dashboard/organisms/releases/cells';
+import {
+  formatReleaseDate,
+  formatReleaseDateMonthYear,
+} from '@/lib/discography/formatting';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 export function createReleaseCellRenderer(
@@ -70,17 +74,10 @@ export function createRightMetaCellRenderer(
   }: CellContext<ReleaseViewModel, unknown>) {
     const release = row.original;
     const dateLabel = release.releaseDate
-      ? new Date(release.releaseDate).toLocaleDateString('en-US', {
-          month: 'short',
-          year: 'numeric',
-        })
+      ? formatReleaseDateMonthYear(release.releaseDate)
       : '—';
     const yearTitle = release.releaseDate
-      ? new Date(release.releaseDate).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })
+      ? formatReleaseDate(release.releaseDate)
       : 'Unknown release date';
 
     return (

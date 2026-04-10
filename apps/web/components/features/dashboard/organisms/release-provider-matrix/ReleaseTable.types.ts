@@ -2,9 +2,14 @@ import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
 export interface ProviderConfig {
-  label: string;
+  readonly label: string;
   readonly accent: string;
 }
+
+export const RELEASE_VIEW_OPTIONS = [
+  { value: 'tracks', label: 'Tracks' },
+  { value: 'releases', label: 'Releases' },
+] as const;
 
 export interface ReleaseTableProps {
   readonly releases: ReleaseViewModel[];

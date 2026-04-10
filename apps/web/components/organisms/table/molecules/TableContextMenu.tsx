@@ -14,6 +14,7 @@ import {
 } from 'react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
+import { logger } from '@/lib/utils/logger';
 
 /**
  * A single action item in the context menu
@@ -244,6 +245,7 @@ export function TableContextMenu({
   const [resolvedItems, setResolvedItems] = useState<ContextMenuItemType[]>(
     items ?? []
   );
+  const [, setResolveGeneration] = useState(0);
 
   useEffect(() => {
     if (!getItems) {
@@ -253,6 +255,7 @@ export function TableContextMenu({
 
   const resolveItems = useCallback(() => {
     if (!getItems) {
+      setResolveGeneration(current => current + 1);
       setResolvedItems(items ?? []);
       return;
     }
@@ -269,17 +272,39 @@ export function TableContextMenu({
         },
       ]);
 
-      void Promise.resolve(nextItems)
-        .then(loadedItems => {
-          setResolvedItems(loadedItems);
-        })
-        .catch(() => {
-          setResolvedItems([]);
-        });
+      setResolveGeneration(currentGeneration => {
+        const nextGeneration = currentGeneration + 1;
+
+        void Promise.resolve(nextItems)
+          .then(loadedItems => {
+            setResolveGeneration(activeGeneration => {
+              if (activeGeneration === nextGeneration) {
+                setResolvedItems(loadedItems);
+              }
+              return activeGeneration;
+            });
+          })
+          .catch(error => {
+            setResolveGeneration(activeGeneration => {
+              if (activeGeneration === nextGeneration) {
+                logger.warn(
+                  'Failed to resolve async context menu items',
+                  error,
+                  'TableContextMenu'
+                );
+                setResolvedItems([]);
+              }
+              return activeGeneration;
+            });
+          });
+
+        return nextGeneration;
+      });
 
       return;
     }
 
+    setResolveGeneration(current => current + 1);
     setResolvedItems(nextItems);
   }, [getItems, items]);
 
@@ -299,10 +324,12 @@ export function TableContextMenu({
     const contextMenuChild = children as ReactElement<{
       onContextMenuCapture?: MouseEventHandler<Element>;
     }>;
+    const originalOnContextMenuCapture =
+      contextMenuChild.props.onContextMenuCapture;
 
     triggerChild = cloneElement(contextMenuChild, {
       onContextMenuCapture: event => {
-        contextMenuChild.props.onContextMenuCapture?.(event);
+        originalOnContextMenuCapture?.(event);
         resolveItems();
       },
     });

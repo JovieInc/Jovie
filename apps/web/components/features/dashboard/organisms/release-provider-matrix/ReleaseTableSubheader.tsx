@@ -19,6 +19,7 @@ import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { useCodeFlag } from '@/lib/feature-flags/client';
 import { cn } from '@/lib/utils';
 import { useReleaseFilterCounts } from './hooks/useReleaseFilterCounts';
+import { RELEASE_VIEW_OPTIONS } from './ReleaseTable.types';
 
 const ReleaseFilterDropdown = lazy(() =>
   import('./ReleaseFilterDropdown').then(m => ({
@@ -84,12 +85,6 @@ interface ReleaseTableSubheaderProps {
   /** Whether create release is available */
   readonly canCreateManualReleases?: boolean;
 }
-
-/** Options for release view segmented control */
-const RELEASE_VIEW_OPTIONS = [
-  { value: 'tracks', label: 'Tracks' },
-  { value: 'releases', label: 'Releases' },
-] as const;
 
 function ReleaseViewButtons({
   value,

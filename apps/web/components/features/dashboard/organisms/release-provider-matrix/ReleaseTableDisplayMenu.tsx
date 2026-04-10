@@ -22,12 +22,8 @@ import {
 } from '@/components/organisms/table';
 import { GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
+import { RELEASE_VIEW_OPTIONS } from './ReleaseTable.types';
 import type { ReleaseView } from './ReleaseTableSubheader';
-
-const RELEASE_VIEW_OPTIONS = [
-  { value: 'tracks', label: 'Tracks' },
-  { value: 'releases', label: 'Releases' },
-] as const;
 
 function ReleaseViewSegmentedControl({
   value,

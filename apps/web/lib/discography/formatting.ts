@@ -12,12 +12,18 @@ const shortReleaseDateFormatter = new Intl.DateTimeFormat('en-US', {
   timeZone: 'UTC',
 });
 
+const monthYearReleaseDateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
 const releaseArtistListFormatter = new Intl.ListFormat('en', {
   style: 'long',
   type: 'conjunction',
 });
 
-function parseReleaseDate(date: string): Date | null {
+export function parseReleaseDate(date: string): Date | null {
   if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     const [year, month, day] = date.split('-').map(Number);
     return new Date(Date.UTC(year, month - 1, day));
@@ -76,4 +82,10 @@ export function formatReleaseDateShort(date: string | undefined): string {
   if (!date) return 'TBD';
   const parsed = parseReleaseDate(date);
   return parsed ? shortReleaseDateFormatter.format(parsed) : 'Invalid';
+}
+
+export function formatReleaseDateMonthYear(date: string | undefined): string {
+  if (!date) return 'TBD';
+  const parsed = parseReleaseDate(date);
+  return parsed ? monthYearReleaseDateFormatter.format(parsed) : 'Invalid';
 }

@@ -195,17 +195,18 @@ export function ReleaseTableWithTracks({
     };
   }, [columnVisibility]);
 
-  const hasExpandedRows = useMemo(
-    () => releases.some(r => isExpanded(r.id)),
-    [releases, isExpanded]
-  );
+  const hasExpandedRows = expandedReleaseIds.size > 0;
 
   const groupingConfig = useMemo(() => {
     if (!groupByYear) return undefined;
     return {
       getGroupKey: (release: ReleaseViewModel) => {
         if (!release.releaseDate) return 'Unknown';
-        const year = new Date(release.releaseDate).getFullYear();
+        const directYear = String(release.releaseDate).match(/^(\d{4})/)?.[1];
+        if (directYear) {
+          return directYear;
+        }
+        const year = new Date(release.releaseDate).getUTCFullYear();
         return Number.isNaN(year) ? 'Unknown' : year.toString();
       },
       getGroupLabel: (year: string) => year,

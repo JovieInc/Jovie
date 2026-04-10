@@ -29,22 +29,37 @@ export function ReleasePlanPromptDialog({
   onClose,
   onGenerateReleasePlan,
 }: ReleasePlanPromptDialogProps) {
+  const dialogTitle = isGateLoading
+    ? 'Release Plan'
+    : canGenerateReleasePlans
+      ? 'Generate Release Plan'
+      : 'Upgrade To Generate A Release Plan';
+  const dialogDescription = isGateLoading
+    ? 'Checking whether this workspace can generate tasks for the release plan.'
+    : canGenerateReleasePlans
+      ? 'Create the step-by-step tasks for this release and jump straight into the plan.'
+      : 'Upgrade to turn this release into a step-by-step plan with tasks you can assign to Jovie AI.';
+  const actionButton = isGateLoading ? (
+    <Button type='button' size='sm' disabled>
+      Loading...
+    </Button>
+  ) : canGenerateReleasePlans ? (
+    <Button
+      type='button'
+      size='sm'
+      onClick={onGenerateReleasePlan}
+      disabled={isGeneratingReleasePlan}
+    >
+      {isGeneratingReleasePlan ? 'Generating...' : 'Generate Release Plan'}
+    </Button>
+  ) : (
+    <UpgradeButton size='sm'>Upgrade to Pro</UpgradeButton>
+  );
+
   return (
     <Dialog open={open} onClose={onClose} size='sm'>
-      <DialogTitle>
-        {isGateLoading
-          ? 'Release Plan'
-          : canGenerateReleasePlans
-            ? 'Generate Release Plan'
-            : 'Upgrade To Generate A Release Plan'}
-      </DialogTitle>
-      <DialogDescription>
-        {isGateLoading
-          ? 'Checking whether this workspace can generate tasks for the release plan.'
-          : canGenerateReleasePlans
-            ? 'Create the step-by-step tasks for this release and jump straight into the plan.'
-            : 'Upgrade to turn this release into a step-by-step plan with tasks you can assign to Jovie AI.'}
-      </DialogDescription>
+      <DialogTitle>{dialogTitle}</DialogTitle>
+      <DialogDescription>{dialogDescription}</DialogDescription>
       <DialogBody className='space-y-2'>
         <p className='text-[13px] text-secondary-token'>
           {releaseTitle ?? 'This release'} is ready.
@@ -60,24 +75,7 @@ export function ReleasePlanPromptDialog({
         >
           Maybe Later
         </Button>
-        {isGateLoading ? (
-          <Button type='button' size='sm' disabled>
-            Loading...
-          </Button>
-        ) : canGenerateReleasePlans ? (
-          <Button
-            type='button'
-            size='sm'
-            onClick={onGenerateReleasePlan}
-            disabled={isGeneratingReleasePlan}
-          >
-            {isGeneratingReleasePlan
-              ? 'Generating...'
-              : 'Generate Release Plan'}
-          </Button>
-        ) : (
-          <UpgradeButton size='sm'>Upgrade to Pro</UpgradeButton>
-        )}
+        {actionButton}
       </DialogActions>
     </Dialog>
   );
