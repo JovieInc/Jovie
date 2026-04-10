@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.141] - 2026-04-09
+
+> Claim-invite emails now read more like a real note from Tim, and they avoid awkward fake personalization when an artist name looks like a handle instead of a real first name.
+
+### Added
+
+- Focused regression coverage for claim-invite greetings across safe real names, handles, symbols, emoji, accented names, and generic follow-up fallbacks
+- [internal] Added repo guardrails and lessons so outbound email personalization fails safe by default
+
+### Changed
+
+- Rewrote the artist claim-invite and follow-up emails in a more personal founder voice with a softer feedback-first ask
+- Only personalize claim-invite greetings when the creator string clearly looks like a real first-and-last name, including accented names; otherwise fall back to a generic opener
+- [internal] Synced the canonical version file, `version.json`, and workspace package versions to `26.4.141`
+
 ## [26.4.140] - 2026-04-09
 
 > Make the app's right-side drawers feel like one product again by flattening stray chrome, unifying shell structure, and turning release playback into a simpler tracks list.

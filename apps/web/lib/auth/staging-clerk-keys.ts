@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { getRequestLocationFromHeaders } from '@/components/providers/clerkAvailability';
+import { STAGING_HOSTNAMES } from '@/constants/domains';
 import { publicEnv } from '@/lib/env-public';
 
 /**
@@ -10,11 +11,8 @@ import { publicEnv } from '@/lib/env-public';
  * Staging uses separate Clerk instance keys stored as server-only runtime env vars.
  */
 
-// Keep in sync with STAGING_HOSTNAMES in proxy.ts and constants/domains.ts
-const STAGING_HOSTS = new Set(['staging.jov.ie', 'main.jov.ie']);
-
 export function isStagingHost(hostname: string): boolean {
-  return STAGING_HOSTS.has(hostname);
+  return STAGING_HOSTNAMES.has(hostname);
 }
 
 interface ClerkKeys {
@@ -25,15 +23,22 @@ interface ClerkKeys {
 /**
  * Resolve Clerk keys for a given hostname.
  * Returns staging keys when on a staging host and staging keys are configured.
+ * Staging must never silently fall back to production keys.
  */
 export function resolveClerkKeys(hostname: string): ClerkKeys {
   if (isStagingHost(hostname)) {
     const stagingPk = process.env.CLERK_PUBLISHABLE_KEY_STAGING;
     const stagingSk = process.env.CLERK_SECRET_KEY_STAGING;
-    if (stagingPk && stagingSk) {
-      return { publishableKey: stagingPk, secretKey: stagingSk };
+    if (!stagingPk || !stagingSk) {
+      return {
+        publishableKey: undefined,
+        secretKey: undefined,
+      };
     }
+
+    return { publishableKey: stagingPk, secretKey: stagingSk };
   }
+
   return {
     publishableKey: publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
     secretKey: process.env.CLERK_SECRET_KEY || undefined,
