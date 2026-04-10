@@ -319,10 +319,18 @@ export default function PricingPage() {
               Start free, upgrade anytime. No credit card required.
             </p>
             <div className='mt-8 flex items-center justify-center gap-4'>
-              <Link href='/signup' prefetch={false} className='public-action-primary'>
+              <Link
+                href='/signup'
+                prefetch={false}
+                className='public-action-primary'
+              >
                 Get started
               </Link>
-              <Link href='/' prefetch={false} className='public-action-secondary'>
+              <Link
+                href='/'
+                prefetch={false}
+                className='public-action-secondary'
+              >
                 Learn more
               </Link>
             </div>
