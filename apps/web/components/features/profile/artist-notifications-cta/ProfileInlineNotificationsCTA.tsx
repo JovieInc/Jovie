@@ -4,6 +4,7 @@ import { ArrowRight, Bell, CheckCircle2 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
+import { OtpInput } from '@/features/auth/atoms/otp-input';
 import { useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 import {
@@ -21,7 +22,7 @@ import {
 } from './shared';
 import { useSubscriptionForm } from './useSubscriptionForm';
 
-type Step = 'cta' | 'email' | 'name' | 'birthday' | 'done';
+type Step = 'cta' | 'email' | 'otp' | 'name' | 'birthday' | 'done';
 
 const EASE_FADE: [number, number, number, number] = [0.32, 0, 0.67, 1];
 
@@ -201,11 +202,14 @@ export function ProfileInlineNotificationsCTA({
   const {
     emailInput,
     error,
+    otpCode,
     isSubmitting,
     handleChannelChange,
     handleEmailChange,
     handleFieldBlur,
+    handleOtpChange,
     handleSubscribe,
+    handleVerifyOtp,
     notificationsState,
     notificationsEnabled,
     openSubscription,
@@ -250,9 +254,19 @@ export function ProfileInlineNotificationsCTA({
     }
   }, [isAlreadySubscribed, step]);
 
-  // Watch for subscription success to advance from email → name
+  // Watch for pending confirmation to advance from email → otp
   useEffect(() => {
-    if (step === 'email' && notificationsState === 'success') {
+    if (step === 'email' && notificationsState === 'pending_confirmation') {
+      setStep('otp');
+    }
+  }, [step, notificationsState]);
+
+  // Watch for subscription success to advance from email/otp → name
+  useEffect(() => {
+    if (
+      (step === 'email' || step === 'otp') &&
+      notificationsState === 'success'
+    ) {
       subscribedEmailRef.current = emailInput.trim();
       setStep('name');
     }
@@ -460,6 +474,49 @@ export function ProfileInlineNotificationsCTA({
               autoComplete='email'
               maxLength={254}
             />
+            {error && (
+              <p className='mt-2 text-center text-[12px] text-red-400'>
+                {error}
+              </p>
+            )}
+          </motion.div>
+        )}
+
+        {step === 'otp' && (
+          <motion.div
+            key='inline-otp'
+            initial={enterVariant.initial}
+            animate={enterVariant.animate}
+            exit={getExitVariant(instant)}
+          >
+            <SubscriptionPearlComposer
+              dataTestId='inline-otp-composer'
+              layout='stacked'
+              className='px-3 py-3'
+              action={
+                <CircularSubmitButton
+                  onClick={() => {
+                    handleVerifyOtp();
+                  }}
+                  disabled={otpCode.length !== 6 || isSubmitting}
+                  submitting={isSubmitting}
+                />
+              }
+            >
+              <div className='px-2 py-2'>
+                <OtpInput
+                  value={otpCode}
+                  onChange={handleOtpChange}
+                  onComplete={() => {
+                    handleVerifyOtp();
+                  }}
+                  autoFocus
+                  aria-label='Enter 6-digit verification code'
+                  disabled={isSubmitting}
+                  error={Boolean(error)}
+                />
+              </div>
+            </SubscriptionPearlComposer>
             {error && (
               <p className='mt-2 text-center text-[12px] text-red-400'>
                 {error}
