@@ -746,7 +746,7 @@ export async function getTopProfilesForStaticGeneration(
 
   const profiles = await db
     .select({
-      username: creatorProfiles.username,
+      username: creatorProfiles.usernameNormalized,
     })
     .from(creatorProfiles)
     .where(

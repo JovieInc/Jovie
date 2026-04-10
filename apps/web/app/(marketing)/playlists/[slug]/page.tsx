@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -9,7 +9,25 @@ import { joviePlaylists, joviePlaylistTracks } from '@/lib/db/schema/playlists';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
-export const revalidate = 300;
+export const dynamicParams = false;
+export const revalidate = false;
+
+export async function generateStaticParams() {
+  try {
+    const playlists = await db
+      .select({ slug: joviePlaylists.slug })
+      .from(joviePlaylists)
+      .where(eq(joviePlaylists.status, 'published'))
+      .orderBy(desc(joviePlaylists.publishedAt), joviePlaylists.slug);
+
+    return playlists.map(playlist => ({
+      slug: playlist.slug,
+    }));
+  } catch {
+    // Build-time DB failures should not block deployment.
+    return [];
+  }
+}
 
 // ============================================================================
 // Data Fetching

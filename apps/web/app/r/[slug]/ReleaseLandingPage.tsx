@@ -36,7 +36,11 @@ import type {
   ProviderKey,
 } from '@/lib/discography/types';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
-import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
+import {
+  appendUTMParamsToUrl,
+  extractUTMParams,
+  type PartialUTMParams,
+} from '@/lib/utm';
 
 interface Provider {
   key: ProviderKey;
@@ -230,6 +234,19 @@ export function ReleaseLandingPage({
   const clickableProviders = providers.filter(
     (provider): provider is Provider & { url: string } => Boolean(provider.url)
   );
+  const resolvedUtmParams = useMemo(() => {
+    if (typeof globalThis.window === 'undefined') {
+      return utmParams;
+    }
+
+    const currentUtmParams = extractUTMParams(
+      new URLSearchParams(globalThis.location.search)
+    );
+
+    return Object.keys(currentUtmParams).length > 0
+      ? currentUtmParams
+      : utmParams;
+  }, [utmParams]);
   // All providers rendered as a flat list — no canonical/fallback distinction for fans
   const sizes = buildArtworkSizes(artworkSizes, release.artworkUrl);
   const hasCredits = credits?.some(group => group.entries.length > 0);
@@ -345,7 +362,7 @@ export function ReleaseLandingPage({
               return (
                 <SmartLinkProviderButton
                   key={provider.key}
-                  href={appendUTMParamsToUrl(provider.url, utmParams)}
+                  href={appendUTMParamsToUrl(provider.url, resolvedUtmParams)}
                   onClick={() => handleProviderClick(provider.key)}
                   label={logoConfig?.name ?? provider.label}
                   iconPath={logoConfig?.iconPath}
@@ -406,7 +423,7 @@ export function ReleaseLandingPage({
           ) : null}
           {soundsUrl ? (
             <Link
-              href={appendUTMParamsToUrl(soundsUrl, utmParams)}
+              href={appendUTMParamsToUrl(soundsUrl, resolvedUtmParams)}
               className={SMART_LINK_MENU_ITEM_CLASS}
               onClick={() => setMenuOpen(false)}
             >
