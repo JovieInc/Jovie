@@ -1,23 +1,35 @@
 'use client';
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { useCallback, useMemo } from 'react';
+import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
-import { TrackRowsContainer } from './components';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
-import { MobileReleaseList } from './MobileReleaseList';
 import {
   createExpandableReleaseCellRenderer,
   createReleaseCellRenderer,
   createRightMetaCellRenderer,
 } from './utils/column-renderers';
 import { getReleaseContextMenuItems } from './utils/release-context-actions';
+
+const MobileReleaseList = lazy(() =>
+  import('./MobileReleaseList').then(m => ({
+    default: m.MobileReleaseList,
+  }))
+);
+
+const TrackRowsContainer = lazy(() =>
+  import(
+    '@/features/dashboard/organisms/release-provider-matrix/components'
+  ).then(m => ({
+    default: m.TrackRowsContainer,
+  }))
+);
 
 interface ProviderConfig {
   label: string;
@@ -65,6 +77,16 @@ const columnHelper = createColumnHelper<ReleaseViewModel>();
 const MetaHeaderCell = () => (
   <span className='sr-only'>Smart link, popularity, year</span>
 );
+
+function TrackRowsLoadingRow({
+  columnCount: _columnCount,
+}: Readonly<{ columnCount: number }>) {
+  return (
+    <div className='px-4 py-2 text-[11px] text-tertiary-token'>
+      Loading tracks...
+    </div>
+  );
+}
 
 /**
  * ReleaseTable - Releases table using UnifiedTable
@@ -283,16 +305,18 @@ export function ReleaseTable({
       if (!tracks) return null;
 
       return (
-        <TrackRowsContainer
-          tracks={tracks}
-          release={release}
-          providerConfig={providerConfig}
-          allProviders={allProviders}
-          columnCount={columnCount}
-          columnVisibility={tanstackColumnVisibility}
-          onTrackClick={onTrackClick}
-          selectedTrackId={selectedTrackId}
-        />
+        <Suspense fallback={<TrackRowsLoadingRow columnCount={columnCount} />}>
+          <TrackRowsContainer
+            tracks={tracks}
+            release={release}
+            providerConfig={providerConfig}
+            allProviders={allProviders}
+            columnCount={columnCount}
+            columnVisibility={tanstackColumnVisibility}
+            onTrackClick={onTrackClick}
+            selectedTrackId={selectedTrackId}
+          />
+        </Suspense>
       );
     },
     [
@@ -329,15 +353,23 @@ export function ReleaseTable({
     }
 
     return (
-      <MobileReleaseList
-        releases={releases}
-        artistName={artistName}
-        onEdit={onEdit}
-        onCopy={onCopy}
-        isSmartLinkLocked={isSmartLinkLocked}
-        getSmartLinkLockReason={getSmartLinkLockReason}
-        groupByYear={groupByYear}
-      />
+      <Suspense
+        fallback={
+          <div className='border-b border-(--linear-app-frame-seam) px-4 py-3 text-[12px] text-secondary-token'>
+            Loading releases...
+          </div>
+        }
+      >
+        <MobileReleaseList
+          releases={releases}
+          artistName={artistName}
+          onEdit={onEdit}
+          onCopy={onCopy}
+          isSmartLinkLocked={isSmartLinkLocked}
+          getSmartLinkLockReason={getSmartLinkLockReason}
+          groupByYear={groupByYear}
+        />
+      </Suspense>
     );
   }
 

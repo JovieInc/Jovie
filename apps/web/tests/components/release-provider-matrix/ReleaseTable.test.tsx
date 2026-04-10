@@ -183,7 +183,7 @@ describe('ReleaseTable', () => {
     expect(idleRow).toBeInTheDocument();
   });
 
-  it('passes the selected track state into expanded track rows', () => {
+  it('passes the selected track state into expanded track rows', async () => {
     render(
       <ReleaseTable
         {...commonProps}
@@ -193,11 +193,11 @@ describe('ReleaseTable', () => {
     );
 
     expect(screen.getByTestId('expanded-row-release_1')).toBeInTheDocument();
-    expect(screen.getByTestId('expanded-track-track-1')).toHaveAttribute(
+    expect(await screen.findByTestId('expanded-track-track-1')).toHaveAttribute(
       'data-state',
       'idle'
     );
-    expect(screen.getByTestId('expanded-track-track-2')).toHaveAttribute(
+    expect(await screen.findByTestId('expanded-track-track-2')).toHaveAttribute(
       'data-state',
       'selected'
     );
