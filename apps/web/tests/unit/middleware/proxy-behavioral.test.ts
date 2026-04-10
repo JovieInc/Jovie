@@ -632,6 +632,26 @@ describe('proxy.ts middleware', () => {
       expect(headers.get('host')).toBe(stagingFapiHost);
       expect(headers.get('origin')).toBe(`https://${stagingFapiHost}`);
     });
+
+    it('returns 503 for staging Clerk proxy traffic when staging keys are missing', async () => {
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_live_${Buffer.from('production-fapi.clerk.example$').toString('base64')}`;
+      mocks.resolveClerkKeys.mockReturnValue({
+        publishableKey: undefined,
+        secretKey: undefined,
+      });
+
+      const req = createUnauthenticatedRequest({
+        hostname: 'staging.jov.ie',
+        pathname: '/__clerk/v1/client',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(503);
+      expect(mocks.fetch).not.toHaveBeenCalled();
+      await expect(res.json()).resolves.toEqual({
+        error: 'Clerk proxy unavailable: missing or invalid publishable key',
+      });
+    });
   });
 
   // ==========================================================================

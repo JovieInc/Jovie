@@ -1177,10 +1177,7 @@ export default async function middleware(
     pathname.startsWith('/clerk/') ||
     pathname === '/clerk'
   ) {
-    const pk =
-      resolveClerkKeys(hostname).publishableKey ??
-      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ??
-      '';
+    const pk = resolveClerkKeys(hostname).publishableKey ?? '';
     let fapiHost = '';
     try {
       const b64 = pk.replace(/^pk_(live|test)_/, '');
