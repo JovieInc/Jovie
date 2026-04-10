@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  mockShowPendingShell,
   mockToastInfo,
   mockUsePathname,
   renderDashboardNav,
@@ -83,6 +84,17 @@ describe('DashboardNav interactions', () => {
     await user.click(profileButton);
 
     expect(profileButton).toBeDefined();
+  });
+
+  it('shows the releases pending shell once for a pointer click', async () => {
+    const user = userEvent.setup();
+
+    renderDashboardNav({ renderFn: render });
+
+    await user.click(screen.getByRole('link', { name: 'Releases' }));
+
+    expect(mockShowPendingShell).toHaveBeenCalledTimes(1);
+    expect(mockShowPendingShell).toHaveBeenCalledWith('releases');
   });
 
   it('keeps demo-disabled items as links on nested demo routes', async () => {

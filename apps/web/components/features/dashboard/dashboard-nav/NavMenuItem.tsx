@@ -182,20 +182,26 @@ export function NavMenuItem({
   );
 
   const handleButtonClick = useCallback(() => {
+    const hadPendingPointerNavigation = pendingNavigationRef.current;
     pendingNavigationRef.current = false;
     clearPendingNavigationListeners();
-    showPendingShell();
+    if (!hadPendingPointerNavigation) {
+      showPendingShell();
+    }
     onClick?.();
   }, [clearPendingNavigationListeners, onClick, showPendingShell]);
 
   const handleLinkClick = useCallback(
     (event: MouseEvent<HTMLAnchorElement>) => {
+      const hadPendingPointerNavigation = pendingNavigationRef.current;
       pendingNavigationRef.current = false;
       clearPendingNavigationListeners();
       if (preventNavigation) {
         event.preventDefault();
       }
-      showPendingShell();
+      if (!hadPendingPointerNavigation) {
+        showPendingShell();
+      }
       onClick?.();
 
       if (!preventNavigation && onNavigate) {
