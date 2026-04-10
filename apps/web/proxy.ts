@@ -16,7 +16,7 @@ import {
   HOMEPAGE_CITY_COOKIE,
   HOMEPAGE_REGION_COOKIE,
 } from '@/constants/app';
-import { BASE_URL, HOSTNAME } from '@/constants/domains';
+import { BASE_URL, HOSTNAME, STAGING_HOSTNAMES } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
 import {
@@ -84,11 +84,6 @@ interface PathCategory {
 function matchesRoute(pathname: string, route: string): boolean {
   return pathname === route || pathname.startsWith(`${route}/`);
 }
-
-const STAGING_HOSTNAMES = new Set([
-  `staging.${HOSTNAME}`,
-  `main.${HOSTNAME}`, // Legacy staging hostname
-]);
 
 // Legacy subdomain set — kept for redirect to /investor-portal
 const INVESTOR_HOSTNAMES = new Set([
@@ -1170,12 +1165,11 @@ export default async function middleware(
   const hostname = req.nextUrl.hostname;
 
   // ========================================================================
-  // Clerk FAPI proxy: fetch-based proxy using the FAPI host decoded from
-  // NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY. Each env (staging/production) has its
-  // own publishable key via Doppler, so the proxy automatically routes to
-  // the correct Clerk instance. We use fetch() because NextResponse.rewrite()
-  // and vercel.json rewrites forward the original Host header, causing Clerk
-  // to return 400 "Invalid host".
+  // Clerk FAPI proxy: fetch-based proxy using the hostname-resolved Clerk
+  // publishable key. Staging and production use different Clerk instances,
+  // so the FAPI host must be decoded from the active host's key at runtime.
+  // We use fetch() because NextResponse.rewrite() and vercel.json rewrites
+  // forward the original Host header, causing Clerk to return 400 "Invalid host".
   // ========================================================================
   if (
     pathname.startsWith('/__clerk/') ||
@@ -1183,7 +1177,7 @@ export default async function middleware(
     pathname.startsWith('/clerk/') ||
     pathname === '/clerk'
   ) {
-    const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+    const pk = resolveClerkKeys(hostname).publishableKey ?? '';
     let fapiHost = '';
     try {
       const b64 = pk.replace(/^pk_(live|test)_/, '');
@@ -1329,8 +1323,29 @@ export default async function middleware(
   // Select the correct Clerk middleware based on hostname.
   // Staging uses a separate Clerk instance with its own keys.
   const selectedMiddleware = isStagingHost(hostname)
-    ? (getClerkStagingMiddleware() ?? clerkProductionMiddleware)
+    ? getClerkStagingMiddleware()
     : clerkProductionMiddleware;
+
+  if (!selectedMiddleware) {
+    if (!pathInfo.isProtectedPath) {
+      return handleRequest(req, null);
+    }
+
+    return new NextResponse(
+      JSON.stringify({
+        error: 'Service temporarily unavailable',
+        message: 'Authentication service is initializing. Please try again.',
+      }),
+      {
+        status: 503,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': '5',
+        },
+      }
+    );
+  }
+
   return selectedMiddleware(req, event);
 }
 

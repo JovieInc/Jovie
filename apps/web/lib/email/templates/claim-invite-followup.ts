@@ -8,7 +8,7 @@
  */
 
 import { APP_NAME } from '@/constants/app';
-import { BASE_URL, getProfileUrl } from '@/constants/domains';
+import { getProfileUrl } from '@/constants/domains';
 import {
   buildClickTrackingUrl,
   buildOpenTrackingUrl,
@@ -16,6 +16,7 @@ import {
 } from '@/lib/email/tracking';
 import { buildClaimInviteUnsubscribeUrl } from '@/lib/email/unsubscribe-token';
 import { escapeHtml } from '../utils';
+import { resolveSafeFirstName } from './personalization';
 
 export interface FollowUpTemplateData {
   /** Creator's display name or username */
@@ -84,11 +85,11 @@ function wrapWithClickTracking(
 export function getFollowUpSubject(data: FollowUpTemplateData): string {
   switch (data.followUpNumber) {
     case 1:
-      return `Reminder: Your ${APP_NAME} profile is waiting`;
+      return `Did you see the profile I made for you?`;
     case 2:
-      return `Last chance to claim your ${APP_NAME} profile`;
+      return `Curious what you think`;
     case 3:
-      return `Your ${APP_NAME} profile will be removed soon`;
+      return `Last note on this`;
   }
 }
 
@@ -99,6 +100,8 @@ export function getFollowUpText(data: FollowUpTemplateData): string {
   const { creatorName, username, claimToken, recipientEmail, followUpNumber } =
     data;
   const claimUrl = buildClaimUrl(username, claimToken);
+  const greetingName = resolveSafeFirstName(creatorName, username);
+  const salutation = greetingName ? `Hey ${greetingName},` : 'Hey,';
   const unsubscribeUrl = recipientEmail
     ? buildClaimInviteUnsubscribeUrl(recipientEmail)
     : null;
@@ -108,39 +111,42 @@ export function getFollowUpText(data: FollowUpTemplateData): string {
     : '';
 
   const messages = {
-    1: `Hey ${creatorName},
+    1: `${salutation}
 
-We noticed you haven't claimed your ${APP_NAME} profile yet. Your page at ${BASE_URL}/${username} is ready and waiting.
+Just bumping this in case you missed it.
 
-Claim it now: ${claimUrl}
+Saw you're on Linktree, so I made you a ${APP_NAME} profile.
 
-It only takes 30 seconds to claim, and it's free forever.
+Claim it here: ${claimUrl}
 
-- The ${APP_NAME} Team${unsubscribeSection}`,
+If you try it, let me know what you think. If you claim it and message me, I'll get it verified.
 
-    2: `Hey ${creatorName},
+Cheers,
+Tim${unsubscribeSection}`,
 
-This is your last chance to claim your ${APP_NAME} profile before someone else does.
+    2: `${salutation}
 
-Your page: ${BASE_URL}/${username}
+Would still love your take on this.
 
-Claim now (30 seconds): ${claimUrl}
+Claim it here: ${claimUrl}
 
-Once claimed, you'll have a professional link-in-bio that automatically syncs with your music.
+Even if you don't end up using it, a quick reply on what turned you off would be super helpful.
 
-- The ${APP_NAME} Team${unsubscribeSection}`,
+Cheers,
+Tim${unsubscribeSection}`,
 
-    3: `Hey ${creatorName},
+    3: `${salutation}
 
-We'll be removing unclaimed profiles soon. If you'd like to keep yours, claim it now:
+Last note on this.
 
-${claimUrl}
+Claim it here: ${claimUrl}
 
-Your profile at ${BASE_URL}/${username} has been set up and is ready to use.
+If you want the profile, grab it here. If you claim it and message me, I'll get it verified.
 
-This is the last email we'll send about this.
+This is the last email I'll send about it.
 
-- The ${APP_NAME} Team${unsubscribeSection}`,
+Cheers,
+Tim${unsubscribeSection}`,
   };
 
   return messages[followUpNumber];
@@ -159,7 +165,6 @@ export function getFollowUpHtml(data: FollowUpTemplateData): string {
     followUpNumber,
   } = data;
   const claimUrl = buildClaimUrl(username, claimToken);
-  const previewUrl = getProfileUrl(username);
   const unsubscribeUrl = recipientEmail
     ? buildClaimInviteUnsubscribeUrl(recipientEmail)
     : null;
@@ -171,24 +176,19 @@ export function getFollowUpHtml(data: FollowUpTemplateData): string {
     trackingPayload,
     'claim_cta'
   );
-  const trackedPreviewUrl = wrapWithClickTracking(
-    previewUrl,
-    trackingPayload,
-    'preview'
-  );
   const openTrackingPixel = trackingPayload
     ? buildOpenTrackingUrl(trackingPayload)
     : null;
 
   // Escape user values
-  const safeCreatorName = escapeHtml(creatorName);
-  const safeUsername = escapeHtml(username);
+  const greetingName = resolveSafeFirstName(creatorName, username);
+  const safeGreetingName = greetingName ? escapeHtml(greetingName) : null;
   const safeAvatarUrl = avatarUrl ? escapeHtml(avatarUrl) : null;
   const safeUnsubscribeUrl = unsubscribeUrl ? escapeHtml(unsubscribeUrl) : null;
 
   const avatarSection = safeAvatarUrl
     ? `<div style="text-align: center; margin-bottom: 24px;">
-        <img src="${safeAvatarUrl}" alt="${safeCreatorName}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;" />
+        <img src="${safeAvatarUrl}" alt="${escapeHtml(creatorName)}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;" />
       </div>`
     : '';
 
@@ -201,10 +201,8 @@ export function getFollowUpHtml(data: FollowUpTemplateData): string {
   // Different content per follow-up
   const content = getFollowUpContent(
     followUpNumber,
-    safeCreatorName,
-    safeUsername,
-    trackedClaimUrl,
-    trackedPreviewUrl
+    safeGreetingName,
+    trackedClaimUrl
   );
 
   return `
@@ -267,19 +265,18 @@ export function getFollowUpHtml(data: FollowUpTemplateData): string {
  */
 function getFollowUpContent(
   followUpNumber: 1 | 2 | 3,
-  creatorName: string,
-  username: string,
-  claimUrl: string,
-  previewUrl: string
+  greetingName: string | null,
+  claimUrl: string
 ): string {
+  const heading = greetingName ? `Hey ${greetingName},` : 'Hey,';
   switch (followUpNumber) {
     case 1:
       return `
         <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 600; color: #000; text-align: center;">
-          Hey ${creatorName}, your profile is waiting!
+          ${heading}
         </h1>
         <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #333; text-align: center;">
-          We noticed you haven't claimed your ${APP_NAME} profile yet. It's all set up at <a href="${previewUrl}" style="color: #000; font-weight: 600;">${BASE_URL}/${username}</a>
+          Just bumping this in case you missed it. Saw you're on Linktree, so I made you a ${APP_NAME} profile.
         </p>
         <div style="text-align: center; margin-bottom: 24px;">
           <a href="${claimUrl}" style="display: inline-block; padding: 14px 32px; background-color: #000; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
@@ -287,41 +284,41 @@ function getFollowUpContent(
           </a>
         </div>
         <p style="margin: 0; font-size: 14px; color: #666; text-align: center;">
-          Takes 30 seconds. Free forever.
+          If you try it, let me know what you think. If you claim it and message me, I'll get it verified.
         </p>`;
 
     case 2:
       return `
         <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 600; color: #000; text-align: center;">
-          Last chance, ${creatorName}!
+          ${heading}
         </h1>
         <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #333; text-align: center;">
-          Your ${APP_NAME} profile is still unclaimed. Don't let someone else take <a href="${previewUrl}" style="color: #000; font-weight: 600;">${BASE_URL}/${username}</a>
+          Would still love your take on this.
         </p>
         <div style="text-align: center; margin-bottom: 24px;">
-          <a href="${claimUrl}" style="display: inline-block; padding: 14px 32px; background-color: #e53e3e; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
-            Claim Now
+          <a href="${claimUrl}" style="display: inline-block; padding: 14px 32px; background-color: #000; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+            Claim Your Profile
           </a>
         </div>
         <p style="margin: 0; font-size: 14px; color: #666; text-align: center;">
-          Once claimed, you'll get a professional link-in-bio that syncs with your music.
+          Even if you don't end up using it, a quick reply on what turned you off would be super helpful.
         </p>`;
 
     case 3:
       return `
         <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 600; color: #000; text-align: center;">
-          Final notice
+          ${heading}
         </h1>
         <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #333; text-align: center;">
-          We'll be removing unclaimed profiles soon. If you'd like to keep yours at <a href="${previewUrl}" style="color: #000; font-weight: 600;">${BASE_URL}/${username}</a>, claim it now.
+          Last note on this.
         </p>
         <div style="text-align: center; margin-bottom: 24px;">
           <a href="${claimUrl}" style="display: inline-block; padding: 14px 32px; background-color: #000; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
-            Keep My Profile
+            Claim Your Profile
           </a>
         </div>
         <p style="margin: 0; font-size: 14px; color: #999; text-align: center;">
-          This is the last email we'll send about this.
+          If you want the profile, grab it here. If you claim it and message me, I'll get it verified. This is the last email I'll send about it.
         </p>`;
   }
 }

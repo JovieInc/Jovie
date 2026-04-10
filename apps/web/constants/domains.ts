@@ -15,7 +15,7 @@ import { publicEnv } from '@/lib/env-public';
 
 /** Main domain hostname (jov.ie) */
 export const HOSTNAME = publicEnv.NEXT_PUBLIC_PROFILE_HOSTNAME;
-const STAGING_HOSTNAMES = new Set([
+export const STAGING_HOSTNAMES = new Set([
   `staging.${HOSTNAME}`,
   `main.${HOSTNAME}`, // Legacy staging hostname
 ]);
