@@ -24,9 +24,10 @@ const FIRST_TASK_TITLE =
   DEFAULT_RELEASE_TASK_TEMPLATE[0]?.title ?? 'Release tasks';
 const FRAME_SETTLE_MS = 1_250;
 const HOME_FRAME_SETTLE_MS = 2_100;
+const FOUNDER_DISPLAY_NAME = 'Tim White';
 const HOME_READY_TEXT =
   /Drop more music\. Crush every release\.|The link your music deserves\./;
-const PUBLIC_PROFILE_READY_TEXT = /Calvin Harris|Tim White/;
+const PUBLIC_PROFILE_READY_TEXT = /Tim White/;
 const CLEANUP_SELECTORS = [
   '[data-testid="dev-toolbar"]',
   '[data-testid="cookie-banner"]',
@@ -676,6 +677,9 @@ test.describe('YC Demo Recording', () => {
       readyText: PUBLIC_PROFILE_READY_TEXT,
     });
     await injectCaptionOverlay(demoPage);
+    await expect(demoPage.locator('body')).toContainText(FOUNDER_DISPLAY_NAME, {
+      timeout: 30_000,
+    });
     await setCaption(
       demoPage,
       'Artist page already live. Latest release featured automatically.'

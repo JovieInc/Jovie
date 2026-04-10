@@ -77,6 +77,9 @@ export const publicEnv = {
   get NEXT_PUBLIC_E2E_MODE() {
     return process.env.NEXT_PUBLIC_E2E_MODE || undefined;
   },
+  get NEXT_PUBLIC_DEMO_RECORDING() {
+    return process.env.NEXT_PUBLIC_DEMO_RECORDING || undefined;
+  },
   get NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION() {
     return process.env.NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION || undefined;
   },

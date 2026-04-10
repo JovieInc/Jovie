@@ -2,13 +2,18 @@ import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getCurrentUserProfile } from '@/lib/auth/session';
-import { resolveTestBypassUserId } from '@/lib/auth/test-mode';
+import {
+  isTestAuthBypassEnabled,
+  isTrustedTestBypassRequest,
+  resolveTestBypassUserId,
+} from '@/lib/auth/test-mode';
 import { db } from '@/lib/db';
 import { clickEvents } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import { getReleaseById } from '@/lib/discography/queries';
+import { env } from '@/lib/env-server';
 
 export const runtime = 'nodejs';
 
@@ -40,8 +45,8 @@ const parseJsonArray = <T>(value: JsonArray<T>): T[] => {
 async function getProfileIdForClerkUserId(clerkUserId: string) {
   const [profile] = await db
     .select({ id: creatorProfiles.id })
-    .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .from(users)
+    .innerJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
 
@@ -62,8 +67,12 @@ async function resolveAnalyticsProfile(request: Request) {
     }
   }
 
-  if (process.env.DEMO_RECORDING === '1') {
-    const demoClerkUserId = process.env.DEMO_CLERK_USER_ID?.trim();
+  if (
+    env.DEMO_RECORDING === '1' &&
+    isTestAuthBypassEnabled() &&
+    isTrustedTestBypassRequest(request.headers)
+  ) {
+    const demoClerkUserId = env.DEMO_CLERK_USER_ID?.trim();
     if (demoClerkUserId) {
       const demoProfileId = await getProfileIdForClerkUserId(demoClerkUserId);
       if (demoProfileId) {

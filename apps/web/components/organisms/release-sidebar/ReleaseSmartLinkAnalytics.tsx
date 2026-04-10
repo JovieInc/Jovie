@@ -9,15 +9,17 @@ import {
   DrawerInlineIconButton,
 } from '@/components/molecules/drawer';
 import { copyToClipboard } from '@/hooks/useClipboard';
+import {
+  TEST_AUTH_BYPASS_MODE,
+  TEST_MODE_COOKIE,
+  TEST_MODE_HEADER,
+  TEST_USER_ID_COOKIE,
+  TEST_USER_ID_HEADER,
+} from '@/lib/auth/test-mode-constants';
+import { env } from '@/lib/env-client';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
 import type { Release, ReleaseSidebarAnalytics } from './types';
-
-const TEST_MODE_HEADER = 'x-test-mode';
-const TEST_USER_ID_HEADER = 'x-test-user-id';
-const TEST_MODE_COOKIE = '__e2e_test_mode';
-const TEST_USER_ID_COOKIE = '__e2e_test_user_id';
-const TEST_AUTH_BYPASS_MODE = 'bypass-auth';
 
 function readCookieValue(cookieName: string): string | null {
   if (typeof document === 'undefined') {
@@ -38,8 +40,7 @@ function readCookieValue(cookieName: string): string | null {
 
 function getTestBypassHeaders(): Record<string, string> | undefined {
   const isDemoBypassEnabled =
-    process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
-    process.env.NEXT_PUBLIC_DEMO_RECORDING === '1';
+    env.NEXT_PUBLIC_E2E_MODE === '1' || env.NEXT_PUBLIC_DEMO_RECORDING === '1';
 
   if (!isDemoBypassEnabled) {
     return undefined;
