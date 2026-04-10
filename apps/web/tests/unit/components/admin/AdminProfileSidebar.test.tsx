@@ -204,7 +204,6 @@ describe('AdminProfileSidebar', () => {
     expect(fetchSpy).toHaveBeenCalledWith(
       '/api/spotify/fal-analysis?artistId=1234567890123456789012',
       expect.objectContaining({
-        cache: 'no-store',
         signal: expect.any(AbortSignal),
       })
     );
@@ -360,7 +359,6 @@ describe('AdminProfileSidebar', () => {
     expect(fetchSpy).toHaveBeenCalledWith(
       '/api/spotify/fal-analysis?artistId=1234567890123456789012',
       expect.objectContaining({
-        cache: 'no-store',
         signal: expect.any(AbortSignal),
       })
     );

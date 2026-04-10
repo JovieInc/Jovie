@@ -1,5 +1,4 @@
 import type { ContextMenuItemType } from '@/components/organisms/table';
-import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 interface GetReleaseContextMenuItemsOptions {
@@ -17,14 +16,18 @@ interface GetReleaseContextMenuItemsOptions {
  *
  * Delegates to the canonical `buildReleaseActions` builder.
  */
-export function getReleaseContextMenuItems({
+export async function getReleaseContextMenuItems({
   release,
   onEdit,
   onCopy,
   artistName,
   isSmartLinkLocked,
   getSmartLinkLockReason,
-}: GetReleaseContextMenuItemsOptions): ContextMenuItemType[] {
+}: GetReleaseContextMenuItemsOptions): Promise<ContextMenuItemType[]> {
+  const { buildReleaseActions } = await import(
+    '@/features/dashboard/organisms/releases/release-actions'
+  );
+
   return buildReleaseActions({
     release,
     onEdit,

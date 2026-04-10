@@ -8,21 +8,43 @@ import { describe, expect, it } from 'vitest';
  * when to start/stop polling for auto-generated titles.
  */
 
-/** Mirrors TITLE_POLL_INTERVAL_MS in useJovieChat */
-const TITLE_POLL_INTERVAL_MS = 2_000;
+/** Mirrors TITLE_POLL_FAST_INTERVAL_MS in useJovieChat */
+const TITLE_POLL_FAST_INTERVAL_MS = 2_000;
+
+/** Mirrors TITLE_POLL_BACKOFF_INTERVAL_MS in useJovieChat */
+const TITLE_POLL_BACKOFF_INTERVAL_MS = 5_000;
 
 /** Mirrors TITLE_POLL_MAX_DURATION_MS in useJovieChat */
 const TITLE_POLL_MAX_DURATION_MS = 15_000;
 
+/** Mirrors TITLE_POLL_FAST_WINDOW_MS in useJovieChat */
+const TITLE_POLL_FAST_WINDOW_MS = TITLE_POLL_FAST_INTERVAL_MS * 3;
+
 describe('title polling decision logic', () => {
+  function getTitlePollIntervalMs(
+    titlePollingSince: number | null,
+    currentTime: number
+  ): number | false {
+    if (titlePollingSince === null) {
+      return false;
+    }
+
+    const elapsed = currentTime - titlePollingSince;
+
+    if (elapsed >= TITLE_POLL_MAX_DURATION_MS) {
+      return false;
+    }
+
+    return elapsed < TITLE_POLL_FAST_WINDOW_MS
+      ? TITLE_POLL_FAST_INTERVAL_MS
+      : TITLE_POLL_BACKOFF_INTERVAL_MS;
+  }
+
   function shouldPollForTitle(
     titlePollingSince: number | null,
     currentTime: number
   ): boolean {
-    return (
-      titlePollingSince !== null &&
-      currentTime - titlePollingSince < TITLE_POLL_MAX_DURATION_MS
-    );
+    return getTitlePollIntervalMs(titlePollingSince, currentTime) !== false;
   }
 
   it('should not poll when titlePollingSince is null', () => {
@@ -32,6 +54,26 @@ describe('title polling decision logic', () => {
   it('should poll when recently started', () => {
     const now = Date.now();
     expect(shouldPollForTitle(now, now)).toBe(true);
+  });
+
+  it('uses the fast interval for the first few title polls', () => {
+    const start = Date.now();
+    expect(getTitlePollIntervalMs(start, start)).toBe(
+      TITLE_POLL_FAST_INTERVAL_MS
+    );
+    expect(
+      getTitlePollIntervalMs(start, start + TITLE_POLL_FAST_WINDOW_MS - 1)
+    ).toBe(TITLE_POLL_FAST_INTERVAL_MS);
+  });
+
+  it('backs off once title polling appears stalled', () => {
+    const start = Date.now();
+    expect(
+      getTitlePollIntervalMs(start, start + TITLE_POLL_FAST_WINDOW_MS)
+    ).toBe(TITLE_POLL_BACKOFF_INTERVAL_MS);
+    expect(
+      getTitlePollIntervalMs(start, start + TITLE_POLL_MAX_DURATION_MS - 1)
+    ).toBe(TITLE_POLL_BACKOFF_INTERVAL_MS);
   });
 
   it('should poll for up to TITLE_POLL_MAX_DURATION_MS', () => {
@@ -57,20 +99,33 @@ describe('title polling decision logic', () => {
 });
 
 describe('title polling behavior', () => {
-  it('uses correct poll interval', () => {
-    expect(TITLE_POLL_INTERVAL_MS).toBe(2000);
+  it('uses correct fast poll interval', () => {
+    expect(TITLE_POLL_FAST_INTERVAL_MS).toBe(2000);
+  });
+
+  it('uses correct backoff poll interval', () => {
+    expect(TITLE_POLL_BACKOFF_INTERVAL_MS).toBe(5000);
   });
 
   it('uses correct max duration', () => {
     expect(TITLE_POLL_MAX_DURATION_MS).toBe(15000);
   });
 
-  it('will make at most ~7 poll attempts before timing out', () => {
-    // 15000ms / 2000ms = 7.5, so at most 7 full intervals
-    const maxAttempts = Math.floor(
-      TITLE_POLL_MAX_DURATION_MS / TITLE_POLL_INTERVAL_MS
+  it('caps title polling to a small number of requests before timing out', () => {
+    const pollSchedule = [
+      TITLE_POLL_FAST_INTERVAL_MS,
+      TITLE_POLL_FAST_INTERVAL_MS,
+      TITLE_POLL_FAST_INTERVAL_MS,
+      TITLE_POLL_BACKOFF_INTERVAL_MS,
+    ];
+
+    const elapsedBeforeTimeout = pollSchedule.reduce(
+      (total, interval) => total + interval,
+      0
     );
-    expect(maxAttempts).toBe(7);
+
+    expect(elapsedBeforeTimeout).toBe(11_000);
+    expect(pollSchedule).toHaveLength(4);
   });
 });
 

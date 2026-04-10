@@ -121,7 +121,7 @@ export default function PricingPage() {
             </div>
             <Link
               href={`${APP_ROUTES.SIGNUP}?plan=pro`}
-              className='marketing-cta focus-ring mt-7'
+              className='public-action-primary focus-ring mt-7'
             >
               Get started
             </Link>

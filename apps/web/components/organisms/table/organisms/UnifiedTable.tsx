@@ -126,7 +126,9 @@ export interface UnifiedTableProps<TData> {
   /**
    * Get context menu items for a row
    */
-  readonly getContextMenuItems?: (row: TData) => ContextMenuItemType[];
+  readonly getContextMenuItems?: (
+    row: TData
+  ) => ContextMenuItemType[] | Promise<ContextMenuItemType[]>;
 
   /**
    * Get custom class names for a row
@@ -548,7 +550,10 @@ export function UnifiedTable<TData>({
           : null;
 
       const wrappedRowElement = getContextMenuItems ? (
-        <TableContextMenu key={row.id} items={getContextMenuItems(rowData)}>
+        <TableContextMenu
+          key={row.id}
+          getItems={() => getContextMenuItems(rowData)}
+        >
           {rowElement}
         </TableContextMenu>
       ) : (

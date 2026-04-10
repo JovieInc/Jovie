@@ -71,7 +71,6 @@ export function useLeadKeywordsQuery() {
     queryKey: queryKeys.admin.leads.keywords(),
     queryFn: async ({ signal }) => {
       const response = await fetchWithTimeout('/api/admin/leads/keywords', {
-        cache: 'no-store',
         signal,
       });
       return response as { keywords: AdminLeadKeyword[] };
@@ -86,7 +85,6 @@ export function useLeadPipelineSettingsQuery() {
     queryKey: queryKeys.admin.leads.settings(),
     queryFn: async ({ signal }) => {
       const response = await fetchWithTimeout('/api/admin/leads/settings', {
-        cache: 'no-store',
         signal,
       });
       return response as { settings: LeadPipelineSettings };

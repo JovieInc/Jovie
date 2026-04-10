@@ -24,6 +24,10 @@ import {
   ReleaseCell,
   SmartLinkCell,
 } from '@/features/dashboard/organisms/releases/cells';
+import {
+  formatReleaseDate,
+  formatReleaseDateMonthYear,
+} from '@/lib/discography/formatting';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
@@ -32,11 +36,11 @@ import { formatDuration } from '@/lib/utils/formatDuration';
 // Constants
 // ============================================================================
 
-/** Date format options for release date display */
 export const DATE_FORMAT_OPTIONS = {
   month: 'short',
   year: 'numeric',
 } as const;
+
 export const DATE_TOOLTIP_FORMAT_OPTIONS = {
   year: 'numeric',
   month: 'long',
@@ -276,17 +280,10 @@ export function createRightMetaCellRenderer(
   }: CellContext<ReleaseViewModel, unknown>) {
     const release = row.original;
     const dateLabel = release.releaseDate
-      ? new Date(release.releaseDate).toLocaleDateString('en-US', {
-          month: 'short',
-          year: 'numeric',
-        })
+      ? formatReleaseDateMonthYear(release.releaseDate)
       : '—';
     const yearTitle = release.releaseDate
-      ? new Date(release.releaseDate).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })
+      ? formatReleaseDate(release.releaseDate)
       : 'Unknown release date';
 
     return (
@@ -510,10 +507,7 @@ export function renderStatsCell({
 }: CellContext<ReleaseViewModel, unknown>) {
   const release = row.original;
   const dateStr = release.releaseDate
-    ? new Date(release.releaseDate).toLocaleDateString('en-US', {
-        month: 'short',
-        year: 'numeric',
-      })
+    ? formatReleaseDateMonthYear(release.releaseDate)
     : null;
 
   return (

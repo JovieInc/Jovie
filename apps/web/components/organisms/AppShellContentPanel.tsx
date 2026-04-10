@@ -17,9 +17,9 @@ export interface AppShellContentPanelProps {
 
 const PANEL_MAX_WIDTH_CLASSNAME = {
   full: 'max-w-none',
-  wide: 'max-w-[84rem]',
-  reading: 'max-w-[56rem]',
-  form: 'max-w-[50rem]',
+  wide: 'max-w-(--app-shell-content-max-wide)',
+  reading: 'max-w-(--app-shell-content-max-reading)',
+  form: 'max-w-(--app-shell-content-max-form)',
 } as const;
 
 const PANEL_OUTER_INSET_CLASSNAME = 'px-2.5 py-2.5 sm:px-3 sm:py-3';
