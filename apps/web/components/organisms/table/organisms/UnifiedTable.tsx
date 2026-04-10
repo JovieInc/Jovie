@@ -548,7 +548,10 @@ export function UnifiedTable<TData>({
           : null;
 
       const wrappedRowElement = getContextMenuItems ? (
-        <TableContextMenu key={row.id} items={getContextMenuItems(rowData)}>
+        <TableContextMenu
+          key={row.id}
+          getItems={() => getContextMenuItems(rowData)}
+        >
           {rowElement}
         </TableContextMenu>
       ) : (

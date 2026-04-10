@@ -1,7 +1,16 @@
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { type ReactNode, useMemo } from 'react';
+import {
+  cloneElement,
+  isValidElement,
+  type MouseEventHandler,
+  type ReactElement,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 
@@ -56,7 +65,9 @@ export interface TableContextMenuProps {
   /** React children to wrap with context menu functionality */
   readonly children: ReactNode;
   /** Array of menu items to display in the context menu */
-  readonly items: ContextMenuItemType[];
+  readonly items?: ContextMenuItemType[];
+  /** Lazily resolve menu items when the context menu is opened */
+  readonly getItems?: () => ContextMenuItemType[];
   /** Whether the context menu is disabled */
   readonly disabled?: boolean;
 }
@@ -220,18 +231,48 @@ export function convertContextMenuItems(
 export function TableContextMenu({
   children,
   items,
+  getItems,
   disabled = false,
 }: TableContextMenuProps) {
-  // Memoize conversion to prevent recalculation on every render
-  const convertedItems = useMemo(() => convertContextMenuItems(items), [items]);
+  const [resolvedItems, setResolvedItems] = useState<ContextMenuItemType[]>(
+    items ?? []
+  );
 
-  if (disabled || items.length === 0) {
+  useEffect(() => {
+    if (!getItems) {
+      setResolvedItems(items ?? []);
+    }
+  }, [getItems, items]);
+
+  // Memoize conversion to prevent recalculation on every render
+  const convertedItems = useMemo(
+    () => convertContextMenuItems(resolvedItems),
+    [resolvedItems]
+  );
+
+  if (disabled || (!getItems && resolvedItems.length === 0)) {
     return <>{children}</>;
   }
 
+  const triggerChild =
+    getItems && isValidElement(children)
+      ? (() => {
+          const contextMenuChild = children as ReactElement<{
+            onContextMenuCapture?: MouseEventHandler<Element>;
+          }>;
+
+          return cloneElement(contextMenuChild, {
+            onContextMenuCapture: event => {
+              contextMenuChild.props.onContextMenuCapture?.(event);
+              setResolvedItems(getItems());
+            },
+          });
+        })()
+      : children;
+
   return (
     <TableActionMenu items={convertedItems} trigger='context'>
-      {children}
+      {triggerChild}
     </TableActionMenu>
   );
 }

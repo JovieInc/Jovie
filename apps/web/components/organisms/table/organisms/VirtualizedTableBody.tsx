@@ -259,7 +259,10 @@ export function VirtualizedTableBody<TData>({
 
         // Apply context menu wrapper if needed
         const wrappedRow = getContextMenuItems ? (
-          <TableContextMenu key={row.id} items={getContextMenuItems(rowData)}>
+          <TableContextMenu
+            key={row.id}
+            getItems={() => getContextMenuItems(rowData)}
+          >
             {rowElement}
           </TableContextMenu>
         ) : (
