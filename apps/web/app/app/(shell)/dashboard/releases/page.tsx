@@ -3,7 +3,11 @@ import { APP_ROUTES } from '@/constants/routes';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
+import { queryKeys } from '@/lib/queries';
+import { HydrateClient } from '@/lib/queries/HydrateClient';
+import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
 import { getDashboardShellData } from '../actions';
+import { loadReleaseMatrix } from './actions';
 import { ReleasesClientBoundary } from './ReleasesClientBoundary';
 import { ReleasesPageClient } from './ReleasesPageClient';
 
@@ -14,8 +18,8 @@ export const runtime = 'nodejs';
  *
  * Auth check via getCachedAuth (Clerk JWT, no DB) runs first. The shared shell
  * and /app route warm the release matrix cache ahead of navigation, so this
- * page avoids an extra blocking server prefetch on warm transitions. Cold
- * loads still fall back to the client skeleton while the query resolves.
+ * page keeps warm transitions instant while still hydrating release data on
+ * direct visits, refreshes, and bookmarks.
  */
 export default async function ReleasesPage() {
   const { userId } = await getCachedAuth();
@@ -43,9 +47,30 @@ export default async function ReleasesPage() {
     redirect(APP_ROUTES.ONBOARDING);
   }
 
+  const profileId = dashboardData.selectedProfile?.id;
+  if (profileId) {
+    const queryClient = getQueryClient();
+    await queryClient
+      .prefetchQuery({
+        queryKey: queryKeys.releases.matrix(profileId),
+        queryFn: () => loadReleaseMatrix(profileId),
+      })
+      .catch(error => {
+        void captureError(
+          'Release matrix prefetch failed on releases page',
+          error,
+          {
+            route: APP_ROUTES.DASHBOARD_RELEASES,
+          }
+        );
+      });
+  }
+
   return (
-    <ReleasesClientBoundary>
-      <ReleasesPageClient />
-    </ReleasesClientBoundary>
+    <HydrateClient state={getDehydratedState()}>
+      <ReleasesClientBoundary>
+        <ReleasesPageClient />
+      </ReleasesClientBoundary>
+    </HydrateClient>
   );
 }

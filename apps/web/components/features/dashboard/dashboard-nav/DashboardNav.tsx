@@ -82,7 +82,7 @@ function formatTaskBadge(
 
 export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
-  const { showPendingShell } = usePendingShell();
+  const { clearPendingShell, showPendingShell } = usePendingShell();
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -248,6 +248,9 @@ export function DashboardNav(_: DashboardNavProps) {
           onNavigate={
             isReleasesItem ? () => showPendingShell('releases') : undefined
           }
+          onCancelNavigate={
+            isReleasesItem ? () => clearPendingShell('releases') : undefined
+          }
           onPrefetch={() => handlePrefetch(item.id)}
         />
       );
@@ -258,6 +261,7 @@ export function DashboardNav(_: DashboardNavProps) {
       handleProfileClick,
       handleDemoNavClick,
       handlePrefetch,
+      clearPendingShell,
       showPendingShell,
       isPreviewOpen,
       isDemo,

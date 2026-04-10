@@ -23,8 +23,8 @@ Docs-only changes do not trigger launch-gate jobs.
 ## What Each Gate Means
 
 - `Golden Path (PR)`: `tests/e2e/golden-path.spec.ts` passes in CI against an ephemeral Neon database.
-- `Lighthouse (dashboard PR)`: authenticated dashboard Lighthouse stays within the blocking thresholds in [apps/web/.lighthouserc.dashboard.pr.json](/Users/timwhite/conductor/workspaces/jovie/memphis-v1/apps/web/.lighthouserc.dashboard.pr.json).
-- `Lighthouse (onboarding PR)`: onboarding Lighthouse stays within the blocking thresholds in [apps/web/.lighthouserc.onboarding.pr.json](/Users/timwhite/conductor/workspaces/jovie/memphis-v1/apps/web/.lighthouserc.onboarding.pr.json).
+- `Lighthouse (dashboard PR)`: authenticated dashboard Lighthouse stays within the blocking thresholds in [apps/web/.lighthouserc.dashboard.pr.json](../../apps/web/.lighthouserc.dashboard.pr.json).
+- `Lighthouse (onboarding PR)`: onboarding Lighthouse stays within the blocking thresholds in [apps/web/.lighthouserc.onboarding.pr.json](../../apps/web/.lighthouserc.onboarding.pr.json).
 
 ## Required Local Launch Perf Check
 

@@ -311,20 +311,20 @@ async function main() {
   const port = await findFreePort();
   const baseUrl = `http://127.0.0.1:${port}`;
   const child = await startServer(baseUrl, artifactDir);
-  const onboardingAuthPath = bootstrapAuthStateForPersona(
-    baseUrl,
-    artifactDir,
-    'creator'
-  );
-  const creatorReadyAuthPath = bootstrapAuthStateForPersona(
-    baseUrl,
-    artifactDir,
-    'creator-ready'
-  );
 
   try {
     process.env.CI = 'true';
     process.env.E2E_USE_TEST_AUTH_BYPASS = '1';
+    const onboardingAuthPath = bootstrapAuthStateForPersona(
+      baseUrl,
+      artifactDir,
+      'creator'
+    );
+    const creatorReadyAuthPath = bootstrapAuthStateForPersona(
+      baseUrl,
+      artifactDir,
+      'creator-ready'
+    );
 
     const onboardingSummary = await runPerformanceBudgetsGuard({
       authPath: onboardingAuthPath,

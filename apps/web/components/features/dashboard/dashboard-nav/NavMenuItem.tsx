@@ -10,7 +10,14 @@ import {
 import { Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type MouseEvent, type ReactNode, useCallback, useMemo } from 'react';
+import {
+  type MouseEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react';
 import { flushSync } from 'react-dom';
 import { toast } from 'sonner';
 import {
@@ -31,6 +38,7 @@ interface NavMenuItemProps {
   readonly actions?: ReactNode;
   readonly children?: ReactNode;
   readonly onNavigate?: () => void;
+  readonly onCancelNavigate?: () => void;
   /** Optional click side effect for links or buttons */
   readonly onClick?: () => void;
   /** When true, keeps link markup but prevents navigation on click */
@@ -94,12 +102,15 @@ export function NavMenuItem({
   actions,
   children,
   onNavigate,
+  onCancelNavigate,
   onClick,
   preventNavigation = false,
   renderAsButton = false,
   onPrefetch,
 }: NavMenuItemProps) {
   const router = useRouter();
+  const pendingNavigationRef = useRef(false);
+  const clearPendingNavigationListenersRef = useRef<(() => void) | null>(null);
   // Memoize tooltip to prevent creating new objects on every render,
   // which would cause unnecessary re-renders in SidebarMenuButton
   const tooltip = useMemo(
@@ -150,13 +161,37 @@ export function NavMenuItem({
     });
   }, [onNavigate]);
 
+  const clearPendingNavigationListeners = useCallback(() => {
+    clearPendingNavigationListenersRef.current?.();
+    clearPendingNavigationListenersRef.current = null;
+  }, []);
+
+  const cancelPendingNavigation = useCallback(() => {
+    if (!pendingNavigationRef.current) {
+      return;
+    }
+
+    pendingNavigationRef.current = false;
+    clearPendingNavigationListeners();
+    onCancelNavigate?.();
+  }, [clearPendingNavigationListeners, onCancelNavigate]);
+
+  useEffect(
+    () => clearPendingNavigationListeners,
+    [clearPendingNavigationListeners]
+  );
+
   const handleButtonClick = useCallback(() => {
+    pendingNavigationRef.current = false;
+    clearPendingNavigationListeners();
     showPendingShell();
     onClick?.();
-  }, [onClick, showPendingShell]);
+  }, [clearPendingNavigationListeners, onClick, showPendingShell]);
 
   const handleLinkClick = useCallback(
     (event: MouseEvent<HTMLAnchorElement>) => {
+      pendingNavigationRef.current = false;
+      clearPendingNavigationListeners();
       if (preventNavigation) {
         event.preventDefault();
       }
@@ -172,6 +207,7 @@ export function NavMenuItem({
     },
     [
       item.href,
+      clearPendingNavigationListeners,
       onClick,
       onNavigate,
       preventNavigation,
@@ -181,9 +217,40 @@ export function NavMenuItem({
   );
 
   const handlePressStart = useCallback(() => {
+    if (onNavigate && typeof window !== 'undefined') {
+      pendingNavigationRef.current = true;
+      clearPendingNavigationListeners();
+
+      const handlePointerUp = () => {
+        setTimeout(() => {
+          if (pendingNavigationRef.current) {
+            cancelPendingNavigation();
+          }
+        }, 0);
+      };
+      const handlePointerCancel = () => {
+        cancelPendingNavigation();
+      };
+
+      window.addEventListener('pointerup', handlePointerUp, true);
+      window.addEventListener('pointercancel', handlePointerCancel, true);
+      window.addEventListener('blur', handlePointerCancel);
+      clearPendingNavigationListenersRef.current = () => {
+        window.removeEventListener('pointerup', handlePointerUp, true);
+        window.removeEventListener('pointercancel', handlePointerCancel, true);
+        window.removeEventListener('blur', handlePointerCancel);
+      };
+    }
+
     showPendingShell();
     onPrefetch?.();
-  }, [onPrefetch, showPendingShell]);
+  }, [
+    cancelPendingNavigation,
+    clearPendingNavigationListeners,
+    onNavigate,
+    onPrefetch,
+    showPendingShell,
+  ]);
 
   return (
     <ContextMenu>
@@ -194,7 +261,7 @@ export function NavMenuItem({
               <button
                 type='button'
                 onClick={handleButtonClick}
-                onMouseDown={handlePressStart}
+                onPointerDown={handlePressStart}
                 onMouseEnter={onPrefetch}
                 onFocus={onPrefetch}
                 aria-pressed={isActive}
@@ -207,7 +274,7 @@ export function NavMenuItem({
                 href={item.href}
                 prefetch={prefetch}
                 onClick={handleLinkClick}
-                onMouseDown={handlePressStart}
+                onPointerDown={handlePressStart}
                 onMouseEnter={onPrefetch}
                 onFocus={onPrefetch}
                 aria-current={isActive ? 'page' : undefined}

@@ -3,6 +3,13 @@
     "collect": {
       "numberOfRuns": 3,
       "puppeteerScript": "scripts/lighthouse-dashboard-auth.cjs",
+      "puppeteerLaunchOptions": {
+        "args": [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage"
+        ]
+      },
       "settings": {
         "disableStorageReset": true
       }

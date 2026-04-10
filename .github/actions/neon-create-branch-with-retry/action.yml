@@ -40,7 +40,7 @@ outputs:
     description: 'Created branch ID'
     value: ${{ steps.set-outputs.outputs.branch_id }}
   db_url:
-    description: 'Database URL'
+    description: 'Direct database URL'
     value: ${{ steps.set-outputs.outputs.db_url }}
   db_url_pooled:
     description: 'Pooled database URL'
@@ -112,13 +112,8 @@ runs:
           POOLED_URL='${{ steps.create-branch-attempt-2.outputs.db_url_pooled }}'
         fi
 
-        STABLE_URL="$POOLED_URL"
-        if [ -z "$STABLE_URL" ]; then
-          STABLE_URL="$DIRECT_URL"
-        fi
-
         echo "branch_id=$BRANCH_ID" >> $GITHUB_OUTPUT
-        echo "db_url=$STABLE_URL" >> $GITHUB_OUTPUT
+        echo "db_url=$DIRECT_URL" >> $GITHUB_OUTPUT
         echo "db_url_pooled=$POOLED_URL" >> $GITHUB_OUTPUT
 
     - name: Report Neon branch status

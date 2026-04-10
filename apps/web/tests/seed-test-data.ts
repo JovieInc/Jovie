@@ -103,10 +103,15 @@ export function isRetryableSeedDatabaseError(error: unknown): boolean {
 
   return (
     message.includes('password authentication failed') ||
+    message.includes('requested endpoint could not be found') ||
+    message.includes("you don't have access to it") ||
     message.includes('connection terminated unexpectedly') ||
     message.includes('server closed the connection unexpectedly') ||
     message.includes('the database system is starting up') ||
-    code === '57P03'
+    message.includes('fetch failed') ||
+    code === '57P03' ||
+    code === 'XX000' ||
+    code === 'ECONNRESET'
   );
 }
 
