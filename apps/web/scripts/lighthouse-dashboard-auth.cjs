@@ -290,21 +290,6 @@ async function seedDashboardAuth(browser, { url }) {
     }
 
     if (pathname.startsWith('/app')) {
-      const bootstrapUrl = new URL('/api/dev/test-auth/session', origin);
-      const bootstrapResponse = await page.request.post(
-        bootstrapUrl.toString(),
-        {
-          failOnStatusCode: false,
-          data: { persona: 'creator-ready' },
-        }
-      );
-
-      if (!bootstrapResponse.ok()) {
-        throw new Error(
-          `Auth bypass bootstrap failed for ${url}; session endpoint returned ${bootstrapResponse.status()}`
-        );
-      }
-
       await page.goto(url, {
         waitUntil: 'domcontentloaded',
         timeout: 60_000,

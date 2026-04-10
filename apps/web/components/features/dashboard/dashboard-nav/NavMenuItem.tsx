@@ -18,7 +18,6 @@ import {
   useMemo,
   useRef,
 } from 'react';
-import { flushSync } from 'react-dom';
 import { toast } from 'sonner';
 import {
   SidebarMenuBadge,
@@ -156,9 +155,7 @@ export function NavMenuItem({
       return;
     }
 
-    flushSync(() => {
-      onNavigate();
-    });
+    onNavigate();
   }, [onNavigate]);
 
   const clearPendingNavigationListeners = useCallback(() => {

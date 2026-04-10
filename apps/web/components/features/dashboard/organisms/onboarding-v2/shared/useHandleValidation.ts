@@ -164,10 +164,13 @@ export function useHandleValidation({
         // Reset local checking flag. If Pacer still has a pending request,
         // isChecking (isPending || isValidating) keeps the combined state true.
         // If nothing is pending (e.g. timeout abort), this unblocks the UI.
-        setHandleValidation(prev => ({
-          ...prev,
+        setHandleValidation({
+          available: false,
           checking: false,
-        }));
+          clientValid: true,
+          error: 'Unable to check handle right now. Please try again.',
+          suggestions: [],
+        });
         return;
       }
 

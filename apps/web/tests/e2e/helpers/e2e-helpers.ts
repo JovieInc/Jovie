@@ -639,6 +639,7 @@ export async function ensureServerAuthenticated(
   }
 
   await setTestAuthBypassSession(page, null, clerkUserId);
+  const originalUrl = page.url();
   try {
     await waitForAuthenticatedHealth(page, clerkUserId);
   } catch {
@@ -653,6 +654,17 @@ export async function ensureServerAuthenticated(
           'Auth bypass fallback should still land on an authenticated app surface',
       })
       .toMatch(/\/(?:app(?:\/|$)|onboarding(?:\/|\?|$))/);
+
+    if (
+      originalUrl &&
+      !originalUrl.startsWith('about:') &&
+      page.url() !== originalUrl
+    ) {
+      await page.goto(originalUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60_000,
+      });
+    }
     return;
   }
 }

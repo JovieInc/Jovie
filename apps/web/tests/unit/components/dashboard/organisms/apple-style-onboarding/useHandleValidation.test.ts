@@ -202,4 +202,36 @@ describe('useHandleValidation', () => {
     expect(retryValidate).toHaveBeenCalledTimes(2);
     expect(retryValidate).toHaveBeenLastCalledWith('prefilled-handle');
   });
+
+  it('surfaces a user-facing error after transient network retries are exhausted', async () => {
+    vi.useFakeTimers();
+    const retryValidate = vi.fn().mockResolvedValue(undefined);
+    validateApiState.current = retryValidate;
+
+    const { result } = renderHook(() =>
+      useHandleValidation({
+        assumeInitialHandleAvailable: false,
+        normalizedInitialHandle: 'prefilled-handle',
+        fullName: 'Taylor Swift',
+      })
+    );
+
+    await act(async () => {
+      result.current.validateHandle('prefilled-handle');
+    });
+
+    act(() => {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        validateApiState.callbacks.onError?.(new Error('Failed to fetch'));
+        vi.advanceTimersByTime(250);
+      }
+      validateApiState.callbacks.onError?.(new Error('Failed to fetch'));
+    });
+
+    expect(retryValidate).toHaveBeenCalledTimes(4);
+    expect(result.current.handleValidation.error).toBe(
+      'Unable to check handle right now. Please try again.'
+    );
+    expect(result.current.handleValidation.checking).toBe(false);
+  });
 });
