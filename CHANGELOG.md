@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.139] - 2026-04-09
+
+> Keep the subscribed notifications state inline on compact public profiles so the CTA does not collapse into passive copy and keyboard users land directly in preferences.
+
+### Added
+
+- Focused regression coverage for the compact profile subscribed-state CTA and notifications drawer handoff
+
+### Changed
+
+- Replaced the compact profile's passive subscribed copy with an inline `Notifications on` button that preserves the CTA footprint and opens preferences
+- Wired the compact public profile subscribed-state CTA directly into the existing notifications drawer, including keyboard tab focus behavior without reopen loops
+- [internal] Synced the canonical version file, `version.json`, and workspace package versions to `26.4.139`
+
 ## [26.4.138] - 2026-04-08
 
 > Finish the remaining design-system audit work by consolidating marketing surfaces, extracting shared public-surface shell primitives, and locking the live public profile path to the canonical compact template.
