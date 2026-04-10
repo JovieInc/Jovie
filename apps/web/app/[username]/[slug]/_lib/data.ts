@@ -22,6 +22,7 @@ import {
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
+import { env } from '@/lib/env-server';
 import { toISOStringOrNull } from '@/lib/utils/date';
 
 export type ContentType = 'release' | 'track';
@@ -812,6 +813,10 @@ export interface SmartLinkTrackStaticParam extends SmartLinkStaticParam {
 export async function getFeaturedSmartLinkStaticParams(
   limit = DEFAULT_STATIC_SMARTLINK_LIMIT
 ): Promise<SmartLinkStaticParam[]> {
+  if (!env.DATABASE_URL) {
+    return [];
+  }
+
   const rows = await db
     .select({
       username: creatorProfiles.usernameNormalized,
@@ -847,6 +852,10 @@ export async function getFeaturedSmartLinkStaticParams(
 export async function getFeaturedTrackStaticParams(
   limit = DEFAULT_STATIC_SMARTLINK_LIMIT
 ): Promise<SmartLinkTrackStaticParam[]> {
+  if (!env.DATABASE_URL) {
+    return [];
+  }
+
   const rows = await db
     .select({
       username: creatorProfiles.usernameNormalized,
