@@ -760,12 +760,12 @@ jobs:
 
   ci-lighthouse-pr:
     name: Lighthouse (public routes PR)
-    needs: [ci-build-public, ci-path-changes]
+    needs: [ci-build-public, ci-path-changes, neon-db]
     # Runs Lighthouse CI against the public-route build artifact on PRs.
     # Blocks PRs when triggered (path-gated to public-route changes).
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
@@ -778,6 +778,7 @@ jobs:
           branch_name: public-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         run: |
@@ -853,7 +854,7 @@ jobs:
 
   ci-lighthouse-dashboard-pr:
     name: Lighthouse (dashboard PR)
-    needs: [ci-fast, ci-path-changes]
+    needs: [ci-fast, ci-path-changes, neon-db]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -904,6 +905,7 @@ jobs:
           branch_name: dashboard-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1005,7 +1007,7 @@ jobs:
 
   ci-lighthouse-onboarding-pr:
     name: Lighthouse (onboarding PR)
-    needs: [ci-fast, ci-path-changes]
+    needs: [ci-fast, ci-path-changes, neon-db]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -1035,6 +1037,7 @@ jobs:
           branch_name: onboarding-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         run: |
@@ -1689,7 +1692,7 @@ jobs:
   ci-a11y:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
-    needs: [ci-build-public, ci-path-changes]
+    needs: [ci-build-public, ci-path-changes, neon-db]
     if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -1730,6 +1733,7 @@ jobs:
           branch_name: public-a11y-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1829,7 +1833,7 @@ jobs:
     environment: Preview – jovie
     # Gated: only runs with 'testing' label to save CI time on most PRs
     # Full E2E runs on merge to main anyway
-    needs: [ci-fast, ci-path-changes]
+    needs: [ci-fast, ci-path-changes, neon-db]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -1863,6 +1867,7 @@ jobs:
           branch_name: e2e-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1926,7 +1931,7 @@ jobs:
     environment: Preview – jovie
     # Gated: only runs with 'testing' label (admin tests need auth credentials).
     # Removed push-to-main trigger — merge queue validates PRs before merge.
-    needs: [ci-fast, ci-path-changes]
+    needs: [ci-fast, ci-path-changes, neon-db]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -1958,6 +1963,7 @@ jobs:
           branch_name: admin-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
