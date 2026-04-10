@@ -40,6 +40,11 @@ async function renderAuthRouteLayout({
     publicEnv: {
       NEXT_PUBLIC_CLERK_MOCK: clerkMockFlag,
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: publishableKey,
+      NEXT_PUBLIC_PROFILE_HOSTNAME: 'jov.ie',
+      NEXT_PUBLIC_PROFILE_URL: 'https://jov.ie',
+      NEXT_PUBLIC_APP_URL: 'https://jov.ie',
+      NEXT_PUBLIC_APP_HOSTNAME: 'jov.ie',
+      NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN: 'jov.ie',
     },
   }));
 
