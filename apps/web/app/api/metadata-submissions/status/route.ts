@@ -8,6 +8,8 @@ import {
   verifySubmissionProfileOwnership,
 } from '@/lib/submission-agent/service';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 function isMissingMetadataSubmissionStorage(
   error: unknown
 ): error is { code?: string; message?: string } {
@@ -39,7 +41,10 @@ export async function GET(request: Request) {
   try {
     const { userId } = await getCachedAuth();
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
     }
 
     const entitlements = await getCurrentUserEntitlements();
@@ -53,7 +58,7 @@ export async function GET(request: Request) {
           error:
             'Metadata submission workflows require a Pro plan. Upgrade to unlock this feature.',
         },
-        { status: 403 }
+        { status: 403, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -70,7 +75,7 @@ export async function GET(request: Request) {
       if (!ownership?.request) {
         return NextResponse.json(
           { success: false, error: 'Submission request not found' },
-          { status: 404 }
+          { status: 404, headers: NO_STORE_HEADERS }
         );
       }
     } else if (profileId) {
@@ -81,13 +86,13 @@ export async function GET(request: Request) {
       if (!ownership) {
         return NextResponse.json(
           { success: false, error: 'Profile not found' },
-          { status: 404 }
+          { status: 404, headers: NO_STORE_HEADERS }
         );
       }
     } else {
       return NextResponse.json(
         { success: false, error: 'requestId or profileId is required' },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -97,16 +102,22 @@ export async function GET(request: Request) {
       releaseId,
     });
 
-    return NextResponse.json({ success: true, requests: result });
+    return NextResponse.json(
+      { success: true, requests: result },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     if (isMissingMetadataSubmissionStorage(error)) {
-      return NextResponse.json({
-        success: true,
-        requests: [],
-        storageAvailable: false,
-        error:
-          'Metadata submission storage is not available in this environment.',
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          requests: [],
+          storageAvailable: false,
+          error:
+            'Metadata submission storage is not available in this environment.',
+        },
+        { headers: NO_STORE_HEADERS }
+      );
     }
 
     await captureError('Metadata submission status failed', error, {
@@ -114,7 +125,7 @@ export async function GET(request: Request) {
     });
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

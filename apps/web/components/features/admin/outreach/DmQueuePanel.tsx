@@ -73,9 +73,7 @@ export function DmQueuePanel() {
         sortOrder: 'desc',
         limit: '50',
       });
-      const res = await fetch(`/api/admin/outreach?${params}`, {
-        cache: 'no-store',
-      });
+      const res = await fetch(`/api/admin/outreach?${params}`);
       if (!res.ok) {
         throw new Error('Failed to load DM queue');
       }

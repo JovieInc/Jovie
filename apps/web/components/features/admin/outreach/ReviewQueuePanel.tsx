@@ -71,9 +71,7 @@ export function ReviewQueuePanel() {
         page: String(page),
         limit: String(limit),
       });
-      const res = await fetch(`/api/admin/outreach?${params}`, {
-        cache: 'no-store',
-      });
+      const res = await fetch(`/api/admin/outreach?${params}`);
       if (!res.ok) {
         throw new Error('Failed to load review queue');
       }

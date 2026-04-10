@@ -41,11 +41,36 @@ interface UseJovieChatOptions {
   readonly username?: string;
 }
 
-/** Interval (ms) to poll for auto-generated title after first message. */
-const TITLE_POLL_INTERVAL_MS = 2_000;
+/** Fast interval (ms) to poll for auto-generated title after first message. */
+const TITLE_POLL_FAST_INTERVAL_MS = 2_000;
+
+/** Slower interval (ms) used once title polling appears stalled. */
+const TITLE_POLL_BACKOFF_INTERVAL_MS = 5_000;
 
 /** Max duration (ms) to keep polling before giving up. */
 const TITLE_POLL_MAX_DURATION_MS = 15_000;
+
+/** Number of fast poll intervals to allow before backing off. */
+const TITLE_POLL_FAST_WINDOW_MS = TITLE_POLL_FAST_INTERVAL_MS * 3;
+
+function getTitlePollIntervalMs(
+  titlePollingSince: number | null,
+  currentTime: number
+): number | false {
+  if (titlePollingSince === null) {
+    return false;
+  }
+
+  const elapsed = currentTime - titlePollingSince;
+
+  if (elapsed >= TITLE_POLL_MAX_DURATION_MS) {
+    return false;
+  }
+
+  return elapsed < TITLE_POLL_FAST_WINDOW_MS
+    ? TITLE_POLL_FAST_INTERVAL_MS
+    : TITLE_POLL_BACKOFF_INTERVAL_MS;
+}
 
 export function useJovieChat({
   profileId,
@@ -94,9 +119,10 @@ export function useJovieChat({
 
   // Determine whether to poll: only while we're actively waiting for a title
   // and haven't exceeded the max poll duration.
-  const shouldPollForTitle =
-    titlePollingSince !== null &&
-    Date.now() - titlePollingSince < TITLE_POLL_MAX_DURATION_MS;
+  const titlePollIntervalMs = getTitlePollIntervalMs(
+    titlePollingSince,
+    Date.now()
+  );
 
   // Load existing conversation if conversationId is provided.
   // When title is pending, enable refetchInterval to poll for the generated title.
@@ -104,7 +130,7 @@ export function useJovieChat({
     useChatConversationQuery({
       conversationId: activeConversationId,
       enabled: !!activeConversationId,
-      refetchInterval: shouldPollForTitle ? TITLE_POLL_INTERVAL_MS : false,
+      refetchInterval: titlePollIntervalMs,
     });
 
   // Create transport: prefer profileId for server-side fetching, fall back to artistContext
