@@ -67,6 +67,16 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ---
 
+## Email Personalization
+
+### Outbound greetings must fail safe instead of guessing names
+
+**Mistake:** Claim-invite emails tried to personalize the greeting from arbitrary creator strings. That risks obvious bad mail-merge output like `timwhite!`, `tim<3!`, emoji names, or smashed-together handles, which makes the outreach feel fake immediately.
+
+**Rule:** Only personalize outbound greetings when the source clearly looks like a conventional two-word human name. If there is any doubt, use a generic opener instead. When tightening one risky email template, audit sibling templates that interpolate the same creator/user fields and apply the same guard there too.
+
+---
+
 ## Tailwind v4 / Design Tokens
 
 ### CSS variables in `:root` don't auto-register as Tailwind utilities

@@ -442,6 +442,12 @@ Never mark a task complete without confirming the fix works:
 - Screenshot test: before and after a perf PR, the fully-loaded page must look identical
 - If a route needs a genuinely different UI, that is a product decision requiring explicit approval, not a perf side effect
 
+### 17. Outbound Email Personalization Must Fail Safe
+
+- In cold email, lifecycle email, or claim-invite copy, **NEVER** greet recipients with raw usernames, handles, emoji names, or other guessed merge fields
+- Only use a personalized first-name greeting when the source string clearly looks like a conventional human first-and-last name; if there is real doubt, fall back to a generic opener
+- When fixing one risky personalization path, search sibling email templates that use the same creator/user fields and apply the same guard there
+
 ---
 
 ## Custom ESLint Rules (Quick Reference)
