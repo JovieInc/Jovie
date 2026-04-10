@@ -5,7 +5,15 @@ import {
   type Page,
   test,
 } from '@playwright/test';
+import {
+  TEST_AUTH_BYPASS_MODE,
+  TEST_MODE_COOKIE,
+  TEST_MODE_HEADER,
+  TEST_USER_ID_COOKIE,
+  TEST_USER_ID_HEADER,
+} from '@/lib/auth/test-mode-constants';
 import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import {
   setTestAuthBypassSession,
   waitForAuthenticatedHealth,
@@ -24,10 +32,10 @@ const FIRST_TASK_TITLE =
   DEFAULT_RELEASE_TASK_TEMPLATE[0]?.title ?? 'Release tasks';
 const FRAME_SETTLE_MS = 1_250;
 const HOME_FRAME_SETTLE_MS = 2_100;
-const FOUNDER_DISPLAY_NAME = 'Tim White';
+const FOUNDER_DISPLAY_NAME = TIM_WHITE_PROFILE.name;
 const HOME_READY_TEXT =
   /Drop more music\. Crush every release\.|The link your music deserves\./;
-const PUBLIC_PROFILE_READY_TEXT = /Tim White/;
+const PUBLIC_PROFILE_READY_TEXT = new RegExp(TIM_WHITE_PROFILE.name);
 const CLEANUP_SELECTORS = [
   '[data-testid="dev-toolbar"]',
   '[data-testid="cookie-banner"]',
@@ -328,8 +336,8 @@ async function waitForReleaseAnalyticsRoute(page: Page, releaseId: string) {
             return decodeURIComponent(cookie.slice(cookieName.length + 1));
           };
 
-          const mode = readCookieValue('__e2e_test_mode');
-          const userId = readCookieValue('__e2e_test_user_id');
+          const mode = readCookieValue(TEST_MODE_COOKIE);
+          const userId = readCookieValue(TEST_USER_ID_COOKIE);
 
           try {
             const response = await fetch(
@@ -338,10 +346,10 @@ async function waitForReleaseAnalyticsRoute(page: Page, releaseId: string) {
                 cache: 'no-store',
                 credentials: 'include',
                 headers:
-                  mode === 'bypass-auth' && userId
+                  mode === TEST_AUTH_BYPASS_MODE && userId
                     ? {
-                        'x-test-mode': mode,
-                        'x-test-user-id': userId,
+                        [TEST_MODE_HEADER]: mode,
+                        [TEST_USER_ID_HEADER]: userId,
                       }
                     : undefined,
               }
