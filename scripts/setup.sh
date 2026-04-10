@@ -51,7 +51,7 @@ install_ripgrep_standalone() {
     return 1
   fi
 
-  local os arch asset_suffix api_response download_url tmp_dir archive_path extracted_rg
+  local os arch asset_suffix api_response asset_urls download_url checksum_url tmp_dir archive_path checksum_path extracted_rg path_already_contains_local_bin
   os="$(uname -s 2>/dev/null || echo unknown)"
   arch="$(uname -m 2>/dev/null || echo unknown)"
 
@@ -76,7 +76,7 @@ install_ripgrep_standalone() {
 
   info "Falling back to standalone ripgrep install..."
   api_response="$(curl -fsSL https://api.github.com/repos/BurntSushi/ripgrep/releases/latest)" || return 1
-  download_url="$(printf '%s' "$api_response" | node -e '
+  asset_urls="$(printf '%s' "$api_response" | node -e '
     const fs = require("fs");
     const suffix = process.argv[1];
     const release = JSON.parse(fs.readFileSync(0, "utf8"));
@@ -84,15 +84,49 @@ install_ripgrep_standalone() {
       typeof item.browser_download_url === "string" &&
       item.browser_download_url.endsWith(suffix),
     );
-    if (!asset) {
+    const checksumAsset = (release.assets || []).find((item) =>
+      typeof item.browser_download_url === "string" &&
+      item.browser_download_url.endsWith(`${suffix}.sha256`),
+    );
+    if (!asset || !checksumAsset) {
       process.exit(1);
     }
-    process.stdout.write(asset.browser_download_url);
+    process.stdout.write(`${asset.browser_download_url}\t${checksumAsset.browser_download_url}`);
   ' "$asset_suffix")" || return 1
+  IFS=$'\t' read -r download_url checksum_url <<< "$asset_urls"
+  if [[ -z "$download_url" || -z "$checksum_url" ]]; then
+    warn "Could not resolve standalone ripgrep download assets"
+    return 1
+  fi
+  case ":$PATH:" in
+    *":$HOME/.local/bin:"*)
+      path_already_contains_local_bin=true
+      ;;
+    *)
+      path_already_contains_local_bin=false
+      ;;
+  esac
 
   tmp_dir="$(mktemp -d)"
-  archive_path="$tmp_dir/ripgrep.tar.gz"
+  trap 'rm -rf "$tmp_dir"' RETURN
+  archive_path="$tmp_dir/$(basename "$download_url")"
+  checksum_path="$tmp_dir/$(basename "$checksum_url")"
   curl -fsSL "$download_url" -o "$archive_path" || return 1
+  curl -fsSL "$checksum_url" -o "$checksum_path" || return 1
+  (
+    cd "$tmp_dir" || exit 1
+    if command -v sha256sum &>/dev/null; then
+      sha256sum -c "$(basename "$checksum_path")"
+    elif command -v shasum &>/dev/null; then
+      shasum -a 256 -c "$(basename "$checksum_path")"
+    else
+      warn "sha256sum or shasum is required to verify standalone ripgrep downloads"
+      exit 1
+    fi
+  ) >/dev/null || {
+    warn "Standalone ripgrep checksum verification failed"
+    return 1
+  }
   tar -xzf "$archive_path" -C "$tmp_dir" || return 1
 
   extracted_rg="$(find "$tmp_dir" -type f -path '*/rg' | head -1)"
@@ -105,6 +139,9 @@ install_ripgrep_standalone() {
   install -m 0755 "$extracted_rg" "$HOME/.local/bin/rg"
   export PATH="$HOME/.local/bin:$PATH"
   success "ripgrep installed to $HOME/.local/bin/rg"
+  if [[ "$path_already_contains_local_bin" != "true" ]]; then
+    info 'Add $HOME/.local/bin to your PATH (for example in ~/.zshrc or ~/.bashrc) to keep rg available in future shells'
+  fi
 }
 
 MISSING=()

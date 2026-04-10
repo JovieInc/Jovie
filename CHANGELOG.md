@@ -12,7 +12,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Changed
 
 - Hardened `scripts/setup.sh` so failed Homebrew or Doppler installer calls degrade into clear missing-tool reporting instead of aborting the whole bootstrap
-- Added a standalone ripgrep fallback that downloads a supported release into `$HOME/.local/bin` when package-manager installation paths fail
+- Added a standalone ripgrep fallback that downloads and verifies a supported release into `$HOME/.local/bin` when package-manager installation paths fail, with guidance for keeping that path available in future shells
 - [internal] Synced the canonical version file, `version.json`, and workspace package versions to `26.4.142`
 
 ### Fixed
