@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { eq, inArray } from 'drizzle-orm';
+import { aliasedTable, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
@@ -10,6 +10,9 @@ import {
   type PlanEntitlements,
   type PlanId,
 } from './registry';
+
+const claimedUsers = aliasedTable(users, 'claimed_users');
+const legacyUsers = aliasedTable(users, 'legacy_users');
 
 /**
  * Look up a creator's plan and entitlements by their profile ID.
@@ -24,13 +27,17 @@ export async function getCreatorEntitlements(
   const [result] = await db
     .select({
       claimedUserId: userProfileClaims.userId,
+      claimedPlan: claimedUsers.plan,
       legacyUserId: creatorProfiles.userId,
+      legacyPlan: legacyUsers.plan,
     })
     .from(creatorProfiles)
     .leftJoin(
       userProfileClaims,
       eq(userProfileClaims.creatorProfileId, creatorProfiles.id)
     )
+    .leftJoin(claimedUsers, eq(claimedUsers.id, userProfileClaims.userId))
+    .leftJoin(legacyUsers, eq(legacyUsers.id, creatorProfiles.userId))
     .where(eq(creatorProfiles.id, creatorProfileId))
     .limit(1);
 
@@ -39,13 +46,12 @@ export async function getCreatorEntitlements(
     return { plan: 'free', entitlements: getEntitlements('free') };
   }
 
-  const [userRecord] = await db
-    .select({ plan: users.plan })
-    .from(users)
-    .where(eq(users.id, ownerUserId))
-    .limit(1);
+  const plan =
+    ((result?.claimedUserId ? result.claimedPlan : result?.legacyPlan) as
+      | PlanId
+      | null
+      | undefined) ?? 'free';
 
-  const plan = (userRecord?.plan as PlanId | undefined) ?? 'free';
   return { plan, entitlements: getEntitlements(plan) };
 }
 
