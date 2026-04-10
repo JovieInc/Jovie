@@ -41,6 +41,7 @@ function sameOriginFailuresForPath(
   failures: readonly { url: string; status: number; statusText: string }[]
 ) {
   const origin = new URL(baseUrl).origin;
+  const currentPathname = currentPath.split('?')[0];
 
   return failures.filter(failure => {
     if (!failure.url.startsWith(origin)) {
@@ -51,14 +52,14 @@ function sameOriginFailuresForPath(
     if (
       surface.expectedState === 'not-found' &&
       failure.status === 404 &&
-      failureUrl.pathname === currentPath
+      failureUrl.pathname === currentPathname
     ) {
       return false;
     }
 
     if (
       surface.allowedFinalDocumentStatuses?.includes(failure.status) &&
-      failureUrl.pathname === currentPath
+      failureUrl.pathname === currentPathname
     ) {
       return false;
     }
