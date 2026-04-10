@@ -9,7 +9,7 @@
 
 import { Headphones, Share2 } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { VIDEO_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import { SmartLinkPoweredByFooter } from '@/features/release/SmartLinkPagePrimitives';
@@ -22,7 +22,11 @@ import {
 } from '@/features/release/SmartLinkShell';
 import type { VideoProviderKey } from '@/lib/discography/types';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
-import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
+import {
+  appendUTMParamsToUrl,
+  extractUTMParams,
+  type PartialUTMParams,
+} from '@/lib/utm';
 
 export interface VideoProvider {
   key: VideoProviderKey;
@@ -60,6 +64,19 @@ export function SoundsLandingPage({
   tracking,
 }: Readonly<SoundsLandingPageProps>) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const resolvedUtmParams = useMemo(() => {
+    if (typeof globalThis.window === 'undefined') {
+      return utmParams;
+    }
+
+    const currentUtmParams = extractUTMParams(
+      new URLSearchParams(globalThis.location.search)
+    );
+
+    return Object.keys(currentUtmParams).length > 0
+      ? currentUtmParams
+      : utmParams;
+  }, [utmParams]);
 
   const handleProviderClick = useCallback(
     (providerKey: VideoProviderKey) => {
@@ -84,6 +101,28 @@ export function SoundsLandingPage({
     },
     [artist.handle, tracking]
   );
+
+  useEffect(() => {
+    if (!artist.handle || !tracking?.contentId || !tracking?.contentType) {
+      return;
+    }
+
+    postJsonBeacon(
+      '/api/track',
+      {
+        handle: artist.handle,
+        linkType: 'listen',
+        target: 'sounds_page',
+        source: 'link',
+        context: {
+          contentType: tracking.contentType,
+          contentId: tracking.contentId,
+          smartLinkSlug: tracking.smartLinkSlug ?? undefined,
+        },
+      },
+      () => {}
+    );
+  }, [artist.handle, tracking]);
 
   const handleShare = useSmartLinkShare(release.title, artist.name, () =>
     setMenuOpen(false)
@@ -123,7 +162,7 @@ export function SoundsLandingPage({
               return (
                 <SmartLinkProviderButton
                   key={provider.key}
-                  href={appendUTMParamsToUrl(provider.url, utmParams)}
+                  href={appendUTMParamsToUrl(provider.url, resolvedUtmParams)}
                   onClick={() => handleProviderClick(provider.key)}
                   label={logoConfig?.name ?? provider.label}
                   iconPath={logoConfig?.iconPath}
@@ -155,7 +194,7 @@ export function SoundsLandingPage({
             Share
           </button>
           <Link
-            href={appendUTMParamsToUrl(smartLinkPath, utmParams)}
+            href={appendUTMParamsToUrl(smartLinkPath, resolvedUtmParams)}
             className={SMART_LINK_MENU_ITEM_CLASS}
             onClick={() => setMenuOpen(false)}
           >

@@ -5,7 +5,7 @@
  * Used by both the main smart link page and the /sounds page.
  */
 
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, isNotNull } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { db } from '@/lib/db';
@@ -22,6 +22,8 @@ import {
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
+import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 import { toISOStringOrNull } from '@/lib/utils/date';
 
 export type ContentType = 'release' | 'track';
@@ -793,3 +795,123 @@ export const getCreatorPlan = cache(async (creatorProfileId: string) => {
     canAccessFutureReleases: entitlements.booleans.canAccessFutureReleases,
   };
 });
+
+const DEFAULT_STATIC_SMARTLINK_LIMIT = 200;
+
+export interface SmartLinkStaticParam {
+  username: string;
+  slug: string;
+}
+
+export interface SmartLinkTrackStaticParam extends SmartLinkStaticParam {
+  trackSlug: string;
+}
+
+/**
+ * Pre-render a bounded set of featured/public release smart links at build time.
+ * Keeps build time under control while converting the route to ISR for hot paths.
+ */
+export async function getFeaturedSmartLinkStaticParams(
+  limit = DEFAULT_STATIC_SMARTLINK_LIMIT
+): Promise<SmartLinkStaticParam[]> {
+  if (!env.DATABASE_URL) {
+    return [];
+  }
+
+  try {
+    const rows = await db
+      .select({
+        username: creatorProfiles.usernameNormalized,
+        slug: discogReleases.slug,
+      })
+      .from(discogReleases)
+      .innerJoin(
+        creatorProfiles,
+        eq(discogReleases.creatorProfileId, creatorProfiles.id)
+      )
+      .where(
+        and(
+          eq(creatorProfiles.isPublic, true),
+          eq(creatorProfiles.isFeatured, true)
+        )
+      )
+      .orderBy(
+        drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`,
+        creatorProfiles.username,
+        discogReleases.slug
+      )
+      .limit(limit);
+
+    return rows.map(row => ({
+      username: row.username,
+      slug: row.slug,
+    }));
+  } catch (error) {
+    void captureError('Failed to load smart-link static params', error, {
+      helper: 'getFeaturedSmartLinkStaticParams',
+      limit,
+      route: '/[username]/[slug]',
+    }).catch(() => {
+      // Ignore telemetry failures so build-time fallback stays resilient.
+    });
+    return [];
+  }
+}
+
+/**
+ * Pre-render a bounded set of featured/public track deep links at build time.
+ */
+export async function getFeaturedTrackStaticParams(
+  limit = DEFAULT_STATIC_SMARTLINK_LIMIT
+): Promise<SmartLinkTrackStaticParam[]> {
+  if (!env.DATABASE_URL) {
+    return [];
+  }
+
+  try {
+    const rows = await db
+      .select({
+        username: creatorProfiles.usernameNormalized,
+        slug: discogReleases.slug,
+        trackSlug: discogReleaseTracks.slug,
+      })
+      .from(discogReleaseTracks)
+      .innerJoin(
+        discogReleases,
+        eq(discogReleaseTracks.releaseId, discogReleases.id)
+      )
+      .innerJoin(
+        creatorProfiles,
+        eq(discogReleases.creatorProfileId, creatorProfiles.id)
+      )
+      .where(
+        and(
+          eq(creatorProfiles.isPublic, true),
+          eq(creatorProfiles.isFeatured, true),
+          isNotNull(discogReleaseTracks.slug)
+        )
+      )
+      .orderBy(
+        drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`,
+        creatorProfiles.username,
+        discogReleases.slug,
+        discogReleaseTracks.trackNumber
+      )
+      .limit(limit);
+
+    return rows.map(row => ({
+      username: row.username,
+      slug: row.slug,
+      trackSlug: row.trackSlug!,
+    }));
+  } catch (error) {
+    void captureError('Failed to load track static params', error, {
+      helper: 'getFeaturedTrackStaticParams',
+      limit,
+      route: '/[username]/[slug]/[trackSlug]',
+    }).catch(() => {
+      // Ignore telemetry failures so build-time fallback stays resilient.
+    });
+    return [];
+  }
+}

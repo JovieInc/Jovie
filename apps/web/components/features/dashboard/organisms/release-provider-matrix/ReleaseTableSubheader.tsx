@@ -9,7 +9,7 @@ import {
 } from '@jovie/ui';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { X } from 'lucide-react';
-import { memo, useState } from 'react';
+import { lazy, memo, Suspense, useState } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
@@ -31,11 +31,16 @@ import { useCodeFlag } from '@/lib/feature-flags/client';
 import { GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
 import { useReleaseFilterCounts } from './hooks/useReleaseFilterCounts';
-import { ReleaseFilterDropdown } from './ReleaseFilterDropdown';
 import {
   getReleasesForExport,
   RELEASES_CSV_COLUMNS,
 } from './utils/exportReleases';
+
+const ReleaseFilterDropdown = lazy(() =>
+  import('./ReleaseFilterDropdown').then(m => ({
+    default: m.ReleaseFilterDropdown,
+  }))
+);
 
 /** Popularity level for filtering */
 export type PopularityLevel = 'low' | 'med' | 'high';
@@ -331,16 +336,35 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             tooltipLabel='Search'
             className='h-7 text-[12px] text-tertiary-token hover:text-primary-token'
           />
-          <ReleaseFilterDropdown
-            filters={filters}
-            onFiltersChange={onFiltersChange}
-            counts={counts}
-            buttonClassName={cn(
-              PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-              'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3'
-            )}
-            iconOnly
-          />
+          <Suspense
+            fallback={
+              <Button
+                variant='ghost'
+                size='sm'
+                className={cn(
+                  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+                  PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+                  'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3'
+                )}
+                aria-label='Loading filters'
+                disabled
+              >
+                <Icon name='Filter' className='h-3.5 w-3.5' strokeWidth={2} />
+                <span className='sr-only'>Loading filters</span>
+              </Button>
+            }
+          >
+            <ReleaseFilterDropdown
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              counts={counts}
+              buttonClassName={cn(
+                PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+                'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3'
+              )}
+              iconOnly
+            />
+          </Suspense>
           {showToolbarExtras && (
             <LinearStyleDisplayMenu
               groupByYear={groupByYear}
