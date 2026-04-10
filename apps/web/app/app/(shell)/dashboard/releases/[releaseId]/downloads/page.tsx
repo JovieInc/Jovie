@@ -9,7 +9,7 @@
 
 import { upload } from '@vercel/blob/client';
 import { useParams } from 'next/navigation';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 
 interface PromoDownloadFile {
@@ -79,9 +79,11 @@ export default function PromoDownloadsPage() {
   }, [releaseId]);
 
   // Load on first render
-  if (!loaded) {
-    void loadFiles();
-  }
+  useEffect(() => {
+    if (!loaded) {
+      loadFiles();
+    }
+  }, [loaded, loadFiles]);
 
   const handleFileSelect = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
