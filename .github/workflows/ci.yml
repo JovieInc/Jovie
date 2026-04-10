@@ -528,22 +528,18 @@ jobs:
           name: neon-db-connection-${{ github.run_id }}
           path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        id: resolve-drizzle-neon-db-url
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: ./.github/actions/resolve-neon-database-url
-        with:
-          connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url
-          fallback_json_key: db_url_pooled
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
-
       - name: Export DATABASE_URL
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
-          echo "Using Neon DB URL from neon-db artifact"
-          echo "DATABASE_URL=${{ steps.resolve-drizzle-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+          CONNECTION_FILE="/tmp/neon-db-connection/connection.json"
+          if [ ! -f "$CONNECTION_FILE" ]; then
+            echo "Neon DB connection artifact missing."
+            exit 1
+          fi
+
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
+          echo "Using pooled-first Neon DB URL from neon-db artifact"
+          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
 
       - name: Fail if Neon DB URL is missing
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1194,20 +1190,17 @@ jobs:
           name: neon-db-connection-${{ github.run_id }}
           path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        id: resolve-build-neon-db-url
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: ./.github/actions/resolve-neon-database-url
-        with:
-          connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url
-          fallback_json_key: db_url_pooled
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
-
       - name: Export DATABASE_URL
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: echo "DATABASE_URL=${{ steps.resolve-build-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+        run: |
+          CONNECTION_FILE="/tmp/neon-db-connection/connection.json"
+          if [ ! -f "$CONNECTION_FILE" ]; then
+            echo "Neon DB connection artifact missing."
+            exit 1
+          fi
+
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
+          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -2148,20 +2141,17 @@ jobs:
           name: neon-db-connection-${{ github.run_id }}
           path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL for E2E
-        id: resolve-e2e-artifact-db-url
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: ./.github/actions/resolve-neon-database-url
-        with:
-          connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url
-          fallback_json_key: db_url_pooled
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
-
       - name: Export DATABASE_URL
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: echo "DATABASE_URL=${{ steps.resolve-e2e-artifact-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+        run: |
+          CONNECTION_FILE="/tmp/neon-db-connection/connection.json"
+          if [ ! -f "$CONNECTION_FILE" ]; then
+            echo "Neon DB connection artifact missing."
+            exit 1
+          fi
+
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
+          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
 
       - name: Fail if Neon DB URL is missing (E2E)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -2212,20 +2202,17 @@ jobs:
           name: neon-db-connection-${{ github.run_id }}
           path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL for E2E
-        id: resolve-e2e-tests-db-url
-        uses: ./.github/actions/resolve-neon-database-url
-        with:
-          connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url
-          fallback_json_key: db_url_pooled
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
-
       - name: Export DATABASE_URL
         run: |
+          CONNECTION_FILE="/tmp/neon-db-connection/connection.json"
+          if [ ! -f "$CONNECTION_FILE" ]; then
+            echo "Neon DB connection artifact missing."
+            exit 1
+          fi
+
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
           echo "Using Neon DB URL from neon-db artifact"
-          echo "DATABASE_URL=${{ steps.resolve-e2e-tests-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
           echo "RESOLVED_DB_SOURCE=neon-artifact" >> "$GITHUB_ENV"
 
       - name: Fail if Neon DB URL is missing (E2E)
@@ -2740,18 +2727,16 @@ jobs:
           name: neon-db-connection-${{ github.run_id }}
           path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL for Smoke DB
-        id: resolve-smoke-db-url
-        uses: ./.github/actions/resolve-neon-database-url
-        with:
-          connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url
-          fallback_json_key: db_url_pooled
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
-
       - name: Export DATABASE_URL
-        run: echo "DATABASE_URL=${{ steps.resolve-smoke-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+        run: |
+          CONNECTION_FILE="/tmp/neon-db-connection/connection.json"
+          if [ ! -f "$CONNECTION_FILE" ]; then
+            echo "Neon DB connection artifact missing."
+            exit 1
+          fi
+
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
+          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
 
       - name: Run migrations for Smoke DB
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
