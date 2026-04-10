@@ -49,7 +49,7 @@ vi.mock(
 );
 
 vi.mock(
-  '@/features/dashboard/organisms/release-provider-matrix/utils/column-renderers',
+  '@/features/dashboard/organisms/release-provider-matrix/utils/release-table-renderers',
   () => ({
     createExpandableReleaseCellRenderer: () => () => null,
     createReleaseCellRenderer: () => () => null,
@@ -153,7 +153,7 @@ describe('ReleaseTable', () => {
     onEdit: vi.fn(),
   } satisfies Partial<ComponentProps<typeof ReleaseTable>>;
 
-  it('keeps selected and expanded release rows visually distinct', () => {
+  it('keeps selected and expanded release rows visually distinct', async () => {
     render(
       <ReleaseTable
         {...commonProps}
@@ -162,12 +162,12 @@ describe('ReleaseTable', () => {
       />
     );
 
-    const expandedRow = screen
-      .getByTestId('release-row-wrapper-release_1')
-      .querySelector('div');
-    const selectedRow = screen
-      .getByTestId('release-row-wrapper-release_2')
-      .querySelector('div');
+    const expandedRow = (
+      await screen.findByTestId('release-row-wrapper-release_1')
+    ).querySelector('div');
+    const selectedRow = (
+      await screen.findByTestId('release-row-wrapper-release_2')
+    ).querySelector('div');
 
     expect(expandedRow).toBeInTheDocument();
     expect(selectedRow).toBeInTheDocument();
@@ -183,7 +183,7 @@ describe('ReleaseTable', () => {
     expect(idleRow).toBeInTheDocument();
   });
 
-  it('passes the selected track state into expanded track rows', () => {
+  it('passes the selected track state into expanded track rows', async () => {
     render(
       <ReleaseTable
         {...commonProps}
@@ -192,12 +192,14 @@ describe('ReleaseTable', () => {
       />
     );
 
-    expect(screen.getByTestId('expanded-row-release_1')).toBeInTheDocument();
-    expect(screen.getByTestId('expanded-track-track-1')).toHaveAttribute(
+    expect(
+      await screen.findByTestId('expanded-row-release_1')
+    ).toBeInTheDocument();
+    expect(await screen.findByTestId('expanded-track-track-1')).toHaveAttribute(
       'data-state',
       'idle'
     );
-    expect(screen.getByTestId('expanded-track-track-2')).toHaveAttribute(
+    expect(await screen.findByTestId('expanded-track-track-2')).toHaveAttribute(
       'data-state',
       'selected'
     );

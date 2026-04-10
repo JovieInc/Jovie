@@ -291,11 +291,7 @@ function TipsFinalCTA() {
               path clean.
             </p>
             <div className='mt-6'>
-              <Button
-                size='lg'
-                className='btn-linear-signup h-(--linear-button-height-md) px-6'
-                asChild
-              >
+              <Button size='lg' className='public-action-primary' asChild>
                 <Link href='/signup'>
                   Claim Your Handle
                   <ArrowRight className='ml-2 h-4 w-4' />

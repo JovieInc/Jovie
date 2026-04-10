@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { FaqSection, MarketingHero } from '@/components/marketing';
+import {
+  FaqSection,
+  MarketingContainer,
+  MarketingHero,
+} from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getAlternative, getAlternativeSlugs } from '@/content/alternatives';
@@ -69,59 +73,65 @@ export default async function AlternativesPage({
       </MarketingHero>
 
       {/* Why Switch */}
-      <section className='mx-auto max-w-[720px] px-6 pb-16 sm:px-8 lg:px-10'>
-        <h2 className='text-2xl font-semibold text-primary-token'>
-          Why musicians are switching
-        </h2>
-        <ul className='mt-6 space-y-4'>
-          {data.whySwitch.map(reason => (
-            <li
-              key={reason}
-              className='flex gap-3 text-base leading-relaxed text-secondary-token'
-            >
-              <span className='mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent-token' />
-              {reason}
-            </li>
-          ))}
-        </ul>
-      </section>
+      <MarketingContainer width='prose' className='pb-16'>
+        <section>
+          <h2 className='text-2xl font-semibold text-primary-token'>
+            Why musicians are switching
+          </h2>
+          <ul className='mt-6 space-y-4'>
+            {data.whySwitch.map(reason => (
+              <li
+                key={reason}
+                className='flex gap-3 text-base leading-relaxed text-secondary-token'
+              >
+                <span className='mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent-token' />
+                {reason}
+              </li>
+            ))}
+          </ul>
+        </section>
+      </MarketingContainer>
 
       {/* Highlights */}
-      <section className='mx-auto max-w-[720px] px-6 pb-16 sm:px-8 lg:px-10'>
-        <h2 className='text-2xl font-semibold text-primary-token'>
-          What you get with {APP_NAME}
-        </h2>
-        <div className='mt-6 grid gap-8 sm:grid-cols-2'>
-          {data.highlights.map(highlight => (
-            <div key={highlight.title}>
-              <h3 className='font-medium text-primary-token'>
-                {highlight.title}
-              </h3>
-              <p className='mt-2 text-sm leading-relaxed text-secondary-token'>
-                {highlight.description}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <MarketingContainer width='prose' className='pb-16'>
+        <section>
+          <h2 className='text-2xl font-semibold text-primary-token'>
+            What you get with {APP_NAME}
+          </h2>
+          <div className='mt-6 grid gap-8 sm:grid-cols-2'>
+            {data.highlights.map(highlight => (
+              <div key={highlight.title}>
+                <h3 className='font-medium text-primary-token'>
+                  {highlight.title}
+                </h3>
+                <p className='mt-2 text-sm leading-relaxed text-secondary-token'>
+                  {highlight.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </MarketingContainer>
 
       {/* CTA */}
-      <section className='mx-auto max-w-[720px] px-6 pb-16 sm:px-8 lg:px-10'>
-        <div className='rounded-xl border border-border-primary bg-surface-secondary p-8 text-center'>
-          <h2 className='text-xl font-semibold text-primary-token'>
-            Ready to try {APP_NAME}?
-          </h2>
-          <p className='mt-2 text-sm text-secondary-token'>
-            Create your free profile in under a minute.
-          </p>
-          <Link
-            href={APP_ROUTES.SIGNUP}
-            className='mt-6 inline-flex items-center rounded-lg bg-accent-token px-6 py-3 text-sm font-medium text-white transition-colors hover:opacity-90'
-          >
-            Get started free
-          </Link>
-        </div>
-      </section>
+      <MarketingContainer width='prose' className='pb-16'>
+        <section>
+          <div className='rounded-xl border border-border-primary bg-surface-secondary p-8 text-center'>
+            <h2 className='text-xl font-semibold text-primary-token'>
+              Ready to try {APP_NAME}?
+            </h2>
+            <p className='mt-2 text-sm text-secondary-token'>
+              Create your free profile in under a minute.
+            </p>
+            <Link
+              href={APP_ROUTES.SIGNUP}
+              className='mt-6 inline-flex items-center rounded-lg bg-accent-token px-6 py-3 text-sm font-medium text-white transition-colors hover:opacity-90'
+            >
+              Get started free
+            </Link>
+          </div>
+        </section>
+      </MarketingContainer>
 
       {/* FAQ */}
       <FaqSection items={data.faq} />
