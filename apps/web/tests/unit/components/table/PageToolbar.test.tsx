@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  PageToolbar,
   PageToolbarActionButton,
   PageToolbarTabButton,
 } from '@/components/organisms/table/molecules/PageToolbar';
@@ -19,6 +20,29 @@ vi.mock('@jovie/ui', () => ({
 }));
 
 describe('PageToolbar buttons', () => {
+  it('renders a flat toolbar shell by default', () => {
+    const { container } = render(
+      <PageToolbar start={<span>Start</span>} end={<span>End</span>} />
+    );
+    const toolbar = container.firstElementChild;
+
+    expect(toolbar).toHaveClass('bg-transparent');
+    expect(toolbar).not.toHaveClass('border-b');
+  });
+
+  it('adds an explicit top divider when requested', () => {
+    const { container } = render(
+      <PageToolbar
+        start={<span>Start</span>}
+        end={<span>End</span>}
+        topDivider
+      />
+    );
+    const toolbar = container.firstElementChild;
+
+    expect(toolbar).toHaveClass('border-t', 'border-subtle');
+  });
+
   it('renders action buttons accessibly', () => {
     render(<PageToolbarActionButton label='Display' icon={<Search />} />);
 

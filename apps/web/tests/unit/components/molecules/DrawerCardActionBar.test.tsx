@@ -38,7 +38,7 @@ const { DrawerCardActionBar } = await import(
 );
 
 describe('DrawerCardActionBar', () => {
-  it('renders a floating top-right overflow trigger and merges close into the menu', () => {
+  it('renders a floating top-right overflow trigger and keeps close as a dedicated button', () => {
     render(
       <div className='relative'>
         <DrawerCardActionBar
@@ -70,6 +70,7 @@ describe('DrawerCardActionBar', () => {
     expect(
       screen.getByTestId('drawer-card-overflow-trigger')
     ).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-card-close-trigger')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-card-action-bar')).toHaveAttribute(
       'data-overflow-placement',
       'card-top-right'
@@ -77,7 +78,7 @@ describe('DrawerCardActionBar', () => {
     expect(screen.getByTestId('table-action-menu-items')).toHaveTextContent(
       'Open profile'
     );
-    expect(screen.getByTestId('table-action-menu-items')).toHaveTextContent(
+    expect(screen.getByTestId('table-action-menu-items')).not.toHaveTextContent(
       'Close'
     );
   });

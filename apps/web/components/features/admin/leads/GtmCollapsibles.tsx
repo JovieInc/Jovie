@@ -24,10 +24,10 @@ const InviteCampaignManager = dynamic(
   { ssr: false }
 );
 
-const UnifiedUrlIntake = dynamic(
+const GrowthIntakeComposer = dynamic(
   () =>
-    import('@/features/admin/leads/UnifiedUrlIntake').then(
-      m => m.UnifiedUrlIntake
+    import('@/features/admin/leads/GrowthIntakeComposer').then(
+      m => m.GrowthIntakeComposer
     ),
   { ssr: false }
 );
@@ -88,9 +88,10 @@ function AccordionSection({
 function viewToAccordionIndex(view?: string): number | null {
   if (!view) return null;
   switch (view) {
+    case 'ingest':
+      return 0;
     case 'outreach':
     case 'campaigns':
-    case 'ingest':
       return 2;
     default:
       return null;
@@ -161,7 +162,9 @@ export function GtmCollapsibles({ initialOpen }: GtmCollapsiblesProps) {
       >
         {everOpened.has(0) && (
           <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
-            <UnifiedUrlIntake />
+            <GrowthIntakeComposer
+              initialMode={initialOpen === 'ingest' ? 'queue' : 'single'}
+            />
             <LeadKeywordsManager />
           </div>
         )}

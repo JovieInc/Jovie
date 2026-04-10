@@ -86,6 +86,7 @@ describe('claim invite founder copy', () => {
     ).toBeNull();
     expect(resolveSafeFirstName('DJ Shadow', 'djshadow')).toBeNull();
     expect(resolveSafeFirstName('Tom River Stone', 'tomriverstone')).toBeNull();
+    expect(resolveSafeFirstName('José González', 'josegonzalez')).toBe('José');
     expect(resolveSafeFirstName('Tim White', 'timwhite')).toBe('Tim');
     expect(resolveSafeFirstName('TIM WHITE', 'timwhite')).toBe('Tim');
   });

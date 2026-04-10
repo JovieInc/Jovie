@@ -1,6 +1,6 @@
-import { capitalizeFirst, normalizeString } from '@/lib/utils/string-utils';
+import { normalizeString } from '@/lib/utils/string-utils';
 
-const NAME_TOKEN_PATTERN = /^[A-Za-z][A-Za-z'-]*$/;
+const NAME_TOKEN_PATTERN = /^\p{L}[\p{L}'’-]*$/u;
 const DISALLOWED_GREETING_TOKENS = new Set([
   'dj',
   'mc',
@@ -12,11 +12,20 @@ const DISALLOWED_GREETING_TOKENS = new Set([
   'official',
 ]);
 
+function capitalizeNamePart(part: string): string {
+  const [firstCharacter = '', ...remainingCharacters] = Array.from(part);
+  return `${firstCharacter.toLocaleUpperCase()}${remainingCharacters.join('')}`;
+}
+
 function formatNameToken(token: string): string {
   return token
-    .toLowerCase()
-    .split(/([-'])/)
-    .map(part => (part === '-' || part === "'" ? part : capitalizeFirst(part)))
+    .toLocaleLowerCase()
+    .split(/([-'’])/u)
+    .map(part =>
+      part === '-' || part === "'" || part === '’'
+        ? part
+        : capitalizeNamePart(part)
+    )
     .join('');
 }
 
@@ -44,8 +53,8 @@ export function resolveSafeFirstName(
   }
 
   const [firstToken, lastToken] = tokens;
-  const normalizedFirstToken = firstToken.toLowerCase();
-  const normalizedLastToken = lastToken.toLowerCase();
+  const normalizedFirstToken = firstToken.toLocaleLowerCase();
+  const normalizedLastToken = lastToken.toLocaleLowerCase();
   if (
     DISALLOWED_GREETING_TOKENS.has(normalizedFirstToken) ||
     DISALLOWED_GREETING_TOKENS.has(normalizedLastToken)

@@ -15,13 +15,14 @@ import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/a
 import { Icon } from '@/components/atoms/Icon';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
+  DrawerCardActionBar,
   DrawerSection,
   DrawerStatGrid,
   DrawerSurfaceCard,
+  EntityHeaderCard,
   EntitySidebarShell,
   StatTile,
 } from '@/components/molecules/drawer';
-import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
 import {
@@ -233,48 +234,46 @@ export function TourDateSidebar({
       <EntitySidebarShell
         isOpen={Boolean(tourDate)}
         ariaLabel='Edit tour date'
-        title='Edit Tour Date'
         onClose={onClose}
         headerMode='minimal'
-        headerActions={
-          <DrawerHeaderActions
-            primaryActions={[]}
-            menuItems={contextMenuItems}
-            onClose={onClose}
-          />
-        }
+        hideMinimalHeaderBar
         isEmpty={!tourDate}
         emptyMessage='Select a tour date to edit'
         contextMenuItems={contextMenuItems}
         entityHeader={
           tourDate ? (
-            <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-              <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-                <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-                  Tour date
-                </p>
-              </div>
-              <div className='space-y-3 p-3.5'>
-                <div className='space-y-1'>
-                  <p className='text-[15px] font-[590] tracking-[-0.016em] text-primary-token'>
-                    {tourDate.title?.trim() || tourDate.venueName}
-                  </p>
-                  <p className='text-[12px] leading-[16px] text-secondary-token'>
+            <DrawerSurfaceCard variant='card' className='overflow-hidden p-3.5'>
+              <EntityHeaderCard
+                eyebrow='Tour Date'
+                title={tourDate.title?.trim() || tourDate.venueName}
+                subtitle={
+                  <>
                     {formatISODate(tourDate.startDate)} · {tourDate.city}
                     {tourDate.region ? `, ${tourDate.region}` : ''} ·{' '}
                     {tourDate.country}
-                  </p>
-                </div>
-                {tourDate.provider === 'bandsintown' ? (
-                  <div className='flex items-center gap-2 rounded-full border border-[color:color-mix(in_oklab,var(--color-success)_18%,var(--linear-app-frame-seam))] bg-[color:color-mix(in_oklab,var(--color-success)_10%,transparent)] px-3 py-1.5 text-[12px] text-[var(--color-success)]'>
-                    <Icon name='Link' className='h-3.5 w-3.5' />
-                    <span>Synced from Bandsintown</span>
-                  </div>
-                ) : null}
-              </div>
-              <div className='border-t border-(--linear-app-frame-seam) px-3.5 py-2'>
-                {actionRow}
-              </div>
+                  </>
+                }
+                meta={
+                  tourDate.provider === 'bandsintown' ? (
+                    <div className='flex items-center gap-2 rounded-full border border-[color:color-mix(in_oklab,var(--color-success)_18%,var(--linear-app-frame-seam))] bg-[color:color-mix(in_oklab,var(--color-success)_10%,transparent)] px-3 py-1.5 text-[12px] text-[var(--color-success)]'>
+                      <Icon name='Link' className='h-3.5 w-3.5' />
+                      <span>Synced from Bandsintown</span>
+                    </div>
+                  ) : null
+                }
+                footer={actionRow}
+                actions={
+                  <DrawerCardActionBar
+                    primaryActions={[]}
+                    menuItems={contextMenuItems}
+                    onClose={onClose}
+                    overflowTriggerPlacement='card-top-right'
+                    overflowTriggerIcon='vertical'
+                    className='border-0 bg-transparent px-0 py-0'
+                  />
+                }
+                bodyClassName='pr-9'
+              />
             </DrawerSurfaceCard>
           ) : undefined
         }

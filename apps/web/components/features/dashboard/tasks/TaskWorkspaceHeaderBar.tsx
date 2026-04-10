@@ -57,7 +57,7 @@ export function TaskWorkspaceHeaderBar({
   return (
     <div
       data-testid='tasks-workspace-subheader'
-      className='flex h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)] items-center justify-between gap-3 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-app-header'
+      className='flex h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)] items-center justify-between gap-3 px-app-header'
     >
       <div className='min-w-0 flex-1'>
         {mode === 'search' && (

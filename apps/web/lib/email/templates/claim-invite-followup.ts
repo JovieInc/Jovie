@@ -268,7 +268,7 @@ function getFollowUpContent(
   greetingName: string | null,
   claimUrl: string
 ): string {
-  const heading = greetingName ? `Hey ${greetingName}` : 'Hey';
+  const heading = greetingName ? `Hey ${greetingName},` : 'Hey,';
   switch (followUpNumber) {
     case 1:
       return `

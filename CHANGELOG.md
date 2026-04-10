@@ -5,20 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.140] - 2026-04-09
+## [26.4.141] - 2026-04-09
 
 > Claim-invite emails now read more like a real note from Tim, and they avoid awkward fake personalization when an artist name looks like a handle instead of a real first name.
 
 ### Added
 
-- Focused regression coverage for claim-invite greetings across safe real names, handles, symbols, emoji, and generic follow-up fallbacks
+- Focused regression coverage for claim-invite greetings across safe real names, handles, symbols, emoji, accented names, and generic follow-up fallbacks
 - [internal] Added repo guardrails and lessons so outbound email personalization fails safe by default
 
 ### Changed
 
 - Rewrote the artist claim-invite and follow-up emails in a more personal founder voice with a softer feedback-first ask
-- Only personalize claim-invite greetings when the creator string clearly looks like a real first-and-last name; otherwise fall back to a generic opener
+- Only personalize claim-invite greetings when the creator string clearly looks like a real first-and-last name, including accented names; otherwise fall back to a generic opener
+- [internal] Synced the canonical version file, `version.json`, and workspace package versions to `26.4.141`
+
+## [26.4.140] - 2026-04-09
+
+> Make the app's right-side drawers feel like one product again by flattening stray chrome, unifying shell structure, and turning release playback into a simpler tracks list.
+
+### Added
+
+- Focused regression coverage for the shared drawer shell, add-release flow, release tracks list, dashboard header chrome, and right-drawer focus behavior
+
+### Changed
+
+- Unified dashboard, admin, and demo entity drawers on the shared right-drawer shell so headers, cards, tabs, and footer actions use one calmer layout model
+- Simplified the add-release drawer into a preview card, an in-card details form, and a flat pinned create action while keeping the release-creation flow intact
+- Renamed the release drawer's `Playback` tab to `Tracks` and reduced it to a flat track list that hands actual playback off to the persistent bottom audio bar
 - [internal] Synced the canonical version file, `version.json`, and workspace package versions to `26.4.140`
+
+### Fixed
+
+- Removed stray divider, border, and wrapper chrome under dashboard header actions and other shared page toolbars so the top of each page stays flat
+- Eliminated the drawer-container focus ring leak and kept one-click close affordances visible in the refactored card action bars
+- Standardized drawer card borders so preview and details surfaces use one consistent perimeter border instead of stacked seams
 
 ## [26.4.139] - 2026-04-09
 

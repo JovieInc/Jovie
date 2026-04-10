@@ -5,8 +5,10 @@ import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
 import {
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_COOKIE,
+  TEST_MODE_HEADER,
   TEST_PERSONA_COOKIE,
   TEST_USER_ID_COOKIE,
+  TEST_USER_ID_HEADER,
 } from '@/lib/auth/test-mode';
 import { smokeNavigateWithRetry } from '../e2e/utils/smoke-test-utils';
 import { primeVercelBypassCookie } from './vercel-preview';
@@ -214,13 +216,27 @@ export async function waitForAuthenticatedHealth(
     .poll(
       async () => {
         try {
+          const contextCookies = await page.context().cookies(baseUrl);
+          const bypassCookieHeader = contextCookies
+            .map(cookie => `${cookie.name}=${cookie.value}`)
+            .join('; ');
+          const bypassHeaders = {
+            ...(bypassCookieHeader ? { cookie: bypassCookieHeader } : {}),
+            [TEST_MODE_HEADER]: TEST_AUTH_BYPASS_MODE,
+            ...(expectedUserId
+              ? { [TEST_USER_ID_HEADER]: expectedUserId }
+              : {}),
+          };
+
           let response = await page.request.get(authHealthUrl, {
             failOnStatusCode: false,
+            headers: bypassHeaders,
           });
 
           if (response.status() === 403) {
             response = await page.request.get(bypassSessionUrl, {
               failOnStatusCode: false,
+              headers: bypassHeaders,
             });
 
             if (!response.ok()) {

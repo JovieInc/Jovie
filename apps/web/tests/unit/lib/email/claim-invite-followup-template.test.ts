@@ -56,6 +56,7 @@ describe('claim invite follow-up founder copy', () => {
   it('uses a single claim CTA in html follow-ups', () => {
     const html = getFollowUpHtml(buildData(2));
 
+    expect(html).toContain('Hey Tom,');
     expect(html).toContain('Would still love your take on this.');
     expect(html).toContain(
       "Even if you don't end up using it, a quick reply on what turned you off would be super helpful."
@@ -86,7 +87,7 @@ describe('claim invite follow-up founder copy', () => {
 
     expect(text.startsWith('Hey,\n\n')).toBe(true);
     expect(text).not.toContain('Hey timwhite,');
-    expect(html).toContain('Hey');
+    expect(html).toContain('Hey,');
     expect(html).not.toContain('Hey timwhite');
   });
 });

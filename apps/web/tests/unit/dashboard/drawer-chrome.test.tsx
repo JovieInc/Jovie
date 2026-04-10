@@ -42,7 +42,7 @@ const audienceMember: AudienceMember = {
 };
 
 describe('dashboard drawer chrome', () => {
-  it('audience member drawer has close in overflow menu, not a standalone button', () => {
+  it('audience member drawer keeps close inside the overflow menu', () => {
     render(
       <AudienceMemberSidebar
         member={audienceMember}
@@ -52,7 +52,6 @@ describe('dashboard drawer chrome', () => {
       />
     );
 
-    // Close is inside the overflow menu, not a standalone button
     expect(
       screen.getByRole('button', { name: 'More actions' })
     ).toBeInTheDocument();
@@ -61,7 +60,7 @@ describe('dashboard drawer chrome', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('presence drawer has close in overflow menu and drops decorative label', () => {
+  it('presence drawer keeps close inside the overflow menu and drops decorative label', () => {
     render(
       <DspPresenceSidebar
         item={{
@@ -81,7 +80,6 @@ describe('dashboard drawer chrome', () => {
       />
     );
 
-    // Close is inside the overflow menu, not a standalone button
     expect(
       screen.getByRole('button', { name: 'More actions' })
     ).toBeInTheDocument();
