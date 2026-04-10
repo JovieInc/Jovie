@@ -42,7 +42,10 @@ export function resolveSafeFirstName(
     return null;
   }
 
-  const tokens = trimmedName.replace(/\s+/g, ' ').split(' ').filter(Boolean);
+  const tokens = trimmedName
+    .replaceAll(/\s+/gu, ' ')
+    .split(' ')
+    .filter(Boolean);
   // Stay intentionally conservative: only personalize clear two-word names.
   if (tokens.length !== 2) {
     return null;

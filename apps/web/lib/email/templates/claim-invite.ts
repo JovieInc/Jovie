@@ -62,6 +62,7 @@ export function getClaimInviteText(data: ClaimInviteTemplateData): string {
   const { creatorName, username, claimToken, recipientEmail } = data;
   const claimUrl = buildClaimUrl(username, claimToken);
   const greetingName = resolveSafeFirstName(creatorName, username);
+  const greeting = greetingName ? `${greetingName}!` : 'Ayyy!';
   const unsubscribeUrl = recipientEmail
     ? buildClaimInviteUnsubscribeUrl(recipientEmail)
     : null;
@@ -70,7 +71,7 @@ export function getClaimInviteText(data: ClaimInviteTemplateData): string {
     ? `\n\nDon't want to receive these emails? Unsubscribe: ${unsubscribeUrl}`
     : '';
 
-  return `${greetingName ? `${greetingName}!` : 'Ayyy!'}
+  return `${greeting}
 
 What up. It's Tim White, artist and founder of ${APP_NAME}.
 
