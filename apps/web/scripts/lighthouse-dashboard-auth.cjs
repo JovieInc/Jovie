@@ -325,6 +325,10 @@ function main() {
   assertCiUsesSyntheticBypass();
   const authStatePath = ensureAuthState(baseUrl);
   const chromePath = ensureChromiumPath();
+  const chromeFlags =
+    process.env.CI === 'true'
+      ? '--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage'
+      : null;
   const env = {
     ...process.env,
     BASE_URL: baseUrl,
@@ -352,6 +356,7 @@ function main() {
       `--config=${process.env.LIGHTHOUSE_CONFIG || '.lighthouserc.dashboard.pr.json'}`,
       `--healthcheck.chromePath=${chromePath}`,
       `--collect.chromePath=${chromePath}`,
+      ...(chromeFlags ? [`--collect.settings.chromeFlags=${chromeFlags}`] : []),
       ...collectUrls.map(url => `--collect.url=${url}`),
     ],
     {

@@ -40,6 +40,40 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
+async function fetchJsonInBrowserContext<T>(
+  page: Page,
+  url: string
+): Promise<{
+  readonly ok: boolean;
+  readonly status: number;
+  readonly payload: T | null;
+}> {
+  const probePage = await page.context().newPage();
+
+  try {
+    const response = await probePage.goto(url, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30_000,
+    });
+    const status = response?.status() ?? 0;
+    const rawBody =
+      (await probePage
+        .locator('body')
+        .textContent()
+        .catch(() => null)) ?? '';
+    const payload =
+      rawBody.trim().length > 0 ? (JSON.parse(rawBody) as T) : null;
+
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      payload,
+    };
+  } finally {
+    await probePage.close().catch(() => undefined);
+  }
+}
+
 export function canFallbackToBypassUserId(
   persona: 'creator' | 'admin' | null
 ): boolean {
@@ -214,25 +248,24 @@ export async function waitForAuthenticatedHealth(
     .poll(
       async () => {
         try {
-          let response = await page.request.get(authHealthUrl, {
-            failOnStatusCode: false,
-          });
+          const response = await fetchJsonInBrowserContext<{
+            authenticated?: boolean;
+            userId?: string | null;
+          }>(page, authHealthUrl);
 
-          if (response.status() === 403) {
-            response = await page.request.get(bypassSessionUrl, {
-              failOnStatusCode: false,
-            });
-
-            if (!response.ok()) {
-              return `http-${response.status()}`;
-            }
-
-            const payload = (await response.json()) as {
+          if (response.status === 403) {
+            const bypassResponse = await fetchJsonInBrowserContext<{
               active?: boolean;
               userId?: string | null;
-            };
+            }>(page, bypassSessionUrl);
 
-            if (!payload.active) {
+            if (!bypassResponse.ok) {
+              return `http-${bypassResponse.status}`;
+            }
+
+            const payload = bypassResponse.payload;
+
+            if (!payload?.active) {
               return 'anonymous';
             }
 
@@ -243,16 +276,13 @@ export async function waitForAuthenticatedHealth(
             return 'authenticated';
           }
 
-          if (!response.ok()) {
-            return `http-${response.status()}`;
+          if (!response.ok) {
+            return `http-${response.status}`;
           }
 
-          const payload = (await response.json()) as {
-            authenticated?: boolean;
-            userId?: string | null;
-          };
+          const payload = response.payload;
 
-          if (!payload.authenticated) {
+          if (!payload?.authenticated) {
             return 'anonymous';
           }
 
