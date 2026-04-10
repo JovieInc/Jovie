@@ -54,5 +54,6 @@ export function useChatConversationQuery({
     gcTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
     refetchInterval,
+    refetchIntervalInBackground: false,
   });
 }

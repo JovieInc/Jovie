@@ -493,7 +493,6 @@ async function fetchDiscoverySnapshot(
   const response = await fetch(
     `/api/onboarding/discovery?profileId=${encodeURIComponent(profileId)}`,
     {
-      cache: 'no-store',
       signal,
     }
   );
