@@ -78,8 +78,6 @@ vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   connectSpotifyArtist: vi.fn(),
   getSpotifyImportPollSnapshot: vi.fn(),
-  getSpotifyImportStatus: vi.fn(),
-  pollReleasesCount: vi.fn(),
   connectAppleMusicArtist: vi.fn(),
   rescanAppleMusicLinks: vi.fn(),
   rescanIsrcLinks: vi.fn(),

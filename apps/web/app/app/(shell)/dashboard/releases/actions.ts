@@ -1,6 +1,6 @@
 'use server';
 
-import { and, count, eq, inArray, ne } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -1352,102 +1352,6 @@ export async function checkSpotifyConnectionForProfile(
   }
 
   return { connected: false, spotifyId: null, artistName };
-}
-
-/**
- * Connect a Spotify artist to the profile and sync releases
- */
-/**
- * Poll current release count and release data (uncached, for real-time import progress).
- */
-export async function pollReleasesCount(): Promise<{
-  count: number;
-  releases: ReleaseViewModel[];
-}> {
-  noStore();
-  const { userId } = await getCachedAuth();
-  if (!userId) throw new Error('Unauthorized');
-
-  const profile = await requireProfile();
-  const providerLabels = buildProviderLabels();
-  const releases = await getReleasesFromDb(profile.id);
-
-  return {
-    count: releases.length,
-    releases: releases.map(r =>
-      mapReleaseToViewModel(r, providerLabels, profile.id, profile.handle)
-    ),
-  };
-}
-
-/**
- * Get Spotify import status from profile settings (uncached).
- */
-export async function getSpotifyImportStatus(): Promise<{
-  status: 'idle' | 'importing' | 'complete' | 'failed';
-  releaseCount: number;
-  totalCount: number;
-  enrichmentStatus: EnrichmentStatusMap;
-  aggregateEnrichmentStatus: AggregateEnrichmentStatus;
-}> {
-  noStore();
-  const { userId } = await getCachedAuth();
-  if (!userId) throw new Error('Unauthorized');
-
-  const profile = await requireProfile();
-
-  const [row] = await db
-    .select({
-      settings: creatorProfiles.settings,
-      spotifyId: creatorProfiles.spotifyId,
-      updatedAt: creatorProfiles.updatedAt,
-      releaseCount: count(discogReleases.id),
-    })
-    .from(creatorProfiles)
-    .leftJoin(
-      discogReleases,
-      eq(discogReleases.creatorProfileId, creatorProfiles.id)
-    )
-    .where(eq(creatorProfiles.id, profile.id))
-    .groupBy(creatorProfiles.id)
-    .limit(1);
-
-  const settings = (row?.settings ?? {}) as Record<string, unknown>;
-  const storedStatus = settings.spotifyImportStatus as string | undefined;
-  const releaseCount = Number(row?.releaseCount ?? 0);
-  const hasSpotifyProfile = Boolean(row?.spotifyId);
-  const totalCount =
-    typeof settings.spotifyImportTotal === 'number'
-      ? settings.spotifyImportTotal
-      : 0;
-
-  let status: 'idle' | 'importing' | 'complete' | 'failed';
-  if (storedStatus === 'complete') {
-    status = 'complete';
-  } else if (storedStatus === 'failed') {
-    status = 'failed';
-  } else if (storedStatus === 'importing') {
-    status = 'importing';
-  } else {
-    status = hasSpotifyProfile && releaseCount > 0 ? 'complete' : 'idle';
-  }
-
-  // Read enrichmentStatus with TTL check for stale 'enriching' entries
-  const rawEnrichmentStatus = (settings.enrichmentStatus ??
-    {}) as EnrichmentStatusMap;
-  const enrichmentStatus = applyTtlToEnrichmentStatus(
-    rawEnrichmentStatus,
-    row?.updatedAt ?? null
-  );
-  const aggregateEnrichmentStatus = deriveAggregateStatus(enrichmentStatus);
-
-  return {
-    status,
-    releaseCount,
-    totalCount,
-    enrichmentStatus,
-    aggregateEnrichmentStatus,
-  };
 }
 
 /**
