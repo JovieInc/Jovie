@@ -2160,7 +2160,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
-          DATABASE_URL: ${{ env.DATABASE_URL_DIRECT }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           GIT_BRANCH: ${{ github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'
@@ -2898,7 +2898,7 @@ jobs:
       - name: Run migrations for Smoke DB
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
-          DATABASE_URL: ${{ env.DATABASE_URL_DIRECT }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           GIT_BRANCH: ${{ github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'

@@ -92,14 +92,31 @@ function isMissingActiveProfileIdColumn(error: unknown): boolean {
 }
 
 export function isRetryableSeedDatabaseError(error: unknown): boolean {
-  const message = (
-    error instanceof Error ? error.message : String(error)
-  ).toLowerCase();
-  const code =
-    typeof error === 'object' && error !== null
-      ? ((error as { code?: string; cause?: { code?: string } }).code ??
-        (error as { cause?: { code?: string } }).cause?.code)
-      : undefined;
+  const messages: string[] = [];
+  const codes = new Set<string>();
+
+  let current: unknown = error;
+  while (current) {
+    if (current instanceof Error) {
+      messages.push(current.message);
+    } else {
+      messages.push(String(current));
+    }
+
+    if (typeof current === 'object' && current !== null) {
+      const code = (current as { code?: string }).code;
+      if (typeof code === 'string' && code.length > 0) {
+        codes.add(code);
+      }
+
+      current = 'cause' in current ? current.cause : undefined;
+      continue;
+    }
+
+    break;
+  }
+
+  const message = messages.join(' ').toLowerCase();
 
   return (
     message.includes('password authentication failed') ||
@@ -109,9 +126,9 @@ export function isRetryableSeedDatabaseError(error: unknown): boolean {
     message.includes('server closed the connection unexpectedly') ||
     message.includes('the database system is starting up') ||
     message.includes('fetch failed') ||
-    code === '57P03' ||
-    code === 'XX000' ||
-    code === 'ECONNRESET'
+    codes.has('57P03') ||
+    codes.has('XX000') ||
+    codes.has('ECONNRESET')
   );
 }
 
