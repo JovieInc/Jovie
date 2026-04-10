@@ -31,6 +31,7 @@ export function useAvatarPolling({ enabled }: UseAvatarPollingParams): {
   const [pollIntervalMs, setPollIntervalMs] = useState(AVATAR_POLL_INTERVAL_MS);
   const pollStartRef = useRef<number>(0);
   const stagnantPollCountRef = useRef(0);
+  const lastProcessedPollAtRef = useRef(0);
 
   useEffect(() => {
     if (enabled && !isComplete) {
@@ -42,12 +43,13 @@ export function useAvatarPolling({ enabled }: UseAvatarPollingParams): {
     if (enabled) {
       setPollIntervalMs(AVATAR_POLL_INTERVAL_MS);
       stagnantPollCountRef.current = 0;
+      lastProcessedPollAtRef.current = 0;
     }
   }, [enabled]);
 
   const isPolling = enabled && !isComplete && !polledAvatarUrl;
 
-  const { data } = useQuery({
+  const { data, dataUpdatedAt } = useQuery({
     queryKey: ['avatar-polling'],
     queryFn: ({ signal: _signal }) => getProfileAvatarUrl(),
     enabled: isPolling,
@@ -59,7 +61,9 @@ export function useAvatarPolling({ enabled }: UseAvatarPollingParams): {
   });
 
   useEffect(() => {
-    if (!data || !isPolling) return;
+    if (!data || !isPolling || dataUpdatedAt === 0) return;
+    if (lastProcessedPollAtRef.current === dataUpdatedAt) return;
+    lastProcessedPollAtRef.current = dataUpdatedAt;
 
     if (data.avatarUrl) {
       setPolledAvatarUrl(data.avatarUrl);
@@ -82,7 +86,7 @@ export function useAvatarPolling({ enabled }: UseAvatarPollingParams): {
     if (timedOut) {
       setIsComplete(true);
     }
-  }, [data, isPolling, pollIntervalMs]);
+  }, [data, dataUpdatedAt, isPolling, pollIntervalMs]);
 
   return { polledAvatarUrl };
 }

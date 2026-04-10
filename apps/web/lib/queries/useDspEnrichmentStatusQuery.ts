@@ -156,6 +156,7 @@ export function useDspEnrichmentStatusQuery({
   );
   const stagnantPollCountRef = useRef(0);
   const lastPhaseRef = useRef<EnrichmentPhase | null>(null);
+  const lastProcessedPollAtRef = useRef(0);
 
   // Skip refetch on mount when polling is already handling freshness
   const cachedData = queryClient.getQueryData<EnrichmentStatus>(
@@ -205,10 +206,19 @@ export function useDspEnrichmentStatusQuery({
     setPollIntervalMs(DEFAULT_POLLING_INTERVAL_MS);
     stagnantPollCountRef.current = 0;
     lastPhaseRef.current = null;
+    lastProcessedPollAtRef.current = 0;
   }, [enabled, profileId]);
 
   useEffect(() => {
     const currentPhase = query.data?.overallPhase;
+    if (query.dataUpdatedAt === 0) {
+      return;
+    }
+    if (lastProcessedPollAtRef.current === query.dataUpdatedAt) {
+      return;
+    }
+    lastProcessedPollAtRef.current = query.dataUpdatedAt;
+
     if (currentPhase == null || !ACTIVE_PHASES.has(currentPhase)) {
       stagnantPollCountRef.current = 0;
       lastPhaseRef.current = null;
@@ -234,7 +244,7 @@ export function useDspEnrichmentStatusQuery({
     ) {
       setPollIntervalMs(BACKOFF_POLLING_INTERVAL_MS);
     }
-  }, [query.data?.overallPhase, pollIntervalMs]);
+  }, [query.data?.overallPhase, query.dataUpdatedAt, pollIntervalMs]);
 
   // Track phase transitions: fire callback when enrichment finishes or new data appears.
   // Triggers on: active → complete, discovering → non-discovering (new matches found)

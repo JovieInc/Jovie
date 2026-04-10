@@ -16,7 +16,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { UpgradeResult, UpgradeState } from '@/lib/sentry/lazy-replay';
 
-const UPGRADE_STATE_RETRY_DELAYS_MS = [0, 500, 1500, 3000, 5000] as const;
+const UPGRADE_STATE_RETRY_DELAYS_MS = [500, 1500, 3000, 5000, 15000] as const;
 
 /**
  * Props for SentryDashboardProvider
@@ -249,19 +249,17 @@ export function useSentryDashboardState(): {
           upgradeState !== 'checking' &&
           upgradeState !== 'upgrading';
 
-        if (
-          isTerminalState ||
-          attempt >= UPGRADE_STATE_RETRY_DELAYS_MS.length - 1
-        ) {
+        if (isTerminalState) {
           return;
         }
 
-        timeoutId = setTimeout(
-          () => {
-            void runCheck(attempt + 1);
-          },
-          UPGRADE_STATE_RETRY_DELAYS_MS[attempt + 1]
-        );
+        const retryDelay =
+          UPGRADE_STATE_RETRY_DELAYS_MS[
+            Math.min(attempt, UPGRADE_STATE_RETRY_DELAYS_MS.length - 1)
+          ];
+        timeoutId = setTimeout(() => {
+          void runCheck(attempt + 1);
+        }, retryDelay);
       } catch {
         if (cancelled) {
           return;

@@ -75,6 +75,7 @@ export function useImportPolling({
   const seenReleasesRef = useRef(new Map<string, ReleaseViewModel>());
   const stagnantPollCountRef = useRef(0);
   const lastProgressSignatureRef = useRef<string | null>(null);
+  const lastProcessedPollAtRef = useRef(0);
   // Track whether import completed so we stop polling
   const [isComplete, setIsComplete] = useState(false);
   const queryClient = useQueryClient();
@@ -115,6 +116,7 @@ export function useImportPolling({
       setIsComplete(false);
       stagnantPollCountRef.current = 0;
       lastProgressSignatureRef.current = null;
+      lastProcessedPollAtRef.current = 0;
       pollStartRef.current = Date.now();
       // Remove stale poll data from previous imports
       queryClient.removeQueries({ queryKey: ['import-polling'] });
@@ -129,7 +131,7 @@ export function useImportPolling({
 
   const isPolling = enabled && !isComplete;
 
-  const { data } = useQuery({
+  const { data, dataUpdatedAt } = useQuery({
     queryKey: ['import-polling'],
     queryFn: fetchImportPoll,
     enabled: isPolling,
@@ -143,7 +145,9 @@ export function useImportPolling({
 
   // Process poll results whenever query data changes
   useEffect(() => {
-    if (!data || !isPolling) return;
+    if (!data || !isPolling || dataUpdatedAt === 0) return;
+    if (lastProcessedPollAtRef.current === dataUpdatedAt) return;
+    lastProcessedPollAtRef.current = dataUpdatedAt;
 
     // Update totalCount from server if available and larger
     if (data.totalCount > 0 && data.totalCount > totalCount) {
@@ -200,7 +204,14 @@ export function useImportPolling({
         completionTimerRef.current = null;
       }, COMPLETION_HOLD_MS);
     }
-  }, [data, isPolling, mergeAndEmit, pollIntervalMs, totalCount]);
+  }, [
+    data,
+    dataUpdatedAt,
+    isPolling,
+    mergeAndEmit,
+    pollIntervalMs,
+    totalCount,
+  ]);
 
   return { importedCount, totalCount };
 }

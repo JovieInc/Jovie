@@ -42,6 +42,7 @@ export function useEnrichmentStatus({
   const pollStartRef = useRef<number>(0);
   const stagnantPollCountRef = useRef(0);
   const lastStatusRef = useRef<AggregateEnrichmentStatus | null>(null);
+  const lastProcessedPollAtRef = useRef(0);
 
   useEffect(() => {
     onCompleteRef.current = onEnrichmentComplete;
@@ -58,12 +59,13 @@ export function useEnrichmentStatus({
       setPollIntervalMs(POLL_INTERVAL_MS);
       stagnantPollCountRef.current = 0;
       lastStatusRef.current = null;
+      lastProcessedPollAtRef.current = 0;
     }
   }, [enabled]);
 
   const isPolling = enabled && !isDone;
 
-  const { data } = useQuery({
+  const { data, dataUpdatedAt } = useQuery({
     queryKey: ['enrichment-status'],
     queryFn: ({ signal: _signal }) => getSpotifyImportPollSnapshot(),
     enabled: isPolling,
@@ -78,7 +80,9 @@ export function useEnrichmentStatus({
   const aggregateStatus = data?.aggregateEnrichmentStatus ?? 'idle';
 
   useEffect(() => {
-    if (!data || !isPolling) return;
+    if (!data || !isPolling || dataUpdatedAt === 0) return;
+    if (lastProcessedPollAtRef.current === dataUpdatedAt) return;
+    lastProcessedPollAtRef.current = dataUpdatedAt;
 
     if (aggregateStatus === lastStatusRef.current) {
       stagnantPollCountRef.current += 1;
@@ -112,7 +116,7 @@ export function useEnrichmentStatus({
       setIsDone(true);
       onCompleteRef.current?.();
     }
-  }, [data, isPolling, aggregateStatus, pollIntervalMs]);
+  }, [data, dataUpdatedAt, isPolling, aggregateStatus, pollIntervalMs]);
 
   return {
     enrichmentStatus,
