@@ -130,3 +130,8 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ### `/claim` route gating in sentry route-detector
 **Situation:** `lib/sentry/route-detector.ts` references `/claim` as a known public route for Sentry performance tracking. This is intentional — the route exists for artist profile claiming. Don't confuse this with marketing CTAs that should link to `/signup`.
+
+### Optional promo fixtures must not break public CI lanes
+**Mistake:** `tests/seed-test-data.ts` treated a missing `promo_downloads` relation as fatal even in shared CI lanes like Lighthouse that only need the core public surfaces. If that optional table was absent, the seed step failed before any page audit ran.
+
+**Rule:** For public-route, Lighthouse, and a11y CI seeding, optional fixtures should warn and skip when their dedicated relation is missing. Only required schema should abort the seed.

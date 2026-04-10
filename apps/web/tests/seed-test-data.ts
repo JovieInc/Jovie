@@ -240,6 +240,22 @@ function isMissingRelationError(error: unknown, relationName: string): boolean {
   );
 }
 
+export function isMissingPromoDownloadsRelationError(error: unknown): boolean {
+  const message = (
+    error instanceof Error ? error.message : String(error)
+  ).toLowerCase();
+  const code =
+    typeof error === 'object' && error !== null
+      ? ((error as { code?: string; cause?: { code?: string } }).code ??
+        (error as { cause?: { code?: string } }).cause?.code)
+      : undefined;
+
+  return (
+    (code === '42P01' && isMissingRelationError(error, 'promo_downloads')) ||
+    /relation ["']?promo_downloads["']? does not exist/.test(message)
+  );
+}
+
 function getSeedEnv() {
   // This file is imported by Playwright global setup, so it must not depend on
   // Next's server-only env modules.
@@ -976,14 +992,15 @@ async function seedReleasesForProfile(
         .onConflictDoNothing();
       console.log('    ✓ Ensured promo download fixture for Neon Skyline');
     } catch (error) {
-      if (isMissingRelationError(error, 'promo_downloads')) {
-        throw new Error(
-          `promo_downloads is missing while seeding public QA fixtures: ${
+      if (isMissingPromoDownloadsRelationError(error)) {
+        console.warn(
+          `    ⚠ promo_downloads is missing; skipping promo download fixture: ${
             error instanceof Error ? error.message : String(error)
           }`
         );
+      } else {
+        throw error;
       }
-      throw error;
     }
   }
 

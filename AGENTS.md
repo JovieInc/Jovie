@@ -1690,3 +1690,8 @@ Key routing rules:
 - Design system, brand → invoke `design-consultation`
 - Visual audit, design polish → invoke `design-review`
 - Architecture review → invoke `plan-eng-review`
+
+## CI Seeding Guardrail
+
+- In shared CI lanes that audit public routes (`Lighthouse`, `a11y`, public smoke), seed scripts must fail only on required schema.
+- Optional fixtures that depend on add-on relations, such as `promo_downloads`, must warn and skip when the relation is missing unless that lane explicitly provisions the schema first.
