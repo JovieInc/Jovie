@@ -381,11 +381,11 @@ describe('ReleaseSidebar Links tab', () => {
     );
   });
 
-  it('tab switching between Playback, DSPs, Details, and Lyrics works', async () => {
+  it('tab switching between Tracks, DSPs, Details, and Lyrics works', async () => {
     const user = userEvent.setup();
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    // Playback tab active by default
+    // Tracks tab active by default
     expect(screen.getByTestId('tracklist')).toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
     expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
@@ -416,7 +416,7 @@ describe('ReleaseSidebar Links tab', () => {
     );
     expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
 
-    // Switch to Playback
+    // Switch back to Tracks
     await user.click(screen.getByTestId('drawer-tab-playback'));
     expect(screen.getByTestId('tracklist')).toBeInTheDocument();
 

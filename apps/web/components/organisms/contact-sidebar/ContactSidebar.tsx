@@ -5,11 +5,13 @@ import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 
 import {
+  DrawerCardActionBar,
+  DrawerSurfaceCard,
   DrawerTabbedCard,
   DrawerTabs,
+  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
-import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import {
   type ContextMenuItemType,
   convertToCommonDropdownItems,
@@ -120,11 +122,7 @@ export const ContactSidebar = memo(function ContactSidebar({
   ]);
 
   const contextMenuItems = providedContextMenuItems ?? fallbackContextMenuItems;
-  const {
-    title: headerTitle,
-    primaryActions,
-    overflowActions,
-  } = useContactHeaderParts({
+  const { title: headerTitle } = useContactHeaderParts({
     contact,
     hasContact,
     onRefresh,
@@ -141,13 +139,30 @@ export const ContactSidebar = memo(function ContactSidebar({
       title={headerTitle}
       onClose={contact ? undefined : onClose}
       headerMode='minimal'
-      headerActions={
-        <DrawerHeaderActions
-          primaryActions={primaryActions}
-          overflowActions={overflowActions}
-          menuItems={contextMenuItems}
-          onClose={onClose}
-        />
+      hideMinimalHeaderBar={hasContact}
+      entityHeader={
+        contact ? (
+          <DrawerSurfaceCard variant='card' className='overflow-hidden p-3'>
+            <EntityHeaderCard
+              eyebrow={headerTitle}
+              title={displayName ?? 'Contact'}
+              subtitle={
+                contact.username ? `@${contact.username}` : 'No username'
+              }
+              actions={
+                <DrawerCardActionBar
+                  primaryActions={[]}
+                  menuItems={contextMenuItems}
+                  onClose={onClose}
+                  overflowTriggerPlacement='card-top-right'
+                  overflowTriggerIcon='vertical'
+                  className='border-0 bg-transparent px-0 py-0'
+                />
+              }
+              bodyClassName='pr-9'
+            />
+          </DrawerSurfaceCard>
+        ) : undefined
       }
       isEmpty={!contact}
       emptyMessage='Select a row in the table to view contact details.'

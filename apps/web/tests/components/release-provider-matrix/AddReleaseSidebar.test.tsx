@@ -92,22 +92,32 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerSurfaceCard: ({ children }: { children: ReactNode }) => (
     <div data-testid='drawer-surface-card'>{children}</div>
   ),
-  DrawerSection: ({ children }: { children: ReactNode }) => (
-    <div data-testid='drawer-section'>{children}</div>
+  DrawerCardActionBar: ({ onClose }: { onClose?: () => void }) => (
+    <button
+      type='button'
+      data-testid='drawer-card-action-bar'
+      onClick={onClose}
+      aria-label='More actions'
+    >
+      More
+    </button>
   ),
   EntityHeaderCard: ({
     title,
     subtitle,
     meta,
     image,
+    actions,
   }: {
     title: ReactNode;
     subtitle?: ReactNode;
     meta?: ReactNode;
     image?: ReactNode;
+    actions?: ReactNode;
   }) => (
     <div data-testid='entity-header-card'>
       {image}
+      <div data-testid='entity-header-actions'>{actions}</div>
       <div data-testid='entity-header-title'>{title}</div>
       <div data-testid='entity-header-subtitle'>{subtitle}</div>
       <div data-testid='entity-header-meta'>{meta}</div>
@@ -120,6 +130,8 @@ vi.mock('@/components/molecules/drawer', () => ({
     'data-testid': testId,
     onClose,
     title,
+    hideMinimalHeaderBar,
+    footerSurface,
   }: {
     children: ReactNode;
     entityHeader?: ReactNode;
@@ -127,15 +139,21 @@ vi.mock('@/components/molecules/drawer', () => ({
     'data-testid'?: string;
     onClose?: () => void;
     title?: ReactNode;
+    hideMinimalHeaderBar?: boolean;
+    footerSurface?: 'card' | 'flat';
   }) => (
     <div data-testid={testId}>
-      <div data-testid='shell-title'>{title}</div>
+      {!hideMinimalHeaderBar && title ? (
+        <div data-testid='shell-title'>{title}</div>
+      ) : null}
       <button type='button' data-testid='shell-close' onClick={onClose}>
         Close
       </button>
       <div data-testid='shell-entity-header'>{entityHeader}</div>
       <div data-testid='shell-body'>{children}</div>
-      <div data-testid='shell-footer'>{footer}</div>
+      <div data-testid='shell-footer' data-surface={footerSurface ?? 'card'}>
+        {footer}
+      </div>
     </div>
   ),
 }));
@@ -292,12 +310,22 @@ describe('AddReleaseSidebar', () => {
     const sidebar = screen.getByTestId('add-release-sidebar');
 
     expect(sidebar).toBeInTheDocument();
-    expect(screen.getByTestId('shell-title')).toHaveTextContent('New Release');
+    expect(screen.queryByTestId('shell-title')).not.toBeInTheDocument();
+    expect(screen.getByTestId('entity-header-actions')).toContainElement(
+      screen.getByTestId('drawer-card-action-bar')
+    );
     expect(screen.getByTestId('entity-header-title')).toHaveTextContent(
       'Untitled'
     );
     expect(screen.getByTestId('entity-header-subtitle')).toHaveTextContent(
       'Test Artist'
+    );
+    expect(screen.getByTestId('add-release-details-card')).toHaveTextContent(
+      'Details'
+    );
+    expect(screen.getByTestId('shell-footer')).toHaveAttribute(
+      'data-surface',
+      'flat'
     );
     expect(within(sidebar).getByLabelText('Title')).toBeInTheDocument();
     expect(

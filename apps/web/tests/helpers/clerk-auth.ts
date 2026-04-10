@@ -5,8 +5,10 @@ import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
 import {
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_COOKIE,
+  TEST_MODE_HEADER,
   TEST_PERSONA_COOKIE,
   TEST_USER_ID_COOKIE,
+  TEST_USER_ID_HEADER,
 } from '@/lib/auth/test-mode';
 import { smokeNavigateWithRetry } from '../e2e/utils/smoke-test-utils';
 import { primeVercelBypassCookie } from './vercel-preview';
@@ -252,6 +254,17 @@ export async function waitForAuthenticatedHealth(
             authenticated?: boolean;
             userId?: string | null;
           }>(page, authHealthUrl);
+          const contextCookies = await page.context().cookies(baseUrl);
+          const bypassCookieHeader = contextCookies
+            .map(cookie => `${cookie.name}=${cookie.value}`)
+            .join('; ');
+          const bypassHeaders = {
+            ...(bypassCookieHeader ? { cookie: bypassCookieHeader } : {}),
+            [TEST_MODE_HEADER]: TEST_AUTH_BYPASS_MODE,
+            ...(expectedUserId
+              ? { [TEST_USER_ID_HEADER]: expectedUserId }
+              : {}),
+          };
 
           if (response.status === 403) {
             const bypassResponse = await fetchJsonInBrowserContext<{
@@ -259,13 +272,38 @@ export async function waitForAuthenticatedHealth(
               userId?: string | null;
             }>(page, bypassSessionUrl);
 
-            if (!bypassResponse.ok) {
-              return `http-${bypassResponse.status}`;
+            if (bypassResponse.ok) {
+              const payload = bypassResponse.payload;
+
+              if (!payload?.active) {
+                return 'anonymous';
+              }
+
+              if (expectedUserId && payload.userId !== expectedUserId) {
+                return `user-mismatch:${payload.userId ?? 'unknown'}`;
+              }
+
+              return 'authenticated';
             }
 
-            const payload = bypassResponse.payload;
+            const bypassSessionResponse = await page.request.get(
+              bypassSessionUrl,
+              {
+                failOnStatusCode: false,
+                headers: bypassHeaders,
+              }
+            );
 
-            if (!payload?.active) {
+            if (!bypassSessionResponse.ok()) {
+              return `http-${bypassSessionResponse.status()}`;
+            }
+
+            const payload = (await bypassSessionResponse.json()) as {
+              active?: boolean;
+              userId?: string | null;
+            };
+
+            if (!payload.active) {
               return 'anonymous';
             }
 
@@ -276,13 +314,64 @@ export async function waitForAuthenticatedHealth(
             return 'authenticated';
           }
 
-          if (!response.ok) {
-            return `http-${response.status}`;
+          if (response.ok) {
+            const payload = response.payload;
+
+            if (!payload?.authenticated) {
+              return 'anonymous';
+            }
+
+            if (expectedUserId && payload.userId !== expectedUserId) {
+              return `user-mismatch:${payload.userId ?? 'unknown'}`;
+            }
+
+            return 'authenticated';
           }
 
-          const payload = response.payload;
+          const fallbackResponse = await page.request.get(authHealthUrl, {
+            failOnStatusCode: false,
+            headers: bypassHeaders,
+          });
 
-          if (!payload?.authenticated) {
+          if (fallbackResponse.status() === 403) {
+            const bypassSessionResponse = await page.request.get(
+              bypassSessionUrl,
+              {
+                failOnStatusCode: false,
+                headers: bypassHeaders,
+              }
+            );
+
+            if (!bypassSessionResponse.ok()) {
+              return `http-${bypassSessionResponse.status()}`;
+            }
+
+            const payload = (await bypassSessionResponse.json()) as {
+              active?: boolean;
+              userId?: string | null;
+            };
+
+            if (!payload.active) {
+              return 'anonymous';
+            }
+
+            if (expectedUserId && payload.userId !== expectedUserId) {
+              return `user-mismatch:${payload.userId ?? 'unknown'}`;
+            }
+
+            return 'authenticated';
+          }
+
+          if (!fallbackResponse.ok()) {
+            return `http-${fallbackResponse.status()}`;
+          }
+
+          const payload = (await fallbackResponse.json()) as {
+            authenticated?: boolean;
+            userId?: string | null;
+          };
+
+          if (!payload.authenticated) {
             return 'anonymous';
           }
 

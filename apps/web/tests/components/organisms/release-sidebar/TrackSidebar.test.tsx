@@ -96,9 +96,7 @@ describe('TrackSidebar', () => {
     );
 
     expect(screen.getAllByText('Midnight Echo').length).toBeGreaterThan(0);
-    expect(
-      screen.getByRole('button', { name: /copy track link/i })
-    ).toBeInTheDocument();
+    expect(screen.getByTitle('Copy track link')).toBeInTheDocument();
     expect(screen.getByText(/Preview Unverified/i)).toBeInTheDocument();
     expect(screen.getByTestId('track-tabbed-card')).toHaveAttribute(
       'data-surface-variant',

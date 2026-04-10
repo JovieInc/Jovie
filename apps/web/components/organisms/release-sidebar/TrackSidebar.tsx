@@ -16,7 +16,6 @@ import {
 } from '@/components/molecules/drawer';
 import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import type {
   PreviewSource,
@@ -251,30 +250,6 @@ export function TrackSidebar({
     ];
   }, [track, isSmartLinkCopied, handleCopySmartLink, smartLinkUrl]);
 
-  const primaryActions = useMemo<DrawerHeaderAction[]>(() => {
-    if (!track) return [];
-    return [
-      {
-        id: 'copy',
-        label: isSmartLinkCopied ? 'Copied!' : 'Copy track link',
-        icon: Copy,
-        activeIcon: Check,
-        isActive: isSmartLinkCopied,
-        onClick: handleCopySmartLink,
-      },
-      {
-        id: 'open',
-        label: 'Open track link',
-        icon: ExternalLink,
-        onClick: () => {
-          if (track.smartLinkPath) {
-            globalThis.open(smartLinkUrl, '_blank', 'noopener,noreferrer');
-          }
-        },
-      },
-    ];
-  }, [track, isSmartLinkCopied, handleCopySmartLink, smartLinkUrl]);
-
   const playableUrl = track?.audioUrl ?? track?.previewUrl ?? null;
   const isThisTrack = playbackState.activeTrackId === track?.id;
   const isPlaying = isThisTrack && playbackState.isPlaying;
@@ -327,16 +302,9 @@ export function TrackSidebar({
       width={width}
       ariaLabel='Track details'
       data-testid='track-sidebar'
-      title={track?.title ?? 'No track selected'}
       onClose={onClose}
       headerMode='minimal'
-      headerActions={
-        <DrawerHeaderActions
-          primaryActions={[]}
-          overflowActions={[]}
-          onClose={onClose}
-        />
-      }
+      hideMinimalHeaderBar={Boolean(track)}
       isEmpty={!track}
       emptyMessage='Select a track to view its details.'
       entityHeader={
@@ -351,23 +319,76 @@ export function TrackSidebar({
                 onClick={handleBackToRelease}
               />
             ) : null}
-            {smartLinkUrl ? (
-              <div className='px-0.5'>
-                <CopyableUrlRow
-                  url={smartLinkUrl}
-                  size='sm'
-                  surface='boxed'
-                  copyButtonTitle='Copy track link'
-                  openButtonTitle='Open track link'
-                  onCopySuccess={() => {
-                    showSmartLinkCopied();
-                  }}
-                  onCopyError={() => {
-                    toast.error('Failed to copy link');
-                  }}
-                />
-              </div>
-            ) : null}
+            <DrawerSurfaceCard variant='card' className='overflow-hidden p-3.5'>
+              <EntityHeaderCard
+                eyebrow='Track'
+                title={track.title}
+                subtitle={
+                  <span className='flex items-center gap-1.5'>
+                    <span className='tabular-nums'>{trackLabel}.</span>
+                    {track.releaseTitle}
+                    {track.isExplicit ? (
+                      <span className='rounded-[4px] bg-surface-1 px-1 text-[9px] font-[510] text-tertiary-token'>
+                        E
+                      </span>
+                    ) : null}
+                  </span>
+                }
+                image={
+                  <DrawerMediaThumb
+                    src={track.releaseArtworkUrl}
+                    alt={`${track.releaseTitle} artwork`}
+                    sizeClassName='h-[72px] w-[72px] rounded-[10px]'
+                    sizes='72px'
+                    fallback={
+                      <div className='h-[72px] w-[72px] rounded-[10px] bg-surface-1' />
+                    }
+                  />
+                }
+                meta={
+                  <div className='flex flex-wrap items-center gap-2 text-[10.5px] text-tertiary-token'>
+                    {track.durationMs != null ? (
+                      <span className='tabular-nums'>
+                        {formatDuration(track.durationMs)}
+                      </span>
+                    ) : null}
+                    {track.isrc ? (
+                      <span className='font-mono text-[9.5px] tracking-[0.02em]'>
+                        {track.isrc}
+                      </span>
+                    ) : null}
+                  </div>
+                }
+                actions={
+                  <DrawerCardActionBar
+                    primaryActions={[]}
+                    overflowActions={overflowActions}
+                    onClose={onClose}
+                    overflowTriggerPlacement='card-top-right'
+                    overflowTriggerIcon='vertical'
+                    className='border-0 bg-transparent px-0 py-0'
+                  />
+                }
+                footer={
+                  smartLinkUrl ? (
+                    <CopyableUrlRow
+                      url={smartLinkUrl}
+                      size='sm'
+                      surface='boxed'
+                      copyButtonTitle='Copy track link'
+                      openButtonTitle='Open track link'
+                      onCopySuccess={() => {
+                        showSmartLinkCopied();
+                      }}
+                      onCopyError={() => {
+                        toast.error('Failed to copy link');
+                      }}
+                    />
+                  ) : null
+                }
+                bodyClassName='pr-9'
+              />
+            </DrawerSurfaceCard>
           </div>
         ) : undefined
       }
@@ -390,48 +411,6 @@ export function TrackSidebar({
           {activeTab === 'playback' ? (
             <DrawerSurfaceCard variant='flat' className='overflow-hidden'>
               <div className='space-y-3 p-2.5'>
-                <div className='flex items-start gap-2.5'>
-                  <DrawerMediaThumb
-                    src={track.releaseArtworkUrl}
-                    alt={`${track.releaseTitle} artwork`}
-                    sizeClassName='h-[72px] w-[72px] rounded-[10px]'
-                    sizes='72px'
-                    fallback={
-                      <div className='h-[72px] w-[72px] rounded-[10px] bg-surface-1' />
-                    }
-                  />
-                  <EntityHeaderCard
-                    title={track.title}
-                    subtitle={
-                      <span className='flex items-center gap-1.5'>
-                        <span className='tabular-nums'>{trackLabel}.</span>
-                        {track.releaseTitle}
-                        {track.isExplicit ? (
-                          <span className='rounded-[4px] bg-surface-1 px-1 text-[9px] font-[510] text-tertiary-token'>
-                            E
-                          </span>
-                        ) : null}
-                      </span>
-                    }
-                    meta={
-                      <div className='flex flex-wrap items-center gap-2 text-[10.5px] text-tertiary-token'>
-                        {track.durationMs != null ? (
-                          <span className='tabular-nums'>
-                            {formatDuration(track.durationMs)}
-                          </span>
-                        ) : null}
-                        {track.isrc ? (
-                          <span className='font-mono text-[9.5px] tracking-[0.02em]'>
-                            {track.isrc}
-                          </span>
-                        ) : null}
-                      </div>
-                    }
-                    className='min-w-0 flex-1'
-                    bodyClassName='pt-0'
-                  />
-                </div>
-
                 <div className='flex min-h-11 items-center gap-2'>
                   {playableUrl ? (
                     <button
@@ -505,12 +484,6 @@ export function TrackSidebar({
                       .join(', ')}
                   </p>
                 ) : null}
-
-                <DrawerCardActionBar
-                  primaryActions={primaryActions}
-                  overflowActions={overflowActions}
-                  className='border-t-0 px-0 py-0'
-                />
               </div>
             </DrawerSurfaceCard>
           ) : (

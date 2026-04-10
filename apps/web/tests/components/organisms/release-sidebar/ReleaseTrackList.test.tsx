@@ -1,116 +1,72 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReleaseTrackList } from '@/components/organisms/release-sidebar/ReleaseTrackList';
 import { createMockRelease } from '@/tests/test-utils/factories';
 
-vi.mock('@jovie/ui', () => ({
-  Badge: ({ children }: { children: React.ReactNode }) => (
-    <span>{children}</span>
-  ),
-  DropdownMenu: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
-  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-  DropdownMenuItem: ({
-    children,
-    onClick,
-  }: {
-    children: React.ReactNode;
-    onClick?: () => void;
-  }) => (
-    <button type='button' onClick={onClick}>
-      {children}
-    </button>
-  ),
-  DropdownMenuSeparator: () => <hr />,
-  DropdownMenuSub: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
-  DropdownMenuSubContent: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-  DropdownMenuSubTrigger: ({ children }: { children: React.ReactNode }) => (
-    <button type='button'>{children}</button>
-  ),
-  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
-}));
-
-vi.mock('@/components/atoms/CopyableMonospaceCell', () => ({
-  CopyableMonospaceCell: ({ value }: { value: string | null }) => (
-    <span>{value}</span>
-  ),
-}));
-
-vi.mock('@/components/atoms/ProviderIcon', () => ({
-  ProviderIcon: ({ provider }: { provider: string }) => (
-    <span data-testid={`provider-icon-${provider}`}>{provider}</span>
-  ),
-}));
-
-vi.mock('@/components/atoms/SeekBar', () => ({
-  SeekBar: () => <div data-testid='seek-bar' />,
-}));
-
-vi.mock('@/components/atoms/TruncatedText', () => ({
-  TruncatedText: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
-}));
+const { mockToggleTrack, mockQueryResult, mockPlaybackState } = vi.hoisted(
+  () => ({
+    mockToggleTrack: vi.fn().mockResolvedValue(undefined),
+    mockQueryResult: {
+      data: null,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+    } as {
+      data: unknown;
+      isLoading: boolean;
+      isFetching: boolean;
+      isError: boolean;
+    },
+    mockPlaybackState: {
+      activeTrackId: null as string | null,
+      isPlaying: false,
+      playbackStatus: 'idle' as
+        | 'idle'
+        | 'loading'
+        | 'playing'
+        | 'paused'
+        | 'error',
+      currentTime: 0,
+      duration: 0,
+      trackTitle: null as string | null,
+    },
+  })
+);
 
 vi.mock('@/components/molecules/drawer', () => ({
-  CollapsibleSectionHeading: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
+  DrawerEmptyState: ({ message }: { readonly message: string }) => (
+    <div>{message}</div>
   ),
-  DrawerEmptyState: ({ message }: { message: string }) => <div>{message}</div>,
-  DrawerInlineIconButton: ({
-    children,
-    ...props
-  }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
-    <button type='button' {...props}>
-      {children}
-    </button>
-  ),
-  DrawerSection: ({ children }: { children: React.ReactNode }) => (
-    <section>{children}</section>
-  ),
-  DrawerSurfaceCard: ({
-    children,
-    ...props
-  }: React.HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
 }));
 
 vi.mock('@/lib/queries', () => ({
-  useReleaseTracksQuery: () => ({
-    data: null,
-    isLoading: false,
-    isFetching: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
+  useReleaseTracksQuery: () => mockQueryResult,
 }));
 
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
-    playbackState: {
-      activeTrackId: null,
-      isPlaying: false,
-      currentTime: 0,
-      duration: 0,
-    },
-    toggleTrack: vi.fn().mockResolvedValue(undefined),
-    seek: vi.fn(),
+    playbackState: mockPlaybackState,
+    toggleTrack: mockToggleTrack,
   }),
 }));
 
 describe('ReleaseTrackList', () => {
-  it('renders playback summary and expanded provider grouping', async () => {
-    const user = userEvent.setup();
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockQueryResult.data = null;
+    mockQueryResult.isLoading = false;
+    mockQueryResult.isFetching = false;
+    mockQueryResult.isError = false;
+    mockPlaybackState.activeTrackId = null;
+    mockPlaybackState.isPlaying = false;
+    mockPlaybackState.playbackStatus = 'idle';
+    mockPlaybackState.currentTime = 0;
+    mockPlaybackState.duration = 0;
+    mockPlaybackState.trackTitle = null;
+  });
+
+  it('renders a flat track list without the old playback summary or card chrome', () => {
     const release = createMockRelease();
 
     render(
@@ -137,126 +93,204 @@ describe('ReleaseTrackList', () => {
             providerConfidenceSummary: {
               canonical: 1,
               searchFallback: 1,
-              unknown: 2,
-              unresolvedProviders: ['apple_music', 'youtube'],
+              unknown: 0,
+              unresolvedProviders: [],
             },
-            providers: [
-              {
-                key: 'spotify',
-                label: 'Spotify',
-                url: 'https://open.spotify.com/track/123',
-                confidence: 'canonical',
-              },
-              {
-                key: 'soundcloud',
-                label: 'SoundCloud',
-                url: 'https://soundcloud.com/track/123',
-                confidence: 'search_fallback',
-              },
-            ],
+            providers: [],
           },
         ]}
       />
     );
 
-    expect(screen.getByTestId('release-preview-summary')).toHaveTextContent(
-      'Audio Previews: 1 ready'
-    );
-    expect(
-      screen.getByTestId('release-track-status-track_1')
-    ).toHaveTextContent('Ready');
-    expect(
-      screen.getByTestId('release-track-provider-summary-track_1')
-    ).toHaveTextContent('1 linked, 1 unconfirmed, 2 pending');
+    const tracklist = screen.getByTestId('tracklist');
+    const row = screen.getByTestId('release-track-row-track_1');
+    const control = screen.getByTestId('release-track-control-track_1');
 
-    const disclosure = screen.getByRole('button', { expanded: false });
-
-    await user.click(disclosure);
-
+    expect(tracklist).toBeInTheDocument();
     expect(
-      screen.getByTestId('release-track-canonical-providers-track_1')
-    ).toBeInTheDocument();
+      screen.queryByTestId('release-preview-summary')
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByTestId('release-track-fallback-providers-track_1')
-    ).toBeInTheDocument();
+      screen.queryByTestId('release-provider-summary')
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByTestId('release-track-unresolved-track_1')
-    ).toHaveTextContent('Unresolved: Apple Music, YouTube');
+      screen.queryByTestId('release-track-status-track_1')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { expanded: false })
+    ).not.toBeInTheDocument();
+    expect(row).not.toHaveAttribute('data-variant', 'card');
+    expect(control).toHaveTextContent('1');
+    expect(screen.getByText('Static Skies')).toBeInTheDocument();
+    expect(screen.getByText('3:05')).toBeInTheDocument();
   });
 
-  it('renders correct status labels for verified, fallback, and unknown preview states', () => {
+  it('swaps the number slot for a pause control on the active track', () => {
     const release = createMockRelease();
-
-    const baseTrack = {
-      releaseId: release.id,
-      releaseSlug: release.slug,
-      trackNumber: 1,
-      discNumber: 1,
-      durationMs: 185000,
-      isrc: 'USRC17607839',
-      isExplicit: false,
-      previewUrl: null,
-      audioUrl: null,
-      audioFormat: null,
-      previewSource: null,
-      providerConfidenceSummary: {
-        canonical: 0,
-        searchFallback: 0,
-        unknown: 0,
-        unresolvedProviders: [],
-      },
-      providers: [],
-    };
+    mockPlaybackState.activeTrackId = 'track_1';
+    mockPlaybackState.isPlaying = true;
+    mockPlaybackState.playbackStatus = 'playing';
+    mockPlaybackState.trackTitle = 'Static Skies';
 
     render(
       <ReleaseTrackList
         release={release}
         tracksOverride={[
           {
-            ...baseTrack,
-            id: 'track_verified',
-            title: 'Verified Track',
-            slug: 'verified-track',
-            smartLinkPath: `${release.smartLinkPath}/verified-track`,
-            previewVerification: 'verified',
+            id: 'track_1',
+            releaseId: release.id,
+            releaseSlug: release.slug,
+            title: 'Static Skies',
+            slug: 'static-skies',
+            smartLinkPath: `${release.smartLinkPath}/static-skies`,
+            trackNumber: 1,
+            discNumber: 1,
+            durationMs: 185000,
+            isrc: 'USRC17607839',
+            isExplicit: false,
             previewUrl: 'https://example.com/preview.mp3',
+            audioUrl: null,
+            audioFormat: null,
             previewSource: 'spotify',
-          },
-          {
-            ...baseTrack,
-            id: 'track_fallback',
-            title: 'Fallback Track',
-            slug: 'fallback-track',
-            smartLinkPath: `${release.smartLinkPath}/fallback-track`,
-            trackNumber: 2,
-            previewVerification: 'fallback',
-            previewUrl: 'https://example.com/preview2.mp3',
-            previewSource: 'musicfetch',
-          },
-          {
-            ...baseTrack,
-            id: 'track_unknown',
-            title: 'Unknown Track',
-            slug: 'unknown-track',
-            smartLinkPath: `${release.smartLinkPath}/unknown-track`,
-            trackNumber: 3,
-            previewVerification: 'unknown',
+            previewVerification: 'verified',
+            providerConfidenceSummary: {
+              canonical: 1,
+              searchFallback: 0,
+              unknown: 0,
+              unresolvedProviders: [],
+            },
+            providers: [],
           },
         ]}
       />
     );
 
-    expect(screen.getByTestId('release-preview-summary')).toHaveTextContent(
-      'Audio Previews: 1 ready, 1 unconfirmed, 1 pending'
+    const control = screen.getByTestId('release-track-control-track_1');
+
+    expect(
+      screen.getByRole('button', { name: 'Pause Static Skies' })
+    ).toBeInTheDocument();
+    expect(within(control).queryByText('1')).not.toBeInTheDocument();
+  });
+
+  it('announces paused playback without repeating a now-playing message', () => {
+    const release = createMockRelease();
+    mockPlaybackState.activeTrackId = 'track_1';
+    mockPlaybackState.isPlaying = false;
+    mockPlaybackState.playbackStatus = 'paused';
+    mockPlaybackState.trackTitle = 'Static Skies';
+
+    render(
+      <ReleaseTrackList
+        release={release}
+        tracksOverride={[
+          {
+            id: 'track_1',
+            releaseId: release.id,
+            releaseSlug: release.slug,
+            title: 'Static Skies',
+            slug: 'static-skies',
+            smartLinkPath: `${release.smartLinkPath}/static-skies`,
+            trackNumber: 1,
+            discNumber: 1,
+            durationMs: 185000,
+            isrc: 'USRC17607839',
+            isExplicit: false,
+            previewUrl: 'https://example.com/preview.mp3',
+            audioUrl: null,
+            audioFormat: null,
+            previewSource: 'spotify',
+            previewVerification: 'verified',
+            providerConfidenceSummary: {
+              canonical: 1,
+              searchFallback: 0,
+              unknown: 0,
+              unresolvedProviders: [],
+            },
+            providers: [],
+          },
+        ]}
+      />
     );
+
+    expect(screen.getByText('Playback paused.')).toBeInTheDocument();
     expect(
-      screen.getByTestId('release-track-status-track_verified')
-    ).toHaveTextContent('Ready');
-    expect(
-      screen.getByTestId('release-track-status-track_fallback')
-    ).toHaveTextContent('Unconfirmed');
-    expect(
-      screen.getByTestId('release-track-status-track_unknown')
-    ).toHaveTextContent('Pending');
+      screen.queryByText('Now playing Static Skies.')
+    ).not.toBeInTheDocument();
+  });
+
+  it('starts playback from the left slot with the correct track payload', async () => {
+    const user = userEvent.setup();
+    const release = createMockRelease({
+      title: 'Midnight Sun',
+      artistNames: ['Test Artist'],
+      artworkUrl: 'https://cdn.example.com/cover.png',
+    });
+
+    render(
+      <ReleaseTrackList
+        release={release}
+        tracksOverride={[
+          {
+            id: 'track_1',
+            releaseId: release.id,
+            releaseSlug: release.slug,
+            title: 'Static Skies',
+            slug: 'static-skies',
+            smartLinkPath: `${release.smartLinkPath}/static-skies`,
+            trackNumber: 1,
+            discNumber: 1,
+            durationMs: 185000,
+            isrc: 'USRC17607839',
+            isExplicit: false,
+            previewUrl: 'https://example.com/preview.mp3',
+            audioUrl: null,
+            audioFormat: null,
+            previewSource: 'spotify',
+            previewVerification: 'verified',
+            providerConfidenceSummary: {
+              canonical: 1,
+              searchFallback: 0,
+              unknown: 0,
+              unresolvedProviders: [],
+            },
+            providers: [],
+          },
+        ]}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Play Static Skies' }));
+
+    expect(mockToggleTrack).toHaveBeenCalledWith({
+      id: 'track_1',
+      title: 'Static Skies',
+      audioUrl: 'https://example.com/preview.mp3',
+      isrc: 'USRC17607839',
+      releaseTitle: 'Midnight Sun',
+      artistName: release.artistNames?.[0],
+      artworkUrl: release.artworkUrl,
+    });
+  });
+
+  it('renders simplified loading, error, and empty states', () => {
+    const release = createMockRelease({ totalTracks: 2 });
+
+    mockQueryResult.isLoading = true;
+    const { rerender } = render(<ReleaseTrackList release={release} />);
+
+    expect(screen.getAllByTestId('release-track-skeleton')).toHaveLength(
+      Math.min(release.totalTracks, 6)
+    );
+
+    mockQueryResult.isLoading = false;
+    mockQueryResult.isError = true;
+    rerender(<ReleaseTrackList release={release} />);
+    expect(screen.getByText('Failed to load tracks.')).toBeInTheDocument();
+
+    mockQueryResult.isError = false;
+    mockQueryResult.data = [];
+    rerender(<ReleaseTrackList release={release} />);
+    expect(screen.getByText('No track data available.')).toBeInTheDocument();
   });
 });

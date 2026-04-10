@@ -53,6 +53,27 @@ vi.mock('@/components/molecules/drawer', () => ({
     children: React.ReactNode;
     className?: string;
   }) => <div data-testid='surface-card'>{children}</div>,
+  EntityHeaderCard: ({
+    title,
+    subtitle,
+    meta,
+    footer,
+    actions,
+  }: {
+    title: React.ReactNode;
+    subtitle?: React.ReactNode;
+    meta?: React.ReactNode;
+    footer?: React.ReactNode;
+    actions?: React.ReactNode;
+  }) => (
+    <div data-testid='entity-header-card'>
+      <div>{title}</div>
+      {subtitle}
+      {meta}
+      {footer}
+      {actions}
+    </div>
+  ),
   EntitySidebarShell: ({
     children,
   }: {
@@ -69,6 +90,7 @@ vi.mock('@/components/molecules/drawer', () => ({
       <span>{value}</span>
     </div>
   ),
+  DrawerCardActionBar: () => <div data-testid='drawer-card-action-bar' />,
 }));
 
 vi.mock('@/components/molecules/LoadingSkeleton', () => ({

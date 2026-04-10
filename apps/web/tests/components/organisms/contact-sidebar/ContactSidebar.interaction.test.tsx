@@ -102,6 +102,27 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerSurfaceCard: ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   ),
+  EntityHeaderCard: ({
+    children,
+    title,
+    subtitle,
+    eyebrow,
+    actions,
+  }: {
+    children?: React.ReactNode;
+    title?: React.ReactNode;
+    subtitle?: React.ReactNode;
+    eyebrow?: React.ReactNode;
+    actions?: React.ReactNode;
+  }) => (
+    <div>
+      {eyebrow}
+      {title}
+      {subtitle}
+      {actions}
+      {children}
+    </div>
+  ),
   DrawerCardActionBar: () => null,
   DrawerLinkSectionSkeleton: () => null,
   DrawerTabs: ({
