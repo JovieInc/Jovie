@@ -3,9 +3,9 @@ import { BlogAuthorCard } from '@/app/(marketing)/blog/components/BlogAuthorCard
 import { BlogRelatedPosts } from '@/app/(marketing)/blog/components/BlogRelatedPosts';
 import { BlogTableOfContents } from '@/app/(marketing)/blog/components/BlogTableOfContents';
 import { CategoryPill } from '@/app/(marketing)/blog/components/CategoryPill';
+import { MarketingContainer } from '@/components/marketing';
 import { Avatar } from '@/components/molecules/Avatar';
 import { BlogMarkdownReader } from '@/components/molecules/BlogMarkdownReader';
-import { Container } from '@/components/site/Container';
 import type { BlogPost, BlogPostSummary } from '@/lib/blog/getBlogPosts';
 import type { ResolvedAuthor } from '@/lib/blog/resolveAuthor';
 import type { TocEntry } from '@/types/docs';
@@ -37,7 +37,7 @@ export function BlogPostPage({
   return (
     <article className='min-h-screen'>
       {/* Header Section */}
-      <Container size='lg' className='pt-16 sm:pt-24 pb-12'>
+      <MarketingContainer width='page' className='pb-12 pt-16 sm:pt-24'>
         <div className='mx-auto max-w-4xl'>
           {/* Back link */}
           <Link
@@ -124,10 +124,10 @@ export function BlogPostPage({
             </div>
           </div>
         </div>
-      </Container>
+      </MarketingContainer>
 
       {/* Article Content + TOC Sidebar */}
-      <Container size='lg' className='pb-16 sm:pb-24'>
+      <MarketingContainer width='page' className='pb-16 sm:pb-24'>
         <div className='mx-auto max-w-4xl'>
           <div className='grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-12'>
             {/* Main content */}
@@ -151,7 +151,7 @@ export function BlogPostPage({
             </div>
           )}
         </div>
-      </Container>
+      </MarketingContainer>
     </article>
   );
 }

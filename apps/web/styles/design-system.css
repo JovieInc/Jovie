@@ -17,6 +17,14 @@
    THEME INPUTS - The only 3 variables needed
    ============================================ */
 :root {
+  /* Public shell semantic aliases — preserve current public surface values while
+     centralizing the contract used by marketing and legal layouts. */
+  --public-shell-header-offset: var(--linear-header-height);
+  --public-shell-bg: var(--color-bg-base);
+  --public-shell-text: var(--color-text-primary-token);
+  --public-shell-border: var(--color-border-default);
+  --public-shell-content-max: var(--linear-content-max);
+
   /* Core Theme Inputs */
   --theme-base-hue: 282;
   /* Neutral foundation hue — Linear March 2026 refresh (shifted from 272→282) */

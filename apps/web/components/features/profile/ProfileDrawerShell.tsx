@@ -1,6 +1,7 @@
 'use client';
 
 import { ChevronLeft, X } from 'lucide-react';
+import { useId } from 'react';
 import { Drawer } from 'vaul';
 
 interface ProfileDrawerShellProps {
@@ -28,6 +29,9 @@ export function ProfileDrawerShell({
   bodyClassName,
   dataTestId,
 }: ProfileDrawerShellProps) {
+  const titleId = useId();
+  const subtitleId = useId();
+
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>
@@ -36,7 +40,8 @@ export function ProfileDrawerShell({
           <Drawer.Content
             className={`flex max-h-[86dvh] w-full flex-col overflow-hidden rounded-t-[24px] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:max-w-[430px] md:rounded-t-[20px] ${contentClassName ?? ''}`}
             data-testid={dataTestId}
-            aria-describedby={undefined}
+            aria-describedby={subtitle ? subtitleId : undefined}
+            aria-labelledby={titleId}
           >
             {/* Highlight line */}
             <div className='pointer-events-none absolute inset-x-0 top-0 h-px bg-white/[0.1]' />
@@ -62,11 +67,17 @@ export function ProfileDrawerShell({
 
               {/* Title block — left-aligned */}
               <div className='min-w-0 flex-1 pt-5'>
-                <Drawer.Title className='text-[15px] font-[590] tracking-[-0.01em] text-primary-token'>
+                <Drawer.Title
+                  id={titleId}
+                  className='text-[15px] font-[590] tracking-[-0.01em] text-primary-token'
+                >
                   {title}
                 </Drawer.Title>
                 {subtitle ? (
-                  <p className='mt-0.5 text-[12px] leading-[1.4] text-white/45'>
+                  <p
+                    id={subtitleId}
+                    className='mt-0.5 text-[12px] leading-[1.4] text-white/45'
+                  >
                     {subtitle}
                   </p>
                 ) : null}

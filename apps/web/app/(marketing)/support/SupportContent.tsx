@@ -52,11 +52,12 @@ export function SupportChannels() {
               asChild
               variant='ghost'
               size='sm'
-              className='mt-3 px-0 text-accent-token hover:text-accent-token/80'
+              className='mt-3 px-0'
               onClick={() => track(channel.event, { source: 'support_page' })}
             >
               <a
                 href={channel.href}
+                className='public-action-inline'
                 {...(channel.external
                   ? { target: '_blank', rel: 'noopener noreferrer' }
                   : {})}
@@ -91,7 +92,9 @@ export function SupportCta() {
           })
         }
       >
-        <a href={`mailto:${SUPPORT_EMAIL}`}>Contact Support</a>
+        <a href={`mailto:${SUPPORT_EMAIL}`} className='public-action-primary'>
+          Contact Support
+        </a>
       </Button>
     </section>
   );
