@@ -392,12 +392,29 @@ jobs:
           branch_name: ${{ steps.sanitize-branch.outputs.name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+      - name: Resolve Neon DB URL
+        id: resolve-db-url
+        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.create-branch.outputs.db_url }}
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+      - name: Resolve Neon pooled DB URL
+        id: resolve-db-url-pooled
+        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.create-branch.outputs.db_url_pooled }}
+          fallback_candidate_url: ${{ steps.create-branch.outputs.db_url }}
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
       - name: Finalize Neon DB URLs
         id: finalize-urls
         if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
         run: |
-          DB_URL="${{ steps.create-branch.outputs.db_url }}"
-          DB_URL_POOLED="${{ steps.create-branch.outputs.db_url_pooled }}"
+          DB_URL="${{ steps.resolve-db-url.outputs.database_url }}"
+          DB_URL_POOLED="${{ steps.resolve-db-url-pooled.outputs.database_url }}"
 
           if [ -z "$DB_URL" ]; then
             echo "Neon branch creation did not return db_url."
@@ -420,8 +437,8 @@ jobs:
         run: |
           mkdir -p /tmp/neon-db-artifact
           jq -n \
-            --arg db_url "${{ steps.create-branch.outputs.db_url }}" \
-            --arg db_url_pooled "${{ steps.create-branch.outputs.db_url_pooled }}" \
+            --arg db_url "${{ steps.resolve-db-url.outputs.database_url }}" \
+            --arg db_url_pooled "${{ steps.resolve-db-url-pooled.outputs.database_url }}" \
             --arg branch_id "${{ steps.create-branch.outputs.branch_id }}" \
             --arg branch_name "${{ steps.sanitize-branch.outputs.name }}" \
             '{
@@ -781,13 +798,16 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
-        run: |
-          CANDIDATE="${{ steps.neon-branch.outputs.db_url }}"
-          if [ -z "$CANDIDATE" ]; then
-            echo "No Neon ephemeral DATABASE_URL available."
-            exit 1
-          fi
-          echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+        id: resolve-neon-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
+      - name: Export DATABASE_URL
+        run: echo "DATABASE_URL=${{ steps.resolve-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
@@ -901,13 +921,17 @@ jobs:
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: |
-          CANDIDATE="${{ steps.neon-branch.outputs.db_url }}"
-          if [ -z "$CANDIDATE" ]; then
-            echo "No Neon ephemeral DATABASE_URL available."
-            exit 1
-          fi
-          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
+        id: resolve-dashboard-neon-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
+      - name: Export DATABASE_URL
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: echo "DATABASE_URL=${{ steps.resolve-dashboard-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1031,13 +1055,16 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
-        run: |
-          CANDIDATE="${{ steps.neon-branch.outputs.db_url }}"
-          if [ -z "$CANDIDATE" ]; then
-            echo "No Neon ephemeral DATABASE_URL available."
-            exit 1
-          fi
-          echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+        id: resolve-onboarding-neon-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
+      - name: Export DATABASE_URL
+        run: echo "DATABASE_URL=${{ steps.resolve-onboarding-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
@@ -1819,11 +1846,25 @@ jobs:
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
 
+      - name: Resolve DATABASE_URL (Neon ephemeral)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        id: resolve-e2e-smoke-neon-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
+      - name: Export DATABASE_URL
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: echo "DATABASE_URL=${{ steps.resolve-e2e-smoke-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
-          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
@@ -1844,7 +1885,7 @@ jobs:
       - name: Run E2E Smoke (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         env:
-          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           CI: true
           SMOKE_ONLY: '1'
@@ -1914,11 +1955,25 @@ jobs:
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
 
+      - name: Resolve DATABASE_URL (Neon ephemeral)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        id: resolve-admin-neon-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
+      - name: Export DATABASE_URL
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: echo "DATABASE_URL=${{ steps.resolve-admin-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
-          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           GIT_BRANCH: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'
@@ -1962,7 +2017,7 @@ jobs:
       - name: Run Admin Smoke Tests (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.run_admin_smoke == 'true'
         env:
-          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           CI: true
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
