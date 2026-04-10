@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { getProfileAvatarUrl } from '@/app/onboarding/actions/update-profile';
 
 const AVATAR_POLL_INTERVAL_MS = 2000;
+const AVATAR_BACKOFF_POLL_INTERVAL_MS = 5000;
+const IDLE_POLLS_BEFORE_BACKOFF = 3;
 const AVATAR_POLL_TIMEOUT_MS = 30_000;
 
 interface UseAvatarPollingParams {
@@ -26,7 +28,10 @@ export function useAvatarPolling({ enabled }: UseAvatarPollingParams): {
 } {
   const [polledAvatarUrl, setPolledAvatarUrl] = useState<string | null>(null);
   const [isComplete, setIsComplete] = useState(false);
+  const [pollIntervalMs, setPollIntervalMs] = useState(AVATAR_POLL_INTERVAL_MS);
   const pollStartRef = useRef<number>(0);
+  const stagnantPollCountRef = useRef(0);
+  const lastProcessedPollAtRef = useRef(0);
 
   useEffect(() => {
     if (enabled && !isComplete) {
@@ -34,25 +39,44 @@ export function useAvatarPolling({ enabled }: UseAvatarPollingParams): {
     }
   }, [enabled, isComplete]);
 
+  useEffect(() => {
+    if (enabled) {
+      setPollIntervalMs(AVATAR_POLL_INTERVAL_MS);
+      stagnantPollCountRef.current = 0;
+      lastProcessedPollAtRef.current = 0;
+    }
+  }, [enabled]);
+
   const isPolling = enabled && !isComplete && !polledAvatarUrl;
 
-  const { data } = useQuery({
+  const { data, dataUpdatedAt } = useQuery({
     queryKey: ['avatar-polling'],
     queryFn: ({ signal: _signal }) => getProfileAvatarUrl(),
     enabled: isPolling,
-    refetchInterval: isPolling ? AVATAR_POLL_INTERVAL_MS : false,
+    refetchInterval: isPolling ? pollIntervalMs : false,
     gcTime: 0,
     staleTime: 0,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
-    if (!data || !isPolling) return;
+    if (!data || !isPolling || dataUpdatedAt === 0) return;
+    if (lastProcessedPollAtRef.current === dataUpdatedAt) return;
+    lastProcessedPollAtRef.current = dataUpdatedAt;
 
     if (data.avatarUrl) {
       setPolledAvatarUrl(data.avatarUrl);
       setIsComplete(true);
       return;
+    }
+
+    stagnantPollCountRef.current += 1;
+    if (
+      stagnantPollCountRef.current >= IDLE_POLLS_BEFORE_BACKOFF &&
+      pollIntervalMs !== AVATAR_BACKOFF_POLL_INTERVAL_MS
+    ) {
+      setPollIntervalMs(AVATAR_BACKOFF_POLL_INTERVAL_MS);
     }
 
     const timedOut =
@@ -62,7 +86,7 @@ export function useAvatarPolling({ enabled }: UseAvatarPollingParams): {
     if (timedOut) {
       setIsComplete(true);
     }
-  }, [data, isPolling]);
+  }, [data, dataUpdatedAt, isPolling, pollIntervalMs]);
 
   return { polledAvatarUrl };
 }

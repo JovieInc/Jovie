@@ -20,6 +20,7 @@ import {
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 class FalUnavailableError extends Error {
   constructor(readonly report: AlgorithmHealthReport) {
@@ -41,12 +42,18 @@ export async function GET(request: NextRequest) {
   // Auth check
   const { userId } = await getCachedAuth();
   if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
   }
 
   const entitlements = await getCurrentUserEntitlements();
   if (!entitlements.isAdmin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json(
+      { error: 'Forbidden' },
+      { status: 403, headers: NO_STORE_HEADERS }
+    );
   }
 
   // Validate input
@@ -54,21 +61,21 @@ export async function GET(request: NextRequest) {
   if (!artistId) {
     return NextResponse.json(
       { error: 'Missing artistId parameter' },
-      { status: 400 }
+      { status: 400, headers: NO_STORE_HEADERS }
     );
   }
 
   if (!/^[a-zA-Z0-9]{22}$/.test(artistId)) {
     return NextResponse.json(
       { error: 'Invalid Spotify artist ID format' },
-      { status: 400 }
+      { status: 400, headers: NO_STORE_HEADERS }
     );
   }
 
   if (!isSpotifyAvailable()) {
     return NextResponse.json(
       { error: 'Spotify integration not configured' },
-      { status: 503 }
+      { status: 503, headers: NO_STORE_HEADERS }
     );
   }
 
@@ -120,10 +127,10 @@ export async function GET(request: NextRequest) {
       { ttlSeconds: 600 } // 10 minute cache
     );
 
-    return NextResponse.json(report);
+    return NextResponse.json(report, { headers: NO_STORE_HEADERS });
   } catch (error) {
     if (error instanceof FalUnavailableError) {
-      return NextResponse.json(error.report);
+      return NextResponse.json(error.report, { headers: NO_STORE_HEADERS });
     }
 
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -131,7 +138,7 @@ export async function GET(request: NextRequest) {
     if (message === 'Artist not found') {
       return NextResponse.json(
         { error: 'Spotify artist not found' },
-        { status: 404 }
+        { status: 404, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -141,7 +148,7 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json(
       { error: 'Failed to analyze artist' },
-      { status: 502 }
+      { status: 502, headers: NO_STORE_HEADERS }
     );
   }
 }
