@@ -520,7 +520,7 @@ jobs:
             exit 1
           fi
 
-          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
+          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
           if [ -n "$CANDIDATE" ]; then
             echo "Using Neon DB URL from neon-db artifact"
             echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
@@ -1174,7 +1174,7 @@ jobs:
             exit 1
           fi
 
-          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
+          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
           if [ -z "$CANDIDATE" ]; then
             echo "No Neon ephemeral DATABASE_URL available from neon-db artifact."
             exit 1
@@ -2095,7 +2095,7 @@ jobs:
             exit 1
           fi
 
-          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
+          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
           if [ -n "$CANDIDATE" ]; then
             echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
           else
@@ -2159,7 +2159,7 @@ jobs:
             exit 1
           fi
 
-          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
+          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
           SRC=""
           if [ -n "$CANDIDATE" ]; then
             echo "Using Neon DB URL from neon-db artifact"
@@ -2691,7 +2691,7 @@ jobs:
             exit 1
           fi
 
-          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
+          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
           if [ -z "$CANDIDATE" ]; then
             echo "No Neon ephemeral DB URL available from neon-db artifact."
             exit 1

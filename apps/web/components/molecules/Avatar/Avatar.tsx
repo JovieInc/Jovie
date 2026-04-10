@@ -191,7 +191,10 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           aria-hidden='true'
         >
           <span
-            className={cn('font-medium leading-none select-none', textSize)}
+            className={cn(
+              'font-medium leading-none select-none text-white',
+              textSize
+            )}
           >
             {initials}
           </span>

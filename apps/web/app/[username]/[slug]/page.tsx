@@ -248,11 +248,14 @@ export default async function ContentSmartLinkPage({
       isrc: content.isrc,
       trackNumber: content.trackNumber,
       inAlbum:
-        content.type === 'track' && content.releaseId && content.releaseTitle
+        content.type === 'track' &&
+        content.releaseId &&
+        content.releaseSlug &&
+        content.releaseTitle
           ? {
-              id: `${BASE_URL}/${creator.usernameNormalized}/${content.releaseSlug ?? content.slug}#release`,
+              id: `${BASE_URL}/${creator.usernameNormalized}/${content.releaseSlug}#release`,
               title: content.releaseTitle,
-              url: `${BASE_URL}/${creator.usernameNormalized}/${content.releaseSlug ?? content.slug}`,
+              url: `${BASE_URL}/${creator.usernameNormalized}/${content.releaseSlug}`,
             }
           : null,
     },
