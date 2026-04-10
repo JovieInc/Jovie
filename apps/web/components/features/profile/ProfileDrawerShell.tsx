@@ -38,7 +38,7 @@ export function ProfileDrawerShell({
         <Drawer.Overlay className='fixed inset-0 z-40 bg-black/60 backdrop-blur-sm' />
         <div className='fixed inset-x-0 bottom-0 z-50 flex justify-center'>
           <Drawer.Content
-            className={`flex max-h-[86dvh] w-full flex-col overflow-hidden rounded-t-[24px] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:max-w-[430px] md:rounded-t-[20px] ${contentClassName ?? ''}`}
+            className={`flex max-h-[86dvh] w-full flex-col overflow-hidden rounded-t-[var(--profile-drawer-radius-mobile)] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:max-w-(--profile-shell-max-width) md:rounded-t-[var(--profile-drawer-radius-desktop)] ${contentClassName ?? ''}`}
             data-testid={dataTestId}
             aria-describedby={subtitle ? subtitleId : undefined}
             aria-labelledby={titleId}

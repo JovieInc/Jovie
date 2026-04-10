@@ -213,6 +213,18 @@ These aliases keep current values but give public surfaces a single shared contr
 - `--public-shell-text`
 - `--public-shell-border`
 - `--public-shell-content-max`
+- `--public-content-max-landing`
+- `--public-content-max-page`
+- `--public-content-max-prose`
+- `--app-shell-content-max-wide`
+- `--app-shell-content-max-reading`
+- `--app-shell-content-max-form`
+- `--profile-shell-max-width`
+- `--profile-shell-header-max-width`
+- `--profile-shell-card-radius`
+- `--profile-drawer-radius-mobile`
+- `--profile-drawer-radius-desktop`
+- `--profile-action-radius`
 
 ## Canonical template mapping
 
@@ -225,7 +237,7 @@ These aliases keep current values but give public surfaces a single shared contr
 ## Known duplication still to retire
 
 - `apps/web/components/site/Container.tsx`
-  Still used by homepage-era surfaces and a few blog/public routes.
+  Still used by homepage-era surfaces and other non-migrated long-tail routes; production public-profile not-found is no longer on it.
 - `homepage-section-*` utility family in `apps/web/app/globals.css`
   Useful but separate from the newer marketing shell contract.
-- Remaining one-off width and spacing wrappers in blog/profile/dashboard route templates.
+- Remaining one-off width and spacing wrappers in launch/blog/dashboard route templates.

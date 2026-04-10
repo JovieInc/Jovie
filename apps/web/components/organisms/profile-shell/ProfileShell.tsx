@@ -235,7 +235,7 @@ export function ProfileShell({
                             artistName={artist.name}
                           />
                         ))}
-                        className='w-full max-w-[38rem]'
+                        className='w-full max-w-(--profile-shell-header-max-width)'
                       />
                     </div>
                     <ArtistInfo

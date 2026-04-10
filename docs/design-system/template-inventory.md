@@ -6,7 +6,7 @@ This inventory defines the current page-template families and the canonical shel
 
 - Route examples: `/`, `/new`, `/tips`, `/launch`
 - Shell owner: `PublicPageShell`
-- Container width policy: `MarketingContainer width='landing'` or homepage-specific temporary wrappers
+- Container width policy: `MarketingContainer width='landing'` or canonical page-width wrapper for the launch route sections still being normalized
 - Intro pattern: `MarketingHero` or homepage section intro family
 - CTA pattern: shared public primary/secondary/inline actions
 - Empty/error/loading: route-local loading pages where present
@@ -36,7 +36,7 @@ This inventory defines the current page-template families and the canonical shel
 
 - Route examples: `/support`
 - Shell owner: `PublicPageShell`
-- Container width policy: custom narrow content inside `MarketingContainer`-compatible spacing
+- Container width policy: `MarketingContainer width='prose'`
 - Intro pattern: `MarketingHero variant='left'`
 - CTA pattern: inline public action links plus one primary contact action
 - Empty/error/loading: route loading page
@@ -69,14 +69,14 @@ This inventory defines the current page-template families and the canonical shel
 - Container width policy: `AUTH_FORM_MAX_WIDTH_CLASS`
 - Intro pattern: shell title + optional branding
 - CTA pattern: auth footer prompt and primary form submit
-- Empty/error/loading: unavailable and loading states in auth feature set
+- Empty/error/loading: unavailable and loading states in auth feature set, all routed through shared shell primitives
 - Mobile collapse behavior: keyboard-aware fixed shell, hidden branding/title when needed
 
 ## Public profile page
 
 - Route examples: `/[username]`, `/[username]/listen`, `/[username]/tour`, `/[username]/tip`
 - Shell owner: `ProfileShell` via `ArtistPageShell`
-- Container width policy: profile shell max width contract, usually `max-w-md`
+- Container width policy: profile shell semantic width contract (`--profile-shell-max-width`) and header-width alias (`--profile-shell-header-max-width`)
 - Intro pattern: profile hero module
 - CTA pattern: `ProfilePrimaryCTA`
 - Empty/error/loading: profile not found, no release, no tour, no tips, notifications unavailable
@@ -86,7 +86,7 @@ This inventory defines the current page-template families and the canonical shel
 
 - Route examples: `/app/dashboard`, `/app/settings/profile`, `/app/admin`
 - Shell owner: `AppShellFrame` + `AppShellContentPanel`
-- Container width policy: panel `maxWidth` variants
+- Container width policy: panel `maxWidth` variants via semantic app-shell width aliases
 - Intro pattern: page toolbar or content panel heading row
 - CTA pattern: internal button/link/status action patterns
 - Empty/error/loading: route and component loading skeletons

@@ -15,7 +15,7 @@ export default function SupportLoading() {
         </div>
 
         {/* Channels grid skeleton */}
-        <div className='mx-auto mt-16 max-w-[720px] px-6 sm:px-8 lg:px-10'>
+        <MarketingContainer width='prose' className='mt-16'>
           <div className='h-7 w-48 skeleton rounded' />
           <div className='mt-6 grid gap-8 sm:grid-cols-3'>
             {SUPPORT_CHANNEL_KEYS.map(channelKey => (
@@ -26,24 +26,24 @@ export default function SupportLoading() {
               </div>
             ))}
           </div>
-        </div>
+        </MarketingContainer>
 
         {/* FAQ skeleton */}
-        <div className='mx-auto mt-16 max-w-[720px] px-6 sm:px-8 lg:px-10'>
+        <MarketingContainer width='prose' className='mt-16'>
           <div className='h-7 w-64 skeleton rounded' />
           <div className='mt-8 space-y-5'>
             {SUPPORT_FAQ_KEYS.map(faqKey => (
               <div key={faqKey} className='h-5 w-full skeleton rounded' />
             ))}
           </div>
-        </div>
+        </MarketingContainer>
 
         {/* Bottom CTA skeleton */}
-        <div className='mx-auto mt-16 max-w-[720px] px-6 sm:px-8 lg:px-10'>
+        <MarketingContainer width='prose' className='mt-16'>
           <div className='h-7 w-40 skeleton rounded' />
           <div className='mt-4 h-5 w-72 skeleton rounded' />
           <div className='mt-6 h-10 w-40 skeleton rounded-lg' />
-        </div>
+        </MarketingContainer>
       </MarketingContainer>
     </div>
   );

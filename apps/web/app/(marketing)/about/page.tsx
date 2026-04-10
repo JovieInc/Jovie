@@ -1,5 +1,9 @@
 import type { Metadata } from 'next';
-import { FaqSection, MarketingHero } from '@/components/marketing';
+import {
+  FaqSection,
+  MarketingContainer,
+  MarketingHero,
+} from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import {
   buildBreadcrumbSchema,
@@ -103,86 +107,90 @@ export default function AboutPage() {
       </MarketingHero>
 
       {/* Origin Story */}
-      <section className='mx-auto max-w-[720px] px-6 pb-16 sm:px-8 lg:px-10'>
-        <h2 className='text-2xl font-semibold text-primary-token'>
-          Why Jovie exists
-        </h2>
-        <div className='mt-6 space-y-5 text-base leading-relaxed text-secondary-token'>
-          <p>
-            I spent 15 years in music marketing. Worked with Armada Music,
-            Universal Music, ran digital campaigns for artists like Tory Lanez
-            and Megan Thee Stallion, and drove campaigns for brands like Google
-            and the NFL.
-          </p>
-          <p>
-            The whole time, I saw the same problem: the artists who needed
-            marketing infrastructure the most were the ones who could never
-            afford it. Labels have teams of people coordinating releases,
-            managing fan data, planning rollouts. Independent artists have
-            themselves and maybe a friend who&apos;s decent at Instagram.
-          </p>
-          <p>
-            Jovie is what I wish existed when I was an artist. One platform that
-            handles the release work so musicians can focus on making music.
-            Smart links that route fans to the right streaming platform. A
-            profile that converts visitors into fans. Audience intelligence that
-            tells you who your fans are and where they came from. AI that
-            actually knows your career — your stream counts, your tour dates,
-            your collaborations — not a blank prompt.
-          </p>
-          <p className='text-primary-token'>— Tim White, Founder</p>
-        </div>
-      </section>
+      <MarketingContainer width='prose' className='pb-16'>
+        <section>
+          <h2 className='text-2xl font-semibold text-primary-token'>
+            Why Jovie exists
+          </h2>
+          <div className='mt-6 space-y-5 text-base leading-relaxed text-secondary-token'>
+            <p>
+              I spent 15 years in music marketing. Worked with Armada Music,
+              Universal Music, ran digital campaigns for artists like Tory Lanez
+              and Megan Thee Stallion, and drove campaigns for brands like
+              Google and the NFL.
+            </p>
+            <p>
+              The whole time, I saw the same problem: the artists who needed
+              marketing infrastructure the most were the ones who could never
+              afford it. Labels have teams of people coordinating releases,
+              managing fan data, planning rollouts. Independent artists have
+              themselves and maybe a friend who&apos;s decent at Instagram.
+            </p>
+            <p>
+              Jovie is what I wish existed when I was an artist. One platform
+              that handles the release work so musicians can focus on making
+              music. Smart links that route fans to the right streaming
+              platform. A profile that converts visitors into fans. Audience
+              intelligence that tells you who your fans are and where they came
+              from. AI that actually knows your career — your stream counts,
+              your tour dates, your collaborations — not a blank prompt.
+            </p>
+            <p className='text-primary-token'>— Tim White, Founder</p>
+          </div>
+        </section>
+      </MarketingContainer>
 
       {/* What Jovie Does */}
-      <section className='mx-auto max-w-[720px] px-6 pb-16 sm:px-8 lg:px-10'>
-        <h2 className='text-2xl font-semibold text-primary-token'>
-          What Jovie does
-        </h2>
-        <div className='mt-6 grid gap-8 sm:grid-cols-2'>
-          {[
-            {
-              title: 'Smart Links',
-              description:
-                'Every release gets a smart link that routes fans to Spotify, Apple Music, YouTube, or wherever they listen.',
-            },
-            {
-              title: 'Artist Profiles',
-              description:
-                'A professional link-in-bio at jov.ie/username — music, social links, tour dates, and bio in one place.',
-            },
-            {
-              title: 'Audience Intelligence',
-              description:
-                'Fan CRM with contact collection, engagement tracking, source attribution, and audience segmentation.',
-            },
-            {
-              title: 'Release Automation',
-              description:
-                'Automatic fan notifications, release task management, and rollout planning for every drop.',
-            },
-            {
-              title: 'AI Tools',
-              description:
-                'Press releases, release strategy, and career insights powered by AI that knows your actual data.',
-            },
-            {
-              title: 'Tipping & Payments',
-              description:
-                'Let fans support you directly with tips via Stripe — at shows, on your profile, or through QR codes.',
-            },
-          ].map(feature => (
-            <div key={feature.title}>
-              <h3 className='font-medium text-primary-token'>
-                {feature.title}
-              </h3>
-              <p className='mt-2 text-sm leading-relaxed text-secondary-token'>
-                {feature.description}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <MarketingContainer width='prose' className='pb-16'>
+        <section>
+          <h2 className='text-2xl font-semibold text-primary-token'>
+            What Jovie does
+          </h2>
+          <div className='mt-6 grid gap-8 sm:grid-cols-2'>
+            {[
+              {
+                title: 'Smart Links',
+                description:
+                  'Every release gets a smart link that routes fans to Spotify, Apple Music, YouTube, or wherever they listen.',
+              },
+              {
+                title: 'Artist Profiles',
+                description:
+                  'A professional link-in-bio at jov.ie/username — music, social links, tour dates, and bio in one place.',
+              },
+              {
+                title: 'Audience Intelligence',
+                description:
+                  'Fan CRM with contact collection, engagement tracking, source attribution, and audience segmentation.',
+              },
+              {
+                title: 'Release Automation',
+                description:
+                  'Automatic fan notifications, release task management, and rollout planning for every drop.',
+              },
+              {
+                title: 'AI Tools',
+                description:
+                  'Press releases, release strategy, and career insights powered by AI that knows your actual data.',
+              },
+              {
+                title: 'Tipping & Payments',
+                description:
+                  'Let fans support you directly with tips via Stripe — at shows, on your profile, or through QR codes.',
+              },
+            ].map(feature => (
+              <div key={feature.title}>
+                <h3 className='font-medium text-primary-token'>
+                  {feature.title}
+                </h3>
+                <p className='mt-2 text-sm leading-relaxed text-secondary-token'>
+                  {feature.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </MarketingContainer>
 
       {/* FAQ Section */}
       <FaqSection items={FAQ_ITEMS} />

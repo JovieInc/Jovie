@@ -6,7 +6,7 @@ This file tracks legacy implementations that should not be used for new work and
 
 | Legacy item | Status | Replacement | Notes |
 | --- | --- | --- | --- |
-| `apps/web/components/site/Container.tsx` on production public routes | Deprecated | `apps/web/components/marketing/MarketingContainer.tsx` | Storybook-only use is acceptable during migration |
+| `apps/web/components/site/Container.tsx` on production public routes | Deprecated | `apps/web/components/marketing/MarketingContainer.tsx` | Public profile not-found route is migrated; storybook-only use is acceptable during migration |
 | Route-local public layout wrappers | Deprecated | `apps/web/components/site/PublicPageShell.tsx` | Marketing/legal/blog-style routes should converge here |
 
 ## Legacy public navigation/TOC
@@ -21,15 +21,29 @@ This file tracks legacy implementations that should not be used for new work and
 | Legacy item | Status | Replacement | Notes |
 | --- | --- | --- | --- |
 | `PrimaryCTA.tsx` as a separate primary-button concept | Constrain | `CTAButton.tsx` or shared public CTA classes | Keep only if needed for existing product surfaces during migration |
-| `marketing-cta` route-local use | Deprecated for new work | shared public CTA contract | Launch pages still need migration |
+| `marketing-cta` route-local use | Deprecated for new work | shared public CTA contract | Guarded in representative marketing/public surfaces; long-tail public routes still need migration |
 | Route-local pricing/support action links | Deprecated | shared public CTA contract | Address in public-template slice |
 
 ## Auth duplication
 
 | Legacy item | Status | Replacement | Notes |
 | --- | --- | --- | --- |
-| `AuthFormContainer.tsx` mobile header duplication | Constrain | `AuthLayout.tsx` contract | Normalize in auth slice |
-| `AuthBranding.tsx` gradient-heavy branding divergence | Constrain | auth shell contract | Preserve existing visual language, avoid new variants |
+| `AuthFormContainer.tsx` mobile header duplication | Constrained | `AuthLayout.tsx` contract | Reduced to form-frame responsibilities only |
+| `AuthBranding.tsx` shell spacing ownership | Constrained | auth shell contract | Preserve branding aesthetic, but keep shell spacing in `AuthLayout` |
+
+## Internal route-entrypoint drift
+
+| Legacy item | Status | Replacement | Notes |
+| --- | --- | --- | --- |
+| `SettingsErrorState` in settings route entrypoints | Deprecated | `PageErrorState` | Guarded across settings page/content entrypoints |
+| Route-local admin playlists shell chrome | Deprecated | `ContentSurfaceCard` | Guarded in `admin-playlists-surface-guard.test.ts` |
+| Route-local dashboard profile chat shell chrome | Deprecated | `ContentSurfaceCard` | Guarded in `internal-shell-surface-guard.test.ts` |
+
+## Profile accessibility drift
+
+| Legacy item | Status | Replacement | Notes |
+| --- | --- | --- | --- |
+| Shared profile `menu` / `menuitem` semantics for dialog content | Deprecated | dialog + plain button contract via `ProfileDrawerShell` | Guarded in `ProfileMenuDrawer.test.tsx` |
 
 ## Token drift
 

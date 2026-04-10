@@ -63,7 +63,7 @@ These values come from the existing production implementation in `MarketingConta
 
 ## Immediate migration targets
 
-1. Move remaining long-form public pages to `MarketingContentShell` or `DocPage`.
-2. Replace residual `Container` usage on public marketing/legal surfaces with `MarketingContainer` widths.
-3. Continue aliasing older `--linear-*` names behind semantic public-shell tokens instead of introducing new raw literals.
-4. Audit docs/blog/public profile surfaces for duplicate accessible navigation output before further shell expansion.
+1. Finish remaining public launch/detail routes that still use page-local width wrappers instead of canonical public width owners.
+2. Continue aliasing shared shell values behind semantic public/profile/app-shell tokens instead of introducing new raw literals.
+3. Complete auth helper reduction so `AuthLayout` remains the single auth shell owner and helper components stay content-only.
+4. Continue internal route-entrypoint convergence on canonical `ContentSurfaceCard`, `PageErrorState`, and app-shell primitives.

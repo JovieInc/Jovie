@@ -31,7 +31,9 @@ describe('AppShellContentPanel', () => {
     );
 
     expect(screen.getByText('Settings content')).toBeInTheDocument();
-    expect(container.innerHTML).toContain('max-w-[50rem]');
+    expect(container.innerHTML).toContain(
+      'max-w-(--app-shell-content-max-form)'
+    );
     expect(container.innerHTML).toContain('px-3 py-3 sm:px-3.5 sm:py-3.5');
     expect(container.innerHTML).toContain('overflow-visible');
   });

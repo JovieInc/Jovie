@@ -21,10 +21,13 @@ This document records the canonical responsive contract chosen from values alrea
 - Landing container: `1280px`
 - Page container: `1120px`
 - Prose container: `680px`
+- Semantic public aliases: `--public-content-max-landing`, `--public-content-max-page`, `--public-content-max-prose`
 - Internal wide content panel: `84rem`
 - Internal reading content panel: `56rem`
 - Internal form content panel: `50rem`
-- Profile default shell width: `max-w-md`
+- Semantic app-shell aliases: `--app-shell-content-max-wide`, `--app-shell-content-max-reading`, `--app-shell-content-max-form`
+- Profile shell width alias: `--profile-shell-max-width`
+- Profile shell header width alias: `--profile-shell-header-max-width`
 
 ## Public shell rules
 
@@ -49,6 +52,7 @@ This document records the canonical responsive contract chosen from values alrea
 - Mobile uses locked viewport / drawer-driven interaction where already implemented
 - Desktop allows normal document scrolling
 - Profile module stack should remain single-column and avoid ad hoc breakpoint forks
+- Shared profile shell values should use semantic aliases for shell width, header width, card radius, and drawer radius
 
 ## Auth behavior
 

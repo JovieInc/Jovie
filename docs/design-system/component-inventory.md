@@ -6,7 +6,7 @@ This inventory records the current canonical component owners, known duplicates,
 
 | Family | Canonical file | Duplicate files to retire or constrain | Current canonical routes | Current duplicate routes | Target slice |
 | --- | --- | --- | --- | --- | --- |
-| Public shell | `apps/web/components/site/PublicPageShell.tsx` | route-local public layout wrappers | `(marketing)`, `(dynamic)/legal` | legacy wrappers in untouched public routes | Slice 2 |
+| Public shell | `apps/web/components/site/PublicPageShell.tsx` | route-local public layout wrappers | `(marketing)`, `(dynamic)/legal`, `[username]/not-found` | legacy wrappers in untouched public routes | Slice 2 |
 | Public header | `apps/web/components/site/MarketingHeader.tsx` via `HeaderNav` | `btn-linear-*` route-local CTA/header usages | public marketing/legal | homepage/detail routes still using raw classes | Slice 2 |
 | Public footer | `apps/web/components/site/MarketingFooter.tsx` | route-local footer/action clusters | public marketing/legal | profile/footer-module is a different family | Slice 2 |
 | Internal app shell | `apps/web/components/organisms/AppShellFrame.tsx` | route-level shell composition | app shell routes | page-local spacing/layout forks | Slice 6 |
@@ -32,16 +32,16 @@ This inventory records the current canonical component owners, known duplicates,
 
 | Family | Canonical file | Duplicate files to retire or constrain | Current canonical routes | Current duplicate routes | Target slice |
 | --- | --- | --- | --- | --- | --- |
-| Auth shell | `apps/web/components/features/auth/AuthLayout.tsx` | `AuthFormContainer.tsx`, `AuthBranding.tsx` spacing duplication | sign-in/sign-up/unavailable | stories and helper wrappers | Slice 4 |
-| Auth form container | `apps/web/components/features/auth/AuthFormContainer.tsx` | route-local mobile header logic | auth forms | duplicated shell spacing/title handling | Slice 4 |
-| Auth branding | `apps/web/components/features/auth/AuthBranding.tsx` | route-local branding treatments | auth brand panel | any future auth-specific hero treatments | Slice 4 |
+| Auth shell | `apps/web/components/features/auth/AuthLayout.tsx` | `AuthFormContainer.tsx`, `AuthBranding.tsx` shell duplication | sign-in/sign-up/unavailable/loading | stories and helper wrappers | Slice 4 |
+| Auth form container | `apps/web/components/features/auth/AuthFormContainer.tsx` | route-local mobile header logic | story/helper form frame only | duplicated shell spacing/title handling retired | Slice 4 |
+| Auth branding | `apps/web/components/features/auth/AuthBranding.tsx` | route-local branding treatments | story/helper branding block only | any future auth-specific hero treatments | Slice 4 |
 
 ## Pricing and support
 
 | Family | Canonical file | Duplicate files to retire or constrain | Current canonical routes | Current duplicate routes | Target slice |
 | --- | --- | --- | --- | --- | --- |
 | Pricing comparison | `apps/web/components/features/pricing/PricingComparisonChart.tsx` | route-local table patterns | pricing | other comparison-like surfaces | Slice 2 |
-| Support actions | `apps/web/app/(marketing)/support/SupportContent.tsx` using shared public CTA styles | route-local text-link CTA styling | support | none once normalized | Slice 2 |
+| Support actions | `apps/web/app/(marketing)/support/SupportContent.tsx` using shared public CTA styles | route-local text-link CTA styling | support + support loading | none once normalized | Slice 2 |
 
 ## Public profile modules
 
@@ -57,7 +57,7 @@ This inventory records the current canonical component owners, known duplicates,
 | --- | --- | --- | --- | --- | --- |
 | Page content frame | `apps/web/components/organisms/AppShellContentPanel.tsx` | route-local content wrappers | dashboard/settings/admin using panel | pages with local padding/max-width wrappers | Slice 6 |
 | Header/nav frame | `apps/web/components/organisms/HeaderNav.tsx` | route-local header composition | public header and app header variants | page-local header wrappers | Slice 6 |
-| Shared status/empty/loading surfaces | existing app shell + dashboard tokens | route-local stat card/loading/empty states | portions of dashboard/admin | local page-specific states | Slice 6 |
+| Shared status/empty/loading surfaces | existing app shell + dashboard tokens | route-local stat card/loading/empty states | portions of dashboard/admin, settings, profile chat | local page-specific states | Slice 6 |
 
 ## Notes
 
