@@ -5,15 +5,21 @@ import {
 } from '@/lib/entitlements/creator-plan';
 import { getEntitlements } from '@/lib/entitlements/registry';
 
-const { selectMock, fromMock, leftJoinMock, whereMock, limitMock } = vi.hoisted(
-  () => ({
-    selectMock: vi.fn(),
-    fromMock: vi.fn(),
-    leftJoinMock: vi.fn(),
-    whereMock: vi.fn(),
-    limitMock: vi.fn(),
-  })
-);
+const {
+  selectMock,
+  fromMock,
+  leftJoinMock,
+  whereMock,
+  orderByMock,
+  limitMock,
+} = vi.hoisted(() => ({
+  selectMock: vi.fn(),
+  fromMock: vi.fn(),
+  leftJoinMock: vi.fn(),
+  whereMock: vi.fn(),
+  orderByMock: vi.fn(),
+  limitMock: vi.fn(),
+}));
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -23,7 +29,8 @@ vi.mock('@/lib/db', () => ({
 
 function installQueryResult(rows: unknown[]) {
   limitMock.mockResolvedValue(rows);
-  whereMock.mockReturnValue({ limit: limitMock });
+  orderByMock.mockReturnValue({ limit: limitMock });
+  whereMock.mockReturnValue({ orderBy: orderByMock, limit: limitMock });
   leftJoinMock.mockReturnValue({
     leftJoin: leftJoinMock,
     where: whereMock,
@@ -80,6 +87,7 @@ describe('getCreatorEntitlements', () => {
     const result = await getCreatorEntitlements('profile_123');
 
     expect(selectMock).toHaveBeenCalledTimes(1);
+    expect(orderByMock).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       plan: 'pro',
       entitlements: getEntitlements('pro'),
@@ -99,6 +107,7 @@ describe('getCreatorEntitlements', () => {
     const result = await getCreatorEntitlements('profile_456');
 
     expect(selectMock).toHaveBeenCalledTimes(1);
+    expect(orderByMock).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       plan: 'pro',
       entitlements: getEntitlements('pro'),

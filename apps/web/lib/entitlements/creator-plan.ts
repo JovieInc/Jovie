@@ -39,6 +39,7 @@ export async function getCreatorEntitlements(
     .leftJoin(claimedUsers, eq(claimedUsers.id, userProfileClaims.userId))
     .leftJoin(legacyUsers, eq(legacyUsers.id, creatorProfiles.userId))
     .where(eq(creatorProfiles.id, creatorProfileId))
+    .orderBy(userProfileClaims.userId)
     .limit(1);
 
   const ownerUserId = result?.claimedUserId ?? result?.legacyUserId ?? null;
