@@ -6,7 +6,10 @@ const handleOnlyFormPropsSpy = vi.fn();
 const v2FormPropsSpy = vi.fn();
 
 vi.mock('@/features/dashboard/organisms/OnboardingHandleOnlyForm', () => ({
-  OnboardingHandleOnlyForm: (props: { initialHandle?: string }) => {
+  OnboardingHandleOnlyForm: (props: {
+    initialHandle?: string;
+    isHydrated?: boolean;
+  }) => {
     handleOnlyFormPropsSpy(props);
     return <div data-testid='mock-onboarding-handle-only-form' />;
   },
@@ -59,6 +62,7 @@ describe('OnboardingFormWrapper', () => {
 
     expect(handleOnlyFormPropsSpy.mock.calls[0]?.[0]).toMatchObject({
       initialHandle: 'serverhandle',
+      isHydrated: true,
     });
     expect(v2FormPropsSpy).not.toHaveBeenCalled();
     expect(globalThis.sessionStorage.getItem('pendingClaim')).not.toBeNull();

@@ -129,7 +129,9 @@ export function OnboardingFormWrapper({
   existingBio = null,
   existingGenres = null,
 }: OnboardingFormWrapperProps) {
-  const [isHydrated, setIsHydrated] = useState(false);
+  // Server-seeded handles are already stable at render time, so they do not
+  // need to wait for the client-only pendingClaim reconciliation pass.
+  const [isHydrated, setIsHydrated] = useState(() => Boolean(initialHandle));
 
   // Resolve the handle synchronously on first render to avoid a key-change
   // remount that causes a visible layout shift.  sessionStorage is available
@@ -144,8 +146,10 @@ export function OnboardingFormWrapper({
   // useState initializer) to avoid a side effect during render, which
   // React StrictMode would execute twice.
   useEffect(() => {
-    setIsHydrated(true);
-  }, []);
+    if (!isHydrated) {
+      setIsHydrated(true);
+    }
+  }, [isHydrated]);
 
   useEffect(() => {
     if (resolvedHandle && resolvedHandle !== initialHandle) {
