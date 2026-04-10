@@ -2,13 +2,12 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  getSpotifyImportStatus,
-  pollReleasesCount,
-} from '@/app/app/(shell)/dashboard/releases/actions';
+import { getSpotifyImportPollSnapshot } from '@/app/app/(shell)/dashboard/releases/actions';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const POLL_INTERVAL_MS = 2000;
+const BACKOFF_POLL_INTERVAL_MS = 5000;
+const IDLE_POLLS_BEFORE_BACKOFF = 3;
 /** Stop polling after 5 minutes to avoid infinite polling when background import silently fails. */
 const POLL_TIMEOUT_MS = 5 * 60 * 1000;
 /** Hold the banner at 100% for 1 second before hiding, so the user sees "done". */
@@ -50,17 +49,14 @@ interface ImportPollResult {
 }
 
 async function fetchImportPoll(): Promise<ImportPollResult> {
-  const [statusResult, releasesResult] = await Promise.all([
-    getSpotifyImportStatus(),
-    pollReleasesCount(),
-  ]);
+  const result = await getSpotifyImportPollSnapshot();
 
   return {
-    status: statusResult.status,
-    releaseCount: statusResult.releaseCount,
-    totalCount: statusResult.totalCount,
-    releases: releasesResult.releases,
-    serverCount: releasesResult.count,
+    status: result.status,
+    releaseCount: result.releaseCount,
+    totalCount: result.totalCount,
+    releases: result.releases,
+    serverCount: result.serverCount,
   };
 }
 
@@ -72,10 +68,14 @@ export function useImportPolling({
 }: UseImportPollingParams) {
   const [importedCount, setImportedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(initialTotalCount);
+  const [pollIntervalMs, setPollIntervalMs] = useState(POLL_INTERVAL_MS);
   const onReleasesUpdateRef = useRef(onReleasesUpdate);
   const onImportCompleteRef = useRef(onImportComplete);
   // Accumulate releases across polls so rows never disappear
   const seenReleasesRef = useRef(new Map<string, ReleaseViewModel>());
+  const stagnantPollCountRef = useRef(0);
+  const lastProgressSignatureRef = useRef<string | null>(null);
+  const lastProcessedPollAtRef = useRef(0);
   // Track whether import completed so we stop polling
   const [isComplete, setIsComplete] = useState(false);
   const queryClient = useQueryClient();
@@ -112,7 +112,11 @@ export function useImportPolling({
       seenReleasesRef.current.clear();
       setImportedCount(0);
       setTotalCount(initialTotalCount);
+      setPollIntervalMs(POLL_INTERVAL_MS);
       setIsComplete(false);
+      stagnantPollCountRef.current = 0;
+      lastProgressSignatureRef.current = null;
+      lastProcessedPollAtRef.current = 0;
       pollStartRef.current = Date.now();
       // Remove stale poll data from previous imports
       queryClient.removeQueries({ queryKey: ['import-polling'] });
@@ -127,20 +131,23 @@ export function useImportPolling({
 
   const isPolling = enabled && !isComplete;
 
-  const { data } = useQuery({
+  const { data, dataUpdatedAt } = useQuery({
     queryKey: ['import-polling'],
     queryFn: fetchImportPoll,
     enabled: isPolling,
-    refetchInterval: isPolling ? POLL_INTERVAL_MS : false,
+    refetchInterval: isPolling ? pollIntervalMs : false,
     // Don't cache stale import data across navigations
     gcTime: 0,
     staleTime: 0,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
   });
 
   // Process poll results whenever query data changes
   useEffect(() => {
-    if (!data || !isPolling) return;
+    if (!data || !isPolling || dataUpdatedAt === 0) return;
+    if (lastProcessedPollAtRef.current === dataUpdatedAt) return;
+    lastProcessedPollAtRef.current = dataUpdatedAt;
 
     // Update totalCount from server if available and larger
     if (data.totalCount > 0 && data.totalCount > totalCount) {
@@ -149,6 +156,35 @@ export function useImportPolling({
 
     if (data.releases.length > 0) {
       mergeAndEmit(data.releases, data.serverCount);
+    }
+
+    const nextImportedCount = Math.max(
+      seenReleasesRef.current.size,
+      data.serverCount,
+      data.releaseCount
+    );
+    const progressSignature = [
+      data.status,
+      nextImportedCount,
+      data.totalCount,
+    ].join(':');
+
+    if (progressSignature === lastProgressSignatureRef.current) {
+      stagnantPollCountRef.current += 1;
+    } else {
+      lastProgressSignatureRef.current = progressSignature;
+      stagnantPollCountRef.current = 0;
+      if (pollIntervalMs !== POLL_INTERVAL_MS) {
+        setPollIntervalMs(POLL_INTERVAL_MS);
+      }
+    }
+
+    if (
+      data.status === 'importing' &&
+      stagnantPollCountRef.current >= IDLE_POLLS_BEFORE_BACKOFF &&
+      pollIntervalMs !== BACKOFF_POLL_INTERVAL_MS
+    ) {
+      setPollIntervalMs(BACKOFF_POLL_INTERVAL_MS);
     }
 
     // Treat stuck imports as failed after POLL_TIMEOUT_MS
@@ -168,7 +204,14 @@ export function useImportPolling({
         completionTimerRef.current = null;
       }, COMPLETION_HOLD_MS);
     }
-  }, [data, isPolling, mergeAndEmit, totalCount]);
+  }, [
+    data,
+    dataUpdatedAt,
+    isPolling,
+    mergeAndEmit,
+    pollIntervalMs,
+    totalCount,
+  ]);
 
   return { importedCount, totalCount };
 }

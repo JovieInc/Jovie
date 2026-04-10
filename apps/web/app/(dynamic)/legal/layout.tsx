@@ -1,6 +1,5 @@
-import { Container } from '@/components/site/Container';
-import { Header } from '@/components/site/Header';
-import { MarketingFooter } from '@/components/site/MarketingFooter';
+import { MarketingContainer } from '@/components/marketing';
+import { PublicPageShell } from '@/components/site/PublicPageShell';
 
 // Note: dynamic = 'force-dynamic' removed for cacheComponents compatibility
 // Legal pages will still be dynamic by default
@@ -11,12 +10,13 @@ export default function LegalLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className='flex min-h-screen flex-col bg-white dark:bg-[#0a0a0b]'>
-      <Header hideNav />
-      <main className='flex-1 py-16 sm:py-20' style={{ paddingTop: '112px' }}>
-        <Container size='lg'>{children}</Container>
-      </main>
-      <MarketingFooter />
-    </div>
+    <PublicPageShell
+      className='bg-white text-neutral-950 dark:bg-[#0a0a0b] dark:text-neutral-50'
+      headerVariant='minimal'
+      logoSize='sm'
+      mainClassName='py-16 sm:py-20'
+    >
+      <MarketingContainer width='page'>{children}</MarketingContainer>
+    </PublicPageShell>
   );
 }

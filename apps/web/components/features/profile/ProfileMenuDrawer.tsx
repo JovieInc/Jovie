@@ -91,10 +91,9 @@ export function ProfileMenuDrawer({
       dataTestId='profile-menu-drawer'
     >
       {view === 'menu' ? (
-        <div className='flex flex-col gap-0.5' role='menu'>
+        <div className='flex flex-col gap-0.5'>
           <button
             type='button'
-            role='menuitem'
             className={menuItemClass}
             onClick={() => handleAction(onShare)}
           >
@@ -105,7 +104,6 @@ export function ProfileMenuDrawer({
           {hasAbout ? (
             <button
               type='button'
-              role='menuitem'
               className={menuItemClass}
               onClick={() => handleAction(onOpenAbout)}
             >
@@ -117,7 +115,6 @@ export function ProfileMenuDrawer({
           {hasTourDates ? (
             <button
               type='button'
-              role='menuitem'
               className={menuItemClass}
               onClick={() => handleAction(onOpenTour)}
             >
@@ -129,7 +126,6 @@ export function ProfileMenuDrawer({
           {hasTip ? (
             <button
               type='button'
-              role='menuitem'
               className={menuItemClass}
               onClick={() => handleAction(onOpenTip)}
             >
@@ -141,7 +137,6 @@ export function ProfileMenuDrawer({
           {hasContacts ? (
             <button
               type='button'
-              role='menuitem'
               className={menuItemClass}
               onClick={() => handleAction(onOpenContact)}
             >
@@ -153,7 +148,6 @@ export function ProfileMenuDrawer({
           {isSubscribed ? (
             <button
               type='button'
-              role='menuitem'
               className={`${menuItemClass} justify-between`}
               onClick={() => setView('notifications')}
             >
@@ -166,7 +160,6 @@ export function ProfileMenuDrawer({
           ) : (
             <button
               type='button'
-              role='menuitem'
               className={menuItemClass}
               onClick={() => handleAction(onOpenSubscribe)}
             >
@@ -203,7 +196,6 @@ export function ProfileMenuDrawer({
 
           <button
             type='button'
-            role='menuitem'
             className='flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-red-400/85 transition-colors duration-150 active:bg-white/[0.06]'
             onClick={onUnsubscribe}
             disabled={isUnsubscribing}

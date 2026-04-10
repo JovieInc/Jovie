@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import {
   lazy,
@@ -24,15 +23,7 @@ import {
   DrawerButton,
   DrawerLoadingSkeleton,
 } from '@/components/molecules/drawer';
-import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
-import {
-  Dialog,
-  DialogActions,
-  DialogBody,
-  DialogDescription,
-  DialogTitle,
-} from '@/components/organisms/Dialog';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import { PageShell } from '@/components/organisms/PageShell';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
@@ -113,6 +104,12 @@ const ReleasesEmptyState = lazy(() =>
 const SmartLinkGateBanner = lazy(() =>
   import('./SmartLinkGateBanner').then(m => ({
     default: m.SmartLinkGateBanner,
+  }))
+);
+
+const ReleasePlanPromptDialog = lazy(() =>
+  import('./ReleasePlanPromptDialog').then(m => ({
+    default: m.ReleasePlanPromptDialog,
   }))
 );
 
@@ -992,60 +989,30 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         />
       </Suspense>
 
-      <Dialog
-        open={isPostCreatePlanModalOpen && postCreateRelease !== null}
-        onClose={closePostCreatePlanModal}
-        size='sm'
-      >
-        <DialogTitle>
-          {isReleasePlanGateLoading
-            ? 'Release Plan'
-            : canGenerateReleasePlans
-              ? 'Generate Release Plan'
-              : 'Upgrade To Generate A Release Plan'}
-        </DialogTitle>
-        <DialogDescription>
-          {isReleasePlanGateLoading
-            ? 'Checking whether this workspace can generate tasks for the release plan.'
-            : canGenerateReleasePlans
-              ? 'Create the step-by-step tasks for this release and jump straight into the plan.'
-              : 'Upgrade to turn this release into a step-by-step plan with tasks you can assign to Jovie AI.'}
-        </DialogDescription>
-        <DialogBody className='space-y-2'>
-          <p className='text-[13px] text-secondary-token'>
-            {postCreateRelease?.title ?? 'This release'} is ready.
-          </p>
-        </DialogBody>
-        <DialogActions>
-          <Button
-            type='button'
-            variant='outline'
-            size='sm'
-            onClick={closePostCreatePlanModal}
-            disabled={isGeneratingReleasePlan}
-          >
-            Maybe Later
-          </Button>
-          {isReleasePlanGateLoading ? (
-            <Button type='button' size='sm' disabled>
-              Loading...
-            </Button>
-          ) : canGenerateReleasePlans ? (
-            <Button
-              type='button'
+      <Suspense
+        fallback={
+          isPostCreatePlanModalOpen && postCreateRelease !== null ? (
+            <DialogLoadingSkeleton
+              open
+              onClose={closePostCreatePlanModal}
               size='sm'
-              onClick={handleGenerateReleasePlan}
-              disabled={isGeneratingReleasePlan}
-            >
-              {isGeneratingReleasePlan
-                ? 'Generating...'
-                : 'Generate Release Plan'}
-            </Button>
-          ) : (
-            <UpgradeButton size='sm'>Upgrade to Pro</UpgradeButton>
-          )}
-        </DialogActions>
-      </Dialog>
+              rows={3}
+            />
+          ) : null
+        }
+      >
+        {isPostCreatePlanModalOpen && postCreateRelease !== null ? (
+          <ReleasePlanPromptDialog
+            open
+            releaseTitle={postCreateRelease.title}
+            isGateLoading={isReleasePlanGateLoading}
+            canGenerateReleasePlans={canGenerateReleasePlans}
+            isGeneratingReleasePlan={isGeneratingReleasePlan}
+            onClose={closePostCreatePlanModal}
+            onGenerateReleasePlan={handleGenerateReleasePlan}
+          />
+        ) : null}
+      </Suspense>
     </>
   );
 });

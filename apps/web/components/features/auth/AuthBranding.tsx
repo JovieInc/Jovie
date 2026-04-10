@@ -39,12 +39,12 @@ export function AuthBranding({
 
   return (
     <div
-      className={`hidden lg:flex lg:flex-1 lg:flex-col lg:justify-center lg:px-12 xl:px-16 relative overflow-hidden ${gradientClass}`}
+      className={`relative hidden overflow-hidden lg:block ${gradientClass}`}
     >
       {/* Subtle noise texture overlay for depth */}
       <div className='absolute inset-0 opacity-[0.015] dark:opacity-[0.03] bg-[url("data:image/svg+xml,%3Csvg viewBox=%270 0 256 256%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cfilter id=%27noise%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%270.8%27 numOctaves=%274%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url(%23noise)%27/%3E%3C/svg%3E")] pointer-events-none' />
 
-      <div className='relative mx-auto w-full max-w-[18rem] z-10'>
+      <div className='relative z-10 mx-auto w-full max-w-[18rem] px-12 py-16 xl:px-16'>
         <div className='text-center'>
           <div className='mb-8'>
             <BrandLogo

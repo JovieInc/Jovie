@@ -49,7 +49,6 @@ const SampleForm = () => (
 
 export const SignIn: Story = {
   args: {
-    title: 'Sign In',
     children: <SampleForm />,
   },
   decorators: [
@@ -63,7 +62,6 @@ export const SignIn: Story = {
 
 export const SignUp: Story = {
   args: {
-    title: 'Create Account',
     children: <SampleForm />,
   },
   decorators: [
@@ -84,7 +82,7 @@ export const WithBranding: Story = {
           <p className='text-blue-100'>Create your artist profile today.</p>
         </div>
       </div>
-      <AuthFormContainer title='Sign In'>
+      <AuthFormContainer>
         <SampleForm />
       </AuthFormContainer>
     </div>

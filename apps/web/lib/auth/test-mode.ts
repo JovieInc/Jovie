@@ -1,11 +1,22 @@
 import { isIPv4 } from 'node:net';
+import {
+  TEST_AUTH_BYPASS_MODE,
+  TEST_MODE_COOKIE,
+  TEST_MODE_HEADER,
+  TEST_PERSONA_COOKIE,
+  TEST_USER_ID_COOKIE,
+  TEST_USER_ID_HEADER,
+} from '@/lib/auth/test-mode-constants';
 
-export const TEST_MODE_HEADER = 'x-test-mode';
-export const TEST_USER_ID_HEADER = 'x-test-user-id';
-export const TEST_AUTH_BYPASS_MODE = 'bypass-auth';
-export const TEST_MODE_COOKIE = '__e2e_test_mode';
-export const TEST_USER_ID_COOKIE = '__e2e_test_user_id';
-export const TEST_PERSONA_COOKIE = '__e2e_test_persona';
+export {
+  TEST_AUTH_BYPASS_MODE,
+  TEST_MODE_COOKIE,
+  TEST_MODE_HEADER,
+  TEST_PERSONA_COOKIE,
+  TEST_USER_ID_COOKIE,
+  TEST_USER_ID_HEADER,
+};
+
 const TRUSTED_PREVIEW_HOSTS = new Set(['preview.jov.ie']);
 
 const PRIVATE_IPV4_BLOCKS = [

@@ -13,6 +13,14 @@ warn()    { echo -e "${YELLOW}⚠  $*${RESET}"; }
 success() { echo -e "${GREEN}✅ $*${RESET}"; }
 info()    { echo "   $*"; }
 
+install_with_brew() {
+  if ! command -v brew &>/dev/null; then
+    return 1
+  fi
+
+  brew install "$@"
+}
+
 install_with_apt() {
   if ! command -v apt-get &>/dev/null; then
     return 1
@@ -24,6 +32,120 @@ install_with_apt() {
     apt-get update && apt-get install -y "$1"
   else
     return 1
+  fi
+}
+
+install_ripgrep_standalone() {
+  if ! command -v curl &>/dev/null; then
+    warn "curl is required for standalone ripgrep install"
+    return 1
+  fi
+
+  if ! command -v tar &>/dev/null; then
+    warn "tar is required for standalone ripgrep install"
+    return 1
+  fi
+
+  if ! command -v node &>/dev/null; then
+    warn "Node.js is required for standalone ripgrep install"
+    return 1
+  fi
+
+  local os arch asset_suffix api_response asset_urls download_url checksum_url tmp_dir archive_path checksum_path extracted_rg path_already_contains_local_bin
+  os="$(uname -s 2>/dev/null || echo unknown)"
+  arch="$(uname -m 2>/dev/null || echo unknown)"
+
+  case "${os}/${arch}" in
+    Darwin/arm64)
+      asset_suffix="aarch64-apple-darwin.tar.gz"
+      ;;
+    Darwin/x86_64)
+      asset_suffix="x86_64-apple-darwin.tar.gz"
+      ;;
+    Linux/x86_64)
+      asset_suffix="x86_64-unknown-linux-musl.tar.gz"
+      ;;
+    Linux/arm64 | Linux/aarch64)
+      asset_suffix="aarch64-unknown-linux-gnu.tar.gz"
+      ;;
+    *)
+      warn "No standalone ripgrep asset configured for ${os}/${arch}"
+      return 1
+      ;;
+  esac
+
+  info "Falling back to standalone ripgrep install..."
+  api_response="$(curl -fsSL https://api.github.com/repos/BurntSushi/ripgrep/releases/latest)" || return 1
+  asset_urls="$(printf '%s' "$api_response" | node -e '
+    const fs = require("fs");
+    const suffix = process.argv[1];
+    const release = JSON.parse(fs.readFileSync(0, "utf8"));
+    const asset = (release.assets || []).find((item) =>
+      typeof item.browser_download_url === "string" &&
+      item.browser_download_url.endsWith(suffix),
+    );
+    const checksumAsset = (release.assets || []).find((item) =>
+      typeof item.browser_download_url === "string" &&
+      item.browser_download_url.endsWith(`${suffix}.sha256`),
+    );
+    if (!asset || !checksumAsset) {
+      process.exit(1);
+    }
+    process.stdout.write(`${asset.browser_download_url}\t${checksumAsset.browser_download_url}`);
+  ' "$asset_suffix")" || return 1
+  IFS=$'\t' read -r download_url checksum_url <<< "$asset_urls"
+  if [[ -z "$download_url" || -z "$checksum_url" ]]; then
+    warn "Could not resolve standalone ripgrep download assets"
+    return 1
+  fi
+  case ":$PATH:" in
+    *":$HOME/.local/bin:"*)
+      path_already_contains_local_bin=true
+      ;;
+    *)
+      path_already_contains_local_bin=false
+      ;;
+  esac
+
+  tmp_dir="$(mktemp -d)"
+  if ! (
+    trap 'rm -rf "$tmp_dir"' EXIT
+    archive_path="$tmp_dir/$(basename "$download_url")"
+    checksum_path="$tmp_dir/$(basename "$checksum_url")"
+    curl -fsSL "$download_url" -o "$archive_path"
+    curl -fsSL "$checksum_url" -o "$checksum_path"
+    (
+      cd "$tmp_dir" || exit 1
+      if command -v sha256sum &>/dev/null; then
+        sha256sum -c "$(basename "$checksum_path")"
+      elif command -v shasum &>/dev/null; then
+        shasum -a 256 -c "$(basename "$checksum_path")"
+      else
+        warn "sha256sum or shasum is required to verify standalone ripgrep downloads"
+        exit 1
+      fi
+    ) >/dev/null || {
+      warn "Standalone ripgrep checksum verification failed"
+      exit 1
+    }
+    tar -xzf "$archive_path" -C "$tmp_dir"
+
+    extracted_rg="$(find "$tmp_dir" -type f -path '*/rg' | head -1)"
+    if [[ -z "$extracted_rg" ]]; then
+      warn "Standalone ripgrep archive did not contain an rg binary"
+      exit 1
+    fi
+
+    mkdir -p "$HOME/.local/bin"
+    install -m 0755 "$extracted_rg" "$HOME/.local/bin/rg"
+  ); then
+    return 1
+  fi
+
+  export PATH="$HOME/.local/bin:$PATH"
+  success "ripgrep installed to $HOME/.local/bin/rg"
+  if [[ "$path_already_contains_local_bin" != "true" ]]; then
+    info 'Add $HOME/.local/bin to your PATH (for example in ~/.zshrc or ~/.bashrc) to keep rg available in future shells'
   fi
 }
 
@@ -93,14 +215,20 @@ else
     Darwin)
       if command -v brew &>/dev/null; then
         info "Installing via Homebrew..."
-        brew install ripgrep
-      else
-        warn "Homebrew not found — install ripgrep manually: brew install ripgrep"
+        if ! install_with_brew ripgrep; then
+          warn "Homebrew install failed for ripgrep"
+          if ! install_ripgrep_standalone; then
+            warn "Standalone install failed — install ripgrep manually: brew install ripgrep"
+            MISSING+=("ripgrep (rg)")
+          fi
+        fi
+      elif ! install_ripgrep_standalone; then
+        warn "Homebrew not found and standalone install failed — install ripgrep manually: brew install ripgrep"
         MISSING+=("ripgrep (rg)")
       fi
       ;;
     Linux)
-      if ! install_with_apt ripgrep; then
+      if ! install_with_apt ripgrep && ! install_ripgrep_standalone; then
         warn "Auto-install failed — install ripgrep manually with your package manager"
         info "Debian/Ubuntu: sudo apt-get install -y ripgrep"
         MISSING+=("ripgrep (rg)")
@@ -134,15 +262,24 @@ else
     Darwin)
       if command -v brew &>/dev/null; then
         info "Installing via Homebrew..."
-        brew install dopplerhq/cli/doppler
+        if ! install_with_brew dopplerhq/cli/doppler; then
+          warn "Homebrew install failed for Doppler CLI"
+          MISSING+=("Doppler CLI")
+        fi
       else
         info "Installing via curl (macOS)..."
-        curl -Lsf https://cli.doppler.com/install.sh | sh
+        if ! curl -Lsf https://cli.doppler.com/install.sh | sh; then
+          warn "Curl install failed for Doppler CLI"
+          MISSING+=("Doppler CLI")
+        fi
       fi
       ;;
     Linux)
       info "Installing via curl (Linux)..."
-      curl -Lsf https://cli.doppler.com/install.sh | sh
+      if ! curl -Lsf https://cli.doppler.com/install.sh | sh; then
+        warn "Curl install failed for Doppler CLI"
+        MISSING+=("Doppler CLI")
+      fi
       ;;
     Windows* | MINGW* | MSYS* | CYGWIN*)
       warn "Windows detected — install Doppler manually:"
