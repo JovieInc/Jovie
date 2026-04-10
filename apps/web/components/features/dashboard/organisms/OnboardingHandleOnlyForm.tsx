@@ -78,6 +78,7 @@ export function OnboardingHandleOnlyForm({
 
   const { handleValidation, setHandleValidation, handle, validateHandle } =
     useHandleValidation({
+      assumeInitialHandleAvailable: false,
       normalizedInitialHandle,
       fullName,
     });

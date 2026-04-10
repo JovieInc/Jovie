@@ -75,4 +75,39 @@ describe('useHandleValidation', () => {
 
     expect(updatedValidateApi).toHaveBeenCalledWith('new-handle');
   });
+
+  it('validates a prefilled handle through the API when it is not already claimed', async () => {
+    const { result } = renderHook(() =>
+      useHandleValidation({
+        assumeInitialHandleAvailable: false,
+        normalizedInitialHandle: 'prefilled-handle',
+        fullName: 'Taylor Swift',
+      })
+    );
+
+    await act(async () => {
+      result.current.validateHandle('prefilled-handle');
+    });
+
+    expect(validateApiState.cancel).not.toHaveBeenCalled();
+    expect(validateApiState.current).toHaveBeenCalledWith('prefilled-handle');
+  });
+
+  it('keeps the fast path for handles that already belong to an existing profile', async () => {
+    const { result } = renderHook(() =>
+      useHandleValidation({
+        assumeInitialHandleAvailable: true,
+        normalizedInitialHandle: 'claimed-handle',
+        fullName: 'Taylor Swift',
+      })
+    );
+
+    await act(async () => {
+      result.current.validateHandle('claimed-handle');
+    });
+
+    expect(validateApiState.cancel).toHaveBeenCalled();
+    expect(validateApiState.current).not.toHaveBeenCalled();
+    expect(result.current.handleValidation.available).toBe(true);
+  });
 });

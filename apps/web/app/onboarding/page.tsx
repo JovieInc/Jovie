@@ -11,7 +11,10 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
-import { buildHandleCandidates } from '@/lib/onboarding/reserved-handle';
+import {
+  buildHandleCandidates,
+  reserveOnboardingHandle,
+} from '@/lib/onboarding/reserved-handle';
 import { extractErrorMessage } from '@/lib/utils/errors';
 
 interface OnboardingPageProps {
@@ -120,12 +123,17 @@ export default async function OnboardingPage({
   const earlyDisplayName = clerkIdentity.displayName || '';
   const earlyProvidedHandle =
     resolvedSearchParams?.handle || spotifySuggestedHandle;
-  const earlyReservedHandle =
+  const reservedHandlePromise =
     !earlyProvidedHandle && earlyDisplayName
-      ? (buildHandleCandidates(earlyDisplayName)[0] ?? null)
-      : null;
+      ? reserveOnboardingHandle(earlyDisplayName).catch(() => {
+          return buildHandleCandidates(earlyDisplayName)[0] ?? null;
+        })
+      : Promise.resolve<string | null>(null);
 
-  const existingProfile = await profilePrefetchPromise;
+  const [existingProfile, earlyReservedHandle] = await Promise.all([
+    profilePrefetchPromise,
+    reservedHandlePromise,
+  ]);
 
   const initialDisplayName =
     existingProfile?.displayName || clerkIdentity.displayName || '';

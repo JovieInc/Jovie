@@ -11,6 +11,7 @@ import {
 import type { HandleValidationState } from './types';
 
 interface UseHandleValidationOptions {
+  assumeInitialHandleAvailable?: boolean;
   normalizedInitialHandle: string;
   fullName: string;
 }
@@ -49,6 +50,7 @@ const CHECKING_SAFETY_TIMEOUT_MS =
  * - Race condition prevention
  */
 export function useHandleValidation({
+  assumeInitialHandleAvailable = false,
   normalizedInitialHandle,
   fullName,
 }: UseHandleValidationOptions): UseHandleValidationReturn {
@@ -56,7 +58,8 @@ export function useHandleValidation({
   const handleRef = useRef(normalizedInitialHandle);
   const [handleValidation, setHandleValidation] =
     useState<HandleValidationState>({
-      available: Boolean(normalizedInitialHandle),
+      available:
+        assumeInitialHandleAvailable && Boolean(normalizedInitialHandle),
       checking: false,
       error: null,
       clientValid: Boolean(normalizedInitialHandle),
@@ -205,6 +208,7 @@ export function useHandleValidation({
 
       // Fast path: if input matches initial handle, mark as valid immediately
       if (
+        assumeInitialHandleAvailable &&
         normalizedInitialHandle &&
         normalizedInput === normalizedInitialHandle
       ) {
@@ -247,10 +251,11 @@ export function useHandleValidation({
       // Trigger API validation via Pacer (debounced, cached)
       validateApiRef.current(normalizedInput);
     },
-    [cancelValidation, normalizedInitialHandle]
+    [assumeInitialHandleAvailable, cancelValidation, normalizedInitialHandle]
   );
 
   const isSeededInitialHandleReady =
+    assumeInitialHandleAvailable &&
     Boolean(normalizedInitialHandle) &&
     handle === normalizedInitialHandle &&
     handleValidation.available &&
