@@ -30,6 +30,7 @@
             "lcp-lazy-loaded": "warn",
             "legacy-javascript": "off",
             "legacy-javascript-insight": "off",
+            "uses-responsive-images": "warn",
             "unused-javascript": "off",
             "color-contrast": "warn",
             "image-delivery-insight": "warn",

@@ -543,9 +543,11 @@ export async function completeOnboardingV2(
     name: 'Want the full profile from day one?',
   });
   const artistConfirmContinue = page.getByRole('button', { name: 'Continue' });
-  const profileReadyHeading = page.getByRole('heading', {
-    name: 'Your profile is ready',
-  });
+  const profileReadyHeading = page
+    .getByRole('heading', {
+      name: /Your profile is ready|Your Link Is Live/i,
+    })
+    .first();
 
   if (options.clerkUserId) {
     await waitForOnboardingReadiness(page, options.clerkUserId);
