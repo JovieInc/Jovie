@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { getSpotifyImportStatus } from '@/app/app/(shell)/dashboard/releases/actions';
+import { getSpotifyImportPollSnapshot } from '@/app/app/(shell)/dashboard/releases/actions';
 import type {
   AggregateEnrichmentStatus,
   EnrichmentStatusMap,
@@ -52,7 +52,7 @@ export function useEnrichmentStatus({
 
   const { data } = useQuery({
     queryKey: ['enrichment-status'],
-    queryFn: ({ signal: _signal }) => getSpotifyImportStatus(),
+    queryFn: ({ signal: _signal }) => getSpotifyImportPollSnapshot(),
     enabled: isPolling,
     refetchInterval: isPolling ? POLL_INTERVAL_MS : false,
     gcTime: 0,

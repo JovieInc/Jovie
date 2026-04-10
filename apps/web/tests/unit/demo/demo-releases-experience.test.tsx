@@ -77,6 +77,7 @@ vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
 // schema evaluation chain.
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   connectSpotifyArtist: vi.fn(),
+  getSpotifyImportPollSnapshot: vi.fn(),
   getSpotifyImportStatus: vi.fn(),
   pollReleasesCount: vi.fn(),
   connectAppleMusicArtist: vi.fn(),

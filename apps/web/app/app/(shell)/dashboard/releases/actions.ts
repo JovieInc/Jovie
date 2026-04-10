@@ -1450,6 +1450,83 @@ export async function getSpotifyImportStatus(): Promise<{
   };
 }
 
+/**
+ * Poll the current Spotify import snapshot for the releases dashboard.
+ * Combines status metadata and mapped releases so the UI can poll with a
+ * single server action during active imports.
+ */
+export async function getSpotifyImportPollSnapshot(): Promise<{
+  status: 'idle' | 'importing' | 'complete' | 'failed';
+  releaseCount: number;
+  totalCount: number;
+  enrichmentStatus: EnrichmentStatusMap;
+  aggregateEnrichmentStatus: AggregateEnrichmentStatus;
+  releases: ReleaseViewModel[];
+  serverCount: number;
+}> {
+  noStore();
+  const { userId } = await getCachedAuth();
+  if (!userId) throw new Error('Unauthorized');
+
+  const profile = await requireProfile();
+
+  const [profileRow, releases] = await Promise.all([
+    db
+      .select({
+        settings: creatorProfiles.settings,
+        spotifyId: creatorProfiles.spotifyId,
+        updatedAt: creatorProfiles.updatedAt,
+      })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profile.id))
+      .limit(1),
+    getReleasesFromDb(profile.id),
+  ]);
+
+  const row = profileRow[0];
+  const settings = (row?.settings ?? {}) as Record<string, unknown>;
+  const releaseCount = releases.length;
+  const hasSpotifyProfile = Boolean(row?.spotifyId);
+  const totalCount =
+    typeof settings.spotifyImportTotal === 'number'
+      ? settings.spotifyImportTotal
+      : 0;
+
+  const providerLabels = buildProviderLabels();
+  const mappedReleases = releases.map(release =>
+    mapReleaseToViewModel(release, providerLabels, profile.id, profile.handle)
+  );
+
+  let status: 'idle' | 'importing' | 'complete' | 'failed';
+  const storedStatus = settings.spotifyImportStatus as string | undefined;
+  if (storedStatus === 'complete') {
+    status = 'complete';
+  } else if (storedStatus === 'failed') {
+    status = 'failed';
+  } else if (storedStatus === 'importing') {
+    status = 'importing';
+  } else {
+    status = hasSpotifyProfile && releaseCount > 0 ? 'complete' : 'idle';
+  }
+
+  const rawEnrichmentStatus = (settings.enrichmentStatus ??
+    {}) as EnrichmentStatusMap;
+  const enrichmentStatus = applyTtlToEnrichmentStatus(
+    rawEnrichmentStatus,
+    row?.updatedAt ?? null
+  );
+
+  return {
+    status,
+    releaseCount,
+    totalCount,
+    enrichmentStatus,
+    aggregateEnrichmentStatus: deriveAggregateStatus(enrichmentStatus),
+    releases: mappedReleases,
+    serverCount: mappedReleases.length,
+  };
+}
+
 export async function connectSpotifyArtist(params: {
   spotifyArtistId: string;
   spotifyArtistUrl: string;

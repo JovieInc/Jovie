@@ -2,10 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  getSpotifyImportStatus,
-  pollReleasesCount,
-} from '@/app/app/(shell)/dashboard/releases/actions';
+import { getSpotifyImportPollSnapshot } from '@/app/app/(shell)/dashboard/releases/actions';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const POLL_INTERVAL_MS = 2000;
@@ -50,17 +47,14 @@ interface ImportPollResult {
 }
 
 async function fetchImportPoll(): Promise<ImportPollResult> {
-  const [statusResult, releasesResult] = await Promise.all([
-    getSpotifyImportStatus(),
-    pollReleasesCount(),
-  ]);
+  const result = await getSpotifyImportPollSnapshot();
 
   return {
-    status: statusResult.status,
-    releaseCount: statusResult.releaseCount,
-    totalCount: statusResult.totalCount,
-    releases: releasesResult.releases,
-    serverCount: releasesResult.count,
+    status: result.status,
+    releaseCount: result.releaseCount,
+    totalCount: result.totalCount,
+    releases: result.releases,
+    serverCount: result.serverCount,
   };
 }
 
