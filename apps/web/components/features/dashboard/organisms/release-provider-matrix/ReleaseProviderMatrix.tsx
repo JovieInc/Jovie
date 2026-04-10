@@ -26,7 +26,6 @@ import {
 } from '@/components/molecules/drawer';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
-import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import {
   Dialog,
   DialogActions,
@@ -45,11 +44,8 @@ import type { ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
 import { useImportPolling } from './hooks/useImportPolling';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
-import { ImportProgressBanner } from './ImportProgressBanner';
-import { ReleasesEmptyState } from './ReleasesEmptyState';
 import { ReleaseTable } from './ReleaseTable';
 import {
   DEFAULT_RELEASE_FILTERS,
@@ -57,7 +53,6 @@ import {
   ReleaseTableSubheader,
   type ReleaseView,
 } from './ReleaseTableSubheader';
-import { SmartLinkGateBanner } from './SmartLinkGateBanner';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
 import { filterReleases } from './utils/filterReleases';
@@ -87,6 +82,37 @@ const TrackSidebar = lazy(() =>
 const SpotifyConnectDialog = lazy(() =>
   import('./SpotifyConnectDialog').then(m => ({
     default: m.SpotifyConnectDialog,
+  }))
+);
+
+// Lazy load Apple Music search palette - only used from the sync banner flow.
+const ArtistSearchCommandPalette = lazy(() =>
+  import('@/components/organisms/artist-search-palette').then(m => ({
+    default: m.ArtistSearchCommandPalette,
+  }))
+);
+
+const ImportProgressBanner = lazy(() =>
+  import('./ImportProgressBanner').then(m => ({
+    default: m.ImportProgressBanner,
+  }))
+);
+
+const AppleMusicSyncBanner = lazy(() =>
+  import('./AppleMusicSyncBanner').then(m => ({
+    default: m.AppleMusicSyncBanner,
+  }))
+);
+
+const ReleasesEmptyState = lazy(() =>
+  import('./ReleasesEmptyState').then(m => ({
+    default: m.ReleasesEmptyState,
+  }))
+);
+
+const SmartLinkGateBanner = lazy(() =>
+  import('./SmartLinkGateBanner').then(m => ({
+    default: m.SmartLinkGateBanner,
   }))
 );
 
@@ -767,42 +793,50 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         {/* Banners — inset from shell edge */}
         {showImportProgress && (
           <div className='mx-3 lg:mx-4 mt-2.5'>
-            <ImportProgressBanner
-              artistName={artistName}
-              importedCount={importedCount}
-              totalCount={totalCount}
-              visible={showImportProgress}
-            />
+            <Suspense fallback={null}>
+              <ImportProgressBanner
+                artistName={artistName}
+                importedCount={importedCount}
+                totalCount={totalCount}
+                visible={showImportProgress}
+              />
+            </Suspense>
           </div>
         )}
         {showReleasesTable &&
           rows[0]?.profileId &&
           !isAmConnected &&
           !isImporting && (
-            <AppleMusicSyncBanner
-              profileId={rows[0].profileId}
-              spotifyConnected={isConnected}
-              releases={rows}
-              onMatchStatusChange={handleMatchStatusChange}
-              className='mx-3 lg:mx-4 mt-3'
-            />
+            <Suspense fallback={null}>
+              <AppleMusicSyncBanner
+                profileId={rows[0].profileId}
+                spotifyConnected={isConnected}
+                releases={rows}
+                onMatchStatusChange={handleMatchStatusChange}
+                className='mx-3 lg:mx-4 mt-3'
+              />
+            </Suspense>
           )}
         {showEmptyState && (
           <PageShell className='mt-2.5' data-testid='release-table-shell'>
-            <ReleasesEmptyState
-              onConnectSpotify={() => setSpotifySearchOpen(true)}
-            />
+            <Suspense fallback={null}>
+              <ReleasesEmptyState
+                onConnectSpotify={() => setSpotifySearchOpen(true)}
+              />
+            </Suspense>
           </PageShell>
         )}
 
         {/* Soft-cap banner: request higher limit when over 100 smart links */}
         {showReleasesTable && !isPro && releasedCount > SMART_LINK_SOFT_CAP && (
-          <SmartLinkGateBanner
-            mode='soft-cap'
-            releasedCount={releasedCount}
-            softCap={SMART_LINK_SOFT_CAP}
-            className='mx-3 lg:mx-4 mt-3'
-          />
+          <Suspense fallback={null}>
+            <SmartLinkGateBanner
+              mode='soft-cap'
+              releasedCount={releasedCount}
+              softCap={SMART_LINK_SOFT_CAP}
+              className='mx-3 lg:mx-4 mt-3'
+            />
+          </Suspense>
         )}
 
         {/* Pre-release upsell for free users with unreleased music */}
@@ -810,11 +844,13 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           !isPro &&
           !canAccessFutureReleases &&
           unreleasedCount > 0 && (
-            <SmartLinkGateBanner
-              mode='unreleased'
-              unreleasedCount={unreleasedCount}
-              className='mx-3 lg:mx-4 mt-3'
-            />
+            <Suspense fallback={null}>
+              <SmartLinkGateBanner
+                mode='unreleased'
+                unreleasedCount={unreleasedCount}
+                className='mx-3 lg:mx-4 mt-3'
+              />
+            </Suspense>
           )}
 
         {/* Table — fills edge-to-edge within the app shell */}
@@ -914,13 +950,27 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         )}
       </div>
 
-      {/* Apple Music artist search command palette */}
-      <ArtistSearchCommandPalette
-        open={amPaletteOpen}
-        onOpenChange={setAmPaletteOpen}
-        provider='apple_music'
-        onArtistSelect={handleAppleMusicConnect}
-      />
+      <Suspense
+        fallback={
+          amPaletteOpen ? (
+            <DialogLoadingSkeleton
+              open={amPaletteOpen}
+              onClose={() => setAmPaletteOpen(false)}
+              size='lg'
+              rows={3}
+            />
+          ) : null
+        }
+      >
+        {amPaletteOpen ? (
+          <ArtistSearchCommandPalette
+            open={amPaletteOpen}
+            onOpenChange={setAmPaletteOpen}
+            provider='apple_music'
+            onArtistSelect={handleAppleMusicConnect}
+          />
+        ) : null}
+      </Suspense>
 
       <Suspense
         fallback={

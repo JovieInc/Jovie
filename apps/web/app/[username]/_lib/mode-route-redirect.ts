@@ -55,12 +55,27 @@ export function getRouteRedirectSearchParams(searchParams: URLSearchParams) {
 
 export async function redirectToProfileMode(
   params: RouteParams,
-  searchParams: RouteSearchParams | undefined,
-  mode: Exclude<ProfileMode, 'profile'>
+  searchParamsOrMode:
+    | RouteSearchParams
+    | Exclude<ProfileMode, 'profile'>
+    | undefined,
+  maybeMode?: Exclude<ProfileMode, 'profile'>
 ) {
+  const mode =
+    typeof searchParamsOrMode === 'string' ? searchParamsOrMode : maybeMode;
+
+  if (!mode) {
+    throw new Error('redirectToProfileMode requires a profile mode');
+  }
+
+  if (typeof searchParamsOrMode === 'string' || searchParamsOrMode == null) {
+    const { username } = await params;
+    redirect(getProfileModeHref(username, mode));
+  }
+
   const [{ username }, resolvedSearchParams] = await Promise.all([
     params,
-    searchParams,
+    searchParamsOrMode,
   ]);
 
   redirect(getProfileModeRedirectHref(username, resolvedSearchParams, mode));

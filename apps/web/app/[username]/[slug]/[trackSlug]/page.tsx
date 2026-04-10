@@ -9,6 +9,7 @@
 
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
+import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { BASE_URL } from '@/constants/app';
 import { buildBreadcrumbObject } from '@/lib/constants/schemas';
@@ -26,11 +27,16 @@ import {
   getContentBySlug,
   getCreatorByUsername,
   getCreatorPlan,
+  getFeaturedTrackStaticParams,
   getTrackBySlugInRelease,
 } from '../_lib/data';
 import { generateMusicStructuredData } from '../music-structured-data';
 
 export const revalidate = 300;
+
+export async function generateStaticParams() {
+  return await getFeaturedTrackStaticParams();
+}
 
 interface PageProps {
   readonly params: Promise<{
@@ -172,6 +178,8 @@ export default async function TrackDeepLinkPage({
   const artistName = creator.displayName ?? creator.username;
   const trackUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}/${trackSlug}`;
   const releaseUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}`;
+  const isUnreleased =
+    track.releaseDate && new Date(track.releaseDate) > new Date();
 
   // Reuse shared structured data generator with track-specific fields
   const structuredData = generateMusicStructuredData(
@@ -212,6 +220,18 @@ export default async function TrackDeepLinkPage({
       <script type='application/ld+json'>
         {safeJsonLdStringify(structuredData)}
       </script>
+
+      {!isUnreleased && (
+        <PreferredDspRedirect
+          providerLinks={track.providerLinks}
+          artistHandle={creator.usernameNormalized}
+          tracking={{
+            contentType: 'track',
+            contentId: track.id,
+            smartLinkSlug: trackSlug,
+          }}
+        />
+      )}
 
       <ReleaseLandingPage
         release={{

@@ -10,6 +10,7 @@
 import { Metadata } from 'next';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
+import { PreserveSearchRedirect } from '@/app/[username]/[slug]/PreserveSearchRedirect';
 import {
   type FeaturedArtist,
   ReleaseLandingPage,
@@ -38,6 +39,7 @@ import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
 import {
   getContentBySlug,
   getCreatorByUsername,
+  getFeaturedSmartLinkStaticParams,
   getReleaseTrackList,
 } from './_lib/data';
 import { isMissingPromoDownloadsRelation } from './_lib/promo-download-errors';
@@ -45,6 +47,10 @@ import { generateMusicStructuredData } from './music-structured-data';
 
 // Use ISR with 5-minute revalidation for smart link pages
 export const revalidate = 300;
+
+export async function generateStaticParams() {
+  return await getFeaturedSmartLinkStaticParams();
+}
 
 interface PageProps {
   readonly params: Promise<{ username: string; slug: string }>;
@@ -168,13 +174,14 @@ export default async function ContentSmartLinkPage({
     requestSearchParams
   );
 
-  // If this is a track with a known parent release, permanently redirect to the nested URL.
-  // Tracks should be deep links of releases: /{handle}/{releaseSlug}/{trackSlug}
+  // Tracks use a client redirect here to preserve query params like dsp/UTM
+  // while keeping this route prerendered. Metadata points crawlers at the
+  // nested canonical path.
   if (content.type === 'track' && content.releaseSlug) {
-    const queryString = requestSearchParams.toString();
-    const suffix = queryString ? `?${queryString}` : '';
-    permanentRedirect(
-      `/${creator.usernameNormalized}/${content.releaseSlug}/${content.slug}${suffix}`
+    return (
+      <PreserveSearchRedirect
+        href={`/${creator.usernameNormalized}/${content.releaseSlug}/${content.slug}`}
+      />
     );
   }
 
@@ -322,7 +329,12 @@ export default async function ContentSmartLinkPage({
       {!isUnreleased && noredirect !== '1' && (
         <PreferredDspRedirect
           providerLinks={content.providerLinks}
-          redirectBasePath={`/${creator.usernameNormalized}/${content.slug}`}
+          artistHandle={creator.usernameNormalized}
+          tracking={{
+            contentType: content.type,
+            contentId: content.id,
+            smartLinkSlug: content.slug,
+          }}
         />
       )}
 

@@ -18,11 +18,19 @@ import {
 import { db } from '@/lib/db';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
-import { getContentBySlug, getCreatorByUsername } from '../_lib/data';
+import {
+  getContentBySlug,
+  getCreatorByUsername,
+  getFeaturedSmartLinkStaticParams,
+} from '../_lib/data';
 import { isMissingPromoDownloadsRelation } from '../_lib/promo-download-errors';
 import { PromoDownloadGate } from './PromoDownloadGate';
 
 export const revalidate = 300; // ISR: 5 minutes
+
+export async function generateStaticParams() {
+  return await getFeaturedSmartLinkStaticParams();
+}
 
 interface PageProps {
   readonly params: Promise<{ username: string; slug: string }>;
