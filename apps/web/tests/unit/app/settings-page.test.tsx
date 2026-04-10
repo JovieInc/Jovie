@@ -80,10 +80,17 @@ describe('settings page', () => {
   });
 
   it('redirects unauthenticated users to sign-in', async () => {
-    await renderSettingsPage({ userId: null });
+    redirectMock.mockImplementation(() => {
+      throw new Error('NEXT_REDIRECT');
+    });
+
+    await expect(renderSettingsPage({ userId: null })).rejects.toThrow(
+      'NEXT_REDIRECT'
+    );
 
     expect(redirectMock).toHaveBeenCalledWith(
       `${'/signin'}?redirect_url=/app/settings`
     );
+    expect(getDashboardDataMock).not.toHaveBeenCalled();
   });
 });

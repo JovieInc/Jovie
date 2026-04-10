@@ -1,15 +1,16 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+const TEST_DIR = dirname(
+  import.meta.url.startsWith('file:')
+    ? fileURLToPath(import.meta.url)
+    : import.meta.url
+);
 const ADMIN_PLAYLISTS_ROUTE = join(
-  process.cwd(),
-  'app',
-  'app',
-  '(shell)',
-  'admin',
-  'playlists',
-  'page.tsx'
+  TEST_DIR,
+  '../../../app/app/(shell)/admin/playlists/page.tsx'
 );
 
 describe('admin playlists surface guard', () => {

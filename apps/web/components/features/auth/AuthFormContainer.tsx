@@ -4,12 +4,10 @@ import { cn } from '@/lib/utils';
 
 interface AuthFormContainerProps {
   readonly children: ReactNode;
-  readonly title: string;
 }
 
 export function AuthFormContainer({
   children,
-  title: _title,
 }: Readonly<AuthFormContainerProps>) {
   return (
     <div className='w-full px-4 sm:px-6'>

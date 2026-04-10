@@ -52,12 +52,10 @@ describe('public profile contract guard', () => {
   it('keeps StaticArtistPage pinned to the canonical public profile view-model builder', () => {
     const contents = readFileSync(STATIC_ARTIST_PAGE, 'utf8');
 
-    expect(contents).toContain(
-      "import { buildProfilePublicViewModel } from '@/features/profile/view-models';"
+    expect(contents).toMatch(
+      /import\s*\{\s*buildProfilePublicViewModel\s*\}\s*from\s*['"]@\/features\/profile\/view-models['"]/
     );
-    expect(contents).toContain(
-      'const viewModel = buildProfilePublicViewModel({'
-    );
+    expect(contents).toMatch(/buildProfilePublicViewModel\s*\(\s*\{/);
     expect(contents).toContain('<ProfileCompactTemplate');
   });
 

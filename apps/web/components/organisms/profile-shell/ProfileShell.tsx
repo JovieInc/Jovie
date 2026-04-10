@@ -268,7 +268,7 @@ export function ProfileShell({
                     <PublicSurfaceFooter className='mt-auto pt-6 sm:pt-8'>
                       <nav
                         className='mx-auto flex w-full max-w-sm items-center justify-center gap-2 rounded-full border border-[color:var(--profile-dock-border)] bg-[var(--profile-dock-bg)] px-2 py-2 shadow-[var(--profile-dock-shadow)] backdrop-blur-2xl sm:gap-3'
-                        aria-label='Profile modes'
+                        aria-label='Profile Modes'
                         data-testid='profile-mode-nav'
                       >
                         <CircleIconButton
@@ -309,7 +309,7 @@ export function ProfileShell({
                           <CircleIconButton
                             size='md'
                             variant='pearl'
-                            ariaLabel='Tour dates'
+                            ariaLabel='Tour Dates'
                             data-testid='tour-trigger'
                             className={`transition-[background-color,color,box-shadow] ${
                               isTourModeActive

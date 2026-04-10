@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -35,6 +35,9 @@ function collectFiles(dir: string, results: string[] = []): string[] {
 
 describe('public CTA guard', () => {
   it('keeps legacy public CTA classnames out of production marketing and key public feature surfaces', () => {
+    const missingDirs = TARGET_DIRS.filter(dir => !existsSync(dir));
+    expect(missingDirs).toEqual([]);
+
     const files = TARGET_DIRS.flatMap(dir => collectFiles(dir));
 
     const offenders = files.filter(filePath => {

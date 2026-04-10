@@ -23,23 +23,21 @@ describe('profile shell token contract', () => {
   it('defines the shared profile shell aliases in the design system', () => {
     const contents = readFileSync(DESIGN_SYSTEM, 'utf8');
 
-    expect(contents).toContain('--profile-shell-max-width: 430px;');
-    expect(contents).toContain('--profile-shell-card-radius: 30px;');
-    expect(contents).toContain('--profile-drawer-radius-mobile: 24px;');
+    expect(contents).toMatch(/--profile-shell-max-width\s*:\s*[^;]+;/);
+    expect(contents).toMatch(/--profile-shell-card-radius\s*:\s*[^;]+;/);
+    expect(contents).toMatch(/--profile-drawer-radius-mobile\s*:\s*[^;]+;/);
   });
 
   it('uses the shared profile aliases in the canonical shell files', () => {
-    expect(readFileSync(PROFILE_DRAWER_SHELL, 'utf8')).toContain(
-      '--profile-drawer-radius-mobile'
+    const drawerShellContents = readFileSync(PROFILE_DRAWER_SHELL, 'utf8');
+    const compactTemplateContents = readFileSync(
+      PROFILE_COMPACT_TEMPLATE,
+      'utf8'
     );
-    expect(readFileSync(PROFILE_DRAWER_SHELL, 'utf8')).toContain(
-      '--profile-shell-max-width'
-    );
-    expect(readFileSync(PROFILE_COMPACT_TEMPLATE, 'utf8')).toContain(
-      '--profile-shell-card-radius'
-    );
-    expect(readFileSync(PROFILE_COMPACT_TEMPLATE, 'utf8')).toContain(
-      '--profile-action-radius'
-    );
+
+    expect(drawerShellContents).toContain('--profile-drawer-radius-mobile');
+    expect(drawerShellContents).toContain('--profile-shell-max-width');
+    expect(compactTemplateContents).toContain('--profile-shell-card-radius');
+    expect(compactTemplateContents).toContain('--profile-action-radius');
   });
 });

@@ -82,16 +82,16 @@ describe('ProfileShell accessibility contract', () => {
       />
     );
 
-    const nav = screen.getByRole('navigation', { name: 'Profile modes' });
+    const nav = screen.getByRole('navigation', { name: 'Profile Modes' });
     expect(nav).toBeInTheDocument();
 
     expect(
-      screen.getAllByRole('navigation', { name: 'Profile modes' })
+      screen.getAllByRole('navigation', { name: 'Profile Modes' })
     ).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Contact' })).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Tour dates' })
+      screen.getByRole('button', { name: 'Tour Dates' })
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tip' })).toBeInTheDocument();
   });

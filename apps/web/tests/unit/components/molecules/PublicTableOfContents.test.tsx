@@ -31,11 +31,9 @@ describe('PublicTableOfContents', () => {
 
     for (const entry of TOC) {
       const element = document.getElementById(entry.id);
-      element?.scrollIntoView ||
-        Object.defineProperty(element ?? {}, 'scrollIntoView', {
-          value: vi.fn(),
-          configurable: true,
-        });
+      if (element) {
+        element.scrollIntoView = vi.fn();
+      }
     }
   });
 

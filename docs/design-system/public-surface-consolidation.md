@@ -34,7 +34,7 @@ This document records the current canonical public-surface design system for the
 - Marketing/public pages: `apps/web/app/(marketing)`
 - Legal pages: `apps/web/app/(dynamic)/legal`
 - Auth pages: `apps/web/app/(auth)`
-- Public profile pages: `apps/web/tests/unit/profile/*` and route-specific profile code
+- Public profile pages: `apps/web/app/[username]` and shared profile route-entry components
 
 ### Duplicate or drifting implementations to retire
 

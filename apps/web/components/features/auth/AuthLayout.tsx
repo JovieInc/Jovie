@@ -50,7 +50,7 @@ export function AuthLayout({
   logoutRedirectUrl = '/signin',
 }: Readonly<AuthLayoutProps>) {
   const { isKeyboardVisible } = useMobileKeyboard();
-  const formRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLElement>(null);
 
   // Scroll form into view when keyboard appears on mobile
   useEffect(() => {

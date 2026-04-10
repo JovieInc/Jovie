@@ -156,7 +156,7 @@ describe('StaticArtistPage', () => {
     ).toBe('true');
   });
 
-  it('uses the canonical profile view-model builder for mode defaults', async () => {
+  it('forwards tour mode to the compact template', async () => {
     const { StaticArtistPage } = await import(
       '@/features/profile/StaticArtistPage'
     );

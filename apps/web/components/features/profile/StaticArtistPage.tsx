@@ -78,7 +78,7 @@ export function StaticArtistPage({
 
   return (
     <ProfileCompactTemplate
-      key={artist.id}
+      key={viewModel.artist.id}
       mode={viewModel.mode}
       artist={viewModel.artist}
       socialLinks={viewModel.socialLinks}

@@ -1,3 +1,4 @@
+import { Check, Minus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -104,40 +105,28 @@ export default async function ComparePage({ params }: ComparePageProps) {
                     </td>
                     <td className='py-3 px-4 text-center'>
                       {feature.jovie ? (
-                        <span
-                          className='text-green-400'
-                          role='img'
+                        <Check
                           aria-label='Yes'
-                        >
-                          &#10003;
-                        </span>
+                          className='mx-auto h-4 w-4 text-green-400'
+                        />
                       ) : (
-                        <span
-                          className='text-tertiary-token'
-                          role='img'
+                        <Minus
                           aria-label='No'
-                        >
-                          &mdash;
-                        </span>
+                          className='mx-auto h-4 w-4 text-tertiary-token'
+                        />
                       )}
                     </td>
                     <td className='py-3 pl-4 text-center'>
                       {feature.competitor ? (
-                        <span
-                          className='text-green-400'
-                          role='img'
+                        <Check
                           aria-label='Yes'
-                        >
-                          &#10003;
-                        </span>
+                          className='mx-auto h-4 w-4 text-green-400'
+                        />
                       ) : (
-                        <span
-                          className='text-tertiary-token'
-                          role='img'
+                        <Minus
                           aria-label='No'
-                        >
-                          &mdash;
-                        </span>
+                          className='mx-auto h-4 w-4 text-tertiary-token'
+                        />
                       )}
                     </td>
                   </tr>
