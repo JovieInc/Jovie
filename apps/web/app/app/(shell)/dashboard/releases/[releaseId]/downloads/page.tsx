@@ -61,6 +61,7 @@ export default function PromoDownloadsPage() {
 
   // Load existing files on mount
   const loadFiles = useCallback(async () => {
+    setLoaded(false);
     try {
       const res = await fetch(
         `/api/promo-downloads/confirm?releaseId=${releaseId}&list=true`
@@ -78,12 +79,9 @@ export default function PromoDownloadsPage() {
     }
   }, [releaseId]);
 
-  // Load on first render
   useEffect(() => {
-    if (!loaded) {
-      loadFiles();
-    }
-  }, [loaded, loadFiles]);
+    void loadFiles();
+  }, [loadFiles]);
 
   const handleFileSelect = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
