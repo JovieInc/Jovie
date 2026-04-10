@@ -156,6 +156,26 @@ describe('StaticArtistPage', () => {
     ).toBe('true');
   });
 
+  it('forwards tour mode to the compact template', async () => {
+    const { StaticArtistPage } = await import(
+      '@/features/profile/StaticArtistPage'
+    );
+
+    render(
+      <StaticArtistPage
+        mode='tour'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Tour dates'
+        showBackButton={true}
+      />
+    );
+
+    const template = screen.getByTestId('profile-compact-template');
+    expect(template.getAttribute('data-mode')).toBe('tour');
+  });
+
   it('remounts the compact template when artist identity changes', async () => {
     const { StaticArtistPage } = await import(
       '@/features/profile/StaticArtistPage'

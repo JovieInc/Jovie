@@ -1,7 +1,12 @@
+import { Check, Minus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { FaqSection, MarketingHero } from '@/components/marketing';
+import {
+  FaqSection,
+  MarketingContainer,
+  MarketingHero,
+} from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getComparison, getComparisonSlugs } from '@/content/comparisons';
@@ -67,98 +72,102 @@ export default async function ComparePage({ params }: ComparePageProps) {
       </MarketingHero>
 
       {/* Feature Comparison Table */}
-      <section className='mx-auto max-w-[720px] px-6 pb-16 sm:px-8 lg:px-10'>
-        <h2 className='text-2xl font-semibold text-primary-token'>
-          Feature comparison
-        </h2>
-        <div className='mt-8 overflow-x-auto'>
-          <table className='w-full text-sm'>
-            <thead>
-              <tr className='border-b border-border-primary'>
-                <th className='pb-3 pr-4 text-left font-medium text-secondary-token'>
-                  Feature
-                </th>
-                <th className='pb-3 px-4 text-center font-medium text-primary-token'>
-                  {APP_NAME}
-                </th>
-                <th className='pb-3 pl-4 text-center font-medium text-secondary-token'>
-                  {data.competitor}
-                </th>
-              </tr>
-            </thead>
-            <tbody className='divide-y divide-border-primary'>
-              {data.features.map(feature => (
-                <tr key={feature.name}>
-                  <td className='py-3 pr-4 text-secondary-token'>
-                    {feature.name}
-                    {feature.note && (
-                      <span className='mt-1 block text-xs text-tertiary-token'>
-                        {feature.note}
-                      </span>
-                    )}
-                  </td>
-                  <td className='py-3 px-4 text-center'>
-                    {feature.jovie ? (
-                      <span
-                        className='text-green-400'
-                        role='img'
-                        aria-label='Yes'
-                      >
-                        &#10003;
-                      </span>
-                    ) : (
-                      <span
-                        className='text-tertiary-token'
-                        role='img'
-                        aria-label='No'
-                      >
-                        &mdash;
-                      </span>
-                    )}
-                  </td>
-                  <td className='py-3 pl-4 text-center'>
-                    {feature.competitor ? (
-                      <span
-                        className='text-green-400'
-                        role='img'
-                        aria-label='Yes'
-                      >
-                        &#10003;
-                      </span>
-                    ) : (
-                      <span
-                        className='text-tertiary-token'
-                        role='img'
-                        aria-label='No'
-                      >
-                        &mdash;
-                      </span>
-                    )}
-                  </td>
+      <MarketingContainer width='prose' className='pb-16'>
+        <section>
+          <h2 className='text-2xl font-semibold text-primary-token'>
+            Feature Comparison
+          </h2>
+          <div className='mt-8 overflow-x-auto'>
+            <table className='w-full text-sm'>
+              <thead>
+                <tr className='border-b border-border-primary'>
+                  <th
+                    scope='col'
+                    className='pb-3 pr-4 text-left font-medium text-secondary-token'
+                  >
+                    Feature
+                  </th>
+                  <th
+                    scope='col'
+                    className='pb-3 px-4 text-center font-medium text-primary-token'
+                  >
+                    {APP_NAME}
+                  </th>
+                  <th
+                    scope='col'
+                    className='pb-3 pl-4 text-center font-medium text-secondary-token'
+                  >
+                    {data.competitor}
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody className='divide-y divide-border-primary'>
+                {data.features.map(feature => (
+                  <tr key={feature.name}>
+                    <th
+                      scope='row'
+                      className='py-3 pr-4 text-left font-normal text-secondary-token'
+                    >
+                      {feature.name}
+                      {feature.note && (
+                        <span className='mt-1 block text-xs text-tertiary-token'>
+                          {feature.note}
+                        </span>
+                      )}
+                    </th>
+                    <td className='py-3 px-4 text-center'>
+                      {feature.jovie ? (
+                        <Check
+                          aria-label='Yes'
+                          className='mx-auto h-4 w-4 text-green-400'
+                        />
+                      ) : (
+                        <Minus
+                          aria-label='No'
+                          className='mx-auto h-4 w-4 text-tertiary-token'
+                        />
+                      )}
+                    </td>
+                    <td className='py-3 pl-4 text-center'>
+                      {feature.competitor ? (
+                        <Check
+                          aria-label='Yes'
+                          className='mx-auto h-4 w-4 text-green-400'
+                        />
+                      ) : (
+                        <Minus
+                          aria-label='No'
+                          className='mx-auto h-4 w-4 text-tertiary-token'
+                        />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </MarketingContainer>
 
       {/* Bottom Line */}
-      <section className='mx-auto max-w-[720px] px-6 pb-16 sm:px-8 lg:px-10'>
-        <h2 className='text-2xl font-semibold text-primary-token'>
-          The bottom line
-        </h2>
-        <p className='mt-4 text-base leading-relaxed text-secondary-token'>
-          {data.bottomLine}
-        </p>
-        <div className='mt-8'>
-          <Link
-            href={APP_ROUTES.SIGNUP}
-            className='inline-flex items-center rounded-lg bg-accent-token px-6 py-3 text-sm font-medium text-white transition-colors hover:opacity-90'
-          >
-            Try {APP_NAME} free
-          </Link>
-        </div>
-      </section>
+      <MarketingContainer width='prose' className='pb-16'>
+        <section>
+          <h2 className='text-2xl font-semibold text-primary-token'>
+            The Bottom Line
+          </h2>
+          <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+            {data.bottomLine}
+          </p>
+          <div className='mt-8'>
+            <Link
+              href={APP_ROUTES.SIGNUP}
+              className='inline-flex items-center rounded-lg bg-accent-token px-6 py-3 text-sm font-medium text-white transition-colors hover:opacity-90'
+            >
+              Try {APP_NAME} Free
+            </Link>
+          </div>
+        </section>
+      </MarketingContainer>
 
       {/* FAQ */}
       <FaqSection items={data.faq} />
