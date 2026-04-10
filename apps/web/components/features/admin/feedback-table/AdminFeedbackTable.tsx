@@ -11,6 +11,7 @@ import {
   DrawerPropertyRow,
   DrawerSection,
   DrawerSurfaceCard,
+  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { type DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -346,72 +347,72 @@ export function AdminFeedbackTable({
         isOpen={Boolean(selected)}
         width={560}
         ariaLabel='Feedback details'
-        title='Feedback details'
         onClose={() => setSelectedId(null)}
         headerMode='minimal'
+        hideMinimalHeaderBar
         isEmpty={!selected}
         emptyMessage='Select a feedback row to view details.'
         entityHeader={
           selected ? (
-            <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-              <div className='border-b border-subtle px-3 py-2'>
-                <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-                  Feedback
-                </p>
-              </div>
-              <div className='space-y-1.5 p-3.5'>
-                <p className='text-[12px] leading-[16px] text-secondary-token'>
-                  Source: {selected.source} ·{' '}
-                  {new Date(selected.createdAtIso).toLocaleString()}
-                </p>
-                <div className='space-y-0.5'>
-                  <p className='truncate text-[15px] font-[590] leading-[18px] tracking-[-0.015em] text-primary-token'>
-                    {getFeedbackUserLabel(selected.user)}
-                  </p>
-                  <p className='truncate text-[12px] leading-[16px] text-secondary-token'>
-                    {selected.user.email ?? 'No email available'}
-                  </p>
-                </div>
-              </div>
-              <DrawerCardActionBar
-                primaryActions={
-                  [
-                    ...(selected.status === 'dismissed'
-                      ? []
-                      : [
-                          {
-                            id: 'dismiss-feedback',
-                            label: 'Dismiss',
-                            icon: XCircle,
-                            disabled: isDismissPending(selected.id),
-                            onClick: () => {
-                              dismissRow(selected);
-                            },
-                          } satisfies DrawerHeaderAction,
-                        ]),
-                    {
-                      id: 'copy-feedback-markdown',
-                      label: 'Copy as Markdown',
-                      icon: ClipboardCopy,
-                      onClick: () => {
-                        copyRowAsMarkdown(selected);
-                      },
-                    } satisfies DrawerHeaderAction,
-                  ] satisfies readonly DrawerHeaderAction[]
+            <DrawerSurfaceCard variant='card' className='overflow-hidden p-3.5'>
+              <EntityHeaderCard
+                eyebrow='Feedback'
+                title={getFeedbackUserLabel(selected.user)}
+                subtitle={selected.user.email ?? 'No email available'}
+                meta={
+                  <div className='space-y-1 text-[12px] leading-[16px] text-secondary-token'>
+                    <p>
+                      Source: {selected.source} ·{' '}
+                      {new Date(selected.createdAtIso).toLocaleString()}
+                    </p>
+                    <p className='text-tertiary-token'>
+                      {selected.status !== 'dismissed'
+                        ? 'Marked as pending'
+                        : `Dismissed ${
+                            selected.dismissedAtIso
+                              ? new Date(
+                                  selected.dismissedAtIso
+                                ).toLocaleString()
+                              : ''
+                          }`}
+                    </p>
+                  </div>
                 }
+                actions={
+                  <DrawerCardActionBar
+                    primaryActions={
+                      [
+                        ...(selected.status === 'dismissed'
+                          ? []
+                          : [
+                              {
+                                id: 'dismiss-feedback',
+                                label: 'Dismiss',
+                                icon: XCircle,
+                                disabled: isDismissPending(selected.id),
+                                onClick: () => {
+                                  dismissRow(selected);
+                                },
+                              } satisfies DrawerHeaderAction,
+                            ]),
+                        {
+                          id: 'copy-feedback-markdown',
+                          label: 'Copy as Markdown',
+                          icon: ClipboardCopy,
+                          onClick: () => {
+                            copyRowAsMarkdown(selected);
+                          },
+                        } satisfies DrawerHeaderAction,
+                      ] satisfies readonly DrawerHeaderAction[]
+                    }
+                    onClose={() => setSelectedId(null)}
+                    overflowTriggerPlacement='card-top-right'
+                    overflowTriggerIcon='vertical'
+                    className='border-0 bg-transparent px-0 py-0'
+                  />
+                }
+                bodyClassName='pr-9'
               />
-              <div className='border-t border-subtle px-3.5 py-2'>
-                <span className='text-[12px] leading-[16px] text-tertiary-token'>
-                  {(() => {
-                    if (selected.status !== 'dismissed')
-                      return 'Marked as pending';
-                    const dismissedDate = selected.dismissedAtIso
-                      ? new Date(selected.dismissedAtIso).toLocaleString()
-                      : '';
-                    return `Dismissed ${dismissedDate}`;
-                  })()}
-                </span>
-              </div>
             </DrawerSurfaceCard>
           ) : undefined
         }

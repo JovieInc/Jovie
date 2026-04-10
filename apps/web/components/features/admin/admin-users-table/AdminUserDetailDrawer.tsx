@@ -6,12 +6,12 @@ import { Copy, ExternalLink } from 'lucide-react';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import {
+  DrawerCardActionBar,
   DrawerSection,
   DrawerSurfaceCard,
   EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
-import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/types';
 
@@ -132,16 +132,9 @@ export function AdminUserDetailDrawer({
       isOpen={hasUser}
       width={400}
       ariaLabel='User details'
-      title='User details'
       onClose={onClose}
       headerMode='minimal'
-      headerActions={
-        <DrawerHeaderActions
-          primaryActions={[]}
-          menuItems={contextMenuItems}
-          onClose={onClose}
-        />
-      }
+      hideMinimalHeaderBar
       contextMenuItems={contextMenuItems}
       isEmpty={!hasUser}
       emptyMessage='Select a user to view details.'
@@ -180,6 +173,17 @@ export function AdminUserDetailDrawer({
                   )}
                 </div>
               }
+              actions={
+                <DrawerCardActionBar
+                  primaryActions={[]}
+                  menuItems={contextMenuItems}
+                  onClose={onClose}
+                  overflowTriggerPlacement='card-top-right'
+                  overflowTriggerIcon='vertical'
+                  className='border-0 bg-transparent px-0 py-0'
+                />
+              }
+              bodyClassName='pr-9'
             />
           </DrawerSurfaceCard>
         ) : undefined
