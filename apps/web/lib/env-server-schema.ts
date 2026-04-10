@@ -175,6 +175,8 @@ export const ServerEnvSchema = z.object({
   E2E_USE_TEST_AUTH_BYPASS: z.string().optional(),
   E2E_CLERK_USER_ID: z.string().optional(),
   E2E_CLERK_USER_USERNAME: z.string().optional(),
+  DEMO_RECORDING: z.string().optional(),
+  DEMO_CLERK_USER_ID: z.string().optional(),
 });
 
 /**
@@ -269,4 +271,6 @@ export const ENV_KEYS = [
   'E2E_USE_TEST_AUTH_BYPASS',
   'E2E_CLERK_USER_ID',
   'E2E_CLERK_USER_USERNAME',
+  'DEMO_RECORDING',
+  'DEMO_CLERK_USER_ID',
 ] as const satisfies readonly (keyof z.infer<typeof ServerEnvSchema>)[];

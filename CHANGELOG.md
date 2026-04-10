@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.142] - 2026-04-10
+
+> YC demo recordings now stay coherent from the dashboard to the public smart link, with real analytics data and cleaner scene transitions. Also keeps fresh worktrees bootstrappable even when local Homebrew metadata is broken.
+
+### Changed
+
+- Made the YC recorder use the canonical auth bypass flow, deterministic seeded releases, and stricter scene readiness gates so the exported demo follows one consistent release story
+- Pinned the demo recorder to `127.0.0.1` and switched contact-sheet capture to stable scene timestamps so the review artifact reflects the polished video instead of transition cuts
+- Hardened `scripts/setup.sh` so failed Homebrew or Doppler installer calls degrade into clear missing-tool reporting instead of aborting the whole bootstrap
+- Added a standalone ripgrep fallback that downloads and verifies a supported release into `$HOME/.local/bin` when package-manager installation paths fail, with guidance for keeping that path available in future shells
+
+### Fixed
+
+- Restored release sidebar analytics during demo runs by forwarding bypass-auth context through the client fetch and resolving the same demo profile in the analytics route
+- Removed captured loading shells, stale row selection drift, and clipped late-scene captions from the exported YC demo video
+- Prevented `./scripts/setup.sh` from failing on macOS worktrees when Homebrew reports `/opt/homebrew/opt/node@22 is not a valid keg` during prerequisite installs
+- [internal] Synced the canonical version file, `version.json`, and workspace package versions to `26.4.142`
+
 ## [26.4.141] - 2026-04-09
 
 > Claim-invite emails now read more like a real note from Tim, and they avoid awkward fake personalization when an artist name looks like a handle instead of a real first name.

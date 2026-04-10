@@ -61,6 +61,12 @@ function ReleaseArtwork({
   );
 }
 
+function getAspectRatio(variant: ReleaseModeMockCardProps['variant']): string {
+  if (variant === 'compact') return '9 / 16';
+  if (variant === 'comparison') return '11 / 13';
+  return '16 / 10';
+}
+
 export function ReleaseModeMockCard({
   release,
   variant,
@@ -76,15 +82,7 @@ export function ReleaseModeMockCard({
   const stateLabel = release.state === 'presave' ? 'Presave' : 'Live';
   const visibleLabels = isCompact ? release.labels.slice(0, 3) : release.labels;
   const stateMetaLabel = release.state === 'presave' ? 'Countdown' : 'Status';
-
-  let aspectRatio: string;
-  if (isCompact) {
-    aspectRatio = '9 / 16';
-  } else if (isComparison) {
-    aspectRatio = '11 / 13';
-  } else {
-    aspectRatio = '16 / 10';
-  }
+  const aspectRatio = getAspectRatio(variant);
 
   return (
     <MarketingSurfaceCard

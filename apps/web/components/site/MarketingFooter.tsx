@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { APP_ROUTES } from '@/constants/routes';
+import { PUBLIC_SHELL_FOOTER_LINKS } from './public-shell.constants';
 
 export function MarketingFooter() {
   return (
@@ -28,27 +28,16 @@ export function MarketingFooter() {
           </span>
         </Link>
         <div className='flex items-center gap-4'>
-          <Link
-            href={APP_ROUTES.LEGAL_PRIVACY}
-            className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
-            style={{ color: 'var(--linear-text-tertiary)' }}
-          >
-            Privacy
-          </Link>
-          <Link
-            href={APP_ROUTES.LEGAL_TERMS}
-            className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
-            style={{ color: 'var(--linear-text-tertiary)' }}
-          >
-            Terms
-          </Link>
-          <Link
-            href={APP_ROUTES.LEGAL_COOKIES}
-            className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
-            style={{ color: 'var(--linear-text-tertiary)' }}
-          >
-            Cookies
-          </Link>
+          {PUBLIC_SHELL_FOOTER_LINKS.map(link => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
+              style={{ color: 'var(--linear-text-tertiary)' }}
+            >
+              {link.label}
+            </Link>
+          ))}
         </div>
       </div>
     </footer>

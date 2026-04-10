@@ -103,17 +103,13 @@ export function MetadataAgentPanel({
 
       try {
         const [providersResponse, statusResponse] = await Promise.all([
-          fetch('/api/metadata-submissions/providers', {
-            method: 'GET',
-            cache: 'no-store',
-          }),
+          fetch('/api/metadata-submissions/providers', { method: 'GET' }),
           fetch(
             `/api/metadata-submissions/status?profileId=${encodeURIComponent(
               profileId
             )}&releaseId=${encodeURIComponent(releaseId)}`,
             {
               method: 'GET',
-              cache: 'no-store',
             }
           ),
         ]);
@@ -200,7 +196,6 @@ export function MetadataAgentPanel({
       )}&releaseId=${encodeURIComponent(releaseId)}`,
       {
         method: 'GET',
-        cache: 'no-store',
       }
     );
 

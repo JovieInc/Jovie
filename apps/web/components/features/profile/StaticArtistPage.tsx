@@ -1,6 +1,7 @@
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import type { ProfileMode } from '@/features/profile/contracts';
 import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
+import { buildProfilePublicViewModel } from '@/features/profile/view-models';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
@@ -36,6 +37,10 @@ export function StaticArtistPage({
   artist,
   socialLinks,
   contacts,
+  subtitle,
+  showBackButton,
+  showTourButton,
+  showFooter,
   latestRelease,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
@@ -46,25 +51,50 @@ export function StaticArtistPage({
   tourDates = [],
   visitTrackingToken,
   showSubscriptionConfirmedBanner = false,
+  showShopButton = false,
   viewerCountryCode,
 }: StaticArtistPageProps) {
+  const viewModel = buildProfilePublicViewModel({
+    mode,
+    artist,
+    socialLinks,
+    contacts,
+    subtitle,
+    showBackButton,
+    showTourButton,
+    showFooter,
+    latestRelease,
+    enableDynamicEngagement,
+    subscribeTwoStep,
+    genres,
+    pressPhotos,
+    allowPhotoDownloads,
+    photoDownloadSizes,
+    tourDates,
+    visitTrackingToken,
+    showSubscriptionConfirmedBanner,
+    showShopButton,
+  });
+
   return (
     <ProfileCompactTemplate
-      key={artist.id}
-      mode={mode}
-      artist={artist}
-      socialLinks={socialLinks}
-      contacts={contacts}
-      latestRelease={latestRelease}
-      enableDynamicEngagement={enableDynamicEngagement}
-      subscribeTwoStep={subscribeTwoStep}
-      genres={genres}
-      pressPhotos={pressPhotos}
-      allowPhotoDownloads={allowPhotoDownloads}
-      photoDownloadSizes={photoDownloadSizes}
-      tourDates={tourDates}
-      visitTrackingToken={visitTrackingToken}
-      showSubscriptionConfirmedBanner={showSubscriptionConfirmedBanner}
+      key={viewModel.artist.id}
+      mode={viewModel.mode}
+      artist={viewModel.artist}
+      socialLinks={viewModel.socialLinks}
+      contacts={viewModel.contacts}
+      latestRelease={viewModel.latestRelease}
+      enableDynamicEngagement={viewModel.enableDynamicEngagement}
+      subscribeTwoStep={viewModel.subscribeTwoStep}
+      genres={viewModel.genres}
+      pressPhotos={viewModel.pressPhotos}
+      allowPhotoDownloads={viewModel.allowPhotoDownloads}
+      photoDownloadSizes={viewModel.photoDownloadSizes}
+      tourDates={viewModel.tourDates}
+      visitTrackingToken={viewModel.visitTrackingToken}
+      showSubscriptionConfirmedBanner={
+        viewModel.showSubscriptionConfirmedBanner
+      }
       viewerCountryCode={viewerCountryCode}
     />
   );

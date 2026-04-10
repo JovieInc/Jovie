@@ -18,7 +18,6 @@ async function fetchEnvHealth({
 }): Promise<EnvHealthResponse> {
   try {
     return await fetchWithTimeout<EnvHealthResponse>('/api/health/env', {
-      cache: 'no-store',
       signal,
     });
   } catch (error) {
@@ -62,6 +61,7 @@ export function useEnvHealthQuery({
       enabled,
       staleTime: 5 * 60 * 1000,
       gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
       retry: false, // Don't retry health checks - they may fail intentionally
     },
     queryClient

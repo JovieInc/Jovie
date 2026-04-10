@@ -271,6 +271,28 @@ function getFitScoreTotal(breakdown: FitScoreBreakdown) {
   );
 }
 
+function applyPaidSignalScores(
+  input: FitScoreInput,
+  breakdown: FitScoreBreakdown
+) {
+  if (
+    input.paidVerificationPlatforms &&
+    input.paidVerificationPlatforms.length > 0
+  ) {
+    breakdown.paidVerification = SCORE_WEIGHTS.PAID_VERIFICATION;
+    breakdown.meta!.paidVerificationPlatforms = input.paidVerificationPlatforms;
+  }
+  if (input.hasSoundCloudPro) {
+    breakdown.soundcloudPro = SCORE_WEIGHTS.SOUNDCLOUD_PRO;
+  }
+  if (input.hasSoundCloudPro && input.soundCloudProTier) {
+    breakdown.meta!.soundcloudProTier = input.soundCloudProTier;
+  }
+  if (input.hasTrackingPixels) {
+    breakdown.hasTrackingPixels = SCORE_WEIGHTS.HAS_TRACKING_PIXELS;
+  }
+}
+
 /**
  * Calculate the fit score for a creator profile.
  *
@@ -351,28 +373,8 @@ export function calculateFitScore(input: FitScoreInput): FitScoreResult {
     breakdown.hasContactEmail = SCORE_WEIGHTS.HAS_CONTACT_EMAIL;
   }
 
-  // 11. Paid verification on social platforms (+10) - signals willingness/ability to pay
-  // Platforms like Twitter/X, Instagram, Facebook, Threads require paid subscriptions for verification
-  if (
-    input.paidVerificationPlatforms &&
-    input.paidVerificationPlatforms.length > 0
-  ) {
-    breakdown.paidVerification = SCORE_WEIGHTS.PAID_VERIFICATION;
-    breakdown.meta!.paidVerificationPlatforms = input.paidVerificationPlatforms;
-  }
-
-  // 12. SoundCloud Pro subscription (+10) - music-specific paid signal, stronger than social verification
-  if (input.hasSoundCloudPro) {
-    breakdown.soundcloudPro = SCORE_WEIGHTS.SOUNDCLOUD_PRO;
-  }
-  if (input.hasSoundCloudPro && input.soundCloudProTier) {
-    breakdown.meta!.soundcloudProTier = input.soundCloudProTier;
-  }
-
-  // 13. Has tracking pixels on link-in-bio (+5) - signals active ad spend
-  if (input.hasTrackingPixels) {
-    breakdown.hasTrackingPixels = SCORE_WEIGHTS.HAS_TRACKING_PIXELS;
-  }
+  // 11-13. Paid verification, SoundCloud Pro, and tracking pixels
+  applyPaidSignalScores(input, breakdown);
 
   // Calculate total score (capped at 100)
   const score = Math.min(100, getFitScoreTotal(breakdown));

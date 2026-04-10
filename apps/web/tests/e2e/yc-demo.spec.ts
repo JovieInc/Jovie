@@ -8,10 +8,16 @@ import {
 import {
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_COOKIE,
-  TEST_PERSONA_COOKIE,
+  TEST_MODE_HEADER,
   TEST_USER_ID_COOKIE,
-} from '@/lib/auth/test-mode';
+  TEST_USER_ID_HEADER,
+} from '@/lib/auth/test-mode-constants';
 import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
+import {
+  setTestAuthBypassSession,
+  waitForAuthenticatedHealth,
+} from '@/tests/helpers/clerk-auth';
 import {
   getDemoUserHandle,
   getTopDemoReleasesForUser,
@@ -24,8 +30,12 @@ const AUTO_TASK_COUNT = DEFAULT_RELEASE_TASK_TEMPLATE.filter(
 ).length;
 const FIRST_TASK_TITLE =
   DEFAULT_RELEASE_TASK_TEMPLATE[0]?.title ?? 'Release tasks';
-const PUBLIC_DEMO_HANDLE = 'tim';
 const FRAME_SETTLE_MS = 1_250;
+const HOME_FRAME_SETTLE_MS = 2_100;
+const FOUNDER_DISPLAY_NAME = TIM_WHITE_PROFILE.name;
+const HOME_READY_TEXT =
+  /Drop more music\. Crush every release\.|The link your music deserves\./;
+const PUBLIC_PROFILE_READY_TEXT = new RegExp(TIM_WHITE_PROFILE.name);
 const CLEANUP_SELECTORS = [
   '[data-testid="dev-toolbar"]',
   '[data-testid="cookie-banner"]',
@@ -39,8 +49,18 @@ const LOADING_SELECTORS = [
   '[data-testid*="loading"]',
   '[data-testid*="skeleton"]',
   '[aria-label^="Loading"]',
+  '[class*="animate-spin"]',
   '[class*="animate-pulse"]',
 ];
+const TRANSITION_VEIL_ID = 'demo-transition-veil';
+const TRANSITION_STORAGE_KEY = 'demo-transition-visible';
+const TRANSITION_FADE_MS = 140;
+const TOTAL_CLICKS_METRIC_TEST_ID = 'drawer-analytics-metric-total-clicks';
+const TOTAL_CLICKS_METRIC_VALUE_TEST_ID =
+  'drawer-analytics-metric-value-total-clicks';
+const LAST_7_DAYS_METRIC_TEST_ID = 'drawer-analytics-metric-last-7-days-clicks';
+const LAST_7_DAYS_METRIC_VALUE_TEST_ID =
+  'drawer-analytics-metric-value-last-7-days-clicks';
 
 interface DemoSceneReadyOptions {
   readonly readyLocator: Locator;
@@ -64,6 +84,85 @@ async function configureRecordingContext(
     localStorage.setItem('jv_cc', '1');
     localStorage.removeItem('__dev_toolbar_open');
     localStorage.removeItem('__dev_toolbar_hidden');
+
+    const isTransitionVisible = () => {
+      try {
+        return sessionStorage.getItem('demo-transition-visible') === '1';
+      } catch {
+        return false;
+      }
+    };
+
+    const syncTransitionRoot = () => {
+      document.documentElement.setAttribute(
+        'data-demo-transition',
+        isTransitionVisible() ? '1' : '0'
+      );
+    };
+
+    const ensureTransitionStyle = () => {
+      const styleId = 'demo-transition-style';
+      const existing = document.getElementById(
+        styleId
+      ) as HTMLStyleElement | null;
+
+      if (existing) {
+        return;
+      }
+
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        html {
+          background: #080a10;
+        }
+
+        body {
+          transition: opacity 140ms ease;
+        }
+
+        html[data-demo-transition="1"] body {
+          opacity: 0 !important;
+        }
+      `;
+      (document.head ?? document.documentElement).appendChild(style);
+    };
+
+    const ensureTransitionVeil = () => {
+      const existing = document.getElementById(
+        'demo-transition-veil'
+      ) as HTMLDivElement | null;
+      if (existing) {
+        syncTransitionRoot();
+        existing.style.opacity = isTransitionVisible() ? '1' : '0';
+        existing.style.pointerEvents = isTransitionVisible() ? 'auto' : 'none';
+        return;
+      }
+
+      const veil = document.createElement('div');
+      veil.id = 'demo-transition-veil';
+      Object.assign(veil.style, {
+        position: 'fixed',
+        inset: '0',
+        background: 'rgba(8, 10, 16, 0.72)',
+        opacity: isTransitionVisible() ? '1' : '0',
+        pointerEvents: isTransitionVisible() ? 'auto' : 'none',
+        transition: 'opacity 140ms ease',
+        zIndex: '100000',
+      });
+      document.body.appendChild(veil);
+    };
+
+    ensureTransitionStyle();
+    syncTransitionRoot();
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', ensureTransitionVeil, {
+        once: true,
+      });
+    } else {
+      ensureTransitionVeil();
+    }
   });
 
   await context.addCookies([
@@ -82,31 +181,13 @@ async function configureRecordingContext(
   ]);
 }
 
-async function addDemoAuthCookies(
-  context: BrowserContext,
-  cookieBaseUrl: string,
-  clerkUserId: string
-) {
-  await context.addCookies([
-    {
-      name: TEST_MODE_COOKIE,
-      value: TEST_AUTH_BYPASS_MODE,
-      url: cookieBaseUrl,
-      sameSite: 'Lax',
-    },
-    {
-      name: TEST_USER_ID_COOKIE,
-      value: clerkUserId,
-      url: cookieBaseUrl,
-      sameSite: 'Lax',
-    },
-    {
-      name: TEST_PERSONA_COOKIE,
-      value: 'creator',
-      url: cookieBaseUrl,
-      sameSite: 'Lax',
-    },
-  ]);
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function authenticateDemoPage(page: Page, clerkUserId: string) {
+  await setTestAuthBypassSession(page, null, clerkUserId);
+  await waitForAuthenticatedHealth(page, clerkUserId);
 }
 
 async function clearDemoAuthCookies(
@@ -143,6 +224,33 @@ async function installCleanupStyle(page: Page) {
   }, CLEANUP_SELECTORS);
 }
 
+async function setTransitionVeilVisible(page: Page, visible: boolean) {
+  await page.evaluate(
+    ({ storageKey, veilId, nextVisible }) => {
+      try {
+        sessionStorage.setItem(storageKey, nextVisible ? '1' : '0');
+      } catch {}
+
+      document.documentElement.setAttribute(
+        'data-demo-transition',
+        nextVisible ? '1' : '0'
+      );
+
+      const veil = document.getElementById(veilId) as HTMLDivElement | null;
+      if (!veil) {
+        return;
+      }
+      veil.style.opacity = nextVisible ? '1' : '0';
+      veil.style.pointerEvents = nextVisible ? 'auto' : 'none';
+    },
+    {
+      nextVisible: visible,
+      storageKey: TRANSITION_STORAGE_KEY,
+      veilId: TRANSITION_VEIL_ID,
+    }
+  );
+}
+
 async function injectCaptionOverlay(page: Page) {
   await installCleanupStyle(page);
   await page.evaluate(() => {
@@ -152,7 +260,7 @@ async function injectCaptionOverlay(page: Page) {
     el.id = 'demo-caption';
     Object.assign(el.style, {
       position: 'fixed',
-      bottom: '32px',
+      bottom: '56px',
       left: '50%',
       transform: 'translateX(-50%)',
       maxWidth: 'min(82vw, 760px)',
@@ -216,6 +324,127 @@ async function waitForSceneCleanup(
   }
 }
 
+async function waitForReleaseAnalyticsRoute(page: Page, releaseId: string) {
+  await expect
+    .poll(
+      async () => {
+        return page.evaluate(
+          async ({
+            id,
+            testAuthBypassMode,
+            testModeCookie,
+            testModeHeader,
+            testUserIdCookie,
+            testUserIdHeader,
+          }) => {
+            const readCookieValue = (cookieName: string) => {
+              const cookie = document.cookie
+                .split(';')
+                .map(entry => entry.trim())
+                .find(entry => entry.startsWith(`${cookieName}=`));
+              if (!cookie) {
+                return null;
+              }
+
+              return decodeURIComponent(cookie.slice(cookieName.length + 1));
+            };
+
+            const mode = readCookieValue(testModeCookie);
+            const userId = readCookieValue(testUserIdCookie);
+
+            try {
+              const response = await fetch(
+                `/api/dashboard/releases/${encodeURIComponent(id)}/analytics`,
+                {
+                  cache: 'no-store',
+                  credentials: 'include',
+                  headers:
+                    mode === testAuthBypassMode && userId
+                      ? {
+                          [testModeHeader]: mode,
+                          [testUserIdHeader]: userId,
+                        }
+                      : undefined,
+                }
+              );
+
+              return response.status;
+            } catch {
+              return 0;
+            }
+          },
+          {
+            id: releaseId,
+            testAuthBypassMode: TEST_AUTH_BYPASS_MODE,
+            testModeCookie: TEST_MODE_COOKIE,
+            testModeHeader: TEST_MODE_HEADER,
+            testUserIdCookie: TEST_USER_ID_COOKIE,
+            testUserIdHeader: TEST_USER_ID_HEADER,
+          }
+        );
+      },
+      { timeout: 30_000 }
+    )
+    .toBe(200);
+}
+
+async function waitForReleaseAnalyticsReady(page: Page, releaseId: string) {
+  await waitForReleaseAnalyticsRoute(page, releaseId);
+
+  const analyticsCard = page.getByTestId('release-smart-link-analytics');
+  await expect(analyticsCard).toBeVisible({ timeout: 30_000 });
+
+  await expect
+    .poll(
+      async () => {
+        return analyticsCard.evaluate(node => {
+          if (!(node instanceof HTMLElement)) {
+            return 'missing';
+          }
+
+          if (node.getAttribute('aria-busy') === 'true') {
+            return 'loading';
+          }
+
+          const text = node.innerText.replace(/\s+/g, ' ').trim();
+          if (text.includes('Analytics unavailable')) {
+            return 'error';
+          }
+
+          const totalClicksMetric = node.querySelector<HTMLElement>(
+            `[data-testid="${TOTAL_CLICKS_METRIC_TEST_ID}"]`
+          );
+          const totalClicksValue = node.querySelector<HTMLElement>(
+            `[data-testid="${TOTAL_CLICKS_METRIC_VALUE_TEST_ID}"]`
+          );
+          const last7DaysMetric = node.querySelector<HTMLElement>(
+            `[data-testid="${LAST_7_DAYS_METRIC_TEST_ID}"]`
+          );
+          const last7DaysValue = node.querySelector<HTMLElement>(
+            `[data-testid="${LAST_7_DAYS_METRIC_VALUE_TEST_ID}"]`
+          );
+
+          if (
+            !totalClicksMetric ||
+            !totalClicksValue ||
+            !last7DaysMetric ||
+            !last7DaysValue
+          ) {
+            return 'missing-metrics';
+          }
+
+          const numericMetricPattern = /^[\d,]+$/u;
+          return numericMetricPattern.test(totalClicksValue.innerText.trim()) &&
+            numericMetricPattern.test(last7DaysValue.innerText.trim())
+            ? 'ready'
+            : 'invalid-metric-values';
+        });
+      },
+      { timeout: 30_000 }
+    )
+    .toBe('ready');
+}
+
 async function waitForDemoSceneReady(
   page: Page,
   {
@@ -235,92 +464,109 @@ async function waitForDemoSceneReady(
   await waitForAnimationFrames(page);
 }
 
+async function waitForReleaseSidebar(
+  page: Page,
+  release: { id: string; title: string }
+) {
+  await expect(
+    page
+      .locator(
+        '[data-testid="drawer-loading-skeleton"], [data-testid="release-sidebar"]'
+      )
+      .first()
+  ).toBeVisible({ timeout: 30_000 });
+
+  const sidebar = page.getByTestId('release-sidebar');
+  await expect(sidebar).toBeVisible({ timeout: 30_000 });
+  await expect(sidebar).toContainText(release.title, { timeout: 30_000 });
+  await waitForReleaseAnalyticsReady(page, release.id);
+  await waitForSceneCleanup(page);
+  await waitForAnimationFrames(page);
+  return sidebar;
+}
+
+async function getReleaseRowTitle(row: Locator) {
+  const openButton = row.locator('button[aria-label^="Open "]').first();
+  if ((await openButton.count()) > 0) {
+    const label = await openButton.getAttribute('aria-label');
+    const buttonTitle = label?.replace(/^Open\s+/, '').trim();
+    if (buttonTitle) {
+      return buttonTitle;
+    }
+  }
+
+  const firstCell = row.locator('td').first();
+  const cellText = (await firstCell.innerText()).trim();
+  const [firstLine] = cellText
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  if (!firstLine) {
+    throw new Error('Could not resolve a release title from the visible row');
+  }
+
+  return firstLine;
+}
+
+async function getReleaseRowTrigger(row: Locator) {
+  const openButton = row.locator('button[aria-label^="Open "]').first();
+  if ((await openButton.count()) > 0) {
+    return openButton;
+  }
+
+  const firstCell = row.locator('td').first();
+  if ((await firstCell.count()) > 0) {
+    return firstCell;
+  }
+
+  return row;
+}
+
+async function getSeededReleaseRow(page: Page, releaseTitle: string) {
+  const escapedTitle = escapeRegExp(releaseTitle);
+  const row = page
+    .locator('tbody tr')
+    .filter({
+      has: page.getByRole('button', {
+        name: new RegExp(`^Open\\s+${escapedTitle}$`),
+      }),
+    })
+    .first();
+
+  if ((await row.count()) > 0) {
+    return row;
+  }
+
+  return page.locator('tbody tr', { hasText: releaseTitle }).first();
+}
+
 async function gotoDemoScene(
   page: Page,
   url: string,
   options: DemoSceneReadyOptions
 ) {
   await page.goto(url, {
-    waitUntil: 'domcontentloaded',
-    timeout: 60_000,
+    waitUntil: 'commit',
+    timeout: 120_000,
   });
+  await page
+    .waitForLoadState('domcontentloaded', { timeout: 10_000 })
+    .catch(() => {});
   await waitForDemoSceneReady(page, options);
 }
 
-async function warmupRoute(
+async function gotoDemoSceneWithTransition(
   page: Page,
   url: string,
   options: DemoSceneReadyOptions
 ) {
+  if (page.url() !== 'about:blank') {
+    await setTransitionVeilVisible(page, true);
+  }
   await gotoDemoScene(page, url, options);
-}
-
-async function warmupDemoRoutes(
-  page: Page,
-  cookieBaseUrl: string,
-  clerkUserId: string,
-  publicHandle: string,
-  releaseId: string,
-  releaseSlug: string,
-  releaseTitle: string
-) {
-  const browser = page.context().browser();
-  if (!browser) {
-    throw new Error('Browser instance required for YC demo warmup');
-  }
-
-  const warmupContext = await browser.newContext({
-    baseURL: cookieBaseUrl,
-    viewport: { width: 1280, height: 720 },
-  });
-
-  try {
-    await configureRecordingContext(warmupContext, cookieBaseUrl);
-
-    const warmupPage = await warmupContext.newPage();
-    await interceptTrackingCalls(warmupPage);
-
-    await warmupRoute(warmupPage, '/', {
-      readyLocator: warmupPage.getByTestId('hero-heading'),
-      readyText: 'The link your music deserves.',
-    });
-
-    await addDemoAuthCookies(warmupContext, cookieBaseUrl, clerkUserId);
-
-    await warmupRoute(warmupPage, '/app/dashboard/releases', {
-      readyLocator: warmupPage.getByTestId('releases-matrix'),
-      readyText: releaseTitle,
-    });
-    await warmupRoute(
-      warmupPage,
-      `/app/dashboard/releases/${releaseId}/tasks`,
-      {
-        readyLocator: warmupPage.getByText(FIRST_TASK_TITLE).first(),
-        readyText: FIRST_TASK_TITLE,
-      }
-    );
-
-    await clearDemoAuthCookies(warmupContext, cookieBaseUrl);
-
-    await warmupRoute(
-      warmupPage,
-      `/${publicHandle}/${releaseSlug}?noredirect=1`,
-      {
-        readyLocator: warmupPage.locator('body'),
-        readyText: releaseTitle,
-      }
-    );
-    await warmupRoute(warmupPage, `/${publicHandle}`, {
-      readyLocator: warmupPage.locator('body'),
-      readyText: 'Calvin Harris',
-    });
-    await warmupRoute(warmupPage, `/${publicHandle}?mode=subscribe`, {
-      readyLocator: warmupPage.locator('body'),
-      readyText: /turn on notifications|never miss a release/i,
-    });
-  } finally {
-    await warmupContext.close();
-  }
+  await setTransitionVeilVisible(page, false);
+  await page.waitForTimeout(TRANSITION_FADE_MS);
 }
 
 async function smoothScrollPage(
@@ -395,26 +641,13 @@ test.describe('YC Demo Recording', () => {
       title: assertReleaseTitle(release.title),
     }));
     const featuredRelease = selectedReleases[2];
-    const publicHandle =
-      seededHandle === 'timwhite' ? PUBLIC_DEMO_HANDLE : seededHandle;
+    const publicHandle = seededHandle;
 
-    await warmupDemoRoutes(
-      page,
-      cookieBaseUrl,
-      demoClerkUserId,
-      publicHandle,
-      featuredRelease.id,
-      featuredRelease.slug,
-      featuredRelease.title
-    );
+    const demoPage = page;
 
-    const demoPage = await page.context().newPage();
-    await interceptTrackingCalls(demoPage);
-    await page.close();
-
-    await gotoDemoScene(demoPage, '/', {
+    await gotoDemoSceneWithTransition(demoPage, '/', {
       readyLocator: demoPage.getByTestId('hero-heading'),
-      readyText: 'The link your music deserves.',
+      readyText: HOME_READY_TEXT,
     });
     await injectCaptionOverlay(demoPage);
     await setCaption(
@@ -423,17 +656,13 @@ test.describe('YC Demo Recording', () => {
     );
     await expect(demoPage.getByTestId('cookie-banner')).toHaveCount(0);
     await expect(demoPage.getByTestId('dev-toolbar')).toHaveCount(0);
-    await demoPage.waitForTimeout(FRAME_SETTLE_MS);
+    await demoPage.waitForTimeout(HOME_FRAME_SETTLE_MS);
 
-    await addDemoAuthCookies(
-      demoPage.context(),
-      cookieBaseUrl,
-      demoClerkUserId
-    );
+    await authenticateDemoPage(demoPage, demoClerkUserId);
 
-    await gotoDemoScene(demoPage, '/app/dashboard/releases', {
+    await gotoDemoSceneWithTransition(demoPage, '/app/dashboard/releases', {
       readyLocator: demoPage.getByTestId('releases-matrix'),
-      readyText: selectedReleases[0].title,
+      readyText: 'Releases',
     });
     await injectCaptionOverlay(demoPage);
     await setCaption(
@@ -442,29 +671,27 @@ test.describe('YC Demo Recording', () => {
     );
     await demoPage.waitForTimeout(FRAME_SETTLE_MS);
 
-    const releasesMatrix = demoPage.getByTestId('releases-matrix');
-    const releaseSidebar = demoPage.getByTestId('release-sidebar');
     await setCaption(
       demoPage,
       'Click any release. Jovie opens the full release workspace instantly.'
     );
 
-    for (const release of selectedReleases) {
-      const releaseRow = releasesMatrix.getByText(release.title, {
-        exact: true,
-      });
-      await expect(releaseRow.first()).toBeVisible({ timeout: 30_000 });
-      await releaseRow.first().click();
-      await waitForDemoSceneReady(demoPage, {
-        readyLocator: releaseSidebar,
-        readyText: release.title,
-      });
+    for (const release of selectedReleases.slice(0, 3)) {
+      const releaseRow = await getSeededReleaseRow(demoPage, release.title);
+      await expect(releaseRow).toBeVisible({ timeout: 30_000 });
+      await releaseRow.scrollIntoViewIfNeeded();
+      const releaseTitle = await getReleaseRowTitle(releaseRow);
+      expect(releaseTitle).toBe(release.title);
+      const releaseTrigger = await getReleaseRowTrigger(releaseRow);
+      await expect(releaseTrigger).toBeVisible({ timeout: 30_000 });
+      await releaseTrigger.click();
+      await waitForReleaseSidebar(demoPage, release);
       await demoPage.waitForTimeout(1_150);
     }
 
     await clearCaption(demoPage);
 
-    await gotoDemoScene(
+    await gotoDemoSceneWithTransition(
       demoPage,
       `/app/dashboard/releases/${featuredRelease.id}/tasks`,
       {
@@ -483,7 +710,7 @@ test.describe('YC Demo Recording', () => {
 
     await clearDemoAuthCookies(demoPage.context(), cookieBaseUrl);
 
-    await gotoDemoScene(
+    await gotoDemoSceneWithTransition(
       demoPage,
       `/${publicHandle}/${featuredRelease.slug}?noredirect=1`,
       {
@@ -499,11 +726,14 @@ test.describe('YC Demo Recording', () => {
     await demoPage.waitForTimeout(2_200);
     await clearCaption(demoPage);
 
-    await gotoDemoScene(demoPage, `/${publicHandle}`, {
+    await gotoDemoSceneWithTransition(demoPage, `/${publicHandle}`, {
       readyLocator: demoPage.locator('body'),
-      readyText: 'Calvin Harris',
+      readyText: PUBLIC_PROFILE_READY_TEXT,
     });
     await injectCaptionOverlay(demoPage);
+    await expect(demoPage.locator('body')).toContainText(FOUNDER_DISPLAY_NAME, {
+      timeout: 30_000,
+    });
     await setCaption(
       demoPage,
       'Artist page already live. Latest release featured automatically.'
@@ -512,10 +742,14 @@ test.describe('YC Demo Recording', () => {
     await demoPage.waitForTimeout(900);
     await clearCaption(demoPage);
 
-    await gotoDemoScene(demoPage, `/${publicHandle}?mode=subscribe`, {
-      readyLocator: demoPage.locator('body'),
-      readyText: /turn on notifications|never miss a release/i,
-    });
+    await gotoDemoSceneWithTransition(
+      demoPage,
+      `/${publicHandle}?mode=subscribe`,
+      {
+        readyLocator: demoPage.locator('body'),
+        readyText: /turn on notifications|never miss a release/i,
+      }
+    );
     await injectCaptionOverlay(demoPage);
     await setCaption(
       demoPage,
