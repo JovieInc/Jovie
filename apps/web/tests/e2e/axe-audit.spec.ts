@@ -105,15 +105,43 @@ async function assertInteractiveLabels(
 }
 
 const surfaceFilter = getSurfaceFilter();
-const publicSurfaces = resolvePublicSurfaceManifestSync().filter(surface =>
-  surfaceFilter ? surfaceFilter.has(surface.id) : true
-);
-const lighthouseSurfaces = getLighthousePublicSurfaceManifestSync().filter(
-  surface => (surfaceFilter ? surfaceFilter.has(surface.id) : true)
-);
+function loadSurfaceManifests() {
+  try {
+    return {
+      lighthouseSurfaces: getLighthousePublicSurfaceManifestSync().filter(
+        surface => (surfaceFilter ? surfaceFilter.has(surface.id) : true)
+      ),
+      publicSurfaces: resolvePublicSurfaceManifestSync().filter(surface =>
+        surfaceFilter ? surfaceFilter.has(surface.id) : true
+      ),
+      error: null,
+    } as const;
+  } catch (error) {
+    return {
+      lighthouseSurfaces: [],
+      publicSurfaces: [],
+      error: new Error(
+        `Failed to resolve public surface manifests for axe audit: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      ),
+    } as const;
+  }
+}
+
+const {
+  publicSurfaces,
+  lighthouseSurfaces,
+  error: surfaceManifestLoadError,
+} = loadSurfaceManifests();
 
 test.describe('Axe WCAG 2.1 Compliance', () => {
   test.setTimeout(120_000);
+  test.beforeAll(() => {
+    if (surfaceManifestLoadError) {
+      throw surfaceManifestLoadError;
+    }
+  });
 
   for (const surface of publicSurfaces) {
     test(`${surface.id} passes WCAG AA`, async ({ browser }, testInfo) => {

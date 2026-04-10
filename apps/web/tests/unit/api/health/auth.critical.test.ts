@@ -38,13 +38,15 @@ describe('@critical GET /api/health/auth', () => {
 
   it('returns 403 in production', async () => {
     vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'production');
     const { GET } = await import('@/app/api/health/auth/route');
     const response = await GET();
     expect(response.status).toBe(403);
   });
 
-  it('allows trusted test-bypass probes in production previews', async () => {
+  it('allows trusted test-bypass probes in preview deployments', async () => {
     vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'preview');
     mockResolveTestBypassUserId.mockReturnValue('user_bypass');
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_bypass' });
     mockGetDbUser.mockResolvedValue(null);
@@ -61,6 +63,17 @@ describe('@critical GET /api/health/auth', () => {
         hasProfile: false,
       })
     );
+  });
+
+  it('blocks trusted test-bypass probes on production deploys', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    mockResolveTestBypassUserId.mockReturnValue('user_bypass');
+
+    const { GET } = await import('@/app/api/health/auth/route');
+    const response = await GET();
+
+    expect(response.status).toBe(403);
   });
 
   it('captures warning when auth check throws', async () => {

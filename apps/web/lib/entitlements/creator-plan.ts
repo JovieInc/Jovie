@@ -77,11 +77,37 @@ export async function getBatchCreatorEntitlements(
       userProfileClaims,
       eq(userProfileClaims.creatorProfileId, creatorProfiles.id)
     )
+    .orderBy(creatorProfiles.id, userProfileClaims.userId)
     .where(inArray(creatorProfiles.id, creatorProfileIds));
+
+  const ownerByCreatorProfileId = new Map<
+    string,
+    { claimedUserId: string | null; legacyUserId: string | null }
+  >();
+  for (const row of ownershipRows) {
+    const existing = ownerByCreatorProfileId.get(row.creatorProfileId);
+    if (!existing) {
+      ownerByCreatorProfileId.set(row.creatorProfileId, {
+        claimedUserId: row.claimedUserId,
+        legacyUserId: row.legacyUserId,
+      });
+      continue;
+    }
+
+    // Duplicate claim rows are invalid, but can appear transiently during
+    // backfills. Keep the first deterministically ordered claimed owner so
+    // public entitlement checks do not flap between plans.
+    if (!existing.claimedUserId && row.claimedUserId) {
+      ownerByCreatorProfileId.set(row.creatorProfileId, {
+        claimedUserId: row.claimedUserId,
+        legacyUserId: row.legacyUserId,
+      });
+    }
+  }
 
   const ownerIds = Array.from(
     new Set(
-      ownershipRows
+      Array.from(ownerByCreatorProfileId.values())
         .map(row => row.claimedUserId ?? row.legacyUserId)
         .filter((userId): userId is string => Boolean(userId))
     )
@@ -103,12 +129,12 @@ export async function getBatchCreatorEntitlements(
     string,
     { plan: PlanId; entitlements: PlanEntitlements }
   >();
-  for (const row of ownershipRows) {
+  for (const [creatorProfileId, row] of ownerByCreatorProfileId) {
     const ownerUserId = row.claimedUserId ?? row.legacyUserId;
     const plan = ownerUserId
       ? (planByUserId.get(ownerUserId) ?? 'free')
       : 'free';
-    map.set(row.creatorProfileId, {
+    map.set(creatorProfileId, {
       plan,
       entitlements: getEntitlements(plan),
     });

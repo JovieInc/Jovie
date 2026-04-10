@@ -18,6 +18,13 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 // preview auth during CI.
 export async function GET() {
   try {
+    if (process.env.VERCEL_ENV === 'production') {
+      return NextResponse.json(
+        { ok: false, error: 'Only available in development' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const headerStore = await headers();
     const cookieStore = await cookies();
     const allowTestBypassProbe = Boolean(
