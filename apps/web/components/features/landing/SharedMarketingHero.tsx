@@ -15,6 +15,7 @@ interface SharedMarketingHeroProps {
   readonly sectionTestId?: string;
   readonly primaryCtaLabel?: string;
   readonly primaryCtaHref?: string;
+  readonly ctaEventName?: string;
   readonly primaryCtaTestId?: string;
   readonly secondaryCtaLabel?: string;
   readonly secondaryCtaHref?: string;
@@ -32,9 +33,10 @@ export function SharedMarketingHero({
   media,
   headingId,
   titleTestId = 'hero-heading',
-  sectionTestId = 'homepage-shell',
+  sectionTestId = 'marketing-hero-section',
   primaryCtaLabel = 'Get started',
   primaryCtaHref = APP_ROUTES.SIGNUP,
+  ctaEventName = 'landing_cta_get_started',
   primaryCtaTestId,
   secondaryCtaLabel,
   secondaryCtaHref,
@@ -82,7 +84,7 @@ export function SharedMarketingHero({
                 <LandingCTAButton
                   href={primaryCtaHref}
                   label={primaryCtaLabel}
-                  eventName='landing_cta_get_started'
+                  eventName={ctaEventName}
                   section='hero'
                   testId={primaryCtaTestId}
                 />
