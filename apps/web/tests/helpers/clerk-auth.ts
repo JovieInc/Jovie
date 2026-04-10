@@ -5,8 +5,10 @@ import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
 import {
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_COOKIE,
+  TEST_MODE_HEADER,
   TEST_PERSONA_COOKIE,
   TEST_USER_ID_COOKIE,
+  TEST_USER_ID_HEADER,
 } from '@/lib/auth/test-mode';
 import { smokeNavigateWithRetry } from '../e2e/utils/smoke-test-utils';
 import { primeVercelBypassCookie } from './vercel-preview';
@@ -203,81 +205,78 @@ export async function waitForAuthenticatedHealth(
   page: Page,
   expectedUserId?: string | null
 ): Promise<void> {
+  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  const authHealthUrl = new URL('/api/health/auth', baseUrl).toString();
+  const bypassSessionUrl = new URL(
+    '/api/dev/test-auth/session',
+    baseUrl
+  ).toString();
+
   await expect
     .poll(
       async () => {
         try {
-          const fetchJson = async (path: string) =>
-            page.evaluate(async requestPath => {
-              try {
-                const response = await fetch(requestPath, {
-                  cache: 'no-store',
-                  credentials: 'include',
-                });
+          const contextCookies = await page.context().cookies(baseUrl);
+          const bypassCookieHeader = contextCookies
+            .map(cookie => `${cookie.name}=${cookie.value}`)
+            .join('; ');
+          const bypassHeaders = {
+            ...(bypassCookieHeader ? { cookie: bypassCookieHeader } : {}),
+            [TEST_MODE_HEADER]: TEST_AUTH_BYPASS_MODE,
+            ...(expectedUserId
+              ? { [TEST_USER_ID_HEADER]: expectedUserId }
+              : {}),
+          };
 
-                const payload = (await response
-                  .json()
-                  .catch(() => null)) as Record<string, unknown> | null;
+          let response = await page.request.get(authHealthUrl, {
+            failOnStatusCode: false,
+            headers: bypassHeaders,
+          });
 
-                return {
-                  ok: response.ok,
-                  status: response.status,
-                  payload,
-                };
-              } catch (error) {
-                return {
-                  ok: false,
-                  status: 0,
-                  payload: null,
-                  error: error instanceof Error ? error.message : String(error),
-                };
-              }
-            }, path);
+          if (response.status() === 403) {
+            response = await page.request.get(bypassSessionUrl, {
+              failOnStatusCode: false,
+              headers: bypassHeaders,
+            });
 
-          const getBypassSessionState = async () => {
-            const bypassResponse = await fetchJson(
-              '/api/dev/test-auth/session'
-            );
-
-            if (!bypassResponse.ok) {
-              return `http-${bypassResponse.status}`;
+            if (!response.ok()) {
+              return `http-${response.status()}`;
             }
 
-            const bypassPayload = bypassResponse.payload as {
+            const payload = (await response.json()) as {
               active?: boolean;
               userId?: string | null;
-            } | null;
+            };
 
-            if (!bypassPayload?.active) {
+            if (!payload.active) {
               return 'anonymous';
             }
 
-            if (expectedUserId && bypassPayload.userId !== expectedUserId) {
-              return `user-mismatch:${bypassPayload.userId ?? 'unknown'}`;
+            if (expectedUserId && payload.userId !== expectedUserId) {
+              return `user-mismatch:${payload.userId ?? 'unknown'}`;
             }
 
             return 'authenticated';
-          };
-
-          const response = await fetchJson('/api/health/auth');
-
-          if (response.ok) {
-            const payload = response.payload as {
-              authenticated?: boolean;
-              active?: boolean;
-              userId?: string | null;
-            } | null;
-
-            if (payload?.authenticated) {
-              if (expectedUserId && payload.userId !== expectedUserId) {
-                return `user-mismatch:${payload.userId ?? 'unknown'}`;
-              }
-
-              return 'authenticated';
-            }
           }
 
-          return getBypassSessionState();
+          if (!response.ok()) {
+            return `http-${response.status()}`;
+          }
+
+          const payload = (await response.json()) as {
+            authenticated?: boolean;
+            userId?: string | null;
+          };
+
+          if (!payload.authenticated) {
+            return 'anonymous';
+          }
+
+          if (expectedUserId && payload.userId !== expectedUserId) {
+            return `user-mismatch:${payload.userId ?? 'unknown'}`;
+          }
+
+          return 'authenticated';
         } catch (error) {
           if (error instanceof Error) {
             if (

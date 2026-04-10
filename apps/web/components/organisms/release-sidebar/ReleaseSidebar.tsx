@@ -73,7 +73,7 @@ type SidebarTab =
 
 /** Options for sidebar tab segment control */
 const SIDEBAR_TAB_OPTIONS = [
-  { value: 'playback' as const, label: 'Playback' },
+  { value: 'playback' as const, label: 'Tracks' },
   { value: 'links' as const, label: 'DSPs' },
   { value: 'details' as const, label: 'Details' },
   { value: 'lyrics' as const, label: 'Lyrics' },

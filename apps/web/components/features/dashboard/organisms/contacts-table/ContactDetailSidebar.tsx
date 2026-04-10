@@ -240,6 +240,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       title={headerTitle}
       onClose={hasContact ? undefined : handleClose}
       headerMode='minimal'
+      hideMinimalHeaderBar={hasContact}
       contextMenuItems={contextMenuItems}
       isEmpty={!hasContact}
       emptyMessage='Select a contact to view details'

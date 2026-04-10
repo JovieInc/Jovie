@@ -55,6 +55,8 @@ export interface EntitySidebarShellProps {
 
   /** Footer slot — pinned to bottom of drawer */
   readonly footer?: ReactNode;
+  /** Controls whether the footer renders inside a card surface or stays flat. */
+  readonly footerSurface?: 'card' | 'flat';
 
   /** When true, shows empty state instead of entityHeader + tabs + children */
   readonly isEmpty?: boolean;
@@ -105,6 +107,7 @@ export function EntitySidebarShell({
   tabsContainerClassName,
   children,
   footer,
+  footerSurface = 'card',
   isEmpty = false,
   emptyMessage = 'Select an item to view details.',
 }: EntitySidebarShellProps) {
@@ -112,6 +115,11 @@ export function EntitySidebarShell({
   const showMinimalHeaderBar = !(isMinimalHeader && hideMinimalHeaderBar);
   const renderMinimalTabsInHeader =
     isMinimalHeader && minimalTabsPlacement === 'header';
+  const hasTopRailContent =
+    (showMinimalHeaderBar &&
+      Boolean(title || headerActions || entityHeader || tabs)) ||
+    (!isMinimalHeader && Boolean(entityHeader || tabs)) ||
+    (renderMinimalTabsInHeader && Boolean(tabs));
   const resolvedHeaderTitle = isMinimalHeader
     ? (title ?? <span className='sr-only'>{ariaLabel}</span>)
     : title;
@@ -135,6 +143,20 @@ export function EntitySidebarShell({
         {entityHeader}
       </DrawerSurfaceCard>
     ) : null;
+  let footerNode: ReactNode = null;
+  if (footer) {
+    footerNode =
+      footerSurface === 'card' ? (
+        <DrawerSurfaceCard
+          variant='card'
+          className='shrink-0 px-3 py-2.5 lg:mx-0'
+        >
+          {footer}
+        </DrawerSurfaceCard>
+      ) : (
+        <div className='shrink-0 px-3 py-2.5 lg:mx-0'>{footer}</div>
+      );
+  }
   return (
     <RightDrawer
       isOpen={isOpen}
@@ -145,62 +167,66 @@ export function EntitySidebarShell({
       data-testid={testId}
     >
       <div className='flex h-full min-h-0 flex-col gap-1.5 px-1.5 py-1.5 lg:px-0 lg:py-0'>
-        <div className='shrink-0 space-y-2.5'>
-          <DrawerSurfaceCard
-            variant='card'
-            className='overflow-hidden lg:rounded-[18px]'
-          >
-            <div className='border-b border-transparent bg-transparent backdrop-blur-[12px]'>
-              {showMinimalHeaderBar ? (
-                <DrawerHeader
-                  title={resolvedHeaderTitle}
-                  actions={titleBarActions}
-                  className={cn(
-                    isMinimalHeader &&
-                      'min-h-[34px] px-2.5 py-1 lg:min-h-[36px] lg:px-3'
-                  )}
-                />
-              ) : null}
+        {hasTopRailContent || minimalEntityHeaderContent ? (
+          <div className='shrink-0 space-y-2.5'>
+            {hasTopRailContent ? (
+              <DrawerSurfaceCard
+                variant='card'
+                className='overflow-hidden lg:rounded-[18px]'
+              >
+                <div className='border-b border-transparent bg-transparent backdrop-blur-[12px]'>
+                  {showMinimalHeaderBar ? (
+                    <DrawerHeader
+                      title={resolvedHeaderTitle}
+                      actions={titleBarActions}
+                      className={cn(
+                        isMinimalHeader &&
+                          'min-h-[34px] px-2.5 py-1 lg:min-h-[36px] lg:px-3'
+                      )}
+                    />
+                  ) : null}
 
-              {!isMinimalHeader && entityHeader ? (
-                <div className='overflow-visible px-3 pb-3 pt-3'>
-                  {actionsInEntityHeader && headerActions ? (
-                    <div className='mb-2 flex items-center justify-end gap-1'>
-                      {headerActions}
+                  {!isMinimalHeader && entityHeader ? (
+                    <div className='overflow-visible px-3 pb-3 pt-3'>
+                      {actionsInEntityHeader && headerActions ? (
+                        <div className='mb-2 flex items-center justify-end gap-1'>
+                          {headerActions}
+                        </div>
+                      ) : null}
+                      {entityHeader}
                     </div>
                   ) : null}
-                  {entityHeader}
-                </div>
-              ) : null}
 
-              {!isMinimalHeader && tabs ? (
-                <div
-                  className={cn(
-                    'overflow-visible border-t border-(--linear-app-frame-seam) px-3 py-2.5 [&>*]:w-full',
-                    tabsContainerClassName
-                  )}
-                >
-                  {tabs}
-                </div>
-              ) : null}
+                  {!isMinimalHeader && tabs ? (
+                    <div
+                      className={cn(
+                        'overflow-visible border-t border-(--linear-app-frame-seam) px-3 py-2.5 [&>*]:w-full',
+                        tabsContainerClassName
+                      )}
+                    >
+                      {tabs}
+                    </div>
+                  ) : null}
 
-              {renderMinimalTabsInHeader && tabs ? (
-                <div
-                  className={cn(
-                    showMinimalHeaderBar &&
-                      'border-t border-(--linear-app-frame-seam)',
-                    'overflow-visible px-3 py-2.5 [&>*]:w-full',
-                    tabsContainerClassName
-                  )}
-                >
-                  {tabs}
+                  {renderMinimalTabsInHeader && tabs ? (
+                    <div
+                      className={cn(
+                        showMinimalHeaderBar &&
+                          'border-t border-(--linear-app-frame-seam)',
+                        'overflow-visible px-3 py-2.5 [&>*]:w-full',
+                        tabsContainerClassName
+                      )}
+                    >
+                      {tabs}
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-            </div>
-          </DrawerSurfaceCard>
+              </DrawerSurfaceCard>
+            ) : null}
 
-          {minimalEntityHeaderContent}
-        </div>
+            {minimalEntityHeaderContent}
+          </div>
+        ) : null}
 
         {isEmpty ? (
           <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-0 lg:pt-0'>
@@ -214,14 +240,7 @@ export function EntitySidebarShell({
               <div className='space-y-2.5'>{children}</div>
             </div>
 
-            {footer ? (
-              <DrawerSurfaceCard
-                variant='card'
-                className='shrink-0 px-3 py-2.5 lg:mx-0'
-              >
-                {footer}
-              </DrawerSurfaceCard>
-            ) : null}
+            {footerNode}
           </>
         )}
       </div>

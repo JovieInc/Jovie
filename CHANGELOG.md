@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.140] - 2026-04-09
+
+> Make the app's right-side drawers feel like one product again by flattening stray chrome, unifying shell structure, and turning release playback into a simpler tracks list.
+
+### Added
+
+- Focused regression coverage for the shared drawer shell, add-release flow, release tracks list, dashboard header chrome, and right-drawer focus behavior
+
+### Changed
+
+- Unified dashboard, admin, and demo entity drawers on the shared right-drawer shell so headers, cards, tabs, and footer actions use one calmer layout model
+- Simplified the add-release drawer into a preview card, an in-card details form, and a flat pinned create action while keeping the release-creation flow intact
+- Renamed the release drawer's `Playback` tab to `Tracks` and reduced it to a flat track list that hands actual playback off to the persistent bottom audio bar
+- [internal] Synced the canonical version file, `version.json`, and workspace package versions to `26.4.140`
+
+### Fixed
+
+- Removed stray divider, border, and wrapper chrome under dashboard header actions and other shared page toolbars so the top of each page stays flat
+- Eliminated the drawer-container focus ring leak and kept one-click close affordances visible in the refactored card action bars
+- Standardized drawer card borders so preview and details surfaces use one consistent perimeter border instead of stacked seams
+
 ## [26.4.139] - 2026-04-09
 
 > Keep the subscribed notifications state inline on compact public profiles so the CTA does not collapse into passive copy and keyboard users land directly in preferences.
