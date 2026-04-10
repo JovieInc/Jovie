@@ -139,7 +139,7 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 ### Playwright route-audit manifests must not crash at import time
 **Mistake:** `axe-audit.spec.ts` resolved public surface manifests at module load. Any env or manifest error then failed the entire file with an opaque import-time crash, which made CI triage much harder.
 
-**Rule:** In Playwright route-audit specs, catch manifest/env resolution at load time and rethrow it from `beforeAll` or another explicit setup phase with a clear message. Do not let import-time failures take down the whole file opaquely.
+**Rule:** In Playwright route-audit specs, catch manifest/env resolution at load time and rethrow it through an always-registered test or other explicit failure path. `beforeAll` is not enough if manifest failure can leave the file with zero generated tests.
 
 ### Preview bypasses must not reopen production health routes
 **Mistake:** `/api/health/auth` allowed the test-bypass probe path whenever the bypass resolver returned a user, even on deployments running with `NODE_ENV=production`. Because preview-host trust was derived from request headers, that reopened a sensitive debug route if the bypass flag ever leaked into production.
