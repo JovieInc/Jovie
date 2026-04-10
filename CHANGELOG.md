@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.142] - 2026-04-10
+
+> Keep fresh worktrees bootstrappable even when local Homebrew metadata is broken, so setup still installs ripgrep and gets agents to a working shell.
+
+### Changed
+
+- Hardened `scripts/setup.sh` so failed Homebrew or Doppler installer calls degrade into clear missing-tool reporting instead of aborting the whole bootstrap
+- Added a standalone ripgrep fallback that downloads and verifies a supported release into `$HOME/.local/bin` when package-manager installation paths fail, with guidance for keeping that path available in future shells
+- [internal] Synced the canonical version file, `version.json`, and workspace package versions to `26.4.142`
+
+### Fixed
+
+- Prevented `./scripts/setup.sh` from failing on macOS worktrees when Homebrew reports `/opt/homebrew/opt/node@22 is not a valid keg` during prerequisite installs
+
 ## [26.4.141] - 2026-04-09
 
 > Claim-invite emails now read more like a real note from Tim, and they avoid awkward fake personalization when an artist name looks like a handle instead of a real first name.
