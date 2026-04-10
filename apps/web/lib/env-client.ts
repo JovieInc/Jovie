@@ -21,4 +21,10 @@ export const env = {
   get IS_E2E() {
     return process.env.NEXT_PUBLIC_E2E_MODE === '1' || isRuntimeE2EMode();
   },
+  get NEXT_PUBLIC_E2E_MODE() {
+    return process.env.NEXT_PUBLIC_E2E_MODE || undefined;
+  },
+  get NEXT_PUBLIC_DEMO_RECORDING() {
+    return process.env.NEXT_PUBLIC_DEMO_RECORDING || undefined;
+  },
 } as const;

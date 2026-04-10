@@ -47,6 +47,7 @@ COMMON_ENV=(
   E2E_USE_TEST_AUTH_BYPASS=1
   NEXT_PUBLIC_E2E_MODE=1
   NEXT_DISABLE_TOOLBAR=1
+  BASE_URL="http://127.0.0.1:${PORT}"
   PORT="$PORT"
 )
 
@@ -102,8 +103,15 @@ cp "$RAW_VIDEO" "$OUTPUT_WEBM"
 cp "$MP4_VIDEO" "$OUTPUT_MP4"
 
 echo "[yc-demo] Extracting review frames..."
-ffmpeg -y -i "$MP4_VIDEO" -vf "fps=1/4,scale=320:-1" "$FRAMES_ROOT/frame-%03d.jpg" >/dev/null 2>&1
-ffmpeg -y -i "$MP4_VIDEO" -vf "fps=1/4,scale=320:-1,tile=2x4:padding=12:margin=12:color=white" -frames:v 1 "$CONTACT_SHEET" >/dev/null 2>&1
+SAMPLE_TIMES=(1 6 10 14 22 26 30 34)
+
+for index in "${!SAMPLE_TIMES[@]}"; do
+  frame_number="$(printf '%03d' "$((index + 1))")"
+  timestamp="${SAMPLE_TIMES[$index]}"
+  ffmpeg -y -ss "$timestamp" -i "$MP4_VIDEO" -frames:v 1 -vf "scale=320:-1" "$FRAMES_ROOT/frame-${frame_number}.jpg" >/dev/null 2>&1
+done
+
+ffmpeg -y -framerate 1 -i "$FRAMES_ROOT/frame-%03d.jpg" -vf "tile=2x4:padding=12:margin=12:color=white" -frames:v 1 "$CONTACT_SHEET" >/dev/null 2>&1
 
 echo "[yc-demo] Outputs ready:"
 echo "  $OUTPUT_WEBM"
