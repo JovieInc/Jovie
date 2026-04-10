@@ -246,10 +246,14 @@ export function DashboardNav(_: DashboardNavProps) {
           preventNavigation={demoUnavailable}
           renderAsButton={renderAsButton}
           onNavigate={
-            isReleasesItem ? () => showPendingShell('releases') : undefined
+            isReleasesItem && !isActive
+              ? () => showPendingShell('releases')
+              : undefined
           }
           onCancelNavigate={
-            isReleasesItem ? () => clearPendingShell('releases') : undefined
+            isReleasesItem && !isActive
+              ? () => clearPendingShell('releases')
+              : undefined
           }
           onPrefetch={() => handlePrefetch(item.id)}
         />

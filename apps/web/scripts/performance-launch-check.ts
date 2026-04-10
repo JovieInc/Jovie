@@ -234,7 +234,12 @@ async function startServer(baseUrl: string, artifactDir: string) {
   child.stdout?.on('data', appendOutput);
   child.stderr?.on('data', appendOutput);
 
-  await waitForServer(baseUrl, child);
+  try {
+    await waitForServer(baseUrl, child);
+  } catch (error) {
+    await stopServer(child);
+    throw error;
+  }
   return child;
 }
 
