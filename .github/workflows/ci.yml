@@ -708,7 +708,9 @@ jobs:
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+        # This job only has an 8 minute budget. Avoid apt-based `--with-deps` here
+        # because slow font package mirrors can consume the whole lane before tests run.
+        run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Download build artifact
         id: download

@@ -77,6 +77,10 @@ describe('staging Clerk key resolution', () => {
       publishableKey: undefined,
       secretKey: undefined,
     });
+    expect(resolveClerkKeys('main.jov.ie')).toEqual({
+      publishableKey: undefined,
+      secretKey: undefined,
+    });
   });
 
   it('keeps non-staging hosts on the default production pair', () => {
@@ -94,6 +98,16 @@ describe('staging Clerk key resolution', () => {
       new Headers({
         host: 'staging.jov.ie',
         'x-forwarded-host': 'staging.jov.ie',
+        'x-forwarded-proto': 'https',
+      })
+    );
+
+    await expect(resolvePublishableKeyFromHeaders()).resolves.toBeUndefined();
+
+    headersMock.mockResolvedValue(
+      new Headers({
+        host: 'main.jov.ie',
+        'x-forwarded-host': 'main.jov.ie',
         'x-forwarded-proto': 'https',
       })
     );
