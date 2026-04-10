@@ -172,6 +172,18 @@ async function connectWithRetry(databaseUrl: string) {
 
     try {
       pool = new Pool({ connectionString: databaseUrl, max: 1 });
+      pool.on('error', error => {
+        if (isRetryableConnectionError(error)) {
+          log.warning(
+            `Ignoring transient Neon pool error during migrate bootstrap: ${flattenErrorMessages(error).join(' ')}`
+          );
+          return;
+        }
+
+        log.error(
+          `Unexpected Neon pool error during migrate bootstrap: ${flattenErrorMessages(error).join(' ')}`
+        );
+      });
       const client = await pool.connect();
       await client.query("SET app.allow_schema_changes = 'true'");
       const db = drizzle(client);

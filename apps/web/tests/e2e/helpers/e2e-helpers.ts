@@ -995,11 +995,14 @@ export async function interceptTrackingCalls(page: Page) {
  */
 export async function createFreshUser(page: Page, uniqueSeed: string) {
   const email = `gp-${uniqueSeed}+clerk_test@test.jovie.com`;
+  const username = `gp-${uniqueSeed}`
+    .replaceAll(/[^a-z0-9-]/gi, '')
+    .slice(0, 32);
 
   if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
     const clerkUserId = await ensureClerkTestUser({
       email,
-      username: `gp-${uniqueSeed}`.replaceAll(/[^a-z0-9-]/gi, '').slice(0, 32),
+      username,
       firstName: 'Golden',
       lastName: 'Path',
       metadata: { source: 'e2e-smoke-bypass' },
@@ -1042,6 +1045,33 @@ export async function createFreshUser(page: Page, uniqueSeed: string) {
   const loaded = await loadClerk();
 
   if (!loaded) {
+    const baseUrl =
+      process.env.BASE_URL ?? page.url() ?? 'http://localhost:3100';
+    const host = (() => {
+      try {
+        return new URL(baseUrl).hostname;
+      } catch {
+        return 'localhost';
+      }
+    })();
+    const isLoopbackHost = host === 'localhost' || host === '127.0.0.1';
+    const usesRestrictedProductionKey =
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith('pk_live_') ===
+      true;
+
+    if (isLoopbackHost && usesRestrictedProductionKey) {
+      const clerkUserId = await ensureClerkTestUser({
+        email,
+        username,
+        firstName: 'Golden',
+        lastName: 'Path',
+        metadata: { source: 'golden-path-ci-localhost-fallback' },
+      });
+
+      await setTestAuthBypassSession(page, null, clerkUserId);
+      return { email, clerkUserId };
+    }
+
     throw new Error('Clerk JS failed to load — cannot create test user');
   }
 

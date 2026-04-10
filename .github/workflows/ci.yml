@@ -919,18 +919,26 @@ jobs:
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
-          CANDIDATE="${{ steps.neon-branch.outputs.db_url }}"
-          if [ -z "$CANDIDATE" ]; then
+          DIRECT_URL="${{ steps.neon-branch.outputs.db_url }}"
+          RUNTIME_URL="${{ steps.neon-branch.outputs.db_url_pooled }}"
+
+          if [ -z "$DIRECT_URL" ]; then
             echo "No Neon ephemeral DATABASE_URL available."
             exit 1
           fi
-          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
+
+          if [ -z "$RUNTIME_URL" ]; then
+            RUNTIME_URL="$DIRECT_URL"
+          fi
+
+          echo "DATABASE_URL_DIRECT=$DIRECT_URL" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=$RUNTIME_URL" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
+          DATABASE_URL: ${{ env.DATABASE_URL_DIRECT }}
           NODE_ENV: test
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
@@ -1050,17 +1058,25 @@ jobs:
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         run: |
-          CANDIDATE="${{ steps.neon-branch.outputs.db_url }}"
-          if [ -z "$CANDIDATE" ]; then
+          DIRECT_URL="${{ steps.neon-branch.outputs.db_url }}"
+          RUNTIME_URL="${{ steps.neon-branch.outputs.db_url_pooled }}"
+
+          if [ -z "$DIRECT_URL" ]; then
             echo "No Neon ephemeral DATABASE_URL available."
             exit 1
           fi
-          echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+
+          if [ -z "$RUNTIME_URL" ]; then
+            RUNTIME_URL="$DIRECT_URL"
+          fi
+
+          echo "DATABASE_URL_DIRECT=$DIRECT_URL" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=$RUNTIME_URL" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
+          DATABASE_URL: ${{ env.DATABASE_URL_DIRECT }}
           NODE_ENV: test
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
@@ -1862,7 +1878,7 @@ jobs:
       - name: Run E2E Smoke (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         env:
-          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url_pooled || steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
           CI: true
           SMOKE_ONLY: '1'
@@ -1980,7 +1996,7 @@ jobs:
       - name: Run Admin Smoke Tests (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.run_admin_smoke == 'true'
         env:
-          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url_pooled || steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
           CI: true
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
@@ -2062,9 +2078,12 @@ jobs:
             exit 1
           fi
 
-          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
-          if [ -n "$CANDIDATE" ]; then
-            echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
+          DIRECT_URL=$(jq -r '.db_url // empty' "$CONNECTION_FILE")
+          RUNTIME_URL=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
+
+          if [ -n "$RUNTIME_URL" ]; then
+            echo "DATABASE_URL=$RUNTIME_URL" >> "$GITHUB_ENV"
+            echo "DATABASE_URL_DIRECT=${DIRECT_URL:-$RUNTIME_URL}" >> "$GITHUB_ENV"
           else
             echo "No Neon ephemeral DB URL available from neon-db artifact."
           fi
@@ -2081,7 +2100,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
+          DATABASE_URL: ${{ env.DATABASE_URL_DIRECT }}
           NODE_ENV: test
           GIT_BRANCH: ${{ github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'
@@ -2126,11 +2145,13 @@ jobs:
             exit 1
           fi
 
-          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
+          DIRECT_URL=$(jq -r '.db_url // empty' "$CONNECTION_FILE")
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
           SRC=""
           if [ -n "$CANDIDATE" ]; then
             echo "Using Neon DB URL from neon-db artifact"
             echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
+            echo "DATABASE_URL_DIRECT=${DIRECT_URL:-$CANDIDATE}" >> "$GITHUB_ENV"
             SRC="neon-artifact"
           else
             echo "No Neon ephemeral DB URL available from neon-db artifact."
@@ -2330,17 +2351,25 @@ jobs:
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         run: |
-          CANDIDATE="${{ steps.neon-branch.outputs.db_url }}"
-          if [ -z "$CANDIDATE" ]; then
+          DIRECT_URL="${{ steps.neon-branch.outputs.db_url }}"
+          RUNTIME_URL="${{ steps.neon-branch.outputs.db_url_pooled }}"
+
+          if [ -z "$DIRECT_URL" ]; then
             echo "No Neon ephemeral DATABASE_URL available."
             exit 1
           fi
-          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
+
+          if [ -z "$RUNTIME_URL" ]; then
+            RUNTIME_URL="$DIRECT_URL"
+          fi
+
+          echo "DATABASE_URL_DIRECT=$DIRECT_URL" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=$RUNTIME_URL" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
+          DATABASE_URL: ${{ env.DATABASE_URL_DIRECT }}
           NODE_ENV: test
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
@@ -2794,17 +2823,19 @@ jobs:
             exit 1
           fi
 
-          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
+          DIRECT_URL=$(jq -r '.db_url // empty' "$CONNECTION_FILE")
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
           if [ -z "$CANDIDATE" ]; then
             echo "No Neon ephemeral DB URL available from neon-db artifact."
             exit 1
           fi
+          echo "DATABASE_URL_DIRECT=${DIRECT_URL:-$CANDIDATE}" >> "$GITHUB_ENV"
           echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
 
       - name: Run migrations for Smoke DB
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
+          DATABASE_URL: ${{ env.DATABASE_URL_DIRECT }}
           NODE_ENV: test
           GIT_BRANCH: ${{ github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'
