@@ -47,6 +47,8 @@ export default async function OnboardingPage({
   const resolvedSearchParams = await searchParams;
   const shouldSkipDashboardPrefetch =
     isE2EFastOnboardingEnabled() && Boolean(resolvedSearchParams?.handle);
+  const assumeInitialHandleAvailable =
+    isE2EFastOnboardingEnabled() && Boolean(resolvedSearchParams?.handle);
 
   const authResult = await resolveUserState();
 
@@ -183,6 +185,7 @@ export default async function OnboardingPage({
 
   return (
     <OnboardingFormWrapper
+      assumeInitialHandleAvailable={assumeInitialHandleAvailable}
       initialDisplayName={initialDisplayName}
       initialHandle={initialHandle}
       isReservedHandle={isReservedHandle}

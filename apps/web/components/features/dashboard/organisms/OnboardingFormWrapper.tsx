@@ -100,6 +100,7 @@ function readPendingClaimHandle(): string {
 }
 
 interface OnboardingFormWrapperProps {
+  readonly assumeInitialHandleAvailable?: boolean;
   readonly initialDisplayName?: string;
   readonly initialHandle?: string;
   readonly isReservedHandle?: boolean;
@@ -117,6 +118,7 @@ interface OnboardingFormWrapperProps {
 }
 
 export function OnboardingFormWrapper({
+  assumeInitialHandleAvailable = false,
   initialDisplayName = '',
   initialHandle = '',
   isReservedHandle = false,
@@ -188,6 +190,7 @@ export function OnboardingFormWrapper({
         />
       ) : (
         <OnboardingHandleOnlyForm
+          assumeInitialHandleAvailable={assumeInitialHandleAvailable}
           initialDisplayName={initialDisplayName}
           initialHandle={resolvedHandle}
           isHydrated={isHydrated}

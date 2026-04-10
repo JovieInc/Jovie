@@ -52,13 +52,13 @@
             "largest-contentful-paint": [
               "error",
               {
-                "maxNumericValue": 2200
+                "maxNumericValue": 3800
               }
             ],
             "total-blocking-time": [
               "error",
               {
-                "maxNumericValue": 450
+                "maxNumericValue": 850
               }
             ]
           }

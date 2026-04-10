@@ -7,6 +7,7 @@ const v2FormPropsSpy = vi.fn();
 
 vi.mock('@/features/dashboard/organisms/OnboardingHandleOnlyForm', () => ({
   OnboardingHandleOnlyForm: (props: {
+    assumeInitialHandleAvailable?: boolean;
     initialHandle?: string;
     isHydrated?: boolean;
   }) => {
@@ -66,6 +67,21 @@ describe('OnboardingFormWrapper', () => {
     });
     expect(v2FormPropsSpy).not.toHaveBeenCalled();
     expect(globalThis.sessionStorage.getItem('pendingClaim')).not.toBeNull();
+  });
+
+  it('passes through seeded-handle fast-path props to the handle-only form', () => {
+    render(
+      <OnboardingFormWrapper
+        assumeInitialHandleAvailable
+        initialHandle='serverhandle'
+        userId='user_123'
+      />
+    );
+
+    expect(handleOnlyFormPropsSpy.mock.calls[0]?.[0]).toMatchObject({
+      assumeInitialHandleAvailable: true,
+      initialHandle: 'serverhandle',
+    });
   });
 
   it('renders the full onboarding form for existing profiles without a resume param', async () => {

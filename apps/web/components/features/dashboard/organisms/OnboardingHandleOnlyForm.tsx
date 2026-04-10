@@ -9,6 +9,7 @@ import { useHandleValidation } from './onboarding-v2/shared/useHandleValidation'
 import { useOnboardingSubmit } from './onboarding-v2/shared/useOnboardingSubmit';
 
 interface OnboardingHandleOnlyFormProps {
+  readonly assumeInitialHandleAvailable?: boolean;
   readonly initialDisplayName?: string;
   readonly initialHandle?: string;
   readonly isHydrated: boolean;
@@ -60,6 +61,7 @@ function HandleSidebar() {
 }
 
 export function OnboardingHandleOnlyForm({
+  assumeInitialHandleAvailable = false,
   initialDisplayName = '',
   initialHandle = '',
   isHydrated,
@@ -78,7 +80,7 @@ export function OnboardingHandleOnlyForm({
 
   const { handleValidation, setHandleValidation, handle, validateHandle } =
     useHandleValidation({
-      assumeInitialHandleAvailable: false,
+      assumeInitialHandleAvailable,
       normalizedInitialHandle,
       fullName,
     });
