@@ -208,18 +208,18 @@ function SignUpPageContent() {
           fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
         />
       </div>
-      <p className='mt-4 text-center text-[11px] leading-relaxed text-secondary-token'>
+      <p className='mt-4 text-center text-[11px] leading-relaxed text-white/80'>
         By signing up, you agree to our{' '}
         <Link
           href={APP_ROUTES.LEGAL_TERMS}
-          className='focus-ring-themed rounded-md py-1 text-secondary-token underline underline-offset-2 transition-colors hover:text-primary-token'
+          className='focus-ring-themed rounded-md py-1 text-white underline underline-offset-2 transition-colors hover:text-white'
         >
           Terms of Service
         </Link>{' '}
         and{' '}
         <Link
           href={APP_ROUTES.LEGAL_PRIVACY}
-          className='focus-ring-themed rounded-md py-1 text-secondary-token underline underline-offset-2 transition-colors hover:text-primary-token'
+          className='focus-ring-themed rounded-md py-1 text-white underline underline-offset-2 transition-colors hover:text-white'
         >
           Privacy Policy
         </Link>
