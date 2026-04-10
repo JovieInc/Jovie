@@ -26,7 +26,8 @@ export const REQUIRED_ENV = {
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
   CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
-  DATABASE_URL: process.env.DATABASE_URL,
+  DATABASE_URL:
+    process.env.DATABASE_URL_DIRECT?.trim() || process.env.DATABASE_URL?.trim(),
 } as const;
 
 export function hasRealEnv(): boolean {
@@ -104,6 +105,19 @@ export const DEFAULT_ONBOARDING_SPOTIFY_ARTIST = {
   url: 'https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we',
 } as const;
 
+function getTestDatabaseUrl(context: string): string {
+  const dbUrl =
+    process.env.DATABASE_URL_DIRECT?.trim() || process.env.DATABASE_URL?.trim();
+
+  if (!dbUrl) {
+    throw new Error(
+      `DATABASE_URL or DATABASE_URL_DIRECT required for ${context}`
+    );
+  }
+
+  return dbUrl;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Spotify import helpers                                              */
 /* ------------------------------------------------------------------ */
@@ -156,12 +170,7 @@ export function countPopulatedDspFields(
 }
 
 export async function waitForSpotifyImport(clerkUserId: string) {
-  const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) {
-    throw new Error('DATABASE_URL required for Spotify import checks');
-  }
-
-  const sql = neon(dbUrl);
+  const sql = neon(getTestDatabaseUrl('Spotify import checks'));
 
   const [state] = (await sql`
     SELECT
@@ -195,12 +204,7 @@ export async function waitForSpotifyImport(clerkUserId: string) {
 }
 
 export async function waitForMultiDspEnrichment(clerkUserId: string) {
-  const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) {
-    throw new Error('DATABASE_URL required for multi-DSP enrichment checks');
-  }
-
-  const sql = neon(dbUrl);
+  const sql = neon(getTestDatabaseUrl('multi-DSP enrichment checks'));
 
   const [state] = (await sql`
     SELECT
@@ -327,12 +331,7 @@ export async function advanceOnboardingToArtistSelection(
 export async function getFirstReleaseForUser(
   clerkUserId: string
 ): Promise<DemoReleaseLookup | null> {
-  const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) {
-    throw new Error('DATABASE_URL required for release lookup');
-  }
-
-  const sql = neon(dbUrl);
+  const sql = neon(getTestDatabaseUrl('release lookup'));
 
   const [preferredRelease] = (await sql`
     SELECT
@@ -378,12 +377,7 @@ export async function getTopDemoReleasesForUser(
   clerkUserId: string,
   limit = 3
 ): Promise<DemoReleaseLookup[]> {
-  const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) {
-    throw new Error('DATABASE_URL required for release lookup');
-  }
-
-  const sql = neon(dbUrl);
+  const sql = neon(getTestDatabaseUrl('release lookup'));
   const rows = (await sql`
     SELECT
       dr.id,
@@ -418,12 +412,7 @@ export async function getTopDemoReleasesForUser(
 export async function getDemoUserHandle(
   clerkUserId: string
 ): Promise<string | null> {
-  const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) {
-    throw new Error('DATABASE_URL required for demo handle lookup');
-  }
-
-  const sql = neon(dbUrl);
+  const sql = neon(getTestDatabaseUrl('demo handle lookup'));
 
   const [row] = (await sql`
     SELECT cp.username
@@ -872,10 +861,7 @@ export async function ensureDbUser(
   email: string,
   knownSpotifyArtistIds: string[] = []
 ) {
-  const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) throw new Error('DATABASE_URL required for DB user creation');
-
-  const sql = neon(dbUrl);
+  const sql = neon(getTestDatabaseUrl('DB user creation'));
   await clearOnboardingRateLimits();
 
   // Release ALL test-linked Spotify artist IDs from previous test profiles.

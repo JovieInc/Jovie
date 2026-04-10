@@ -11,7 +11,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
-import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
+import { buildHandleCandidates } from '@/lib/onboarding/reserved-handle';
 import { extractErrorMessage } from '@/lib/utils/errors';
 
 interface OnboardingPageProps {
@@ -120,15 +120,12 @@ export default async function OnboardingPage({
   const earlyDisplayName = clerkIdentity.displayName || '';
   const earlyProvidedHandle =
     resolvedSearchParams?.handle || spotifySuggestedHandle;
-  const handleReservationPromise = !earlyProvidedHandle
-    ? reserveOnboardingHandle(earlyDisplayName)
-    : Promise.resolve(null);
+  const earlyReservedHandle =
+    !earlyProvidedHandle && earlyDisplayName
+      ? (buildHandleCandidates(earlyDisplayName)[0] ?? null)
+      : null;
 
-  // Await both in parallel
-  const [existingProfile, earlyReservedHandle] = await Promise.all([
-    profilePrefetchPromise,
-    handleReservationPromise,
-  ]);
+  const existingProfile = await profilePrefetchPromise;
 
   const initialDisplayName =
     existingProfile?.displayName || clerkIdentity.displayName || '';
@@ -148,7 +145,7 @@ export default async function OnboardingPage({
     !reservedHandle &&
     initialDisplayName !== earlyDisplayName
   ) {
-    reservedHandle = await reserveOnboardingHandle(initialDisplayName);
+    reservedHandle = buildHandleCandidates(initialDisplayName)[0] ?? null;
   }
 
   const initialHandle = providedHandle || reservedHandle || '';

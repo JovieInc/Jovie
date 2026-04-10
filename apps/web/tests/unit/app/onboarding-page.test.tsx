@@ -82,7 +82,7 @@ vi.mock('@/lib/env-server', () => ({
 }));
 
 vi.mock('@/lib/onboarding/reserved-handle', () => ({
-  reserveOnboardingHandle: vi.fn().mockResolvedValue(null),
+  buildHandleCandidates: vi.fn().mockReturnValue([]),
 }));
 
 vi.mock('@/lib/utils/errors', () => ({
@@ -388,7 +388,7 @@ describe('onboarding page', () => {
 
   it('prefills a reserved handle when no explicit handle is provided', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
-    const { reserveOnboardingHandle } = await import(
+    const { buildHandleCandidates } = await import(
       '@/lib/onboarding/reserved-handle'
     );
 
@@ -404,7 +404,7 @@ describe('onboarding page', () => {
         email: 'artist@example.com',
       },
     });
-    vi.mocked(reserveOnboardingHandle).mockResolvedValueOnce('reserved-handle');
+    vi.mocked(buildHandleCandidates).mockReturnValueOnce(['reserved-handle']);
 
     const page = await OnboardingPage({
       searchParams: Promise.resolve({}),

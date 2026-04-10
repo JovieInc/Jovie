@@ -560,7 +560,7 @@ async function armWarmNavigationStart(locator: Locator) {
     perfWindow.__perfWarmNavStart = undefined;
     perfWindow.__perfWarmNavFallbackStart = performance.now();
     node.addEventListener(
-      'mousedown',
+      'pointerdown',
       () => {
         if (typeof perfWindow.__perfWarmNavStart !== 'number') {
           perfWindow.__perfWarmNavStart = performance.now();

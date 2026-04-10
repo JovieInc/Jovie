@@ -194,7 +194,10 @@ function getSeedEnv() {
   // Next's server-only env modules.
   return {
     CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
-    DATABASE_URL: process.env.DATABASE_URL,
+    DATABASE_URL:
+      process.env.DATABASE_URL_DIRECT?.trim() ||
+      process.env.DATABASE_URL?.trim(),
+    DATABASE_URL_DIRECT: process.env.DATABASE_URL_DIRECT?.trim(),
     E2E_CLERK_USER_ID: process.env.E2E_CLERK_USER_ID,
     E2E_CLERK_USER_USERNAME: process.env.E2E_CLERK_USER_USERNAME,
     UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
@@ -884,7 +887,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
 
   const { DATABASE_URL: databaseUrl } = getSeedEnv();
   if (!databaseUrl) {
-    console.warn('⚠ DATABASE_URL not set, skipping seed');
+    console.warn('⚠ DATABASE_URL/DATABASE_URL_DIRECT not set, skipping seed');
     return { success: false, reason: 'no_database_url' };
   }
 

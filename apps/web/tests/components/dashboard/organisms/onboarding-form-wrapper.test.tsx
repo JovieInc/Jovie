@@ -1,13 +1,14 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingFormWrapper } from '@/features/dashboard/organisms/OnboardingFormWrapper';
 
-const formPropsSpy = vi.fn();
+const handleOnlyFormPropsSpy = vi.fn();
+const v2FormPropsSpy = vi.fn();
 
 vi.mock('@/features/dashboard/organisms/OnboardingHandleOnlyForm', () => ({
   OnboardingHandleOnlyForm: (props: { initialHandle?: string }) => {
-    formPropsSpy(props);
-    return <div data-testid='mock-onboarding-form' />;
+    handleOnlyFormPropsSpy(props);
+    return <div data-testid='mock-onboarding-handle-only-form' />;
   },
 }));
 
@@ -15,15 +16,16 @@ vi.mock(
   '@/features/dashboard/organisms/onboarding-v2/OnboardingV2Form',
   () => ({
     OnboardingV2Form: (props: { initialHandle?: string }) => {
-      formPropsSpy(props);
-      return <div data-testid='mock-onboarding-form' />;
+      v2FormPropsSpy(props);
+      return <div data-testid='mock-onboarding-v2-form' />;
     },
   })
 );
 
 describe('OnboardingFormWrapper', () => {
   beforeEach(() => {
-    formPropsSpy.mockClear();
+    handleOnlyFormPropsSpy.mockClear();
+    v2FormPropsSpy.mockClear();
     globalThis.sessionStorage.clear();
   });
 
@@ -37,9 +39,10 @@ describe('OnboardingFormWrapper', () => {
 
     // The handle is resolved eagerly in the useState initializer to avoid
     // a key-change remount that would cause visible layout shift.
-    expect(formPropsSpy.mock.calls[0]?.[0]).toMatchObject({
+    expect(handleOnlyFormPropsSpy.mock.calls[0]?.[0]).toMatchObject({
       initialHandle: 'claimedhandle',
     });
+    expect(v2FormPropsSpy).not.toHaveBeenCalled();
 
     expect(globalThis.sessionStorage.getItem('pendingClaim')).toBeNull();
   });
@@ -54,9 +57,23 @@ describe('OnboardingFormWrapper', () => {
       <OnboardingFormWrapper initialHandle='serverhandle' userId='user_123' />
     );
 
-    expect(formPropsSpy.mock.calls[0]?.[0]).toMatchObject({
+    expect(handleOnlyFormPropsSpy.mock.calls[0]?.[0]).toMatchObject({
       initialHandle: 'serverhandle',
     });
+    expect(v2FormPropsSpy).not.toHaveBeenCalled();
     expect(globalThis.sessionStorage.getItem('pendingClaim')).not.toBeNull();
+  });
+
+  it('renders the full onboarding form for existing profiles without a resume param', () => {
+    render(
+      <OnboardingFormWrapper
+        initialHandle='existing-handle'
+        initialProfileId='profile_123'
+        userId='user_123'
+      />
+    );
+
+    expect(handleOnlyFormPropsSpy).not.toHaveBeenCalled();
+    expect(screen.getByTestId('onboarding-loading-shell')).toBeTruthy();
   });
 });

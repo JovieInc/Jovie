@@ -159,7 +159,7 @@ export function OnboardingFormWrapper({
 
   // Stable key — never changes after mount, preventing full-form CLS.
   const formKey = resolvedHandle || '__empty__';
-  const isResumeFlow = Boolean(initialResumeStep);
+  const isResumeFlow = Boolean(initialResumeStep || initialProfileId);
 
   return (
     <div

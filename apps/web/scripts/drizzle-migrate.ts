@@ -163,6 +163,47 @@ function isRetryableConnectionError(error: unknown) {
   );
 }
 
+async function connectClientWithRetryableBootstrap(pool: Pool) {
+  return await new Promise<PoolClient>((resolve, reject) => {
+    let settled = false;
+
+    const cleanup = () => {
+      process.off('uncaughtException', handleBootstrapFailure);
+      process.off('unhandledRejection', handleBootstrapFailure);
+    };
+
+    const rejectOnce = (error: unknown) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+
+    const resolveOnce = (client: PoolClient) => {
+      if (settled) {
+        void client.release();
+        return;
+      }
+
+      settled = true;
+      cleanup();
+      resolve(client);
+    };
+
+    const handleBootstrapFailure = (error: unknown) => {
+      rejectOnce(error);
+    };
+
+    process.on('uncaughtException', handleBootstrapFailure);
+    process.on('unhandledRejection', handleBootstrapFailure);
+
+    pool.connect().then(resolveOnce).catch(rejectOnce);
+  });
+}
+
 async function connectWithRetry(databaseUrl: string) {
   const maxAttempts = process.env.CI === 'true' ? CI_CONNECT_RETRY_LIMIT : 1;
   let lastError: unknown;
@@ -184,7 +225,7 @@ async function connectWithRetry(databaseUrl: string) {
           `Unexpected Neon pool error during migrate bootstrap: ${flattenErrorMessages(error).join(' ')}`
         );
       });
-      const client = await pool.connect();
+      const client = await connectClientWithRetryableBootstrap(pool);
       await client.query("SET app.allow_schema_changes = 'true'");
       const db = drizzle(client);
 

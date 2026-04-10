@@ -261,6 +261,23 @@ async function seedDashboardAuth(browser, { url }) {
   };
 
   if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1' && testUserId) {
+    if (pathname.startsWith('/app')) {
+      const bootstrapUrl = new URL('/api/dev/test-auth/enter', origin);
+      bootstrapUrl.searchParams.set('persona', 'creator-ready');
+      bootstrapUrl.searchParams.set('redirect', pathname);
+
+      await page.goto(bootstrapUrl.toString(), {
+        waitUntil: 'domcontentloaded',
+        timeout: 60_000,
+      });
+      await page.waitForURL(new RegExp(`${pathname.replace(/\//g, '\\/')}`), {
+        timeout: 60_000,
+      });
+      await warmRouteRepeatedly();
+      await page.close();
+      return;
+    }
+
     const authCookies = [
       {
         name: TEST_MODE_COOKIE,
