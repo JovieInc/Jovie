@@ -81,13 +81,22 @@ export default async function ComparePage({ params }: ComparePageProps) {
             <table className='w-full text-sm'>
               <thead>
                 <tr className='border-b border-border-primary'>
-                  <th className='pb-3 pr-4 text-left font-medium text-secondary-token'>
+                  <th
+                    scope='col'
+                    className='pb-3 pr-4 text-left font-medium text-secondary-token'
+                  >
                     Feature
                   </th>
-                  <th className='pb-3 px-4 text-center font-medium text-primary-token'>
+                  <th
+                    scope='col'
+                    className='pb-3 px-4 text-center font-medium text-primary-token'
+                  >
                     {APP_NAME}
                   </th>
-                  <th className='pb-3 pl-4 text-center font-medium text-secondary-token'>
+                  <th
+                    scope='col'
+                    className='pb-3 pl-4 text-center font-medium text-secondary-token'
+                  >
                     {data.competitor}
                   </th>
                 </tr>
@@ -95,14 +104,17 @@ export default async function ComparePage({ params }: ComparePageProps) {
               <tbody className='divide-y divide-border-primary'>
                 {data.features.map(feature => (
                   <tr key={feature.name}>
-                    <td className='py-3 pr-4 text-secondary-token'>
+                    <th
+                      scope='row'
+                      className='py-3 pr-4 text-left font-normal text-secondary-token'
+                    >
                       {feature.name}
                       {feature.note && (
                         <span className='mt-1 block text-xs text-tertiary-token'>
                           {feature.note}
                         </span>
                       )}
-                    </td>
+                    </th>
                     <td className='py-3 px-4 text-center'>
                       {feature.jovie ? (
                         <Check

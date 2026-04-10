@@ -333,7 +333,7 @@ export default async function PlaylistPage({
               href='/playlists'
               className='text-[13px] font-[450] text-white/40 hover:text-white/60'
             >
-              Discover more playlists
+              Discover More Playlists
             </Link>
           </div>
         </div>
