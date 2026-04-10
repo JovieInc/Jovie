@@ -30,7 +30,7 @@ const isAuthRefreshOnly = process.env.E2E_AUTH_REFRESH_ONLY === '1';
 const useStoredAuth = process.env.E2E_USE_STORED_AUTH === '1';
 const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 const resolvedDatabaseUrl =
-  process.env.DATABASE_URL_DIRECT || process.env.DATABASE_URL;
+  process.env.DATABASE_URL || process.env.DATABASE_URL_DIRECT;
 const shouldSkipSeeding =
   isAuthRefreshOnly ||
   (!isCI && isFastIteration) ||

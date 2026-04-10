@@ -195,8 +195,8 @@ function getSeedEnv() {
   return {
     CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
     DATABASE_URL:
-      process.env.DATABASE_URL_DIRECT?.trim() ||
-      process.env.DATABASE_URL?.trim(),
+      process.env.DATABASE_URL?.trim() ||
+      process.env.DATABASE_URL_DIRECT?.trim(),
     DATABASE_URL_DIRECT: process.env.DATABASE_URL_DIRECT?.trim(),
     E2E_CLERK_USER_ID: process.env.E2E_CLERK_USER_ID,
     E2E_CLERK_USER_USERNAME: process.env.E2E_CLERK_USER_USERNAME,

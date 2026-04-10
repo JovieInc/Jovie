@@ -1,8 +1,9 @@
 /**
  * Shared E2E test helpers extracted from golden-path.spec.ts.
  *
- * Used by both golden-path and yc-demo specs. All functions use
- * direct Neon HTTP queries (not the pool) to avoid SSR abort races.
+ * Used by both golden-path and yc-demo specs. Prefer the shared runtime
+ * connection first so CI stays on the stable pooled URL; fall back to the
+ * direct URL only when a job does not provide the pooled variant.
  */
 
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
@@ -27,7 +28,7 @@ export const REQUIRED_ENV = {
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
   CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
   DATABASE_URL:
-    process.env.DATABASE_URL_DIRECT?.trim() || process.env.DATABASE_URL?.trim(),
+    process.env.DATABASE_URL?.trim() || process.env.DATABASE_URL_DIRECT?.trim(),
 } as const;
 
 export function hasRealEnv(): boolean {
@@ -107,7 +108,7 @@ export const DEFAULT_ONBOARDING_SPOTIFY_ARTIST = {
 
 function getTestDatabaseUrl(context: string): string {
   const dbUrl =
-    process.env.DATABASE_URL_DIRECT?.trim() || process.env.DATABASE_URL?.trim();
+    process.env.DATABASE_URL?.trim() || process.env.DATABASE_URL_DIRECT?.trim();
 
   if (!dbUrl) {
     throw new Error(
@@ -1041,17 +1042,18 @@ export async function createFreshUser(page: Page, uniqueSeed: string) {
       }
     })();
     const isLoopbackHost = host === 'localhost' || host === '127.0.0.1';
-    const usesRestrictedProductionKey =
-      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith('pk_live_') ===
-      true;
+    const shouldUseLoopbackBypassFallback =
+      isLoopbackHost &&
+      (process.env.CI === 'true' ||
+        Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim()));
 
-    if (isLoopbackHost && usesRestrictedProductionKey) {
+    if (shouldUseLoopbackBypassFallback) {
       const clerkUserId = await ensureClerkTestUser({
         email,
         username,
         firstName: 'Golden',
         lastName: 'Path',
-        metadata: { source: 'golden-path-ci-localhost-fallback' },
+        metadata: { source: 'golden-path-loopback-fallback' },
       });
 
       await setTestAuthBypassSession(page, null, clerkUserId);
