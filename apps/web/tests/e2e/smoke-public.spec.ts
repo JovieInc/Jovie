@@ -248,6 +248,73 @@ test.describe('Public Profile - dualipa', () => {
       'Subscribe mode did not render a subscription CTA'
     ).toBeVisible({ timeout: 30_000 });
   });
+
+  test('subscribe mode: email submit transitions to OTP verification UI', async ({
+    page,
+  }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Public smoke coverage runs in content-gate and targeted smoke-public loops'
+    );
+    test.setTimeout(90_000);
+
+    await page.route('**/api/notifications/subscribe', route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          message: 'Please check your email to confirm your subscription',
+          emailDispatched: true,
+          durationMs: 25,
+          pendingConfirmation: true,
+          requiresOtp: true,
+        }),
+      })
+    );
+
+    await page.goto(`/${TEST_PROFILE}?mode=subscribe`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
+    if (
+      bodyText.toLowerCase().includes('not found') ||
+      bodyText.toLowerCase().includes('temporarily unavailable')
+    ) {
+      test.skip(true, 'Profile not seeded');
+      return;
+    }
+
+    const switchToEmail = page.getByRole('button', {
+      name: 'Switch to email updates',
+    });
+    const canSwitchToEmail = await switchToEmail
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
+    if (canSwitchToEmail) {
+      await switchToEmail.click();
+    }
+
+    await page.getByPlaceholder('your@email.com').fill('fan@example.com');
+    await page.getByRole('button', { name: 'Get notified' }).click();
+
+    await expect(
+      page.getByText('Check your inbox. Enter your code.')
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(
+      page.getByLabel('Enter 6-digit verification code')
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: /verify/i })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByText(/confirmation link/i)).toHaveCount(0);
+  });
 });
 
 test('signin and signup pages load', async ({ page }) => {

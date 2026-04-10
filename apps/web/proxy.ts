@@ -252,6 +252,7 @@ async function createFingerprintEdge(
 // Complements the RESERVED_USERNAMES list in lib/validation/username-core.ts
 // which prevents these being registered as profile handles in the first place.
 const MIDDLEWARE_SYSTEM_SEGMENTS = new Set([
+  '.env',
   '_next',
   'favicon.ico',
   'og',
@@ -259,10 +260,15 @@ const MIDDLEWARE_SYSTEM_SEGMENTS = new Set([
   'out',
   '__clerk',
   'clerk',
+  'phpmyadmin',
   'sidebar-demo',
   'sentry-example-page',
   'sentry-example-api',
   'investor-portal',
+  'wordpress',
+  'wp',
+  'wp-admin',
+  'xmlrpc.php',
 ]);
 
 /**

@@ -56,8 +56,8 @@ export function WaitlistSettingsPanel() {
   if (loading) {
     return (
       <SettingsPanel
-        title='Waitlist gate'
-        description='Control approvals, auto-accept behavior, and daily intake limits.'
+        title='People Intake Defaults'
+        description='Set the approval rules for new people entering the pipeline.'
       >
         <div className='flex items-center gap-2 px-4 py-4 text-[13px] text-secondary-token sm:px-5'>
           <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
@@ -70,8 +70,8 @@ export function WaitlistSettingsPanel() {
   if (isError || !settings) {
     return (
       <SettingsPanel
-        title='Waitlist gate'
-        description='Control approvals, auto-accept behavior, and daily intake limits.'
+        title='People Intake Defaults'
+        description='Set the approval rules for new people entering the pipeline.'
       >
         <div className='px-4 py-4 text-[13px] text-destructive sm:px-5'>
           {error instanceof Error
@@ -84,8 +84,8 @@ export function WaitlistSettingsPanel() {
 
   return (
     <SettingsPanel
-      title='Waitlist gate'
-      description='Control approvals, auto-accept behavior, and daily intake limits.'
+      title='People Intake Defaults'
+      description='Set the approval rules for new people entering the pipeline.'
       actions={
         <Button
           variant='primary'
@@ -102,7 +102,7 @@ export function WaitlistSettingsPanel() {
         <div className='py-3.5'>
           <SettingsToggleRow
             icon={<ShieldCheck className='h-4 w-4' aria-hidden />}
-            title='Waitlist gate'
+            title='Manual approval gate'
             description='When disabled, new submissions bypass manual approval.'
             checked={settings.gateEnabled}
             onCheckedChange={checked =>
@@ -119,7 +119,7 @@ export function WaitlistSettingsPanel() {
           <SettingsToggleRow
             icon={<UserPlus className='h-4 w-4' aria-hidden />}
             title='Auto-accept'
-            description='Automatically approve a limited number of new submissions each day.'
+            description='Automatically approve a limited number of new submissions each day before manual review takes over.'
             checked={settings.autoAcceptEnabled}
             onCheckedChange={checked =>
               setSettings(current =>
@@ -135,7 +135,7 @@ export function WaitlistSettingsPanel() {
           <SettingsActionRow
             icon={<Hash className='h-4 w-4' aria-hidden />}
             title='Daily limit'
-            description={`Today: ${settings.autoAcceptedToday} approvals`}
+            description={`Today: ${settings.autoAcceptedToday} people auto-approved`}
             action={
               <Input
                 type='number'

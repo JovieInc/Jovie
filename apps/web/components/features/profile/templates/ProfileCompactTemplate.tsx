@@ -707,6 +707,7 @@ export function ProfileCompactTemplate({
 
                 <ProfileInlineNotificationsCTA
                   artist={artist}
+                  onManageNotifications={() => openDrawerMode('notifications')}
                   onRegisterReveal={fn => {
                     revealNotificationsRef.current = fn;
                   }}

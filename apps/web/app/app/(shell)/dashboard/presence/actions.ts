@@ -4,7 +4,7 @@ import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { dspCatalogMismatches } from '@/lib/db/schema/dsp-catalog-scan';
@@ -102,15 +102,15 @@ export async function loadDspPresenceForProfile(
   profileId: string
 ): Promise<DspPresenceData> {
   // Verify the caller owns this profile
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
+  const { user } = await getSessionContext();
   const [ownedProfile] = await db
     .select({ id: creatorProfiles.id })
     .from(creatorProfiles)
     .where(
-      and(eq(creatorProfiles.id, profileId), eq(creatorProfiles.userId, userId))
+      and(
+        eq(creatorProfiles.id, profileId),
+        eq(creatorProfiles.userId, user.id)
+      )
     )
     .limit(1);
   if (!ownedProfile) {

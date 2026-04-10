@@ -18,7 +18,6 @@ import {
   noFontSynthesisStyle,
   SubscriptionFormSkeleton,
   SubscriptionPearlComposer,
-  SubscriptionPendingConfirmation,
   SubscriptionSuccess,
   subscriptionComposerFocusClassName,
   subscriptionDisclaimerClassName,
@@ -422,10 +421,6 @@ export function ArtistNotificationsCTA({
     )
   ) {
     return <ListenNowCTA variant={variant} handle={artist.handle} />;
-  }
-
-  if (notificationsState === 'pending_confirmation') {
-    return <SubscriptionPendingConfirmation />;
   }
 
   if (isSubscribed) {

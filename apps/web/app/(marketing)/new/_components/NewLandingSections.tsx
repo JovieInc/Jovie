@@ -167,6 +167,7 @@ export function NewLandingSections() {
                   height={1800}
                   title='Release workspace'
                   chrome='minimal'
+                  priority
                   skipCheck
                   testId='landing-release-screenshot'
                   className='rounded-[1.15rem]'
@@ -251,6 +252,7 @@ export function NewLandingSections() {
                             src='/product-screenshots/profile-phone.png'
                             alt='Mobile artist profile preview with fan actions and listening destinations'
                             fill
+                            priority
                             sizes='238px'
                             className='object-cover object-top'
                           />
@@ -267,6 +269,7 @@ export function NewLandingSections() {
                             src='/product-screenshots/profile-phone.png'
                             alt='Mobile artist profile preview with fan actions and listening destinations'
                             fill
+                            priority
                             sizes='172px'
                             className='object-cover object-top'
                           />

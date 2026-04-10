@@ -307,6 +307,17 @@ describe('Profile Service Queries', () => {
   });
 
   describe('getProfileWithLinks', () => {
+    it('fast-fails known probe usernames without touching Redis or the database', async () => {
+      const { getProfileWithLinks } = await import(
+        '@/lib/services/profile/queries'
+      );
+      const result = await getProfileWithLinks('wp');
+
+      expect(result).toBeNull();
+      expect(mockRedisGet).not.toHaveBeenCalled();
+      expect(mockDbSelect).not.toHaveBeenCalled();
+    });
+
     it('returns cached data from Redis when available', async () => {
       const cachedProfile = {
         ...mockProfileWithUser,

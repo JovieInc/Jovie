@@ -109,12 +109,17 @@ describe('CampaignSettingsPanel', () => {
     renderWithQueryClient(<CampaignSettingsPanel />);
 
     await waitFor(() => {
-      expect(screen.getByText('Campaign targeting')).toBeInTheDocument();
+      expect(screen.getByText('Growth Defaults')).toBeInTheDocument();
     });
 
-    expect(screen.getByLabelText('Minimum Fit Score')).toBeInTheDocument();
-    expect(screen.getByLabelText('Batch Size')).toBeInTheDocument();
-    expect(screen.getByLabelText('Min Delay (seconds)')).toBeInTheDocument();
-    expect(screen.getByLabelText('Max Delay (seconds)')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Set campaign qualification and send pacing defaults. Day-to-day operation lives in Admin Growth.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Minimum fit score')).toBeInTheDocument();
+    expect(screen.getByLabelText('Batch size')).toBeInTheDocument();
+    expect(screen.getByLabelText('Min delay (seconds)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Max delay (seconds)')).toBeInTheDocument();
   });
 });

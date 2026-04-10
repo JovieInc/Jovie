@@ -4,12 +4,10 @@ import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { track } from '@/lib/analytics';
 
-type LandingCTAEventName = 'landing_cta_get_started';
-
 interface LandingCTAButtonProps {
   readonly href: string;
   readonly label: string;
-  readonly eventName: LandingCTAEventName;
+  readonly eventName: string;
   readonly section: 'hero';
   readonly variant?: 'primary' | 'text';
   readonly className?: string;

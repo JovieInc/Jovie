@@ -11,6 +11,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
+import { OtpInput } from '@/features/auth/atoms/otp-input';
 import {
   type CountryOption,
   CountrySelector,
@@ -23,7 +24,6 @@ import {
   noFontSynthesisStyle,
   SubscriptionFormSkeleton,
   SubscriptionPearlComposer,
-  SubscriptionPendingConfirmation,
   SubscriptionSuccess,
   subscriptionComposerFocusClassName,
   subscriptionDisclaimerClassName,
@@ -122,6 +122,12 @@ function getSubmitLabel(isSubmitting: boolean, otpStep: string): string {
   return 'Get notified';
 }
 
+function getHeading(otpStep: string): string {
+  return otpStep === 'verify'
+    ? 'Check your inbox. Enter your code.'
+    : 'Never miss a release.';
+}
+
 function getChannelToggleLabel(channel: 'email' | 'sms'): string {
   return channel === 'sms'
     ? 'Switch to email updates'
@@ -142,8 +148,10 @@ interface ChannelInputRowProps {
   readonly disclaimerId: string;
   readonly inputConfig: ReturnType<typeof getInputConfig>;
   readonly inputValue: string;
+  readonly otpCode: string;
   readonly handlePhoneChange: (v: string) => void;
   readonly handleEmailChange: (v: string) => void;
+  readonly handleOtpChange: (v: string) => void;
   readonly isInputFocused: boolean;
   readonly setIsInputFocused: (f: boolean) => void;
   readonly handleFieldBlur: () => void;
@@ -152,6 +160,7 @@ interface ChannelInputRowProps {
   readonly handleVerifyOtp: () => Promise<void>;
   readonly handleSubscribe: () => Promise<void>;
   readonly smsEnabled: boolean;
+  readonly error: string | null;
 }
 
 function ChannelInputRow({
@@ -168,8 +177,10 @@ function ChannelInputRow({
   disclaimerId,
   inputConfig,
   inputValue,
+  otpCode,
   handlePhoneChange,
   handleEmailChange,
+  handleOtpChange,
   isInputFocused,
   setIsInputFocused,
   handleFieldBlur,
@@ -178,6 +189,7 @@ function ChannelInputRow({
   handleVerifyOtp,
   handleSubscribe,
   smsEnabled,
+  error,
 }: ChannelInputRowProps) {
   const handleSubmit = () => {
     const action = otpStep === 'verify' ? handleVerifyOtp() : handleSubscribe();
@@ -194,9 +206,10 @@ function ChannelInputRow({
 
   return (
     <SubscriptionPearlComposer
+      layout={otpStep === 'verify' ? 'stacked' : 'inline'}
       dataTestId='subscription-pearl-composer'
       leftSlot={
-        shouldShowCountrySelector ? (
+        otpStep === 'verify' ? undefined : shouldShowCountrySelector ? (
           <CountrySelector
             country={country}
             isOpen={isCountryOpen}
@@ -232,35 +245,57 @@ function ChannelInputRow({
           {getSubmitLabel(isSubmitting, otpStep)}
         </button>
       }
-      className={isInputFocused ? subscriptionComposerFocusClassName : ''}
+      className={
+        otpStep === 'verify'
+          ? 'px-3 py-3'
+          : isInputFocused
+            ? subscriptionComposerFocusClassName
+            : ''
+      }
     >
-      <div className='min-w-0'>
-        <label htmlFor={inputId} className='sr-only'>
-          {channel === 'sms' ? 'Phone number' : 'Email address'}
-        </label>
-        <input
-          ref={inputRef}
-          id={inputId}
-          data-testid='subscription-input'
-          aria-describedby={disclaimerId}
-          type={inputConfig.type}
-          inputMode={inputConfig.inputMode}
-          className={subscriptionInputClassName}
-          placeholder={inputConfig.placeholder}
-          value={inputValue}
-          onChange={handleInputChange}
-          onFocus={() => setIsInputFocused(true)}
-          onBlur={() => {
-            setIsInputFocused(false);
-            handleFieldBlur();
-          }}
-          onKeyDown={handleKeyDown}
-          disabled={isSubmitting}
-          autoComplete={inputConfig.autoComplete}
-          maxLength={inputConfig.maxLength}
-          style={noFontSynthesisStyle}
-        />
-      </div>
+      {otpStep === 'verify' ? (
+        <div className='px-2 py-2'>
+          <OtpInput
+            value={otpCode}
+            onChange={handleOtpChange}
+            onComplete={() => {
+              handleVerifyOtp().catch(() => {});
+            }}
+            autoFocus
+            aria-label='Enter 6-digit verification code'
+            disabled={isSubmitting}
+            error={Boolean(error)}
+          />
+        </div>
+      ) : (
+        <div className='min-w-0'>
+          <label htmlFor={inputId} className='sr-only'>
+            {channel === 'sms' ? 'Phone number' : 'Email address'}
+          </label>
+          <input
+            ref={inputRef}
+            id={inputId}
+            data-testid='subscription-input'
+            aria-describedby={disclaimerId}
+            type={inputConfig.type}
+            inputMode={inputConfig.inputMode}
+            className={subscriptionInputClassName}
+            placeholder={inputConfig.placeholder}
+            value={inputValue}
+            onChange={handleInputChange}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => {
+              setIsInputFocused(false);
+              handleFieldBlur();
+            }}
+            onKeyDown={handleKeyDown}
+            disabled={isSubmitting}
+            autoComplete={inputConfig.autoComplete}
+            maxLength={inputConfig.maxLength}
+            style={noFontSynthesisStyle}
+          />
+        </div>
+      )}
     </SubscriptionPearlComposer>
   );
 }
@@ -300,6 +335,7 @@ export function TwoStepNotificationsCTA({
     phoneInput,
     emailInput,
     error,
+    otpCode,
     otpStep,
     isSubmitting,
     isCountryOpen,
@@ -310,6 +346,7 @@ export function TwoStepNotificationsCTA({
     handlePhoneChange,
     handleEmailChange,
     handleFieldBlur,
+    handleOtpChange,
     handleSubscribe,
     handleVerifyOtp,
     handleKeyDown,
@@ -347,7 +384,10 @@ export function TwoStepNotificationsCTA({
   }, [openSubscription, startExpanded]);
 
   useEffect(() => {
-    if (notificationsState === 'editing') {
+    if (
+      notificationsState === 'editing' ||
+      notificationsState === 'pending_confirmation'
+    ) {
       setStep('input');
     }
   }, [notificationsState]);
@@ -410,10 +450,6 @@ export function TwoStepNotificationsCTA({
     return <SubscriptionFormSkeleton />;
   }
 
-  if (notificationsState === 'pending_confirmation') {
-    return <SubscriptionPendingConfirmation />;
-  }
-
   if (isSubscribed) {
     return (
       <SubscriptionSuccess
@@ -444,7 +480,7 @@ export function TwoStepNotificationsCTA({
       data-testid='subscribe-cta-container'
     >
       <p className={subscriptionHeadingClassName} style={noFontSynthesisStyle}>
-        Never miss a release.
+        {getHeading(otpStep)}
       </p>
 
       <AnimatePresence mode='wait' initial={false}>
@@ -480,8 +516,10 @@ export function TwoStepNotificationsCTA({
                 disclaimerId={disclaimerId}
                 inputConfig={inputConfig}
                 inputValue={inputValue}
+                otpCode={otpCode}
                 handlePhoneChange={handlePhoneChange}
                 handleEmailChange={handleEmailChange}
+                handleOtpChange={handleOtpChange}
                 isInputFocused={isInputFocused}
                 setIsInputFocused={setIsInputFocused}
                 handleFieldBlur={handleFieldBlur}
@@ -490,6 +528,7 @@ export function TwoStepNotificationsCTA({
                 handleVerifyOtp={handleVerifyOtp}
                 handleSubscribe={handleSubscribe}
                 smsEnabled={smsEnabled}
+                error={error}
               />
 
               <div className='relative min-h-5'>

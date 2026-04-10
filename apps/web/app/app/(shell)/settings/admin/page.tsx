@@ -23,7 +23,7 @@ export default function SettingsAdminPage() {
     <SettingsSection
       id='admin'
       title='Admin'
-      description='Dev toolbar, waitlist controls, campaign targeting, and admin quick links.'
+      description='Persistent admin defaults, environment controls, and quick links into the operator workspaces.'
     >
       <SettingsAdminSection />
     </SettingsSection>
