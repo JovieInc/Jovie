@@ -136,7 +136,6 @@ function HeroSmartLinkPanel() {
         glowTone='blue'
         imageClassName='object-cover'
         className='shadow-[0_30px_90px_rgba(0,0,0,0.44)]'
-        priority
       />
     </div>
   );

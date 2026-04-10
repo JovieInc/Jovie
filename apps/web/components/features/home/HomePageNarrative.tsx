@@ -39,7 +39,9 @@ function HomeHero() {
     <SharedMarketingHero
       eyebrow='The release system for independent artists'
       headingId='home-hero-heading'
+      sectionTestId='homepage-shell'
       primaryCtaLabel='Get Started'
+      ctaEventName='landing_cta_get_started'
       primaryCtaTestId='homepage-primary-cta'
       secondaryCtaLabel='See Demo'
       secondaryCtaHref={APP_ROUTES.DEMO}
