@@ -35,16 +35,16 @@ describe('DrawerSurfaceCard', () => {
 
     expect(className).toContain('border-subtle');
     expect(className).toContain('bg-surface-1');
-    expect(className).toContain('shadow-card');
+    expect(className).toContain('shadow-none');
     expect(className).toContain('rounded-[10px]');
   });
 
-  it('drawer and sidebar cards are elevated above content (Tier 2)', () => {
-    expect(LINEAR_SURFACE.drawerCard).toContain('shadow-card');
+  it('drawer and sidebar cards use border-only elevation (no shadow)', () => {
+    expect(LINEAR_SURFACE.drawerCard).toContain('shadow-none');
     expect(LINEAR_SURFACE.drawerCard).toContain('border-subtle');
     expect(LINEAR_SURFACE.drawerCard).toContain('bg-surface-1');
-    expect(LINEAR_SURFACE.drawerCardSm).toContain('shadow-card');
-    expect(LINEAR_SURFACE.sidebarCard).toContain('shadow-card');
+    expect(LINEAR_SURFACE.drawerCardSm).toContain('shadow-none');
+    expect(LINEAR_SURFACE.sidebarCard).toContain('shadow-none');
 
     expect(LINEAR_SURFACE.contentContainer).toContain('shadow-none');
     expect(LINEAR_SURFACE.popover).toContain('shadow-[var(--shadow-popover)]');
