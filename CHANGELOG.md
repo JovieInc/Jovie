@@ -27,6 +27,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - OG images no longer bypass the 2MB size guard when upstream servers omit Content-Length headers
 - Empty countdown container no longer renders when release date has passed (uses CSS empty:hidden)
+- Notification subscribe on profile pages now shows the OTP verification input after email submission instead of staying stuck on the email field
 
 ## [26.4.142] - 2026-04-10
 

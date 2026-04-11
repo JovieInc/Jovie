@@ -253,7 +253,7 @@ async function aggregateClicks(
             with base as (
               select * from ${clickEvents}
               where ${clickEvents.creatorProfileId} = ${profileId}
-                and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
+                and ${clickEvents.isBot} = false
             ),
             current_events as (
               select * from base
@@ -714,7 +714,7 @@ async function aggregateTemporalPatterns(
             with events as (
               select created_at from ${clickEvents}
               where ${clickEvents.creatorProfileId} = ${profileId}
-                and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
+                and ${clickEvents.isBot} = false
                 and created_at >= ${sqlTimestamp(period.start)}
                 and created_at < ${sqlTimestamp(period.end)}
             )
