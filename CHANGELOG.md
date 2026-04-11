@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.143.1] - 2026-04-10
+
+### Fixed
+
+- Checkboxes now properly toggle when clicked, fixing broken indeterminate state handling that prevented "select all" from working correctly in tables
+- Indeterminate checkboxes now show a minus icon instead of a checkmark, matching standard UI conventions
+- Checkbox alignment fixed in admin creator profile rows (was rendering at top-left instead of centered)
+- Screen readers can now access table checkboxes (removed `aria-hidden` from interactive containers)
+
+### Changed
+
+- All checkbox instances now use the central design system component without custom style overrides, ensuring consistent appearance across admin, audience, and dashboard tables
+
 ## [26.4.143] - 2026-04-10
 
 ### Fixed
