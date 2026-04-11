@@ -820,8 +820,8 @@ jobs:
         id: resolve-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
@@ -944,8 +944,8 @@ jobs:
         id: resolve-dashboard-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
@@ -1087,8 +1087,8 @@ jobs:
         id: resolve-onboarding-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
@@ -1901,8 +1901,8 @@ jobs:
         id: resolve-e2e-smoke-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
@@ -2010,8 +2010,8 @@ jobs:
         id: resolve-admin-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
@@ -2425,7 +2425,7 @@ jobs:
       - name: Resolve DATABASE_URL (Neon ephemeral)
         run: |
           DIRECT_URL="${{ steps.neon-branch.outputs.db_url }}"
-          RUNTIME_URL="${{ steps.neon-branch.outputs.db_url_pooled }}"
+          RUNTIME_URL="$DIRECT_URL"
 
           if [ -z "$DIRECT_URL" ]; then
             echo "No Neon ephemeral DATABASE_URL available."
@@ -2433,7 +2433,7 @@ jobs:
           fi
 
           if [ -z "$RUNTIME_URL" ]; then
-            RUNTIME_URL="$DIRECT_URL"
+            RUNTIME_URL="${{ steps.neon-branch.outputs.db_url_pooled }}"
           fi
 
           echo "DATABASE_URL_DIRECT=$DIRECT_URL" >> "$GITHUB_ENV"
@@ -2908,8 +2908,8 @@ jobs:
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url_pooled
-          fallback_json_key: db_url
+          candidate_json_key: db_url
+          fallback_json_key: db_url_pooled
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
