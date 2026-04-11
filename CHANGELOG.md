@@ -7,9 +7,33 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.145] - 2026-04-10
 
+### Changed
+
+- Normalized audience JSONB arrays (referrer history, actions) into relational tables for query performance and schema safety
+- Made `url` column on `audience_referrers` NOT NULL since the write path already guards against null values
+- Populated the `source` field from referrer URL hostname on every referrer insert
+- Removed redundant `onConflictDoNothing()` on referrer inserts where no unique constraint exists
+
 ### Fixed
 
 - Profile nav button now toggles the right drawer open and closed instead of only opening it
+
+## [26.4.144.1] - 2026-04-10
+
+### Added
+
+- "Create a new release" suggestion on the empty chat state, shown as the first option for both new and returning users
+
+### Fixed
+
+- Checkboxes now properly toggle when clicked, fixing broken indeterminate state handling that prevented "select all" from working correctly in tables
+- Indeterminate checkboxes now show a minus icon instead of a checkmark, matching standard UI conventions
+- Checkbox alignment fixed in admin creator profile rows (was rendering at top-left instead of centered)
+- Screen readers can now access table checkboxes (removed `aria-hidden` from interactive containers)
+
+### Changed
+
+- All checkbox instances now use the central design system component without custom style overrides, ensuring consistent appearance across admin, audience, and dashboard tables
 
 ## [26.4.144] - 2026-04-10
 

@@ -60,6 +60,7 @@ export default function CheckboxesPage() {
           <Checkbox
             checked={indeterminate ? 'indeterminate' : false}
             onCheckedChange={() => setIndeterminate(prev => !prev)}
+            aria-label='Indeterminate example'
           />
         </Stack>
         <Stack title='disabled unchecked'>

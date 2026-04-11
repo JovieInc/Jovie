@@ -61,7 +61,6 @@ export function AdminCreatorsTableHeader({
             aria-label='Select all creators'
             checked={headerCheckboxState}
             onCheckedChange={onToggleSelectAll}
-            className='border-subtle bg-surface-0 text-(--linear-accent) data-[state=checked]:border-(--linear-accent) data-[state=checked]:bg-(--linear-accent) data-[state=checked]:text-white'
           />
         </th>
         <th className={headerCellClass} style={stickyStyle}>
