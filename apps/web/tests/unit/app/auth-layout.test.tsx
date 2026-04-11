@@ -7,18 +7,23 @@ interface RenderAuthLayoutOptions {
   readonly forwardedHost?: string;
   readonly forwardedProto?: string;
   readonly publishableKey?: string;
+  readonly secretKey?: string;
   readonly stagingPublishableKey?: string;
   readonly stagingSecretKey?: string;
 }
 
 const originalStagingPublishableKey = process.env.CLERK_PUBLISHABLE_KEY_STAGING;
 const originalStagingSecretKey = process.env.CLERK_SECRET_KEY_STAGING;
+const originalClerkSecretKey = process.env.CLERK_SECRET_KEY;
+const originalClerkPublishableKey =
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 async function renderAuthRouteLayout({
   clerkMockFlag = '0',
   forwardedHost = 'jov.ie',
   forwardedProto = 'https',
   publishableKey,
+  secretKey = 'sk_test_default',
   stagingPublishableKey,
   stagingSecretKey,
 }: RenderAuthLayoutOptions) {
@@ -34,6 +39,13 @@ async function renderAuthRouteLayout({
     delete process.env.CLERK_SECRET_KEY_STAGING;
   } else {
     process.env.CLERK_SECRET_KEY_STAGING = stagingSecretKey;
+  }
+
+  // resolvePublishableKeyFromHeaders requires both PK and SK to return a key
+  if (publishableKey) {
+    process.env.CLERK_SECRET_KEY = secretKey;
+  } else {
+    delete process.env.CLERK_SECRET_KEY;
   }
 
   vi.doMock('@/lib/env-public', () => ({
@@ -98,6 +110,18 @@ afterEach(() => {
     delete process.env.CLERK_SECRET_KEY_STAGING;
   } else {
     process.env.CLERK_SECRET_KEY_STAGING = originalStagingSecretKey;
+  }
+
+  if (originalClerkSecretKey === undefined) {
+    delete process.env.CLERK_SECRET_KEY;
+  } else {
+    process.env.CLERK_SECRET_KEY = originalClerkSecretKey;
+  }
+
+  if (originalClerkPublishableKey === undefined) {
+    delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  } else {
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = originalClerkPublishableKey;
   }
 
   vi.resetModules();
