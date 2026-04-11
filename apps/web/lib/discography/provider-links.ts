@@ -238,7 +238,7 @@ export async function lookupSpotifyByIsrc(
         }>;
       };
     }>(
-      `/search?q=${encodeURIComponent(`isrc:${isrc}`)}&type=track&limit=1&market=${encodeURIComponent(market)}`
+      `/search?q=${encodeURIComponent('isrc:' + isrc)}&type=track&limit=1&market=${encodeURIComponent(market)}`
     );
 
     const match = payload.tracks?.items?.[0];
