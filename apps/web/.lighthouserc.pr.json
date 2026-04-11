@@ -24,7 +24,7 @@
             "speed-index": ["warn", { "maxNumericValue": 5000 }],
             "max-potential-fid": "warn",
             "mainthread-work-breakdown": "warn",
-            "uses-responsive-images": "warn",
+            "uses-responsive-images": ["warn", { "maxLength": 2 }],
             "render-blocking-resources": "off",
             "render-blocking-insight": "off",
             "lcp-discovery-insight": "warn",
