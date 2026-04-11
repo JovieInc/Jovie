@@ -275,11 +275,11 @@ function buildClickAggSubquery(tx: DbSessionTx, profileId: string) {
     .select({
       audienceMemberId: clickEvents.audienceMemberId,
       streamingClicks:
-        drizzleSql<number>`COALESCE(COUNT(*) FILTER (WHERE ${clickEvents.linkType} = 'listen' AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)), 0)`.as(
+        drizzleSql<number>`COALESCE(COUNT(*) FILTER (WHERE ${clickEvents.linkType} = 'listen' AND ${clickEvents.isBot} = false), 0)`.as(
           'streaming_clicks'
         ),
       tipClickValueCents:
-        drizzleSql<number>`COALESCE(SUM(CASE WHEN ${clickEvents.linkType} = 'tip' AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL) THEN COALESCE((NULLIF(${clickEvents.metadata} ->> 'tipAmountCents', '')::integer), 500) ELSE 0 END), 0)`.as(
+        drizzleSql<number>`COALESCE(SUM(CASE WHEN ${clickEvents.linkType} = 'tip' AND ${clickEvents.isBot} = false THEN COALESCE((NULLIF(${clickEvents.metadata} ->> 'tipAmountCents', '')::integer), 500) ELSE 0 END), 0)`.as(
           'tip_click_value_cents'
         ),
     })
