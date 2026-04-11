@@ -237,6 +237,18 @@ describe('proxy composition (critical)', () => {
   // Clerk publishable key header injection
   // ==========================================================================
   describe('x-clerk-publishable-key header', () => {
+    const nextSpy = vi.spyOn(NextResponse, 'next');
+    beforeEach(() => {
+      nextSpy.mockClear();
+    });
+
+    const getInjectedClerkHeader = () => {
+      const arg = nextSpy.mock.calls.at(-1)?.[0] as
+        | { request?: { headers?: Headers } }
+        | undefined;
+      return arg?.request?.headers?.get('x-clerk-publishable-key') ?? null;
+    };
+
     it('sets header when both publishableKey and secretKey are present', async () => {
       mocks.resolveClerkKeys.mockReturnValue({
         publishableKey: 'pk_test_valid-key',
@@ -247,9 +259,8 @@ describe('proxy composition (critical)', () => {
       const req = createTestRequest({ pathname: '/signup' });
       const res = await callMiddleware(req);
 
-      // The header is set on the request passed to Next.js, which we can
-      // verify via the middleware mock's received args
       expect(res.status).toBeLessThan(400);
+      expect(getInjectedClerkHeader()).toBe('pk_test_valid-key');
     });
 
     it('does NOT set header when secretKey is missing (staging without CLERK_SECRET_KEY)', async () => {
@@ -262,8 +273,8 @@ describe('proxy composition (critical)', () => {
       const req = createTestRequest({ pathname: '/signup' });
       const res = await callMiddleware(req);
 
-      // Should not 500 — should pass through gracefully
       expect(res.status).toBeLessThan(500);
+      expect(getInjectedClerkHeader()).toBeNull();
     });
 
     it('does NOT set header when publishableKey is missing', async () => {
@@ -277,6 +288,7 @@ describe('proxy composition (critical)', () => {
       const res = await callMiddleware(req);
 
       expect(res.status).toBeLessThan(500);
+      expect(getInjectedClerkHeader()).toBeNull();
     });
   });
 
