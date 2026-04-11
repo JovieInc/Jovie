@@ -170,10 +170,7 @@ export function EntitySidebarShell({
         {hasTopRailContent || minimalEntityHeaderContent ? (
           <div className='shrink-0 space-y-2.5'>
             {hasTopRailContent ? (
-              <DrawerSurfaceCard
-                variant='card'
-                className='overflow-hidden lg:rounded-[18px]'
-              >
+              <DrawerSurfaceCard variant='card' className='overflow-hidden'>
                 <div className='border-b border-transparent bg-transparent backdrop-blur-[12px]'>
                   {showMinimalHeaderBar ? (
                     <DrawerHeader

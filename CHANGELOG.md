@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.146.2] - 2026-04-11
+
+### Fixed
+
+- Pass CSP nonce from middleware to theme-init Script in root layout, fixing hydration mismatch on authenticated pages
+- Suppress expected hydration warning on smart link URLs where server/client origins intentionally differ
+
+## [26.4.146.1] - 2026-04-11
+
+### Changed
+
+- Normalize settings typography: descriptions from 13px to 12px in SettingsActionRow and SettingsToggleRow
+- Align SettingsPanel title letter-spacing to -0.02em to match row components
+- Override SettingsSection header to 13px/font-[540] with 12px descriptions via new PageHeader pass-through props
+- Moved playlist pages from `(marketing)` to `(dynamic)` route group so ISR pages with DB queries no longer violate the static marketing page contract
+- Added dedicated playlist layout to preserve site header, footer, and dark theme styling
+
+## [26.4.146.0] - 2026-04-11
+
+### Fixed
+
+- Staging auth routes (/signup, /signin) returning 500, blocking CI canary health gate since April 8
+- Detect production Clerk keys on staging and skip middleware instead of crashing on domain mismatch
+- Add try-catch safety net around staging Clerk middleware call
+- Fix auth layout tests missing CLERK_SECRET_KEY in test environment
+- Gate x-clerk-publishable-key header injection on both PK and SK presence
+
+## [26.4.145.2] - 2026-04-11
+
+### Fixed
+
+<<<<<<< HEAD
+- Fixed territory badge border token in ContactDetailSidebar — replaced `border-(--linear-app-frame-seam)` (divider token) with `border-subtle` (card-level token) to match release sidebar badge pattern
+=======
+- Standardized dashboard elevation tokens to 3-tier system (DataCard, EmptyState, banners, empty state icons)
+- Added card wrapper to audience funnel stats (Profile Views, Unique Visitors, Followers)
+- Removed double shadow on chat input that caused visible border artifact
+- Fixed drawer card clipping from oversized 18px border radius
+- Improved smart link URL contrast from tertiary to secondary text color
+- Removed directional shadow-card from drawer/sidebar cards to fix uneven border weight
+- Centered empty state text with contextual icons in analytics sidebar tabs
+
 ## [26.4.145.1] - 2026-04-10
 
 ### Fixed
@@ -24,6 +66,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Made `url` column on `audience_referrers` NOT NULL since the write path already guards against null values
 - Populated the `source` field from referrer URL hostname on every referrer insert
 - Removed redundant `onConflictDoNothing()` on referrer inserts where no unique constraint exists
+
+### Fixed
+
+- Profile nav button now toggles the right drawer open and closed instead of only opening it
 
 ## [26.4.144.1] - 2026-04-10
 

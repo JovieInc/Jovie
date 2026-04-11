@@ -467,7 +467,8 @@ export function ProfileContactSidebar() {
       nextParams.set('tab', 'earn');
       nextParams.set('addLink', '1');
       const nextSearch = nextParams.toString();
-      router.replace(`${pathname}${nextSearch ? `?${nextSearch}` : ''}#tips`, {
+      const searchSuffix = nextSearch ? `?${nextSearch}` : '';
+      router.replace(`${pathname}${searchSuffix}#tips`, {
         scroll: false,
       });
     }

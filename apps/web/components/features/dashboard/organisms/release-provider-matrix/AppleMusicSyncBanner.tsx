@@ -210,7 +210,7 @@ export function AppleMusicSyncBanner({
     <DrawerSurfaceCard
       variant='card'
       className={cn(
-        'flex items-center gap-3 rounded-[12px] border border-[#FA243C]/16 bg-[color-mix(in_oklab,#FA243C_4%,var(--linear-app-content-surface))] px-4 py-3',
+        'flex items-center gap-3 rounded-[10px] border border-[#FA243C]/16 bg-[color-mix(in_oklab,#FA243C_4%,var(--linear-app-content-surface))] px-4 py-3',
         className
       )}
     >

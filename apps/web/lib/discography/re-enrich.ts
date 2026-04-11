@@ -74,7 +74,9 @@ export async function reEnrichProfile(
     errors: [],
   };
 
-  const importedReleases = await getReleasesForProfile(creatorProfileId);
+  const importedReleases = await getReleasesForProfile(creatorProfileId, {
+    includeDrafts: true,
+  });
 
   if (importedReleases.length === 0) {
     return result;

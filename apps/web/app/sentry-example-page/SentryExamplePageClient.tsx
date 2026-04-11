@@ -63,7 +63,7 @@ export function SentryExamplePageClient() {
               >
                 Next.js docs
               </a>
-              .
+              {'.'}
             </p>
           </div>
 

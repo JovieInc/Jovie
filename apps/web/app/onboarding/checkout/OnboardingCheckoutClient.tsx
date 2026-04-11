@@ -113,7 +113,8 @@ function ProfilePreviewCard({
             <span className='font-medium text-primary-token'>
               {spotifyFollowers.toLocaleString()} Spotify followers
             </span>
-            . Pro analytics shows exactly where they&apos;re listening from.
+            {'. '}
+            Pro analytics shows exactly where they&apos;re listening from.
           </p>
         </ContentSurfaceCard>
       ) : null}

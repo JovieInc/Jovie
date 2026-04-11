@@ -26,7 +26,7 @@ export function ReleasesEmptyState({
         className={emptyCardClassName}
         testId='releases-empty-state-enriching'
       >
-        <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[11px] border border-(--linear-app-frame-seam) bg-surface-1'>
+        <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
           <Icon name='Sparkles' className='h-4 w-4 text-tertiary-token' />
         </div>
         <div className='mb-2.5 h-4.5 w-4.5 animate-spin rounded-full border-2 border-accent/30 border-t-accent' />
@@ -49,7 +49,7 @@ export function ReleasesEmptyState({
         className={emptyCardClassName}
         testId='releases-empty-state-partial'
       >
-        <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[11px] border border-(--linear-app-frame-seam) bg-surface-1'>
+        <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
           <Icon name='Disc3' className='h-4 w-4 text-tertiary-token' />
         </div>
         <h3 className='text-[13px] font-[510] text-primary-token'>
@@ -80,7 +80,7 @@ export function ReleasesEmptyState({
         className={emptyCardClassName}
         testId='releases-empty-state-failed'
       >
-        <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[11px] border border-(--linear-app-frame-seam) bg-surface-1'>
+        <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
           <Icon name='SearchX' className='h-4 w-4 text-tertiary-token' />
         </div>
         <h3 className='text-[13px] font-[510] text-primary-token'>
@@ -110,7 +110,7 @@ export function ReleasesEmptyState({
       className='flex min-h-[204px] flex-col items-center justify-center px-5 py-8 text-center'
       testId='releases-empty-state-disconnected'
     >
-      <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[11px] border border-(--linear-app-frame-seam) bg-surface-1'>
+      <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
         <Icon name='Disc3' className='h-4 w-4 text-tertiary-token' />
       </div>
       <h3 className='text-[13px] font-[510] text-primary-token'>

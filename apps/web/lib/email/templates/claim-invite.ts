@@ -70,7 +70,9 @@ export function getClaimInviteText(data: ClaimInviteTemplateData): string {
     ? `\n\nDon't want to receive these emails? Unsubscribe: ${unsubscribeUrl}`
     : '';
 
-  return `${greetingName ? `${greetingName}!` : 'Ayyy!'}
+  const greeting = greetingName ? `${greetingName}!` : 'Ayyy!';
+
+  return `${greeting}
 
 What up. It's Tim White, artist and founder of ${APP_NAME}.
 
