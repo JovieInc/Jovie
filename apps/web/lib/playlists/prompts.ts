@@ -18,21 +18,22 @@ export function buildConceptPrompt(options: {
 }): string {
   const { previousTitles, genreFocus, category = 'general', seed } = options;
 
+  const titleList = previousTitles.map(t => `- ${t}`).join('\n');
   const avoidList =
     previousTitles.length > 0
-      ? `\nPreviously generated titles (DO NOT repeat or closely resemble these):\n${previousTitles.map(t => `- ${t}`).join('\n')}`
+      ? `\nPreviously generated titles (DO NOT repeat or closely resemble these):\n${titleList}`
       : '';
 
   const genreDirective = genreFocus
     ? `\nGenre focus for this playlist: ${genreFocus}. Stay within this genre family but be creative with the angle.`
     : '';
 
-  const categoryDirective =
-    category === 'soundtrack'
-      ? `\nThis playlist should be themed around a movie, TV show, video game, or cultural moment. Examples: "Songs That Sound Like Running Through Rain in a Movie", "If Wes Anderson Made a Lo-Fi Playlist", "GTA Vice City Radio Vibes". The reference should be specific and searchable.`
-      : category === 'cultural'
-        ? `\nThis playlist should be themed around a specific cultural moment, aesthetic, or activity. Examples: "Coffee Shop in Brooklyn on a Sunday", "Desert Road Trip: Psych Rock & Stoner Metal", "3am Alone in a City That Never Sleeps".`
-        : '';
+  let categoryDirective = '';
+  if (category === 'soundtrack') {
+    categoryDirective = `\nThis playlist should be themed around a movie, TV show, video game, or cultural moment. Examples: "Songs That Sound Like Running Through Rain in a Movie", "If Wes Anderson Made a Lo-Fi Playlist", "GTA Vice City Radio Vibes". The reference should be specific and searchable.`;
+  } else if (category === 'cultural') {
+    categoryDirective = `\nThis playlist should be themed around a specific cultural moment, aesthetic, or activity. Examples: "Coffee Shop in Brooklyn on a Sunday", "Desert Road Trip: Psych Rock & Stoner Metal", "3am Alone in a City That Never Sleeps".`;
+  }
 
   return `You are a music curator with encyclopedic knowledge across all genres, eras, and scenes. Generate a hyper-specific playlist concept that someone would actually search for on Google or Spotify.
 
@@ -89,7 +90,7 @@ export function buildCurationPrompt(options: {
 
   const jovieSection =
     jovieArtistTracks.length > 0
-      ? `\nJovie artist tracks to include (place in positions 3-8, after mood is established):\n${jovieArtistTracks.map(t => `  - [${t.spotifyTrackId}] ${t.artist} - ${t.name}`).join('\n')}`
+      ? `\nJovie artist tracks to include (place in positions 3-8, after mood is established):\n${jovieArtistTracks.map(t => '  - [' + t.spotifyTrackId + '] ' + t.artist + ' - ' + t.name).join('\n')}`
       : '\nNo Jovie artists match this theme.';
 
   return `You are sequencing a ${targetSize}-track playlist called "${concept.title}".

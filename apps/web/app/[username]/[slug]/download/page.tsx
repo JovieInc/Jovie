@@ -44,7 +44,7 @@ export async function generateMetadata({
   if (!creator) return {};
 
   const content = await getContentBySlug(creator.id, slug);
-  if (!content || content.type !== 'release') return {};
+  if (content?.type !== 'release') return {};
 
   const artistName = creator.displayName ?? creator.username;
 
@@ -70,7 +70,7 @@ export default async function PromoDownloadPage({ params }: PageProps) {
 
   const content = await getContentBySlug(creator.id, slug);
   // Only releases have promo downloads, not tracks
-  if (!content || content.type !== 'release') notFound();
+  if (content?.type !== 'release') notFound();
 
   const { plan } = await getCreatorEntitlements(creator.id);
   if (plan === 'free') notFound();

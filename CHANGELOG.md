@@ -9,6 +9,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Normalize settings typography: descriptions from 13px to 12px in SettingsActionRow and SettingsToggleRow
+- Align SettingsPanel title letter-spacing to -0.02em to match row components
+- Override SettingsSection header to 13px/font-[540] with 12px descriptions via new PageHeader pass-through props
 - Moved playlist pages from `(marketing)` to `(dynamic)` route group so ISR pages with DB queries no longer violate the static marketing page contract
 - Added dedicated playlist layout to preserve site header, footer, and dark theme styling
 
@@ -26,6 +29,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+<<<<<<< HEAD
+- Fixed territory badge border token in ContactDetailSidebar — replaced `border-(--linear-app-frame-seam)` (divider token) with `border-subtle` (card-level token) to match release sidebar badge pattern
+=======
 - Standardized dashboard elevation tokens to 3-tier system (DataCard, EmptyState, banners, empty state icons)
 - Added card wrapper to audience funnel stats (Profile Views, Unique Visitors, Followers)
 - Removed double shadow on chat input that caused visible border artifact
