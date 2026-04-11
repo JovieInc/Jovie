@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.145] - 2026-04-10
+
+### Changed
+
+- Normalized audience JSONB arrays (referrer history, actions) into relational tables for query performance and schema safety
+- Made `url` column on `audience_referrers` NOT NULL since the write path already guards against null values
+- Populated the `source` field from referrer URL hostname on every referrer insert
+- Removed redundant `onConflictDoNothing()` on referrer inserts where no unique constraint exists
+
 ## [26.4.144.1] - 2026-04-10
 
 ### Added
