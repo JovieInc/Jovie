@@ -155,7 +155,7 @@ export function SessionManagementCard({
                   </p>
                   {isCurrent ? (
                     <Badge variant='secondary' size='sm'>
-                      Current session
+                      Current Session
                     </Badge>
                   ) : null}
                 </div>
