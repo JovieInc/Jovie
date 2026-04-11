@@ -34,6 +34,7 @@ import {
 } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
+import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import { CompactReleasePlanUpgradeCard } from '@/features/dashboard/tasks/TasksUpgradeInterstitial';
@@ -47,7 +48,6 @@ import type { ProviderKey } from '@/lib/discography/types';
 import { usePlanGate } from '@/lib/queries';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { ReleaseCreditsSection } from './ReleaseCreditsSection';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
@@ -58,7 +58,12 @@ import { useReleaseHeaderParts } from './ReleaseSidebarHeader';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
 import { ReleaseTargetPlaylistsSection } from './ReleaseTargetPlaylistsSection';
 import { ReleaseTrackList } from './ReleaseTrackList';
-import type { Release, ReleaseSidebarProps } from './types';
+import type {
+  Release,
+  ReleaseSidebarAnalytics,
+  ReleaseSidebarAnalyticsState,
+  ReleaseSidebarProps,
+} from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
 import { useTrackAudioPlayer } from './useTrackAudioPlayer';
 
@@ -363,6 +368,12 @@ export function ReleaseSidebar({
     usePlanGate();
   const [platformRescanCooldownEnd, setPlatformRescanCooldownEnd] = useState(0);
   const [platformRescanRemainingMs, setPlatformRescanRemainingMs] = useState(0);
+  const [drawerAnalytics, setDrawerAnalytics] =
+    useState<ReleaseSidebarAnalytics | null>(analyticsOverride ?? null);
+  const [drawerAnalyticsState, setDrawerAnalyticsState] =
+    useState<ReleaseSidebarAnalyticsState>(
+      analyticsOverride ? 'ready' : 'loading'
+    );
   const platformRescanTimerRef = useRef<ReturnType<typeof setInterval> | null>(
     null
   );
@@ -372,6 +383,17 @@ export function ReleaseSidebar({
     setPlatformRescanCooldownEnd(0);
     setPlatformRescanRemainingMs(0);
   }, [release?.id]);
+
+  useEffect(() => {
+    if (analyticsOverride) {
+      setDrawerAnalytics(analyticsOverride);
+      setDrawerAnalyticsState('ready');
+      return;
+    }
+
+    setDrawerAnalytics(null);
+    setDrawerAnalyticsState(release?.id ? 'loading' : 'ready');
+  }, [analyticsOverride, release?.id]);
 
   useEffect(() => {
     if (isRescanningIsrc) {
@@ -447,15 +469,27 @@ export function ReleaseSidebar({
 
   const handleCopyReleasePath = useCallback(
     async (path: string, label: string) => {
-      const copied = await copyToClipboard(`${getBaseUrl()}${path}`);
+      const publicSmartLinkUrl = `${BASE_URL}${path}`;
+      const copied = await copyToClipboard(publicSmartLinkUrl);
 
       if (copied) {
         toast.success(`${label} copied`);
-        return `${getBaseUrl()}${path}`;
+        return publicSmartLinkUrl;
       }
 
       toast.error(`Failed to copy ${label.toLowerCase()}`);
       return undefined;
+    },
+    []
+  );
+
+  const handleAnalyticsStateChange = useCallback(
+    (
+      state: ReleaseSidebarAnalyticsState,
+      analytics: ReleaseSidebarAnalytics | null
+    ) => {
+      setDrawerAnalyticsState(state);
+      setDrawerAnalytics(analytics);
     },
     []
   );
@@ -632,6 +666,7 @@ export function ReleaseSidebar({
                 analyticsOverride={analyticsOverride}
                 artistName={artistName}
                 variant='flat'
+                onAnalyticsStateChange={handleAnalyticsStateChange}
               />
             }
           />
@@ -672,6 +707,8 @@ export function ReleaseSidebar({
                   <ReleaseDspLinks
                     release={release}
                     providerConfig={providerConfig}
+                    analytics={drawerAnalytics}
+                    analyticsState={drawerAnalyticsState}
                     isEditable={isEditable}
                     isAddingLink={isAddingLink}
                     newLinkUrl={newLinkUrl}

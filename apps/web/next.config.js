@@ -221,10 +221,6 @@ const nextConfig = {
     // Add both lowercase and mixed-case variants for each alias
     const vipUsernameRedirects = [
       // Tim White → Tim
-      { source: '/timwhite', destination: '/tim', permanent: true },
-      { source: '/TimWhite', destination: '/tim', permanent: true },
-      { source: '/Timwhite', destination: '/tim', permanent: true },
-      { source: '/TIMWHITE', destination: '/tim', permanent: true },
     ];
 
     const legacyAppRedirects = [

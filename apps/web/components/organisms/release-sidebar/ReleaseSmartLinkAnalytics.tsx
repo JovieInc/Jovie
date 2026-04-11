@@ -8,6 +8,7 @@ import {
   DrawerAnalyticsSummaryCard,
   DrawerInlineIconButton,
 } from '@/components/molecules/drawer';
+import { BASE_URL } from '@/constants/app';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import {
   TEST_AUTH_BYPASS_MODE,
@@ -19,7 +20,11 @@ import {
 import { env } from '@/lib/env-client';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
-import type { Release, ReleaseSidebarAnalytics } from './types';
+import type {
+  Release,
+  ReleaseSidebarAnalytics,
+  ReleaseSidebarAnalyticsState,
+} from './types';
 
 function readCookieValue(cookieName: string): string | null {
   if (typeof document === 'undefined') {
@@ -88,6 +93,10 @@ interface ReleaseSmartLinkAnalyticsProps {
   readonly analyticsOverride?: ReleaseSidebarAnalytics | null;
   readonly artistName?: string | null;
   readonly variant?: 'card' | 'flat';
+  readonly onAnalyticsStateChange?: (
+    state: ReleaseSidebarAnalyticsState,
+    analytics: ReleaseSidebarAnalytics | null
+  ) => void;
 }
 
 function getReleaseAnalyticsState({
@@ -121,13 +130,14 @@ function ReleaseSmartLinkControl({
   readonly artistName?: string | null;
   readonly helperText?: string;
 }) {
-  const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
-  const smartLinkLabel = smartLinkUrl.replace(/^https?:\/\//u, '');
+  const runtimeSmartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
+  const publicSmartLinkUrl = `${BASE_URL}${release.smartLinkPath}`;
+  const smartLinkLabel = publicSmartLinkUrl.replace(/^https?:\/\//u, '');
   const shareItems = useMemo(() => {
     const items = getUTMShareDropdownItems({
-      smartLinkUrl,
+      smartLinkUrl: publicSmartLinkUrl,
       context: buildUTMContext({
-        smartLinkUrl,
+        smartLinkUrl: publicSmartLinkUrl,
         releaseSlug: release.slug,
         releaseTitle: release.title,
         artistName: artistName ?? release.artistNames?.[0],
@@ -142,11 +152,11 @@ function ReleaseSmartLinkControl({
     return items;
   }, [
     artistName,
+    publicSmartLinkUrl,
     release.artistNames,
     release.releaseDate,
     release.slug,
     release.title,
-    smartLinkUrl,
   ]);
 
   return (
@@ -161,14 +171,14 @@ function ReleaseSmartLinkControl({
         />
         <span
           className='min-w-0 flex-1 truncate font-mono text-[10.5px] leading-none tracking-[-0.01em] text-secondary-token'
-          title={smartLinkUrl}
+          title={publicSmartLinkUrl}
         >
           {smartLinkLabel}
         </span>
         <DrawerInlineIconButton
           onClick={async event => {
             event.stopPropagation();
-            const copied = await copyToClipboard(smartLinkUrl);
+            const copied = await copyToClipboard(publicSmartLinkUrl);
             if (copied) {
               toast.success('Smart link copied');
               return;
@@ -183,7 +193,11 @@ function ReleaseSmartLinkControl({
         <DrawerInlineIconButton
           onClick={event => {
             event.stopPropagation();
-            globalThis.open(smartLinkUrl, '_blank', 'noopener,noreferrer');
+            globalThis.open(
+              runtimeSmartLinkUrl,
+              '_blank',
+              'noopener,noreferrer'
+            );
           }}
           title='Open smart link'
           className='h-7 w-7 rounded-full text-tertiary-token'
@@ -219,6 +233,7 @@ export function ReleaseSmartLinkAnalytics({
   analyticsOverride,
   artistName,
   variant = 'card',
+  onAnalyticsStateChange,
 }: ReleaseSmartLinkAnalyticsProps) {
   const [data, setData] = useState<ReleaseSidebarAnalytics | null>(
     analyticsOverride ?? null
@@ -226,6 +241,9 @@ export function ReleaseSmartLinkAnalytics({
   const [isLoading, setIsLoading] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [resolvedReleaseId, setResolvedReleaseId] = useState<string | null>(
+    analyticsOverride ? release.id : null
+  );
 
   useEffect(() => {
     if (analyticsOverride) {
@@ -233,6 +251,7 @@ export function ReleaseSmartLinkAnalytics({
       setIsLoading(false);
       setIsSwitching(false);
       setHasError(false);
+      setResolvedReleaseId(release.id);
       return;
     }
 
@@ -240,15 +259,20 @@ export function ReleaseSmartLinkAnalytics({
     setIsLoading(prev => (data === null ? true : prev));
     setIsSwitching(data !== null);
     setHasError(false);
+    setResolvedReleaseId(null);
 
     fetchReleaseAnalytics(release.id, controller.signal)
       .then(response => {
-        if (!controller.signal.aborted) setData(response);
+        if (!controller.signal.aborted) {
+          setData(response);
+          setResolvedReleaseId(release.id);
+        }
       })
       .catch(() => {
         if (controller.signal.aborted) return;
         setHasError(true);
         setData(null);
+        setResolvedReleaseId(release.id);
       })
       .finally(() => {
         if (!controller.signal.aborted) {
@@ -265,6 +289,15 @@ export function ReleaseSmartLinkAnalytics({
   const last7DaysClicks = data?.last7DaysClicks ?? 0;
 
   const state = getReleaseAnalyticsState({ isLoading, hasError, data });
+  const emittedState =
+    resolvedReleaseId === release.id ? state : ('loading' as const);
+
+  useEffect(() => {
+    onAnalyticsStateChange?.(
+      emittedState,
+      emittedState === 'ready' ? data : null
+    );
+  }, [data, emittedState, onAnalyticsStateChange]);
 
   return (
     <DrawerAnalyticsSummaryCard

@@ -415,6 +415,26 @@ export async function getTopDemoReleasesForUser(
   return deduped;
 }
 
+export async function getDemoReleasesForUserByTitles(
+  clerkUserId: string,
+  releaseTitles: readonly string[]
+): Promise<DemoReleaseLookup[]> {
+  if (releaseTitles.length === 0) {
+    return [];
+  }
+
+  const rows = await getTopDemoReleasesForUser(clerkUserId, 50);
+  const releasesByTitle = new Map(
+    rows
+      .filter(row => row.title?.trim())
+      .map(row => [row.title!.trim().toLowerCase(), row] as const)
+  );
+
+  return releaseTitles
+    .map(title => releasesByTitle.get(title.trim().toLowerCase()) ?? null)
+    .filter((release): release is DemoReleaseLookup => release !== null);
+}
+
 export async function getDemoUserHandle(
   clerkUserId: string
 ): Promise<string | null> {

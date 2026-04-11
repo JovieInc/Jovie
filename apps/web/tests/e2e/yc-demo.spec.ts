@@ -15,12 +15,17 @@ import {
 import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import {
+  getTimWhiteDashboardReleaseSequence,
+  getTimWhiteDemoReleaseById,
+  TIM_WHITE_DEMO_MANIFEST,
+} from '@/lib/tim-white-demo';
+import {
   setTestAuthBypassSession,
   waitForAuthenticatedHealth,
 } from '@/tests/helpers/clerk-auth';
 import {
+  getDemoReleasesForUserByTitles,
   getDemoUserHandle,
-  getTopDemoReleasesForUser,
   interceptTrackingCalls,
 } from './helpers/e2e-helpers';
 
@@ -28,8 +33,6 @@ const TASK_COUNT = DEFAULT_RELEASE_TASK_TEMPLATE.length;
 const AUTO_TASK_COUNT = DEFAULT_RELEASE_TASK_TEMPLATE.filter(
   item => item.assigneeType === 'ai_workflow'
 ).length;
-const FIRST_TASK_TITLE =
-  DEFAULT_RELEASE_TASK_TEMPLATE[0]?.title ?? 'Release tasks';
 const FRAME_SETTLE_MS = 1_250;
 const HOME_FRAME_SETTLE_MS = 2_100;
 const FOUNDER_DISPLAY_NAME = TIM_WHITE_PROFILE.name;
@@ -55,12 +58,15 @@ const LOADING_SELECTORS = [
 const TRANSITION_VEIL_ID = 'demo-transition-veil';
 const TRANSITION_STORAGE_KEY = 'demo-transition-visible';
 const TRANSITION_FADE_MS = 140;
+const NOTIFICATION_CONTACT_STORAGE_KEY = 'jovie:notification-contacts';
+const NOTIFICATION_STATUS_CACHE_KEY = 'jovie:notification-status-cache';
 const TOTAL_CLICKS_METRIC_TEST_ID = 'drawer-analytics-metric-total-clicks';
 const TOTAL_CLICKS_METRIC_VALUE_TEST_ID =
   'drawer-analytics-metric-value-total-clicks';
 const LAST_7_DAYS_METRIC_TEST_ID = 'drawer-analytics-metric-last-7-days-clicks';
 const LAST_7_DAYS_METRIC_VALUE_TEST_ID =
   'drawer-analytics-metric-value-last-7-days-clicks';
+const PROFILE_SKELETON_SELECTOR = 'output[aria-label="Loading Jovie profile"]';
 
 interface DemoSceneReadyOptions {
   readonly readyLocator: Locator;
@@ -80,39 +86,48 @@ async function configureRecordingContext(
   context: BrowserContext,
   cookieBaseUrl: string
 ) {
-  await context.addInitScript(() => {
-    localStorage.setItem('jv_cc', '1');
-    localStorage.removeItem('__dev_toolbar_open');
-    localStorage.removeItem('__dev_toolbar_hidden');
+  await context.addInitScript(
+    ({
+      notificationContactStorageKey,
+      notificationStatusCacheKey,
+    }: {
+      notificationContactStorageKey: string;
+      notificationStatusCacheKey: string;
+    }) => {
+      localStorage.setItem('jv_cc', '1');
+      localStorage.removeItem('__dev_toolbar_open');
+      localStorage.removeItem('__dev_toolbar_hidden');
+      localStorage.removeItem(notificationContactStorageKey);
+      localStorage.removeItem(notificationStatusCacheKey);
 
-    const isTransitionVisible = () => {
-      try {
-        return sessionStorage.getItem('demo-transition-visible') === '1';
-      } catch {
-        return false;
-      }
-    };
+      const isTransitionVisible = () => {
+        try {
+          return sessionStorage.getItem('demo-transition-visible') === '1';
+        } catch {
+          return false;
+        }
+      };
 
-    const syncTransitionRoot = () => {
-      document.documentElement.setAttribute(
-        'data-demo-transition',
-        isTransitionVisible() ? '1' : '0'
-      );
-    };
+      const syncTransitionRoot = () => {
+        document.documentElement.setAttribute(
+          'data-demo-transition',
+          isTransitionVisible() ? '1' : '0'
+        );
+      };
 
-    const ensureTransitionStyle = () => {
-      const styleId = 'demo-transition-style';
-      const existing = document.getElementById(
-        styleId
-      ) as HTMLStyleElement | null;
+      const ensureTransitionStyle = () => {
+        const styleId = 'demo-transition-style';
+        const existing = document.getElementById(
+          styleId
+        ) as HTMLStyleElement | null;
 
-      if (existing) {
-        return;
-      }
+        if (existing) {
+          return;
+        }
 
-      const style = document.createElement('style');
-      style.id = styleId;
-      style.textContent = `
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
         html {
           background: #080a10;
         }
@@ -125,45 +140,52 @@ async function configureRecordingContext(
           opacity: 0 !important;
         }
       `;
-      (document.head ?? document.documentElement).appendChild(style);
-    };
+        (document.head ?? document.documentElement).appendChild(style);
+      };
 
-    const ensureTransitionVeil = () => {
-      const existing = document.getElementById(
-        'demo-transition-veil'
-      ) as HTMLDivElement | null;
-      if (existing) {
-        syncTransitionRoot();
-        existing.style.opacity = isTransitionVisible() ? '1' : '0';
-        existing.style.pointerEvents = isTransitionVisible() ? 'auto' : 'none';
-        return;
+      const ensureTransitionVeil = () => {
+        const existing = document.getElementById(
+          'demo-transition-veil'
+        ) as HTMLDivElement | null;
+        if (existing) {
+          syncTransitionRoot();
+          existing.style.opacity = isTransitionVisible() ? '1' : '0';
+          existing.style.pointerEvents = isTransitionVisible()
+            ? 'auto'
+            : 'none';
+          return;
+        }
+
+        const veil = document.createElement('div');
+        veil.id = 'demo-transition-veil';
+        Object.assign(veil.style, {
+          position: 'fixed',
+          inset: '0',
+          background: 'rgba(8, 10, 16, 0.72)',
+          opacity: isTransitionVisible() ? '1' : '0',
+          pointerEvents: isTransitionVisible() ? 'auto' : 'none',
+          transition: 'opacity 140ms ease',
+          zIndex: '100000',
+        });
+        document.body.appendChild(veil);
+      };
+
+      ensureTransitionStyle();
+      syncTransitionRoot();
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ensureTransitionVeil, {
+          once: true,
+        });
+      } else {
+        ensureTransitionVeil();
       }
-
-      const veil = document.createElement('div');
-      veil.id = 'demo-transition-veil';
-      Object.assign(veil.style, {
-        position: 'fixed',
-        inset: '0',
-        background: 'rgba(8, 10, 16, 0.72)',
-        opacity: isTransitionVisible() ? '1' : '0',
-        pointerEvents: isTransitionVisible() ? 'auto' : 'none',
-        transition: 'opacity 140ms ease',
-        zIndex: '100000',
-      });
-      document.body.appendChild(veil);
-    };
-
-    ensureTransitionStyle();
-    syncTransitionRoot();
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', ensureTransitionVeil, {
-        once: true,
-      });
-    } else {
-      ensureTransitionVeil();
+    },
+    {
+      notificationContactStorageKey: NOTIFICATION_CONTACT_STORAGE_KEY,
+      notificationStatusCacheKey: NOTIFICATION_STATUS_CACHE_KEY,
     }
-  });
+  );
 
   await context.addCookies([
     {
@@ -397,48 +419,65 @@ async function waitForReleaseAnalyticsReady(page: Page, releaseId: string) {
   await expect
     .poll(
       async () => {
-        return analyticsCard.evaluate(node => {
-          if (!(node instanceof HTMLElement)) {
-            return 'missing';
+        return analyticsCard.evaluate(
+          (
+            node,
+            {
+              totalClicksMetricTestId,
+              totalClicksValueTestId,
+              last7DaysMetricTestId,
+              last7DaysValueTestId,
+            }
+          ) => {
+            if (!(node instanceof HTMLElement)) {
+              return 'missing';
+            }
+
+            if (node.getAttribute('aria-busy') === 'true') {
+              return 'loading';
+            }
+
+            const text = node.innerText.replace(/\s+/g, ' ').trim();
+            if (text.includes('Analytics unavailable')) {
+              return 'error';
+            }
+
+            const totalClicksMetric = node.querySelector<HTMLElement>(
+              `[data-testid="${totalClicksMetricTestId}"]`
+            );
+            const totalClicksValue = node.querySelector<HTMLElement>(
+              `[data-testid="${totalClicksValueTestId}"]`
+            );
+            const last7DaysMetric = node.querySelector<HTMLElement>(
+              `[data-testid="${last7DaysMetricTestId}"]`
+            );
+            const last7DaysValue = node.querySelector<HTMLElement>(
+              `[data-testid="${last7DaysValueTestId}"]`
+            );
+
+            if (
+              !totalClicksMetric ||
+              !totalClicksValue ||
+              !last7DaysMetric ||
+              !last7DaysValue
+            ) {
+              return 'missing-metrics';
+            }
+
+            const numericMetricPattern = /^[\d,]+$/u;
+            return numericMetricPattern.test(
+              totalClicksValue.innerText.trim()
+            ) && numericMetricPattern.test(last7DaysValue.innerText.trim())
+              ? 'ready'
+              : 'invalid-metric-values';
+          },
+          {
+            totalClicksMetricTestId: TOTAL_CLICKS_METRIC_TEST_ID,
+            totalClicksValueTestId: TOTAL_CLICKS_METRIC_VALUE_TEST_ID,
+            last7DaysMetricTestId: LAST_7_DAYS_METRIC_TEST_ID,
+            last7DaysValueTestId: LAST_7_DAYS_METRIC_VALUE_TEST_ID,
           }
-
-          if (node.getAttribute('aria-busy') === 'true') {
-            return 'loading';
-          }
-
-          const text = node.innerText.replace(/\s+/g, ' ').trim();
-          if (text.includes('Analytics unavailable')) {
-            return 'error';
-          }
-
-          const totalClicksMetric = node.querySelector<HTMLElement>(
-            `[data-testid="${TOTAL_CLICKS_METRIC_TEST_ID}"]`
-          );
-          const totalClicksValue = node.querySelector<HTMLElement>(
-            `[data-testid="${TOTAL_CLICKS_METRIC_VALUE_TEST_ID}"]`
-          );
-          const last7DaysMetric = node.querySelector<HTMLElement>(
-            `[data-testid="${LAST_7_DAYS_METRIC_TEST_ID}"]`
-          );
-          const last7DaysValue = node.querySelector<HTMLElement>(
-            `[data-testid="${LAST_7_DAYS_METRIC_VALUE_TEST_ID}"]`
-          );
-
-          if (
-            !totalClicksMetric ||
-            !totalClicksValue ||
-            !last7DaysMetric ||
-            !last7DaysValue
-          ) {
-            return 'missing-metrics';
-          }
-
-          const numericMetricPattern = /^[\d,]+$/u;
-          return numericMetricPattern.test(totalClicksValue.innerText.trim()) &&
-            numericMetricPattern.test(last7DaysValue.innerText.trim())
-            ? 'ready'
-            : 'invalid-metric-values';
-        });
+        );
       },
       { timeout: 30_000 }
     )
@@ -483,6 +522,46 @@ async function waitForReleaseSidebar(
   await waitForSceneCleanup(page);
   await waitForAnimationFrames(page);
   return sidebar;
+}
+
+async function waitForReleaseLinksView(page: Page) {
+  const linksTab = page.getByTestId('drawer-tab-links');
+  await expect(linksTab).toBeVisible({ timeout: 30_000 });
+  await linksTab.click();
+
+  const platformsCard = page.getByTestId('release-platforms-card');
+  await expect(platformsCard).toBeVisible({ timeout: 30_000 });
+
+  const providerRows = platformsCard.locator('[data-surface-variant="track"]');
+  await expect(providerRows.first()).toBeVisible({ timeout: 30_000 });
+  await waitForSceneCleanup(page);
+  await waitForAnimationFrames(page);
+  return platformsCard;
+}
+
+async function prewarmReleaseSidebar(
+  page: Page,
+  release: { readonly title: string; readonly id: string }
+) {
+  try {
+    const releaseRow = await getSeededReleaseRow(page, release.title);
+    await releaseRow.scrollIntoViewIfNeeded();
+    const releaseTrigger = await getReleaseRowTrigger(releaseRow);
+    await releaseTrigger.click();
+
+    const sidebar = page.getByTestId('release-sidebar');
+    const loadingSkeleton = page.getByLabel('Loading release details');
+    await Promise.race([
+      sidebar.waitFor({ state: 'visible', timeout: 12_000 }),
+      loadingSkeleton.waitFor({ state: 'visible', timeout: 12_000 }),
+    ]).catch(() => {});
+
+    if (await sidebar.isVisible().catch(() => false)) {
+      await waitForReleaseLinksView(page).catch(() => {});
+    }
+  } catch {
+    // Warmup is best-effort only. The recorded pass still enforces real readiness.
+  }
 }
 
 async function getReleaseRowTitle(row: Locator) {
@@ -569,6 +648,60 @@ async function gotoDemoSceneWithTransition(
   await page.waitForTimeout(TRANSITION_FADE_MS);
 }
 
+async function openSubscribeDrawerOnProfile(page: Page) {
+  await setTransitionVeilVisible(page, true);
+  await page.evaluate(() => {
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('mode', 'subscribe');
+    window.history.pushState(window.history.state, '', nextUrl);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+
+  const drawer = page.getByTestId('profile-menu-drawer');
+  const subscribeDrawer = page.getByTestId('profile-mode-drawer-subscribe');
+  await expect(drawer).toBeVisible({ timeout: 30_000 });
+  await expect(subscribeDrawer).toBeVisible({ timeout: 30_000 });
+  await expect(subscribeDrawer.locator('input').first()).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.locator(PROFILE_SKELETON_SELECTOR)).toHaveCount(0, {
+    timeout: 30_000,
+  });
+  await expect(subscribeDrawer.locator('output[aria-busy="true"]')).toHaveCount(
+    0,
+    {
+      timeout: 30_000,
+    }
+  );
+  await waitForSceneCleanup(page, [
+    ...LOADING_SELECTORS,
+    PROFILE_SKELETON_SELECTOR,
+  ]);
+  await waitForAnimationFrames(page);
+  await setTransitionVeilVisible(page, false);
+  await page.waitForTimeout(TRANSITION_FADE_MS);
+}
+
+async function waitForReleaseTasksView(page: Page) {
+  const tasksTab = page.getByTestId('drawer-tab-tasks');
+  await expect(tasksTab).toBeVisible({ timeout: 30_000 });
+  await tasksTab.click();
+
+  const tasksCard = page.getByTestId('release-tasks-card');
+  await expect(tasksCard).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('release-tasks-loading-state')).toHaveCount(0, {
+    timeout: 30_000,
+  });
+  await expect(
+    page.getByTestId('release-task-empty-state-compact')
+  ).toHaveCount(0);
+  await expect(tasksCard).toContainText(/\d+\/\d+\s+done/);
+  await expect(tasksCard).toContainText('AI');
+  await waitForSceneCleanup(page);
+  await waitForAnimationFrames(page);
+  return tasksCard;
+}
+
 async function smoothScrollPage(
   page: Page,
   positions: number[],
@@ -612,6 +745,13 @@ test.describe('YC Demo Recording', () => {
     const demoClerkUserId = process.env.DEMO_CLERK_USER_ID?.trim();
     const cookieBaseUrl =
       baseURL ?? process.env.BASE_URL ?? 'http://localhost:3100';
+    const manifestReleaseSequence = getTimWhiteDashboardReleaseSequence();
+    const featuredManifestRelease = getTimWhiteDemoReleaseById(
+      TIM_WHITE_DEMO_MANIFEST.featuredReleaseId
+    );
+    const upcomingManifestRelease = getTimWhiteDemoReleaseById(
+      TIM_WHITE_DEMO_MANIFEST.upcomingReleaseId
+    );
 
     if (!demoClerkUserId) {
       throw new Error('DEMO_CLERK_USER_ID is required');
@@ -619,9 +759,12 @@ test.describe('YC Demo Recording', () => {
 
     await configureRecordingContext(page.context(), cookieBaseUrl);
 
-    const [seededHandle, topReleases] = await Promise.all([
+    const [seededHandle, seededReleases] = await Promise.all([
       getDemoUserHandle(demoClerkUserId),
-      getTopDemoReleasesForUser(demoClerkUserId, 3),
+      getDemoReleasesForUserByTitles(
+        demoClerkUserId,
+        manifestReleaseSequence.map(release => release.title)
+      ),
     ]);
 
     if (!seededHandle) {
@@ -630,20 +773,68 @@ test.describe('YC Demo Recording', () => {
       );
     }
 
-    if (topReleases.length < 3) {
+    const seededReleasesByTitle = new Map(
+      seededReleases.map(release => {
+        const title = assertReleaseTitle(release.title);
+        return [title.toLowerCase(), { ...release, title }] as const;
+      })
+    );
+    const selectedReleases = manifestReleaseSequence.map(release => {
+      const seededRelease = seededReleasesByTitle.get(
+        release.title.toLowerCase()
+      );
+      if (!seededRelease) {
+        throw new Error(
+          `Expected seeded demo release "${release.title}" for the recorder sequence.`
+        );
+      }
+      return seededRelease;
+    });
+    const featuredRelease =
+      selectedReleases.find(
+        release => release.title === featuredManifestRelease.title
+      ) ?? null;
+    const upcomingRelease =
+      selectedReleases.find(
+        release => release.title === upcomingManifestRelease.title
+      ) ?? null;
+
+    if (!featuredRelease || !upcomingRelease) {
       throw new Error(
-        'Expected three seeded releases for the demo drawer sequence.'
+        'Expected featured and upcoming Tim White releases for the demo recorder.'
       );
     }
 
-    const selectedReleases = topReleases.map(release => ({
-      ...release,
-      title: assertReleaseTitle(release.title),
-    }));
-    const featuredRelease = selectedReleases[2];
     const publicHandle = seededHandle;
+    const warmupPage = page;
 
-    const demoPage = page;
+    await authenticateDemoPage(warmupPage, demoClerkUserId);
+    await gotoDemoScene(warmupPage, '/app/dashboard/releases', {
+      readyLocator: warmupPage.getByTestId('releases-matrix'),
+      readyText: 'Releases',
+    });
+    await prewarmReleaseSidebar(warmupPage, featuredRelease);
+    await waitForReleaseTasksView(warmupPage).catch(() => {});
+
+    await clearDemoAuthCookies(warmupPage.context(), cookieBaseUrl);
+
+    await gotoDemoScene(
+      warmupPage,
+      `/${publicHandle}/${featuredRelease.slug}?noredirect=1`,
+      {
+        readyLocator: warmupPage.locator('body'),
+        readyText: featuredRelease.title,
+      }
+    );
+    await gotoDemoScene(warmupPage, `/${publicHandle}`, {
+      readyLocator: warmupPage.getByTestId('profile-latest-release-card'),
+      readyText: PUBLIC_PROFILE_READY_TEXT,
+    });
+    await openSubscribeDrawerOnProfile(warmupPage);
+
+    const demoPage = await page.context().newPage();
+    await interceptTrackingCalls(demoPage);
+    await warmupPage.close();
 
     await gotoDemoSceneWithTransition(demoPage, '/', {
       readyLocator: demoPage.getByTestId('hero-heading'),
@@ -686,26 +877,42 @@ test.describe('YC Demo Recording', () => {
       await expect(releaseTrigger).toBeVisible({ timeout: 30_000 });
       await releaseTrigger.click();
       await waitForReleaseSidebar(demoPage, release);
+      const platformsCard = await waitForReleaseLinksView(demoPage);
+      await expect(
+        platformsCard.locator('[data-surface-variant="track"]').first()
+      ).toContainText('Spotify');
+      if (release.title === featuredManifestRelease.title) {
+        await expect(platformsCard).toContainText('Popular');
+      }
       await demoPage.waitForTimeout(1_150);
     }
 
     await clearCaption(demoPage);
 
-    await gotoDemoSceneWithTransition(
+    const featuredReleaseRow = await getSeededReleaseRow(
       demoPage,
-      `/app/dashboard/releases/${featuredRelease.id}/tasks`,
-      {
-        readyLocator: demoPage.getByText(FIRST_TASK_TITLE).first(),
-        readyText: FIRST_TASK_TITLE,
-      }
+      featuredRelease.title
     );
+    await expect(featuredReleaseRow).toBeVisible({ timeout: 30_000 });
+    await featuredReleaseRow.scrollIntoViewIfNeeded();
+    const featuredReleaseTrigger =
+      await getReleaseRowTrigger(featuredReleaseRow);
+    await featuredReleaseTrigger.click();
+    await waitForReleaseSidebar(demoPage, featuredRelease);
+    const tasksCard = await waitForReleaseTasksView(demoPage);
     await injectCaptionOverlay(demoPage);
     await setCaption(
       demoPage,
       `Every release gets a campaign: ${TASK_COUNT} tasks, ${AUTO_TASK_COUNT} already handled by Jovie.`
     );
-    await smoothScrollPage(demoPage, [180, 420, 700], 1_000);
-    await demoPage.waitForTimeout(900);
+    await tasksCard
+      .getByTestId('release-task-checklist-scroll-region')
+      .evaluate(node => {
+        node.scrollTo({ top: 220, behavior: 'smooth' });
+      })
+      .catch(() => {});
+    await waitForAnimationFrames(demoPage, 2);
+    await demoPage.waitForTimeout(2_100);
     await clearCaption(demoPage);
 
     await clearDemoAuthCookies(demoPage.context(), cookieBaseUrl);
@@ -727,29 +934,28 @@ test.describe('YC Demo Recording', () => {
     await clearCaption(demoPage);
 
     await gotoDemoSceneWithTransition(demoPage, `/${publicHandle}`, {
-      readyLocator: demoPage.locator('body'),
+      readyLocator: demoPage.getByTestId('profile-latest-release-card'),
       readyText: PUBLIC_PROFILE_READY_TEXT,
     });
     await injectCaptionOverlay(demoPage);
     await expect(demoPage.locator('body')).toContainText(FOUNDER_DISPLAY_NAME, {
       timeout: 30_000,
     });
+    await expect(
+      demoPage.getByTestId('profile-latest-release-card')
+    ).toContainText(upcomingRelease.title);
+    await expect(
+      demoPage.getByTestId('profile-latest-release-timing')
+    ).toContainText(/Coming .* • .*days?/);
     await setCaption(
       demoPage,
-      'Artist page already live. Latest release featured automatically.'
+      'Artist page already live. The next release is already counting down.'
     );
     await smoothScrollPage(demoPage, [120], 950);
     await demoPage.waitForTimeout(900);
     await clearCaption(demoPage);
 
-    await gotoDemoSceneWithTransition(
-      demoPage,
-      `/${publicHandle}?mode=subscribe`,
-      {
-        readyLocator: demoPage.locator('body'),
-        readyText: /turn on notifications|never miss a release/i,
-      }
-    );
+    await openSubscribeDrawerOnProfile(demoPage);
     await injectCaptionOverlay(demoPage);
     await setCaption(
       demoPage,

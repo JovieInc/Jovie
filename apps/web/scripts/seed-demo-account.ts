@@ -20,16 +20,17 @@ import { Redis } from '@upstash/redis';
 import { eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
-import {
-  type DemoPersonaRelease,
-  type DemoPersonaTourDate,
-  INTERNAL_DJ_DEMO_PERSONA,
-} from '@/lib/demo-personas';
 import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
+import {
+  getTimWhiteDashboardReleaseSequence,
+  getTimWhiteDemoReleaseById,
+  TIM_WHITE_DEMO_MANIFEST,
+} from '@/lib/tim-white-demo';
 
 const {
   users,
   creatorProfiles,
+  userProfileClaims,
   creatorContacts,
   socialLinks,
   discogReleases,
@@ -56,20 +57,35 @@ const {
   preSaveTokens,
   dspArtistMatches,
   releaseTasks,
+  metadataSubmissionRequests,
+  metadataSubmissionTargets,
+  metadataSubmissionSnapshots,
 } = schema;
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const DEMO_USERNAME = INTERNAL_DJ_DEMO_PERSONA.profile.handle;
-const DEMO_DISPLAY_NAME = INTERNAL_DJ_DEMO_PERSONA.profile.displayName;
+const DEMO_USERNAME = TIM_WHITE_DEMO_MANIFEST.handle;
+const DEMO_DISPLAY_NAME = TIM_WHITE_DEMO_MANIFEST.profile.displayName;
 const DEMO_EMAIL = 'demo@jov.ie';
 const DEMO_REFERRED_EMAILS = Array.from(
   { length: 3 },
   (_, index) => `demo.referred.${index}@example.com`
 );
-const DEMO_PROFILE = INTERNAL_DJ_DEMO_PERSONA.profile;
+const DEMO_PROFILE = TIM_WHITE_DEMO_MANIFEST.profile;
+const FEATURED_RELEASE = getTimWhiteDemoReleaseById(
+  TIM_WHITE_DEMO_MANIFEST.featuredReleaseId
+);
+const UPCOMING_RELEASE = getTimWhiteDemoReleaseById(
+  TIM_WHITE_DEMO_MANIFEST.upcomingReleaseId
+);
+
+interface SeededReleaseRecord {
+  readonly id: string;
+  readonly title: string;
+  readonly slug: string;
+}
 
 const FAN_NAMES = [
   'Sarah M.',
@@ -217,18 +233,16 @@ const sql = neon(DATABASE_URL);
 const db = drizzle(sql, { schema });
 
 // ---------------------------------------------------------------------------
-// Tour dates sourced from the internal Calvin Harris demo persona.
+// Tour dates sourced from the canonical Tim White demo manifest.
 // ---------------------------------------------------------------------------
 
-const TEST_TOUR_DATES: readonly DemoPersonaTourDate[] =
-  INTERNAL_DJ_DEMO_PERSONA.tourDates;
+const TEST_TOUR_DATES = TIM_WHITE_DEMO_MANIFEST.tourDates;
 
 // ---------------------------------------------------------------------------
-// Release data (copied from seed-test-data.ts)
+// Release data sourced from the canonical Tim White demo manifest.
 // ---------------------------------------------------------------------------
 
-const TEST_RELEASES: readonly DemoPersonaRelease[] =
-  INTERNAL_DJ_DEMO_PERSONA.releases;
+const TEST_RELEASES = getTimWhiteDashboardReleaseSequence();
 
 // ---------------------------------------------------------------------------
 // Seed functions
@@ -333,8 +347,20 @@ async function seedDemoProfile(userId: string): Promise<string> {
     avatarUrl,
     spotifyId: spotifyIdForProfile,
     spotifyUrl: spotifyUrlForProfile,
+    appleMusicUrl: DEMO_PROFILE.appleMusicUrl,
+    youtubeUrl: DEMO_PROFILE.youtubeUrl,
+    appleMusicId: DEMO_PROFILE.appleMusicArtistId,
+    youtubeMusicId: DEMO_PROFILE.youtubeMusicArtistId,
+    deezerId: DEMO_PROFILE.deezerArtistId,
+    tidalId: DEMO_PROFILE.tidalArtistId,
+    soundcloudId: DEMO_PROFILE.soundcloudArtistId,
+    bandsintownArtistName: DEMO_PROFILE.bandsintownArtistName,
     genres: profileGenres,
     location,
+    activeSinceYear: DEMO_PROFILE.activeSinceYear,
+    spotifyFollowers: DEMO_PROFILE.spotifyFollowers,
+    spotifyPopularity: DEMO_PROFILE.spotifyPopularity,
+    email: DEMO_EMAIL,
     creatorType: 'artist' as const,
     isPublic: true,
     isVerified: true,
@@ -342,7 +368,7 @@ async function seedDemoProfile(userId: string): Promise<string> {
     isClaimed: DEMO_PROFILE.isClaimedByDefault,
     avatarLockedByUser: true,
     ingestionStatus: 'idle' as const,
-    stripeAccountId: 'acct_demo_calvin',
+    stripeAccountId: 'acct_demo_timwhite',
     stripeOnboardingComplete: true,
     stripePayoutsEnabled: true,
     venmoHandle: DEMO_PROFILE.venmoHandle,
@@ -350,21 +376,40 @@ async function seedDemoProfile(userId: string): Promise<string> {
     updatedAt: new Date(),
   };
 
+  let profileId: string;
+
   if (existingProfile) {
     await db
       .update(creatorProfiles)
       .set(profileData)
       .where(eq(creatorProfiles.id, existingProfile.id));
     console.log(`    Updated existing profile (ID: ${existingProfile.id})`);
-    return existingProfile.id;
+    profileId = existingProfile.id;
+  } else {
+    const [created] = await db
+      .insert(creatorProfiles)
+      .values(profileData)
+      .returning({ id: creatorProfiles.id });
+    console.log(`    Created profile (ID: ${created.id})`);
+    profileId = created.id;
   }
 
-  const [created] = await db
-    .insert(creatorProfiles)
-    .values(profileData)
-    .returning({ id: creatorProfiles.id });
-  console.log(`    Created profile (ID: ${created.id})`);
-  return created.id;
+  await db
+    .update(users)
+    .set({ activeProfileId: profileId, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+
+  await db
+    .delete(userProfileClaims)
+    .where(eq(userProfileClaims.userId, userId));
+  await db.insert(userProfileClaims).values({
+    userId,
+    creatorProfileId: profileId,
+    role: 'owner',
+    claimedAt: new Date(),
+  });
+
+  return profileId;
 }
 
 async function cleanDemoChildData(profileId: string, userId: string) {
@@ -493,10 +538,12 @@ async function seedDemoContacts(profileId: string): Promise<string[]> {
   return ids;
 }
 
-async function seedDemoReleases(profileId: string): Promise<string[]> {
+async function seedDemoReleases(
+  profileId: string
+): Promise<SeededReleaseRecord[]> {
   console.log('  Seeding releases...');
 
-  const seededReleaseIds: string[] = [];
+  const seededReleases: SeededReleaseRecord[] = [];
 
   for (const release of TEST_RELEASES) {
     const [created] = await db
@@ -504,17 +551,25 @@ async function seedDemoReleases(profileId: string): Promise<string[]> {
       .values({
         creatorProfileId: profileId,
         title: release.title,
-        slug: `demo-${release.slug}`,
+        slug: release.slug,
         releaseType: release.releaseType,
         releaseDate: new Date(release.releaseDate),
         artworkUrl: release.artworkUrl,
         totalTracks: release.totalTracks,
+        totalDurationMs: release.totalDurationMs,
         upc: release.upc ? `DEMO${release.upc}` : undefined,
         label: release.label ?? undefined,
+        spotifyPopularity: release.spotifyPopularity,
+        genres: [...release.genres],
+        primaryIsrc: release.primaryIsrc,
         sourceType: 'manual',
       })
-      .returning({ id: discogReleases.id });
-    seededReleaseIds.push(created.id);
+      .returning({ id: discogReleases.id, slug: discogReleases.slug });
+    seededReleases.push({
+      id: created.id,
+      title: release.title,
+      slug: created.slug,
+    });
 
     const providerRows = Object.entries(release.providerUrls).map(
       ([providerId, url], index) => ({
@@ -552,32 +607,33 @@ async function seedDemoReleases(profileId: string): Promise<string[]> {
     }
   }
 
-  console.log(`    Created ${seededReleaseIds.length} demo releases`);
-  return seededReleaseIds;
+  console.log(`    Created ${seededReleases.length} demo releases`);
+  return seededReleases;
 }
 
 async function seedDemoReleaseTasks(
   profileId: string,
-  releaseIds: string[]
+  releases: SeededReleaseRecord[]
 ): Promise<void> {
   console.log('  Seeding release tasks...');
 
-  for (const releaseId of releaseIds) {
-    await db.delete(releaseTasks).where(eq(releaseTasks.releaseId, releaseId));
+  for (const release of releases) {
+    const isFeaturedRelease = release.title === FEATURED_RELEASE.title;
+    await db.delete(releaseTasks).where(eq(releaseTasks.releaseId, release.id));
 
-    const [release] = await db
+    const [releaseRow] = await db
       .select({ releaseDate: discogReleases.releaseDate })
       .from(discogReleases)
-      .where(eq(discogReleases.id, releaseId))
+      .where(eq(discogReleases.id, release.id))
       .limit(1);
 
-    const releaseDate = release?.releaseDate
-      ? new Date(release.releaseDate)
+    const releaseDate = releaseRow?.releaseDate
+      ? new Date(releaseRow.releaseDate)
       : null;
 
     await db.insert(releaseTasks).values(
       DEFAULT_RELEASE_TASK_TEMPLATE.map((item, index) => ({
-        releaseId,
+        releaseId: release.id,
         creatorProfileId: profileId,
         title: item.title,
         description: item.description ?? null,
@@ -587,7 +643,11 @@ async function seedDemoReleaseTasks(
         status:
           item.assigneeType === 'ai_workflow'
             ? ('done' as const)
-            : ('todo' as const),
+            : isFeaturedRelease && index < 2
+              ? ('done' as const)
+              : isFeaturedRelease && index < 5
+                ? ('in_progress' as const)
+                : ('todo' as const),
         priority: item.priority,
         position: index,
         assigneeType: item.assigneeType,
@@ -598,22 +658,123 @@ async function seedDemoReleaseTasks(
               releaseDate.getTime() + item.dueDaysOffset * 24 * 60 * 60 * 1000
             )
           : null,
-        completedAt: item.assigneeType === 'ai_workflow' ? new Date() : null,
+        completedAt:
+          item.assigneeType === 'ai_workflow' ||
+          (isFeaturedRelease && index < 2)
+            ? new Date()
+            : null,
       }))
     );
   }
 
   console.log(
-    `    Seeded ${DEFAULT_RELEASE_TASK_TEMPLATE.length} tasks across ${releaseIds.length} releases`
+    `    Seeded ${DEFAULT_RELEASE_TASK_TEMPLATE.length} tasks across ${releases.length} releases`
   );
+}
+
+async function seedDemoMetadataSubmissionState(
+  profileId: string,
+  releases: SeededReleaseRecord[]
+) {
+  console.log('  Seeding metadata submission state...');
+
+  const featuredRelease =
+    releases.find(release => release.title === FEATURED_RELEASE.title) ?? null;
+
+  if (!featuredRelease) {
+    console.log(
+      '    Featured release missing, skipping metadata submission state'
+    );
+    return;
+  }
+
+  const createdAt = randomTimestampOutsideRecentWindow();
+  const approvedAt = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
+  const sentAt = new Date(approvedAt.getTime() + 2 * 60 * 60 * 1000);
+  const latestSnapshotAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+
+  const [request] = await db
+    .insert(metadataSubmissionRequests)
+    .values({
+      creatorProfileId: profileId,
+      releaseId: featuredRelease.id,
+      providerId: 'xperi_allmusic_email',
+      status: 'live',
+      approvedAt,
+      sentAt,
+      latestSnapshotAt,
+      providerMessageId: `xperi-demo-${featuredRelease.slug}`,
+      replyToEmail: DEMO_EMAIL,
+      createdAt,
+      updatedAt: latestSnapshotAt,
+    })
+    .returning({ id: metadataSubmissionRequests.id });
+
+  const targetRows = await db
+    .insert(metadataSubmissionTargets)
+    .values([
+      {
+        requestId: request.id,
+        targetType: 'allmusic',
+        canonicalUrl: `https://www.allmusic.com/search/albums/${encodeURIComponent(
+          featuredRelease.title
+        )}`,
+        externalId: `allmusic-${featuredRelease.slug}`,
+        discoveredAt: sentAt,
+        lastSeenAt: latestSnapshotAt,
+      },
+      {
+        requestId: request.id,
+        targetType: 'musicbrainz',
+        canonicalUrl: `https://musicbrainz.org/search?query=${encodeURIComponent(
+          featuredRelease.title
+        )}&type=release&method=indexed`,
+        externalId: `musicbrainz-${featuredRelease.slug}`,
+        discoveredAt: sentAt,
+        lastSeenAt: latestSnapshotAt,
+      },
+      {
+        requestId: request.id,
+        targetType: 'search_result',
+        canonicalUrl: `https://www.google.com/search?q=${encodeURIComponent(
+          `${DEMO_DISPLAY_NAME} ${featuredRelease.title}`
+        )}`,
+        externalId: `google-${featuredRelease.slug}`,
+        discoveredAt: sentAt,
+        lastSeenAt: latestSnapshotAt,
+      },
+    ])
+    .returning({ id: metadataSubmissionTargets.id });
+
+  await db.insert(metadataSubmissionSnapshots).values(
+    targetRows.map((target, index) => ({
+      requestId: request.id,
+      targetId: target.id,
+      snapshotType: 'live',
+      normalizedData: {
+        artistName: DEMO_DISPLAY_NAME,
+        releaseTitle: featuredRelease.title,
+        releaseDate: FEATURED_RELEASE.releaseDate,
+        trackCount: 1,
+        hasCredits: true,
+        hasBio: true,
+        hasArtistImage: true,
+        hasArtwork: true,
+      },
+      hash: `demo-${featuredRelease.slug}-${index}`,
+      observedAt: latestSnapshotAt,
+    }))
+  );
+
+  console.log('    Created 1 live metadata submission request with 3 targets');
 }
 
 async function seedDemoSocialLinks(profileId: string): Promise<string[]> {
   console.log('  Seeding social links...');
 
-  const links = INTERNAL_DJ_DEMO_PERSONA.socialLinks.map(link => ({
+  const links = TIM_WHITE_DEMO_MANIFEST.socialLinks.map((link, index) => ({
     ...link,
-    clicks: 50 + Math.floor(Math.random() * 450),
+    clicks: 180 + (TIM_WHITE_DEMO_MANIFEST.socialLinks.length - index) * 65,
   }));
 
   const ids: string[] = [];
@@ -978,70 +1139,165 @@ async function seedDemoTipAudience(
   console.log(`    Created ${rows.length} tip audience entries`);
 }
 
-async function seedDemoClicks(profileId: string, linkIds: string[]) {
+function randomTimestampWithin(daysBack: number): Date {
+  const date = new Date();
+  date.setDate(date.getDate() - Math.floor(Math.random() * daysBack));
+  date.setHours(
+    Math.floor(Math.random() * 24),
+    Math.floor(Math.random() * 60),
+    Math.floor(Math.random() * 60),
+    0
+  );
+  return date;
+}
+
+function randomTimestampOutsideRecentWindow(): Date {
+  const date = new Date();
+  date.setDate(date.getDate() - (8 + Math.floor(Math.random() * 83)));
+  date.setHours(
+    Math.floor(Math.random() * 24),
+    Math.floor(Math.random() * 60),
+    Math.floor(Math.random() * 60),
+    0
+  );
+  return date;
+}
+
+async function seedDemoClicks(
+  profileId: string,
+  socialLinkIds: string[],
+  releases: SeededReleaseRecord[]
+) {
   console.log('  Seeding click events...');
 
   const browsers = ['Chrome', 'Safari', 'Firefox', 'Edge'];
   const oses = ['iOS', 'Android', 'Windows', 'macOS', 'Linux'];
-  const linkTypes = ['listen', 'social', 'tip', 'other'] as const;
-
   const clickRows = [];
 
-  for (let i = 0; i < 800; i++) {
-    const clickDate = hockeyStickDate(90);
-    const dayOfWeek = clickDate.getUTCDay();
-    // Weekday-weighted: skip ~33% of weekend clicks
-    if ((dayOfWeek === 0 || dayOfWeek === 6) && Math.random() < 0.33) continue;
-
+  const buildClickRow = ({
+    createdAt,
+    linkId,
+    linkType,
+    metadata,
+  }: {
+    readonly createdAt: Date;
+    readonly linkId: string | null;
+    readonly linkType: 'listen' | 'social' | 'tip' | 'other';
+    readonly metadata?: Record<string, unknown>;
+  }) => {
     const country = pickCountry();
     const city = pickCity(country);
+    const os = oses[Math.floor(Math.random() * oses.length)];
+    const browser = browsers[Math.floor(Math.random() * browsers.length)];
+    const deviceRoll = Math.random();
+    const deviceType =
+      deviceRoll < 0.58 ? 'mobile' : deviceRoll < 0.92 ? 'desktop' : 'tablet';
+    const referrerRoll = Math.random();
+    const referrer =
+      referrerRoll < 0.34
+        ? 'https://instagram.com'
+        : referrerRoll < 0.52
+          ? 'https://tiktok.com'
+          : referrerRoll < 0.74
+            ? 'https://google.com'
+            : referrerRoll < 0.86
+              ? 'https://music.apple.com'
+              : null;
 
-    // Link type distribution: 60% listen, 20% social, 15% tip, 5% other
-    let linkType: (typeof linkTypes)[number];
-    const lr = Math.random();
-    if (lr < 0.6) linkType = 'listen';
-    else if (lr < 0.8) linkType = 'social';
-    else if (lr < 0.95) linkType = 'tip';
-    else linkType = 'other';
-
-    // Referrer distribution
-    let referrer: string | null;
-    const rr = Math.random();
-    if (rr < 0.3) referrer = 'https://instagram.com';
-    else if (rr < 0.45) referrer = 'https://twitter.com';
-    else if (rr < 0.65) referrer = 'https://google.com';
-    else if (rr < 0.8) referrer = 'https://tiktok.com';
-    else referrer = null; // direct
-
-    // Device distribution: 55% mobile, 35% desktop, 10% tablet
-    let deviceType: string;
-    const dr = Math.random();
-    if (dr < 0.55) deviceType = 'mobile';
-    else if (dr < 0.9) deviceType = 'desktop';
-    else deviceType = 'tablet';
-
-    clickRows.push({
+    return {
       creatorProfileId: profileId,
-      linkId:
-        linkIds.length > 0
-          ? linkIds[Math.floor(Math.random() * linkIds.length)]
-          : null,
+      linkId,
       linkType,
       ipAddress: `10.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
-      userAgent: `Mozilla/5.0 (${oses[Math.floor(Math.random() * oses.length)]}) ${browsers[Math.floor(Math.random() * browsers.length)]}`,
+      userAgent: `Mozilla/5.0 (${os}) ${browser}`,
       referrer,
       country,
       city,
       deviceType,
-      os: oses[Math.floor(Math.random() * oses.length)],
-      browser: browsers[Math.floor(Math.random() * browsers.length)],
-      isBot: Math.random() < 0.02,
-      createdAt: clickDate,
-    });
+      os,
+      browser,
+      isBot: false,
+      metadata: metadata ?? {},
+      createdAt,
+    };
+  };
+
+  for (const release of releases) {
+    const manifestRelease = TEST_RELEASES.find(
+      candidate => candidate.title === release.title
+    );
+    const analyticsTarget = manifestRelease
+      ? TIM_WHITE_DEMO_MANIFEST.analyticsTargets[manifestRelease.id]
+      : undefined;
+
+    if (!analyticsTarget) {
+      continue;
+    }
+
+    let recentClicksRemaining = analyticsTarget.last7DaysClicks;
+
+    for (const [providerId, clicks] of Object.entries(
+      analyticsTarget.providerClicks
+    )) {
+      for (let index = 0; index < clicks; index += 1) {
+        const createdAt =
+          recentClicksRemaining > 0
+            ? randomTimestampWithin(7)
+            : randomTimestampOutsideRecentWindow();
+        if (recentClicksRemaining > 0) {
+          recentClicksRemaining -= 1;
+        }
+
+        clickRows.push(
+          buildClickRow({
+            createdAt,
+            linkId: null,
+            linkType: 'listen',
+            metadata: {
+              contentId: release.id,
+              contentType: 'release',
+              provider: providerId,
+              source: 'smart_link',
+            },
+          })
+        );
+      }
+    }
+  }
+
+  for (let index = 0; index < 180; index += 1) {
+    clickRows.push(
+      buildClickRow({
+        createdAt: hockeyStickDate(90),
+        linkId:
+          socialLinkIds.length > 0
+            ? socialLinkIds[index % socialLinkIds.length]
+            : null,
+        linkType: index % 6 === 0 ? 'tip' : 'social',
+        metadata: {
+          source: 'profile',
+        },
+      })
+    );
   }
 
   if (clickRows.length > 0) {
-    await db.insert(clickEvents).values(clickRows);
+    const CLICK_INSERT_BATCH_SIZE = 250;
+
+    for (
+      let batchStartIndex = 0;
+      batchStartIndex < clickRows.length;
+      batchStartIndex += CLICK_INSERT_BATCH_SIZE
+    ) {
+      await db
+        .insert(clickEvents)
+        .values(
+          clickRows.slice(
+            batchStartIndex,
+            batchStartIndex + CLICK_INSERT_BATCH_SIZE
+          )
+        );
+    }
   }
   console.log(`    Created ${clickRows.length} click events`);
 }
@@ -1117,7 +1373,7 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
         fromEmail: 'alex.rivera@outsidelands.example.com',
         fromName: 'Alex Rivera',
         bodyText:
-          "Hi Calvin,\n\nHope this message finds you well. I'm Alex Rivera, Talent Buyer at Another Planet Entertainment. We're putting together the 2026 Outside Lands lineup and we'd love to have you on the Sutro stage.\n\nWe're looking at August 7-9 and can offer a $15,000 guarantee for a 45-minute set. The festival typically draws 75,000+ attendees daily and your sound would be a perfect fit for the Sutro crowd.\n\nWould love to discuss details with your team. Are you available for a quick call this week?\n\nBest,\nAlex Rivera\nTalent Buyer, Another Planet Entertainment",
+          "Hi Tim,\n\nHope this message finds you well. I'm Alex Rivera, Talent Buyer at Another Planet Entertainment. We're putting together the 2026 Outside Lands lineup and we'd love to have you on the Sutro stage.\n\nWe're looking at August 7-9 and can offer a $15,000 guarantee for a 45-minute set. The festival typically draws 75,000+ attendees daily and your sound would be a perfect fit for the Sutro crowd.\n\nWould love to discuss details with your team. Are you available for a quick call this week?\n\nBest,\nAlex Rivera\nTalent Buyer, Another Planet Entertainment",
       },
     },
     {
@@ -1136,12 +1392,11 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
       email: {
         fromEmail: 'jessica.nguyen@pitchfork.example.com',
         fromName: 'Jessica Nguyen',
-        bodyText:
-          "Hi Calvin,\n\nI'm Jessica Nguyen, a staff writer at Pitchfork. I'm working on a feature about artists who are redefining the boundary between electronic and acoustic music, and your work keeps coming up in my research.\n\nWould you be open to a 30-minute interview? I'd love to talk about your creative process, particularly how you approach production on tracks like \"Blessings featuring Clementine Douglas.\"\n\nWe're looking to publish in the April issue. Happy to work around your schedule.\n\nThanks,\nJessica",
+        bodyText: `Hi Tim,\n\nI'm Jessica Nguyen, a staff writer at Pitchfork. I'm working on a feature about artists who are redefining the boundary between electronic and acoustic music, and your work keeps coming up in my research.\n\nWould you be open to a 30-minute interview? I'd love to talk about your creative process, particularly how you approach production on tracks like "${FEATURED_RELEASE.title}."\n\nWe're looking to publish in the April issue. Happy to work around your schedule.\n\nThanks,\nJessica`,
       },
     },
     {
-      subject: 'Sennheiser x Calvin Harris — Creator Partnership',
+      subject: 'Sennheiser x Tim White — Creator Partnership',
       category: 'brand_partnership' as const,
       priority: 'high' as const,
       status: 'pending_review' as const,
@@ -1157,7 +1412,7 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
         fromEmail: 'partnerships@sennheiser.example.com',
         fromName: 'David Park',
         bodyText:
-          "Hi Calvin,\n\nDavid Park here from Sennheiser's Creator Partnerships team. We've been following your work and think there's a natural fit between your artistry and the Momentum line.\n\nWe're exploring a creator partnership that would include:\n- Product endorsement (Momentum 4 Wireless)\n- 3 social content pieces over 6 months\n- Studio session content featuring the gear\n- Affiliate compensation on sales through your link\n\nWould love to set up a call to discuss terms and creative direction. Are you interested?\n\nBest,\nDavid Park\nCreator Partnerships, Sennheiser",
+          "Hi Tim,\n\nDavid Park here from Sennheiser's Creator Partnerships team. We've been following your work and think there's a natural fit between your artistry and the Momentum line.\n\nWe're exploring a creator partnership that would include:\n- Product endorsement (Momentum 4 Wireless)\n- 3 social content pieces over 6 months\n- Studio session content featuring the gear\n- Affiliate compensation on sales through your link\n\nWould love to set up a call to discuss terms and creative direction. Are you interested?\n\nBest,\nDavid Park\nCreator Partnerships, Sennheiser",
       },
     },
     {
@@ -1172,8 +1427,7 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
       email: {
         fromEmail: 'sarah.m@gmail.com',
         fromName: 'Sarah M.',
-        bodyText:
-          'Dear Calvin,\n\nI know you probably get a lot of messages like this, but I had to write. Your album 96 Months came into my life at exactly the right time. I was going through a divorce and your music was the only thing that made the long nights bearable.\n\n"Miracle" in particular — that drop where everything opens up — it just hits different when you\'re starting over. I\'ve listened to it probably 500 times.\n\nI just wanted to say thank you. Your art matters more than you know.\n\nWith gratitude,\nSarah',
+        bodyText: `Dear Tim,\n\nI know you probably get a lot of messages like this, but I had to write. "${FEATURED_RELEASE.title}" came into my life at exactly the right time. I was going through a rough stretch and your music was the only thing that made the long nights bearable.\n\nThat drop where everything opens up just hits different when you're starting over. I've listened to it probably 500 times.\n\nI just wanted to say thank you. Your art matters more than you know.\n\nWith gratitude,\nSarah`,
       },
     },
     {
@@ -1192,7 +1446,7 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
         fromEmail: 'beats@producerx.example.com',
         fromName: 'DJ Lumina',
         bodyText:
-          "Hey Calvin!\n\nBig fan of your work, especially the production on Desire with Sam Smith. I'm DJ Lumina — I produce electronic/ambient stuff and I think our styles would mesh really well.\n\nI've got a beat that I've been sitting on that has your name written all over it. It's got this ethereal synth pad foundation with a driving rhythm section that I think you'd vibe with.\n\nHere's a demo: https://soundcloud.com/djlumina/collab-demo-private\n\nWould love to hear your thoughts. No pressure at all.\n\nPeace,\nLumina",
+          "Hey Tim!\n\nBig fan of your work, especially the way you balance emotional vocals with harder-edged production. I'm DJ Lumina — I produce electronic/ambient stuff and I think our styles would mesh really well.\n\nI've got a beat that I've been sitting on that has your name written all over it. It's got this ethereal synth pad foundation with a driving rhythm section that I think you'd vibe with.\n\nHere's a demo: https://soundcloud.com/djlumina/collab-demo-private\n\nWould love to hear your thoughts. No pressure at all.\n\nPeace,\nLumina",
       },
     },
     {
@@ -1214,7 +1468,7 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
         fromEmail: 'events@thefillmore.example.com',
         fromName: 'The Fillmore Events',
         bodyText:
-          "Hi Calvin,\n\nWe'd love to offer you a headlining slot at The Fillmore in October 2026. Based on your growing Bay Area following and the success of your last run here, we think a proper headline would be electric.\n\nWe're looking at October 15th. The Fillmore capacity is 1,150 and we're confident we can sell it out based on your trajectory.\n\nPlease have your booking team reach out to discuss terms.\n\nBest,\nThe Fillmore Events Team",
+          "Hi Tim,\n\nWe'd love to offer you a headlining slot at The Fillmore in October 2026. Based on your growing Bay Area following and the success of your last run here, we think a proper headline would be electric.\n\nWe're looking at October 15th. The Fillmore capacity is 1,150 and we're confident we can sell it out based on your trajectory.\n\nPlease have your booking team reach out to discuss terms.\n\nBest,\nThe Fillmore Events Team",
       },
     },
     {
@@ -1248,7 +1502,7 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
         fromEmail: 'talent@redlightmgmt.example.com',
         fromName: 'Chris Walsh',
         bodyText:
-          'Hi Calvin,\n\nChris Walsh here from Red Light Management. I\'ve been watching your career with great interest — particularly the organic audience growth and the quality of your fanbase engagement.\n\nRed Light represents artists across electronic, indie, and pop, and I think we could be a great fit for where you\'re headed. We specialize in artist development at your stage — bridging the gap between "emerging" and "established."\n\nWould love to grab a coffee or hop on a call to introduce ourselves properly. No commitment, just a conversation.\n\nBest,\nChris Walsh\nRed Light Management',
+          'Hi Tim,\n\nChris Walsh here from Red Light Management. I\'ve been watching your career with great interest — particularly the organic audience growth and the quality of your fanbase engagement.\n\nRed Light represents artists across electronic, indie, and pop, and I think we could be a great fit for where you\'re headed. We specialize in artist development at your stage — bridging the gap between "emerging" and "established."\n\nWould love to grab a coffee or hop on a call to introduce ourselves properly. No commitment, just a conversation.\n\nBest,\nChris Walsh\nRed Light Management',
       },
     },
   ];
@@ -1410,12 +1664,15 @@ async function seedDemoInsights(profileId: string) {
       priority: 'low' as const,
       title:
         'Your latest single is gaining traction — 47 new subscribers in the week after release',
-      description:
-        'The release of "Raw Energy" drove 47 new email subscribers in the first week, 3.5x your weekly average. The momentum is real.',
+      description: `The release of "${FEATURED_RELEASE.title}" drove 47 new email subscribers in the first week, 3.5x your weekly average. The momentum is real.`,
       actionSuggestion:
         'Capitalize on this momentum with a follow-up content drop (remix, music video, live session).',
       confidence: '0.91',
-      dataSnapshot: { release: 'Raw Energy', newSubs: 47, weeklyAvg: 13 },
+      dataSnapshot: {
+        release: FEATURED_RELEASE.title,
+        newSubs: 47,
+        weeklyAvg: 13,
+      },
     },
   ];
 
@@ -1454,8 +1711,7 @@ async function seedDemoChatHistory(userId: string, profileId: string) {
         },
         {
           role: 'assistant' as const,
-          content:
-            'Here\'s a polished bio for you:\n\n"Producer, songwriter, and artist building at the intersection of music and technology. Creating sounds that blur the line between organic and electronic — from intimate bedroom productions to festival stages.\n\nLatest release: Raw Energy"\n\nThis is concise (under 280 chars for social sharing), hits your key identity points, and includes a call-to-action with your latest release. Want me to update your profile with this?',
+          content: `Here's a polished bio for you:\n\n"Producer, songwriter, and artist building at the intersection of music and technology. Creating sounds that blur the line between organic and electronic — from intimate bedroom productions to festival stages.\n\nLatest release: ${FEATURED_RELEASE.title}"\n\nThis is concise (under 280 chars for social sharing), hits your key identity points, and includes a call-to-action with your latest release. Want me to update your profile with this?`,
         },
       ],
     },
@@ -1479,13 +1735,11 @@ async function seedDemoChatHistory(userId: string, profileId: string) {
       messages: [
         {
           role: 'user' as const,
-          content:
-            'Draft a notification for my subscribers about my new single "Raw Energy" that just dropped today.',
+          content: `Draft a notification for my subscribers about my new single "${FEATURED_RELEASE.title}" that just dropped today.`,
         },
         {
           role: 'assistant' as const,
-          content:
-            "Here's a notification draft:\n\n**Subject:** \"Raw Energy\" is out now\n\n**Body:**\nHey! My new single \"Raw Energy\" is live everywhere. This one's been in the works for months and I'm really proud of how it turned out — it's probably the most energetic thing I've ever made.\n\nListen now: [link]\n\nIf you dig it, adding it to a playlist or sharing it with a friend means the world. Every stream and share helps more than you know.\n\nThanks for being here.\n— Tim\n\nThis keeps it personal, authentic, and has a clear call-to-action without feeling like marketing. Want me to send this to your subscribers?",
+          content: `Here's a notification draft:\n\n**Subject:** "${FEATURED_RELEASE.title}" is out now\n\n**Body:**\nHey! My new single "${FEATURED_RELEASE.title}" is live everywhere. This one's been in the works for months and I'm really proud of how it turned out — it feels like the clearest version of this project yet.\n\nListen now: [link]\n\nIf you dig it, adding it to a playlist or sharing it with a friend means the world. Every stream and share helps more than you know.\n\nThanks for being here.\n— Tim\n\nThis keeps it personal, authentic, and has a clear call-to-action without feeling like marketing. Want me to send this to your subscribers?`,
         },
       ],
     },
@@ -1688,15 +1942,21 @@ async function seedDemoEmailEngagement(
   );
 }
 
-async function seedDemoPreSaveTokens(profileId: string, releaseIds: string[]) {
+async function seedDemoPreSaveTokens(
+  profileId: string,
+  releases: SeededReleaseRecord[]
+) {
   console.log('  Seeding pre-save tokens...');
 
-  if (releaseIds.length === 0) {
+  if (releases.length === 0) {
     console.log('    No releases to create pre-saves for');
     return;
   }
 
-  const releaseId = releaseIds[releaseIds.length - 1]; // most recent release
+  const upcomingRelease =
+    releases.find(release => release.title === UPCOMING_RELEASE.title) ??
+    releases[releases.length - 1];
+  const releaseId = upcomingRelease.id;
   const rows = [];
 
   for (let i = 0; i < 50; i++) {
@@ -1726,7 +1986,7 @@ async function seedDemoDspMatches(profileId: string) {
   const matches = [
     {
       providerId: 'spotify',
-      externalArtistId: DEMO_PROFILE.spotifyArtistId ?? 'calvin-harris',
+      externalArtistId: DEMO_PROFILE.spotifyArtistId ?? 'tim-white',
       externalArtistName: DEMO_DISPLAY_NAME,
       externalArtistUrl: DEMO_PROFILE.spotifyUrl ?? 'https://open.spotify.com',
       confidenceScore: '0.9800',
@@ -1735,38 +1995,40 @@ async function seedDemoDspMatches(profileId: string) {
     },
     {
       providerId: 'apple_music',
-      externalArtistId: 'calvin-harris-apple',
+      externalArtistId: DEMO_PROFILE.appleMusicArtistId ?? 'tim-white-apple',
       externalArtistName: DEMO_DISPLAY_NAME,
       externalArtistUrl:
         DEMO_PROFILE.appleMusicUrl ??
-        'https://music.apple.com/us/search?term=Calvin%20Harris',
+        'https://music.apple.com/us/search?term=Tim%20White',
       confidenceScore: '0.9500',
       status: 'confirmed' as const,
       confirmedAt: new Date(),
     },
     {
       providerId: 'youtube_music',
-      externalArtistId: 'UCcalvinharrisofficial',
+      externalArtistId: DEMO_PROFILE.youtubeMusicArtistId ?? 'UCtimwhite',
       externalArtistName: DEMO_DISPLAY_NAME,
-      externalArtistUrl: 'https://music.youtube.com/search?q=Calvin+Harris',
+      externalArtistUrl:
+        DEMO_PROFILE.youtubeUrl ??
+        'https://music.youtube.com/search?q=Tim+White',
       confidenceScore: '0.9200',
       status: 'confirmed' as const,
       confirmedAt: new Date(),
     },
     {
       providerId: 'deezer',
-      externalArtistId: 'calvin-harris-deezer',
+      externalArtistId: DEMO_PROFILE.deezerArtistId ?? 'tim-white-deezer',
       externalArtistName: DEMO_DISPLAY_NAME,
-      externalArtistUrl: 'https://www.deezer.com/search/Calvin%20Harris',
+      externalArtistUrl: 'https://www.deezer.com/search/Tim%20White',
       confidenceScore: '0.8800',
       status: 'confirmed' as const,
       confirmedAt: new Date(),
     },
     {
       providerId: 'tidal',
-      externalArtistId: 'calvin-harris-tidal',
+      externalArtistId: DEMO_PROFILE.tidalArtistId ?? 'tim-white-tidal',
       externalArtistName: DEMO_DISPLAY_NAME,
-      externalArtistUrl: 'https://listen.tidal.com/search?q=Calvin%20Harris',
+      externalArtistUrl: 'https://listen.tidal.com/search?q=Tim%20White',
       confidenceScore: '0.8200',
       status: 'suggested' as const,
       confirmedAt: null,
@@ -1840,10 +2102,14 @@ async function seedDemoAccount() {
     const contactIds = await seedDemoContacts(profileId);
 
     // 5. Releases
-    const releaseIds = await seedDemoReleases(profileId);
+    const releases = await seedDemoReleases(profileId);
+    const releaseIds = releases.map(release => release.id);
 
     // 6. Release tasks
-    await seedDemoReleaseTasks(profileId, releaseIds);
+    await seedDemoReleaseTasks(profileId, releases);
+
+    // 6a. Metadata submission workflow
+    await seedDemoMetadataSubmissionState(profileId, releases);
 
     // 7. Social links
     const linkIds = await seedDemoSocialLinks(profileId);
@@ -1864,7 +2130,7 @@ async function seedDemoAccount() {
     await seedDemoTipAudience(profileId, tipData);
 
     // 13. Clicks
-    await seedDemoClicks(profileId, linkIds);
+    await seedDemoClicks(profileId, linkIds, releases);
 
     // 14. Profile views
     await seedDemoProfileViews(profileId);
@@ -1885,7 +2151,7 @@ async function seedDemoAccount() {
     await seedDemoEmailEngagement(profileId, subscriberIds, releaseIds);
 
     // 20. Pre-save tokens
-    await seedDemoPreSaveTokens(profileId, releaseIds);
+    await seedDemoPreSaveTokens(profileId, releases);
 
     // 21. DSP matches
     await seedDemoDspMatches(profileId);

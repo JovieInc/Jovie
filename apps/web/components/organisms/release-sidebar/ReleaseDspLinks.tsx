@@ -28,8 +28,30 @@ import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ProviderKey } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 
-import type { Release } from './types';
+import type {
+  Release,
+  ReleaseSidebarAnalytics,
+  ReleaseSidebarAnalyticsState,
+} from './types';
 import { isValidUrl } from './utils';
+
+const MIN_PROVIDER_BADGE_CLICKS = 25;
+const POPULAR_PROVIDER_BADGE = 'Popular';
+
+function getMedian(values: readonly number[]): number {
+  if (values.length === 0) {
+    return 0;
+  }
+
+  const sortedValues = [...values].sort((left, right) => left - right);
+  const middleIndex = Math.floor(sortedValues.length / 2);
+
+  if (sortedValues.length % 2 === 0) {
+    return (sortedValues[middleIndex - 1] + sortedValues[middleIndex]) / 2;
+  }
+
+  return sortedValues[middleIndex] ?? 0;
+}
 
 interface ReleaseDspLinksProps {
   readonly release: Release;
@@ -37,6 +59,8 @@ interface ReleaseDspLinksProps {
     ProviderKey,
     { label: string; accent: string }
   >;
+  readonly analytics?: ReleaseSidebarAnalytics | null;
+  readonly analyticsState?: ReleaseSidebarAnalyticsState;
   readonly isEditable: boolean;
   readonly isAddingLink: boolean;
   readonly newLinkUrl: string;
@@ -55,6 +79,8 @@ interface ReleaseDspLinksProps {
 export function ReleaseDspLinks({
   release,
   providerConfig,
+  analytics = null,
+  analyticsState = 'loading',
   isEditable,
   isAddingLink,
   newLinkUrl,
@@ -74,6 +100,41 @@ export function ReleaseDspLinks({
   const availableProviders = providerKeys
     .filter(key => !release.providers.some(p => p.key === key))
     .map(key => [key, providerConfig[key]] as const);
+  const providerClickMap =
+    analyticsState === 'ready' && analytics
+      ? new Map(
+          analytics.providerClicks.map(({ provider, clicks }) => [
+            provider,
+            clicks,
+          ])
+        )
+      : null;
+  const totalProviderClicks = providerClickMap
+    ? [...providerClickMap.values()].reduce(
+        (runningTotal, clicks) => runningTotal + clicks,
+        0
+      )
+    : 0;
+  const visibleProviderClicks = providerClickMap
+    ? release.providers.map(provider => providerClickMap.get(provider.key) ?? 0)
+    : [];
+  const medianVisibleProviderClicks = getMedian(visibleProviderClicks);
+  const sortedProviders = providerClickMap
+    ? [...release.providers]
+        .map((provider, index) => ({
+          provider,
+          index,
+          clicks: providerClickMap.get(provider.key) ?? 0,
+        }))
+        .sort((left, right) => {
+          if (right.clicks !== left.clicks) {
+            return right.clicks - left.clicks;
+          }
+
+          return left.index - right.index;
+        })
+        .map(item => item.provider)
+    : release.providers;
 
   return (
     <DrawerLinkSection
@@ -83,11 +144,22 @@ export function ReleaseDspLinks({
       emptyMessage='No DSP links yet.'
     >
       {/* Providers list */}
-      {release.providers.length > 0 && (
+      {sortedProviders.length > 0 && (
         <div className='space-y-1.5'>
-          {release.providers.map(provider => {
+          {sortedProviders.map(provider => {
             const config = providerConfig[provider.key];
             const isManual = provider.source === 'manual';
+            const clicks = providerClickMap?.get(provider.key) ?? 0;
+            const isPopularProvider =
+              totalProviderClicks >= MIN_PROVIDER_BADGE_CLICKS &&
+              clicks > 0 &&
+              clicks >= totalProviderClicks * 0.2 &&
+              clicks >= Math.max(1, medianVisibleProviderClicks * 2);
+            const badge = isPopularProvider
+              ? POPULAR_PROVIDER_BADGE
+              : isManual
+                ? 'Custom'
+                : undefined;
 
             return (
               <SidebarLinkRow
@@ -102,7 +174,7 @@ export function ReleaseDspLinks({
                 label={config?.label || provider.key}
                 url={provider.url}
                 deepLinkPlatform={provider.key}
-                badge={isManual ? 'Custom' : undefined}
+                badge={badge}
                 isEditable={isEditable}
                 isRemoving={isRemovingDspLink === provider.key}
                 onRemove={() => void onRemoveLink(provider.key)}

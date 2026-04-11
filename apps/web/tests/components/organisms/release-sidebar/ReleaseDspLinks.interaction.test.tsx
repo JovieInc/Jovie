@@ -99,15 +99,18 @@ vi.mock('@/components/molecules/drawer', () => ({
   SidebarLinkRow: ({
     label,
     icon,
+    badge,
     onRemove,
   }: {
     label: string;
     icon: React.ReactNode;
+    badge?: string;
     onRemove?: () => void;
   }) => (
     <div>
       {icon}
       <span>{label}</span>
+      {badge ? <span>{badge}</span> : null}
       {onRemove ? (
         <button type='button' onClick={onRemove}>
           Remove {label}
@@ -275,5 +278,58 @@ describe('ReleaseDspLinks interactions', () => {
 
     await user.click(screen.getByRole('button', { name: 'Remove Spotify' }));
     expect(onRemoveLink).toHaveBeenCalledWith('spotify');
+  });
+
+  it('sorts providers by analytics popularity and marks outliers as Popular', () => {
+    render(
+      <ReleaseDspLinks
+        release={createMockRelease({
+          providers: [
+            {
+              key: 'apple_music',
+              url: 'https://music.apple.com/us/song/deep-end/1',
+            },
+            {
+              key: 'spotify',
+              url: 'https://open.spotify.com/track/deep-end',
+            },
+            {
+              key: 'youtube',
+              url: 'https://music.youtube.com/watch?v=deep-end',
+            },
+          ],
+        })}
+        providerConfig={providerConfig}
+        analytics={{
+          totalClicks: 2841,
+          last7DaysClicks: 186,
+          providerClicks: [
+            { provider: 'spotify', clicks: 1910 },
+            { provider: 'apple_music', clicks: 581 },
+            { provider: 'youtube', clicks: 350 },
+          ],
+        }}
+        analyticsState='ready'
+        isEditable
+        isAddingLink={false}
+        newLinkUrl=''
+        selectedProvider={null}
+        isAddingDspLink={false}
+        isRemovingDspLink={null}
+        onSetIsAddingLink={onSetIsAddingLink}
+        onSetNewLinkUrl={onSetNewLinkUrl}
+        onSetSelectedProvider={onSetSelectedProvider}
+        onAddLink={onAddLink}
+        onRemoveLink={onRemoveLink}
+        onNewLinkKeyDown={vi.fn()}
+      />
+    );
+
+    const labels = screen
+      .getAllByText(/^Spotify$|^Apple Music$|^YouTube Music$/)
+      .map(node => node.textContent);
+
+    expect(labels).toEqual(['Spotify', 'Apple Music', 'YouTube Music']);
+    expect(screen.getByText('Popular')).toBeInTheDocument();
   });
 });

@@ -6,6 +6,7 @@ REPO_ROOT="$(cd "$WEB_ROOT/../.." && pwd)"
 OUTPUT_ROOT="$REPO_ROOT/.context/outputs"
 RESULT_ROOT="$WEB_ROOT/test-results"
 FRAMES_ROOT="$OUTPUT_ROOT/yc-demo-frames"
+AUDIT_ROOT="$OUTPUT_ROOT/yc-demo-audit"
 PORT="${PORT:-3100}"
 RAW_VIDEO="$RESULT_ROOT/yc-demo.webm"
 MP4_VIDEO="$RESULT_ROOT/yc-demo.mp4"
@@ -13,6 +14,7 @@ OUTPUT_WEBM="$OUTPUT_ROOT/yc-demo.webm"
 OUTPUT_MP4="$OUTPUT_ROOT/yc-demo.mp4"
 CONTACT_SHEET="$OUTPUT_ROOT/yc-demo-contact-sheet.jpg"
 SERVER_LOG="$OUTPUT_ROOT/yc-demo-server.log"
+AUDIT_CHECKLIST="$OUTPUT_ROOT/yc-demo-audit.md"
 
 if [[ -z "${DEMO_CLERK_USER_ID:-}" ]]; then
   echo "DEMO_CLERK_USER_ID is required." >&2
@@ -29,6 +31,8 @@ done
 mkdir -p "$OUTPUT_ROOT" "$RESULT_ROOT"
 rm -rf "$FRAMES_ROOT"
 mkdir -p "$FRAMES_ROOT"
+rm -rf "$AUDIT_ROOT"
+mkdir -p "$AUDIT_ROOT"
 
 cleanup() {
   if [[ -n "${SERVER_PID:-}" ]] && kill -0 "$SERVER_PID" >/dev/null 2>&1; then
@@ -70,7 +74,20 @@ if ! curl -sf "http://127.0.0.1:${PORT}/" >/dev/null; then
   exit 1
 fi
 
+echo "[yc-demo] Prewarming public routes..."
+PREWARM_PATHS=(
+  "/"
+  "/timwhite/the-deep-end?noredirect=1"
+  "/timwhite"
+  "/timwhite?mode=subscribe"
+)
+
+for path in "${PREWARM_PATHS[@]}"; do
+  curl -sf "http://127.0.0.1:${PORT}${path}" >/dev/null || true
+done
+
 rm -f "$RAW_VIDEO" "$MP4_VIDEO" "$OUTPUT_WEBM" "$OUTPUT_MP4" "$CONTACT_SHEET"
+rm -f "$AUDIT_CHECKLIST"
 
 echo "[yc-demo] Recording Playwright demo..."
 doppler run -- env "${COMMON_ENV[@]}" \
@@ -103,7 +120,7 @@ cp "$RAW_VIDEO" "$OUTPUT_WEBM"
 cp "$MP4_VIDEO" "$OUTPUT_MP4"
 
 echo "[yc-demo] Extracting review frames..."
-SAMPLE_TIMES=(1 6 10 14 22 26 30 34)
+SAMPLE_TIMES=(3 6 8 12 14 18 24 26 32 36)
 
 for index in "${!SAMPLE_TIMES[@]}"; do
   frame_number="$(printf '%03d' "$((index + 1))")"
@@ -111,9 +128,39 @@ for index in "${!SAMPLE_TIMES[@]}"; do
   ffmpeg -y -ss "$timestamp" -i "$MP4_VIDEO" -frames:v 1 -vf "scale=320:-1" "$FRAMES_ROOT/frame-${frame_number}.jpg" >/dev/null 2>&1
 done
 
-ffmpeg -y -framerate 1 -i "$FRAMES_ROOT/frame-%03d.jpg" -vf "tile=2x4:padding=12:margin=12:color=white" -frames:v 1 "$CONTACT_SHEET" >/dev/null 2>&1
+ffmpeg -y -framerate 1 -i "$FRAMES_ROOT/frame-%03d.jpg" -vf "tile=2x5:padding=12:margin=12:color=white" -frames:v 1 "$CONTACT_SHEET" >/dev/null 2>&1
+
+echo "[yc-demo] Extracting full audit frames..."
+ffmpeg -y -i "$MP4_VIDEO" -vf "fps=1,scale=640:-1" "$AUDIT_ROOT/sec-%03d.jpg" >/dev/null 2>&1
+
+cat >"$AUDIT_CHECKLIST" <<'EOF'
+# YC Demo Audit Checklist
+
+- Confirm there is no `Analytics unavailable` state.
+- Confirm there are no visible `localhost` or `127.0.0.1` URLs.
+- Confirm there are no visible loading spinners or skeletons.
+- Confirm the demo profile does not show `Profile 75%` or any incomplete profile badge.
+- Confirm the featured release tasks scene avoids negative metadata workflow empty states.
+- Confirm Tim White identity and the curated release sequence stay consistent.
+- Confirm the public profile latest-release card shows the upcoming release countdown.
+- Confirm the release drawer DSP list shows popularity ordering and the `Popular` badge when expected.
+
+Recommended checkpoints:
+- `sec-003.jpg`
+- `sec-006.jpg`
+- `sec-008.jpg`
+- `sec-012.jpg`
+- `sec-014.jpg`
+- `sec-018.jpg`
+- `sec-024.jpg`
+- `sec-026.jpg`
+- `sec-032.jpg`
+- `sec-036.jpg`
+EOF
 
 echo "[yc-demo] Outputs ready:"
 echo "  $OUTPUT_WEBM"
 echo "  $OUTPUT_MP4"
 echo "  $CONTACT_SHEET"
+echo "  $AUDIT_ROOT"
+echo "  $AUDIT_CHECKLIST"

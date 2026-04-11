@@ -41,6 +41,8 @@ export interface ReleaseSidebarAnalytics {
   providerClicks: Array<{ provider: string; clicks: number }>;
 }
 
+export type ReleaseSidebarAnalyticsState = 'loading' | 'ready' | 'error';
+
 export interface DspLink extends ProviderLink {
   label: string;
   path: string;

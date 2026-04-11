@@ -415,4 +415,42 @@ describe('ProfileCompactTemplate', () => {
 
     pushStateSpy.mockRestore();
   });
+
+  it('shows an upcoming-release countdown in the existing latest release card', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+
+    const { ProfileCompactTemplate } = await import(
+      '@/features/profile/templates/ProfileCompactTemplate'
+    );
+
+    const upcomingReleaseDate = new Date();
+    upcomingReleaseDate.setDate(upcomingReleaseDate.getDate() + 10);
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        latestRelease={{
+          title: 'Future Waves',
+          slug: 'future-waves',
+          artworkUrl: 'https://example.com/future-waves.jpg',
+          releaseDate: upcomingReleaseDate,
+          releaseType: 'single',
+        }}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: /pre-save future waves/i })
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('profile-latest-release-card')).toHaveTextContent(
+      'Future Waves'
+    );
+    expect(
+      screen.getByTestId('profile-latest-release-timing')
+    ).toHaveTextContent(/Coming .* • .*days?/);
+    expect(screen.getByText('Pre-save')).toBeInTheDocument();
+  });
 });

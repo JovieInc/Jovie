@@ -146,6 +146,64 @@ function getModeFromDrawerView(view: DrawerView): ProfileMode | null {
   }
 }
 
+function getNormalizedReleaseDate(value: Date | string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const resolvedDate = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(resolvedDate.getTime()) ? null : resolvedDate;
+}
+
+function getLatestReleaseCardState(
+  releaseDate: Date | string | null | undefined
+): {
+  readonly ctaLabel: 'Listen' | 'Pre-save';
+  readonly timingLabel: string | null;
+  readonly ariaLabelPrefix: 'Listen to' | 'Pre-save';
+} {
+  const normalizedReleaseDate = getNormalizedReleaseDate(releaseDate);
+  if (!normalizedReleaseDate) {
+    return {
+      ctaLabel: 'Listen',
+      timingLabel: null,
+      ariaLabelPrefix: 'Listen to',
+    };
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const releaseDay = new Date(
+    normalizedReleaseDate.getFullYear(),
+    normalizedReleaseDate.getMonth(),
+    normalizedReleaseDate.getDate()
+  );
+  const daysUntilRelease = Math.ceil(
+    (releaseDay.getTime() - today.getTime()) / (24 * 60 * 60 * 1000)
+  );
+  const releaseDateLabel = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+  }).format(normalizedReleaseDate);
+
+  if (daysUntilRelease > 0) {
+    const countdownLabel =
+      daysUntilRelease === 1 ? '1 day' : `${daysUntilRelease} days`;
+
+    return {
+      ctaLabel: 'Pre-save',
+      timingLabel: `Coming ${releaseDateLabel} • ${countdownLabel}`,
+      ariaLabelPrefix: 'Pre-save',
+    };
+  }
+
+  return {
+    ctaLabel: 'Listen',
+    timingLabel: `Live now • ${releaseDateLabel}`,
+    ariaLabelPrefix: 'Listen to',
+  };
+}
+
 export function ProfileCompactTemplate({
   mode,
   artist,
@@ -355,6 +413,9 @@ export function ProfileCompactTemplate({
       tourDates.find(td => new Date(td.startDate).getTime() >= now) ?? null
     );
   }, [tourDates]);
+  const latestReleaseCardState = latestRelease
+    ? getLatestReleaseCardState(latestRelease.releaseDate)
+    : null;
 
   const resolveInitialView = useCallback(
     (nextMode: ProfileMode) =>
@@ -640,8 +701,9 @@ export function ProfileCompactTemplate({
                   <button
                     type='button'
                     onClick={handlePlayClick}
+                    data-testid='profile-latest-release-card'
                     className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-2.5 py-2 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
-                    aria-label={`Listen to ${latestRelease.title}`}
+                    aria-label={`${latestReleaseCardState?.ariaLabelPrefix ?? 'Listen to'} ${latestRelease.title}`}
                   >
                     {latestRelease.artworkUrl ? (
                       <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
@@ -655,11 +717,21 @@ export function ProfileCompactTemplate({
                         />
                       </div>
                     ) : null}
-                    <p className='min-w-0 flex-1 truncate text-[13px] font-[510] leading-[1.15] text-white/88'>
-                      {latestRelease.title}
-                    </p>
+                    <div className='min-w-0 flex-1'>
+                      <p className='truncate text-[13px] font-[510] leading-[1.15] text-white/88'>
+                        {latestRelease.title}
+                      </p>
+                      {latestReleaseCardState?.timingLabel ? (
+                        <p
+                          className='mt-0.5 truncate text-[10.5px] leading-[1.2] text-white/56'
+                          data-testid='profile-latest-release-timing'
+                        >
+                          {latestReleaseCardState.timingLabel}
+                        </p>
+                      ) : null}
+                    </div>
                     <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
-                      Listen
+                      {latestReleaseCardState?.ctaLabel ?? 'Listen'}
                     </span>
                   </button>
                 ) : nextTourDate ? (
