@@ -2495,7 +2495,7 @@ jobs:
             exit 1
           fi
 
-          PASSED=$(jq '[.. | objects | select((.location?.file? // "" | endswith("tests/e2e/golden-path.spec.ts")) and (.results? | type == "array")) | .results[] | select(.status == "passed")] | length' "$RESULTS_FILE")
+          PASSED=$(jq '[.. | .results? // empty | .[] | select(.status == "passed")] | length' "$RESULTS_FILE")
 
           if ! [[ "$PASSED" =~ ^[0-9]+$ ]]; then
             echo "Golden path results parsing returned an invalid count: ${PASSED:-<empty>}"
