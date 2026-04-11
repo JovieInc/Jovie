@@ -225,7 +225,7 @@ async function handleBulkInsertMessage(message: BulkInsertMessage) {
       element instanceof HTMLTextAreaElement
     ) {
       const previousValue = element.value;
-      insertIntoInput(element, field.value);
+      setInputValue(element, field.value);
       appliedCount += 1;
       results.push({
         selector: field.selector,
@@ -267,7 +267,6 @@ const LABEL_ALIASES: ReadonlyMap<string, readonly string[]> = new Map([
   ['project name', ['release title']],
   ['project code', ['release title']],
   ['project artist', ['display name']],
-  ['project description', []],
   ['song title', ['release title']],
 ]);
 

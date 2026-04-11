@@ -86,10 +86,6 @@ export const ADAPTERS: readonly PageAdapter[] = [
         label: 'Project Artist',
         inputTypes: ['text'],
       },
-      {
-        selector: 'textarea.ProjectDescriptionInput-textarea',
-        label: 'Project Description',
-      },
     ],
   },
   {
