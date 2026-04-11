@@ -404,6 +404,7 @@ describe('AddReleaseSidebar', () => {
         title: 'Midnight Sun',
         releaseType: 'single',
         releaseDate: null,
+        revealDate: null,
         genres: ['indie pop'],
         isExplicit: true,
       });

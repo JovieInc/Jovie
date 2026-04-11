@@ -69,6 +69,7 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] =
     title: release.title,
     artistNames: [...release.artistNames],
     releaseDate: release.releaseDate,
+    status: 'released' as const,
     artworkUrl: release.artworkUrl,
     slug: release.slug,
     smartLinkPath: `/${INTERNAL_DJ_DEMO_PERSONA.profile.handle}/${release.slug}`,
