@@ -557,6 +557,10 @@ export async function completeOnboardingV2(
   });
   const artistConfirmContinue = page.getByRole('button', { name: 'Continue' });
   const lateArrivalsFinish = page.getByRole('button', { name: 'Finish setup' });
+  const releasePreviewHeading = page.getByRole('heading', {
+    name: 'Your release preview',
+  });
+  const releasePreviewContinue = page.getByRole('button', { name: 'Continue' });
   const profileReadyHeading = page.getByRole('heading', {
     name: /^(Your profile is ready|Your Link Is Live)$/i,
   });
@@ -568,6 +572,10 @@ export async function completeOnboardingV2(
   await expect
     .poll(
       async () => {
+        if (!page.url().includes('/onboarding')) {
+          return 'dashboard';
+        }
+
         if (await profileReadyHeading.isVisible().catch(() => false)) {
           return 'profile-ready';
         }
@@ -587,7 +595,7 @@ export async function completeOnboardingV2(
       },
       { timeout: 180_000 }
     )
-    .toMatch(/upgrade|artist-confirm-ready|profile-ready/);
+    .toMatch(/upgrade|artist-confirm-ready|profile-ready|dashboard/);
 
   if (
     (await artistConfirmContinue.isVisible().catch(() => false)) &&
@@ -599,6 +607,10 @@ export async function completeOnboardingV2(
   const postConfirmStep = await expect
     .poll(
       async () => {
+        if (!page.url().includes('/onboarding')) {
+          return 'dashboard';
+        }
+
         if (await profileReadyHeading.isVisible().catch(() => false)) {
           return 'profile-ready';
         }
@@ -611,21 +623,37 @@ export async function completeOnboardingV2(
           return 'late-arrivals';
         }
 
+        if (await releasePreviewHeading.isVisible().catch(() => false)) {
+          return 'releases';
+        }
+
         return 'waiting';
       },
       { timeout: 30_000 }
     )
-    .toMatch(/profile-ready|upgrade|late-arrivals/)
+    .toMatch(/profile-ready|upgrade|late-arrivals|releases|dashboard/)
     .then(async () =>
-      (await profileReadyHeading.isVisible().catch(() => false))
-        ? 'profile-ready'
-        : (await lateArrivalsHeading.isVisible().catch(() => false))
-          ? 'late-arrivals'
-          : 'upgrade'
+      !page.url().includes('/onboarding')
+        ? 'dashboard'
+        : (await profileReadyHeading.isVisible().catch(() => false))
+          ? 'profile-ready'
+          : (await lateArrivalsHeading.isVisible().catch(() => false))
+            ? 'late-arrivals'
+            : (await releasePreviewHeading.isVisible().catch(() => false))
+              ? 'releases'
+              : 'upgrade'
     );
+
+  if (postConfirmStep === 'dashboard') {
+    return;
+  }
 
   if (postConfirmStep === 'upgrade') {
     await page.getByRole('button', { name: 'Continue free' }).click();
+  }
+
+  if (postConfirmStep === 'releases') {
+    await releasePreviewContinue.click();
   }
 
   if (postConfirmStep === 'late-arrivals') {
@@ -635,8 +663,21 @@ export async function completeOnboardingV2(
   await expect
     .poll(
       async () => {
+        if (!page.url().includes('/onboarding')) {
+          return 'dashboard';
+        }
+
         if (await profileReadyHeading.isVisible().catch(() => false)) {
           return 'profile-ready';
+        }
+
+        if (
+          (await releasePreviewHeading.isVisible().catch(() => false)) &&
+          (await releasePreviewContinue.isVisible().catch(() => false)) &&
+          (await releasePreviewContinue.isEnabled().catch(() => false))
+        ) {
+          await releasePreviewContinue.click();
+          return 'releases';
         }
 
         if (
@@ -652,7 +693,7 @@ export async function completeOnboardingV2(
       },
       { timeout: 120_000 }
     )
-    .toMatch(/profile-ready|late-arrivals/);
+    .toMatch(/profile-ready|late-arrivals|releases|dashboard/);
 
   if (options.clerkUserId) {
     await expect
