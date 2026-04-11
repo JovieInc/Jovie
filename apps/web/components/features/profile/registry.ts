@@ -18,7 +18,7 @@ export const PROFILE_MODE_REGISTRY: Record<ProfileMode, ProfileModeDefinition> =
     },
     listen: {
       mode: 'listen',
-      subtitle: 'Choose a Service',
+      subtitle: 'Listen now',
       pathSegment: 'listen',
       shell: {
         showBackButton: true,
@@ -30,7 +30,7 @@ export const PROFILE_MODE_REGISTRY: Record<ProfileMode, ProfileModeDefinition> =
     },
     tip: {
       mode: 'tip',
-      subtitle: 'Tip with Venmo',
+      subtitle: 'Send a tip',
       pathSegment: 'tip',
       shell: {
         showBackButton: true,
