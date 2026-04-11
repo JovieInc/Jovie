@@ -439,6 +439,68 @@ export function buildValidOnboardingHandle(
   return `j${seedFragment}${userFragment.slice(-6)}`.slice(0, 30);
 }
 
+type OnboardingCompletionStep =
+  | 'artist-confirm-ready'
+  | 'profile-ready'
+  | 'upgrade'
+  | 'waiting';
+
+async function readOnboardingCompletionStep(
+  profileReadyHeading: ReturnType<Page['getByRole']>,
+  upgradeHeading: ReturnType<Page['getByRole']>,
+  artistConfirmContinue: ReturnType<Page['getByRole']>
+): Promise<OnboardingCompletionStep> {
+  if (await profileReadyHeading.isVisible().catch(() => false)) {
+    return 'profile-ready';
+  }
+
+  if (await upgradeHeading.isVisible().catch(() => false)) {
+    return 'upgrade';
+  }
+
+  if (
+    (await artistConfirmContinue.isVisible().catch(() => false)) &&
+    (await artistConfirmContinue.isEnabled().catch(() => false))
+  ) {
+    return 'artist-confirm-ready';
+  }
+
+  return 'waiting';
+}
+
+async function readPostConfirmStep(
+  profileReadyHeading: ReturnType<Page['getByRole']>,
+  upgradeHeading: ReturnType<Page['getByRole']>
+): Promise<'profile-ready' | 'upgrade' | 'waiting'> {
+  if (await profileReadyHeading.isVisible().catch(() => false)) {
+    return 'profile-ready';
+  }
+
+  if (await upgradeHeading.isVisible().catch(() => false)) {
+    return 'upgrade';
+  }
+
+  return 'waiting';
+}
+
+async function reopenOnboardingAtProfileReadyStep(
+  page: Page,
+  clerkUserId: string
+): Promise<void> {
+  await ensureServerAuthenticated(page, clerkUserId);
+  await smokeNavigateWithRetry(page, '/onboarding?resume=profile-ready', {
+    retries: 1,
+    timeout: 60_000,
+  });
+  await expect(page).toHaveURL(/\/onboarding\?(?:.*&)?resume=profile-ready/, {
+    timeout: 30_000,
+  });
+  await expect(
+    page.locator('[data-testid="onboarding-form-wrapper"]')
+  ).toBeVisible({ timeout: 20_000 });
+  await waitForHydration(page, { timeout: 90_000 });
+}
+
 export async function completeOnboardingV2(
   page: Page,
   spotifyArtistUrl: string = DEFAULT_ONBOARDING_SPOTIFY_ARTIST.url,
@@ -553,58 +615,75 @@ export async function completeOnboardingV2(
     await waitForOnboardingReadiness(page, options.clerkUserId);
   }
 
-  await expect
+  const completionStep = await expect
     .poll(
-      async () => {
-        if (await profileReadyHeading.isVisible().catch(() => false)) {
-          return 'profile-ready';
-        }
-
-        if (await upgradeHeading.isVisible().catch(() => false)) {
-          return 'upgrade';
-        }
-
-        if (
-          (await artistConfirmContinue.isVisible().catch(() => false)) &&
-          (await artistConfirmContinue.isEnabled().catch(() => false))
-        ) {
-          return 'artist-confirm-ready';
-        }
-
-        return 'waiting';
-      },
-      { timeout: 180_000 }
+      () =>
+        readOnboardingCompletionStep(
+          profileReadyHeading,
+          upgradeHeading,
+          artistConfirmContinue
+        ),
+      {
+        timeout: options.clerkUserId ? 30_000 : 180_000,
+      }
     )
-    .toMatch(/upgrade|artist-confirm-ready|profile-ready/);
+    .toMatch(/upgrade|artist-confirm-ready|profile-ready/)
+    .then(() =>
+      readOnboardingCompletionStep(
+        profileReadyHeading,
+        upgradeHeading,
+        artistConfirmContinue
+      )
+    )
+    .catch(async error => {
+      if (!options.clerkUserId) {
+        throw error;
+      }
 
-  if (
-    (await artistConfirmContinue.isVisible().catch(() => false)) &&
-    (await artistConfirmContinue.isEnabled().catch(() => false))
-  ) {
+      await reopenOnboardingAtProfileReadyStep(page, options.clerkUserId);
+      return expect
+        .poll(
+          () =>
+            readOnboardingCompletionStep(
+              profileReadyHeading,
+              upgradeHeading,
+              artistConfirmContinue
+            ),
+          { timeout: 30_000 }
+        )
+        .toMatch(/upgrade|artist-confirm-ready|profile-ready/)
+        .then(() =>
+          readOnboardingCompletionStep(
+            profileReadyHeading,
+            upgradeHeading,
+            artistConfirmContinue
+          )
+        );
+    });
+
+  if (completionStep === 'artist-confirm-ready') {
     await artistConfirmContinue.click();
   }
 
   const postConfirmStep = await expect
-    .poll(
-      async () => {
-        if (await profileReadyHeading.isVisible().catch(() => false)) {
-          return 'profile-ready';
-        }
-
-        if (await upgradeHeading.isVisible().catch(() => false)) {
-          return 'upgrade';
-        }
-
-        return 'waiting';
-      },
-      { timeout: 30_000 }
-    )
+    .poll(() => readPostConfirmStep(profileReadyHeading, upgradeHeading), {
+      timeout: 30_000,
+    })
     .toMatch(/profile-ready|upgrade/)
-    .then(async () =>
-      (await profileReadyHeading.isVisible().catch(() => false))
-        ? 'profile-ready'
-        : 'upgrade'
-    );
+    .then(() => readPostConfirmStep(profileReadyHeading, upgradeHeading))
+    .catch(async error => {
+      if (!options.clerkUserId) {
+        throw error;
+      }
+
+      await reopenOnboardingAtProfileReadyStep(page, options.clerkUserId);
+      return expect
+        .poll(() => readPostConfirmStep(profileReadyHeading, upgradeHeading), {
+          timeout: 30_000,
+        })
+        .toMatch(/profile-ready|upgrade/)
+        .then(() => readPostConfirmStep(profileReadyHeading, upgradeHeading));
+    });
 
   if (postConfirmStep === 'upgrade') {
     await page.getByRole('button', { name: 'Continue free' }).click();
