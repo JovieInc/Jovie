@@ -5,10 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.143] - 2026-04-10
+## [26.4.145] - 2026-04-10
+
+### Changed
+
+- Normalized audience JSONB arrays (referrer history, actions) into relational tables for query performance and schema safety
+- Made `url` column on `audience_referrers` NOT NULL since the write path already guards against null values
+- Populated the `source` field from referrer URL hostname on every referrer insert
+- Removed redundant `onConflictDoNothing()` on referrer inserts where no unique constraint exists
+
+## [26.4.144.1] - 2026-04-10
+
+### Added
+
+- "Create a new release" suggestion on the empty chat state, shown as the first option for both new and returning users
 
 ### Fixed
 
+- Checkboxes now properly toggle when clicked, fixing broken indeterminate state handling that prevented "select all" from working correctly in tables
+- Indeterminate checkboxes now show a minus icon instead of a checkmark, matching standard UI conventions
+- Checkbox alignment fixed in admin creator profile rows (was rendering at top-left instead of centered)
+- Screen readers can now access table checkboxes (removed `aria-hidden` from interactive containers)
+
+### Changed
+
+- All checkbox instances now use the central design system component without custom style overrides, ensuring consistent appearance across admin, audience, and dashboard tables
+
+## [26.4.144] - 2026-04-10
+
+### Added
+
+- Chrome extension support for AWAL (workstation.awal.com) and Kosign (app.kosignmusic.com) alongside DistroKid
+- Autofill button in extension sidebar that fills distributor/publisher forms from Jovie release data
+- Bulk-insert content script handler with React-compatible nativeInputValueSetter for framework-controlled inputs
+- React Select async dropdown handler for AWAL's Project Artist field (type, wait, select)
+- Undo button to revert autofilled fields to previous values
+- Label-alias mapping so Jovie entity fields (Release Title, Display Name) map to platform form labels (Project Name, Project Artist)
+- Slugified project code derivation from release title for AWAL
+
+### Changed
+
+- Extension domain infrastructure refactored for multi-distributor support (DRY classifyPage reads from shared DOMAIN_CONFIGS)
+- Shell copy updated from DistroKid-specific messaging to generic distributor language
+- DistroKid domain mode changed from read to write (pre-launch, no existing users)
+
+## [26.4.143] - 2026-04-10
+
+> Unreleased content pages now capture fan emails instead of showing a dead-end "Coming Soon" card. Smart link errors show the right message, OG images generate faster, and profile copy is tighter across all modes.
+
+### Added
+
+- Email notification signup on countdown pages for unreleased releases, with countdown timer and share button
+- Error and 404 boundaries for smart link routes so errors say "Content not found" instead of "Profile is temporarily unavailable"
+- Unit tests for the redesigned countdown page
+
+### Changed
+
+- "Choose a Service" → "Listen now" and "Tip with Venmo" → "Send a tip" in profile mode subtitles
+- "Drops in" → "Releases in" on countdown timers
+- OG image base64 encoding uses chunked conversion instead of char-by-char concatenation
+- Extracted shared profile mapper to eliminate duplicate CreatorProfile construction
+- Moved promo download check from inline dynamic imports to a shared data function
+
+### Fixed
+
+- OG images no longer bypass the 2MB size guard when upstream servers omit Content-Length headers
+- Empty countdown container no longer renders when release date has passed (uses CSS empty:hidden)
 - Notification subscribe on profile pages now shows the OTP verification input after email submission instead of staying stuck on the email field
 
 ## [26.4.142] - 2026-04-10

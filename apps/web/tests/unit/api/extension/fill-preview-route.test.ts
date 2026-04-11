@@ -92,4 +92,78 @@ describe('POST /api/extension/actions/fill-preview', () => {
       error: 'Release not found',
     });
   });
+
+  it('accepts the awal_release_form workflow ID', async () => {
+    mockBuildExtensionFillPreview.mockResolvedValue({
+      status: 'ready',
+      workflowId: 'awal_release_form',
+      entityId: 'release_2',
+      entityTitle: 'Midnight',
+      mappings: [],
+      blockers: [],
+      unsupportedTargets: [],
+      submissionPacket: { title: 'Packet', summary: 'Summary', sections: [] },
+    });
+
+    const { POST } = await import(
+      '@/app/api/extension/actions/fill-preview/route'
+    );
+    const response = await POST(
+      new Request('http://localhost/api/extension/actions/fill-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workflowId: 'awal_release_form',
+          entityId: 'release_2',
+          entityKind: 'release',
+          pageUrl: 'https://workstation.awal.com/project/new-create',
+          pageVariant: null,
+          availableTargets: [],
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: 'ready',
+      workflowId: 'awal_release_form',
+    });
+  });
+
+  it('accepts the kosign_work_form workflow ID', async () => {
+    mockBuildExtensionFillPreview.mockResolvedValue({
+      status: 'ready',
+      workflowId: 'kosign_work_form',
+      entityId: 'release_3',
+      entityTitle: 'Sunrise',
+      mappings: [],
+      blockers: [],
+      unsupportedTargets: [],
+      submissionPacket: { title: 'Packet', summary: 'Summary', sections: [] },
+    });
+
+    const { POST } = await import(
+      '@/app/api/extension/actions/fill-preview/route'
+    );
+    const response = await POST(
+      new Request('http://localhost/api/extension/actions/fill-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workflowId: 'kosign_work_form',
+          entityId: 'release_3',
+          entityKind: 'release',
+          pageUrl: 'https://app.kosignmusic.com/catalog/work-submission/1',
+          pageVariant: null,
+          availableTargets: [],
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: 'ready',
+      workflowId: 'kosign_work_form',
+    });
+  });
 });

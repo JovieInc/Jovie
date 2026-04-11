@@ -1,0 +1,49 @@
+{
+  "$schema": "Route-level performance budgets for CI enforcement",
+  "routes": {
+    "public": {
+      "description": "Public smart-link and profile routes",
+      "examples": ["/[username]", "/[username]/[slug]", "/r/[slug]"],
+      "budgets": {
+        "initialJS_gzip_kb": 180,
+        "lcp_ms": 2500,
+        "fcp_ms": 1500,
+        "cls": 0.1,
+        "tti_ms": 3000
+      }
+    },
+    "marketing": {
+      "description": "Marketing and legal pages",
+      "examples": ["/", "/legal/privacy", "/playlists/[slug]"],
+      "budgets": {
+        "initialJS_gzip_kb": 150,
+        "lcp_ms": 2000,
+        "fcp_ms": 1200,
+        "cls": 0.05,
+        "tti_ms": 2500
+      }
+    },
+    "dashboard": {
+      "description": "Authenticated dashboard routes",
+      "examples": ["/app/dashboard/releases", "/app/dashboard/audience"],
+      "budgets": {
+        "initialJS_gzip_kb": 250,
+        "lcp_ms": 3500,
+        "fcp_ms": 2000,
+        "cls": 0.1,
+        "tti_ms": 4000
+      }
+    },
+    "admin": {
+      "description": "Admin-only routes",
+      "examples": ["/app/admin/*"],
+      "budgets": {
+        "initialJS_gzip_kb": 300,
+        "lcp_ms": 4000,
+        "fcp_ms": 2500,
+        "cls": 0.15,
+        "tti_ms": 5000
+      }
+    }
+  }
+}

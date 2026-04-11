@@ -11,11 +11,22 @@
   ],
   "optional_host_permissions": [
     "https://distrokid.com/*",
-    "https://*.distrokid.com/*"
+    "https://*.distrokid.com/*",
+    "https://workstation.awal.com/*",
+    "https://*.awal.com/*",
+    "https://app.kosignmusic.com/*",
+    "https://*.kosignmusic.com/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://distrokid.com/*", "https://*.distrokid.com/*"],
+      "matches": [
+        "https://distrokid.com/*",
+        "https://*.distrokid.com/*",
+        "https://workstation.awal.com/*",
+        "https://*.awal.com/*",
+        "https://app.kosignmusic.com/*",
+        "https://*.kosignmusic.com/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_idle"
     }

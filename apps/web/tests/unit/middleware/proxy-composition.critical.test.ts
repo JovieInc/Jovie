@@ -234,6 +234,65 @@ describe('proxy composition (critical)', () => {
   });
 
   // ==========================================================================
+  // Clerk publishable key header injection
+  // ==========================================================================
+  describe('x-clerk-publishable-key header', () => {
+    const nextSpy = vi.spyOn(NextResponse, 'next');
+    beforeEach(() => {
+      nextSpy.mockClear();
+    });
+
+    const getInjectedClerkHeader = () => {
+      const arg = nextSpy.mock.calls.at(-1)?.[0] as
+        | { request?: { headers?: Headers } }
+        | undefined;
+      return arg?.request?.headers?.get('x-clerk-publishable-key') ?? null;
+    };
+
+    it('sets header when both publishableKey and secretKey are present', async () => {
+      mocks.resolveClerkKeys.mockReturnValue({
+        publishableKey: 'pk_test_valid-key',
+        secretKey: 'sk_test_valid-key',
+      });
+      mocks.shouldBypassClerkForRequest.mockReturnValue(true);
+
+      const req = createTestRequest({ pathname: '/signup' });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeLessThan(400);
+      expect(getInjectedClerkHeader()).toBe('pk_test_valid-key');
+    });
+
+    it('does NOT set header when secretKey is missing (staging without CLERK_SECRET_KEY)', async () => {
+      mocks.resolveClerkKeys.mockReturnValue({
+        publishableKey: 'pk_live_valid-production-key',
+        secretKey: undefined,
+      });
+      mocks.shouldBypassClerkForRequest.mockReturnValue(true);
+
+      const req = createTestRequest({ pathname: '/signup' });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeLessThan(500);
+      expect(getInjectedClerkHeader()).toBeNull();
+    });
+
+    it('does NOT set header when publishableKey is missing', async () => {
+      mocks.resolveClerkKeys.mockReturnValue({
+        publishableKey: undefined,
+        secretKey: undefined,
+      });
+      mocks.shouldBypassClerkForRequest.mockReturnValue(true);
+
+      const req = createTestRequest({ pathname: '/' });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeLessThan(500);
+      expect(getInjectedClerkHeader()).toBeNull();
+    });
+  });
+
+  // ==========================================================================
   // Middleware matcher exclusions
   // ==========================================================================
   describe('matcher config', () => {
