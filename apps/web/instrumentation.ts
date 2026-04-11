@@ -2,8 +2,12 @@
 const INSTRUMENTATION_START_TIME = Date.now();
 let firstValidationAttemptTime: number | null = null;
 let validationResolvedTime: number | null = null;
-type SentryModule = typeof import('@sentry/nextjs');
-type OnRequestErrorArgs = Parameters<SentryModule['captureRequestError']>;
+
+type SentryModule = {
+  captureException: (error: unknown, context?: Record<string, unknown>) => void;
+  captureMessage: (message: string, context?: Record<string, unknown>) => void;
+  captureRequestError: (...args: unknown[]) => unknown;
+};
 
 let sentryModulePromise: Promise<SentryModule> | null = null;
 
@@ -241,7 +245,7 @@ export async function register() {
   }
 }
 
-export async function onRequestError(...args: OnRequestErrorArgs) {
+export async function onRequestError(...args: unknown[]) {
   const isDev = process.env.NODE_ENV === 'development';
   const isCi = process.env.CI === 'true';
 

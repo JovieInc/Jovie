@@ -520,8 +520,8 @@ jobs:
             exit 1
           fi
 
-          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
-          echo "Using direct-first Neon DB URL from neon-db artifact for Drizzle check"
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
+          echo "Using pooled-first Neon DB URL from neon-db artifact for Drizzle check"
           echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
 
       - name: Fail if Neon DB URL is missing
@@ -1188,7 +1188,7 @@ jobs:
             exit 1
           fi
 
-          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
           echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup-node-pnpm
@@ -2139,7 +2139,7 @@ jobs:
             exit 1
           fi
 
-          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
           echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
 
       - name: Fail if Neon DB URL is missing (E2E)
@@ -2724,7 +2724,7 @@ jobs:
             exit 1
           fi
 
-          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
+          CANDIDATE=$(jq -r '.db_url_pooled // .db_url // empty' "$CONNECTION_FILE")
           echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
 
       - name: Run migrations for Smoke DB
