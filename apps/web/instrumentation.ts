@@ -12,7 +12,17 @@ type SentryModule = {
 let sentryModulePromise: Promise<SentryModule> | null = null;
 
 function loadSentry(): Promise<SentryModule> {
-  sentryModulePromise ??= import('@sentry/nextjs');
+  if (!sentryModulePromise) {
+    sentryModulePromise = import('@sentry/nextjs').then(module => ({
+      captureException: module.captureException,
+      captureMessage: module.captureMessage,
+      captureRequestError: (...args: unknown[]) =>
+        module.captureRequestError(
+          ...(args as Parameters<typeof module.captureRequestError>)
+        ),
+    }));
+  }
+
   return sentryModulePromise;
 }
 
