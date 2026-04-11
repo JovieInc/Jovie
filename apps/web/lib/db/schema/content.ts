@@ -50,6 +50,9 @@ export const discogReleases = pgTable(
       .notNull()
       .default('single'),
     releaseDate: timestamp('release_date'),
+    status: text('status').notNull().default('released'),
+    revealDate: timestamp('reveal_date'),
+    deletedAt: timestamp('deleted_at'),
     label: text('label'),
     upc: text('upc'),
     totalTracks: integer('total_tracks').default(0).notNull(),

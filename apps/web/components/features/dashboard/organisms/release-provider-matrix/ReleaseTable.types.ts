@@ -21,6 +21,7 @@ export interface ReleaseTableProps {
     testId: string
   ) => Promise<string>;
   readonly onEdit: (release: ReleaseViewModel) => void;
+  readonly onDelete?: (releaseId: string) => void;
   readonly columnVisibility?: Record<string, boolean>;
   readonly rowHeight?: number;
   readonly onFocusedRowChange?: (release: ReleaseViewModel) => void;

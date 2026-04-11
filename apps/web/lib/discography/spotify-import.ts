@@ -146,7 +146,9 @@ async function discoverLinksForReleases(
   creatorProfileId: string,
   market: string
 ): Promise<void> {
-  const importedReleases = await getReleasesForProfile(creatorProfileId);
+  const importedReleases = await getReleasesForProfile(creatorProfileId, {
+    includeDrafts: true,
+  });
 
   await mapConcurrent(importedReleases, 5, async release => {
     try {
@@ -364,7 +366,9 @@ export async function importReleasesFromSpotify(
 
         if (spotifyAlbums.length === 0) {
           result.success = true;
-          result.releases = await getReleasesForProfile(creatorProfileId);
+          result.releases = await getReleasesForProfile(creatorProfileId, {
+            includeDrafts: true,
+          });
           return result;
         }
 
@@ -486,7 +490,9 @@ export async function importReleasesFromSpotify(
         }
 
         // 6. Fetch the final state
-        result.releases = await getReleasesForProfile(creatorProfileId);
+        result.releases = await getReleasesForProfile(creatorProfileId, {
+          includeDrafts: true,
+        });
         result.success = result.failed === 0;
 
         span.setAttribute('spotify.imported_count', result.imported);
