@@ -12,6 +12,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Normalize settings typography: descriptions from 13px to 12px in SettingsActionRow and SettingsToggleRow
 - Align SettingsPanel title letter-spacing to -0.02em to match row components
 - Override SettingsSection header to 13px/font-[540] with 12px descriptions via new PageHeader pass-through props
+- Moved playlist pages from `(marketing)` to `(dynamic)` route group so ISR pages with DB queries no longer violate the static marketing page contract
+- Added dedicated playlist layout to preserve site header, footer, and dark theme styling
 
 ## [26.4.146.0] - 2026-04-11
 

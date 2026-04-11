@@ -11,8 +11,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-11T02:58:21.741Z",
-    "gitSha": "e82e0191f27a141b87abe00dd2e589734ab65cf9",
+    "capturedAt": "2026-04-11T06:48:12.929Z",
+    "gitSha": "81fe1aee0dfff9797608fc956e98e97045a26501",
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -55,8 +55,8 @@
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-11T02:59:14.879Z",
-    "gitSha": "e82e0191f27a141b87abe00dd2e589734ab65cf9",
+    "capturedAt": "2026-04-11T06:49:06.199Z",
+    "gitSha": "81fe1aee0dfff9797608fc956e98e97045a26501",
     "imagePath": "release-presave-mobile.png",
     "publicExportPath": "release-deep-end-phone.png"
   },
@@ -106,8 +106,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-04-10T18:18:40.008Z",
-    "gitSha": "20ec10fb799301dcf5e734bb54499e955c45e4c8",
+    "capturedAt": "2026-04-11T06:50:00.576Z",
+    "gitSha": "81fe1aee0dfff9797608fc956e98e97045a26501",
     "imagePath": "dashboard-releases-sidebar-desktop.png",
     "publicExportPath": "releases-dashboard-sidebar.png"
   },
@@ -123,8 +123,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-04-10T18:19:06.061Z",
-    "gitSha": "20ec10fb799301dcf5e734bb54499e955c45e4c8",
+    "capturedAt": "2026-04-11T06:50:26.711Z",
+    "gitSha": "81fe1aee0dfff9797608fc956e98e97045a26501",
     "imagePath": "dashboard-release-sidebar-detail-desktop.png",
     "publicExportPath": "release-sidebar-detail.png"
   },
@@ -137,8 +137,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-04-11T03:00:58.642Z",
-    "gitSha": "e82e0191f27a141b87abe00dd2e589734ab65cf9",
+    "capturedAt": "2026-04-11T06:50:50.541Z",
+    "gitSha": "81fe1aee0dfff9797608fc956e98e97045a26501",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
