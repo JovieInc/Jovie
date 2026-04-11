@@ -117,6 +117,7 @@ export function CopyableUrlRow({
           valueClassName
         )}
         title={url}
+        suppressHydrationWarning
       >
         {displayValue ?? url.replace(/^https?:\/\//, '')}
       </span>
