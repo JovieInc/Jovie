@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.146.1] - 2026-04-11
+
+### Changed
+
+- Moved playlist pages from `(marketing)` to `(dynamic)` route group so ISR pages with DB queries no longer violate the static marketing page contract
+- Added dedicated playlist layout to preserve site header, footer, and dark theme styling
+
 ## [26.4.146.0] - 2026-04-11
 
 ### Fixed
