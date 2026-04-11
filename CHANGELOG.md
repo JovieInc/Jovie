@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.143] - 2026-04-10
+
+> Unreleased content pages now capture fan emails instead of showing a dead-end "Coming Soon" card. Smart link errors show the right message, OG images generate faster, and profile copy is tighter across all modes.
+
+### Added
+
+- Email notification signup on countdown pages for unreleased releases, with countdown timer and share button
+- Error and 404 boundaries for smart link routes so errors say "Content not found" instead of "Profile is temporarily unavailable"
+- Unit tests for the redesigned countdown page
+
+### Changed
+
+- "Choose a Service" → "Listen now" and "Tip with Venmo" → "Send a tip" in profile mode subtitles
+- "Drops in" → "Releases in" on countdown timers
+- OG image base64 encoding uses chunked conversion instead of char-by-char concatenation
+- Extracted shared profile mapper to eliminate duplicate CreatorProfile construction
+- Moved promo download check from inline dynamic imports to a shared data function
+
+### Fixed
+
+- OG images no longer bypass the 2MB size guard when upstream servers omit Content-Length headers
+- Empty countdown container no longer renders when release date has passed (uses CSS empty:hidden)
+
 ## [26.4.142] - 2026-04-10
 
 > YC demo recordings now stay coherent from the dashboard to the public smart link, with real analytics data and cleaner scene transitions. Also keeps fresh worktrees bootstrappable even when local Homebrew metadata is broken.
