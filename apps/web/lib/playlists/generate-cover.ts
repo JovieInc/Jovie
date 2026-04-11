@@ -134,7 +134,9 @@ function createTextOverlay(text: string): Buffer {
     .replace(/"/g, '&quot;');
 
   // Calculate font size based on text length
-  const fontSize = text.length <= 10 ? 180 : text.length <= 20 ? 140 : 100;
+  let fontSize = 100;
+  if (text.length <= 10) fontSize = 180;
+  else if (text.length <= 20) fontSize = 140;
 
   // eslint-disable-next-line @jovie/icon-usage -- SVG string for Sharp image processing, not a React component
   const svg = `<svg width="${COVER_SIZE}" height="${COVER_SIZE}" xmlns="http://www.w3.org/2000/svg">
@@ -224,7 +226,9 @@ export async function generateCoverArt(options: {
   let spotifyBuffer: Buffer | null = null;
 
   for (let quality = 80; quality >= 20; quality -= 10) {
-    const size = quality >= 60 ? 640 : quality >= 40 ? 480 : 320;
+    let size = 320;
+    if (quality >= 60) size = 640;
+    else if (quality >= 40) size = 480;
     const compressed = await sharp(fullRes)
       .resize(size, size)
       .jpeg({ quality })

@@ -129,7 +129,7 @@ export async function generatePlaylistConcept(options?: {
       );
 
       const textBlock = message.content.find(b => b.type === 'text');
-      if (!textBlock || textBlock.type !== 'text') {
+      if (textBlock?.type !== 'text') {
         throw new Error('No text response from Claude');
       }
 
