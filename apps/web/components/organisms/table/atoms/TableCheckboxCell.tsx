@@ -69,12 +69,14 @@ function TanStackHeaderCheckbox({
       onKeyDown={event =>
         handleActivationKeyDown(event, e => e.stopPropagation())
       }
-      aria-hidden='true'
     >
       <Checkbox
         aria-label='Select all rows'
-        checked={normalizedState === 'checked'}
-        indeterminate={normalizedState === 'indeterminate'}
+        checked={
+          normalizedState === 'indeterminate'
+            ? 'indeterminate'
+            : normalizedState === 'checked'
+        }
         onCheckedChange={onToggleSelectAll}
       />
     </div>
@@ -98,7 +100,6 @@ function TanStackRowCheckbox({
       onKeyDown={event =>
         handleActivationKeyDown(event, e => e.stopPropagation())
       }
-      aria-hidden='true'
     >
       <span
         className={cn(
@@ -166,12 +167,11 @@ function LegacyCheckboxCell({
           )}
         >
           <Checkbox
-            checked={checked}
+            checked={checked ? true : indeterminate ? 'indeterminate' : false}
             onCheckedChange={(value: boolean | 'indeterminate') =>
               onChange(value === true)
             }
             aria-label={ariaLabel}
-            indeterminate={indeterminate}
           />
         </div>
       </div>
