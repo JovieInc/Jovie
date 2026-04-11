@@ -186,6 +186,7 @@ export interface ContentData {
   slug: string;
   artworkUrl: string | null;
   releaseDate: Date | null;
+  revealDate?: Date | null;
   providerLinks: Array<{
     providerId: string;
     url: string;
@@ -229,6 +230,7 @@ export interface CachedContentData {
   slug: string;
   artworkUrl: string | null;
   releaseDate: string | null;
+  revealDate?: string | null;
   providerLinks: Array<{
     providerId: string;
     url: string;
@@ -315,6 +317,7 @@ const fetchContentBySlug = async (
       slug: discogReleases.slug,
       artworkUrl: discogReleases.artworkUrl,
       releaseDate: discogReleases.releaseDate,
+      revealDate: discogReleases.revealDate,
       releaseType: discogReleases.releaseType,
       totalTracks: discogReleases.totalTracks,
       metadata: discogReleases.metadata,
@@ -381,6 +384,7 @@ const fetchContentBySlug = async (
       slug: release.slug,
       artworkUrl: release.artworkUrl,
       releaseDate: toISOStringOrNull(release.releaseDate),
+      revealDate: toISOStringOrNull(release.revealDate),
       providerLinks: links,
       artworkSizes,
       releaseType: release.releaseType,
@@ -563,6 +567,7 @@ function rehydrateContent(
   return {
     ...cached,
     releaseDate: cached.releaseDate ? new Date(cached.releaseDate) : null,
+    revealDate: cached.revealDate ? new Date(cached.revealDate) : null,
   };
 }
 
