@@ -13,6 +13,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 
 const WEB_ROOT = join(import.meta.dirname, '..');
 const BASELINE_PATH = join(
@@ -32,6 +33,7 @@ const DEFAULT_INITIAL_JS_BUDGET_KB = 250;
 const GROWTH_THRESHOLD_PERCENT = 10;
 
 interface Baseline {
+  _note?: string;
   capturedAt: string | null;
   commit: string | null;
   totalInitialJS_bytes: number;
@@ -117,7 +119,19 @@ function captureSnapshot(): void {
     // Not in a git repo
   }
 
+  // Preserve _note from existing baseline if present
+  let existingNote: string | undefined;
+  if (existsSync(BASELINE_PATH)) {
+    try {
+      const existing = JSON.parse(readFileSync(BASELINE_PATH, 'utf-8'));
+      existingNote = existing._note;
+    } catch {
+      // Ignore parse errors
+    }
+  }
+
   const baseline: Baseline = {
+    ...(existingNote ? { _note: existingNote } : {}),
     capturedAt: new Date().toISOString(),
     commit,
     totalInitialJS_bytes: totalBytes,
@@ -159,15 +173,21 @@ function compare(): void {
       const routeBudgets = JSON.parse(
         readFileSync(ROUTE_BUDGETS_PATH, 'utf-8')
       );
-      // Use the highest budget (admin) as the overall threshold
-      budgetKB = Math.max(
-        ...Object.values(
-          routeBudgets.routes as Record<
-            string,
-            { budgets: { initialJS_gzip_kb: number } }
-          >
-        ).map(r => r.budgets.initialJS_gzip_kb)
-      );
+      // Use the highest route budget as the aggregate threshold
+      const budgetValues = Object.values(
+        (routeBudgets.routes ?? {}) as Record<
+          string,
+          { budgets?: { initialJS_gzip_kb?: number } }
+        >
+      )
+        .map(r => r.budgets?.initialJS_gzip_kb)
+        .filter(
+          (v): v is number =>
+            typeof v === 'number' && Number.isFinite(v) && v > 0
+        );
+      if (budgetValues.length > 0) {
+        budgetKB = Math.max(...budgetValues);
+      }
     } catch {
       // Use default
     }
@@ -194,6 +214,14 @@ function compare(): void {
       `| vs Baseline | ${sign}${formatBytes(delta)} (${sign}${deltaPercent}%) |`
     );
     console.log(`| Baseline commit | ${baseline.commit ?? 'unknown'} |`);
+
+    // Flag large baseline regressions as blocking
+    if (delta > 0 && parseFloat(deltaPercent) > GROWTH_THRESHOLD_PERCENT) {
+      console.log(
+        `\n⚠️ REGRESSION: Bundle grew ${sign}${deltaPercent}% vs baseline (threshold: ${GROWTH_THRESHOLD_PERCENT}%)`
+      );
+      hasFailure = true;
+    }
 
     // Find new, removed, and grown chunks
     const newChunks: string[] = [];
@@ -260,17 +288,26 @@ function compare(): void {
     console.log(`| vs Baseline | No baseline captured yet |`);
   }
 
-  // Budget check
-  // Note: currentTotal is uncompressed; budget is gzip. Rough estimate: gzip ≈ 30% of uncompressed.
-  const estimatedGzip = currentTotal * 0.3;
-  if (estimatedGzip > budgetBytes) {
+  // Budget check — measure actual gzip size
+  let actualGzipBytes = 0;
+  for (const file of Object.keys(currentChunks)) {
+    try {
+      const fullPath = join(WEB_ROOT, '.next', file);
+      if (existsSync(fullPath)) {
+        actualGzipBytes += gzipSync(readFileSync(fullPath)).length;
+      }
+    } catch {
+      // Skip missing files
+    }
+  }
+  if (actualGzipBytes > budgetBytes) {
     console.log(
-      `\n❌ BUDGET EXCEEDED: Estimated gzip size ${formatBytes(estimatedGzip)} > ${formatBytes(budgetBytes)} budget`
+      `\n❌ BUDGET EXCEEDED: Gzip size ${formatBytes(actualGzipBytes)} > ${formatBytes(budgetBytes)} budget`
     );
     hasFailure = true;
   } else {
     console.log(
-      `\n✅ Within budget: ~${formatBytes(estimatedGzip)} gzip < ${formatBytes(budgetBytes)}`
+      `\n✅ Within budget: ${formatBytes(actualGzipBytes)} gzip < ${formatBytes(budgetBytes)}`
     );
   }
 

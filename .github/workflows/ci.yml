@@ -1534,7 +1534,7 @@ jobs:
 
       - name: Upload build manifest
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         continue-on-error: true
         with:
           name: build-manifest

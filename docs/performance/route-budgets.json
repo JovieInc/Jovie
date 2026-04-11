@@ -1,5 +1,5 @@
 {
-  "$schema": "Route-level performance budgets for CI enforcement",
+  "_description": "Route-level performance budgets for CI enforcement",
   "routes": {
     "public": {
       "description": "Public smart-link and profile routes",
