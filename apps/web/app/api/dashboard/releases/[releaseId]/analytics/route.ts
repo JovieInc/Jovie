@@ -124,7 +124,7 @@ export async function GET(
             select created_at, metadata
             from ${clickEvents}
             where ${clickEvents.creatorProfileId} = ${profile.id}
-              and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
+              and ${clickEvents.isBot} = false
               and ${clickEvents.metadata} ->> 'contentId' = ${releaseId}
               and ${clickEvents.metadata} ->> 'contentType' = 'release'
           ),
