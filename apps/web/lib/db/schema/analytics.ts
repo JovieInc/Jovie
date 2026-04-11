@@ -111,7 +111,7 @@ export const audienceReferrers = pgTable(
     audienceMemberId: uuid('audience_member_id')
       .notNull()
       .references(() => audienceMembers.id, { onDelete: 'cascade' }),
-    url: text('url'),
+    url: text('url').notNull(),
     source: text('source'),
     timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow(),
     createdAt: timestamp('created_at', { withTimezone: true })

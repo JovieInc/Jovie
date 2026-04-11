@@ -477,14 +477,19 @@ export async function POST(request: NextRequest) {
 
         // Dual-write: insert into normalized referrer table
         if (latestReferrerUrl) {
-          await tx
-            .insert(audienceReferrers)
-            .values({
-              audienceMemberId: existing.id,
-              url: latestReferrerUrl,
-              timestamp: now,
-            })
-            .onConflictDoNothing();
+          const referrerSource = (() => {
+            try {
+              return new URL(latestReferrerUrl).hostname;
+            } catch {
+              return null;
+            }
+          })();
+          await tx.insert(audienceReferrers).values({
+            audienceMemberId: existing.id,
+            url: latestReferrerUrl,
+            source: referrerSource,
+            timestamp: now,
+          });
         }
         return;
       }

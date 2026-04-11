@@ -7,7 +7,7 @@ ALTER TABLE "audience_members" ADD COLUMN IF NOT EXISTS "latest_action_label" te
 CREATE TABLE IF NOT EXISTS "audience_referrers" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"audience_member_id" uuid NOT NULL,
-	"url" text,
+	"url" text NOT NULL,
 	"source" text,
 	"timestamp" timestamp with time zone DEFAULT now(),
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
