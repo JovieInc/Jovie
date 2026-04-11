@@ -1,6 +1,5 @@
-import { getProfileModeHref } from '@/features/profile/registry';
 import { getProfileStaticParams } from '../_lib/profile-static-params';
-import { PreserveSearchRedirect } from '../[slug]/PreserveSearchRedirect';
+import { redirectToProfileMode } from '../_lib/mode-route-redirect';
 
 interface Props {
   readonly params: Promise<{
@@ -13,9 +12,5 @@ export async function generateStaticParams() {
 }
 
 export default async function ListenPage({ params }: Props) {
-  const { username } = await params;
-
-  return (
-    <PreserveSearchRedirect href={getProfileModeHref(username, 'listen')} />
-  );
+  return redirectToProfileMode(params, 'listen');
 }
