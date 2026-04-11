@@ -44,7 +44,7 @@ export async function getLinkClicksByPlatform(
         left join ${socialLinks} sl on sl.id = ce.link_id
         where ce.creator_profile_id = ${profile.id}
           and ce.created_at >= ${thirtyDaysAgo.toISOString()}::timestamptz
-          and (ce.is_bot = false or ce.is_bot is null)
+          and ce.is_bot = false
         group by coalesce(sl.platform, ce.link_type)
         order by clicks desc
         limit 10
