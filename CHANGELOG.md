@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.146.1] - 2026-04-11
+
+### Changed
+
+- Normalize settings typography: descriptions from 13px to 12px in SettingsActionRow and SettingsToggleRow
+- Align SettingsPanel title letter-spacing to -0.02em to match row components
+- Override SettingsSection header to 13px/font-[540] with 12px descriptions via new PageHeader pass-through props
+
 ## [26.4.146.0] - 2026-04-11
 
 ### Fixed
