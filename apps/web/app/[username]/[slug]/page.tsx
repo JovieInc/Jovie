@@ -385,9 +385,9 @@ export default async function ContentSmartLinkPage({
     showUnreleasedHero = creatorPlan.canAccessFutureReleases;
   }
 
-  // Check for promo downloads (releases only, not tracks)
+  // Check for promo downloads (released content only, not tracks or unreleased releases)
   const downloadUrl =
-    content.type === 'release' && content.id
+    !isUnreleased && content.type === 'release' && content.id
       ? await checkPromoDownloads(
           content.id,
           creator.usernameNormalized,
