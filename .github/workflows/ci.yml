@@ -1564,6 +1564,20 @@ jobs:
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+      - name: Bundle size comparison
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        continue-on-error: true
+        run: pnpm --filter @jovie/web compare-chunks
+
+      - name: Upload build manifest
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: build-manifest
+          path: apps/web/.next/build-manifest.json
+          retention-days: 7
+
       - name: Pre-deploy Lighthouse performance check
         if: steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         continue-on-error: true
