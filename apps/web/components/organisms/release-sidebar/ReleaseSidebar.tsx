@@ -240,6 +240,7 @@ function ReleaseEntityHeader({
             meta={
               <ReleaseFields
                 releaseDate={release.releaseDate}
+                revealDate={release.revealDate}
                 releaseType={release.releaseType}
                 totalTracks={release.totalTracks}
                 platformCount={release.providers.length}

@@ -1,6 +1,6 @@
 'use server';
 
-import { and, count, eq, inArray, ne } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, ne } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -17,6 +17,7 @@ import { isUniqueViolation } from '@/lib/db/errors';
 import {
   discogRecordings,
   discogReleases,
+  discogReleaseTracks,
   discogTracks,
 } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
@@ -255,6 +256,10 @@ function mapReleaseToViewModel(
     title: release.title,
     artistNames: release.artistNames,
     releaseDate: toISOStringOrNull(release.releaseDate) ?? undefined,
+    status:
+      (release.status as 'draft' | 'scheduled' | 'released') ?? 'released',
+    revealDate: toISOStringOrNull(release.revealDate) ?? undefined,
+    deletedAt: toISOStringOrNull(release.deletedAt) ?? undefined,
     artworkUrl: release.artworkUrl ?? undefined,
     slug,
     smartLinkPath: buildSmartLinkPath(profileHandle, slug),
@@ -301,7 +306,7 @@ async function fetchReleaseMatrixCore(
   profileHandle: string
 ): Promise<ReleaseViewModel[]> {
   const providerLabels = buildProviderLabels();
-  const releases = await getReleasesFromDb(profileId);
+  const releases = await getReleasesFromDb(profileId, { includeDrafts: true });
 
   return releases.map(release =>
     mapReleaseToViewModel(release, providerLabels, profileId, profileHandle)
@@ -1355,40 +1360,18 @@ export async function checkSpotifyConnectionForProfile(
 }
 
 /**
- * Connect a Spotify artist to the profile and sync releases
+ * Poll the current Spotify import snapshot for the releases dashboard.
+ * Combines status metadata and mapped releases so the UI can poll with a
+ * single server action during active imports.
  */
-/**
- * Poll current release count and release data (uncached, for real-time import progress).
- */
-export async function pollReleasesCount(): Promise<{
-  count: number;
-  releases: ReleaseViewModel[];
-}> {
-  noStore();
-  const { userId } = await getCachedAuth();
-  if (!userId) throw new Error('Unauthorized');
-
-  const profile = await requireProfile();
-  const providerLabels = buildProviderLabels();
-  const releases = await getReleasesFromDb(profile.id);
-
-  return {
-    count: releases.length,
-    releases: releases.map(r =>
-      mapReleaseToViewModel(r, providerLabels, profile.id, profile.handle)
-    ),
-  };
-}
-
-/**
- * Get Spotify import status from profile settings (uncached).
- */
-export async function getSpotifyImportStatus(): Promise<{
+export async function getSpotifyImportPollSnapshot(): Promise<{
   status: 'idle' | 'importing' | 'complete' | 'failed';
   releaseCount: number;
   totalCount: number;
   enrichmentStatus: EnrichmentStatusMap;
   aggregateEnrichmentStatus: AggregateEnrichmentStatus;
+  releases: ReleaseViewModel[];
+  serverCount: number;
 }> {
   noStore();
   const { userId } = await getCachedAuth();
@@ -1396,32 +1379,35 @@ export async function getSpotifyImportStatus(): Promise<{
 
   const profile = await requireProfile();
 
-  const [row] = await db
-    .select({
-      settings: creatorProfiles.settings,
-      spotifyId: creatorProfiles.spotifyId,
-      updatedAt: creatorProfiles.updatedAt,
-      releaseCount: count(discogReleases.id),
-    })
-    .from(creatorProfiles)
-    .leftJoin(
-      discogReleases,
-      eq(discogReleases.creatorProfileId, creatorProfiles.id)
-    )
-    .where(eq(creatorProfiles.id, profile.id))
-    .groupBy(creatorProfiles.id)
-    .limit(1);
+  const [profileRow, releases] = await Promise.all([
+    db
+      .select({
+        settings: creatorProfiles.settings,
+        spotifyId: creatorProfiles.spotifyId,
+        updatedAt: creatorProfiles.updatedAt,
+      })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profile.id))
+      .limit(1),
+    getReleasesFromDb(profile.id, { includeDrafts: true }),
+  ]);
 
+  const row = profileRow[0];
   const settings = (row?.settings ?? {}) as Record<string, unknown>;
-  const storedStatus = settings.spotifyImportStatus as string | undefined;
-  const releaseCount = Number(row?.releaseCount ?? 0);
+  const releaseCount = releases.length;
   const hasSpotifyProfile = Boolean(row?.spotifyId);
   const totalCount =
     typeof settings.spotifyImportTotal === 'number'
       ? settings.spotifyImportTotal
       : 0;
 
+  const providerLabels = buildProviderLabels();
+  const mappedReleases = releases.map(release =>
+    mapReleaseToViewModel(release, providerLabels, profile.id, profile.handle)
+  );
+
   let status: 'idle' | 'importing' | 'complete' | 'failed';
+  const storedStatus = settings.spotifyImportStatus as string | undefined;
   if (storedStatus === 'complete') {
     status = 'complete';
   } else if (storedStatus === 'failed') {
@@ -1432,21 +1418,21 @@ export async function getSpotifyImportStatus(): Promise<{
     status = hasSpotifyProfile && releaseCount > 0 ? 'complete' : 'idle';
   }
 
-  // Read enrichmentStatus with TTL check for stale 'enriching' entries
   const rawEnrichmentStatus = (settings.enrichmentStatus ??
     {}) as EnrichmentStatusMap;
   const enrichmentStatus = applyTtlToEnrichmentStatus(
     rawEnrichmentStatus,
     row?.updatedAt ?? null
   );
-  const aggregateEnrichmentStatus = deriveAggregateStatus(enrichmentStatus);
 
   return {
     status,
     releaseCount,
     totalCount,
     enrichmentStatus,
-    aggregateEnrichmentStatus,
+    aggregateEnrichmentStatus: deriveAggregateStatus(enrichmentStatus),
+    releases: mappedReleases,
+    serverCount: mappedReleases.length,
   };
 }
 
@@ -2041,12 +2027,12 @@ interface DeleteReleaseParams {
 }
 
 /**
- * Delete a release and all associated data (tracks, provider links, etc.).
- * Cascading deletes handle child records automatically.
+ * Soft-delete a release (sets deleted_at instead of removing the row).
+ * Blocks deletion of actively distributed releases (ISRC + past release date).
  */
 export async function deleteRelease(
   params: DeleteReleaseParams
-): Promise<{ success: boolean }> {
+): Promise<{ success: boolean; message?: string }> {
   noStore();
 
   const { userId } = await getCachedAuth();
@@ -2062,8 +2048,36 @@ export async function deleteRelease(
     throw new TypeError('Release not found');
   }
 
+  // Distribution gate: block if release has ISRC and is past release date
+  if (release.releaseDate && new Date(release.releaseDate) <= new Date()) {
+    const [hasIsrc] = await db
+      .select({ id: discogRecordings.id })
+      .from(discogRecordings)
+      .innerJoin(
+        discogReleaseTracks,
+        eq(discogReleaseTracks.recordingId, discogRecordings.id)
+      )
+      .where(
+        and(
+          eq(discogReleaseTracks.releaseId, params.releaseId),
+          isNotNull(discogRecordings.isrc)
+        )
+      )
+      .limit(1);
+
+    if (hasIsrc) {
+      return {
+        success: false,
+        message:
+          'This release appears to be distributed. Remove it from distribution first.',
+      };
+    }
+  }
+
+  // Soft delete: set deleted_at instead of removing the row
   await db
-    .delete(discogReleases)
+    .update(discogReleases)
+    .set({ deletedAt: new Date() })
     .where(eq(discogReleases.id, params.releaseId));
 
   // Invalidate cache and revalidate path
@@ -2243,6 +2257,7 @@ export async function createRelease(formData: {
   title: string;
   releaseType: 'single' | 'ep' | 'album' | 'compilation' | 'live';
   releaseDate?: string | null;
+  revealDate?: string | null;
   genres?: string[];
   isExplicit?: boolean;
 }): Promise<{
@@ -2272,6 +2287,27 @@ export async function createRelease(formData: {
     ? new Date(formData.releaseDate)
     : null;
 
+  // Determine status based on release date
+  const now = new Date();
+  let status: 'draft' | 'scheduled' | 'released';
+  if (!releaseDate) {
+    status = 'draft';
+  } else if (releaseDate > now) {
+    status = 'scheduled';
+  } else {
+    status = 'released';
+  }
+
+  // Reveal date: use explicit override if provided, otherwise auto-set for scheduled releases
+  let revealDate: Date | null = null;
+  if (formData.revealDate) {
+    revealDate = new Date(formData.revealDate);
+  } else if (releaseDate && status === 'scheduled') {
+    const thirtyDaysBefore = new Date(releaseDate);
+    thirtyDaysBefore.setDate(thirtyDaysBefore.getDate() - 30);
+    revealDate = thirtyDaysBefore > now ? thirtyDaysBefore : now;
+  }
+
   try {
     const [inserted] = await db
       .insert(discogReleases)
@@ -2281,6 +2317,8 @@ export async function createRelease(formData: {
         slug,
         releaseType: formData.releaseType,
         releaseDate,
+        status,
+        revealDate,
         genres: formData.genres?.slice(0, 3) ?? null,
         isExplicit: formData.isExplicit ?? false,
         sourceType: 'manual',

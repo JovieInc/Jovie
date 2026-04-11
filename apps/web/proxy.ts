@@ -614,11 +614,15 @@ async function handleRequest(req: NextRequest, userId: string | null) {
 
     // Inject the resolved Clerk publishable key so server components can read
     // it from a single pre-resolved header instead of re-parsing the hostname.
-    // ResolvedClientProviders reads x-clerk-publishable-key first, then falls
-    // back to hostname-based resolution for environments without middleware.
-    const { publishableKey: resolvedClerkPk } = resolveClerkKeys(hostname);
-    if (resolvedClerkPk) {
-      requestHeaders.set('x-clerk-publishable-key', resolvedClerkPk);
+    // Only set when BOTH keys are present — a valid publishable key with a
+    // missing secret key would trick the auth layout into rendering ClerkProvider,
+    // which then throws during SSR because CLERK_SECRET_KEY is unavailable.
+    const resolvedKeys = resolveClerkKeys(hostname);
+    if (resolvedKeys.publishableKey && resolvedKeys.secretKey) {
+      requestHeaders.set(
+        'x-clerk-publishable-key',
+        resolvedKeys.publishableKey
+      );
     }
 
     // ========================================================================
@@ -1113,11 +1117,33 @@ const clerkProductionMiddleware = clerkMiddleware(async (auth, req) => {
 // Staging Clerk middleware — lazy-initialized with separate instance keys.
 // The same build is promoted staging → production, so staging keys are
 // stored as server-only runtime env vars (not NEXT_PUBLIC_).
+//
+// Key resolution order:
+// 1. Explicit _STAGING suffixed vars (if either is set, use only those)
+// 2. Standard env vars read at runtime via bracket notation to bypass
+//    webpack DefinePlugin (Doppler syncs staging values per-environment)
 let _clerkStagingMiddleware: NextMiddleware | null = null;
 function getClerkStagingMiddleware() {
   if (_clerkStagingMiddleware === null) {
-    const stagingPk = process.env.CLERK_PUBLISHABLE_KEY_STAGING;
-    const stagingSk = process.env.CLERK_SECRET_KEY_STAGING;
+    const explicitPk = process.env.CLERK_PUBLISHABLE_KEY_STAGING;
+    const explicitSk = process.env.CLERK_SECRET_KEY_STAGING;
+
+    let stagingPk: string | undefined;
+    let stagingSk: string | undefined;
+
+    if (explicitPk || explicitSk) {
+      // Explicit _STAGING vars present — use only those (fail closed on partial)
+      stagingPk = explicitPk;
+      stagingSk = explicitSk;
+    } else {
+      // Fall back to runtime standard vars (bracket notation bypasses DefinePlugin)
+      stagingPk =
+        (process.env as Record<string, string | undefined>)[
+          'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY'
+        ] || undefined;
+      stagingSk = process.env.CLERK_SECRET_KEY || undefined;
+    }
+
     if (stagingPk && stagingSk) {
       _clerkStagingMiddleware = clerkMiddleware(
         async (auth, req) => {
@@ -1346,7 +1372,18 @@ export default async function middleware(
     );
   }
 
-  return selectedMiddleware(req, event);
+  try {
+    return await selectedMiddleware(req, event);
+  } catch (error) {
+    // Clerk middleware can throw on staging when keys are invalid or the
+    // domain isn't in the Clerk app's allowlist. Fall back gracefully so
+    // auth routes render the "Auth unavailable" card instead of a 500.
+    if (isStagingHost(hostname)) {
+      console.error('[middleware] Staging Clerk error:', error);
+      return handleRequest(req, null);
+    }
+    throw error;
+  }
 }
 
 export const config = {

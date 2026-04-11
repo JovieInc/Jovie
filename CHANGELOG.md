@@ -5,6 +5,111 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.146.0] - 2026-04-11
+
+### Fixed
+
+- Staging auth routes (/signup, /signin) returning 500, blocking CI canary health gate since April 8
+- Detect production Clerk keys on staging and skip middleware instead of crashing on domain mismatch
+- Add try-catch safety net around staging Clerk middleware call
+- Fix auth layout tests missing CLERK_SECRET_KEY in test environment
+- Gate x-clerk-publishable-key header injection on both PK and SK presence
+
+## [26.4.145.2] - 2026-04-11
+
+### Fixed
+
+- Standardized dashboard elevation tokens to 3-tier system (DataCard, EmptyState, banners, empty state icons)
+- Added card wrapper to audience funnel stats (Profile Views, Unique Visitors, Followers)
+- Removed double shadow on chat input that caused visible border artifact
+- Fixed drawer card clipping from oversized 18px border radius
+- Improved smart link URL contrast from tertiary to secondary text color
+- Removed directional shadow-card from drawer/sidebar cards to fix uneven border weight
+- Centered empty state text with contextual icons in analytics sidebar tabs
+
+## [26.4.145.1] - 2026-04-10
+
+### Fixed
+
+- Bumped `next` 16.2.1 → 16.2.3 across all apps to fix Server Components DoS vulnerability
+- Bumped `drizzle-orm` override to 0.45.2 to fix SQL injection via improperly escaped identifiers
+- Bumped `vite` override to ^6.4.2 to fix arbitrary file read and path traversal (dev-only)
+- Bumped `basic-ftp` override to ^5.2.2 to fix FTP command injection via CRLF (dev-only)
+- Bumped `lodash` override to >=4.18.1 to fix code injection and prototype pollution
+- Added overrides for `lodash-es`, `handlebars`, `@xmldom/xmldom`, and `brace-expansion` to remediate transitive dependency vulnerabilities
+
+## [26.4.145] - 2026-04-10
+
+### Changed
+
+- Normalized audience JSONB arrays (referrer history, actions) into relational tables for query performance and schema safety
+- Made `url` column on `audience_referrers` NOT NULL since the write path already guards against null values
+- Populated the `source` field from referrer URL hostname on every referrer insert
+- Removed redundant `onConflictDoNothing()` on referrer inserts where no unique constraint exists
+
+### Fixed
+
+- Profile nav button now toggles the right drawer open and closed instead of only opening it
+
+## [26.4.144.1] - 2026-04-10
+
+### Added
+
+- "Create a new release" suggestion on the empty chat state, shown as the first option for both new and returning users
+
+### Fixed
+
+- Checkboxes now properly toggle when clicked, fixing broken indeterminate state handling that prevented "select all" from working correctly in tables
+- Indeterminate checkboxes now show a minus icon instead of a checkmark, matching standard UI conventions
+- Checkbox alignment fixed in admin creator profile rows (was rendering at top-left instead of centered)
+- Screen readers can now access table checkboxes (removed `aria-hidden` from interactive containers)
+
+### Changed
+
+- All checkbox instances now use the central design system component without custom style overrides, ensuring consistent appearance across admin, audience, and dashboard tables
+
+## [26.4.144] - 2026-04-10
+
+### Added
+
+- Chrome extension support for AWAL (workstation.awal.com) and Kosign (app.kosignmusic.com) alongside DistroKid
+- Autofill button in extension sidebar that fills distributor/publisher forms from Jovie release data
+- Bulk-insert content script handler with React-compatible nativeInputValueSetter for framework-controlled inputs
+- React Select async dropdown handler for AWAL's Project Artist field (type, wait, select)
+- Undo button to revert autofilled fields to previous values
+- Label-alias mapping so Jovie entity fields (Release Title, Display Name) map to platform form labels (Project Name, Project Artist)
+- Slugified project code derivation from release title for AWAL
+
+### Changed
+
+- Extension domain infrastructure refactored for multi-distributor support (DRY classifyPage reads from shared DOMAIN_CONFIGS)
+- Shell copy updated from DistroKid-specific messaging to generic distributor language
+- DistroKid domain mode changed from read to write (pre-launch, no existing users)
+
+## [26.4.143] - 2026-04-10
+
+> Unreleased content pages now capture fan emails instead of showing a dead-end "Coming Soon" card. Smart link errors show the right message, OG images generate faster, and profile copy is tighter across all modes.
+
+### Added
+
+- Email notification signup on countdown pages for unreleased releases, with countdown timer and share button
+- Error and 404 boundaries for smart link routes so errors say "Content not found" instead of "Profile is temporarily unavailable"
+- Unit tests for the redesigned countdown page
+
+### Changed
+
+- "Choose a Service" → "Listen now" and "Tip with Venmo" → "Send a tip" in profile mode subtitles
+- "Drops in" → "Releases in" on countdown timers
+- OG image base64 encoding uses chunked conversion instead of char-by-char concatenation
+- Extracted shared profile mapper to eliminate duplicate CreatorProfile construction
+- Moved promo download check from inline dynamic imports to a shared data function
+
+### Fixed
+
+- OG images no longer bypass the 2MB size guard when upstream servers omit Content-Length headers
+- Empty countdown container no longer renders when release date has passed (uses CSS empty:hidden)
+- Notification subscribe on profile pages now shows the OTP verification input after email submission instead of staying stuck on the email field
+
 ## [26.4.142] - 2026-04-10
 
 > YC demo recordings now stay coherent from the dashboard to the public smart link, with real analytics data and cleaner scene transitions. Also keeps fresh worktrees bootstrappable even when local Homebrew metadata is broken.

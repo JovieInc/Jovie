@@ -346,4 +346,100 @@ describe('CatalogHealthSection', () => {
       );
     });
   });
+
+  it('backs off catalog scan polling after the initial fast window', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.includes('/api/dsp/catalog-scan/results')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ scan: null, mismatches: [] }),
+        });
+      }
+
+      if (url === '/api/dsp/catalog-scan') {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              scanId: 'new-scan',
+              status: 'pending',
+            }),
+        });
+      }
+
+      if (url.includes('/api/dsp/catalog-scan/status?scanId=new-scan')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              scan: { status: 'pending' },
+            }),
+        });
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+
+    render(
+      <CatalogHealthSection
+        profileId='profile-1'
+        spotifyId='spotify-1'
+        hasUnresolvedMismatches={false}
+      />
+    );
+
+    await user.click(screen.getByText('Catalog Health'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Scan Catalog')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Scan Catalog'));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/dsp/catalog-scan/status?scanId=new-scan'
+      );
+    });
+
+    const getStatusCallCount = () =>
+      mockFetch.mock.calls.filter(([input]) =>
+        String(input).includes('/api/dsp/catalog-scan/status?scanId=new-scan')
+      ).length;
+
+    expect(getStatusCallCount()).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    await waitFor(() => {
+      expect(getStatusCallCount()).toBe(2);
+    });
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    await waitFor(() => {
+      expect(getStatusCallCount()).toBe(3);
+    });
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    await waitFor(() => {
+      expect(getStatusCallCount()).toBe(4);
+    });
+
+    await vi.advanceTimersByTimeAsync(4_000);
+
+    expect(getStatusCallCount()).toBe(4);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    await waitFor(() => {
+      expect(getStatusCallCount()).toBe(5);
+    });
+
+    vi.useRealTimers();
+  });
 });

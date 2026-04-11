@@ -32,6 +32,7 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/db/schema', () => ({
   audienceMembers: {},
+  audienceReferrers: {},
   creatorProfiles: {},
 }));
 
@@ -124,7 +125,9 @@ describe('POST /api/audience/visit', () => {
         values: vi.fn().mockImplementation(value => {
           insertedValues.push(value);
           return {
-            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
+            }),
           };
         }),
       });
@@ -219,7 +222,9 @@ describe('POST /api/audience/visit', () => {
         }),
         insert: vi.fn().mockReturnValue({
           values: vi.fn().mockReturnValue({
-            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
+            }),
           }),
         }),
       });
@@ -331,7 +336,9 @@ describe('POST /api/audience/visit', () => {
         })
         .mockReturnValueOnce({
           values: vi.fn().mockReturnValue({
-            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
+            }),
           }),
         });
 
@@ -389,7 +396,9 @@ describe('POST /api/audience/visit', () => {
         })
         .mockReturnValueOnce({
           values: vi.fn().mockReturnValue({
-            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
+            }),
           }),
         });
 
@@ -466,7 +475,9 @@ describe('POST /api/audience/visit', () => {
             onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
           })
           .mockReturnValueOnce({
-            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
+            }),
           }),
       });
 
@@ -522,6 +533,7 @@ describe('POST /api/audience/visit', () => {
       const mockInsert = vi
         .fn()
         .mockReturnValueOnce({
+          // 1. daily profile view insert
           values: vi.fn().mockImplementation(value => {
             insertedValues.push(value);
             return {
@@ -530,6 +542,7 @@ describe('POST /api/audience/visit', () => {
           }),
         })
         .mockReturnValueOnce({
+          // 2. distribution event insert (before audience member)
           values: vi.fn().mockImplementation(value => {
             insertedValues.push(value);
             return {
@@ -538,11 +551,23 @@ describe('POST /api/audience/visit', () => {
           }),
         })
         .mockReturnValueOnce({
+          // 3. audience member insert (new member path)
           values: vi.fn().mockImplementation(value => {
             insertedValues.push(value);
             return {
-              onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+              onConflictDoNothing: vi.fn().mockReturnValue({
+                returning: vi
+                  .fn()
+                  .mockResolvedValue([{ id: 'inserted_member' }]),
+              }),
             };
+          }),
+        })
+        .mockReturnValueOnce({
+          // 4. audienceReferrers dual-write
+          values: vi.fn().mockImplementation(value => {
+            insertedValues.push(value);
+            return Promise.resolve(undefined);
           }),
         });
 
@@ -631,7 +656,11 @@ describe('POST /api/audience/visit', () => {
           values: vi.fn().mockImplementation(value => {
             insertedValues.push(value);
             return {
-              onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+              onConflictDoNothing: vi.fn().mockReturnValue({
+                returning: vi
+                  .fn()
+                  .mockResolvedValue([{ id: 'inserted_member' }]),
+              }),
             };
           }),
         });
@@ -710,7 +739,11 @@ describe('POST /api/audience/visit', () => {
             onConflictDoNothing:
               value.eventType === 'activated'
                 ? vi.fn().mockRejectedValueOnce(missingTableError)
-                : vi.fn().mockResolvedValue(undefined),
+                : vi.fn().mockReturnValue({
+                    returning: vi
+                      .fn()
+                      .mockResolvedValue([{ id: 'inserted_member' }]),
+                  }),
             onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
           })),
       });
@@ -781,7 +814,9 @@ describe('POST /api/audience/visit', () => {
         }),
         insert: vi.fn().mockReturnValue({
           values: vi.fn().mockReturnValue({
-            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
+            }),
           }),
         }),
       });

@@ -174,6 +174,12 @@ export interface StarterSuggestionContext {
  */
 export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
+    icon: 'Disc3',
+    label: 'Create a new release',
+    prompt: 'Help me create a new release.',
+    accent: 'green',
+  },
+  {
     icon: 'Eye',
     label: 'Preview profile',
     prompt: 'Preview my profile.',
@@ -216,6 +222,12 @@ export const FEEDBACK_SUGGESTION: ChatSuggestion = {
 };
 
 export const FIRST_SESSION_SUGGESTIONS: readonly ChatSuggestion[] = [
+  {
+    icon: 'Disc3',
+    label: 'Create a new release',
+    prompt: 'Help me create a new release.',
+    accent: 'green',
+  },
   {
     icon: 'Link2',
     label: 'Release link',

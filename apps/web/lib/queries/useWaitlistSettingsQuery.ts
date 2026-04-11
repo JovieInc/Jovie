@@ -29,7 +29,7 @@ async function fetchWaitlistSettings(
 ): Promise<WaitlistSettingsResponse> {
   const payload = await fetchWithTimeout<WaitlistSettingsApiResponse>(
     APP_ROUTES.ADMIN_WAITLIST_SETTINGS,
-    { signal, cache: 'no-store' }
+    { signal }
   );
 
   if (!payload.settings) {

@@ -18,7 +18,7 @@ export function ReleaseSmartLinkSection({
       displayValue={smartLinkPath}
       size='md'
       className='rounded-[10px]'
-      valueClassName='text-tertiary-token'
+      valueClassName='text-secondary-token'
       copyButtonTitle='Copy link'
       openButtonTitle='Open smart link'
       surface='boxed'

@@ -21,22 +21,53 @@ interface ClerkKeys {
 }
 
 /**
+ * Read a NEXT_PUBLIC_* env var at runtime, bypassing webpack DefinePlugin.
+ *
+ * Dot-notation access (process.env.NEXT_PUBLIC_X) is replaced at build time
+ * with the production literal. Bracket notation is NOT replaced, so it reads
+ * the actual runtime value from the deployment environment.
+ */
+function runtimePublicEnv(key: string): string | undefined {
+  return (process.env as Record<string, string | undefined>)[key] || undefined;
+}
+
+/**
  * Resolve Clerk keys for a given hostname.
  * Returns staging keys when on a staging host and staging keys are configured.
  * Staging must never silently fall back to production keys.
  */
 export function resolveClerkKeys(hostname: string): ClerkKeys {
   if (isStagingHost(hostname)) {
-    const stagingPk = process.env.CLERK_PUBLISHABLE_KEY_STAGING;
-    const stagingSk = process.env.CLERK_SECRET_KEY_STAGING;
-    if (!stagingPk || !stagingSk) {
-      return {
-        publishableKey: undefined,
-        secretKey: undefined,
-      };
+    const explicitPk = process.env.CLERK_PUBLISHABLE_KEY_STAGING;
+    const explicitSk = process.env.CLERK_SECRET_KEY_STAGING;
+
+    // When explicit _STAGING vars exist, use only those (fail closed on partial).
+    if (explicitPk || explicitSk) {
+      if (!explicitPk || !explicitSk) {
+        return { publishableKey: undefined, secretKey: undefined };
+      }
+      return { publishableKey: explicitPk, secretKey: explicitSk };
     }
 
-    return { publishableKey: stagingPk, secretKey: stagingSk };
+    // No _STAGING vars at all: fall back to the standard env vars read at
+    // runtime. Doppler syncs these directly to Vercel per-environment, so the
+    // staging deployment has staging values even though the build inlined
+    // production values via DefinePlugin.
+    const runtimePk = runtimePublicEnv('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY');
+    const runtimeSk = process.env.CLERK_SECRET_KEY || undefined;
+    if (!runtimePk || !runtimeSk) {
+      return { publishableKey: undefined, secretKey: undefined };
+    }
+    // If the runtime PK matches the build-time production PK, the staging
+    // environment doesn't have staging-specific Clerk keys — the Vercel
+    // Preview env just inherited the production value. Using production keys
+    // on staging.jov.ie causes Clerk middleware to throw because the domain
+    // isn't in the production Clerk app's allowlist.
+    const buildTimePk = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    if (buildTimePk && runtimePk === buildTimePk) {
+      return { publishableKey: undefined, secretKey: undefined };
+    }
+    return { publishableKey: runtimePk, secretKey: runtimeSk };
   }
 
   return {
@@ -61,7 +92,13 @@ export async function resolvePublishableKeyFromHeaders(): Promise<
   const hdrs = await headers();
   const preResolved = hdrs.get('x-clerk-publishable-key');
   if (preResolved) return preResolved;
-  // Fallback: resolve from the Host header directly
+  // Fallback: resolve from the Host header directly.
+  // Only return the publishable key when the secret key is also present,
+  // otherwise ClerkProvider will throw during SSR.
   const hostname = getRequestLocationFromHeaders(hdrs)?.hostname ?? '';
-  return resolveClerkKeys(hostname).publishableKey;
+  const keys = resolveClerkKeys(hostname);
+  if (keys.publishableKey && keys.secretKey) {
+    return keys.publishableKey;
+  }
+  return undefined;
 }

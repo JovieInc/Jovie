@@ -6,6 +6,7 @@ import type {
   ExtensionFillPreviewResponse,
   ExtensionSubmissionPacket,
   ExtensionTargetKey,
+  ExtensionWorkflowId,
 } from '@jovie/extension-contracts';
 import { APP_ROUTES } from '@/constants/routes';
 import { getReleaseById } from '@/lib/discography/queries';
@@ -26,6 +27,27 @@ const RELEASE_TARGET_KEYS = new Set<ExtensionTargetKey>([
   'secondary_genre',
   'label_name',
 ]);
+
+const AWAL_TARGET_KEYS = new Set<ExtensionTargetKey>([
+  'release_title',
+  'artist_name',
+  'label_name',
+]);
+
+const KOSIGN_TARGET_KEYS = new Set<ExtensionTargetKey>(['track_title']);
+
+function getTargetKeysForWorkflow(
+  workflowId: ExtensionWorkflowId
+): Set<ExtensionTargetKey> {
+  switch (workflowId) {
+    case 'awal_release_form':
+      return AWAL_TARGET_KEYS;
+    case 'kosign_work_form':
+      return KOSIGN_TARGET_KEYS;
+    default:
+      return RELEASE_TARGET_KEYS;
+  }
+}
 
 function formatDateForForm(value: string | Date | null | undefined) {
   if (!value) return null;
@@ -62,7 +84,7 @@ function buildSubmissionPacket(params: {
             label: 'Release Date',
             value: params.releaseDate ?? 'Missing In Jovie',
           },
-          { label: 'UPC', value: params.upc ?? 'Auto-Generate In DistroKid' },
+          { label: 'UPC', value: params.upc ?? 'Not Set' },
           {
             label: 'Primary Genre',
             value: params.genres[0] ?? 'Missing In Jovie',
@@ -107,6 +129,8 @@ function getSourceValue(
       };
     case 'label_name':
       return { sourceKey: 'release.label', value: params.labelName };
+    case 'track_title':
+      return { sourceKey: 'release.title', value: params.releaseTitle };
     default:
       return null;
   }
@@ -136,13 +160,12 @@ export async function buildExtensionFillPreview(
     labelName,
   });
 
-  if (
-    request.pageVariant !== 'release_form_v1' ||
-    request.availableTargets.length === 0
-  ) {
+  const targetKeys = getTargetKeysForWorkflow(request.workflowId);
+
+  if (request.availableTargets.length === 0) {
     return {
       status: 'fallback',
-      workflowId: 'distrokid_release_form',
+      workflowId: request.workflowId,
       entityId: release.id,
       entityTitle: release.title,
       mappings: [],
@@ -156,7 +179,7 @@ export async function buildExtensionFillPreview(
   const unsupportedTargets: ExtensionAvailableTarget[] = [];
   const mappings: ExtensionFieldMapping[] = request.availableTargets.map(
     target => {
-      if (!RELEASE_TARGET_KEYS.has(target.targetKey)) {
+      if (!targetKeys.has(target.targetKey)) {
         unsupportedTargets.push(target);
         return {
           targetId: target.targetId,
@@ -186,7 +209,7 @@ export async function buildExtensionFillPreview(
           blockers.push({
             code: source?.sourceKey ?? target.targetKey,
             label: target.targetLabel,
-            message: `${target.targetLabel} is required in Jovie before this DistroKid form can be shipped.`,
+            message: `${target.targetLabel} is required in Jovie before this form can be filled.`,
             fixUrl,
           });
           return {
@@ -231,7 +254,7 @@ export async function buildExtensionFillPreview(
 
   return {
     status: blockers.length ? 'blocked' : 'ready',
-    workflowId: 'distrokid_release_form',
+    workflowId: request.workflowId,
     entityId: release.id,
     entityTitle: release.title,
     mappings,

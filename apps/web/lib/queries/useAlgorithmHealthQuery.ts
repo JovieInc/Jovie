@@ -17,7 +17,6 @@ async function fetchAlgorithmHealth(
     `/api/spotify/fal-analysis?artistId=${encodeURIComponent(artistId)}`,
     {
       signal,
-      cache: 'no-store',
     }
   );
 }

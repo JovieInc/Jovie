@@ -53,6 +53,9 @@ export const audienceMembers = pgTable(
     latestActions: jsonb('latest_actions')
       .$type<Record<string, unknown>[]>()
       .default([]),
+    // Summary columns for fast list views (avoids JSONB expansion)
+    latestReferrerUrl: text('latest_referrer_url'),
+    latestActionLabel: text('latest_action_label'),
     email: text('email'),
     phone: text('phone'),
     spotifyConnected: boolean('spotify_connected').default(false).notNull(),
@@ -100,6 +103,57 @@ export const audienceMembers = pgTable(
   })
 );
 
+// Normalized audience referrer history (replaces JSONB referrer_history)
+export const audienceReferrers = pgTable(
+  'audience_referrers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    audienceMemberId: uuid('audience_member_id')
+      .notNull()
+      .references(() => audienceMembers.id, { onDelete: 'cascade' }),
+    url: text('url').notNull(),
+    source: text('source'),
+    timestamp: timestamp('timestamp', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    memberTimestampIdx: index('audience_referrers_member_ts_idx').on(
+      table.audienceMemberId,
+      table.timestamp
+    ),
+  })
+);
+
+// Normalized audience action history (replaces JSONB latest_actions)
+export const audienceActions = pgTable(
+  'audience_actions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    audienceMemberId: uuid('audience_member_id')
+      .notNull()
+      .references(() => audienceMembers.id, { onDelete: 'cascade' }),
+    label: text('label').notNull(),
+    emoji: text('emoji'),
+    platform: text('platform'),
+    // Intentionally nullable with no default — action timestamps come from
+    // external event sources and may be backdated by the caller.
+    timestamp: timestamp('timestamp', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    memberTimestampIdx: index('audience_actions_member_ts_idx').on(
+      table.audienceMemberId,
+      table.timestamp
+    ),
+  })
+);
+
 // Click events table
 export const clickEvents = pgTable(
   'click_events',
@@ -120,7 +174,7 @@ export const clickEvents = pgTable(
     deviceType: text('device_type'),
     os: text('os'),
     browser: text('browser'),
-    isBot: boolean('is_bot').default(false),
+    isBot: boolean('is_bot').notNull().default(false),
     metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
     audienceMemberId: uuid('audience_member_id').references(
       () => audienceMembers.id,
@@ -150,10 +204,9 @@ export const clickEvents = pgTable(
       table.createdAt
     ),
     // Performance index: non-bot clicks for dashboard analytics (JOV-520)
-    // Partial index avoids full table scans when filtering is_bot = false OR is_bot IS NULL
     nonBotClicksIdx: index('idx_click_events_non_bot')
       .on(table.creatorProfileId, table.createdAt)
-      .where(drizzleSql`is_bot = false OR is_bot IS NULL`),
+      .where(drizzleSql`is_bot = false`),
     // Partial index for release analytics queries filtering on metadata contentId
     metadataContentIdx: index('idx_click_events_metadata_content')
       .on(table.creatorProfileId, table.createdAt)

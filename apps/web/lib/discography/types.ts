@@ -120,6 +120,9 @@ export interface ReleaseViewModel {
   title: string;
   artistNames?: string[];
   releaseDate?: string;
+  status: 'draft' | 'scheduled' | 'released';
+  revealDate?: string;
+  deletedAt?: string;
   artworkUrl?: string;
   slug: string;
   smartLinkPath: string;

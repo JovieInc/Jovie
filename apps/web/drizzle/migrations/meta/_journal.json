@@ -204,6 +204,27 @@
       "when": 1775682246003,
       "tag": "0028_curious_squirrel_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1775682246100,
+      "tag": "0029_normalize_is_bot",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1775682246200,
+      "tag": "0030_normalize_audience_jsonb",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1775885889990,
+      "tag": "0031_needy_blindfold",
+      "breakpoints": true
     }
   ]
 }

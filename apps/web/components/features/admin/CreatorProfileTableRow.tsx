@@ -254,7 +254,7 @@ function CreatorProfileTableRowComponent({
           </span>
           <div
             className={cn(
-              'absolute inset-0 transition-opacity',
+              'absolute inset-0 flex items-center justify-center transition-opacity',
               isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
             )}
           >
@@ -262,7 +262,6 @@ function CreatorProfileTableRowComponent({
               aria-label={`Select ${profile.username}`}
               checked={isChecked}
               onCheckedChange={() => onToggleSelect(profile.id)}
-              className='border-subtle bg-surface-1 text-(--linear-border-focus) data-[state=checked]:border-(--linear-border-focus) data-[state=checked]:bg-(--linear-border-focus) data-[state=checked]:text-white'
             />
           </div>
         </div>
