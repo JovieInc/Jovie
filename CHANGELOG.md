@@ -25,6 +25,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Populated the `source` field from referrer URL hostname on every referrer insert
 - Removed redundant `onConflictDoNothing()` on referrer inserts where no unique constraint exists
 
+### Fixed
+
+- Profile nav button now toggles the right drawer open and closed instead of only opening it
+
 ## [26.4.144.1] - 2026-04-10
 
 ### Added
