@@ -51,6 +51,30 @@ vi.mock(
   })
 );
 
+vi.mock('@/features/auth/atoms/otp-input', () => ({
+  OtpInput: (props: {
+    'aria-label'?: string;
+    value?: string;
+    onChange?: (v: string) => void;
+    onComplete?: () => void;
+    disabled?: boolean;
+  }) => (
+    <input
+      data-testid='mock-otp-input'
+      aria-label={props['aria-label'] ?? 'otp'}
+      value={props.value}
+      onChange={e => {
+        const value = e.target.value;
+        props.onChange?.(value);
+        if (value.length === 6) {
+          props.onComplete?.();
+        }
+      }}
+      disabled={props.disabled}
+    />
+  ),
+}));
+
 function makeArtist(overrides: Partial<Artist> = {}): Artist {
   return {
     id: 'artist-1',
@@ -75,11 +99,15 @@ describe('ProfileInlineNotificationsCTA', () => {
     mockUseSubscriptionForm.mockReturnValue({
       emailInput: '',
       error: null,
+      otpCode: '',
+      otpStep: 'input',
       isSubmitting: false,
       handleChannelChange: vi.fn(),
       handleEmailChange: vi.fn(),
       handleFieldBlur: vi.fn(),
+      handleOtpChange: vi.fn(),
       handleSubscribe: vi.fn().mockResolvedValue(undefined),
+      handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
       notificationsState: 'success',
       notificationsEnabled: true,
       openSubscription: vi.fn(),
@@ -165,6 +193,67 @@ describe('ProfileInlineNotificationsCTA', () => {
     fireEvent.focus(button);
 
     expect(onManageNotifications).not.toHaveBeenCalled();
+  });
+
+  // Regression: OTP input never appeared when notificationsState became pending_confirmation
+  // Found by /investigate on 2026-04-10
+  it('renders OTP input when notificationsState is pending_confirmation after email submit', () => {
+    // Start in idle state so the CTA button appears
+    mockUseSubscriptionForm.mockReturnValue({
+      emailInput: '',
+      error: null,
+      otpCode: '',
+      otpStep: 'input',
+      isSubmitting: false,
+      handleChannelChange: vi.fn(),
+      handleEmailChange: vi.fn(),
+      handleFieldBlur: vi.fn(),
+      handleOtpChange: vi.fn(),
+      handleSubscribe: vi.fn().mockResolvedValue(undefined),
+      handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
+      notificationsState: 'idle',
+      notificationsEnabled: true,
+      openSubscription: vi.fn(),
+      hydrationStatus: 'done',
+      subscribedChannels: {},
+    });
+
+    const { rerender } = render(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} />
+    );
+
+    // Click "Turn on notifications" to advance to the email step
+    fireEvent.click(
+      screen.getByRole('button', { name: /turn on notifications/i })
+    );
+
+    // Now simulate the hook returning pending_confirmation after email submit
+    mockUseSubscriptionForm.mockReturnValue({
+      emailInput: 'test@example.com',
+      error: null,
+      otpCode: '',
+      otpStep: 'verify',
+      isSubmitting: false,
+      handleChannelChange: vi.fn(),
+      handleEmailChange: vi.fn(),
+      handleFieldBlur: vi.fn(),
+      handleOtpChange: vi.fn(),
+      handleSubscribe: vi.fn().mockResolvedValue(undefined),
+      handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
+      notificationsState: 'pending_confirmation',
+      notificationsEnabled: true,
+      openSubscription: vi.fn(),
+      hydrationStatus: 'done',
+      subscribedChannels: {},
+    });
+
+    rerender(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
+
+    // The OTP input should be rendered
+    expect(screen.getByTestId('mock-otp-input')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/enter 6-digit verification code/i)
+    ).toBeInTheDocument();
   });
 
   it('does not create a reopen loop when focus returns after closing the drawer', () => {
