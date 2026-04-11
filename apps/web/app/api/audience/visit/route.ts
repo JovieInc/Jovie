@@ -11,7 +11,11 @@ import {
 import { isVisitorBlocked } from '@/lib/audience/block-check';
 import { type DbOrTransaction, db, doesTableExist } from '@/lib/db';
 import { unwrapPgError } from '@/lib/db/errors';
-import { audienceMembers, dailyProfileViews } from '@/lib/db/schema/analytics';
+import {
+  audienceMembers,
+  audienceReferrers,
+  dailyProfileViews,
+} from '@/lib/db/schema/analytics';
 import {
   creatorDistributionEvents,
   creatorProfiles,
@@ -169,6 +173,10 @@ function isMissingDailyProfileViewsTableError(error: unknown): boolean {
 }
 
 function isMissingCreatorDistributionEventsTableError(error: unknown): boolean {
+  return unwrapPgError(error).code === '42P01';
+}
+
+function isMissingAudienceReferrersTableError(error: unknown): boolean {
   return unwrapPgError(error).code === '42P01';
 }
 
@@ -449,6 +457,9 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Summary column value for fast list views
+      const latestReferrerUrl = resolvedReferrer?.trim() ?? null;
+
       if (existing) {
         await tx
           .update(audienceMembers)
@@ -463,13 +474,37 @@ export async function POST(request: NextRequest) {
             deviceType: normalizedDevice,
             referrerHistory,
             tags: mergedTags,
+            ...(latestReferrerUrl && { latestReferrerUrl }),
             ...(utmParams && { utmParams: resolvedUtmParams }),
           })
           .where(eq(audienceMembers.id, existing.id));
+
+        // Dual-write: insert into normalized referrer table
+        if (latestReferrerUrl) {
+          try {
+            const referrerSource = (() => {
+              try {
+                return new URL(latestReferrerUrl).hostname;
+              } catch {
+                return null;
+              }
+            })();
+            await tx.insert(audienceReferrers).values({
+              audienceMemberId: existing.id,
+              url: latestReferrerUrl,
+              source: referrerSource,
+              timestamp: now,
+            });
+          } catch (error) {
+            if (!isMissingAudienceReferrersTableError(error)) {
+              throw error;
+            }
+          }
+        }
         return;
       }
 
-      await tx
+      const [inserted] = await tx
         .insert(audienceMembers)
         .values({
           creatorProfileId: profileId,
@@ -488,6 +523,7 @@ export async function POST(request: NextRequest) {
           utmParams: resolvedUtmParams,
           tags: mergedTags,
           latestActions: [],
+          latestReferrerUrl,
           updatedAt: now,
           createdAt: now,
         })
@@ -496,7 +532,31 @@ export async function POST(request: NextRequest) {
             audienceMembers.creatorProfileId,
             audienceMembers.fingerprint,
           ],
-        });
+        })
+        .returning({ id: audienceMembers.id });
+
+      // Dual-write: insert first referrer for new members
+      if (inserted && latestReferrerUrl) {
+        try {
+          const referrerSource = (() => {
+            try {
+              return new URL(latestReferrerUrl).hostname;
+            } catch {
+              return null;
+            }
+          })();
+          await tx.insert(audienceReferrers).values({
+            audienceMemberId: inserted.id,
+            url: latestReferrerUrl,
+            source: referrerSource,
+            timestamp: now,
+          });
+        } catch (error) {
+          if (!isMissingAudienceReferrersTableError(error)) {
+            throw error;
+          }
+        }
+      }
     });
 
     return NextResponse.json(

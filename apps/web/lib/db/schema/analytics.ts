@@ -53,6 +53,9 @@ export const audienceMembers = pgTable(
     latestActions: jsonb('latest_actions')
       .$type<Record<string, unknown>[]>()
       .default([]),
+    // Summary columns for fast list views (avoids JSONB expansion)
+    latestReferrerUrl: text('latest_referrer_url'),
+    latestActionLabel: text('latest_action_label'),
     email: text('email'),
     phone: text('phone'),
     spotifyConnected: boolean('spotify_connected').default(false).notNull(),
@@ -97,6 +100,57 @@ export const audienceMembers = pgTable(
     emailLookupIdx: index('idx_audience_members_email')
       .on(table.creatorProfileId, table.email)
       .where(drizzleSql`email IS NOT NULL`),
+  })
+);
+
+// Normalized audience referrer history (replaces JSONB referrer_history)
+export const audienceReferrers = pgTable(
+  'audience_referrers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    audienceMemberId: uuid('audience_member_id')
+      .notNull()
+      .references(() => audienceMembers.id, { onDelete: 'cascade' }),
+    url: text('url').notNull(),
+    source: text('source'),
+    timestamp: timestamp('timestamp', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    memberTimestampIdx: index('audience_referrers_member_ts_idx').on(
+      table.audienceMemberId,
+      table.timestamp
+    ),
+  })
+);
+
+// Normalized audience action history (replaces JSONB latest_actions)
+export const audienceActions = pgTable(
+  'audience_actions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    audienceMemberId: uuid('audience_member_id')
+      .notNull()
+      .references(() => audienceMembers.id, { onDelete: 'cascade' }),
+    label: text('label').notNull(),
+    emoji: text('emoji'),
+    platform: text('platform'),
+    // Intentionally nullable with no default — action timestamps come from
+    // external event sources and may be backdated by the caller.
+    timestamp: timestamp('timestamp', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    memberTimestampIdx: index('audience_actions_member_ts_idx').on(
+      table.audienceMemberId,
+      table.timestamp
+    ),
   })
 );
 

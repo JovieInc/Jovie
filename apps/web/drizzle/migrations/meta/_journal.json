@@ -211,6 +211,13 @@
       "when": 1775682246100,
       "tag": "0029_normalize_is_bot",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1775682246200,
+      "tag": "0030_normalize_audience_jsonb",
+      "breakpoints": true
     }
   ]
 }
