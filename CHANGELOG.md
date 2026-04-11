@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.143] - 2026-04-10
+
+### Fixed
+
+- Notification subscribe on profile pages now shows the OTP verification input after email submission instead of staying stuck on the email field
+
 ## [26.4.142] - 2026-04-10
 
 > YC demo recordings now stay coherent from the dashboard to the public smart link, with real analytics data and cleaner scene transitions. Also keeps fresh worktrees bootstrappable even when local Homebrew metadata is broken.
