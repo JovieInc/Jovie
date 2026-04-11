@@ -67,6 +67,42 @@ export const ADAPTERS: readonly PageAdapter[] = [
       },
     ],
   },
+  {
+    id: 'awal-project',
+    hosts: ['workstation.awal.com'],
+    targets: [
+      {
+        selector: 'input[placeholder="Project name"]',
+        label: 'Project Name',
+        inputTypes: ['text'],
+      },
+      {
+        selector: 'input[placeholder="Project code"]',
+        label: 'Project Code',
+        inputTypes: ['text'],
+      },
+      {
+        selector: 'input[id^="react-select"]',
+        label: 'Project Artist',
+        inputTypes: ['text'],
+      },
+      {
+        selector: 'textarea.ProjectDescriptionInput-textarea',
+        label: 'Project Description',
+      },
+    ],
+  },
+  {
+    id: 'kosign-work',
+    hosts: ['app.kosignmusic.com'],
+    targets: [
+      {
+        selector: 'input[name="workTitle"]',
+        label: 'Song Title',
+        inputTypes: ['text'],
+      },
+    ],
+  },
 ] as const;
 
 function normalizeHost(hostname: string) {
