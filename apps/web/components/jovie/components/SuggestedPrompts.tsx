@@ -2,6 +2,7 @@
 
 import {
   Camera,
+  Disc3,
   DollarSign,
   Eye,
   Link2,
@@ -28,6 +29,7 @@ import {
 /** Map icon name strings to lucide components */
 const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   Camera,
+  Disc3,
   DollarSign,
   Eye,
   Link2,
