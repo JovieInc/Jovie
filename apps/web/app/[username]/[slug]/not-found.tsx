@@ -6,7 +6,7 @@ export default function SmartLinkNotFound() {
       <div className='w-full max-w-sm text-center'>
         <div className='mb-6 select-none'>
           <span
-            className='block text-[100px] font-semibold leading-none tracking-tighter text-white/[0.06]'
+            className='block text-[100px] font-semibold leading-none tracking-tighter text-primary-token/[0.34]'
             aria-hidden='true'
           >
             404
