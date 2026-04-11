@@ -15,7 +15,7 @@ export default function SmartLinkNotFound() {
 
         <div className='-mt-12 relative'>
           <h1 className='text-lg font-semibold tracking-tight'>
-            Content not found
+            Content Not Found
           </h1>
           <p className='text-muted-foreground mt-2 text-sm leading-relaxed'>
             This page may have been removed or the link may be incorrect.
@@ -26,7 +26,7 @@ export default function SmartLinkNotFound() {
               href='/'
               className='text-muted-foreground hover:text-foreground text-sm transition-colors'
             >
-              Go home
+              Go Home
             </Link>
           </div>
         </div>

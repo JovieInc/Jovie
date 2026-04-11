@@ -926,16 +926,24 @@ export async function checkPromoDownloads(
   usernameNormalized: string,
   slug: string
 ): Promise<string | null> {
-  const [hasDownloads] = await db
-    .select({ id: promoDownloads.id })
-    .from(promoDownloads)
-    .where(
-      and(
-        eq(promoDownloads.releaseId, releaseId),
-        eq(promoDownloads.isActive, true)
+  try {
+    const [hasDownloads] = await db
+      .select({ id: promoDownloads.id })
+      .from(promoDownloads)
+      .where(
+        and(
+          eq(promoDownloads.releaseId, releaseId),
+          eq(promoDownloads.isActive, true)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  return hasDownloads ? `/${usernameNormalized}/${slug}/download` : null;
+    return hasDownloads ? `/${usernameNormalized}/${slug}/download` : null;
+  } catch (error) {
+    void captureError('Failed to check promo downloads', error, {
+      helper: 'checkPromoDownloads',
+      releaseId,
+    }).catch(() => {});
+    return null;
+  }
 }

@@ -101,7 +101,7 @@ export function ScheduledReleasePage({
           onClick={() => handleShare()}
           className='text-muted-foreground hover:text-foreground mt-4 inline-flex items-center gap-1.5 text-xs transition-colors'
         >
-          <Share2 className='h-3.5 w-3.5' />
+          <Share2 className='h-4 w-4' />
           Share
         </button>
       </SmartLinkPageFrame>
