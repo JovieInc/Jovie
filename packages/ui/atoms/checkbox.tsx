@@ -51,6 +51,7 @@ const Checkbox = React.forwardRef<
       <CheckboxPrimitive.Indicator
         className={cn('flex items-center justify-center text-current')}
       >
+        {/* Uses effectiveChecked (prop), not internal Radix state. Safe for controlled mode. */}
         {effectiveChecked === 'indeterminate' ? (
           <Minus className='h-3 w-3 [stroke-width:2.5]' />
         ) : (
