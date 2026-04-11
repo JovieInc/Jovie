@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.146.2] - 2026-04-11
+
+### Fixed
+
+- Pass CSP nonce from middleware to theme-init Script in root layout, fixing hydration mismatch on authenticated pages
+- Suppress expected hydration warning on smart link URLs where server/client origins intentionally differ
+
 ## [26.4.146.1] - 2026-04-11
 
 ### Changed
