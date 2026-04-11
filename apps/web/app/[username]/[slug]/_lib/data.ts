@@ -21,6 +21,7 @@ import {
   releaseArtists,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
@@ -913,5 +914,36 @@ export async function getFeaturedTrackStaticParams(
       // Ignore telemetry failures so build-time fallback stays resilient.
     });
     return [];
+  }
+}
+
+/**
+ * Check if a release has active promo downloads.
+ * Returns the download URL path if available, null otherwise.
+ */
+export async function checkPromoDownloads(
+  releaseId: string,
+  usernameNormalized: string,
+  slug: string
+): Promise<string | null> {
+  try {
+    const [hasDownloads] = await db
+      .select({ id: promoDownloads.id })
+      .from(promoDownloads)
+      .where(
+        and(
+          eq(promoDownloads.releaseId, releaseId),
+          eq(promoDownloads.isActive, true)
+        )
+      )
+      .limit(1);
+
+    return hasDownloads ? `/${usernameNormalized}/${slug}/download` : null;
+  } catch (error) {
+    void captureError('Failed to check promo downloads', error, {
+      helper: 'checkPromoDownloads',
+      releaseId,
+    }).catch(() => {});
+    return null;
   }
 }

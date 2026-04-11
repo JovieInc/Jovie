@@ -38,7 +38,7 @@ function getTimeLeft(targetDate: Date): TimeLeft {
 
 interface ReleaseCountdownProps {
   readonly releaseDate: Date;
-  /** Compact inline mode: "Drops in 14d 3h 22m" on one line */
+  /** Compact inline mode: "Releases in 14d 3h 22m" on one line */
   readonly compact?: boolean;
 }
 
@@ -119,7 +119,7 @@ export function ReleaseCountdown({
   return (
     <div className='text-center'>
       <p className='text-xs uppercase tracking-widest text-white/40'>
-        Drops in
+        Releases in
       </p>
       <div className='mt-2 flex items-center justify-center gap-3'>
         {timeLeft.days > 0 && (

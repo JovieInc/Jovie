@@ -15,6 +15,8 @@
     "build": "NODE_OPTIONS=--max-old-space-size=8192 NEXT_IGNORE_TYPECHECK=1 next build --turbopack",
     "build:strict": "pnpm run typecheck && NODE_OPTIONS=--max-old-space-size=8192 next build --turbopack",
     "analyze": "NODE_OPTIONS=--max-old-space-size=8192 ANALYZE=true NEXT_IGNORE_TYPECHECK=1 next build --webpack",
+    "compare-chunks": "tsx scripts/compare-chunks.ts",
+    "compare-chunks:snapshot": "tsx scripts/compare-chunks.ts --snapshot",
     "build:validate": "pnpm run validate-env && pnpm run build",
     "start": "next start",
     "lint": "biome lint .",
