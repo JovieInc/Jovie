@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.144.1] - 2026-04-10
+
+### Added
+
+- "Create a new release" suggestion on the empty chat state, shown as the first option for both new and returning users
+
 ## [26.4.144] - 2026-04-10
 
 ### Added
