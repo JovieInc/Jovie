@@ -10,7 +10,9 @@ import { parseJsonBody } from '@/lib/http/parse-json';
 const requestSchema = z
   .object({
     action: z.enum(['insert', 'copy', 'sync', 'open', 'preview']).optional(),
-    workflowId: z.enum(['distrokid_release_form']).optional(),
+    workflowId: z
+      .enum(['distrokid_release_form', 'awal_release_form', 'kosign_work_form'])
+      .optional(),
     operation: z.enum(['preview', 'apply', 'undo', 'open']).optional(),
     entityId: z.string().min(1),
     entityKind: z.enum(['profile', 'release', 'tourDate']),

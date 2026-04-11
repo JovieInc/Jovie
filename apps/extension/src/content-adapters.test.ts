@@ -76,4 +76,44 @@ describe('content adapters', () => {
       error: 'No supported adapter is active on this page.',
     });
   });
+
+  it('matches the awal-project adapter on workstation.awal.com', () => {
+    const adapter = findAdapterForHost('workstation.awal.com');
+
+    expect(adapter?.id).toBe('awal-project');
+  });
+
+  it('builds a preview for a focused AWAL project name field', () => {
+    const doc = createDocument(
+      '<input type="text" placeholder="Project name" />'
+    );
+    setActiveElement('input[placeholder="Project name"]');
+
+    const response = buildPreviewResponse('workstation.awal.com', doc);
+
+    expect(response).toEqual({
+      ok: true,
+      adapterId: 'awal-project',
+      targetLabel: 'Project Name',
+    });
+  });
+
+  it('matches the kosign-work adapter on app.kosignmusic.com', () => {
+    const adapter = findAdapterForHost('app.kosignmusic.com');
+
+    expect(adapter?.id).toBe('kosign-work');
+  });
+
+  it('builds a preview for a focused Kosign song title field', () => {
+    const doc = createDocument('<input type="text" name="workTitle" />');
+    setActiveElement('input[name="workTitle"]');
+
+    const response = buildPreviewResponse('app.kosignmusic.com', doc);
+
+    expect(response).toEqual({
+      ok: true,
+      adapterId: 'kosign-work',
+      targetLabel: 'Song Title',
+    });
+  });
 });

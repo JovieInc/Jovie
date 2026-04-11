@@ -13,6 +13,7 @@ import { db } from '@/lib/db';
 import { socialLinks } from '@/lib/db/schema/links';
 import { tourDates } from '@/lib/db/schema/tour';
 import { getReleasesForProfile } from '@/lib/discography/queries';
+import { getMatchingDomainConfig } from '@/lib/extensions/flags';
 
 type SupportedPage = {
   kind: ExtensionPageKind;
@@ -20,13 +21,10 @@ type SupportedPage = {
 } | null;
 
 function classifyPage(url: URL): SupportedPage {
-  const host = url.hostname.toLowerCase();
+  const config = getMatchingDomainConfig(url.hostname);
+  if (!config) return null;
 
-  if (host === 'distrokid.com' || host.endsWith('.distrokid.com')) {
-    return { kind: 'release', label: 'DistroKid Release Form' };
-  }
-
-  return null;
+  return { kind: config.pageKind, label: config.pageLabel };
 }
 
 function getShellCopy(
@@ -36,8 +34,8 @@ function getShellCopy(
 ): ExtensionShellCopy {
   if (status === 'unsupported') {
     return {
-      title: 'Open A DistroKid Release Form',
-      body: 'This alpha only supports DistroKid release metadata previews from Jovie.',
+      title: 'Open A Supported Form',
+      body: 'Open a distributor or publisher form to autofill release metadata from Jovie.',
     };
   }
 
@@ -59,7 +57,7 @@ function getShellCopy(
     },
     release: {
       title: 'Release Metadata Is Ready',
-      body: `Jovie pulled release details for ${displayName} so you can review them before filling DistroKid.`,
+      body: `Jovie pulled release details for ${displayName} so you can review and autofill this form.`,
     },
     lyrics: {
       title: 'Lyrics Context Is Ready',
@@ -233,6 +231,12 @@ export async function buildExtensionSummary(params: {
           id: 'release-title',
           label: 'Release Title',
           value: release.title,
+          actions: ['copy', 'insert'],
+        },
+        {
+          id: 'artist-name',
+          label: 'Artist Name',
+          value: release.artistNames?.join(', ') ?? displayName,
           actions: ['copy', 'insert'],
         },
         {
