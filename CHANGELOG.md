@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.144] - 2026-04-10
+
+### Added
+
+- Chrome extension support for AWAL (workstation.awal.com) and Kosign (app.kosignmusic.com) alongside DistroKid
+- Autofill button in extension sidebar that fills distributor/publisher forms from Jovie release data
+- Bulk-insert content script handler with React-compatible nativeInputValueSetter for framework-controlled inputs
+- React Select async dropdown handler for AWAL's Project Artist field (type, wait, select)
+- Undo button to revert autofilled fields to previous values
+- Label-alias mapping so Jovie entity fields (Release Title, Display Name) map to platform form labels (Project Name, Project Artist)
+- Slugified project code derivation from release title for AWAL
+
+### Changed
+
+- Extension domain infrastructure refactored for multi-distributor support (DRY classifyPage reads from shared DOMAIN_CONFIGS)
+- Shell copy updated from DistroKid-specific messaging to generic distributor language
+- DistroKid domain mode changed from read to write (pre-launch, no existing users)
+
 ## [26.4.143] - 2026-04-10
 
 ### Fixed

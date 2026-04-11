@@ -112,11 +112,11 @@ async function batchFetchLtv(
       audienceMemberId: clickEvents.audienceMemberId,
       streamingClicks: drizzleSql<number>`COALESCE(COUNT(*) FILTER (
           WHERE ${clickEvents.linkType} = 'listen'
-            AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
+            AND ${clickEvents.isBot} = false
         ), 0)`.as('streaming_clicks'),
       tipValue: drizzleSql<number>`COALESCE(SUM(
           CASE
-            WHEN ${clickEvents.linkType} = 'tip' AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
+            WHEN ${clickEvents.linkType} = 'tip' AND ${clickEvents.isBot} = false
               THEN COALESCE((NULLIF(${clickEvents.metadata} ->> 'tipAmountCents', '')::integer), 500)
             ELSE 0
           END

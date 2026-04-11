@@ -26,6 +26,13 @@ interface PendingInsert {
   readonly adapterId: string;
 }
 
+interface UndoField {
+  readonly selector: string;
+  readonly previousValue: string | null;
+  readonly nextValue: string;
+  readonly applied: boolean;
+}
+
 interface AppState {
   readonly flags: ExtensionFlagsResponse | null;
   readonly summary: ExtensionSummaryResponse | null;
@@ -37,6 +44,7 @@ interface AppState {
   readonly pendingInsert: PendingInsert | null;
   readonly statusMessage: string | null;
   readonly loading: boolean;
+  readonly undoSnapshot: readonly UndoField[] | null;
 }
 
 const rootElement = document.querySelector<HTMLDivElement>('#app');
@@ -58,6 +66,7 @@ let state: AppState = {
   pendingInsert: null,
   statusMessage: null,
   loading: true,
+  undoSnapshot: null,
 };
 
 function setState(partial: Partial<AppState>) {
@@ -186,6 +195,21 @@ async function fetchSummary(
   return (await response.json()) as ExtensionSummaryResponse;
 }
 
+const OPTIONAL_ORIGIN_DOMAINS = [
+  {
+    hosts: ['distrokid.com'],
+    origins: ['https://distrokid.com/*', 'https://*.distrokid.com/*'],
+  },
+  {
+    hosts: ['workstation.awal.com', 'awal.com'],
+    origins: ['https://workstation.awal.com/*', 'https://*.awal.com/*'],
+  },
+  {
+    hosts: ['app.kosignmusic.com', 'kosignmusic.com'],
+    origins: ['https://app.kosignmusic.com/*', 'https://*.kosignmusic.com/*'],
+  },
+] as const;
+
 function getOptionalOriginsForUrl(tabUrl: string | null) {
   if (!tabUrl) return [];
 
@@ -193,8 +217,10 @@ function getOptionalOriginsForUrl(tabUrl: string | null) {
     const url = new URL(tabUrl);
     const host = url.hostname.toLowerCase();
 
-    if (host === 'distrokid.com' || host.endsWith('.distrokid.com')) {
-      return ['https://distrokid.com/*', 'https://*.distrokid.com/*'];
+    for (const domain of OPTIONAL_ORIGIN_DOMAINS) {
+      if (domain.hosts.some(h => host === h || host.endsWith(`.${h}`))) {
+        return [...domain.origins];
+      }
     }
   } catch {
     return [];
@@ -504,6 +530,7 @@ function renderCandidateCard(entity: ExtensionEntitySummary) {
       selectedEntityId: entity.id,
       pendingInsert: null,
       statusMessage: null,
+      undoSnapshot: null,
     });
   });
 
@@ -825,6 +852,92 @@ async function confirmInsert(
   }
 }
 
+async function autofillEntity(
+  apiBaseUrl: string,
+  currentTabId: number,
+  currentTab: { url: string | null; title: string | null },
+  entity: ExtensionEntitySummary
+) {
+  setState({ statusMessage: 'Filling fields...', undoSnapshot: null });
+
+  try {
+    const response = (await chrome?.tabs?.sendMessage(currentTabId, {
+      type: 'jovie:autofill',
+      fields: entity.fields.map(field => ({
+        label: field.label,
+        value: field.value,
+      })),
+    })) as
+      | {
+          ok: true;
+          appliedCount: number;
+          undoSnapshot: readonly UndoField[];
+        }
+      | { ok: false; error: string }
+      | undefined;
+
+    if (!response?.ok) {
+      setState({
+        statusMessage:
+          (response && 'error' in response ? response.error : null) ??
+          'Autofill failed.',
+      });
+      return;
+    }
+
+    const { appliedCount, undoSnapshot } = response;
+
+    await logAction(apiBaseUrl, {
+      action: 'insert',
+      entity,
+      pageUrl: currentTab.url,
+      pageTitle: currentTab.title,
+      result: 'succeeded',
+    });
+
+    setState({
+      statusMessage: `${appliedCount} field${appliedCount === 1 ? '' : 's'} filled.`,
+      undoSnapshot: undoSnapshot ?? null,
+    });
+  } catch (error) {
+    setState({
+      statusMessage:
+        error instanceof Error ? error.message : 'Autofill failed.',
+    });
+  }
+}
+
+async function undoAutofill(currentTabId: number) {
+  if (!state.undoSnapshot) return;
+
+  const fieldsToUndo = state.undoSnapshot
+    .filter(f => f.applied && f.previousValue !== null)
+    .map(f => ({
+      selector: f.selector,
+      value: f.previousValue as string,
+    }));
+
+  if (fieldsToUndo.length === 0) {
+    setState({ undoSnapshot: null, statusMessage: 'Nothing to undo.' });
+    return;
+  }
+
+  const response = (await chrome?.tabs?.sendMessage(currentTabId, {
+    type: 'jovie:bulk-insert',
+    fields: fieldsToUndo,
+  })) as { ok: true; appliedCount: number } | { ok: false } | undefined;
+
+  if (response?.ok) {
+    const count = response.appliedCount;
+    setState({
+      undoSnapshot: null,
+      statusMessage: `${count} field${count === 1 ? '' : 's'} reverted.`,
+    });
+  } else {
+    setState({ statusMessage: 'Undo failed.' });
+  }
+}
+
 function getMatchingDomainMode(
   flags: ExtensionFlagsResponse | null,
   host: string
@@ -1021,31 +1134,27 @@ function renderReady(
           setState({ pendingInsert: null, statusMessage: null });
         })
       );
-    } else if (primaryField && domainMode === 'write') {
+    } else if (domainMode === 'write' && currentTabId !== null) {
       actionTray.appendChild(
-        createButton(
-          selectedEntity.primaryAction.label,
-          'primary',
-          async () => {
-            if (currentTabId === null) {
-              setState({ statusMessage: 'No active tab available.' });
-              return;
-            }
-
-            try {
-              const preview = await getInsertPreview(currentTabId);
-              startInsertPreview(selectedEntity, primaryField, preview);
-            } catch (error) {
-              setState({
-                statusMessage:
-                  error instanceof Error
-                    ? error.message
-                    : 'Unable to build an insert preview.',
-              });
-            }
-          }
-        )
+        createButton('Autofill', 'primary', async () => {
+          await autofillEntity(
+            apiBaseUrl,
+            currentTabId,
+            currentTab,
+            selectedEntity
+          );
+        })
       );
+
+      if (state.undoSnapshot) {
+        actionTray.appendChild(
+          createButton('Undo', 'secondary', async () => {
+            if (currentTabId !== null) {
+              await undoAutofill(currentTabId);
+            }
+          })
+        );
+      }
     }
 
     if (primaryField) {
