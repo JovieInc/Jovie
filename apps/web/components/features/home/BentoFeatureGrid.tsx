@@ -34,7 +34,7 @@ function GenerateReleasePlanCard() {
         </span>
         <div className='flex items-center gap-1.5 text-[11px] text-white/30'>
           <span className='h-1 w-1 rounded-full bg-emerald-400/60' />
-          Brief loaded
+          <span>Brief loaded</span>
         </div>
       </div>
     </BentoCard>
