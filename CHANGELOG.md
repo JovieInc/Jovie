@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.145.1] - 2026-04-10
+
+### Fixed
+
+- Bumped `next` 16.2.1 → 16.2.3 across all apps to fix Server Components DoS vulnerability
+- Bumped `drizzle-orm` override to 0.45.2 to fix SQL injection via improperly escaped identifiers
+- Bumped `vite` override to ^6.4.2 to fix arbitrary file read and path traversal (dev-only)
+- Bumped `basic-ftp` override to ^5.2.2 to fix FTP command injection via CRLF (dev-only)
+- Bumped `lodash` override to >=4.18.1 to fix code injection and prototype pollution
+- Added overrides for `lodash-es`, `handlebars`, `@xmldom/xmldom`, and `brace-expansion` to remediate transitive dependency vulnerabilities
+
 ## [26.4.145] - 2026-04-10
 
 ### Changed
