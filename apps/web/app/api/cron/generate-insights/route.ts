@@ -157,13 +157,13 @@ export async function GET(request: Request) {
               SELECT count(*)
               FROM ${clickEvents} ce
               WHERE ce.creator_profile_id = cp.id
-                AND (ce.is_bot = false OR ce.is_bot IS NULL)
+                AND ce.is_bot = false
             ) >= ${MIN_TOTAL_CLICKS}
             AND (
               SELECT min(ce2.created_at)
               FROM ${clickEvents} ce2
               WHERE ce2.creator_profile_id = cp.id
-                AND (ce2.is_bot = false OR ce2.is_bot IS NULL)
+                AND ce2.is_bot = false
             ) <= ${sevenDaysAgo.toISOString()}::timestamp
           ORDER BY cp.profile_views DESC
           LIMIT ${MAX_CRON_BATCH_SIZE}
