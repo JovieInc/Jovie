@@ -58,6 +58,15 @@ export function resolveClerkKeys(hostname: string): ClerkKeys {
     if (!runtimePk || !runtimeSk) {
       return { publishableKey: undefined, secretKey: undefined };
     }
+    // If the runtime PK matches the build-time production PK, the staging
+    // environment doesn't have staging-specific Clerk keys — the Vercel
+    // Preview env just inherited the production value. Using production keys
+    // on staging.jov.ie causes Clerk middleware to throw because the domain
+    // isn't in the production Clerk app's allowlist.
+    const buildTimePk = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    if (buildTimePk && runtimePk === buildTimePk) {
+      return { publishableKey: undefined, secretKey: undefined };
+    }
     return { publishableKey: runtimePk, secretKey: runtimeSk };
   }
 
@@ -83,7 +92,13 @@ export async function resolvePublishableKeyFromHeaders(): Promise<
   const hdrs = await headers();
   const preResolved = hdrs.get('x-clerk-publishable-key');
   if (preResolved) return preResolved;
-  // Fallback: resolve from the Host header directly
+  // Fallback: resolve from the Host header directly.
+  // Only return the publishable key when the secret key is also present,
+  // otherwise ClerkProvider will throw during SSR.
   const hostname = getRequestLocationFromHeaders(hdrs)?.hostname ?? '';
-  return resolveClerkKeys(hostname).publishableKey;
+  const keys = resolveClerkKeys(hostname);
+  if (keys.publishableKey && keys.secretKey) {
+    return keys.publishableKey;
+  }
+  return undefined;
 }

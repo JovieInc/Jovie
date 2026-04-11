@@ -5,12 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.145.3] - 2026-04-11
+## [26.4.146.1] - 2026-04-11
 
 ### Changed
 
 - Moved playlist pages from `(marketing)` to `(dynamic)` route group so ISR pages with DB queries no longer violate the static marketing page contract
 - Added dedicated playlist layout to preserve site header, footer, and dark theme styling
+
+## [26.4.146.0] - 2026-04-11
+
+### Fixed
+
+- Staging auth routes (/signup, /signin) returning 500, blocking CI canary health gate since April 8
+- Detect production Clerk keys on staging and skip middleware instead of crashing on domain mismatch
+- Add try-catch safety net around staging Clerk middleware call
+- Fix auth layout tests missing CLERK_SECRET_KEY in test environment
+- Gate x-clerk-publishable-key header injection on both PK and SK presence
 
 ## [26.4.145.2] - 2026-04-11
 
