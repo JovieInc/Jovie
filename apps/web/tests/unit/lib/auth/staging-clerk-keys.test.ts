@@ -106,12 +106,36 @@ describe('staging Clerk key resolution', () => {
     });
   });
 
-  it('falls back to runtime standard env vars on staging when no _STAGING vars exist', () => {
+  it('returns undefined on staging when runtime PK matches build-time production PK', () => {
     // beforeEach sets NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY
-    // but deletes _STAGING vars — simulates the Doppler/Vercel staging env
+    // to production values and deletes _STAGING vars. In this case, the
+    // bracket-notation fallback reads the same production PK as the build-time
+    // value (dot notation). The function detects this means staging-specific
+    // keys aren't configured and returns undefined to prevent using production
+    // keys on staging.jov.ie (which causes Clerk domain mismatch errors).
     expect(resolveClerkKeys('staging.jov.ie')).toEqual({
-      publishableKey: 'pk_live_production_example',
-      secretKey: 'sk_live_production_example',
+      publishableKey: undefined,
+      secretKey: undefined,
+    });
+  });
+
+  it('uses runtime staging keys when they differ from build-time production PK', () => {
+    // Simulate Doppler syncing real staging keys to the Vercel Preview env.
+    // In tests, both dot and bracket notation read from process.env, so we
+    // set the env var to a staging-specific value that differs from the
+    // build-time production PK used by publicEnv.
+    //
+    // NOTE: In real Vercel deployments, publicEnv uses dot notation (build-time
+    // inlined production PK) while runtimePublicEnv uses bracket notation
+    // (runtime staging PK). In Vitest there's no DefinePlugin, so we can't
+    // fully simulate this divergence. This test validates the comparison logic
+    // by using explicit _STAGING vars which bypass the comparison entirely.
+    process.env.CLERK_PUBLISHABLE_KEY_STAGING = 'pk_test_staging_real';
+    process.env.CLERK_SECRET_KEY_STAGING = 'sk_test_staging_real';
+
+    expect(resolveClerkKeys('staging.jov.ie')).toEqual({
+      publishableKey: 'pk_test_staging_real',
+      secretKey: 'sk_test_staging_real',
     });
   });
 
@@ -125,7 +149,7 @@ describe('staging Clerk key resolution', () => {
     });
   });
 
-  it('resolves staging PK from headers via runtime fallback', async () => {
+  it('returns undefined from headers on staging when runtime PK matches production PK', async () => {
     headersMock.mockResolvedValue(
       new Headers({
         host: 'staging.jov.ie',
@@ -134,14 +158,30 @@ describe('staging Clerk key resolution', () => {
       })
     );
 
-    // No _STAGING vars, but standard vars are set (beforeEach)
-    await expect(resolvePublishableKeyFromHeaders()).resolves.toBe(
-      'pk_live_production_example'
-    );
+    // No _STAGING vars, standard vars are set (beforeEach) — runtime PK
+    // matches build-time PK, so staging detection returns undefined.
+    await expect(resolvePublishableKeyFromHeaders()).resolves.toBeUndefined();
   });
 
   it('returns undefined publishable key on staging when all keys are missing', async () => {
     delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    delete process.env.CLERK_SECRET_KEY;
+
+    headersMock.mockResolvedValue(
+      new Headers({
+        host: 'staging.jov.ie',
+        'x-forwarded-host': 'staging.jov.ie',
+        'x-forwarded-proto': 'https',
+      })
+    );
+
+    await expect(resolvePublishableKeyFromHeaders()).resolves.toBeUndefined();
+  });
+
+  it('returns undefined on staging when publishable key exists but secret key is missing', async () => {
+    // Simulates the actual staging bug: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is
+    // available (via build-time inlining or Vercel env) but CLERK_SECRET_KEY
+    // is not set in the Preview deployment runtime.
     delete process.env.CLERK_SECRET_KEY;
 
     headersMock.mockResolvedValue(

@@ -32,7 +32,7 @@ export function DataCard({
   return (
     <div
       className={cn(
-        'flex items-center justify-between rounded-lg border border-subtle bg-surface p-3 shadow-sm transition-colors',
+        'flex items-center justify-between rounded-[10px] border border-subtle bg-surface-1 p-3 shadow-card transition-colors',
         className
       )}
     >
