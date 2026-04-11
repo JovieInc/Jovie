@@ -487,7 +487,10 @@ export async function generateMetadata({
 
   const artistName = creator.displayName ?? creator.username;
   const contentType = content.type === 'release' ? 'album' : 'song';
-  const canonicalUrl = `${BASE_URL}/${creator.usernameNormalized}/${content.slug}`;
+  const canonicalUrl =
+    content.type === 'track' && content.releaseSlug
+      ? `${BASE_URL}/${creator.usernameNormalized}/${content.releaseSlug}/${content.slug}`
+      : `${BASE_URL}/${creator.usernameNormalized}/${content.slug}`;
 
   const isUnreleased =
     content.releaseDate && new Date(content.releaseDate) > new Date();
