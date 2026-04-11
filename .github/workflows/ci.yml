@@ -2203,8 +2203,8 @@ jobs:
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url_pooled
-          fallback_json_key: db_url
+          candidate_json_key: db_url
+          fallback_json_key: db_url_pooled
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
