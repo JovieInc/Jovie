@@ -7,6 +7,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.144.1] - 2026-04-10
 
+### Added
+
+- "Create a new release" suggestion on the empty chat state, shown as the first option for both new and returning users
+
 ### Fixed
 
 - Checkboxes now properly toggle when clicked, fixing broken indeterminate state handling that prevented "select all" from working correctly in tables
