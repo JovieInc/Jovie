@@ -254,3 +254,51 @@ export async function updateAllowProfilePhotoDownloads(
     throw error;
   }
 }
+
+/**
+ * Update the "show old releases" setting for a creator profile.
+ * When false (default), releases older than 90 days are hidden from the
+ * public profile card. Setting to true keeps them visible.
+ */
+export async function updateShowOldReleases(
+  showOldReleases: boolean
+): Promise<void> {
+  noStore();
+
+  if (typeof showOldReleases !== 'boolean') {
+    throw new TypeError('showOldReleases must be a boolean');
+  }
+
+  try {
+    const profile = await requireOwnProfile();
+    const currentSettings = (profile.settings ?? {}) as Record<string, unknown>;
+
+    const [updated] = await db
+      .update(creatorProfiles)
+      .set({
+        settings: {
+          ...currentSettings,
+          showOldReleases,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id))
+      .returning({ id: creatorProfiles.id });
+
+    if (!updated) {
+      throw new Error('Profile update failed — profile not found');
+    }
+
+    // Invalidate cached public profile so visitors see the updated setting
+    if (profile.usernameNormalized) {
+      await invalidateProfileCache(profile.usernameNormalized);
+    }
+  } catch (error) {
+    if (!isExpectedProfileActionError(error)) {
+      await captureError('updateShowOldReleases failed', error, {
+        route: 'dashboard/actions/creator-profile',
+      });
+    }
+    throw error;
+  }
+}

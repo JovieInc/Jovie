@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { determineReleasePhase } from '@/app/[username]/[slug]/_lib/release-phase';
+import { determineReleasePhase } from '@/lib/discography/release-phase';
 
 describe('determineReleasePhase', () => {
   const now = new Date('2025-06-15T12:00:00Z');
