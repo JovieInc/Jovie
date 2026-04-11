@@ -176,6 +176,10 @@ function isMissingCreatorDistributionEventsTableError(error: unknown): boolean {
   return unwrapPgError(error).code === '42P01';
 }
 
+function isMissingAudienceReferrersTableError(error: unknown): boolean {
+  return unwrapPgError(error).code === '42P01';
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Extract client IP for rate limiting
@@ -477,19 +481,25 @@ export async function POST(request: NextRequest) {
 
         // Dual-write: insert into normalized referrer table
         if (latestReferrerUrl) {
-          const referrerSource = (() => {
-            try {
-              return new URL(latestReferrerUrl).hostname;
-            } catch {
-              return null;
+          try {
+            const referrerSource = (() => {
+              try {
+                return new URL(latestReferrerUrl).hostname;
+              } catch {
+                return null;
+              }
+            })();
+            await tx.insert(audienceReferrers).values({
+              audienceMemberId: existing.id,
+              url: latestReferrerUrl,
+              source: referrerSource,
+              timestamp: now,
+            });
+          } catch (error) {
+            if (!isMissingAudienceReferrersTableError(error)) {
+              throw error;
             }
-          })();
-          await tx.insert(audienceReferrers).values({
-            audienceMemberId: existing.id,
-            url: latestReferrerUrl,
-            source: referrerSource,
-            timestamp: now,
-          });
+          }
         }
         return;
       }
@@ -527,19 +537,25 @@ export async function POST(request: NextRequest) {
 
       // Dual-write: insert first referrer for new members
       if (inserted && latestReferrerUrl) {
-        const referrerSource = (() => {
-          try {
-            return new URL(latestReferrerUrl).hostname;
-          } catch {
-            return null;
+        try {
+          const referrerSource = (() => {
+            try {
+              return new URL(latestReferrerUrl).hostname;
+            } catch {
+              return null;
+            }
+          })();
+          await tx.insert(audienceReferrers).values({
+            audienceMemberId: inserted.id,
+            url: latestReferrerUrl,
+            source: referrerSource,
+            timestamp: now,
+          });
+        } catch (error) {
+          if (!isMissingAudienceReferrersTableError(error)) {
+            throw error;
           }
-        })();
-        await tx.insert(audienceReferrers).values({
-          audienceMemberId: inserted.id,
-          url: latestReferrerUrl,
-          source: referrerSource,
-          timestamp: now,
-        });
+        }
       }
     });
 
