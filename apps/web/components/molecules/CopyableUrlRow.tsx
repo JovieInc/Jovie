@@ -117,6 +117,8 @@ export function CopyableUrlRow({
           valueClassName
         )}
         title={url}
+        // getBaseUrl() returns production URL on server, current origin on client.
+        // This is intentional — smart links should show the user's current origin.
         suppressHydrationWarning
       >
         {displayValue ?? url.replace(/^https?:\/\//, '')}
