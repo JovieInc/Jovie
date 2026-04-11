@@ -36,12 +36,16 @@ async function toDataUrl(imageUrl: string): Promise<string | null> {
     }
 
     const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > 2 * 1024 * 1024) return null;
     const bytes = new Uint8Array(arrayBuffer);
-    let binary = '';
-    for (const byte of bytes) {
-      binary += String.fromCodePoint(byte);
+    // Convert to binary string in chunks to avoid call stack limits
+    // and O(n²) string concatenation in edge runtime
+    const CHUNK = 8192;
+    const chunks: string[] = [];
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      chunks.push(String.fromCharCode(...bytes.subarray(i, i + CHUNK)));
     }
-    return `data:${contentType};base64,${btoa(binary)}`;
+    return `data:${contentType};base64,${btoa(chunks.join(''))}`;
   } catch {
     return null;
   }

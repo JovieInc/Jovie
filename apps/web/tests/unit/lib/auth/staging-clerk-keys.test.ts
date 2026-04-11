@@ -106,7 +106,26 @@ describe('staging Clerk key resolution', () => {
     });
   });
 
-  it('returns undefined publishable key on staging headers when staging runtime keys are missing', async () => {
+  it('falls back to runtime standard env vars on staging when no _STAGING vars exist', () => {
+    // beforeEach sets NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY
+    // but deletes _STAGING vars — simulates the Doppler/Vercel staging env
+    expect(resolveClerkKeys('staging.jov.ie')).toEqual({
+      publishableKey: 'pk_live_production_example',
+      secretKey: 'sk_live_production_example',
+    });
+  });
+
+  it('returns undefined on staging when no _STAGING vars and no standard vars exist', () => {
+    delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    delete process.env.CLERK_SECRET_KEY;
+
+    expect(resolveClerkKeys('staging.jov.ie')).toEqual({
+      publishableKey: undefined,
+      secretKey: undefined,
+    });
+  });
+
+  it('resolves staging PK from headers via runtime fallback', async () => {
     headersMock.mockResolvedValue(
       new Headers({
         host: 'staging.jov.ie',
@@ -115,12 +134,20 @@ describe('staging Clerk key resolution', () => {
       })
     );
 
-    await expect(resolvePublishableKeyFromHeaders()).resolves.toBeUndefined();
+    // No _STAGING vars, but standard vars are set (beforeEach)
+    await expect(resolvePublishableKeyFromHeaders()).resolves.toBe(
+      'pk_live_production_example'
+    );
+  });
+
+  it('returns undefined publishable key on staging when all keys are missing', async () => {
+    delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    delete process.env.CLERK_SECRET_KEY;
 
     headersMock.mockResolvedValue(
       new Headers({
-        host: 'main.jov.ie',
-        'x-forwarded-host': 'main.jov.ie',
+        host: 'staging.jov.ie',
+        'x-forwarded-host': 'staging.jov.ie',
         'x-forwarded-proto': 'https',
       })
     );

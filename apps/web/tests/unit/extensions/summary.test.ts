@@ -80,27 +80,15 @@ describe('extension summary', () => {
     mockGetReleasesForProfile.mockResolvedValue([]);
   });
 
-  it('exposes only the DistroKid alpha surface', () => {
+  it('disables domains via EXTENSION_DISABLED_DOMAINS env var', () => {
     const originalDisabledDomains = process.env.EXTENSION_DISABLED_DOMAINS;
     process.env.EXTENSION_DISABLED_DOMAINS = 'distrokid.com';
 
     try {
-      expect(getExtensionFlags(true)).toEqual({
-        signedIn: true,
-        chatPromptEnabled: false,
-        domains: [
-          {
-            host: 'distrokid.com',
-            label: 'DistroKid',
-            mode: 'off',
-          },
-        ],
-      });
-      expect(getMatchingDomainFlag('app.distrokid.com')).toEqual({
-        host: 'distrokid.com',
-        label: 'DistroKid',
-        mode: 'off',
-      });
+      const flags = getExtensionFlags(true);
+      const dk = flags.domains.find(d => d.host === 'distrokid.com');
+      expect(dk?.mode).toBe('off');
+      expect(getMatchingDomainFlag('app.distrokid.com')?.mode).toBe('off');
     } finally {
       if (originalDisabledDomains === undefined) {
         delete process.env.EXTENSION_DISABLED_DOMAINS;
@@ -110,7 +98,23 @@ describe('extension summary', () => {
     }
   });
 
-  it('treats non-DistroKid pages as unsupported', async () => {
+  it('includes AWAL and Kosign domains', () => {
+    const flags = getExtensionFlags(true);
+    const awal = flags.domains.find(d => d.host === 'workstation.awal.com');
+    const kosign = flags.domains.find(d => d.host === 'app.kosignmusic.com');
+    expect(awal).toEqual({
+      host: 'workstation.awal.com',
+      label: 'AWAL',
+      mode: 'write',
+    });
+    expect(kosign).toEqual({
+      host: 'app.kosignmusic.com',
+      label: 'Kosign',
+      mode: 'write',
+    });
+  });
+
+  it('treats unsupported pages as unsupported', async () => {
     const summary = await buildExtensionSummary({
       pageUrl: 'https://mail.google.com/mail/u/0/#inbox',
       pageTitle: 'Inbox',
@@ -124,7 +128,7 @@ describe('extension summary', () => {
         statusLabel: 'Unsupported Page',
       },
       shellCopy: {
-        title: 'Open A DistroKid Release Form',
+        title: 'Open A Supported Form',
       },
       suggestion: null,
     });
@@ -161,7 +165,7 @@ describe('extension summary', () => {
     });
     expect(summary.shellCopy).toEqual({
       title: 'Release Metadata Is Ready',
-      body: 'Jovie pulled release details for Night Shift so you can review them before filling DistroKid.',
+      body: 'Jovie pulled release details for Night Shift so you can review and autofill this form.',
     });
     expect(summary.discoverySuggestions).toEqual([]);
     expect(summary.entities).toHaveLength(1);
@@ -171,5 +175,51 @@ describe('extension summary', () => {
         kind: 'copy',
       },
     });
+  });
+
+  it('returns release context for an AWAL page', async () => {
+    mockGetReleasesForProfile.mockResolvedValue([
+      {
+        id: 'release_456',
+        title: 'Midnight',
+        artistNames: ['Night Shift'],
+        artworkUrl: null,
+        releaseDate: new Date('2026-03-15T00:00:00.000Z'),
+        trackSummary: null,
+      },
+    ]);
+
+    const summary = await buildExtensionSummary({
+      pageUrl: 'https://workstation.awal.com/project/new-create',
+      pageTitle: 'Create New Project',
+    });
+
+    expect(summary.status).toBe('ready');
+    expect(summary.context.pageKind).toBe('release');
+    expect(summary.context.statusLabel).toBe('AWAL Project Form');
+    expect(summary.entities).toHaveLength(1);
+  });
+
+  it('returns release context for a Kosign page', async () => {
+    mockGetReleasesForProfile.mockResolvedValue([
+      {
+        id: 'release_789',
+        title: 'Sunrise',
+        artistNames: ['Night Shift'],
+        artworkUrl: null,
+        releaseDate: null,
+        trackSummary: null,
+      },
+    ]);
+
+    const summary = await buildExtensionSummary({
+      pageUrl: 'https://app.kosignmusic.com/catalog/work-submission/1',
+      pageTitle: 'Work Submission',
+    });
+
+    expect(summary.status).toBe('ready');
+    expect(summary.context.pageKind).toBe('release');
+    expect(summary.context.statusLabel).toBe('Kosign Work Submission');
+    expect(summary.entities).toHaveLength(1);
   });
 });

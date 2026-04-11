@@ -1,14 +1,6 @@
 import 'server-only';
 
-import {
-  and,
-  count,
-  sql as drizzleSql,
-  eq,
-  isNotNull,
-  ne,
-  or,
-} from 'drizzle-orm';
+import { and, count, sql as drizzleSql, eq, isNotNull, ne } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 
 import { db } from '@/lib/db';
@@ -115,13 +107,7 @@ const getCachedAdminPlatformStats = unstable_cache(
         .select({ count: count() })
         .from(clickEvents)
         .where(
-          and(
-            eq(clickEvents.linkType, 'listen'),
-            or(
-              eq(clickEvents.isBot, false),
-              drizzleSql`${clickEvents.isBot} IS NULL`
-            )
-          )
+          and(eq(clickEvents.linkType, 'listen'), eq(clickEvents.isBot, false))
         ),
       db.execute(drizzleSql<{ email_count: number; phone_count: number }>`
           SELECT

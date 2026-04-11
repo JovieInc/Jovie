@@ -93,7 +93,7 @@ export async function getUserDashboardAnalytics(
         )`
       : drizzleSql`0`;
     // Consolidated dashboard analytics into one SQL round trip.
-    // Bot traffic is filtered from click aggregations (is_bot = false or is_bot IS NULL).
+    // Bot traffic is filtered via is_bot = false (column is NOT NULL since Wave 4a migration).
     // Cities, countries, and referrers are sourced from audience_members (visit data)
     // rather than click_events, so geo data appears even when visitors don't click links.
     // Top-list aggregates are cached for 5 minutes (JOV-1270).
@@ -133,7 +133,7 @@ export async function getUserDashboardAnalytics(
               select created_at, link_id, link_type, city, country, referrer
               from ${clickEvents}
               where ${clickEvents.creatorProfileId} = ${creatorProfile.id}
-                and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
+                and ${clickEvents.isBot} = false
             ),
             ranged_events as (
               select link_id, link_type, city, country, referrer
@@ -321,7 +321,7 @@ export async function getTourDateAnalytics(
               select city, referrer
               from ${clickEvents}
               where ${clickEvents.creatorProfileId} = ${creatorProfileId}
-                and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
+                and ${clickEvents.isBot} = false
                 and ${clickEvents.metadata}->>'contentType' = 'tour_date'
                 and ${clickEvents.metadata}->>'contentId' = ${tourDateId}
             ),
