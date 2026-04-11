@@ -494,7 +494,7 @@ export async function POST(request: NextRequest) {
         return;
       }
 
-      await tx
+      const [inserted] = await tx
         .insert(audienceMembers)
         .values({
           creatorProfileId: profileId,
@@ -522,7 +522,25 @@ export async function POST(request: NextRequest) {
             audienceMembers.creatorProfileId,
             audienceMembers.fingerprint,
           ],
+        })
+        .returning({ id: audienceMembers.id });
+
+      // Dual-write: insert first referrer for new members
+      if (inserted && latestReferrerUrl) {
+        const referrerSource = (() => {
+          try {
+            return new URL(latestReferrerUrl).hostname;
+          } catch {
+            return null;
+          }
+        })();
+        await tx.insert(audienceReferrers).values({
+          audienceMemberId: inserted.id,
+          url: latestReferrerUrl,
+          source: referrerSource,
+          timestamp: now,
         });
+      }
     });
 
     return NextResponse.json(

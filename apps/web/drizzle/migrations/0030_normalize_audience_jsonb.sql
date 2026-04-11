@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS "audience_referrers" (
 	"audience_member_id" uuid NOT NULL,
 	"url" text NOT NULL,
 	"source" text,
-	"timestamp" timestamp with time zone DEFAULT now(),
+	"timestamp" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );--> statement-breakpoint
 

@@ -113,7 +113,9 @@ export const audienceReferrers = pgTable(
       .references(() => audienceMembers.id, { onDelete: 'cascade' }),
     url: text('url').notNull(),
     source: text('source'),
-    timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow(),
+    timestamp: timestamp('timestamp', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -137,6 +139,8 @@ export const audienceActions = pgTable(
     label: text('label').notNull(),
     emoji: text('emoji'),
     platform: text('platform'),
+    // Intentionally nullable with no default — action timestamps come from
+    // external event sources and may be backdated by the caller.
     timestamp: timestamp('timestamp', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
