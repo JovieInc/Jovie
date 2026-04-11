@@ -1,5 +1,5 @@
-import { getProfileStaticParams } from '../_lib/profile-static-params';
 import { redirectToProfileMode } from '../_lib/mode-route-redirect';
+import { getProfileStaticParams } from '../_lib/profile-static-params';
 
 interface Props {
   readonly params: Promise<{
