@@ -1113,11 +1113,33 @@ const clerkProductionMiddleware = clerkMiddleware(async (auth, req) => {
 // Staging Clerk middleware — lazy-initialized with separate instance keys.
 // The same build is promoted staging → production, so staging keys are
 // stored as server-only runtime env vars (not NEXT_PUBLIC_).
+//
+// Key resolution order:
+// 1. Explicit _STAGING suffixed vars (if either is set, use only those)
+// 2. Standard env vars read at runtime via bracket notation to bypass
+//    webpack DefinePlugin (Doppler syncs staging values per-environment)
 let _clerkStagingMiddleware: NextMiddleware | null = null;
 function getClerkStagingMiddleware() {
   if (_clerkStagingMiddleware === null) {
-    const stagingPk = process.env.CLERK_PUBLISHABLE_KEY_STAGING;
-    const stagingSk = process.env.CLERK_SECRET_KEY_STAGING;
+    const explicitPk = process.env.CLERK_PUBLISHABLE_KEY_STAGING;
+    const explicitSk = process.env.CLERK_SECRET_KEY_STAGING;
+
+    let stagingPk: string | undefined;
+    let stagingSk: string | undefined;
+
+    if (explicitPk || explicitSk) {
+      // Explicit _STAGING vars present — use only those (fail closed on partial)
+      stagingPk = explicitPk;
+      stagingSk = explicitSk;
+    } else {
+      // Fall back to runtime standard vars (bracket notation bypasses DefinePlugin)
+      stagingPk =
+        (process.env as Record<string, string | undefined>)[
+          'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY'
+        ] || undefined;
+      stagingSk = process.env.CLERK_SECRET_KEY || undefined;
+    }
+
     if (stagingPk && stagingSk) {
       _clerkStagingMiddleware = clerkMiddleware(
         async (auth, req) => {

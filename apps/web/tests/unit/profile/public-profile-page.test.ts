@@ -480,8 +480,8 @@ describe('Public Profile Page Logic', () => {
   describe('Profile page mode logic', () => {
     it.each([
       ['profile', 'Artist'],
-      ['tip', 'Tip with Venmo'],
-      ['listen', 'Choose a Service'],
+      ['tip', 'Send a tip'],
+      ['listen', 'Listen now'],
       ['subscribe', 'Get notified'],
     ])('mode "%s" maps to subtitle "%s"', (mode, expectedSubtitle) => {
       expect(getProfileModeSubtitle(mode)).toBe(expectedSubtitle);

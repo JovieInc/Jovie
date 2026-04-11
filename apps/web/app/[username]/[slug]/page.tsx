@@ -35,12 +35,12 @@ import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import {
+  checkPromoDownloads,
   getContentBySlug,
   getCreatorByUsername,
   getFeaturedSmartLinkStaticParams,
   getReleaseTrackList,
 } from './_lib/data';
-import { isMissingPromoDownloadsRelation } from './_lib/promo-download-errors';
 import { generateMusicStructuredData } from './music-structured-data';
 
 // Use ISR with 5-minute revalidation for smart link pages
@@ -201,39 +201,15 @@ export default async function ContentSmartLinkPage({
       creatorEntitlements.entitlements.booleans.canAccessFutureReleases;
   }
 
-  // Check for promo downloads (releases only, not tracks)
-  let downloadUrl: string | null = null;
-  if (content.type === 'release' && content.id) {
-    creatorEntitlements ??= await getCreatorEntitlements(creator.id);
-
-    if (creatorEntitlements.plan !== 'free') {
-      try {
-        const { promoDownloads: promoDownloadsTable } = await import(
-          '@/lib/db/schema/promo-downloads'
-        );
-        const { db: dbInstance } = await import('@/lib/db');
-        const { eq, and } = await import('drizzle-orm');
-        const [hasDownloads] = await dbInstance
-          .select({ id: promoDownloadsTable.id })
-          .from(promoDownloadsTable)
-          .where(
-            and(
-              eq(promoDownloadsTable.releaseId, content.id),
-              eq(promoDownloadsTable.isActive, true)
-            )
-          )
-          .limit(1);
-
-        if (hasDownloads) {
-          downloadUrl = `/${creator.usernameNormalized}/${content.slug}/download`;
-        }
-      } catch (error) {
-        if (!isMissingPromoDownloadsRelation(error)) {
-          throw error;
-        }
-      }
-    }
-  }
+  // Check for promo downloads (released content only, not tracks or unreleased releases)
+  const downloadUrl =
+    !isUnreleased && content.type === 'release' && content.id
+      ? await checkPromoDownloads(
+          content.id,
+          creator.usernameNormalized,
+          content.slug
+        )
+      : null;
 
   return (
     <>
@@ -337,10 +313,13 @@ function ContentPageBody({
         release={{
           title: content.title,
           artworkUrl: content.artworkUrl,
+          releaseDate: toISOStringOrNull(content.releaseDate)!,
         }}
         artist={{
+          id: creator.id,
           name: artistName,
           handle: creator.usernameNormalized,
+          avatarUrl: creator.avatarUrl,
         }}
       />
     );

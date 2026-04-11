@@ -43,6 +43,7 @@ import {
   LegacySocialLink,
 } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
+import { mapProfileWithLinksToCreatorProfile } from './_lib/profile-mapper';
 import { getProfileStaticParams } from './_lib/profile-static-params';
 import { shouldBypassPublicProfileQaCache } from './_lib/public-profile-qa';
 
@@ -326,45 +327,9 @@ const fetchProfileAndLinks = async (
     const creatorClerkId =
       typeof result.userClerkId === 'string' ? result.userClerkId : null;
 
-    const profile: CreatorProfile = {
-      id: result.id,
-      user_id: result.userId,
-      creator_type: result.creatorType,
-      username: result.username,
-      display_name: result.displayName,
-      bio: result.bio,
-      avatar_url: result.avatarUrl,
-      spotify_url: result.spotifyUrl,
-      apple_music_url: result.appleMusicUrl,
-      youtube_url: result.youtubeUrl,
-      spotify_id: result.spotifyId,
-      apple_music_id: result.appleMusicId ?? null,
-      youtube_music_id: result.youtubeMusicId ?? null,
-      deezer_id: result.deezerId ?? null,
-      tidal_id: result.tidalId ?? null,
-      soundcloud_id: result.soundcloudId ?? null,
-      is_public: !!result.isPublic,
-      is_verified: !!result.isVerified,
-      is_claimed: !!result.isClaimed,
-      claim_token: null, // Hash stored in DB; raw token never exposed on public pages
-      claimed_at: null,
-      settings: result.settings,
-      theme: result.theme,
-      location: result.location ?? null,
-      active_since_year: result.activeSinceYear ?? null,
-      is_featured: result.isFeatured || false,
-      marketing_opt_out: result.marketingOptOut || false,
-      profile_views: result.profileViews || 0,
-      username_normalized: result.usernameNormalized,
-      search_text:
-        `${result.displayName || ''} ${result.username} ${result.bio || ''}`
-          .toLowerCase()
-          .trim(),
-      display_title: result.displayName || result.username,
-      profile_completion_pct: calculateProfileCompletion(result),
-      created_at: toISOStringSafe(result.createdAt),
-      updated_at: toISOStringSafe(result.updatedAt),
-    };
+    const profile = mapProfileWithLinksToCreatorProfile(result, {
+      profileCompletionPct: calculateProfileCompletion(result),
+    });
 
     const links: LegacySocialLink[] =
       result.socialLinks?.map(link => ({
