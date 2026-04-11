@@ -1372,7 +1372,18 @@ export default async function middleware(
     );
   }
 
-  return selectedMiddleware(req, event);
+  try {
+    return await selectedMiddleware(req, event);
+  } catch (error) {
+    // Clerk middleware can throw on staging when keys are invalid or the
+    // domain isn't in the Clerk app's allowlist. Fall back gracefully so
+    // auth routes render the "Auth unavailable" card instead of a 500.
+    if (isStagingHost(hostname)) {
+      console.error('[middleware] Staging Clerk error:', error);
+      return handleRequest(req, null);
+    }
+    throw error;
+  }
 }
 
 export const config = {
