@@ -98,12 +98,14 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
   >('all');
   const isOpen = selectedIndex !== null;
   const filteredScreenshots = screenshots.filter(screenshot => {
-    const surfaceMatch =
-      surfaceFilter === 'all'
-        ? true
-        : surfaceFilter === 'other'
-          ? screenshot.canonicalSurfaceId === undefined
-          : screenshot.canonicalSurfaceId === surfaceFilter;
+    let surfaceMatch: boolean;
+    if (surfaceFilter === 'all') {
+      surfaceMatch = true;
+    } else if (surfaceFilter === 'other') {
+      surfaceMatch = screenshot.canonicalSurfaceId === undefined;
+    } else {
+      surfaceMatch = screenshot.canonicalSurfaceId === surfaceFilter;
+    }
     const groupMatch =
       groupFilter === 'all' || screenshot.group === groupFilter;
     const consumerMatch =

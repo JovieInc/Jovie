@@ -79,7 +79,8 @@ function buildModeHref(mode: ProfileMode): string {
   }
 
   const search = url.searchParams.toString();
-  return `${url.pathname}${search ? `?${search}` : ''}`;
+  const searchSuffix = search ? `?${search}` : '';
+  return `${url.pathname}${searchSuffix}`;
 }
 
 function getModeFromLocation(): ProfileMode {
