@@ -87,8 +87,11 @@ export function DashboardNav(_: DashboardNavProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const threadsEnabled = useCodeFlag('THREADS_ENABLED');
-  const { isOpen: isPreviewOpen, open: openPreviewPanel } =
-    usePreviewPanelState();
+  const {
+    isOpen: isPreviewOpen,
+    open: openPreviewPanel,
+    toggle: togglePreviewPanel,
+  } = usePreviewPanelState();
 
   const username =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
@@ -149,12 +152,12 @@ export function DashboardNav(_: DashboardNavProps) {
   const handleProfileClick = useCallback(() => {
     const isOnChat = pathname.startsWith(APP_ROUTES.CHAT);
     if (isOnChat) {
-      openPreviewPanel();
+      togglePreviewPanel();
     } else {
       router.push(APP_ROUTES.CHAT);
       queueMicrotask(() => openPreviewPanel());
     }
-  }, [pathname, openPreviewPanel, router]);
+  }, [pathname, togglePreviewPanel, openPreviewPanel, router]);
 
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
