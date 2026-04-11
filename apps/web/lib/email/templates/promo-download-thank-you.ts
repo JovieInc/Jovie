@@ -60,7 +60,8 @@ export function getPromoDownloadThankYouText(
     .map(f => {
       const size = formatFileSize(f.fileSizeBytes);
       const ext = formatExtension(f.fileMimeType);
-      return `- ${f.title} (${ext}${size ? `, ${size}` : ''}): ${f.downloadUrl}`;
+      const sizeInfo = size ? `, ${size}` : '';
+      return `- ${f.title} (${ext}${sizeInfo}): ${f.downloadUrl}`;
     })
     .join('\n');
 

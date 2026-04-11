@@ -18,9 +18,10 @@ export function buildConceptPrompt(options: {
 }): string {
   const { previousTitles, genreFocus, category = 'general', seed } = options;
 
+  const titleList = previousTitles.map(t => `- ${t}`).join('\n');
   const avoidList =
     previousTitles.length > 0
-      ? `\nPreviously generated titles (DO NOT repeat or closely resemble these):\n${previousTitles.map(t => `- ${t}`).join('\n')}`
+      ? `\nPreviously generated titles (DO NOT repeat or closely resemble these):\n${titleList}`
       : '';
 
   const genreDirective = genreFocus
@@ -89,7 +90,7 @@ export function buildCurationPrompt(options: {
 
   const jovieSection =
     jovieArtistTracks.length > 0
-      ? `\nJovie artist tracks to include (place in positions 3-8, after mood is established):\n${jovieArtistTracks.map(t => `  - [${t.spotifyTrackId}] ${t.artist} - ${t.name}`).join('\n')}`
+      ? `\nJovie artist tracks to include (place in positions 3-8, after mood is established):\n${jovieArtistTracks.map(t => '  - [' + t.spotifyTrackId + '] ' + t.artist + ' - ' + t.name).join('\n')}`
       : '\nNo Jovie artists match this theme.';
 
   return `You are sequencing a ${targetSize}-track playlist called "${concept.title}".
