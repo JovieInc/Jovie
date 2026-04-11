@@ -105,21 +105,67 @@ describe('Checkbox', () => {
   });
 
   describe('Indeterminate State', () => {
-    it('supports indeterminate state', () => {
-      render(<Checkbox indeterminate aria-label='Select all' />);
+    it('sets data-state=indeterminate with checked="indeterminate"', () => {
+      render(<Checkbox checked='indeterminate' aria-label='Select all' />);
       const checkbox = screen.getByRole('checkbox');
-      expect((checkbox as HTMLInputElement).indeterminate).toBe(true);
+      expect(checkbox).toHaveAttribute('data-state', 'indeterminate');
     });
 
-    it('can change from indeterminate to checked', () => {
+    it('maps legacy indeterminate prop to checked="indeterminate"', () => {
+      render(<Checkbox indeterminate aria-label='Select all' />);
+      const checkbox = screen.getByRole('checkbox');
+      expect(checkbox).toHaveAttribute('data-state', 'indeterminate');
+    });
+
+    it('renders minus icon when indeterminate', () => {
+      const { container } = render(
+        <Checkbox checked='indeterminate' aria-label='Select all' />
+      );
+      // Minus icon from lucide-react renders as an SVG
+      const svg = container.querySelector('[data-state="indeterminate"] svg');
+      expect(svg).toBeInTheDocument();
+    });
+
+    it('renders check icon when checked (not minus)', () => {
+      const { container } = render(
+        <Checkbox defaultChecked aria-label='Select all' />
+      );
+      const svg = container.querySelector('[data-state="checked"] svg');
+      expect(svg).toBeInTheDocument();
+    });
+
+    it('transitions from indeterminate to unchecked', () => {
       const { rerender } = render(
-        <Checkbox indeterminate aria-label='Select all' />
+        <Checkbox checked='indeterminate' aria-label='Select all' />
       );
       const checkbox = screen.getByRole('checkbox');
-      expect((checkbox as HTMLInputElement).indeterminate).toBe(true);
+      expect(checkbox).toHaveAttribute('data-state', 'indeterminate');
 
-      rerender(<Checkbox indeterminate={false} aria-label='Select all' />);
-      expect((checkbox as HTMLInputElement).indeterminate).toBe(false);
+      rerender(<Checkbox checked={false} aria-label='Select all' />);
+      expect(checkbox).toHaveAttribute('data-state', 'unchecked');
+    });
+
+    it('does not override explicit checked with indeterminate prop', () => {
+      render(<Checkbox checked={true} indeterminate aria-label='Select all' />);
+      const checkbox = screen.getByRole('checkbox');
+      // When checked is explicitly true, indeterminate prop should not override
+      expect(checkbox).toHaveAttribute('data-state', 'checked');
+    });
+
+    it('calls onCheckedChange(true) when clicking an indeterminate checkbox', () => {
+      const onCheckedChange = vi.fn();
+      render(
+        <Checkbox
+          checked='indeterminate'
+          onCheckedChange={onCheckedChange}
+          aria-label='Select all'
+        />
+      );
+      const checkbox = screen.getByRole('checkbox');
+      expect(checkbox).toHaveAttribute('data-state', 'indeterminate');
+
+      fireEvent.click(checkbox);
+      expect(onCheckedChange).toHaveBeenCalledWith(true);
     });
   });
 

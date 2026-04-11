@@ -1,58 +1,41 @@
 'use client';
 
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
-import { Check } from 'lucide-react';
+import { Check, Minus } from 'lucide-react';
 import * as React from 'react';
 
 import { cn } from '../lib/utils';
 
 export interface CheckboxProps
   extends React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root> {
+  /**
+   * @deprecated Use `checked="indeterminate"` instead.
+   * Kept for backward compatibility — maps to `checked="indeterminate"` internally.
+   */
   readonly indeterminate?: boolean;
 }
 
 /**
  * Checkbox component with proper accessibility and keyboard support.
- * Includes visual checked state with animated checkmark icon.
- * Supports indeterminate state via the indeterminate prop.
+ * Includes visual checked state with animated checkmark icon and
+ * indeterminate state with minus icon.
+ *
+ * Preferred API for indeterminate: `checked="indeterminate"`
  */
 const Checkbox = React.forwardRef<
   React.ComponentRef<typeof CheckboxPrimitive.Root>,
   CheckboxProps
->(({ className, indeterminate, ...props }, ref) => {
-  const internalRef = React.useRef<HTMLButtonElement>(null);
-
-  // Merge refs to support both callback refs and object refs
-  const mergedRef = React.useCallback(
-    (node: HTMLButtonElement | null) => {
-      // Update internal ref
-      (
-        internalRef as React.MutableRefObject<HTMLButtonElement | null>
-      ).current = node;
-
-      // Forward to external ref (supports both callback and object refs)
-      if (typeof ref === 'function') {
-        ref(node);
-      } else if (ref) {
-        (ref as React.MutableRefObject<HTMLButtonElement | null>).current =
-          node;
-      }
-    },
-    [ref]
-  );
-
-  React.useEffect(() => {
-    if (internalRef.current) {
-      const element = internalRef.current as HTMLButtonElement & {
-        indeterminate?: boolean;
-      };
-      element.indeterminate = indeterminate ?? false;
-    }
-  }, [indeterminate]);
+>(({ className, indeterminate, checked, ...props }, ref) => {
+  // Map legacy indeterminate prop to Radix-native checked="indeterminate"
+  const effectiveChecked =
+    indeterminate && checked !== 'indeterminate' && !checked
+      ? 'indeterminate'
+      : checked;
 
   return (
     <CheckboxPrimitive.Root
-      ref={mergedRef}
+      ref={ref}
+      checked={effectiveChecked}
       className={cn(
         'peer h-4 w-4 shrink-0 rounded-(--linear-app-radius-item) border border-(--linear-border-strong) bg-transparent cursor-pointer transition-colors duration-fast ease-interactive',
         'hover:border-(--color-accent) hover:bg-(--linear-bg-surface-1)',
@@ -68,7 +51,11 @@ const Checkbox = React.forwardRef<
       <CheckboxPrimitive.Indicator
         className={cn('flex items-center justify-center text-current')}
       >
-        <Check className='h-3 w-3 [stroke-width:2.5]' />
+        {effectiveChecked === 'indeterminate' ? (
+          <Minus className='h-3 w-3 [stroke-width:2.5]' />
+        ) : (
+          <Check className='h-3 w-3 [stroke-width:2.5]' />
+        )}
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   );

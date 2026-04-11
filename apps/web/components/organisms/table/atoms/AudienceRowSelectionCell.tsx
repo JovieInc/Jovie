@@ -3,6 +3,7 @@
 import { Checkbox } from '@jovie/ui';
 import { alignment } from '@/components/organisms/table/table.styles';
 import { cn } from '@/lib/utils';
+import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
 export interface AudienceRowSelectionCellProps {
   readonly rowNumber: number;
@@ -11,12 +12,6 @@ export interface AudienceRowSelectionCellProps {
   readonly onToggle: () => void;
   readonly className?: string;
 }
-
-// Shared checkbox styling for consistent appearance (uses design tokens)
-const CHECKBOX_STYLES = cn(
-  alignment.checkboxSize,
-  'rounded-sm border border-subtle bg-surface-0 text-(--linear-accent) transition-all duration-100 ease-out data-[state=checked]:border-(--linear-accent) data-[state=checked]:bg-(--linear-accent) data-[state=checked]:text-white data-[state=indeterminate]:border-(--linear-accent) data-[state=indeterminate]:bg-(--linear-accent) data-[state=indeterminate]:text-white focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-);
 
 export function AudienceRowSelectionCell({
   rowNumber,
@@ -33,10 +28,11 @@ export function AudienceRowSelectionCell({
       )}
     >
       <div
-        className='contents'
+        className='relative flex h-5 w-5 items-center justify-center'
         onClick={event => event.stopPropagation()}
-        onKeyDown={event => event.stopPropagation()}
-        aria-hidden='true'
+        onKeyDown={event =>
+          handleActivationKeyDown(event, e => e.stopPropagation())
+        }
       >
         <span
           className={cn(
@@ -49,7 +45,7 @@ export function AudienceRowSelectionCell({
         </span>
         <div
           className={cn(
-            'absolute inset-0 transition-opacity flex items-center justify-center',
+            'absolute inset-0 flex items-center justify-center transition-opacity',
             isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           )}
         >
@@ -57,7 +53,7 @@ export function AudienceRowSelectionCell({
             aria-label={`Select ${displayName || 'row'}`}
             checked={isChecked}
             onCheckedChange={onToggle}
-            className={CHECKBOX_STYLES}
+            className={alignment.checkboxSize}
           />
         </div>
       </div>
