@@ -3,6 +3,7 @@ export {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from './AlbumArtworkContextMenu';
+export { MysteryReleasePage } from './MysteryReleasePage';
 export { ReleaseCountdown } from './ReleaseCountdown';
 export { ReleaseNotificationsProvider } from './ReleaseNotificationsProvider';
 export { ScheduledReleasePage } from './ScheduledReleasePage';

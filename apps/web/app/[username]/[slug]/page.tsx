@@ -9,6 +9,7 @@
 
 import { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
+import { determineReleasePhase } from '@/app/[username]/[slug]/_lib/release-phase';
 import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { PreserveSearchRedirect } from '@/app/[username]/[slug]/PreserveSearchRedirect';
 import {
@@ -17,6 +18,7 @@ import {
 } from '@/app/r/[slug]/ReleaseLandingPage';
 import { BASE_URL } from '@/constants/app';
 import {
+  MysteryReleasePage,
   ScheduledReleasePage,
   UnreleasedReleaseHero,
 } from '@/features/release';
@@ -374,8 +376,11 @@ export default async function ContentSmartLinkPage({
     trackList
   );
 
-  const isUnreleased =
-    content.releaseDate && new Date(content.releaseDate) > new Date();
+  const releasePhase = determineReleasePhase(
+    content.releaseDate,
+    content.revealDate
+  );
+  const isUnreleased = releasePhase !== 'released';
 
   // Check if the creator's plan allows unreleased content features
   let showUnreleasedHero = false;
@@ -429,6 +434,7 @@ export default async function ContentSmartLinkPage({
 
       <ContentPageBody
         isUnreleased={!!isUnreleased}
+        releasePhase={releasePhase}
         showUnreleasedHero={showUnreleasedHero}
         content={content}
         creator={creator}
@@ -443,6 +449,7 @@ export default async function ContentSmartLinkPage({
 
 function ContentPageBody({
   isUnreleased,
+  releasePhase,
   showUnreleasedHero,
   content,
   creator,
@@ -452,6 +459,7 @@ function ContentPageBody({
   downloadUrl,
 }: Readonly<{
   isUnreleased: boolean;
+  releasePhase: 'mystery' | 'revealed' | 'released';
   showUnreleasedHero: boolean;
   content: Content;
   creator: Creator;
@@ -474,6 +482,37 @@ function ContentPageBody({
       ?.find(g => g.role === 'featured_artist')
       ?.entries.map(e => ({ name: e.name, handle: e.handle })) ?? [];
 
+  // Mystery phase: revealDate is in the future, hide all details
+  if (releasePhase === 'mystery' && content.revealDate) {
+    if (showUnreleasedHero) {
+      return (
+        <MysteryReleasePage
+          revealDate={new Date(content.revealDate)}
+          artist={{
+            id: creator.id,
+            name: artistName,
+            handle: creator.usernameNormalized,
+            avatarUrl: creator.avatarUrl,
+          }}
+        />
+      );
+    }
+    // Free plan: minimal mystery page
+    return (
+      <MysteryReleasePage
+        revealDate={new Date(content.revealDate)}
+        artist={{
+          id: creator.id,
+          name: artistName,
+          handle: creator.usernameNormalized,
+          avatarUrl: creator.avatarUrl,
+        }}
+        minimal
+      />
+    );
+  }
+
+  // Revealed phase: show full details with countdown to release
   if (isUnreleased && showUnreleasedHero) {
     return (
       <UnreleasedReleaseHero
@@ -665,33 +704,42 @@ export async function generateMetadata({
       ? `${BASE_URL}/${creator.usernameNormalized}/${content.releaseSlug}/${content.slug}`
       : `${BASE_URL}/${creator.usernameNormalized}/${content.slug}`;
 
-  const isUnreleased =
-    content.releaseDate && new Date(content.releaseDate) > new Date();
-
-  const title = isUnreleased
-    ? `${content.title} by ${artistName} - Coming Soon`
-    : `${content.title} by ${artistName} - Stream Now`;
-
-  const description = buildContentDescription(
-    content,
-    artistName,
-    !!isUnreleased
+  const metadataPhase = determineReleasePhase(
+    content.releaseDate,
+    content.revealDate
   );
+  const isUnreleased = metadataPhase !== 'released';
+  const isMystery = metadataPhase === 'mystery';
 
-  const keywords = [
-    content.title,
-    artistName,
-    `${artistName} ${content.title}`,
-    `${content.title} lyrics`,
-    `${content.title} stream`,
-    `${artistName} music`,
-    `${artistName} ${contentType}`,
-    'stream music',
-    'music links',
-  ];
+  // In mystery phase, hide release title and artwork from OG tags
+  const title = isMystery
+    ? `New music from ${artistName} - Coming Soon`
+    : isUnreleased
+      ? `${content.title} by ${artistName} - Coming Soon`
+      : `${content.title} by ${artistName} - Stream Now`;
+
+  const description = isMystery
+    ? `${artistName} has something new coming. Get notified when it drops.`
+    : buildContentDescription(content, artistName, !!isUnreleased);
+
+  const keywords = isMystery
+    ? [artistName, `${artistName} music`, 'new music', 'coming soon']
+    : [
+        content.title,
+        artistName,
+        `${artistName} ${content.title}`,
+        `${content.title} lyrics`,
+        `${content.title} stream`,
+        `${artistName} music`,
+        `${artistName} ${contentType}`,
+        'stream music',
+        'music links',
+      ];
 
   const ogType = content.type === 'release' ? 'music.album' : 'music.song';
-  const ogImage = resolveOgImage(content.artworkSizes, content.artworkUrl);
+  const ogImage = isMystery
+    ? null
+    : resolveOgImage(content.artworkSizes, content.artworkUrl);
   const artworkAlt = `${content.title} ${content.type === 'release' ? 'album' : 'track'} artwork`;
 
   return {
@@ -717,37 +765,45 @@ export async function generateMetadata({
     },
     openGraph: {
       type: ogType,
-      title: `${content.title} by ${artistName}`,
+      title: isMystery
+        ? `New music from ${artistName}`
+        : `${content.title} by ${artistName}`,
       description,
       url: canonicalUrl,
       siteName: 'Jovie',
       locale: 'en_US',
-      images: [
-        {
-          url: ogImage.url,
-          width: ogImage.width,
-          height: ogImage.height,
-          alt: artworkAlt,
-          type: ogImage.type,
-        },
-      ],
+      ...(ogImage && {
+        images: [
+          {
+            url: ogImage.url,
+            width: ogImage.width,
+            height: ogImage.height,
+            alt: artworkAlt,
+            type: ogImage.type,
+          },
+        ],
+      }),
       ...(content.type === 'track' &&
         content.previewUrl && {
           audio: content.previewUrl,
         }),
     },
     twitter: {
-      card: 'summary_large_image',
-      title: `${content.title} by ${artistName}`,
+      card: ogImage ? 'summary_large_image' : 'summary',
+      title: isMystery
+        ? `New music from ${artistName}`
+        : `${content.title} by ${artistName}`,
       description,
       creator: '@jovieapp',
       site: '@jovieapp',
-      images: [
-        {
-          url: ogImage.url,
-          alt: artworkAlt,
-        },
-      ],
+      ...(ogImage && {
+        images: [
+          {
+            url: ogImage.url,
+            alt: artworkAlt,
+          },
+        ],
+      }),
     },
     other: {
       'music:musician': `${BASE_URL}/${creator.usernameNormalized}`,

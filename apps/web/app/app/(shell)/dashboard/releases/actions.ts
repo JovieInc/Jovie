@@ -1,6 +1,6 @@
 'use server';
 
-import { and, eq, inArray, ne } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, ne } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -17,6 +17,7 @@ import { isUniqueViolation } from '@/lib/db/errors';
 import {
   discogRecordings,
   discogReleases,
+  discogReleaseTracks,
   discogTracks,
 } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
@@ -255,6 +256,10 @@ function mapReleaseToViewModel(
     title: release.title,
     artistNames: release.artistNames,
     releaseDate: toISOStringOrNull(release.releaseDate) ?? undefined,
+    status:
+      (release.status as 'draft' | 'scheduled' | 'released') ?? 'released',
+    revealDate: toISOStringOrNull(release.revealDate) ?? undefined,
+    deletedAt: toISOStringOrNull(release.deletedAt) ?? undefined,
     artworkUrl: release.artworkUrl ?? undefined,
     slug,
     smartLinkPath: buildSmartLinkPath(profileHandle, slug),
@@ -301,7 +306,7 @@ async function fetchReleaseMatrixCore(
   profileHandle: string
 ): Promise<ReleaseViewModel[]> {
   const providerLabels = buildProviderLabels();
-  const releases = await getReleasesFromDb(profileId);
+  const releases = await getReleasesFromDb(profileId, { includeDrafts: true });
 
   return releases.map(release =>
     mapReleaseToViewModel(release, providerLabels, profileId, profileHandle)
@@ -1384,7 +1389,7 @@ export async function getSpotifyImportPollSnapshot(): Promise<{
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profile.id))
       .limit(1),
-    getReleasesFromDb(profile.id),
+    getReleasesFromDb(profile.id, { includeDrafts: true }),
   ]);
 
   const row = profileRow[0];
@@ -2022,12 +2027,12 @@ interface DeleteReleaseParams {
 }
 
 /**
- * Delete a release and all associated data (tracks, provider links, etc.).
- * Cascading deletes handle child records automatically.
+ * Soft-delete a release (sets deleted_at instead of removing the row).
+ * Blocks deletion of actively distributed releases (ISRC + past release date).
  */
 export async function deleteRelease(
   params: DeleteReleaseParams
-): Promise<{ success: boolean }> {
+): Promise<{ success: boolean; message?: string }> {
   noStore();
 
   const { userId } = await getCachedAuth();
@@ -2043,8 +2048,36 @@ export async function deleteRelease(
     throw new TypeError('Release not found');
   }
 
+  // Distribution gate: block if release has ISRC and is past release date
+  if (release.releaseDate && new Date(release.releaseDate) <= new Date()) {
+    const [hasIsrc] = await db
+      .select({ id: discogRecordings.id })
+      .from(discogRecordings)
+      .innerJoin(
+        discogReleaseTracks,
+        eq(discogReleaseTracks.recordingId, discogRecordings.id)
+      )
+      .where(
+        and(
+          eq(discogReleaseTracks.releaseId, params.releaseId),
+          isNotNull(discogRecordings.isrc)
+        )
+      )
+      .limit(1);
+
+    if (hasIsrc) {
+      return {
+        success: false,
+        message:
+          'This release appears to be distributed. Remove it from distribution first.',
+      };
+    }
+  }
+
+  // Soft delete: set deleted_at instead of removing the row
   await db
-    .delete(discogReleases)
+    .update(discogReleases)
+    .set({ deletedAt: new Date() })
     .where(eq(discogReleases.id, params.releaseId));
 
   // Invalidate cache and revalidate path
@@ -2224,6 +2257,7 @@ export async function createRelease(formData: {
   title: string;
   releaseType: 'single' | 'ep' | 'album' | 'compilation' | 'live';
   releaseDate?: string | null;
+  revealDate?: string | null;
   genres?: string[];
   isExplicit?: boolean;
 }): Promise<{
@@ -2253,6 +2287,27 @@ export async function createRelease(formData: {
     ? new Date(formData.releaseDate)
     : null;
 
+  // Determine status based on release date
+  const now = new Date();
+  let status: 'draft' | 'scheduled' | 'released';
+  if (!releaseDate) {
+    status = 'draft';
+  } else if (releaseDate > now) {
+    status = 'scheduled';
+  } else {
+    status = 'released';
+  }
+
+  // Reveal date: use explicit override if provided, otherwise auto-set for scheduled releases
+  let revealDate: Date | null = null;
+  if (formData.revealDate) {
+    revealDate = new Date(formData.revealDate);
+  } else if (releaseDate && status === 'scheduled') {
+    const thirtyDaysBefore = new Date(releaseDate);
+    thirtyDaysBefore.setDate(thirtyDaysBefore.getDate() - 30);
+    revealDate = thirtyDaysBefore > now ? thirtyDaysBefore : now;
+  }
+
   try {
     const [inserted] = await db
       .insert(discogReleases)
@@ -2262,6 +2317,8 @@ export async function createRelease(formData: {
         slug,
         releaseType: formData.releaseType,
         releaseDate,
+        status,
+        revealDate,
         genres: formData.genres?.slice(0, 3) ?? null,
         isExplicit: formData.isExplicit ?? false,
         sourceType: 'manual',
