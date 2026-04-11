@@ -26,6 +26,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+<<<<<<< HEAD
+- Fixed territory badge border token in ContactDetailSidebar — replaced `border-(--linear-app-frame-seam)` (divider token) with `border-subtle` (card-level token) to match release sidebar badge pattern
+=======
 - Standardized dashboard elevation tokens to 3-tier system (DataCard, EmptyState, banners, empty state icons)
 - Added card wrapper to audience funnel stats (Profile Views, Unique Visitors, Followers)
 - Removed double shadow on chat input that caused visible border artifact
