@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.145.2] - 2026-04-11
+
+### Fixed
+
+- Standardized dashboard elevation tokens to 3-tier system (DataCard, EmptyState, banners, empty state icons)
+- Added card wrapper to audience funnel stats (Profile Views, Unique Visitors, Followers)
+- Removed double shadow on chat input that caused visible border artifact
+- Fixed drawer card clipping from oversized 18px border radius
+- Improved smart link URL contrast from tertiary to secondary text color
+- Removed directional shadow-card from drawer/sidebar cards to fix uneven border weight
+- Centered empty state text with contextual icons in analytics sidebar tabs
+
+## [26.4.145.1] - 2026-04-10
+
+### Fixed
+
+- Bumped `next` 16.2.1 → 16.2.3 across all apps to fix Server Components DoS vulnerability
+- Bumped `drizzle-orm` override to 0.45.2 to fix SQL injection via improperly escaped identifiers
+- Bumped `vite` override to ^6.4.2 to fix arbitrary file read and path traversal (dev-only)
+- Bumped `basic-ftp` override to ^5.2.2 to fix FTP command injection via CRLF (dev-only)
+- Bumped `lodash` override to >=4.18.1 to fix code injection and prototype pollution
+- Added overrides for `lodash-es`, `handlebars`, `@xmldom/xmldom`, and `brace-expansion` to remediate transitive dependency vulnerabilities
+
 ## [26.4.145] - 2026-04-10
 
 ### Changed
@@ -13,6 +36,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Made `url` column on `audience_referrers` NOT NULL since the write path already guards against null values
 - Populated the `source` field from referrer URL hostname on every referrer insert
 - Removed redundant `onConflictDoNothing()` on referrer inserts where no unique constraint exists
+
+### Fixed
+
+- Profile nav button now toggles the right drawer open and closed instead of only opening it
 
 ## [26.4.144.1] - 2026-04-10
 

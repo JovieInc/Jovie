@@ -39,7 +39,7 @@ describe('EmptyState', () => {
     expect(screen.getByText(/add content/i)).toBeInTheDocument();
     expect(screen.getByTestId('test-icon')).toBeInTheDocument();
     expect(screen.getByTestId('test-icon').parentElement?.className).toContain(
-      'h-8'
+      'h-9'
     );
   });
 

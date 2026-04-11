@@ -15,10 +15,12 @@ import {
 import { toast } from 'sonner';
 import {
   connectAppleMusicArtist,
+  deleteRelease,
   revertReleaseArtwork,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import { instantiateReleaseTasks } from '@/app/app/(shell)/dashboard/releases/task-actions';
 import { Icon } from '@/components/atoms/Icon';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
   DrawerButton,
   DrawerLoadingSkeleton,
@@ -176,6 +178,49 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     isLyricsSaving,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
   const copyHandler = experienceAdapter?.onCopy ?? handleCopy;
+
+  // Delete state and handlers
+  const [deleteTarget, setDeleteTarget] = useState<ReleaseViewModel | null>(
+    null
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const isDistributed = useCallback((release: ReleaseViewModel) => {
+    return (
+      !!release.primaryIsrc &&
+      !!release.releaseDate &&
+      new Date(release.releaseDate) <= new Date()
+    );
+  }, []);
+
+  const handleDeleteRequest = useCallback(
+    (releaseId: string) => {
+      const release = rows.find(r => r.id === releaseId);
+      if (release) {
+        setDeleteTarget(release);
+      }
+    },
+    [rows]
+  );
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const result = await deleteRelease({ releaseId: deleteTarget.id });
+      if (!result.success) {
+        toast.error(result.message ?? 'Failed to delete release.');
+      } else {
+        setRows(prev => prev.filter(r => r.id !== deleteTarget.id));
+        toast.success(`"${deleteTarget.title}" deleted.`);
+      }
+    } catch {
+      toast.error('Failed to delete release.');
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
+  }, [deleteTarget, setRows]);
 
   const [editingTrack, setEditingTrack] = useState<TrackSidebarData | null>(
     null
@@ -789,7 +834,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
         {/* Banners — inset from shell edge */}
         {showImportProgress && (
-          <div className='mx-3 lg:mx-4 mt-2.5'>
+          <div className='mx-3 lg:mx-4 mt-3'>
             <Suspense fallback={null}>
               <ImportProgressBanner
                 artistName={artistName}
@@ -879,6 +924,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 artistName={artistName}
                 onCopy={copyHandler}
                 onEdit={handleOpenEditor}
+                onDelete={handleDeleteRequest}
                 columnVisibility={columnVisibility}
                 rowHeight={rowHeight}
                 groupByYear={groupByYear}
@@ -898,10 +944,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         {isConnected && rows.length === 0 && !isImporting && (
           <PageShell className='mt-2.5' data-testid='release-table-shell'>
             <div className='flex min-h-[260px] w-full flex-1 flex-col items-center justify-center px-4 py-12 text-center'>
-              <div className='flex h-12 w-12 items-center justify-center rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-1'>
+              <div className='flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
                 <Icon
                   name='Disc3'
-                  className='h-6 w-6 text-tertiary-token'
+                  className='h-4 w-4 text-tertiary-token'
                   aria-hidden='true'
                 />
               </div>
@@ -1013,6 +1059,34 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           />
         ) : null}
       </Suspense>
+
+      {/* Delete confirmation / blocking dialog */}
+      {deleteTarget && (
+        <ConfirmDialog
+          open
+          onOpenChange={open => {
+            if (!open) setDeleteTarget(null);
+          }}
+          title={
+            isDistributed(deleteTarget)
+              ? 'Release is distributed'
+              : `Delete "${deleteTarget.title}"?`
+          }
+          description={
+            isDistributed(deleteTarget)
+              ? 'Remove this release from distribution before deleting it.'
+              : 'This will remove the release from your dashboard and public profile.'
+          }
+          confirmLabel={isDistributed(deleteTarget) ? 'OK' : 'Delete'}
+          variant={isDistributed(deleteTarget) ? 'default' : 'destructive'}
+          isLoading={isDeleting}
+          onConfirm={
+            isDistributed(deleteTarget)
+              ? () => setDeleteTarget(null)
+              : handleDeleteConfirm
+          }
+        />
+      )}
     </>
   );
 });

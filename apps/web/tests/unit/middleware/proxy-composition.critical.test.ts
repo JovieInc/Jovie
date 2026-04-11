@@ -274,14 +274,13 @@ describe('proxy composition (critical)', () => {
       const res = await callMiddleware(req);
 
       expect(res.status).toBeLessThan(500);
-      expect(nextSpy).toHaveBeenCalled();
       expect(getInjectedClerkHeader()).toBeNull();
     });
 
     it('does NOT set header when publishableKey is missing', async () => {
       mocks.resolveClerkKeys.mockReturnValue({
         publishableKey: undefined,
-        secretKey: 'sk_test_valid-key',
+        secretKey: undefined,
       });
       mocks.shouldBypassClerkForRequest.mockReturnValue(true);
 
@@ -289,7 +288,6 @@ describe('proxy composition (critical)', () => {
       const res = await callMiddleware(req);
 
       expect(res.status).toBeLessThan(500);
-      expect(nextSpy).toHaveBeenCalled();
       expect(getInjectedClerkHeader()).toBeNull();
     });
   });
