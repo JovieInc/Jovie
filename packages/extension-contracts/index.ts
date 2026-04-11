@@ -9,10 +9,13 @@ export type ExtensionPageKind =
 
 export type ExtensionEntityKind = 'profile' | 'release' | 'tourDate';
 
-export type ExtensionWorkflowId =
-  | 'distrokid_release_form'
-  | 'awal_release_form'
-  | 'kosign_work_form';
+export const EXTENSION_WORKFLOW_IDS = [
+  'distrokid_release_form',
+  'awal_release_form',
+  'kosign_work_form',
+] as const;
+
+export type ExtensionWorkflowId = (typeof EXTENSION_WORKFLOW_IDS)[number];
 
 export type ExtensionPrimaryActionKind =
   | 'insert'

@@ -234,6 +234,12 @@ export async function buildExtensionSummary(params: {
           actions: ['copy', 'insert'],
         },
         {
+          id: 'artist-name',
+          label: 'Artist Name',
+          value: release.artistNames?.join(', ') ?? displayName,
+          actions: ['copy', 'insert'],
+        },
+        {
           id: 'release-date',
           label: 'Release Date',
           value: formatDisplayDate(release.releaseDate),

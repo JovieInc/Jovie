@@ -117,15 +117,20 @@ async function fillReactSelect(
   input.focus();
   setInputValue(input, value);
 
-  await new Promise(resolve => setTimeout(resolve, 600));
+  const optionSelector = '[class*="__menu"] [class*="__option"]';
+  const scope = container.closest('[class*="__container"]') ?? document;
+  const maxWait = 2000;
+  const pollInterval = 100;
+  let elapsed = 0;
 
-  const menu = document.querySelector<HTMLElement>(
-    '[class*="__menu"] [class*="__option"]'
-  );
-
-  if (menu) {
-    menu.click();
-    return true;
+  while (elapsed < maxWait) {
+    const option = scope.querySelector<HTMLElement>(optionSelector);
+    if (option) {
+      option.click();
+      return true;
+    }
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
+    elapsed += pollInterval;
   }
 
   return false;
@@ -266,7 +271,7 @@ async function handleBulkInsertMessage(message: BulkInsertMessage) {
 const LABEL_ALIASES: ReadonlyMap<string, readonly string[]> = new Map([
   ['project name', ['release title']],
   ['project code', ['release title']],
-  ['project artist', ['display name']],
+  ['project artist', ['artist name', 'display name']],
   ['song title', ['release title']],
 ]);
 
