@@ -2971,6 +2971,8 @@ jobs:
           export E2E_USE_TEST_AUTH_BYPASS=1
           export E2E_CLERK_USER_ID="${{ secrets.E2E_CLERK_USER_ID }}"
           export FLAGS_SECRET="${{ secrets.FLAGS_SECRET }}"
+          export URL_ENCRYPTION_KEY="${{ secrets.URL_ENCRYPTION_KEY }}"
+          export AI_GATEWAY_API_KEY="${{ secrets.AI_GATEWAY_API_KEY }}"
           PORT=3100 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
@@ -3006,6 +3008,8 @@ jobs:
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          URL_ENCRYPTION_KEY: ${{ secrets.URL_ENCRYPTION_KEY }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() }}
