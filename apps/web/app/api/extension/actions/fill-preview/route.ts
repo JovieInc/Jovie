@@ -7,7 +7,11 @@ import { createExtensionCorsHeaders } from '@/lib/extensions/http';
 import { parseJsonBody } from '@/lib/http/parse-json';
 
 const requestSchema = z.object({
-  workflowId: z.literal('distrokid_release_form'),
+  workflowId: z.enum([
+    'distrokid_release_form',
+    'awal_release_form',
+    'kosign_work_form',
+  ]),
   entityId: z.string().min(1),
   entityKind: z.literal('release'),
   pageUrl: z.string().url(),
