@@ -386,9 +386,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           }
           className={cn(
             'overflow-hidden border transition-[border-color,background-color,box-shadow] duration-normal',
-            // Always one elevation above the content surface
+            // Always one elevation above the content surface — shadow is animated via motion.div
             'bg-surface-1',
-            'shadow-[0_2px_8px_-2px_rgba(15,23,42,0.12),0_1px_0_rgba(255,255,255,0.4)_inset] dark:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.04)]',
             borderClass
           )}
           style={reducedMotion ? { borderRadius, boxShadow } : { borderRadius }}

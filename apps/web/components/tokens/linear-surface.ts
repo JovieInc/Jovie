@@ -19,9 +19,11 @@ export const LINEAR_SURFACE = {
   toolbar: 'border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
 
   // Tier 2 — elevated cards (drawer cards, standalone cards in content)
-  drawerCard: 'rounded-[10px] border border-subtle bg-surface-1 shadow-card',
-  drawerCardSm: 'rounded-[10px] border border-subtle bg-surface-1 shadow-card',
-  sidebarCard: 'rounded-[10px] border border-subtle bg-surface-1 shadow-card',
+  // Drawer/sidebar cards: border-only, no shadow (they sit inside an already-elevated drawer).
+  // shadow-card adds a ring + directional depth that clashes with the CSS border on stacked cards.
+  drawerCard: 'rounded-[10px] border border-subtle bg-surface-1 shadow-none',
+  drawerCardSm: 'rounded-[10px] border border-subtle bg-surface-1 shadow-none',
+  sidebarCard: 'rounded-[10px] border border-subtle bg-surface-1 shadow-none',
   bannerCard: 'rounded-xl border border-subtle bg-surface-1 shadow-card',
   dialogCard: 'rounded-xl border border-subtle bg-surface-1 shadow-card',
 

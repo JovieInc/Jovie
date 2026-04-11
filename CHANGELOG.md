@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.145.2] - 2026-04-11
+
+### Fixed
+
+- Standardized dashboard elevation tokens to 3-tier system (DataCard, EmptyState, banners, empty state icons)
+- Added card wrapper to audience funnel stats (Profile Views, Unique Visitors, Followers)
+- Removed double shadow on chat input that caused visible border artifact
+- Fixed drawer card clipping from oversized 18px border radius
+- Improved smart link URL contrast from tertiary to secondary text color
+- Removed directional shadow-card from drawer/sidebar cards to fix uneven border weight
+- Centered empty state text with contextual icons in analytics sidebar tabs
+
 ## [26.4.145.1] - 2026-04-10
 
 ### Fixed

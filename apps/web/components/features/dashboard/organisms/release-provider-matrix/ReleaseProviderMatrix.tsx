@@ -789,7 +789,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
         {/* Banners — inset from shell edge */}
         {showImportProgress && (
-          <div className='mx-3 lg:mx-4 mt-2.5'>
+          <div className='mx-3 lg:mx-4 mt-3'>
             <Suspense fallback={null}>
               <ImportProgressBanner
                 artistName={artistName}
@@ -898,10 +898,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         {isConnected && rows.length === 0 && !isImporting && (
           <PageShell className='mt-2.5' data-testid='release-table-shell'>
             <div className='flex min-h-[260px] w-full flex-1 flex-col items-center justify-center px-4 py-12 text-center'>
-              <div className='flex h-12 w-12 items-center justify-center rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-1'>
+              <div className='flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
                 <Icon
                   name='Disc3'
-                  className='h-6 w-6 text-tertiary-token'
+                  className='h-4 w-4 text-tertiary-token'
                   aria-hidden='true'
                 />
               </div>

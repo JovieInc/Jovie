@@ -58,7 +58,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
     >
       <DrawerSurfaceCard
         variant='card'
-        className='mx-4 mt-2 flex items-center gap-3 rounded-[12px] border border-[#1DB954]/14 bg-[color-mix(in_oklab,#1DB954_4.5%,var(--linear-app-content-surface))] px-4 py-3 transition-opacity duration-200'
+        className='flex items-center gap-3 rounded-[10px] border border-[#1DB954]/14 bg-[color-mix(in_oklab,#1DB954_4.5%,var(--linear-app-content-surface))] px-4 py-3 transition-opacity duration-200'
       >
         <ProviderIcon provider='spotify' className='h-4.5 w-4.5' />
         <div className='flex min-w-0 flex-1 flex-col gap-1'>
@@ -86,7 +86,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
         <DrawerSurfaceCard
           variant='card'
           data-testid='release-enrichment-progress-banner'
-          className='mx-4 mt-2 flex items-center gap-3 rounded-[12px] border border-accent/14 bg-[color-mix(in_oklab,var(--linear-accent)_4.5%,var(--linear-app-content-surface))] px-4 py-3 transition-opacity duration-200'
+          className='mt-2 flex items-center gap-3 rounded-[10px] border border-accent/14 bg-[color-mix(in_oklab,var(--linear-accent)_4.5%,var(--linear-app-content-surface))] px-4 py-3 transition-opacity duration-200'
         >
           <div className='flex h-5 w-5 items-center justify-center'>
             <div className='h-4 w-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent' />
