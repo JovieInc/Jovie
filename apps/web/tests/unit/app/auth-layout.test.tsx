@@ -72,7 +72,7 @@ async function renderAuthRouteLayout({
   if (publishableKey && !isStagingHost) {
     mockHeaders['x-clerk-publishable-key'] = publishableKey;
   }
-  if (stagingPublishableKey && isStagingHost) {
+  if (stagingPublishableKey && stagingSecretKey && isStagingHost) {
     mockHeaders['x-clerk-publishable-key'] = stagingPublishableKey;
   }
 
