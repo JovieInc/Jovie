@@ -1515,6 +1515,20 @@ jobs:
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+      - name: Bundle size comparison
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        continue-on-error: true
+        run: pnpm --filter @jovie/web compare-chunks
+
+      - name: Upload build manifest
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: build-manifest
+          path: apps/web/.next/build-manifest.json
+          retention-days: 7
+
       - name: Pre-deploy Lighthouse performance check
         if: steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         continue-on-error: true
@@ -2977,7 +2991,7 @@ jobs:
           # Retry up to 3 times for transient Vercel failures
           for attempt in 1 2 3; do
             echo "Deploy attempt $attempt/3"
-            if deploy_output="$(vercel deploy --prebuilt --archive=tgz --token ${{ secrets.VERCEL_TOKEN }} 2>&1)"; then
+            if deploy_output="$(vercel deploy --prebuilt --archive=tgz --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}" --token ${{ secrets.VERCEL_TOKEN }} 2>&1)"; then
               deploy_exit=0
             else
               deploy_exit=$?
