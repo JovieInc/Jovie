@@ -3,8 +3,6 @@
 import { Checkbox } from '@jovie/ui';
 import { alignment } from '@/components/organisms/table/table.styles';
 import { cn } from '@/lib/utils';
-import { handleActivationKeyDown } from '@/lib/utils/keyboard';
-
 export interface AudienceRowSelectionCellProps {
   readonly rowNumber: number;
   readonly isChecked: boolean;
@@ -30,9 +28,7 @@ export function AudienceRowSelectionCell({
       <div
         className='relative flex h-5 w-5 items-center justify-center'
         onClick={event => event.stopPropagation()}
-        onKeyDown={event =>
-          handleActivationKeyDown(event, e => e.stopPropagation())
-        }
+        onKeyDown={event => event.stopPropagation()}
       >
         <span
           className={cn(

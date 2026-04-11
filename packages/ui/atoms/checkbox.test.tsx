@@ -121,17 +121,30 @@ describe('Checkbox', () => {
       const { container } = render(
         <Checkbox checked='indeterminate' aria-label='Select all' />
       );
-      // Minus icon from lucide-react renders as an SVG
-      const svg = container.querySelector('[data-state="indeterminate"] svg');
+      const svg = container.querySelector(
+        '[data-state="indeterminate"] svg.lucide-minus'
+      );
       expect(svg).toBeInTheDocument();
+      // Ensure it's NOT the check icon
+      const check = container.querySelector(
+        '[data-state="indeterminate"] svg.lucide-check'
+      );
+      expect(check).not.toBeInTheDocument();
     });
 
     it('renders check icon when checked (not minus)', () => {
       const { container } = render(
         <Checkbox defaultChecked aria-label='Select all' />
       );
-      const svg = container.querySelector('[data-state="checked"] svg');
+      const svg = container.querySelector(
+        '[data-state="checked"] svg.lucide-check'
+      );
       expect(svg).toBeInTheDocument();
+      // Ensure it's NOT the minus icon
+      const minus = container.querySelector(
+        '[data-state="checked"] svg.lucide-minus'
+      );
+      expect(minus).not.toBeInTheDocument();
     });
 
     it('transitions from indeterminate to unchecked', () => {

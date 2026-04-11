@@ -167,7 +167,7 @@ function LegacyCheckboxCell({
           )}
         >
           <Checkbox
-            checked={indeterminate ? 'indeterminate' : checked}
+            checked={checked ? true : indeterminate ? 'indeterminate' : false}
             onCheckedChange={(value: boolean | 'indeterminate') =>
               onChange(value === true)
             }
