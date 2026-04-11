@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import type { ReactNode } from 'react';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import {
   Dialog,
@@ -29,32 +30,39 @@ export function ReleasePlanPromptDialog({
   onClose,
   onGenerateReleasePlan,
 }: ReleasePlanPromptDialogProps) {
-  const dialogTitle = isGateLoading
-    ? 'Release Plan'
-    : canGenerateReleasePlans
-      ? 'Generate Release Plan'
-      : 'Upgrade To Generate A Release Plan';
-  const dialogDescription = isGateLoading
-    ? 'Checking whether this workspace can generate tasks for the release plan.'
-    : canGenerateReleasePlans
-      ? 'Create the step-by-step tasks for this release and jump straight into the plan.'
-      : 'Upgrade to turn this release into a step-by-step plan with tasks you can assign to Jovie AI.';
-  const actionButton = isGateLoading ? (
-    <Button type='button' size='sm' disabled>
-      Loading...
-    </Button>
-  ) : canGenerateReleasePlans ? (
-    <Button
-      type='button'
-      size='sm'
-      onClick={onGenerateReleasePlan}
-      disabled={isGeneratingReleasePlan}
-    >
-      {isGeneratingReleasePlan ? 'Generating...' : 'Generate Release Plan'}
-    </Button>
-  ) : (
-    <UpgradeButton size='sm'>Upgrade to Pro</UpgradeButton>
-  );
+  let dialogTitle: string;
+  let dialogDescription: string;
+  let actionButton: ReactNode;
+
+  if (isGateLoading) {
+    dialogTitle = 'Release Plan';
+    dialogDescription =
+      'Checking whether this workspace can generate tasks for the release plan.';
+    actionButton = (
+      <Button type='button' size='sm' disabled>
+        Loading...
+      </Button>
+    );
+  } else if (canGenerateReleasePlans) {
+    dialogTitle = 'Generate Release Plan';
+    dialogDescription =
+      'Create the step-by-step tasks for this release and jump straight into the plan.';
+    actionButton = (
+      <Button
+        type='button'
+        size='sm'
+        onClick={onGenerateReleasePlan}
+        disabled={isGeneratingReleasePlan}
+      >
+        {isGeneratingReleasePlan ? 'Generating...' : 'Generate Release Plan'}
+      </Button>
+    );
+  } else {
+    dialogTitle = 'Upgrade To Generate A Release Plan';
+    dialogDescription =
+      'Upgrade to turn this release into a step-by-step plan with tasks you can assign to Jovie AI.';
+    actionButton = <UpgradeButton size='sm'>Upgrade to Pro</UpgradeButton>;
+  }
 
   return (
     <Dialog open={open} onClose={onClose} size='sm'>
