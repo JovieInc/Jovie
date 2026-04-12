@@ -212,13 +212,19 @@ async function requireOwnProfile() {
  * Stored in the profile's settings JSONB field, mirroring the
  * allowArtworkDownloads pattern used for album art.
  */
-export async function updateAllowProfilePhotoDownloads(
-  allowDownloads: boolean
+
+/**
+ * Generic helper to update a single boolean setting on the creator profile.
+ */
+async function updateProfileBooleanSetting(
+  key: string,
+  value: boolean,
+  label: string
 ): Promise<void> {
   noStore();
 
-  if (typeof allowDownloads !== 'boolean') {
-    throw new TypeError('allowDownloads must be a boolean');
+  if (typeof value !== 'boolean') {
+    throw new TypeError(`${label} must be a boolean`);
   }
 
   try {
@@ -230,7 +236,7 @@ export async function updateAllowProfilePhotoDownloads(
       .set({
         settings: {
           ...currentSettings,
-          allowProfilePhotoDownloads: allowDownloads,
+          [key]: value,
         },
         updatedAt: new Date(),
       })
@@ -241,18 +247,27 @@ export async function updateAllowProfilePhotoDownloads(
       throw new Error('Profile update failed — profile not found');
     }
 
-    // Invalidate cached public profile so visitors see the updated setting
     if (profile.usernameNormalized) {
       await invalidateProfileCache(profile.usernameNormalized);
     }
   } catch (error) {
     if (!isExpectedProfileActionError(error)) {
-      await captureError('updateAllowProfilePhotoDownloads failed', error, {
+      await captureError(`${label} failed`, error, {
         route: 'dashboard/actions/creator-profile',
       });
     }
     throw error;
   }
+}
+
+export async function updateAllowProfilePhotoDownloads(
+  allowDownloads: boolean
+): Promise<void> {
+  return updateProfileBooleanSetting(
+    'allowProfilePhotoDownloads',
+    allowDownloads,
+    'updateAllowProfilePhotoDownloads'
+  );
 }
 
 /**
@@ -263,42 +278,9 @@ export async function updateAllowProfilePhotoDownloads(
 export async function updateShowOldReleases(
   showOldReleases: boolean
 ): Promise<void> {
-  noStore();
-
-  if (typeof showOldReleases !== 'boolean') {
-    throw new TypeError('showOldReleases must be a boolean');
-  }
-
-  try {
-    const profile = await requireOwnProfile();
-    const currentSettings = (profile.settings ?? {}) as Record<string, unknown>;
-
-    const [updated] = await db
-      .update(creatorProfiles)
-      .set({
-        settings: {
-          ...currentSettings,
-          showOldReleases,
-        },
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profile.id))
-      .returning({ id: creatorProfiles.id });
-
-    if (!updated) {
-      throw new Error('Profile update failed — profile not found');
-    }
-
-    // Invalidate cached public profile so visitors see the updated setting
-    if (profile.usernameNormalized) {
-      await invalidateProfileCache(profile.usernameNormalized);
-    }
-  } catch (error) {
-    if (!isExpectedProfileActionError(error)) {
-      await captureError('updateShowOldReleases failed', error, {
-        route: 'dashboard/actions/creator-profile',
-      });
-    }
-    throw error;
-  }
+  return updateProfileBooleanSetting(
+    'showOldReleases',
+    showOldReleases,
+    'updateShowOldReleases'
+  );
 }
