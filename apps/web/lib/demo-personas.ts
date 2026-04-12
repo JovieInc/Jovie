@@ -220,8 +220,7 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
       slug: 'blessings-featuring-clementine-douglas',
       releaseType: 'single',
       releaseDate: '2025-06-09',
-      artworkUrl:
-        'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=640&q=80',
+      artworkUrl: '/images/demo/artwork-1.png',
       totalTracks: 1,
       totalDurationMs: 221000,
       upc: '194399301001',
@@ -258,8 +257,7 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
       slug: '96-months',
       releaseType: 'album',
       releaseDate: '2025-09-05',
-      artworkUrl:
-        'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=640&q=80',
+      artworkUrl: '/images/demo/artwork-2.png',
       totalTracks: 18,
       totalDurationMs: 4080000,
       upc: '194399301002',
@@ -337,8 +335,7 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
       slug: 'lovers-in-a-past-life-with-ragnbone-man',
       releaseType: 'single',
       releaseDate: '2024-02-16',
-      artworkUrl:
-        'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=640&q=80',
+      artworkUrl: '/images/demo/artwork-3.png',
       totalTracks: 1,
       totalDurationMs: 189000,
       upc: '194399301003',
@@ -376,8 +373,7 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
       slug: 'desire-with-sam-smith',
       releaseType: 'single',
       releaseDate: '2023-07-28',
-      artworkUrl:
-        'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=640&q=80',
+      artworkUrl: '/images/demo/artwork-4.png',
       totalTracks: 1,
       totalDurationMs: 180000,
       upc: '194399301004',
@@ -415,8 +411,7 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
       slug: 'miracle-with-ellie-goulding',
       releaseType: 'single',
       releaseDate: '2023-07-22',
-      artworkUrl:
-        'https://images.unsplash.com/photo-1446057032654-9d8885db76c6?auto=format&fit=crop&w=640&q=80',
+      artworkUrl: '/images/demo/artwork-5.png',
       totalTracks: 1,
       totalDurationMs: 219000,
       upc: '194399301005',
