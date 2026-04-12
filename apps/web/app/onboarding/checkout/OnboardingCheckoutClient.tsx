@@ -351,7 +351,7 @@ export function OnboardingCheckoutClient({
         >
           {isLoading
             ? 'Redirecting to checkout...'
-            : `Upgrade to ${planMarketing.displayName}`}
+            : `End trial and start ${planMarketing.displayName} today`}
         </Button>
 
         {/* Skip */}
@@ -361,9 +361,7 @@ export function OnboardingCheckoutClient({
           disabled={isLoading}
           className='mt-4 w-full text-center text-[13px] text-tertiary-token hover:text-secondary-token transition-colors disabled:opacity-50'
         >
-          {isDefaultUpsell
-            ? 'Start free, upgrade anytime'
-            : 'Continue with Free'}
+          Continue with trial
         </button>
       </div>
     </div>

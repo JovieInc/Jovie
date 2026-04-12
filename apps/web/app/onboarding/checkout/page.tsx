@@ -123,13 +123,19 @@ export default async function OnboardingCheckoutPage({
     // Profile load failed — proceed with empty data
   }
 
+  // All new users get a 14-day Pro trial, so skip the checkout upsell
+  // when this is the default organic redirect (no explicit paid intent).
+  if (isDefaultUpsell) {
+    redirect(APP_ROUTES.DASHBOARD);
+  }
+
   // Smart plan recommendation only for organic users with no expressed paid intent.
   // If the user has a paid-intent cookie (e.g., founding), preserve it — don't override
   // with recommendPlan. Also fall back to pro if Max plan is disabled.
   const hadPaidIntentFromCookie = isPaidIntent(
     getPlanIntentFromCookies(cookieHeader)
   );
-  if (isDefaultUpsell && !hadPaidIntentFromCookie) {
+  if (!hadPaidIntentFromCookie) {
     let recommended = recommendPlan(profileData.spotifyFollowers);
     if (recommended === 'max' && !isMaxPlanEnabled()) {
       recommended = DEFAULT_UPSELL_PLAN;
