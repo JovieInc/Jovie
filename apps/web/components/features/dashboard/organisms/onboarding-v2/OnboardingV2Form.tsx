@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { ArrowRight, Check, Disc3, Music2, RefreshCw } from 'lucide-react';
+import { ArrowRight, Disc3, Lock, Music2, RefreshCw } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -902,7 +902,6 @@ export function OnboardingV2Form({
       const requestSeq = discoveryRequestSeqRef.current + 1;
       discoveryRequestSeqRef.current = requestSeq;
       setIsDiscoveryLoading(true);
-      setDiscoveryError(null);
 
       try {
         const nextSnapshot = await fetchDiscoverySnapshot(profileId, signal);
@@ -910,6 +909,8 @@ export function OnboardingV2Form({
           return;
         }
 
+        // Only clear error on successful fetch — don't clear on poll start
+        setDiscoveryError(null);
         const previousSnapshot = discoverySnapshotRef.current;
         discoverySnapshotRef.current = nextSnapshot;
         setDiscoverySnapshot(nextSnapshot);
@@ -1581,14 +1582,12 @@ export function OnboardingV2Form({
                 type='button'
                 disabled={unavailable}
                 onClick={() => {
-                  if (!unavailable) {
-                    connectArtist({
-                      id: artist.id,
-                      imageUrl: artist.imageUrl ?? null,
-                      name: artist.name,
-                      url: artist.url,
-                    });
-                  }
+                  connectArtist({
+                    id: artist.id,
+                    imageUrl: artist.imageUrl ?? null,
+                    name: artist.name,
+                    url: artist.url,
+                  });
                 }}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition-colors',
@@ -1626,7 +1625,7 @@ export function OnboardingV2Form({
                 </div>
 
                 {unavailable ? (
-                  <Check className='h-4 w-4 shrink-0 text-tertiary-token' />
+                  <Lock className='h-4 w-4 shrink-0 text-tertiary-token' />
                 ) : (
                   <ArrowRight className='h-4 w-4 shrink-0 text-tertiary-token' />
                 )}
@@ -1731,7 +1730,12 @@ export function OnboardingV2Form({
                 >
                   {hasError ? 'Try again' : 'Choose a different artist'}
                 </Button>
-                <Button onClick={advanceFromStep} disabled={isImporting}>
+                <Button
+                  onClick={
+                    hasError ? () => setCurrentStep('upgrade') : advanceFromStep
+                  }
+                  disabled={isImporting}
+                >
                   Continue
                   <ArrowRight className='ml-1 h-4 w-4' />
                 </Button>
