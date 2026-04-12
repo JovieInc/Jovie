@@ -14,7 +14,6 @@ import {
   MailCheck,
   Music,
   PieChart,
-  Radio,
   Settings,
   ShieldCheck,
   SquarePen,
@@ -74,13 +73,6 @@ export const primaryNavigation: NavItem[] = [
     id: 'audience',
     icon: Users,
     description: 'Understand your audience demographics',
-  },
-  {
-    name: 'Presence',
-    href: APP_ROUTES.PRESENCE,
-    id: 'presence',
-    icon: Radio,
-    description: 'See your profiles across streaming platforms',
   },
 ];
 

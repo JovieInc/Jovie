@@ -1,62 +1,12 @@
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { PageErrorState } from '@/features/feedback/PageErrorState';
-import { getCachedAuth } from '@/lib/auth/cached';
-import { captureError } from '@/lib/error-tracking';
-import { queryKeys } from '@/lib/queries';
-import { HydrateClient } from '@/lib/queries/HydrateClient';
-import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
-import { getDashboardShellData } from '../actions';
-import { loadDspPresenceForProfile } from './actions';
-import { PresencePageClient } from './PresencePageClient';
 
 export const runtime = 'nodejs';
 
 /**
- * Presence page — client-first with server prefetch.
- *
- * Auth check via getCachedAuth (Clerk JWT, no DB) runs first. On first visit,
- * presence data is prefetched into TanStack Query cache and hydrated to the
- * client. On subsequent navigations, the client component renders from cache
- * instantly (no skeleton), with background refetch if stale.
+ * Presence page — redirects to artist profile settings (Music tab in the right drawer).
+ * Suggested DSP matches are now shown inline in the profile sidebar.
  */
-export default async function PresencePage() {
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.PRESENCE}`);
-  }
-
-  const dashboardData = await getDashboardShellData(userId);
-
-  if (dashboardData.dashboardLoadError) {
-    void captureError(
-      'Dashboard data load failed on presence page',
-      dashboardData.dashboardLoadError,
-      { route: APP_ROUTES.PRESENCE }
-    );
-    return (
-      <PageErrorState message='Failed to load presence data. Please refresh the page.' />
-    );
-  }
-
-  if (dashboardData.needsOnboarding) {
-    redirect(APP_ROUTES.ONBOARDING);
-  }
-
-  const profileId = dashboardData.selectedProfile?.id;
-
-  // Prefetch presence data into TanStack cache for instant client render
-  if (profileId) {
-    const queryClient = getQueryClient();
-    await queryClient.prefetchQuery({
-      queryKey: queryKeys.dspEnrichment.presence(profileId),
-      queryFn: () => loadDspPresenceForProfile(profileId),
-    });
-  }
-
-  return (
-    <HydrateClient state={getDehydratedState()}>
-      <PresencePageClient />
-    </HydrateClient>
-  );
+export default function PresencePage() {
+  redirect(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`);
 }
