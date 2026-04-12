@@ -206,6 +206,35 @@ describe('AdminScoreboardSection', () => {
     expect(screen.getByText('No funnel data yet')).toBeInTheDocument();
   });
 
+  it('shows funnel when only claimClicks7d is non-zero', async () => {
+    hoisted.getAdminFunnelMetrics.mockResolvedValue(
+      buildDefaultMetrics({
+        outreachSent7d: 0,
+        claimClicks7d: 5,
+        signups7d: 0,
+        paidConversions7d: 0,
+      })
+    );
+    hoisted.getWeeklyFunnelTrend.mockResolvedValue([]);
+    hoisted.getAllTimeFunnelTotals.mockResolvedValue(
+      buildDefaultTotals({
+        scraped: 0,
+        qualified: 0,
+        contacted: 0,
+        claimed: 0,
+        signedUp: 0,
+        paid: 0,
+      })
+    );
+
+    const Component = await AdminScoreboardSection();
+    render(Component);
+
+    expect(screen.queryByText('No funnel data yet')).not.toBeInTheDocument();
+    // Claimed step should render with count 5
+    expect(screen.getByText('Claimed')).toBeInTheDocument();
+  });
+
   it('renders error state when metrics has errors', async () => {
     hoisted.getAdminFunnelMetrics.mockResolvedValue(
       buildDefaultMetrics({ errors: ['Stripe unavailable'] })

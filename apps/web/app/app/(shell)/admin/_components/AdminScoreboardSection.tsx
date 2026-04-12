@@ -97,6 +97,7 @@ export async function AdminScoreboardSection() {
     totals.scraped === 0 &&
     totals.qualified === 0 &&
     metrics.outreachSent7d === 0 &&
+    metrics.claimClicks7d === 0 &&
     metrics.signups7d === 0 &&
     metrics.paidConversions7d === 0;
 
@@ -119,7 +120,7 @@ export async function AdminScoreboardSection() {
     {
       label: 'Contacted',
       count: metrics.outreachSent7d,
-      prevCount: totals.qualified,
+      prevCount: null, // different time window (7d vs all-time) — no meaningful rate
     },
     {
       label: 'Claimed',
