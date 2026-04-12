@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.150.1] - 2026-04-12
+
+### Fixed
+
+- Settings page cards now have consistent padding across all sections (Email, Appearance, Billing, etc.) by removing redundant card-level padding that was doubling up with child padding
+
 ## [26.4.150.0] - 2026-04-12
 
 > Full-screen offline and error screens now use one consistent, design-system-aligned layout.
