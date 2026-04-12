@@ -10,7 +10,6 @@ export {
   WAITLIST_STORAGE_KEYS,
 } from './types';
 export { WaitlistAdditionalInfoStep } from './WaitlistAdditionalInfoStep';
-export { WaitlistSkeleton } from './WaitlistSkeleton';
 export { WaitlistSocialStep } from './WaitlistSocialStep';
 export { WaitlistSpotifySearch } from './WaitlistSpotifySearch';
 export { WaitlistSuccessView } from './WaitlistSuccessView';

@@ -14,9 +14,7 @@ import {
 
 const SHELL_ROOT = path.resolve(__dirname, '../../../app/app/(shell)');
 
-const NAV_ROUTE_PAGE_ALIASES: Record<string, string> = {
-  '/app/presence': '/app/dashboard/presence',
-};
+const NAV_ROUTE_PAGE_ALIASES: Record<string, string> = {};
 
 const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app': 'Shell root entry page',

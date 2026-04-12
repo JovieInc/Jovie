@@ -195,7 +195,7 @@ export function OnboardingHandleStep({
           data-testid='handle-unavailable'
           className='text-error text-[13px] animate-in fade-in slide-in-from-top-1 duration-300 text-center'
         >
-          Not available
+          {handleValidation.error}
         </div>
       );
     }
