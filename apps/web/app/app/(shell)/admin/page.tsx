@@ -16,12 +16,15 @@ import {
   AdminKpiSectionSkeleton,
   AdminOutreachSection,
   AdminOutreachSectionSkeleton,
+  AdminScoreboardSection,
+  AdminScoreboardSectionSkeleton,
   AdminUsageSection,
   AdminUsageSectionSkeleton,
 } from './_components';
 
 export const metadata: Metadata = {
-  title: 'Admin dashboard',
+  title: 'Admin Scoreboard',
+  description: 'Funnel scoreboard and operator tools.',
 };
 
 export const runtime = 'nodejs';
@@ -56,70 +59,93 @@ const overviewCards = [
   },
 ] as const;
 
-const overviewTabs = [{ value: 'overview', label: 'Overview' }] as const;
+type AdminView = 'scoreboard' | 'workspaces';
 
-export default function AdminPage() {
+const adminTabs = [
+  { value: 'scoreboard' as const, label: 'Scoreboard' },
+  { value: 'workspaces' as const, label: 'Workspaces' },
+] as const;
+
+function isAdminView(value: string): value is AdminView {
+  return value === 'scoreboard' || value === 'workspaces';
+}
+
+interface AdminPageProps {
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function AdminPage({ searchParams }: AdminPageProps) {
+  const params = await searchParams;
+  const rawView = typeof params.view === 'string' ? params.view : 'scoreboard';
+  const view: AdminView = isAdminView(rawView) ? rawView : 'scoreboard';
+
   return (
     <AdminWorkspacePage
-      title='Overview'
-      description='Operator launchpad for people, growth, and system health.'
+      title={view === 'scoreboard' ? 'Scoreboard' : 'Workspaces'}
+      description='Funnel scoreboard and operator tools.'
       primaryParam='view'
-      primaryValue='overview'
-      primaryOptions={overviewTabs}
+      primaryValue={view}
+      primaryOptions={adminTabs}
       testId='admin-overview-page'
       viewTestId='admin-overview-view'
     >
-      <div
-        className='flex h-full flex-col gap-4'
-        data-testid='admin-dashboard-content'
-      >
-        <div className='grid gap-4 lg:grid-cols-2 xl:grid-cols-4'>
-          {overviewCards.map(card => (
-            <Link
-              key={card.href}
-              href={card.href}
-              className='group block h-full'
-            >
-              <ContentSurfaceCard className='flex h-full flex-col justify-between gap-4 p-4 transition-colors hover:bg-surface-0'>
-                <div className='space-y-3'>
-                  <div className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-0 text-secondary-token'>
-                    <card.icon className='h-4 w-4' aria-hidden='true' />
-                  </div>
-                  <div>
-                    <p className='text-[14px] font-[560] tracking-[-0.01em] text-primary-token'>
-                      {card.title}
-                    </p>
-                    <p className='mt-1 text-[13px] leading-[19px] text-secondary-token'>
-                      {card.description}
-                    </p>
-                  </div>
-                </div>
-                <span className='inline-flex items-center gap-2 text-[12px] font-[560] text-secondary-token transition-colors group-hover:text-primary-token'>
-                  Open
-                  <ArrowRight className='h-3.5 w-3.5' aria-hidden='true' />
-                </span>
-              </ContentSurfaceCard>
-            </Link>
-          ))}
-        </div>
-
-        <Suspense fallback={<AdminKpiSectionSkeleton />}>
-          <AdminKpiSection />
+      {view === 'scoreboard' ? (
+        <Suspense fallback={<AdminScoreboardSectionSkeleton />}>
+          <AdminScoreboardSection />
         </Suspense>
-
-        <div className='grid min-h-0 flex-1 gap-4 lg:grid-cols-3'>
-          <div className='lg:col-span-2'>
-            <Suspense fallback={<AdminOutreachSectionSkeleton />}>
-              <AdminOutreachSection />
-            </Suspense>
+      ) : (
+        <div
+          className='flex h-full flex-col gap-4'
+          data-testid='admin-dashboard-content'
+        >
+          <div className='grid gap-4 lg:grid-cols-2 xl:grid-cols-4'>
+            {overviewCards.map(card => (
+              <Link
+                key={card.href}
+                href={card.href}
+                className='group block h-full'
+              >
+                <ContentSurfaceCard className='flex h-full flex-col justify-between gap-4 p-4 transition-colors hover:bg-surface-0'>
+                  <div className='space-y-3'>
+                    <div className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-0 text-secondary-token'>
+                      <card.icon className='h-4 w-4' aria-hidden='true' />
+                    </div>
+                    <div>
+                      <p className='text-[14px] font-[560] tracking-[-0.01em] text-primary-token'>
+                        {card.title}
+                      </p>
+                      <p className='mt-1 text-[13px] leading-[19px] text-secondary-token'>
+                        {card.description}
+                      </p>
+                    </div>
+                  </div>
+                  <span className='inline-flex items-center gap-2 text-[12px] font-[560] text-secondary-token transition-colors group-hover:text-primary-token'>
+                    Open
+                    <ArrowRight className='h-3.5 w-3.5' aria-hidden='true' />
+                  </span>
+                </ContentSurfaceCard>
+              </Link>
+            ))}
           </div>
-          <div>
-            <Suspense fallback={<AdminUsageSectionSkeleton />}>
-              <AdminUsageSection />
-            </Suspense>
+
+          <Suspense fallback={<AdminKpiSectionSkeleton />}>
+            <AdminKpiSection />
+          </Suspense>
+
+          <div className='grid min-h-0 flex-1 gap-4 lg:grid-cols-3'>
+            <div className='lg:col-span-2'>
+              <Suspense fallback={<AdminOutreachSectionSkeleton />}>
+                <AdminOutreachSection />
+              </Suspense>
+            </div>
+            <div>
+              <Suspense fallback={<AdminUsageSectionSkeleton />}>
+                <AdminUsageSection />
+              </Suspense>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </AdminWorkspacePage>
   );
 }
