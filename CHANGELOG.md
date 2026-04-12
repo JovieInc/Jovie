@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.150.0] - 2026-04-12
+
+### Changed
+
+- Unified all full-screen error/offline screens to match DESIGN.md: consistent 32px logo, #08090a background, pill buttons, identical layout geometry
+- Removed card wrapper from PublicPageErrorFallback (subtraction principle)
+- Removed wifi-off icon from offline page (headline says it all)
+- Added inline SVG logo to root error page (was missing entirely)
+- Replaced marketing-themed classes in root error with System B dark mode
+- Bumped service worker cache name to ensure existing users get the updated offline page
+
+### Added
+
+- Full-Screen Status Screens section in DESIGN.md codifying the canonical spec
+
 ## [26.4.149.1] - 2026-04-12
 
 ### Changed
