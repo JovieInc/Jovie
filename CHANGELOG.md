@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.149.0] - 2026-04-12
+
+### Added
+
+- Suggested DSP matches now appear in the Music tab of the right drawer sidebar with confirm/reject actions and hover popover details
+- Dot indicator on Music tab when unreviewed suggestions exist
+- One-line explanation for first-time users seeing suggested profiles
+
+### Changed
+
+- Presence page now redirects to artist profile settings (Music tab) instead of loading the broken presence UI
+- Removed Presence link from sidebar navigation
+
 ## [26.4.148.0] - 2026-04-11
 
 ### Fixed
