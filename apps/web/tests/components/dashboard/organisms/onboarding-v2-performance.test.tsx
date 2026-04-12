@@ -364,8 +364,8 @@ async function measureRenderTime(
 
 describe('Onboarding screen performance budgets', () => {
   it.each([
-    ['handle', 'Choose your handle', SCREEN_BUDGETS.handle],
-    ['spotify', 'Pick your Spotify artist', SCREEN_BUDGETS.spotify],
+    ['handle', 'Claim your link', SCREEN_BUDGETS.handle],
+    ['spotify', 'Are you on Spotify?', SCREEN_BUDGETS.spotify],
     ['artist-confirm', 'Spotify is connected', SCREEN_BUDGETS.artistConfirm],
     ['upgrade', 'Want the full profile from day one?', SCREEN_BUDGETS.upgrade],
     ['dsp', 'Review DSP matches', SCREEN_BUDGETS.dsp],
@@ -423,7 +423,7 @@ describe('Onboarding screen performance budgets', () => {
             userId='user-performance'
           />
         ),
-      'Pick your Spotify artist'
+      'Are you on Spotify?'
     );
 
     expect(screen.getByText('Search Budget Artist')).toBeInTheDocument();

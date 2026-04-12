@@ -24,9 +24,9 @@ const ROOT_CLASSNAME = {
 
 const CONTENT_CLASSNAME = {
   standalone:
-    'mx-auto flex min-h-screen w-full max-w-[1440px] flex-col gap-5 px-4 py-8 sm:px-6 lg:px-8 xl:flex-row xl:gap-10',
+    'mx-auto flex min-h-screen w-full max-w-[1440px] gap-5 px-4 py-8 max-lg:flex-col sm:px-6 lg:gap-10 lg:px-8',
   embedded:
-    'mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8 xl:flex-row xl:gap-8',
+    'mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 gap-5 px-4 py-6 max-lg:flex-col sm:px-6 lg:gap-8 lg:px-8',
 } as const;
 
 const STAGE_HEIGHT_CLASSNAME = {
@@ -66,7 +66,7 @@ export function OnboardingExperienceShell({
 
       <div className={CONTENT_CLASSNAME[mode]}>
         {sidebar ? (
-          <aside className='w-full shrink-0 xl:w-[240px] 2xl:w-[260px]'>
+          <aside className='shrink-0 max-lg:w-full lg:w-[220px] xl:w-[240px] 2xl:w-[260px]'>
             <div className='sticky top-8'>
               {sidebarTitle ? (
                 <div className='border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_68%,transparent)] pb-4'>
@@ -83,7 +83,7 @@ export function OnboardingExperienceShell({
         <div className='flex min-w-0 flex-1 flex-col'>
           <div
             className={cn(
-              'flex min-w-0 flex-1 flex-col',
+              'flex min-w-0 flex-1 flex-col justify-center',
               STAGE_HEIGHT_CLASSNAME[stableStageHeight],
               STAGE_VARIANT_CLASSNAME[stageVariant],
               stageClassName
