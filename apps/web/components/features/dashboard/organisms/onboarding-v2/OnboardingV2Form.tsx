@@ -1105,6 +1105,7 @@ export function OnboardingV2Form({
   const handleArtistInput = useCallback(
     (value: string) => {
       setSearchInput(value);
+      setDiscoveryError(null);
 
       const directArtistId = extractSpotifyArtistId(value);
       if (directArtistId) {
@@ -1114,6 +1115,22 @@ export function OnboardingV2Form({
           name: '',
           url: `https://open.spotify.com/artist/${directArtistId}`,
         });
+        return;
+      }
+
+      // Detect URLs and show helpful feedback
+      const trimmed = value.trim();
+      if (/^https?:\/\/.+/i.test(trimmed)) {
+        if (trimmed.includes('spotify.com')) {
+          // Spotify URL but not an artist page (track, album, playlist, etc.)
+          setDiscoveryError(
+            'That looks like a Spotify link, but not an artist page. Paste your Spotify artist URL.'
+          );
+        } else {
+          setDiscoveryError(
+            'Only Spotify artist URLs are supported. Paste a link like open.spotify.com/artist/...'
+          );
+        }
         return;
       }
 
