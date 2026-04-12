@@ -111,18 +111,11 @@ export const HOME_HERO_TASKS: readonly HomepageTaskCard[] = [
   },
 ] as const;
 
-/** Returns a realistic release label N days from now. */
-function formatFutureReleaseLabel(daysFromNow: number): string {
-  const target = new Date();
-  target.setDate(target.getDate() + daysFromNow);
-  return `Drops ${target.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
-}
-
 export const HOME_RELEASE_DESTINATION_PRESAVE_MOCK: HomepageReleaseMock = {
   id: 'the-deep-end-presave',
   title: 'The Deep End',
   artist: 'Cosmic Gate & Tim White',
-  releaseLabel: formatFutureReleaseLabel(10),
+  releaseLabel: 'Dropping soon',
   modeLabel: 'Countdown Presave',
   state: 'presave',
   stateDetail: 'Presave is open',
