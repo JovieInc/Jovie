@@ -32,7 +32,7 @@ describe('PublicPageErrorFallback', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'Something went wrong',
+        name: 'Something Went Wrong',
       })
     ).toBeInTheDocument();
     expect(screen.getByText('Try refreshing the page.')).toBeInTheDocument();

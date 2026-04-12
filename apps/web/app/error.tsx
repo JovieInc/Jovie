@@ -20,9 +20,9 @@ export default function RootError({ error, reset }: ErrorProps) {
         </svg>
 
         <h1 className='mt-5 text-[18px] font-[590] leading-[1.3] tracking-[-0.02em]'>
-          Something went wrong
+          Something Went Wrong
         </h1>
-        <p className='mt-2 text-sm leading-relaxed text-[#969799]'>
+        <p className='mt-2 text-sm leading-normal text-[#969799]'>
           An unexpected error occurred.
         </p>
 
@@ -32,14 +32,14 @@ export default function RootError({ error, reset }: ErrorProps) {
             onClick={reset}
             className='h-9 cursor-pointer rounded-full bg-[#e6e6e6] px-4 text-sm font-medium text-[#08090a] transition-[background] duration-150 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7170ff] active:scale-[0.97]'
           >
-            Try again
+            Try Again
           </button>
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Using <a> for resilience when Next.js routing may be broken */}
           <a
             href='/'
             className='flex h-9 items-center rounded-full border border-white/[0.08] bg-transparent px-4 text-sm font-medium text-[#969799] transition-[background,border-color] duration-150 hover:border-white/[0.12] hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7170ff] active:scale-[0.97]'
           >
-            Go home
+            Go Home
           </a>
         </div>
 

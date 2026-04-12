@@ -44,18 +44,6 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.5,
     color: '#969799',
   },
-  button: {
-    marginTop: '24px',
-    height: '36px',
-    padding: '0 16px',
-    border: 'none',
-    borderRadius: '9999px',
-    backgroundColor: '#e6e6e6',
-    color: '#08090a',
-    fontSize: '14px',
-    fontWeight: 500,
-    cursor: 'pointer',
-  },
   errorId: {
     marginTop: '20px',
     color: '#62666d',
@@ -95,9 +83,13 @@ export function PublicPageErrorFallback({
     <div style={styles.page} role='alert' aria-live='assertive'>
       <div style={styles.container}>
         <JovieLogo />
-        <h1 style={styles.title}>Something went wrong</h1>
+        <h1 style={styles.title}>Something Went Wrong</h1>
         <p style={styles.description}>Try refreshing the page.</p>
-        <button type='button' style={styles.button} onClick={onRefresh}>
+        <button
+          type='button'
+          className='mt-6 inline-flex h-9 cursor-pointer items-center justify-center rounded-full bg-[#e6e6e6] px-4 text-sm font-medium text-[#08090a] transition-[background] duration-150 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7170ff] active:scale-[0.97]'
+          onClick={onRefresh}
+        >
           Refresh
         </button>
         {error.digest ? (

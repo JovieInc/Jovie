@@ -176,16 +176,16 @@ export default function GlobalError({
             </svg>
           </div>
 
-          <h1>Something went wrong</h1>
+          <h1>Something Went Wrong</h1>
           <p className='description'>An unexpected error occurred.</p>
 
           <div className='actions'>
             <button type='button' onClick={reset} className='btn btn-primary'>
-              Try again
+              Try Again
             </button>
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Using <a> intentionally in global error boundary for resilience when routing may be broken */}
             <a href='/' className='btn btn-secondary'>
-              Go home
+              Go Home
             </a>
           </div>
 

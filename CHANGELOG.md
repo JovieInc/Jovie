@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.150.0] - 2026-04-12
 
+> Full-screen offline and error screens now use one consistent, design-system-aligned layout.
+
 ### Changed
 
 - Unified all full-screen error/offline screens to match DESIGN.md: consistent 32px logo, #08090a background, pill buttons, identical layout geometry
