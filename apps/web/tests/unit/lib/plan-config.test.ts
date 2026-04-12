@@ -51,10 +51,10 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       const pro = ENTITLEMENT_REGISTRY.pro;
       expect(pro.limits).toEqual({
         analyticsRetentionDays: 180,
-        contactsLimit: 5000,
+        contactsLimit: null,
         smartLinksLimit: null,
         aiDailyMessageLimit: 100,
-        aiPitchGenPerRelease: null,
+        aiPitchGenPerRelease: 5,
       });
       expect(pro.booleans).toEqual({
         canExportContacts: true,
@@ -66,8 +66,8 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         aiCanUseTools: true,
         canCreateManualReleases: true,
         canAccessTasksWorkspace: true,
-        canGenerateReleasePlans: true,
-        canAccessMetadataSubmissionAgent: true,
+        canGenerateReleasePlans: false,
+        canAccessMetadataSubmissionAgent: false,
         canAccessFutureReleases: true,
         canSendNotifications: true,
         canEditSmartLinks: true,
@@ -127,8 +127,8 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       expect(ENTITLEMENT_REGISTRY.free.limits.contactsLimit).toBe(100);
     });
 
-    it('pro has 5000 contacts limit and max has unlimited contacts (null)', () => {
-      expect(ENTITLEMENT_REGISTRY.pro.limits.contactsLimit).toBe(5000);
+    it('pro has unlimited contacts and max has unlimited contacts (null)', () => {
+      expect(ENTITLEMENT_REGISTRY.pro.limits.contactsLimit).toBeNull();
       expect(ENTITLEMENT_REGISTRY.max.limits.contactsLimit).toBeNull();
     });
   });
@@ -244,9 +244,9 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       );
     });
 
-    it('max plan has unlimited contacts (null), pro has 5000', () => {
+    it('max and pro plans have unlimited contacts (null)', () => {
       expect(ENTITLEMENT_REGISTRY.max.limits.contactsLimit).toBeNull();
-      expect(ENTITLEMENT_REGISTRY.pro.limits.contactsLimit).toBe(5000);
+      expect(ENTITLEMENT_REGISTRY.pro.limits.contactsLimit).toBeNull();
     });
 
     it('max plan enables all boolean features', () => {

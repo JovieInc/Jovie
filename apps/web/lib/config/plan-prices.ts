@@ -9,12 +9,12 @@
 
 export const PLAN_PRICES = {
   pro: {
-    monthly: 20,
-    yearly: 192,
+    monthly: 39,
+    yearly: 375,
   },
   max: {
-    monthly: 200,
-    yearly: 1920,
+    monthly: 149,
+    yearly: 1430,
   },
 } as const;
 

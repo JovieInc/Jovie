@@ -218,18 +218,39 @@ export function getReleaseDayNotificationHtml(
 
 /**
  * Build List-Unsubscribe headers for release day notification emails.
- * Improves deliverability — Gmail/Outlook show an unsubscribe button in the UI.
+ * Includes RFC 8058 one-click unsubscribe (required by Gmail/Yahoo for bulk senders).
  *
- * Note: List-Unsubscribe-Post (RFC 8058 one-click) is intentionally omitted
- * because the unsubscribe URL is a profile page, not a POST endpoint.
- * Add it back when a dedicated POST /api/notifications/unsubscribe endpoint exists.
+ * When subscriberId is provided, generates a signed one-click URL.
+ * Falls back to profile manage-notifications URL when subscriber info is unavailable.
  */
 export function getReleaseDayUnsubscribeHeaders(
-  username: string
+  username: string,
+  subscriberId?: string,
+  email?: string
 ): Record<string, string> {
-  const unsubscribeUrl = buildManageNotificationsUrl(username);
+  const manageUrl = buildManageNotificationsUrl(username);
+
+  if (subscriberId && email) {
+    const {
+      buildOneClickUnsubscribeUrl,
+    } = require('@/lib/email/one-click-unsubscribe-token');
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jov.ie';
+    const oneClickUrl = buildOneClickUnsubscribeUrl(
+      baseUrl,
+      subscriberId,
+      email
+    );
+
+    if (oneClickUrl) {
+      return {
+        'List-Unsubscribe': `<${oneClickUrl}>, <${manageUrl}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      };
+    }
+  }
+
   return {
-    'List-Unsubscribe': `<${unsubscribeUrl}>`,
+    'List-Unsubscribe': `<${manageUrl}>`,
   };
 }
 
