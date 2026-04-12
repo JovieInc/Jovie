@@ -21,14 +21,14 @@
  */
 export function isEmbarrassingDisplayName(name: string): boolean {
   const trimmed = name.trim();
+  const lower = trimmed.toLowerCase();
 
   if (trimmed.length === 0) return true;
 
-  if (trimmed.includes('http://') || trimmed.includes('https://')) return true;
+  if (lower.includes('http://') || lower.includes('https://')) return true;
 
-  if (trimmed.toLowerCase().startsWith('www.')) return true;
+  if (lower.startsWith('www.')) return true;
 
-  const lower = trimmed.toLowerCase();
   if (lower === 'undefined' || lower === 'null') return true;
 
   if (/^\d+$/.test(trimmed)) return true;

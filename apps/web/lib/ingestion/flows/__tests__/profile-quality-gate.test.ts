@@ -38,6 +38,7 @@ describe('isEmbarrassingDisplayName', () => {
     expect(isEmbarrassingDisplayName('check out https://spotify.com')).toBe(
       true
     );
+    expect(isEmbarrassingDisplayName('HTTPS://EXAMPLE.COM')).toBe(true);
   });
 
   it('returns true for www. prefix', () => {
