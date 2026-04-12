@@ -3,11 +3,13 @@ import { NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
+import { users } from '@/lib/db/schema/auth';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getReleaseDayNotificationEmail } from '@/lib/email/templates/release-day-notification';
 import { getBatchCreatorEntitlements } from '@/lib/entitlements/creator-plan';
+import { TRIAL_NOTIFICATION_RECIPIENT_LIMIT } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
 import { sendNotification } from '@/lib/notifications/service';
 import { toISOStringSafe } from '@/lib/utils/date';
@@ -307,6 +309,54 @@ async function batchFetchStreamingLinks(releaseIds: string[]) {
 }
 
 // ============================================================================
+// Trial Cap
+// ============================================================================
+
+/**
+ * Check and atomically increment the trial notification counter for a creator.
+ * Returns true if the notification can proceed, false if the cap is reached.
+ * Non-trial creators always return true.
+ */
+async function checkAndIncrementTrialCap(
+  creatorProfileId: string
+): Promise<boolean> {
+  // Atomic increment: only succeeds if user is on trial AND under the cap
+  const result = await db
+    .update(users)
+    .set({
+      trialNotificationsSent: drizzleSql`${users.trialNotificationsSent} + 1`,
+    })
+    .where(
+      and(
+        eq(users.activeProfileId, creatorProfileId),
+        eq(users.plan, 'trial'),
+        drizzleSql`${users.trialNotificationsSent} < ${TRIAL_NOTIFICATION_RECIPIENT_LIMIT}`
+      )
+    )
+    .returning({ id: users.id });
+
+  if (result.length > 0) {
+    // Was on trial, increment succeeded (under cap)
+    return true;
+  }
+
+  // Check if the user is actually on trial — if not, no cap applies
+  const [user] = await db
+    .select({ plan: users.plan })
+    .from(users)
+    .where(eq(users.activeProfileId, creatorProfileId))
+    .limit(1);
+
+  // Not on trial → no cap applies
+  if (!user || user.plan !== 'trial') {
+    return true;
+  }
+
+  // On trial but cap reached
+  return false;
+}
+
+// ============================================================================
 // Notification Processing
 // ============================================================================
 
@@ -402,6 +452,20 @@ async function processNotificationWithBatchedData(
     // Get pre-fetched streaming links
     const links = linksMap.get(release.id) ?? [];
 
+    // Check trial notification cap before sending
+    const canSend = await checkAndIncrementTrialCap(
+      ctx.notification.creatorProfileId
+    );
+    if (!canSend) {
+      await updateNotificationStatus(
+        ctx.notification.id,
+        ctx.now,
+        'cancelled',
+        'Trial notification cap reached'
+      );
+      return 'skipped';
+    }
+
     // Build email content
     const artistName = creator.displayName ?? creator.username;
     const emailData = getReleaseDayNotificationEmail({
@@ -412,6 +476,8 @@ async function processNotificationWithBatchedData(
       slug: release.slug,
       streamingLinks: links,
       subscriberName: subscriber.name,
+      subscriberId: subscriber.id,
+      subscriberEmail: subscriber.email ?? undefined,
     });
 
     // Build sender context for "Artist Name via Jovie" emails
