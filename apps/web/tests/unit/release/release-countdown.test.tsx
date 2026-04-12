@@ -212,18 +212,20 @@ describe('@critical ReleaseCountdown — refresh guard contract', () => {
     let hasRefreshedCurrent = false;
     let refreshCount = 0;
 
-    // Mount path fires first (expired on mount)
-    if (!hasRefreshedCurrent) {
-      hasRefreshedCurrent = true;
-      refreshCount++;
+    // Simulate the guard logic used by both mount and interval paths
+    function attemptRefresh() {
+      if (!hasRefreshedCurrent) {
+        hasRefreshedCurrent = true;
+        refreshCount++;
+      }
     }
+
+    // Mount path fires first (expired on mount)
+    attemptRefresh();
     expect(refreshCount).toBe(1);
 
-    // Interval path fires later (also expired)
-    if (!hasRefreshedCurrent) {
-      hasRefreshedCurrent = true;
-      refreshCount++;
-    }
-    expect(refreshCount).toBe(1); // Still 1, guard blocked it
+    // Interval path fires later (also expired) — guard blocks it
+    attemptRefresh();
+    expect(refreshCount).toBe(1);
   });
 });
