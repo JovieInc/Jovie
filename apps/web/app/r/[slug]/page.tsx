@@ -28,6 +28,7 @@ import {
 } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { parseSmartLinkSlug } from '@/lib/utils/smart-link';
 import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
 import { ReleaseLandingPage } from './ReleaseLandingPage';
 
@@ -38,31 +39,6 @@ export const revalidate = 300;
 interface PageProps {
   readonly params: Promise<{ slug: string }>;
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
-}
-
-/**
- * Parse the smart link slug to extract releaseSlug and profileId
- * Format: {releaseSlug}--{profileId}
- */
-function parseSmartLinkSlug(slug: string): {
-  releaseSlug: string;
-  profileId: string;
-} | null {
-  const separator = '--';
-  const lastSeparatorIndex = slug.lastIndexOf(separator);
-
-  if (lastSeparatorIndex === -1) {
-    return null;
-  }
-
-  const releaseSlug = slug.slice(0, lastSeparatorIndex);
-  const profileId = slug.slice(lastSeparatorIndex + separator.length);
-
-  if (!releaseSlug || !profileId) {
-    return null;
-  }
-
-  return { releaseSlug, profileId };
 }
 
 /**

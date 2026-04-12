@@ -94,6 +94,10 @@ describe('shouldUseEssentialShellData', () => {
   it('returns false for null', () => {
     expect(shouldUseEssentialShellData(null)).toBe(false);
   });
+
+  it('returns false for non-lightweight routes', () => {
+    expect(shouldUseEssentialShellData('/app/settings')).toBe(false);
+  });
 });
 
 describe('shouldRedirectToOnboarding', () => {
@@ -104,5 +108,9 @@ describe('shouldRedirectToOnboarding', () => {
 
   it('returns false for null', () => {
     expect(shouldRedirectToOnboarding(null)).toBe(false);
+  });
+
+  it('returns false for non-lightweight routes', () => {
+    expect(shouldRedirectToOnboarding('/app/settings')).toBe(false);
   });
 });

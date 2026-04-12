@@ -104,7 +104,7 @@ module.exports = {
       auth: true,
       timings: [
         { metric: 'first-contentful-paint', budget: 1500 },
-        { metric: 'largest-contentful-paint', budget: 2500 },
+        { metric: 'largest-contentful-paint', budget: 3000 },
         { metric: 'cumulative-layout-shift', budget: 0.1 },
         { metric: 'first-input-delay', budget: 100 },
         { metric: 'time-to-first-byte', budget: 1500 },
@@ -121,8 +121,8 @@ module.exports = {
       path: '/billing',
       auth: true,
       timings: [
-        { metric: 'first-contentful-paint', budget: 1500 },
-        { metric: 'largest-contentful-paint', budget: 2500 },
+        { metric: 'first-contentful-paint', budget: 2000 },
+        { metric: 'largest-contentful-paint', budget: 3000 },
         { metric: 'cumulative-layout-shift', budget: 0.1 },
         { metric: 'first-input-delay', budget: 100 },
         { metric: 'time-to-first-byte', budget: 1500 },

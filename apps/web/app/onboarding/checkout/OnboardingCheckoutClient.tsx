@@ -12,6 +12,7 @@ import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import { cn } from '@/lib/utils';
+import { formatPrice, getAnnualSavingsPercent } from '@/lib/utils/pricing';
 
 interface OnboardingCheckoutClientProps {
   readonly plan: PlanIntentTier;
@@ -24,18 +25,6 @@ interface OnboardingCheckoutClientProps {
   readonly avatarUrl: string | null;
   readonly spotifyFollowers: number | null;
   readonly isDefaultUpsell: boolean;
-}
-
-function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(0)}`;
-}
-
-function getAnnualSavingsPercent(
-  monthlyAmount: number,
-  annualAmount: number
-): number {
-  const yearlyAtMonthly = monthlyAmount * 12;
-  return Math.round(((yearlyAtMonthly - annualAmount) / yearlyAtMonthly) * 100);
 }
 
 const PRO_HIGHLIGHTS = [

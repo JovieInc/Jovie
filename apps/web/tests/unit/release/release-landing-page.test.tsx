@@ -261,7 +261,10 @@ describe('@critical ReleaseLandingPage', () => {
     expect(flowEl.closest('a')).toBeNull();
   });
 
-  it('captures javascript: protocol in provider URLs for XSS audit', () => {
+  // TODO: SmartLinkProviderButton should sanitize href to reject javascript:
+  // protocol. This test documents the current gap and will break (correctly)
+  // when sanitization is added. Flip the assertion at that point.
+  it('documents that javascript: URLs currently pass through unsanitized', () => {
     const xssProviders = [
       {
         key: 'spotify' as const,
@@ -272,10 +275,6 @@ describe('@critical ReleaseLandingPage', () => {
     ];
     render(<ReleaseLandingPage {...defaultProps} providers={xssProviders} />);
     const btn = screen.getByTestId('provider-button');
-    // The mock captures the href value. In production, the real
-    // SmartLinkProviderButton renders an <a> tag. This test documents
-    // that the URL passes through without sanitization — a security
-    // invariant to monitor.
     expect(btn.getAttribute('data-href')).toBe('javascript:alert(1)');
   });
 });

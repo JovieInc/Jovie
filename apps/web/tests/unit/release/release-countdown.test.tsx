@@ -3,28 +3,7 @@
  * @critical — Revenue-facing countdown timer, previously had zero tests
  */
 import { describe, expect, it } from 'vitest';
-
-// Test the pure getTimeLeft logic extracted inline (the component is too heavy
-// to render in the fork pool due to OOM in the worker). We test the algorithm
-// that drives the UI rather than rendering the full React component.
-
-interface TimeLeft {
-  days: number;
-  hours: number;
-  minutes: number;
-  total: number;
-}
-
-function getTimeLeft(targetDate: Date, now: Date = new Date()): TimeLeft {
-  const total = targetDate.getTime() - now.getTime();
-  if (total <= 0) {
-    return { days: 0, hours: 0, minutes: 0, total: 0 };
-  }
-  const days = Math.floor(total / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((total % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutes = Math.floor((total % (1000 * 60 * 60)) / (1000 * 60));
-  return { days, hours, minutes, total };
-}
+import { getTimeLeft } from '@/lib/utils/release-countdown';
 
 describe('@critical ReleaseCountdown — getTimeLeft logic', () => {
   const NOW = new Date('2025-06-01T00:00:00.000Z');
@@ -82,8 +61,8 @@ describe('@critical ReleaseCountdown — getTimeLeft logic', () => {
   });
 });
 
-describe('@critical ReleaseCountdown — UI behavior contracts', () => {
-  it('days segment hidden when days === 0 (compact: D not shown)', () => {
+describe('@critical ReleaseCountdown — component data conditions', () => {
+  it('days === 0 triggers hidden days segment in component', () => {
     const result = getTimeLeft(
       new Date('2025-06-01T03:45:00.000Z'),
       new Date('2025-06-01T00:00:00.000Z')
@@ -120,7 +99,7 @@ describe('@critical ReleaseCountdown — UI behavior contracts', () => {
     expect(twoHours.hours).toBe(2);
   });
 
-  it('router.refresh() should fire when total <= 0 (expired)', () => {
+  it('total <= 0 for expired dates (component uses this to trigger refresh)', () => {
     const result = getTimeLeft(
       new Date('2025-05-01T00:00:00.000Z'),
       new Date('2025-06-01T00:00:00.000Z')
@@ -129,7 +108,7 @@ describe('@critical ReleaseCountdown — UI behavior contracts', () => {
     expect(result.total).toBe(0);
   });
 
-  it('interval should be set for future dates (total > 0)', () => {
+  it('total > 0 for future dates (component uses this to start interval)', () => {
     const result = getTimeLeft(
       new Date('2025-06-10T00:00:00.000Z'),
       new Date('2025-06-01T00:00:00.000Z')
@@ -138,7 +117,7 @@ describe('@critical ReleaseCountdown — UI behavior contracts', () => {
     expect(result.total).toBeGreaterThan(0);
   });
 
-  it('interval should NOT be set for past dates (total === 0)', () => {
+  it('total === 0 for past dates (component skips interval)', () => {
     const result = getTimeLeft(
       new Date('2025-05-01T00:00:00.000Z'),
       new Date('2025-06-01T00:00:00.000Z')

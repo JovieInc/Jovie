@@ -8,22 +8,7 @@
  */
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-
-// ---------------------------------------------------------------------------
-// Pure logic tests (functions are not exported, so we duplicate the algorithm)
-// ---------------------------------------------------------------------------
-
-function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(0)}`;
-}
-
-function getAnnualSavingsPercent(
-  monthlyAmount: number,
-  annualAmount: number
-): number {
-  const yearlyAtMonthly = monthlyAmount * 12;
-  return Math.round(((yearlyAtMonthly - annualAmount) / yearlyAtMonthly) * 100);
-}
+import { formatPrice, getAnnualSavingsPercent } from '@/lib/utils/pricing';
 
 describe('@critical OnboardingCheckout — pricing logic', () => {
   it('formatPrice converts cents to dollar string', () => {
@@ -164,7 +149,7 @@ describe('@critical OnboardingCheckoutClient — render', () => {
     render(
       <OnboardingCheckoutClient {...defaultProps} spotifyFollowers={null} />
     );
-    expect(screen.queryByText('Spotify followers')).toBeNull();
+    expect(screen.queryByText(/spotify followers/i)).toBeNull();
   });
 
   it('renders plan highlight features', () => {

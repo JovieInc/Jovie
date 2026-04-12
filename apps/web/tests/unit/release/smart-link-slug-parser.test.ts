@@ -1,24 +1,5 @@
 import { describe, expect, it } from 'vitest';
-
-/**
- * @smoke
- *
- * Tests for the slug parsing algorithm used by the smart link page
- * at /r/[slug]. The actual function is private inside the page component,
- * so we replicate the algorithm here to verify its behavior.
- */
-
-function parseSmartLinkSlug(
-  slug: string
-): { releaseSlug: string; profileId: string } | null {
-  const separator = '--';
-  const lastSeparatorIndex = slug.lastIndexOf(separator);
-  if (lastSeparatorIndex === -1) return null;
-  const releaseSlug = slug.slice(0, lastSeparatorIndex);
-  const profileId = slug.slice(lastSeparatorIndex + separator.length);
-  if (!releaseSlug || !profileId) return null;
-  return { releaseSlug, profileId };
-}
+import { parseSmartLinkSlug } from '@/lib/utils/smart-link';
 
 describe('@smoke parseSmartLinkSlug', () => {
   it('parses a simple slug into releaseSlug and profileId', () => {
