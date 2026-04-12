@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Show specific handle validation errors during onboarding instead of generic "Not available" for all failures
 - Rewrite retargeting-ads loading skeleton to match actual page layout (summary cards, ad group grids, instructions)
 - Rewrite blog index loading skeleton from timeline to featured post + 2-column grid layout
 - Replace billing success/cancel `AuthLoader` skeletons with page-matching celebration and cancel layouts
