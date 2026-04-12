@@ -133,7 +133,7 @@ describe('gate.ts', () => {
       mockDbSelect.mockReturnValue(
         createJoinQueryMock([
           {
-            id: 'db-user-123',
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             email: 'test@example.com',
             userStatus: 'active',
             isAdmin: false,
@@ -159,7 +159,7 @@ describe('gate.ts', () => {
       mockDbSelect.mockReturnValue(
         createJoinQueryMock([
           {
-            id: 'db-user-123',
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             email: 'test@example.com',
             userStatus: 'banned',
             isAdmin: false,
@@ -185,7 +185,7 @@ describe('gate.ts', () => {
       mockDbSelect.mockReturnValue(
         createJoinQueryMock([
           {
-            id: 'db-user-123',
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             email: 'test@example.com',
             userStatus: 'suspended',
             isAdmin: false,
@@ -212,7 +212,7 @@ describe('gate.ts', () => {
       mockDbSelect.mockReturnValue(
         createJoinQueryMock([
           {
-            id: 'db-user-123',
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             email: 'test@example.com',
             userStatus: 'active',
             isAdmin: false,
@@ -234,7 +234,7 @@ describe('gate.ts', () => {
 
       expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
       expect(result.redirectTo).toBe('/onboarding?fresh_signup=true');
-      expect(result.dbUserId).toBe('db-user-123');
+      expect(result.dbUserId).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
     });
 
     it('returns NEEDS_ONBOARDING when profile is incomplete', async () => {
@@ -247,7 +247,7 @@ describe('gate.ts', () => {
       mockDbSelect.mockReturnValue(
         createJoinQueryMock([
           {
-            id: 'db-user-123',
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             email: 'test@example.com',
             userStatus: 'active',
             isAdmin: false,
@@ -281,7 +281,7 @@ describe('gate.ts', () => {
       mockDbSelect.mockReturnValue(
         createJoinQueryMock([
           {
-            id: 'db-user-123',
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             email: 'test@example.com',
             userStatus: 'active',
             isAdmin: false,
@@ -322,7 +322,7 @@ describe('gate.ts', () => {
       mockDbSelect.mockReturnValue(
         createJoinQueryMock([
           {
-            id: 'db-user-123',
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             email: 'admin@example.com',
             userStatus: 'active',
             isAdmin: true,

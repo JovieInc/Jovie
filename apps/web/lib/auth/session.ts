@@ -381,6 +381,21 @@ export async function getSessionContext(options?: {
   }
 
   // Build user context from result
+  // Guard: users.id must be a UUID. If a Clerk ID leaked into the id column
+  // (data issue), fail fast here instead of causing "invalid input syntax for
+  // type uuid" errors in every downstream query (see JOVIE-WEB-HH).
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(result.userId)) {
+    logDbError(
+      'getSessionContext',
+      new Error(
+        `user.id is not a UUID: ${result.userId} (clerkId=${clerkUserId})`
+      )
+    );
+    throw new TypeError(SESSION_ERRORS.USER_NOT_FOUND);
+  }
+
   const user: DbUserContext = {
     id: result.userId,
     clerkId: result.userClerkId,
