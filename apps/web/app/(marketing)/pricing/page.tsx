@@ -315,7 +315,7 @@ export default function PricingPage() {
                 color: 'var(--linear-text-secondary)',
               }}
             >
-              Start free, upgrade anytime. No credit card required.
+              Start with a free 14-day Pro trial. No credit card required.
             </p>
             <div className='mt-8 flex items-center justify-center gap-4'>
               <Link href='/signup' className='public-action-primary'>

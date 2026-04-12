@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.149.2] - 2026-04-12
+
+> Pricing, terms, and docs copy now consistently reflect Free, Pro, and Max plans with a 14-day Pro trial.
+
+### Changed
+
+- Pricing page CTA updated to mention 14-day Pro trial
+- Terms of service payment section rewritten to reflect Free/Pro/Max plans, trial, and billing
+- Docs plans-pricing page fully rewritten: removed stale Founding Member ($12) and Growth ($99) tiers, added current Free/$39 Pro/$149 Max
+- All docs feature pages updated from "Growth" to "Max" plan references (11 files)
+- "Remove Jovie branding" corrected from Pro to Max-only in docs
+- Pro analytics retention corrected from 90 to 180 days in docs
+- Free AI message limit corrected from 25 to 10/day in chat-ai docs
+- LLMs route pricing section updated with accurate tier descriptions and trial mention
+
 ## [26.4.143] - 2026-04-12
 
 ### Added
