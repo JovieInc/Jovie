@@ -310,7 +310,7 @@ const SCREEN_BUDGETS = {
   artistConfirm: 425,
   checkout: 350,
   dsp: 180,
-  handle: 200,
+  handle: 500,
   lateArrivals: 500,
   profileReady: 180,
   releases: 180,
