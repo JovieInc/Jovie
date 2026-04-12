@@ -130,7 +130,7 @@ function unwrapNextImageUrl(url: string | null | undefined): string | null {
 }
 
 function getModeFromLocation(fallbackMode: ProfileMode): ProfileMode {
-  if (typeof globalThis.window === 'undefined') {
+  if (globalThis.window === undefined) {
     return fallbackMode;
   }
 
@@ -215,7 +215,7 @@ export function ProfileCompactTemplate({
   }, [artist.image_url, photoDownloadSizes]);
 
   const initialSource = useMemo(() => {
-    if (typeof globalThis.window === 'undefined') return null;
+    if (globalThis.window === undefined) return null;
     return new URLSearchParams(globalThis.location.search).get('source');
   }, []);
 

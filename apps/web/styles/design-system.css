@@ -25,7 +25,7 @@
   --public-shell-border: var(--color-border-default);
   --public-shell-content-max: var(--linear-content-max);
   --public-content-max-landing: 1280px;
-  --public-content-max-page: 1120px;
+  --public-content-max-page: 1200px;
   --public-content-max-prose: 680px;
   --app-shell-content-max-wide: 84rem;
   --app-shell-content-max-reading: 56rem;
@@ -1195,6 +1195,11 @@
 
 [data-theme="linear"],
 .linear-marketing {
+  /* Marketing typography: Satoshi (display/buttons) + DM Sans (body) */
+  font-family: var(--font-body);
+  --marketing-font-display: var(--font-display);
+  --marketing-font-body: var(--font-body);
+
   /* Map Linear text colors to design system */
   --color-text-primary-token: var(--linear-text-primary);
   --color-text-secondary-token: var(--linear-text-secondary);
@@ -1223,4 +1228,19 @@
   /* Map Linear page bg and focus ring */
   --color-bg-page: var(--linear-bg-page);
   --color-border-focus: var(--linear-border-focus);
+}
+
+/* Marketing typography: headings and buttons use Satoshi (display font) */
+.linear-marketing h1,
+.linear-marketing h2,
+.linear-marketing h3,
+.linear-marketing h4 {
+  font-family: var(--marketing-font-display);
+}
+
+.linear-marketing button,
+.linear-marketing [role="button"],
+.linear-marketing a[class*="btn"] {
+  font-family: var(--marketing-font-display);
+  letter-spacing: -0.01em;
 }

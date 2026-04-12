@@ -5,6 +5,90 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.149.1] - 2026-04-12
+
+### Changed
+
+- Marketing typography: Inter replaced with Satoshi (display) + DM Sans (body) for all marketing pages
+- All marketing container widths unified from 1120px to 1200px across 10 files
+- Feature grid icons replaced with accent-colored title text (no more emoji-on-colored-square pattern)
+- Container homepage variant simplified from padding hack to standard max-width
+- CTA philosophy documented as white-on-black (Apple approach), no saturated brand color
+- Replace hardcoded hex colors in mobile swipe actions with design system tokens
+- Unify empty state styling across releases page (consistent min-height, heading size, button spacing)
+- Align table base text to 13px per DESIGN.md specification
+- Wrap connected-but-empty state in DrawerSurfaceCard for visual consistency
+
+### Added
+
+- Self-hosted Satoshi Variable (42KB) and DM Sans Variable (48KB) font files
+- Marketing font loading via next/font/local, scoped to .linear-marketing wrapper
+- Font families registered in @theme block (--font-display, --font-body)
+- Feature accent color system documented in DESIGN.md with usage rules
+- Explicit anti-patterns added to DESIGN.md: gold colors, emoji-on-square icons, saturated brand colors
+
+## [26.4.149.0] - 2026-04-12
+
+### Changed
+
+- Redesign onboarding handle step with inline `jov.ie/` prefix, pearl composer-style input, and circular arrow submit button
+- Simplify Spotify search step to single headline "Are you on Spotify?" with no redundant copy
+- Fix sidebar layout to sit beside content at 1024px+ instead of stacking on top (Tailwind v4 cascade fix)
+- Vertically position onboarding content in upper third of viewport for consistent headline placement
+- Replace filled sidebar circles with hollow stroke icons: solid (complete), half-solid/half-dotted (in-progress), dotted (pending)
+- Add per-step accent colors to sidebar step indicators
+- Simplify artist-confirm step to single clear message with always-enabled Continue button
+- Show specific handle validation errors instead of generic "Not available" message
+- Move Back button into sidebar for consistent alignment with "Jovie Setup" title
+- Presence page now redirects to artist profile settings (Music tab) instead of loading the broken presence UI
+- Removed Presence link from sidebar navigation
+
+### Added
+
+- Reserve top artist Spotify IDs as unavailable in search dropdown for social proof
+- "Need help?" / "Contact support" mailto link in search dropdown footer
+- Handle suggestions shown as clickable `jov.ie/` pills with "Try:" label
+- Suggested DSP matches now appear in the Music tab of the right drawer sidebar with confirm/reject actions and hover popover details
+- Dot indicator on Music tab when unreviewed suggestions exist
+- One-line explanation for first-time users seeing suggested profiles
+
+### Fixed
+
+- Fix dropdown flickering during typing with `placeholderData: keepPreviousData`
+- Errors on artist-confirm step stay in context instead of bouncing to "Are you on Spotify?"
+- Split generic server error "That handle can't be used" into specific messages (reserved, too short, invalid characters)
+
+## [26.4.148.1] - 2026-04-12
+
+### Removed
+
+- Delete 23 dead loading skeletons on redirect-only routes that never rendered
+- Remove orphaned `WaitlistSkeleton` component and Storybook story
+- Remove unused `BrandingSettingsLoading`, `NotificationsSettingsLoading`, and `BillingSettingsLoading` exports
+
+### Fixed
+
+- Fix infinite page refresh loop on release pages when countdown expires (affects ScheduledReleasePage, MysteryReleasePage, PreSaveActions, ProfileCompactTemplate)
+- Show specific handle validation errors during onboarding instead of generic "Not available" for all failures
+- Rewrite retargeting-ads loading skeleton to match actual page layout (summary cards, ad group grids, instructions)
+- Rewrite blog index loading skeleton from timeline to featured post + 2-column grid layout
+- Replace billing success/cancel `AuthLoader` skeletons with page-matching celebration and cancel layouts
+- Add missing ad-pixels section skeleton to audience settings loader
+- Fix billing settings loader description text ("Subscription" to "Plan")
+
+## [26.4.148.0] - 2026-04-11
+
+### Fixed
+
+- Eliminate chat message flickering by skipping entrance animation on messages loaded from persistence
+- Rewrite chat skeleton loader to match actual message layout (circular logo above bubble, correct border styling)
+- Cap chat thread and input width at 44rem to prevent overly wide layouts on large screens
+
+### Changed
+
+- Chat copy buttons now show icon-only with circle background only on hover, matching the sidebar toggle pattern
+- Replace top-right Copy Session ID button with an ellipsis dropdown menu containing Copy and Archive actions
+
 ## [26.4.147.0] - 2026-04-11
 
 ### Fixed
@@ -57,9 +141,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-<<<<<<< HEAD
 - Fixed territory badge border token in ContactDetailSidebar — replaced `border-(--linear-app-frame-seam)` (divider token) with `border-subtle` (card-level token) to match release sidebar badge pattern
-=======
 - Standardized dashboard elevation tokens to 3-tier system (DataCard, EmptyState, banners, empty state icons)
 - Added card wrapper to audience funnel stats (Profile Views, Unique Visitors, Followers)
 - Removed double shadow on chat input that caused visible border artifact

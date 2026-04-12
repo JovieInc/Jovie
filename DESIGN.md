@@ -1,7 +1,8 @@
 # Jovie Design System
 
-> **Baseline:** Linear.app March 2026 UI refresh (changelog 2026-03-12).
-> **Strategy:** Start from Linear's proven design system, lock it as baseline, evolve into Jovie's own identity later.
+> **Baseline:** Linear.app March 2026 UI refresh, evolved with Jovie's own identity.
+> **Aesthetic:** Apple meets Rekordbox. Dark-first, restrained, product-as-hero. The restraint is the brand.
+> **Target audience:** World-class touring DJs who take themselves seriously.
 > **Color space:** OKLCH (with LCH for values extracted directly from Linear's CSS).
 
 ---
@@ -26,6 +27,23 @@ See the [Surface Classification](#canonical-surface-split) section below for ful
 
 ## Typography
 
+### System A — Marketing (Satoshi + DM Sans)
+
+Marketing pages use a two-font system loaded via `next/font/local` in the marketing layout:
+
+- **Display/Hero:** Satoshi Variable (weight 800, letter-spacing -0.025em)
+- **Section headlines:** Satoshi Variable (weight 700, letter-spacing -0.02em)
+- **Subsection:** Satoshi Variable (weight 600, letter-spacing -0.015em)
+- **Buttons:** Satoshi Variable (weight 600, letter-spacing -0.01em) — buttons are controls, not copy
+- **Body:** DM Sans Variable (weight 400, letter-spacing -0.005em)
+- **Captions/meta:** DM Sans Variable (weight 500)
+
+Font files: `apps/web/public/fonts/Satoshi-Variable.woff2` (~42KB), `apps/web/public/fonts/DMSans-Variable.woff2` (~48KB).
+
+CSS variables: `--font-satoshi`, `--font-dm-sans` (set by `next/font/local`). Scoped to `.linear-marketing` wrapper via `--marketing-font-display` and `--marketing-font-body`.
+
+### System B — App (Inter)
+
 **Font:** Inter Variable (self-hosted, weight range 100–900)
 
 ### Font Weights
@@ -42,10 +60,10 @@ See the [Surface Classification](#canonical-surface-split) section below for ful
 
 | Level | Size | Weight | Letter-spacing | Line-height | Usage |
 |-------|------|--------|----------------|-------------|-------|
-| H1 | 64px | 510 | -1.408px (-2.2%) | 67.84px (1.06) | Hero headlines |
-| H2 | 48px | 510 | -1.056px (-2.2%) | 48px (1.0) | Section headlines |
-| H3 | 20px | 590 | -0.24px (-1.2%) | 26.6px (1.33) | Sub-section titles |
-| H4 | 18px | 538 | — | 24px (1.33) | Card titles |
+| H1 | 64px | 800 | -1.6px (-2.5%) | 67.84px (1.06) | Hero headlines (Satoshi) |
+| H2 | 48px | 700 | -0.96px (-2.0%) | 48px (1.0) | Section headlines (Satoshi) |
+| H3 | 20px | 600 | -0.3px (-1.5%) | 26.6px (1.33) | Sub-section titles (Satoshi) |
+| H4 | 18px | 600 | -0.18px (-1.0%) | 24px (1.33) | Card titles (Satoshi) |
 | Body LG | 24px | 400 | -0.288px (-1.2%) | 31.92px (1.33) | Lead paragraphs |
 | Body | 15px | 400 | -0.165px (-1.1%) | 24px (1.6) | Body text |
 | Body SM | 14px | 400 | -0.182px (-1.3%) | 21px (1.5) | Small body |
@@ -126,6 +144,10 @@ The example above says one thing three times. Jovie should say it once.
 - Long helper paragraphs inside cards when a short label or one sentence would do
 - Multiple nested surfaces whose only job is to create the feeling of "designed"
 - Treating borders as the primary way to separate content instead of using spacing, alignment, contrast, and typography
+- **Emoji/symbol on colored background square** — explicitly banned. This pattern cheapens the brand and reads as consumer-grade AI slop. Use accent color on title text only.
+- **Gold colors in brand/CTA expression** — banned. Avoid prestige-signaling metallic tones for identity or primary actions. (Feature accent orange/amber for Pro tier is a distinct, permitted use.)
+- **Saturated brand colors** for CTAs — CTAs are white-on-black (Apple approach). Accent colors are for feature differentiation only.
+- **"Fun" fonts** — Jovie's audience is world-class touring DJs who take themselves seriously. Typography should be utilitarian, clean, and modern.
 
 ### Product UI Taste
 
@@ -220,6 +242,8 @@ Three input variables generate the entire palette:
 
 ### Marketing Colors (System A — Dark by Default)
 
+**No brand color.** Black, white, and gray are the brand. The restraint is the identity.
+
 | Token | Value | Usage |
 |-------|-------|-------|
 | Background | `#000000` | Pure black |
@@ -227,10 +251,30 @@ Three input variables generate the entire palette:
 | Body text | `#A2A7AF` | Paragraphs |
 | Muted text | `#8A8F98` | Nav items, secondary |
 | Quaternary text | `#62666d` | Subtle, disabled |
-| CTA accent | `#5E6AD2` | Linear indigo — sign-up buttons |
-| App accent | `#7170ff` | In-app accent (different from marketing CTA) |
+| Primary CTA bg | `#ffffff` | White-on-black (Apple approach) |
+| Primary CTA fg | `#08090a` | Dark text on white button |
+| Secondary CTA bg | `transparent` | Glass with white border |
+| Secondary CTA fg | `#F7F8F8` | White text |
 | Login button bg | `rgba(255,255,255,0.1)` | Subtle glass |
 | Header bg | `transparent` | Blur backdrop |
+
+### Feature Accent Colors (supporting, never brand)
+
+These colors differentiate features in bento grids and semantic indicators. They are supporting cast, never used for CTAs or brand identity.
+
+| Token | Light | Dark | Feature |
+|-------|-------|------|---------|
+| `--accent-analytics` | `#2563ff` | `#4d7dff` | Analytics |
+| `--accent-conv` | `#8b1eff` | `#9b4dff` | Conversion |
+| `--accent-beauty` | `#d61a7f` | `#ea4a9c` | Beauty/Design |
+| `--accent-links` | `#0f9b8e` | `#22b8a7` | Smart Links |
+| `--accent-speed` | `#2f9e44` | `#43b85c` | Speed |
+| `--accent-pro` | `#ff9800` | `#ffab2e` | Pro Tools |
+
+**Usage rules:**
+- Apply accent color to feature card **title text only** via `text-[color:var(--accent-*)]`
+- Never use accent colors on CTAs, brand identity, icon backgrounds, or decorative elements
+- Feature accents are defined in `design-system.css` (lines 136-151 light, 362-377 dark, 816-823 aliases)
 
 ### Gray Scale (Radix-style)
 
@@ -295,12 +339,11 @@ Pure neutral HSL — no hue tint. Used across both systems.
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| Homepage max | 1344px | Full-width marketing |
-| Container | 1298px | Standard container |
-| Content | 1200px | Content area |
-| Hero section | 1024px | Hero content |
+| Marketing canonical | 1200px | **All boxed marketing content** — header, hero, every section. One width. |
 | Prose | 624px | Long-form text |
-| Pricing grid | 1024px | Pricing layout |
+| Pricing grid | 1024px | Pricing layout (intentional narrow) |
+
+**Rule:** All marketing sections use `max-w-[1200px]` (or `var(--linear-content-max)`). Full-bleed sections explicitly break out. No more mixed widths.
 
 ---
 
@@ -383,7 +426,7 @@ Pure neutral HSL — no hue tint. Used across both systems.
 | Primary | `oklch(10% 0 0)` | `oklch(100% 0 0)` | `#e6e6e6` | `#08090a` |
 | Secondary | `oklch(93% chroma hue)` | `oklch(20% 0 0)` | `oklch(19% chroma hue)` | `oklch(90% 0 0)` |
 | Accent | `#7170ff` | white | `#7170ff` | white |
-| Marketing CTA | `#5E6AD2` | white | `#5E6AD2` | white |
+| Marketing CTA | `#ffffff` | `#08090a` | `#ffffff` | `#08090a` |
 
 Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padding: 12px horizontal.
 
@@ -535,3 +578,8 @@ Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padd
 | 2026-03-25 | Right panel inside `<main>` content card | Matches Linear's unified card layout — sidebar and panel share one card with a thin left-border divider |
 | 2026-03-25 | Sidebar: no border, radius, shadow, or backdrop-blur | Flat sidebar sits flush against page background — matches Linear's design (v26.4.72) |
 | 2026-03-25 | BrandLogo: `next/image` with dark/light variants | Reverted from inline SVG — `next/image` handles theme-aware loading with proper optimization |
+| 2026-04-11 | Marketing typography: Satoshi (display) + DM Sans (body) | Inter is too generic for a music/DJ product. Satoshi 800 provides hierarchy without being flashy. DM Sans is clean body text. |
+| 2026-04-11 | No brand color (Apple approach) | White-on-black CTAs. Accent colors are supporting cast for feature differentiation only. Restraint is the brand. |
+| 2026-04-11 | Canonical 1200px width for all marketing | Fixed inconsistent widths (header 1200px, hero 1120px). Everything boxed at 1200px now. |
+| 2026-04-11 | Ban emoji-on-colored-square icons | Replaced with accent color on card title text. Icon-on-square reads as AI slop and cheapens the brand. |
+| 2026-04-11 | Ban gold colors | Gold signals prestige-seeking. Not appropriate for Jovie's DJ audience. |

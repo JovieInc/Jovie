@@ -43,7 +43,7 @@ import {
   getFeaturedSmartLinkStaticParams,
   getReleaseTrackList,
 } from './_lib/data';
-import { generateMusicStructuredData } from './music-structured-data';
+import { generateMusicStructuredData } from './_lib/structured-data';
 
 // Use ISR with 5-minute revalidation for smart link pages
 export const revalidate = 300;
@@ -185,7 +185,6 @@ export default async function ContentSmartLinkPage({
           : null,
     },
     creator,
-    BASE_URL,
     trackList
   );
 

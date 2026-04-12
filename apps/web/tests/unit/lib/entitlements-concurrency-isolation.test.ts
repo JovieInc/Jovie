@@ -99,7 +99,7 @@ describe('entitlements concurrent access isolation', () => {
 
     expect(pro.userId).toBe('user_pro');
     expect(pro.plan).toBe('pro');
-    expect(pro.contactsLimit).toBe(5000);
+    expect(pro.contactsLimit).toBeNull();
     expect(pro.hasAdvancedFeatures).toBe(false);
 
     expect(max.userId).toBe('user_max');

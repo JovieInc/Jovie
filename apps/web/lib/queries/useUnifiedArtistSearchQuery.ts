@@ -1,7 +1,7 @@
 'use client';
 
 import { useAsyncDebouncer } from '@tanstack/react-pacer';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
 import { SEARCH_CACHE } from './cache-strategies';
@@ -79,6 +79,7 @@ export function useUnifiedArtistSearchQuery<TResult>(
     queryKey: queryKey(debouncedQuery, limit),
     queryFn: ({ signal }) => searchFn(debouncedQuery, limit, signal),
     enabled: debouncedQuery.length >= minQueryLength,
+    placeholderData: keepPreviousData,
     ...SEARCH_CACHE,
     retry: (failureCount, error) => {
       if (error instanceof Error && error.name === 'RateLimitError') {

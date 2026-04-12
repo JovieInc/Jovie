@@ -9,7 +9,7 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface TimeLeft {
   days: number;
@@ -54,6 +54,8 @@ export function ReleaseCountdown({
   const router = useRouter();
   // Initialize with null to avoid hydration mismatch (server/client time differences)
   const [timeLeft, setTimeLeft] = useState<TimeLeft | null>(null);
+  // Guard to prevent infinite router.refresh() loop when ISR cache returns stale page
+  const hasRefreshed = useRef(false);
 
   useEffect(() => {
     // Compute initial time on client to avoid hydration mismatch
@@ -62,7 +64,10 @@ export function ReleaseCountdown({
 
     // Check immediately in case release time passed during SSR/hydration
     if (initialTimeLeft.total <= 0) {
-      router.refresh();
+      if (!hasRefreshed.current) {
+        hasRefreshed.current = true;
+        router.refresh();
+      }
       return;
     }
 
@@ -74,7 +79,10 @@ export function ReleaseCountdown({
       // This ensures users see the correct UI state without manual refresh
       if (newTimeLeft.total <= 0) {
         clearInterval(timer);
-        router.refresh();
+        if (!hasRefreshed.current) {
+          hasRefreshed.current = true;
+          router.refresh();
+        }
       }
     }, UPDATE_INTERVAL_MS);
 

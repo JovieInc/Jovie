@@ -139,7 +139,14 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const nonce = (await headers()).get(SCRIPT_NONCE_HEADER) ?? undefined;
+  // headers() throws DYNAMIC_SERVER_USAGE during ISR/static rendering (e.g.
+  // public profile pages with revalidate). Fall back to no nonce in that case.
+  let nonce: string | undefined;
+  try {
+    nonce = (await headers()).get(SCRIPT_NONCE_HEADER) ?? undefined;
+  } catch {
+    nonce = undefined;
+  }
 
   const isE2EClientRuntime =
     process.env.NEXT_PUBLIC_E2E_MODE === '1' ||

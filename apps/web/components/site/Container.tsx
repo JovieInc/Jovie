@@ -12,7 +12,7 @@ const containerSizes = {
   lg: 'max-w-6xl',
   xl: 'max-w-7xl',
   full: 'max-w-none',
-  homepage: 'max-w-none',
+  homepage: 'max-w-[1200px]',
 };
 
 export function Container({
@@ -23,9 +23,7 @@ export function Container({
   return (
     <div
       className={cn(
-        size === 'homepage'
-          ? 'px-5 sm:px-6 lg:px-[77px]'
-          : 'mx-auto px-4 sm:px-6 lg:px-8',
+        'mx-auto px-5 sm:px-6 lg:px-8',
         containerSizes[size],
         className
       )}

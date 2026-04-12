@@ -21,6 +21,7 @@ import type { LinkSection } from '@/features/dashboard/organisms/links/utils/lin
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { cn } from '@/lib/utils';
 import { extractHandleFromUrl } from '@/lib/utils/social-platform';
+import { SuggestedDspMatches } from './SuggestedDspMatches';
 
 export type CategoryOption = LinkSection | 'all';
 
@@ -34,6 +35,7 @@ export interface ProfileLinkListProps {
   readonly dspConnections?: PreviewDspConnections;
   readonly onDisconnectDsp?: (provider: 'spotify' | 'apple_music') => void;
   readonly surface?: 'card' | 'plain';
+  readonly profileId?: string;
 }
 
 function mapPreviewCategoryToSection(
@@ -193,6 +195,7 @@ export function ProfileLinkList({
   dspConnections,
   onDisconnectDsp,
   surface = 'card',
+  profileId,
 }: ProfileLinkListProps) {
   // Group links by category
   const groupedLinks = useMemo(() => {
@@ -231,7 +234,9 @@ export function ProfileLinkList({
         dspConnections.spotify.connected ||
         dspConnections.appleMusic.connected;
 
-      if (!hasDspContent) {
+      // When profileId is present, always render the section so
+      // SuggestedDspMatches can show even when nothing is connected yet.
+      if (!hasDspContent && !profileId) {
         return (
           <div className={cn(sectionSurfaceClassName, 'px-3 py-3')}>
             <p className='py-1 text-xs text-tertiary-token'>
@@ -250,6 +255,7 @@ export function ProfileLinkList({
           {filteredLinks.map(link => (
             <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
           ))}
+          {profileId && <SuggestedDspMatches profileId={profileId} />}
         </div>
       );
     }

@@ -34,9 +34,9 @@ export const mobileReleaseTokens = {
     button:
       'flex w-16 flex-col items-center justify-center gap-1 text-white transition-colors',
     label: 'text-[10px] font-[510] tracking-normal',
-    edit: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,#5563d6)] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,#5563d6)]',
-    link: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,#3182ce)] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_58%,#3182ce)]',
+    edit: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-accent))] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,var(--linear-accent))]',
+    link: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,var(--linear-info))] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_58%,var(--linear-info))]',
     locked:
-      'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,#7d8795)] opacity-75',
+      'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-accent-gray))] opacity-75',
   },
 } as const;
