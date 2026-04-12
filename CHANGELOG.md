@@ -14,6 +14,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Feature grid icons replaced with accent-colored title text (no more emoji-on-colored-square pattern)
 - Container homepage variant simplified from padding hack to standard max-width
 - CTA philosophy documented as white-on-black (Apple approach), no saturated brand color
+- Replace hardcoded hex colors in mobile swipe actions with design system tokens
+- Unify empty state styling across releases page (consistent min-height, heading size, button spacing)
+- Align table base text to 13px per DESIGN.md specification
+- Wrap connected-but-empty state in DrawerSurfaceCard for visual consistency
 
 ### Added
 
@@ -22,6 +26,19 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Font families registered in @theme block (--font-display, --font-body)
 - Feature accent color system documented in DESIGN.md with usage rules
 - Explicit anti-patterns added to DESIGN.md: gold colors, emoji-on-square icons, saturated brand colors
+
+## [26.4.149.0] - 2026-04-12
+
+### Added
+
+- Suggested DSP matches now appear in the Music tab of the right drawer sidebar with confirm/reject actions and hover popover details
+- Dot indicator on Music tab when unreviewed suggestions exist
+- One-line explanation for first-time users seeing suggested profiles
+
+### Changed
+
+- Presence page now redirects to artist profile settings (Music tab) instead of loading the broken presence UI
+- Removed Presence link from sidebar navigation
 
 ## [26.4.148.1] - 2026-04-12
 
@@ -33,6 +50,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Fix infinite page refresh loop on release pages when countdown expires (affects ScheduledReleasePage, MysteryReleasePage, PreSaveActions, ProfileCompactTemplate)
+- Show specific handle validation errors during onboarding instead of generic "Not available" for all failures
 - Rewrite retargeting-ads loading skeleton to match actual page layout (summary cards, ad group grids, instructions)
 - Rewrite blog index loading skeleton from timeline to featured post + 2-column grid layout
 - Replace billing success/cancel `AuthLoader` skeletons with page-matching celebration and cancel layouts
@@ -104,9 +123,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-<<<<<<< HEAD
 - Fixed territory badge border token in ContactDetailSidebar — replaced `border-(--linear-app-frame-seam)` (divider token) with `border-subtle` (card-level token) to match release sidebar badge pattern
-=======
 - Standardized dashboard elevation tokens to 3-tier system (DataCard, EmptyState, banners, empty state icons)
 - Added card wrapper to audience funnel stats (Profile Views, Unique Visitors, Followers)
 - Removed double shadow on chat input that caused visible border artifact

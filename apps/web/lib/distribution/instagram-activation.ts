@@ -175,7 +175,7 @@ export async function postDistributionEvent(
 ): Promise<boolean> {
   // This helper relies on a same-origin relative URL and keepalive semantics,
   // so accidental server-side calls should no-op instead of throwing.
-  if (typeof globalThis.window === 'undefined') {
+  if (globalThis.window === undefined) {
     return false;
   }
 

@@ -65,7 +65,7 @@ export function SoundsLandingPage({
 }: Readonly<SoundsLandingPageProps>) {
   const [menuOpen, setMenuOpen] = useState(false);
   const resolvedUtmParams = useMemo(() => {
-    if (typeof globalThis.window === 'undefined') {
+    if (globalThis.window === undefined) {
       return utmParams;
     }
 
