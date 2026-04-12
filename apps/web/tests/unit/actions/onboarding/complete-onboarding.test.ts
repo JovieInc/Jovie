@@ -386,7 +386,9 @@ describe('completeOnboarding', () => {
   });
 
   it('updates an existing incomplete profile and deactivates orphaned profiles', async () => {
-    mockFetchExistingUser.mockResolvedValueOnce({ id: 'db-user-123' });
+    mockFetchExistingUser.mockResolvedValueOnce({
+      id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    });
     mockUpdateExistingProfile.mockResolvedValueOnce({
       username: 'newartist',
       status: 'updated',
@@ -394,7 +396,7 @@ describe('completeOnboarding', () => {
     });
     mockFetchExistingProfile.mockResolvedValueOnce({
       id: 'profile-123',
-      userId: 'db-user-123',
+      userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       username: 'old-artist',
       usernameNormalized: 'old-artist',
       displayName: 'Old Artist',
@@ -429,16 +431,18 @@ describe('completeOnboarding', () => {
     );
     expect(mockDeactivateOrphanedProfiles).toHaveBeenCalledWith(
       {},
-      'db-user-123',
+      'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       'profile-123'
     );
   });
 
   it('returns an already-complete profile without rewriting it', async () => {
-    mockFetchExistingUser.mockResolvedValueOnce({ id: 'db-user-123' });
+    mockFetchExistingUser.mockResolvedValueOnce({
+      id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    });
     mockFetchExistingProfile.mockResolvedValueOnce({
       id: 'profile-123',
-      userId: 'db-user-123',
+      userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       username: 'artist',
       usernameNormalized: 'artist',
       displayName: 'Artist',
