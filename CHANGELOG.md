@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.148.0] - 2026-04-11
+
+### Fixed
+
+- Eliminate chat message flickering by skipping entrance animation on messages loaded from persistence
+- Rewrite chat skeleton loader to match actual message layout (circular logo above bubble, correct border styling)
+- Cap chat thread and input width at 44rem to prevent overly wide layouts on large screens
+
+### Changed
+
+- Chat copy buttons now show icon-only with circle background only on hover, matching the sidebar toggle pattern
+- Replace top-right Copy Session ID button with an ellipsis dropdown menu containing Copy and Archive actions
+
 ## [26.4.147.0] - 2026-04-11
 
 ### Fixed
