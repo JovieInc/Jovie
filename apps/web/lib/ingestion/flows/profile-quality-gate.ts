@@ -33,7 +33,7 @@ export function isEmbarrassingDisplayName(name: string): boolean {
 
   if (/^\d+$/.test(trimmed)) return true;
 
-  if (trimmed.startsWith('artist_')) return true;
+  if (lower.startsWith('artist_')) return true;
 
   return false;
 }

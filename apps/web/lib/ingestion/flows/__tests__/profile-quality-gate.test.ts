@@ -45,9 +45,11 @@ describe('isEmbarrassingDisplayName', () => {
     expect(isEmbarrassingDisplayName('WWW.example.com')).toBe(true);
   });
 
-  it('returns true for "artist_" prefix', () => {
+  it('returns true for "artist_" prefix (case-insensitive)', () => {
     expect(isEmbarrassingDisplayName('artist_4829173')).toBe(true);
     expect(isEmbarrassingDisplayName('artist_abc')).toBe(true);
+    expect(isEmbarrassingDisplayName('Artist_4829173')).toBe(true);
+    expect(isEmbarrassingDisplayName('ARTIST_abc')).toBe(true);
   });
 
   it('returns false for normal artist names', () => {

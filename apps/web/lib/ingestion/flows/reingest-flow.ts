@@ -60,7 +60,8 @@ export async function handleReingestProfile({
     );
 
     // Promote quarantined profiles if quality now passes (never demote public profiles)
-    if (!existing.isPublic && !mergeError) {
+    let promoted = false;
+    if (existing.isPublic === false && !mergeError) {
       const qualityResult = evaluateProfileQuality({
         displayName: existing.displayNameLocked
           ? (existing.displayName ?? displayName)
@@ -74,6 +75,7 @@ export async function handleReingestProfile({
           .set({ isPublic: true, updatedAt: new Date() })
           .where(eq(creatorProfiles.id, existing.id));
         await invalidateProfileCache(existing.usernameNormalized);
+        promoted = true;
         logger.info('Quarantined profile promoted to public after reingest', {
           profileId: existing.id,
           handle: existing.usernameNormalized,
@@ -90,6 +92,8 @@ export async function handleReingestProfile({
           usernameNormalized: existing.usernameNormalized,
         },
         links: extraction.links.length,
+        quarantined: existing.isPublic === false && !promoted,
+        promoted: promoted || undefined,
         warning: mergeError
           ? `Profile updated but link extraction had issues: ${mergeError}`
           : undefined,

@@ -307,6 +307,19 @@ export async function createNewSocialProfile(
       profileId: created.id,
       platform: platformId,
     });
+
+    // Quarantine the profile if link insert failed — a public profile
+    // with zero links violates the quality gate invariant
+    if (qualityResult.isPublic) {
+      await tx
+        .update(creatorProfiles)
+        .set({ isPublic: false, updatedAt: new Date() })
+        .where(eq(creatorProfiles.id, created.id));
+      logger.info('Profile quarantined after link insert failure', {
+        profileId: created.id,
+        handle: finalHandle,
+      });
+    }
   }
 
   // Calculate fit score
