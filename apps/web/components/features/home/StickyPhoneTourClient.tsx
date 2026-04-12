@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { PhoneShowcaseModeData } from './phone-showcase-modes';
 import {
   CrossfadeBlock,
   MODES,
@@ -12,10 +13,22 @@ import {
   scrollToActiveIndex,
 } from './phone-showcase-primitives';
 
-const SLIDE_COUNT = MODES.length;
 const VH_PER_SLIDE = 80;
 
-export function StickyPhoneTourClient() {
+export interface StickyPhoneTourProps {
+  readonly modes?: readonly PhoneShowcaseModeData[];
+  readonly introTitle?: string;
+  readonly introBadge?: string;
+  readonly artistHandle?: string;
+}
+
+export function StickyPhoneTourClient({
+  modes = MODES,
+  introTitle = 'The right action for every fan.',
+  introBadge = 'One profile. Every way fans support you.',
+  artistHandle = 'timwhite',
+}: StickyPhoneTourProps) {
+  const slideCount = Math.max(modes.length, 1);
   const sectionRef = useRef<HTMLElement>(null);
   const [activeSlide, setActiveSlide] = useState(0);
 
@@ -27,10 +40,10 @@ export function StickyPhoneTourClient() {
       rect.top,
       rect.height,
       globalThis.innerHeight,
-      SLIDE_COUNT
+      slideCount
     );
     setActiveSlide(newIndex);
-  }, []);
+  }, [slideCount]);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -66,7 +79,7 @@ export function StickyPhoneTourClient() {
 
   const headlines = useMemo(
     () =>
-      MODES.map(mode => (
+      modes.map(mode => (
         <h3
           key={mode.id}
           className='text-xl font-[590] leading-snug tracking-[-0.012em] text-secondary-token'
@@ -74,12 +87,12 @@ export function StickyPhoneTourClient() {
           {mode.headline}
         </h3>
       )),
-    []
+    [modes]
   );
 
   const descriptions = useMemo(
     () =>
-      MODES.map(mode => (
+      modes.map(mode => (
         <p
           key={mode.id}
           className='max-w-[400px] marketing-lead-linear text-secondary-token'
@@ -87,7 +100,7 @@ export function StickyPhoneTourClient() {
           {mode.description}
         </p>
       )),
-    []
+    [modes]
   );
 
   return (
@@ -96,7 +109,7 @@ export function StickyPhoneTourClient() {
         ref={sectionRef}
         className='relative max-lg:hidden section-spacing-linear'
         style={{
-          height: `${SLIDE_COUNT * VH_PER_SLIDE}vh`,
+          height: `${slideCount * VH_PER_SLIDE}vh`,
         }}
       >
         <PhoneTourDivider />
@@ -118,11 +131,11 @@ export function StickyPhoneTourClient() {
               <div className='grid items-center grid-cols-[1fr_auto_1fr] gap-8 xl:gap-16'>
                 <div className='relative min-h-[320px]'>
                   <span className='inline-flex items-center gap-1.5 self-start rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
-                    One profile. Every way fans support you.
+                    {introBadge}
                   </span>
 
                   <h2 className='marketing-h2-linear mt-5 text-primary-token'>
-                    The right action for every fan.
+                    {introTitle}
                   </h2>
 
                   <div className='mt-6'>
@@ -144,7 +157,7 @@ export function StickyPhoneTourClient() {
                       filter: PHONE_TOUR_SHOWCASE_SHADOW,
                     }}
                   >
-                    <PhoneShowcase activeIndex={phoneIndex} modes={MODES} />
+                    <PhoneShowcase activeIndex={phoneIndex} modes={modes} />
                   </div>
                 </div>
 
@@ -155,7 +168,7 @@ export function StickyPhoneTourClient() {
                     transform: 'translateX(0)',
                   }}
                 >
-                  {MODES.map((mode, i) => {
+                  {modes.map((mode, i) => {
                     const slug = mode.id === 'profile' ? '' : `/${mode.id}`;
                     const isActive = i === phoneIndex;
                     return (
@@ -180,7 +193,7 @@ export function StickyPhoneTourClient() {
                               'font-size 0.5s cubic-bezier(0.33,.01,.27,1), font-weight 0.5s cubic-bezier(0.33,.01,.27,1), color 0.5s cubic-bezier(0.33,.01,.27,1)',
                           }}
                         >
-                          jov.ie/timwhite
+                          jov.ie/{artistHandle}
                           {slug && (
                             <span
                               style={{

@@ -442,7 +442,15 @@ Never mark a task complete without confirming the fix works:
 - Screenshot test: before and after a perf PR, the fully-loaded page must look identical
 - If a route needs a genuinely different UI, that is a product decision requiring explicit approval, not a perf side effect
 
-### 17. Outbound Email Personalization Must Fail Safe
+### 17. CSP Domains Must Stay In Sync With Providers
+
+When adding a new DSP, social platform, or any feature that loads external images or media in the browser, update `apps/web/constants/platforms/cdn-domains.ts`:
+- Image CDNs → `PLATFORM_CDN_DOMAINS` (governs CSP `img-src` + Next.js `remotePatterns`)
+- Audio/video CDNs → `PLATFORM_MEDIA_DOMAINS` (governs CSP `media-src`)
+
+These registries are the **single source of truth** consumed by the CSP builder, Next.js config, and avatar hostname validation. Do **NOT** edit CSP directives in `content-security-policy.ts` directly — add domains to the registry instead.
+
+### 18. Outbound Email Personalization Must Fail Safe
 
 - In cold email, lifecycle email, or claim-invite copy, **NEVER** greet recipients with raw usernames, handles, emoji names, or other guessed merge fields
 - Only use a personalized first-name greeting when the source string clearly looks like a conventional human first-and-last name; if there is real doubt, fall back to a generic opener

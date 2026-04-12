@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.148.1] - 2026-04-12
+
+### Removed
+
+- Delete 23 dead loading skeletons on redirect-only routes that never rendered
+- Remove orphaned `WaitlistSkeleton` component and Storybook story
+- Remove unused `BrandingSettingsLoading`, `NotificationsSettingsLoading`, and `BillingSettingsLoading` exports
+
+### Fixed
+
+- Rewrite retargeting-ads loading skeleton to match actual page layout (summary cards, ad group grids, instructions)
+- Rewrite blog index loading skeleton from timeline to featured post + 2-column grid layout
+- Replace billing success/cancel `AuthLoader` skeletons with page-matching celebration and cancel layouts
+- Add missing ad-pixels section skeleton to audience settings loader
+- Fix billing settings loader description text ("Subscription" to "Plan")
+
+## [26.4.148.0] - 2026-04-11
+
+### Fixed
+
+- Eliminate chat message flickering by skipping entrance animation on messages loaded from persistence
+- Rewrite chat skeleton loader to match actual message layout (circular logo above bubble, correct border styling)
+- Cap chat thread and input width at 44rem to prevent overly wide layouts on large screens
+
+### Changed
+
+- Chat copy buttons now show icon-only with circle background only on hover, matching the sidebar toggle pattern
+- Replace top-right Copy Session ID button with an ellipsis dropdown menu containing Copy and Archive actions
+
+## [26.4.147.0] - 2026-04-11
+
+### Fixed
+
+- Gracefully handle missing Clerk middleware context on `/api/images/upload` instead of throwing unhandled errors (Fixes JOVIE-WEB-JC)
+- Add CSP `media-src` directive to allow audio previews from Spotify, Apple Music, and Deezer CDNs, and video from Vercel blob storage (Fixes JOVIE-WEB-JD)
+
+### Added
+
+- Centralized media CDN domain registry (`PLATFORM_MEDIA_DOMAINS`) alongside existing image CDN registry, so CSP stays in sync when new providers are added
+- AGENTS.md guardrail requiring CSP domain updates go through the CDN registry, not direct CSP edits
+
 ## [26.4.146.3] - 2026-04-11
 
 ### Changed

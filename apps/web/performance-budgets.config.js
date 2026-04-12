@@ -81,5 +81,59 @@ module.exports = {
         { resourceType: 'total', budget: 2800 },
       ],
     },
+    {
+      path: '/[username]/[slug]',
+      timings: [
+        // Smart link release page — same speed targets as profile pages
+        { metric: 'first-contentful-paint', budget: 800 },
+        { metric: 'largest-contentful-paint', budget: 1500 },
+        { metric: 'cumulative-layout-shift', budget: 0.05 },
+        { metric: 'first-input-delay', budget: 100 },
+        { metric: 'time-to-first-byte', budget: 200 },
+      ],
+      resourceSizes: [
+        { resourceType: 'script', budget: 1050 },
+        { resourceType: 'image', budget: 500 },
+        { resourceType: 'font', budget: 100 },
+        { resourceType: 'stylesheet', budget: 100 },
+        { resourceType: 'total', budget: 1200 },
+      ],
+    },
+    {
+      path: '/app/chat',
+      auth: true,
+      timings: [
+        { metric: 'first-contentful-paint', budget: 1500 },
+        { metric: 'largest-contentful-paint', budget: 2500 },
+        { metric: 'cumulative-layout-shift', budget: 0.1 },
+        { metric: 'first-input-delay', budget: 100 },
+        { metric: 'time-to-first-byte', budget: 1500 },
+      ],
+      resourceSizes: [
+        { resourceType: 'script', budget: 2750 },
+        { resourceType: 'image', budget: 500 },
+        { resourceType: 'font', budget: 100 },
+        { resourceType: 'stylesheet', budget: 500 },
+        { resourceType: 'total', budget: 3100 },
+      ],
+    },
+    {
+      path: '/billing',
+      auth: true,
+      timings: [
+        { metric: 'first-contentful-paint', budget: 1500 },
+        { metric: 'largest-contentful-paint', budget: 2500 },
+        { metric: 'cumulative-layout-shift', budget: 0.1 },
+        { metric: 'first-input-delay', budget: 100 },
+        { metric: 'time-to-first-byte', budget: 1500 },
+      ],
+      resourceSizes: [
+        { resourceType: 'script', budget: 2600 },
+        { resourceType: 'image', budget: 700 },
+        { resourceType: 'font', budget: 100 },
+        { resourceType: 'stylesheet', budget: 550 },
+        { resourceType: 'total', budget: 3300 },
+      ],
+    },
   ],
 };

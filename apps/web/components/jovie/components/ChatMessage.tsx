@@ -6,7 +6,6 @@ import { motion, useReducedMotion } from 'motion/react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import React, { useMemo } from 'react';
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
@@ -158,6 +157,8 @@ interface ChatMessageProps {
   readonly avatarUrl?: string | null;
   /** Profile ID for interactive tool cards (avatar upload, link confirmation). */
   readonly profileId?: string;
+  /** Skip entrance animation for messages loaded from persistence. */
+  readonly skipEntrance?: boolean;
 }
 
 export function ChatMessage({
@@ -168,6 +169,7 @@ export function ChatMessage({
   isThinking,
   avatarUrl,
   profileId,
+  skipEntrance,
 }: ChatMessageProps) {
   const isUser = role === 'user';
   const { copy, isSuccess } = useClipboard();
@@ -191,7 +193,9 @@ export function ChatMessage({
       data-message-id={id}
       data-role={role}
       className={cn('flex gap-3.5', isUser ? 'justify-end' : 'justify-start')}
-      initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
+      initial={
+        skipEntrance || shouldReduceMotion ? false : { opacity: 0, y: 8 }
+      }
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
@@ -318,10 +322,7 @@ export function ChatMessage({
                 <button
                   type='button'
                   onClick={() => copy(messageText)}
-                  className={cn(
-                    APP_CONTROL_BUTTON_CLASS,
-                    'h-7 w-7 rounded-full px-0 text-tertiary-token hover:text-secondary-token'
-                  )}
+                  className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token shadow-none transition-colors duration-150 hover:bg-surface-1 hover:text-secondary-token focus-visible:bg-surface-1 focus-visible:outline-none'
                   aria-label={
                     isSuccess ? 'Copied to clipboard' : 'Copy message'
                   }
