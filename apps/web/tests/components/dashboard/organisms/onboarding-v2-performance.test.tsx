@@ -366,7 +366,7 @@ describe('Onboarding screen performance budgets', () => {
   it.each([
     ['handle', 'Claim your link', SCREEN_BUDGETS.handle],
     ['spotify', 'Are you on Spotify?', SCREEN_BUDGETS.spotify],
-    ['artist-confirm', 'Spotify is connected', SCREEN_BUDGETS.artistConfirm],
+    ['artist-confirm', 'Spotify connected', SCREEN_BUDGETS.artistConfirm],
     ['upgrade', 'Want the full profile from day one?', SCREEN_BUDGETS.upgrade],
     ['dsp', 'Review DSP matches', SCREEN_BUDGETS.dsp],
     ['social', 'Review social links', SCREEN_BUDGETS.social],
@@ -457,7 +457,7 @@ describe('Onboarding screen performance budgets', () => {
     );
   });
 
-  it('keeps artist confirmation blocked until import readiness is terminal', async () => {
+  it('shows importing state on artist-confirm step', async () => {
     mockDiscoveryResponse(
       createDiscoverySnapshot({
         importState: {
@@ -484,16 +484,13 @@ describe('Onboarding screen performance budgets', () => {
       />
     );
 
-    await screen.findByRole('heading', { name: 'Spotify is connected' });
+    await screen.findByRole('heading', { name: 'Spotify connected' });
     expect(
-      screen.getByRole('button', { name: /Finishing import/i })
-    ).toBeDisabled();
-    expect(
-      screen.getByText('We are still importing your Spotify releases.')
+      screen.getByRole('button', { name: /Continue/i })
     ).toBeInTheDocument();
   });
 
-  it('shows retry guidance when Spotify import fails', async () => {
+  it('shows error state when Spotify import fails', async () => {
     mockDiscoveryResponse(
       createDiscoverySnapshot({
         importState: {
@@ -520,15 +517,10 @@ describe('Onboarding screen performance budgets', () => {
       />
     );
 
-    await screen.findByRole('heading', { name: 'Spotify is connected' });
-    expect(
-      screen.getByText(
-        'Spotify import failed. Choose your artist again to retry.'
-      )
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /Choose a different artist/i })
-    ).toBeEnabled();
+    await screen.findByRole('heading', {
+      name: 'Import ran into an issue',
+    });
+    expect(screen.getByRole('button', { name: /Try again/i })).toBeEnabled();
   });
 
   it('lets creators continue when Spotify import completed without releases', async () => {

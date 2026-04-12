@@ -1,16 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import {
-  ArrowRight,
-  Check,
-  Circle,
-  Disc3,
-  ExternalLink,
-  Loader2,
-  Music2,
-  RefreshCw,
-} from 'lucide-react';
+import { ArrowRight, Check, Disc3, Music2, RefreshCw } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -636,60 +627,54 @@ function EmptyState({
   );
 }
 
-function SelectedArtistCard({
-  artist,
-  isLoading,
-}: Readonly<{ artist: SelectedArtist | null; isLoading: boolean }>) {
+function StepCircleIcon({
+  className,
+  color,
+  state,
+}: Readonly<{
+  className?: string;
+  color: string;
+  state: 'complete' | 'current' | 'pending';
+}>) {
   return (
-    <FlatPanel>
-      <div className='flex items-center gap-4'>
-        {artist?.imageUrl ? (
-          <Image
-            src={artist.imageUrl}
-            alt=''
-            width={72}
-            height={72}
-            className='h-[72px] w-[72px] rounded-full object-cover'
-            unoptimized
+    <svg
+      aria-hidden='true'
+      className={className}
+      viewBox='0 0 24 24'
+      fill='none'
+    >
+      {state === 'complete' ? (
+        <circle cx='12' cy='12' r='10' stroke={color} strokeWidth='2' />
+      ) : state === 'current' ? (
+        <>
+          {/* Solid left half */}
+          <path
+            d='M12 2a10 10 0 0 0 0 20'
+            stroke={color}
+            strokeWidth='2'
+            fill='none'
           />
-        ) : (
-          <div className='flex h-[72px] w-[72px] items-center justify-center rounded-full bg-surface-0 text-tertiary-token'>
-            <Music2 className='h-6 w-6' />
-          </div>
-        )}
-
-        <div className='min-w-0 flex-1'>
-          <p className='text-[11px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
-            Selected artist
-          </p>
-          <p className='truncate text-lg font-[590] text-primary-token'>
-            {artist?.name || 'Spotify artist'}
-          </p>
-          <div className='mt-2 flex items-center gap-2 text-sm text-secondary-token'>
-            {isLoading ? (
-              <>
-                <Loader2 className='h-4 w-4 animate-spin' />
-                <span>Finishing import and discovery...</span>
-              </>
-            ) : (
-              <>
-                <Check className='h-4 w-4 text-success' />
-                <span>Connected for this profile</span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {artist?.url ? (
-          <Button asChild variant='secondary' size='sm'>
-            <Link href={artist.url} target='_blank' rel='noreferrer'>
-              View
-              <ExternalLink className='ml-1 h-3.5 w-3.5' />
-            </Link>
-          </Button>
-        ) : null}
-      </div>
-    </FlatPanel>
+          {/* Dotted right half */}
+          <path
+            d='M12 2a10 10 0 0 1 0 20'
+            stroke={color}
+            strokeWidth='2'
+            strokeDasharray='2.5 2.5'
+            fill='none'
+          />
+        </>
+      ) : (
+        <circle
+          cx='12'
+          cy='12'
+          r='10'
+          stroke='currentColor'
+          strokeWidth='2'
+          strokeDasharray='2.5 2.5'
+          opacity={0.35}
+        />
+      )}
+    </svg>
   );
 }
 
@@ -717,22 +702,11 @@ function OnboardingSidebar({
                     : 'text-secondary-token'
                 )}
               >
-                {state === 'complete' ? (
-                  <Circle
-                    className='h-4 w-4 shrink-0'
-                    style={{ color: step.color }}
-                  />
-                ) : state === 'current' ? (
-                  <Circle
-                    className='h-4 w-4 shrink-0'
-                    style={{ color: step.color }}
-                  />
-                ) : (
-                  <Circle
-                    className='h-4 w-4 shrink-0'
-                    style={{ color: step.color, opacity: 0.3 }}
-                  />
-                )}
+                <StepCircleIcon
+                  className='h-4 w-4 shrink-0'
+                  color={state === 'pending' ? 'currentColor' : step.color}
+                  state={state}
+                />
                 <span className='font-[560]'>{step.label}</span>
               </div>
             </li>
@@ -887,21 +861,18 @@ export function OnboardingV2Form({
       setCurrentStep('artist-confirm');
     },
     onAutoConnectFailed: message => {
-      const currentStepAtFailure = currentStepRef.current;
-
-      if (
-        currentStepAtFailure !== 'spotify' &&
-        currentStepAtFailure !== 'artist-confirm'
-      ) {
-        setDiscoveryError(message);
-        return;
-      }
-
+      setDiscoveryError(message);
       setSelectedArtist(
         discoverySnapshotRef.current?.selectedSpotifyProfile ?? null
       );
-      setCurrentStep('spotify');
-      setDiscoveryError(message);
+      // Stay on artist-confirm so the user sees the error in context
+      // instead of being bounced back to "Are you on Spotify?"
+      if (
+        currentStepRef.current === 'spotify' ||
+        currentStepRef.current === 'artist-confirm'
+      ) {
+        setCurrentStep('artist-confirm');
+      }
     },
     onCompleted: result => {
       setProfileId(result.profileId);
@@ -1142,15 +1113,12 @@ export function OnboardingV2Form({
         }
       } catch (error) {
         setIsArtistConnectPending(false);
-        setSelectedArtist(
-          discoverySnapshotRef.current?.selectedSpotifyProfile ?? null
-        );
-        setCurrentStep('spotify');
         setDiscoveryError(
           error instanceof Error
             ? error.message
             : 'Failed to connect your Spotify artist.'
         );
+        // Stay on artist-confirm so the user sees the error in context
         return;
       }
 
@@ -1639,7 +1607,7 @@ export function OnboardingV2Form({
                   </p>
                   <p className='text-xs text-secondary-token'>
                     {unavailable
-                      ? 'Already claimed'
+                      ? 'Unavailable'
                       : artist.followers
                         ? `${artist.followers.toLocaleString()} followers`
                         : 'Spotify'}
@@ -1656,12 +1624,13 @@ export function OnboardingV2Form({
           );
         })}
 
-        <li className='border-t border-subtle px-3 py-2'>
+        <li className='flex items-center justify-between border-t border-subtle px-3 py-2'>
+          <span className='text-xs text-tertiary-token'>Need help?</span>
           <a
             href='mailto:support@jov.ie'
-            className='flex items-center gap-2 text-xs text-tertiary-token transition-colors hover:text-secondary-token'
+            className='text-xs text-secondary-token transition-colors hover:text-primary-token'
           >
-            Need help? Contact support@jov.ie
+            Contact support
           </a>
         </li>
       </ContentSurfaceCard>
@@ -1721,52 +1690,52 @@ export function OnboardingV2Form({
           </StepFrame>
         );
 
-      case 'artist-confirm':
+      case 'artist-confirm': {
+        const hasError =
+          discoveryError ||
+          getBlockingReason(discoverySnapshot) === 'spotify_import_failed';
+        const isImporting =
+          isArtistConnectPending ||
+          isConnecting ||
+          isEnriching ||
+          isDiscoveryLoading;
+
         return (
           <StepFrame
-            title='Spotify is connected'
-            prompt='We are finishing your import and discovery now.'
+            title={hasError ? 'Import ran into an issue' : 'Spotify connected'}
+            prompt={
+              hasError
+                ? 'You can try connecting again or skip ahead.'
+                : "We'll import your discography in the background. You can keep going."
+            }
             actions={
               <>
                 <Button
-                  onClick={() => setCurrentStep('spotify')}
-                  disabled={isArtistConnectPending || isConnecting}
+                  onClick={() => {
+                    setDiscoveryError(null);
+                    setCurrentStep('spotify');
+                  }}
+                  disabled={isImporting}
                   variant='secondary'
                 >
-                  Choose a different artist
+                  {hasError ? 'Try again' : 'Choose a different artist'}
                 </Button>
-                <Button
-                  disabled={
-                    isArtistConnectPending ||
-                    isConnecting ||
-                    !canProceedToDashboard(discoverySnapshot)
-                  }
-                  onClick={advanceFromStep}
-                >
-                  {canProceedToDashboard(discoverySnapshot)
-                    ? 'Continue'
-                    : 'Finishing import'}
+                <Button onClick={advanceFromStep} disabled={isImporting}>
+                  Continue
                   <ArrowRight className='ml-1 h-4 w-4' />
                 </Button>
               </>
             }
           >
-            {getReadinessMessage(discoverySnapshot) ? (
-              <InlineNotice>
-                {getReadinessMessage(discoverySnapshot)}
-              </InlineNotice>
+            {isImporting && !hasError ? (
+              <div className='flex items-center gap-2 text-sm text-secondary-token'>
+                <LoadingSpinner size='sm' className='text-tertiary-token' />
+                <span>Importing…</span>
+              </div>
             ) : null}
-            <SelectedArtistCard
-              artist={selectedArtist}
-              isLoading={
-                isArtistConnectPending ||
-                isConnecting ||
-                isEnriching ||
-                isDiscoveryLoading
-              }
-            />
           </StepFrame>
         );
+      }
 
       case 'upgrade':
         return (
