@@ -60,10 +60,10 @@ CSS variables: `--font-satoshi`, `--font-dm-sans` (set by `next/font/local`). Sc
 
 | Level | Size | Weight | Letter-spacing | Line-height | Usage |
 |-------|------|--------|----------------|-------------|-------|
-| H1 | 64px | 510 | -1.408px (-2.2%) | 67.84px (1.06) | Hero headlines |
-| H2 | 48px | 510 | -1.056px (-2.2%) | 48px (1.0) | Section headlines |
-| H3 | 20px | 590 | -0.24px (-1.2%) | 26.6px (1.33) | Sub-section titles |
-| H4 | 18px | 538 | — | 24px (1.33) | Card titles |
+| H1 | 64px | 800 | -1.6px (-2.5%) | 67.84px (1.06) | Hero headlines (Satoshi) |
+| H2 | 48px | 700 | -0.96px (-2.0%) | 48px (1.0) | Section headlines (Satoshi) |
+| H3 | 20px | 600 | -0.3px (-1.5%) | 26.6px (1.33) | Sub-section titles (Satoshi) |
+| H4 | 18px | 600 | -0.18px (-1.0%) | 24px (1.33) | Card titles (Satoshi) |
 | Body LG | 24px | 400 | -0.288px (-1.2%) | 31.92px (1.33) | Lead paragraphs |
 | Body | 15px | 400 | -0.165px (-1.1%) | 24px (1.6) | Body text |
 | Body SM | 14px | 400 | -0.182px (-1.3%) | 21px (1.5) | Small body |
@@ -145,7 +145,7 @@ The example above says one thing three times. Jovie should say it once.
 - Multiple nested surfaces whose only job is to create the feeling of "designed"
 - Treating borders as the primary way to separate content instead of using spacing, alignment, contrast, and typography
 - **Emoji/symbol on colored background square** — explicitly banned. This pattern cheapens the brand and reads as consumer-grade AI slop. Use accent color on title text only.
-- **Gold colors** — never, anywhere. Gold signals prestige-seeking and cheapness. No amber, no warm metallics.
+- **Gold colors in brand/CTA expression** — banned. Avoid prestige-signaling metallic tones for identity or primary actions. (Feature accent orange/amber for Pro tier is a distinct, permitted use.)
 - **Saturated brand colors** for CTAs — CTAs are white-on-black (Apple approach). Accent colors are for feature differentiation only.
 - **"Fun" fonts** — Jovie's audience is world-class touring DJs who take themselves seriously. Typography should be utilitarian, clean, and modern.
 
@@ -426,7 +426,7 @@ Pure neutral HSL — no hue tint. Used across both systems.
 | Primary | `oklch(10% 0 0)` | `oklch(100% 0 0)` | `#e6e6e6` | `#08090a` |
 | Secondary | `oklch(93% chroma hue)` | `oklch(20% 0 0)` | `oklch(19% chroma hue)` | `oklch(90% 0 0)` |
 | Accent | `#7170ff` | white | `#7170ff` | white |
-| Marketing CTA | `#5E6AD2` | white | `#5E6AD2` | white |
+| Marketing CTA | `#ffffff` | `#08090a` | `#ffffff` | `#08090a` |
 
 Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padding: 12px horizontal.
 

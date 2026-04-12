@@ -3,6 +3,8 @@ import './marketing-utilities.css';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
 import { MarketingEnhancements } from '@/features/home/MarketingEnhancements';
 
+export const revalidate = false;
+
 const satoshi = localFont({
   src: '../../public/fonts/Satoshi-Variable.woff2',
   variable: '--font-satoshi',
