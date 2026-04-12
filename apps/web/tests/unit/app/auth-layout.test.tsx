@@ -7,23 +7,18 @@ interface RenderAuthLayoutOptions {
   readonly forwardedHost?: string;
   readonly forwardedProto?: string;
   readonly publishableKey?: string;
-  readonly secretKey?: string;
   readonly stagingPublishableKey?: string;
   readonly stagingSecretKey?: string;
 }
 
 const originalStagingPublishableKey = process.env.CLERK_PUBLISHABLE_KEY_STAGING;
 const originalStagingSecretKey = process.env.CLERK_SECRET_KEY_STAGING;
-const originalClerkSecretKey = process.env.CLERK_SECRET_KEY;
-const originalClerkPublishableKey =
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 async function renderAuthRouteLayout({
   clerkMockFlag = '0',
   forwardedHost = 'jov.ie',
   forwardedProto = 'https',
   publishableKey,
-  secretKey = 'sk_test_default',
   stagingPublishableKey,
   stagingSecretKey,
 }: RenderAuthLayoutOptions) {
@@ -39,13 +34,6 @@ async function renderAuthRouteLayout({
     delete process.env.CLERK_SECRET_KEY_STAGING;
   } else {
     process.env.CLERK_SECRET_KEY_STAGING = stagingSecretKey;
-  }
-
-  // resolvePublishableKeyFromHeaders requires both PK and SK to return a key
-  if (publishableKey) {
-    process.env.CLERK_SECRET_KEY = secretKey;
-  } else {
-    delete process.env.CLERK_SECRET_KEY;
   }
 
   vi.doMock('@/lib/env-public', () => ({
@@ -72,13 +60,24 @@ async function renderAuthRouteLayout({
     ),
   }));
 
+  const mockHeaders: Record<string, string> = {
+    host: forwardedHost,
+    'x-forwarded-host': forwardedHost,
+    'x-forwarded-proto': forwardedProto,
+  };
+  // Simulate what middleware does: set the pre-resolved publishable key header.
+  // On staging hosts, middleware resolves staging keys separately so we only
+  // set the header for non-staging hosts (matching production behavior).
+  const isStagingHost = forwardedHost.startsWith('staging.');
+  if (publishableKey && !isStagingHost) {
+    mockHeaders['x-clerk-publishable-key'] = publishableKey;
+  }
+  if (stagingPublishableKey && isStagingHost) {
+    mockHeaders['x-clerk-publishable-key'] = stagingPublishableKey;
+  }
+
   vi.doMock('next/headers', () => ({
-    headers: async () =>
-      new Headers({
-        host: forwardedHost,
-        'x-forwarded-host': forwardedHost,
-        'x-forwarded-proto': forwardedProto,
-      }),
+    headers: async () => new Headers(mockHeaders),
   }));
 
   vi.doMock('@/features/auth', () => ({
@@ -110,18 +109,6 @@ afterEach(() => {
     delete process.env.CLERK_SECRET_KEY_STAGING;
   } else {
     process.env.CLERK_SECRET_KEY_STAGING = originalStagingSecretKey;
-  }
-
-  if (originalClerkSecretKey === undefined) {
-    delete process.env.CLERK_SECRET_KEY;
-  } else {
-    process.env.CLERK_SECRET_KEY = originalClerkSecretKey;
-  }
-
-  if (originalClerkPublishableKey === undefined) {
-    delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  } else {
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = originalClerkPublishableKey;
   }
 
   vi.resetModules();
