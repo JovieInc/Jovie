@@ -408,7 +408,11 @@ export function ArtistNotificationsCTA({
 
   // Show loading skeleton while checking subscription status
   if (hydrationStatus === 'checking') {
-    return <SubscriptionFormSkeleton />;
+    return (
+      <div className='min-h-[180px]'>
+        <SubscriptionFormSkeleton />
+      </div>
+    );
   }
 
   if (
@@ -420,18 +424,24 @@ export function ArtistNotificationsCTA({
       hideListenFallback
     )
   ) {
-    return <ListenNowCTA variant={variant} handle={artist.handle} />;
+    return (
+      <div className='min-h-[180px]'>
+        <ListenNowCTA variant={variant} handle={artist.handle} />
+      </div>
+    );
   }
 
   if (isSubscribed) {
     return (
-      <SubscriptionSuccess
-        artistName={artist.name}
-        handle={artist.handle}
-        subscribedChannels={subscribedChannels}
-        artistId={artist.id}
-        subscriberEmail={channel === 'email' ? emailInput.trim() : undefined}
-      />
+      <div className='min-h-[180px]'>
+        <SubscriptionSuccess
+          artistName={artist.name}
+          handle={artist.handle}
+          subscribedChannels={subscribedChannels}
+          artistId={artist.id}
+          subscriberEmail={channel === 'email' ? emailInput.trim() : undefined}
+        />
+      </div>
     );
   }
 
@@ -455,7 +465,7 @@ export function ArtistNotificationsCTA({
     otpStep === 'verify' ? handleVerifyOtp : handleSubscribe;
 
   return (
-    <div className='space-y-3'>
+    <div className='min-h-[180px] space-y-3'>
       <p className={subscriptionHeadingClassName} style={noFontSynthesisStyle}>
         {getFormHeading(otpStep)}
       </p>
