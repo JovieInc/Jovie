@@ -1,29 +1,13 @@
 import { Button } from '@jovie/ui';
-import {
-  BellRing,
-  CalendarDays,
-  ChevronRight,
-  Headphones,
-  Mail,
-  Play,
-  QrCode,
-  Sparkles,
-  UserPlus,
-} from 'lucide-react';
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import Link from 'next/link';
-import {
-  MarketingContainer,
-  MarketingHero,
-  MarketingPageShell,
-} from '@/components/marketing';
-
+import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { ClaimHandleForm } from '@/features/home/claim-handle';
-
+import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
 import { getCanonicalSurface } from '@/lib/canonical-surfaces';
+import { ARTIST_PROFILE_MODES } from './artist-profile-modes';
 
 export const revalidate = false;
 
@@ -80,86 +64,12 @@ export const metadata: Metadata = {
 const PUBLIC_PROFILE_REVIEW_ROUTE =
   getCanonicalSurface('public-profile').reviewRoute;
 
-/* -------------------------------------------------------------------------- */
-/*  Adaptive profile modes                                                     */
-/* -------------------------------------------------------------------------- */
-
-const PROFILE_MODES = [
-  {
-    label: 'Upcoming release',
-    description: 'Countdown + Notify me',
-    icon: BellRing,
-    tone: 'violet' as const,
-  },
-  {
-    label: 'Release day',
-    description: 'Listen now with smart routing to their preferred platform',
-    icon: Play,
-    tone: 'emerald' as const,
-  },
-  {
-    label: 'Touring',
-    description: 'Nearby fans see ticket dates first',
-    icon: CalendarDays,
-    tone: 'sky' as const,
-  },
-  {
-    label: 'No campaign',
-    description: 'Latest release + full catalog + fan capture',
-    icon: Headphones,
-    tone: 'amber' as const,
-  },
-] as const;
-
-type ModeTone = (typeof PROFILE_MODES)[number]['tone'];
-
-const TONE_CLASSES: Record<
-  ModeTone,
-  { border: string; bg: string; text: string }
-> = {
-  violet: {
-    border: 'border-violet-400/20',
-    bg: 'bg-violet-400/10',
-    text: 'text-violet-300',
-  },
-  emerald: {
-    border: 'border-emerald-400/20',
-    bg: 'bg-emerald-400/10',
-    text: 'text-emerald-300',
-  },
-  sky: {
-    border: 'border-sky-400/20',
-    bg: 'bg-sky-400/10',
-    text: 'text-sky-300',
-  },
-  amber: {
-    border: 'border-amber-400/20',
-    bg: 'bg-amber-400/10',
-    text: 'text-amber-300',
-  },
-};
-
-/* -------------------------------------------------------------------------- */
-/*  Contact roles                                                              */
-/* -------------------------------------------------------------------------- */
-
-const CONTACT_ROLES = [
-  'Booking',
-  'Press',
-  'Management',
-  'Brand collabs',
-] as const;
-
-/* -------------------------------------------------------------------------- */
-/*  Page                                                                       */
-/* -------------------------------------------------------------------------- */
-
 export default function ArtistProfilesPage() {
   return (
     <MarketingPageShell>
-      {/* ── Hero ── */}
+      {/* ── Hero (text-only, phone tour is the visual proof) ── */}
       <section
-        className='relative overflow-hidden pb-14 pt-[5.75rem] md:pb-20 md:pt-[6.25rem]'
+        className='relative overflow-hidden pb-8 pt-[5.75rem] md:pb-12 md:pt-[6.25rem]'
         aria-labelledby='artist-profiles-heading'
       >
         <div
@@ -169,22 +79,22 @@ export default function ArtistProfilesPage() {
         />
         <div className='hero-glow pointer-events-none absolute inset-x-0 top-0 h-[36rem]' />
 
-        <MarketingHero variant='split' className='relative'>
-          <div className='max-w-[36rem]'>
+        <div className='relative mx-auto max-w-[1120px] px-6 sm:px-8 lg:px-10'>
+          <div className='mx-auto max-w-[42rem] text-center'>
             <h1
               id='artist-profiles-heading'
               className='marketing-h1-linear text-primary-token'
             >
               One link. Every release.
             </h1>
-            <p className='mt-5 max-w-[34rem] text-[17px] leading-[1.7] text-secondary-token sm:text-[18px]'>
+            <p className='mx-auto mt-5 max-w-[36rem] text-[17px] leading-[1.7] text-secondary-token sm:text-[18px]'>
               Put jov.ie/username in your bio once. Before a drop it becomes a
               countdown. On release day it becomes the best place to listen.
               Between campaigns it keeps collecting fans, tickets, tips, and
               business inquiries.
             </p>
 
-            <div className='mt-8 flex flex-wrap items-center gap-3'>
+            <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
               <Button asChild size='lg'>
                 <Link href={APP_ROUTES.SIGNUP}>Claim your profile</Link>
               </Button>
@@ -195,306 +105,16 @@ export default function ArtistProfilesPage() {
               </Button>
             </div>
           </div>
-
-          <div
-            data-testid='artist-profiles-hero-surface'
-            className='relative flex justify-center'
-          >
-            <div className='relative'>
-              {/* Ambient glow behind phone */}
-              <div
-                aria-hidden='true'
-                className='pointer-events-none absolute -inset-12 blur-3xl'
-                style={{
-                  background:
-                    'radial-gradient(circle at center, rgba(129,140,248,0.28), transparent 60%)',
-                }}
-              />
-              <div className='relative w-[248px] overflow-hidden rounded-[2rem] border border-white/15 shadow-[0_34px_90px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.08)] lg:w-[276px]'>
-                <Image
-                  src='/product-screenshots/profile-phone.png'
-                  alt='Jovie artist profile showing fan actions, smart links, and listening destinations'
-                  width={390}
-                  height={844}
-                  sizes='276px'
-                  className='w-full'
-                  priority
-                />
-              </div>
-            </div>
-          </div>
-        </MarketingHero>
+        </div>
       </section>
 
-      {/* ── The problem ── */}
-      <section className='border-b border-subtle bg-page py-16 sm:py-20 lg:py-24'>
-        <MarketingContainer width='landing'>
-          <div className='mx-auto max-w-[1120px]'>
-            <h2 className='marketing-h2-linear text-primary-token'>
-              Every extra click loses fans.
-            </h2>
-            <p className='mt-5 max-w-[36rem] text-[15px] leading-[1.75] text-secondary-token sm:text-[16px]'>
-              Today your audience navigates a maze of disconnected tools.
-              Competitors split the experience across bio pages, smart-link
-              pages, pre-save pages, and ticket pages.
-            </p>
-
-            <div className='mt-10 grid gap-6 sm:grid-cols-2'>
-              {/* Old stack */}
-              <div className='rounded-2xl border border-white/8 bg-white/[0.02] p-6'>
-                <p className='text-[11px] font-[560] tracking-[0.04em] uppercase text-white/30'>
-                  The old stack
-                </p>
-                <div className='mt-4 flex flex-wrap items-center gap-2 text-[13px] text-white/50'>
-                  {['Instagram bio', 'Linktree', 'Release link', 'DSP'].map(
-                    (step, i) => (
-                      <span key={step} className='flex items-center gap-2'>
-                        {i > 0 && (
-                          <ChevronRight
-                            className='h-3 w-3 text-white/20'
-                            aria-hidden='true'
-                          />
-                        )}
-                        <span>{step}</span>
-                      </span>
-                    )
-                  )}
-                </div>
-              </div>
-
-              {/* Jovie stack */}
-              <div className='rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(23,24,31,0.98),rgba(13,14,19,0.98))] p-6 shadow-[0_12px_32px_rgba(0,0,0,0.3)]'>
-                <div
-                  aria-hidden='true'
-                  className='pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent)]'
-                />
-                <p className='text-[11px] font-[560] tracking-[0.04em] uppercase text-white/50'>
-                  With Jovie
-                </p>
-                <div className='mt-4 flex flex-wrap items-center gap-2 text-[13px] text-white/80'>
-                  {['Instagram bio', 'Jovie profile'].map((step, i) => (
-                    <span key={step} className='flex items-center gap-2'>
-                      {i > 0 && (
-                        <ChevronRight
-                          className='h-3 w-3 text-white/30'
-                          aria-hidden='true'
-                        />
-                      )}
-                      <span>{step}</span>
-                    </span>
-                  ))}
-                </div>
-                <div className='mt-3 flex flex-wrap gap-2'>
-                  {['Listen', 'Notify', 'Tickets', 'Tip', 'Contact'].map(
-                    action => (
-                      <span
-                        key={action}
-                        className='rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-white/60'
-                      >
-                        {action}
-                      </span>
-                    )
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </MarketingContainer>
-      </section>
-
-      {/* ── How the profile adapts ── */}
-      <section className='border-b border-subtle bg-page py-16 sm:py-20 lg:py-24'>
-        <MarketingContainer width='landing'>
-          <div className='mx-auto max-w-[1120px]'>
-            <h2 className='marketing-h2-linear text-primary-token'>
-              One profile that always shows fans what to do next.
-            </h2>
-            <p className='mt-5 max-w-[36rem] text-[15px] leading-[1.75] text-secondary-token sm:text-[16px]'>
-              Count down to a drop, send fans to listen, show local tickets, and
-              keep contact info one tap away.
-            </p>
-
-            <div className='mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
-              {PROFILE_MODES.map(mode => {
-                const Icon = mode.icon;
-                const toneClass = TONE_CLASSES[mode.tone];
-                return (
-                  <div
-                    key={mode.label}
-                    className='relative overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(23,24,31,0.98),rgba(13,14,19,0.98))] p-5 shadow-[0_12px_32px_rgba(0,0,0,0.3)]'
-                  >
-                    <div
-                      aria-hidden='true'
-                      className='pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent)]'
-                    />
-                    <div className='relative'>
-                      <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-lg border ${toneClass.border} ${toneClass.bg}`}
-                      >
-                        <Icon
-                          className={`h-4 w-4 ${toneClass.text}`}
-                          aria-hidden='true'
-                        />
-                      </div>
-                      <p className='mt-3 text-[14px] font-[560] text-white'>
-                        {mode.label}
-                      </p>
-                      <p className='mt-1 text-[12px] leading-[1.5] text-white/45'>
-                        {mode.description}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </MarketingContainer>
-      </section>
-
-      {/* ── Turn profile traffic into an audience you own ── */}
-      <section className='border-b border-subtle bg-page py-16 sm:py-20 lg:py-24'>
-        <MarketingContainer width='landing'>
-          <div className='mx-auto max-w-[1120px]'>
-            <h2 className='marketing-h2-linear text-primary-token'>
-              Turn bio clicks into fans you can reach again.
-            </h2>
-            <p className='mt-5 max-w-[36rem] text-[15px] leading-[1.75] text-secondary-token sm:text-[16px]'>
-              Fans subscribe once. Jovie sends new-music notifications
-              automatically. Every release compounds instead of starting from
-              zero.
-            </p>
-
-            <div className='mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
-              {[
-                {
-                  icon: UserPlus,
-                  title: 'Fans subscribe once',
-                  body: 'One tap on your profile. No forms, no extra apps.',
-                },
-                {
-                  icon: Sparkles,
-                  title: 'Automatic release notifications',
-                  body: 'Drop a song and your fans hear about it. No templates, no campaigns.',
-                },
-                {
-                  icon: Mail,
-                  title: 'Retargeting in one system',
-                  body: 'Every fan, every release, every data point in one place.',
-                },
-              ].map(item => {
-                const Icon = item.icon;
-                return (
-                  <div
-                    key={item.title}
-                    className='relative overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(23,24,31,0.98),rgba(13,14,19,0.98))] p-5 shadow-[0_12px_32px_rgba(0,0,0,0.3)]'
-                  >
-                    <div
-                      aria-hidden='true'
-                      className='pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent)]'
-                    />
-                    <div className='relative'>
-                      <Icon
-                        className='h-5 w-5 text-white/40'
-                        aria-hidden='true'
-                      />
-                      <p className='mt-3 text-[14px] font-[560] text-white'>
-                        {item.title}
-                      </p>
-                      <p className='mt-1 text-[12px] leading-[1.5] text-white/45'>
-                        {item.body}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </MarketingContainer>
-      </section>
-
-      {/* ── Stay reachable for the deals that matter ── */}
-      <section className='border-b border-subtle bg-page py-16 sm:py-20 lg:py-24'>
-        <MarketingContainer width='landing'>
-          <div className='mx-auto max-w-[1120px]'>
-            <h2 className='marketing-h2-linear text-primary-token'>
-              Stay reachable for the deals that matter.
-            </h2>
-            <p className='mt-5 max-w-[36rem] text-[15px] leading-[1.75] text-secondary-token sm:text-[16px]'>
-              Your full contact team, accessible from your profile without
-              cluttering the homepage. Labels, agencies, and brands find who
-              they need in one tap.
-            </p>
-
-            <div className='mt-8 flex flex-wrap gap-3'>
-              {CONTACT_ROLES.map(role => (
-                <span
-                  key={role}
-                  className='rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[13px] font-medium text-white/60'
-                >
-                  {role}
-                </span>
-              ))}
-            </div>
-          </div>
-        </MarketingContainer>
-      </section>
-
-      {/* ── Make live moments worth more ── */}
-      <section className='border-b border-subtle bg-page py-16 sm:py-20 lg:py-24'>
-        <MarketingContainer width='landing'>
-          <div className='mx-auto max-w-[1120px]'>
-            <h2 className='marketing-h2-linear text-primary-token'>
-              Make live moments worth more.
-            </h2>
-            <p className='mt-5 max-w-[36rem] text-[15px] leading-[1.75] text-secondary-token sm:text-[16px]'>
-              When someone tips you at a show, Jovie captures their email, sends
-              a thank-you with a playlist link, and adds them to your audience.
-              That person goes from cash in hand to streams on the train home.
-            </p>
-
-            <div className='mt-8 flex items-center gap-3'>
-              <div className='flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]'>
-                <QrCode className='h-5 w-5 text-white/50' aria-hidden='true' />
-              </div>
-              <p className='text-[13px] text-white/50'>
-                QR code or deep link to your tip page. Three preset amounts.
-                Apple Pay or Venmo.
-              </p>
-            </div>
-          </div>
-        </MarketingContainer>
-      </section>
-
-      {/* ── Set it up once ── */}
-      <section className='border-b border-subtle bg-page py-16 sm:py-20 lg:py-24'>
-        <MarketingContainer width='landing'>
-          <div className='mx-auto max-w-[1120px]'>
-            <h2 className='marketing-h2-linear text-primary-token'>
-              Set it up once.
-            </h2>
-
-            <div className='mt-8 space-y-3'>
-              {[
-                'Claim your handle or import your existing presence',
-                'Connect Spotify to import your catalog',
-                'Connect Bandsintown if you tour',
-                'Add your contact team',
-                'Publish jov.ie/username',
-              ].map((step, i) => (
-                <div
-                  key={step}
-                  className='flex items-center gap-3 text-[15px] text-white/60'
-                >
-                  <span className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[11px] font-medium text-white/40'>
-                    {i + 1}
-                  </span>
-                  {step}
-                </div>
-              ))}
-            </div>
-          </div>
-        </MarketingContainer>
-      </section>
+      {/* ── Phone Tour (the centerpiece) ── */}
+      <StickyPhoneTour
+        modes={ARTIST_PROFILE_MODES}
+        introTitle='Your profile adapts to what matters right now.'
+        introBadge='One link. Four modes.'
+        artistHandle='timwhite'
+      />
 
       {/* ── Final CTA ── */}
       <section
