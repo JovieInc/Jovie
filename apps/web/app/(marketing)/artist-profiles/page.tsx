@@ -18,7 +18,7 @@ import {
   MarketingHero,
   MarketingPageShell,
 } from '@/components/marketing';
-import { Container } from '@/components/site/Container';
+
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { ClaimHandleForm } from '@/features/home/claim-handle';
@@ -228,7 +228,7 @@ export default function ArtistProfilesPage() {
 
       {/* ── The problem ── */}
       <section className='border-b border-subtle bg-page py-16 sm:py-20 lg:py-24'>
-        <Container size='homepage'>
+        <MarketingContainer width='landing'>
           <div className='mx-auto max-w-[1120px]'>
             <h2 className='marketing-h2-linear text-primary-token'>
               Every extra click loses fans.
@@ -299,12 +299,12 @@ export default function ArtistProfilesPage() {
               </div>
             </div>
           </div>
-        </Container>
+        </MarketingContainer>
       </section>
 
       {/* ── How the profile adapts ── */}
       <section className='border-b border-subtle bg-page py-16 sm:py-20 lg:py-24'>
-        <Container size='homepage'>
+        <MarketingContainer width='landing'>
           <div className='mx-auto max-w-[1120px]'>
             <h2 className='marketing-h2-linear text-primary-token'>
               One profile that always shows fans what to do next.
@@ -348,12 +348,12 @@ export default function ArtistProfilesPage() {
               })}
             </div>
           </div>
-        </Container>
+        </MarketingContainer>
       </section>
 
       {/* ── Turn profile traffic into an audience you own ── */}
       <section className='border-b border-subtle bg-page py-16 sm:py-20 lg:py-24'>
-        <Container size='homepage'>
+        <MarketingContainer width='landing'>
           <div className='mx-auto max-w-[1120px]'>
             <h2 className='marketing-h2-linear text-primary-token'>
               Turn bio clicks into fans you can reach again.
@@ -409,12 +409,12 @@ export default function ArtistProfilesPage() {
               })}
             </div>
           </div>
-        </Container>
+        </MarketingContainer>
       </section>
 
       {/* ── Stay reachable for the deals that matter ── */}
       <section className='border-b border-subtle bg-page py-16 sm:py-20 lg:py-24'>
-        <Container size='homepage'>
+        <MarketingContainer width='landing'>
           <div className='mx-auto max-w-[1120px]'>
             <h2 className='marketing-h2-linear text-primary-token'>
               Stay reachable for the deals that matter.
@@ -436,12 +436,12 @@ export default function ArtistProfilesPage() {
               ))}
             </div>
           </div>
-        </Container>
+        </MarketingContainer>
       </section>
 
       {/* ── Make live moments worth more ── */}
       <section className='border-b border-subtle bg-page py-16 sm:py-20 lg:py-24'>
-        <Container size='homepage'>
+        <MarketingContainer width='landing'>
           <div className='mx-auto max-w-[1120px]'>
             <h2 className='marketing-h2-linear text-primary-token'>
               Make live moments worth more.
@@ -462,12 +462,12 @@ export default function ArtistProfilesPage() {
               </p>
             </div>
           </div>
-        </Container>
+        </MarketingContainer>
       </section>
 
       {/* ── Set it up once ── */}
       <section className='border-b border-subtle bg-page py-16 sm:py-20 lg:py-24'>
-        <Container size='homepage'>
+        <MarketingContainer width='landing'>
           <div className='mx-auto max-w-[1120px]'>
             <h2 className='marketing-h2-linear text-primary-token'>
               Set it up once.
@@ -493,7 +493,7 @@ export default function ArtistProfilesPage() {
               ))}
             </div>
           </div>
-        </Container>
+        </MarketingContainer>
       </section>
 
       {/* ── Final CTA ── */}
