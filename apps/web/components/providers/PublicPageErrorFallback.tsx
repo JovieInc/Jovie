@@ -23,47 +23,43 @@ const styles: Record<string, CSSProperties> = {
       "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     fontFeatureSettings: '"cv01", "ss03"',
   },
-  card: {
+  container: {
     width: '100%',
-    maxWidth: '420px',
-    padding: '32px',
-    borderRadius: '12px',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    background: '#1c1c1f',
-    boxShadow:
-      'rgba(0,0,0,0.2) 0px 0px 12px inset, rgba(0,0,0,0.2) 0px 4px 24px',
+    maxWidth: '320px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
     textAlign: 'center',
   },
-  logoWrap: {
-    display: 'flex',
-    justifyContent: 'center',
-    marginBottom: '24px',
-  },
   title: {
-    margin: 0,
-    fontSize: '20px',
+    marginTop: '20px',
+    fontSize: '18px',
     fontWeight: 590,
-    letterSpacing: '-0.24px',
-    lineHeight: 1.33,
+    letterSpacing: '-0.02em',
+    lineHeight: 1.3,
+  },
+  description: {
+    marginTop: '8px',
+    fontSize: '14px',
+    lineHeight: 1.5,
+    color: '#969799',
   },
   button: {
     marginTop: '24px',
-    width: '100%',
-    minHeight: '40px',
+    height: '36px',
+    padding: '0 16px',
     border: 'none',
     borderRadius: '9999px',
     backgroundColor: '#e6e6e6',
     color: '#08090a',
-    fontSize: '15px',
-    fontWeight: 590,
+    fontSize: '14px',
+    fontWeight: 500,
     cursor: 'pointer',
   },
   errorId: {
-    marginTop: '16px',
+    marginTop: '20px',
     color: '#62666d',
     fontSize: '12px',
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
   },
 };
 
@@ -72,8 +68,8 @@ function JovieLogo() {
     <svg
       aria-hidden='true'
       viewBox='0 0 353.68 347.97'
-      width='44'
-      height='44'
+      width='32'
+      height='32'
       fill='none'
       xmlns='http://www.w3.org/2000/svg'
     >
@@ -97,13 +93,10 @@ export function PublicPageErrorFallback({
 
   return (
     <div style={styles.page} role='alert' aria-live='assertive'>
-      <div style={styles.card}>
-        <div style={styles.logoWrap}>
-          <JovieLogo />
-        </div>
-        <h1 style={styles.title}>
-          Something went wrong. Please refresh the page.
-        </h1>
+      <div style={styles.container}>
+        <JovieLogo />
+        <h1 style={styles.title}>Something went wrong</h1>
+        <p style={styles.description}>Try refreshing the page.</p>
         <button type='button' style={styles.button} onClick={onRefresh}>
           Refresh
         </button>
