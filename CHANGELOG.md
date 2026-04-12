@@ -16,16 +16,34 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.149.0] - 2026-04-12
 
+### Changed
+
+- Redesign onboarding handle step with inline `jov.ie/` prefix, pearl composer-style input, and circular arrow submit button
+- Simplify Spotify search step to single headline "Are you on Spotify?" with no redundant copy
+- Fix sidebar layout to sit beside content at 1024px+ instead of stacking on top (Tailwind v4 cascade fix)
+- Vertically position onboarding content in upper third of viewport for consistent headline placement
+- Replace filled sidebar circles with hollow stroke icons: solid (complete), half-solid/half-dotted (in-progress), dotted (pending)
+- Add per-step accent colors to sidebar step indicators
+- Simplify artist-confirm step to single clear message with always-enabled Continue button
+- Show specific handle validation errors instead of generic "Not available" message
+- Move Back button into sidebar for consistent alignment with "Jovie Setup" title
+- Presence page now redirects to artist profile settings (Music tab) instead of loading the broken presence UI
+- Removed Presence link from sidebar navigation
+
 ### Added
 
+- Reserve top artist Spotify IDs as unavailable in search dropdown for social proof
+- "Need help?" / "Contact support" mailto link in search dropdown footer
+- Handle suggestions shown as clickable `jov.ie/` pills with "Try:" label
 - Suggested DSP matches now appear in the Music tab of the right drawer sidebar with confirm/reject actions and hover popover details
 - Dot indicator on Music tab when unreviewed suggestions exist
 - One-line explanation for first-time users seeing suggested profiles
 
-### Changed
+### Fixed
 
-- Presence page now redirects to artist profile settings (Music tab) instead of loading the broken presence UI
-- Removed Presence link from sidebar navigation
+- Fix dropdown flickering during typing with `placeholderData: keepPreviousData`
+- Errors on artist-confirm step stay in context instead of bouncing to "Are you on Spotify?"
+- Split generic server error "That handle can't be used" into specific messages (reserved, too short, invalid characters)
 
 ## [26.4.148.1] - 2026-04-12
 
@@ -110,9 +128,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-<<<<<<< HEAD
 - Fixed territory badge border token in ContactDetailSidebar — replaced `border-(--linear-app-frame-seam)` (divider token) with `border-subtle` (card-level token) to match release sidebar badge pattern
-=======
 - Standardized dashboard elevation tokens to 3-tier system (DataCard, EmptyState, banners, empty state icons)
 - Added card wrapper to audience funnel stats (Profile Views, Unique Visitors, Followers)
 - Removed double shadow on chat input that caused visible border artifact

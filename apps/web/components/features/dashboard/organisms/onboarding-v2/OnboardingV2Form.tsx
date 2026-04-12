@@ -1,17 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import {
-  ArrowRight,
-  Check,
-  Circle,
-  CircleDashed,
-  Disc3,
-  ExternalLink,
-  Loader2,
-  Music2,
-  RefreshCw,
-} from 'lucide-react';
+import { ArrowRight, Disc3, Lock, Music2, RefreshCw } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -30,7 +20,6 @@ import { OnboardingExperienceShell } from '@/components/features/onboarding/Onbo
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { getProfileUrl } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthBackButton } from '@/features/auth';
 import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding';
 import { useHandleValidation } from '@/features/dashboard/organisms/onboarding-v2/shared/useHandleValidation';
 import {
@@ -65,6 +54,57 @@ import { cn } from '@/lib/utils';
 const DISCOVERY_POLL_INTERVAL_MS = 1200;
 const DISCOVERY_AUTO_ADVANCE_MS = 800;
 
+/**
+ * Reserved Spotify artist IDs — top DJs.
+ * These appear in search results as "unavailable" to create social proof.
+ */
+const RESERVED_SPOTIFY_IDS = new Set([
+  '1Cs0zKBU1kc0i8ypK3B9ai', // David Guetta
+  '60d24wfXkVzDSfLS6hyCjZ', // Martin Garrix
+  '64KEffDW9EtZ1y2vBYgq8T', // Marshmello
+  '1vCWHaC5f2uS3yhpwWbIA6', // Avicii
+  '6VuMaDnrHyPL1p4EHjYLi7', // Charlie Puth (crossover DJ/producer)
+  '5fMUXHkw8R8eOP2RNVYEZX', // Diplo
+  '4q3ewBCX7sLwd24euuV69X', // Bad Bunny
+  '1McMsnEElThX1knmY4oliG', // Olivia Rodrigo
+  '738wLrAtLtCtFOLvQBXOXp', // Kygo
+  '0EmeFodog0BfCgMzAIvKQp', // Skrillex
+  '5he5w2lnU9x7JFhnwcekXX', // Tiësto
+  '2o5jDhtHVPhrJdv3UGqLyI', // Armin van Buuren
+  '6nB0iY1cjSY1KyhYyuIIKH', // Deadmau5
+  '4YLtL2W80ytGNMKnW7ALBx', // Calvin Harris
+  '6hyMWrxGBsOx6sWcVj1DqP', // Zedd
+  '20s0P9QLxGqKuCsGwFsp7w', // Alesso
+  '4AVFqumd2ogHFlRbKIjp1t', // Afrojack
+  '77AiFEVeAVj2ORpC85QVJs', // Steve Aoki
+  '4pbG9SUmhZhrQKoSCxZyHc', // Don Diablo
+  '5YGY8feqx7naU7z4HrwZM6', // Miley Cyrus
+  '540vIaP2JwjQb9dm3aArA4', // DJ Snake
+  '2wY79sveU1sp5g7SokKOiI', // Sam Smith
+  '2ye2Wgw4gimLv2eAKyk1NB', // Metallica
+  '23fqKkggKUBHNkbKtXEls4', // Kylie Minogue
+  '0C8ZW7ezQVs4URX5aX7Kqx', // Selena Gomez
+  '2YZyLoL8N0Wb9xBt1NhZWg', // Kendrick Lamar
+  '3TVXtAsR1Inumwj472S9r4', // Drake
+  '06HL4z0CvFAxyc27GXpf02', // Taylor Swift
+  '6eUKZXaKkcviH0Ku9w2n3V', // Ed Sheeran
+  '1HY2Jd0NmPuamShAr6KMms', // Lady Gaga
+  '4gzpq5DPGxSnKTe4SA8HAU', // Coldplay
+  '3WrFJ7ztbogyGnTHbHJFl2', // The Beatles
+  '0du5cEVh5yTK9QJze8zA0C', // Bruno Mars
+  '4dpARuHxo51G3z768sgnrY', // Adele
+  '66CXWjxzNUsdJxJ2JdwvnR', // Ariana Grande
+  '7dGJo4pcD2V6oG8kP0tJRR', // Eminem
+  '3Nrfpe0tUJi4K4DXYWgMUX', // BTS
+  '6qqNVTkY8uBg9cP3Jd7DAH', // Billie Eilish
+  '1Xyo4u8uXC1ZmMpatF05PJ', // The Weeknd
+  '5K4W6rqBFWDnAN6FQUkS6x', // Kanye West
+]);
+
+function isReservedArtist(artist: SpotifyArtistResult): boolean {
+  return artist.isClaimed === true || RESERVED_SPOTIFY_IDS.has(artist.id);
+}
+
 type StepId =
   | 'handle'
   | 'spotify'
@@ -88,14 +128,16 @@ const STEP_ORDER: StepId[] = [
   'profile-ready',
 ];
 
-const SIDEBAR_STEPS: ReadonlyArray<Readonly<{ id: StepId; label: string }>> = [
-  { id: 'handle', label: 'Handle' },
-  { id: 'spotify', label: 'Spotify' },
-  { id: 'upgrade', label: 'Plan' },
-  { id: 'dsp', label: 'DSPs' },
-  { id: 'social', label: 'Social' },
-  { id: 'releases', label: 'Releases' },
-  { id: 'profile-ready', label: 'Finish' },
+const SIDEBAR_STEPS: ReadonlyArray<
+  Readonly<{ id: StepId; label: string; color: string }>
+> = [
+  { id: 'handle', label: 'Handle', color: '#a78bfa' },
+  { id: 'spotify', label: 'Spotify', color: '#1DB954' },
+  { id: 'upgrade', label: 'Plan', color: '#f59e0b' },
+  { id: 'dsp', label: 'DSPs', color: '#38bdf8' },
+  { id: 'social', label: 'Social', color: '#f472b6' },
+  { id: 'releases', label: 'Releases', color: '#fb923c' },
+  { id: 'profile-ready', label: 'Finish', color: '#34d399' },
 ];
 
 interface SelectedArtist {
@@ -215,7 +257,11 @@ function getSidebarStepState(step: StepId, currentStep: StepId) {
   const currentIndex = STEP_ORDER.indexOf(currentStep);
   const stepIndex = STEP_ORDER.indexOf(step);
 
-  if (stepIndex <= currentIndex) {
+  if (step === currentStep) {
+    return 'current';
+  }
+
+  if (stepIndex < currentIndex) {
     return 'complete';
   }
 
@@ -580,67 +626,63 @@ function EmptyState({
   );
 }
 
-function SelectedArtistCard({
-  artist,
-  isLoading,
-}: Readonly<{ artist: SelectedArtist | null; isLoading: boolean }>) {
+function StepCircleIcon({
+  className,
+  color,
+  state,
+}: Readonly<{
+  className?: string;
+  color: string;
+  state: 'complete' | 'current' | 'pending';
+}>) {
   return (
-    <FlatPanel>
-      <div className='flex items-center gap-4'>
-        {artist?.imageUrl ? (
-          <Image
-            src={artist.imageUrl}
-            alt=''
-            width={72}
-            height={72}
-            className='h-[72px] w-[72px] rounded-full object-cover'
-            unoptimized
+    <svg
+      aria-hidden='true'
+      className={className}
+      viewBox='0 0 24 24'
+      fill='none'
+    >
+      {state === 'complete' ? (
+        <circle cx='12' cy='12' r='10' stroke={color} strokeWidth='2' />
+      ) : state === 'current' ? (
+        <>
+          {/* Solid left half */}
+          <path
+            d='M12 2a10 10 0 0 0 0 20'
+            stroke={color}
+            strokeWidth='2'
+            fill='none'
           />
-        ) : (
-          <div className='flex h-[72px] w-[72px] items-center justify-center rounded-full bg-surface-0 text-tertiary-token'>
-            <Music2 className='h-6 w-6' />
-          </div>
-        )}
-
-        <div className='min-w-0 flex-1'>
-          <p className='text-[11px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
-            Selected artist
-          </p>
-          <p className='truncate text-lg font-[590] text-primary-token'>
-            {artist?.name || 'Spotify artist'}
-          </p>
-          <div className='mt-2 flex items-center gap-2 text-sm text-secondary-token'>
-            {isLoading ? (
-              <>
-                <Loader2 className='h-4 w-4 animate-spin' />
-                <span>Finishing import and discovery...</span>
-              </>
-            ) : (
-              <>
-                <Check className='h-4 w-4 text-success' />
-                <span>Connected for this profile</span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {artist?.url ? (
-          <Button asChild variant='secondary' size='sm'>
-            <Link href={artist.url} target='_blank' rel='noreferrer'>
-              View
-              <ExternalLink className='ml-1 h-3.5 w-3.5' />
-            </Link>
-          </Button>
-        ) : null}
-      </div>
-    </FlatPanel>
+          {/* Dotted right half */}
+          <path
+            d='M12 2a10 10 0 0 1 0 20'
+            stroke={color}
+            strokeWidth='2'
+            strokeDasharray='2.5 2.5'
+            fill='none'
+          />
+        </>
+      ) : (
+        <circle
+          cx='12'
+          cy='12'
+          r='10'
+          stroke='currentColor'
+          strokeWidth='2'
+          strokeDasharray='2.5 2.5'
+          opacity={0.35}
+        />
+      )}
+    </svg>
   );
 }
 
 function OnboardingSidebar({
   currentStep,
+  onBack,
 }: Readonly<{
   currentStep: StepId;
+  onBack?: () => void;
 }>) {
   const displayStep = normalizeSidebarCurrentStep(currentStep);
   const currentIndex = SIDEBAR_STEPS.findIndex(s => s.id === displayStep);
@@ -649,6 +691,16 @@ function OnboardingSidebar({
 
   return (
     <nav aria-label='Onboarding steps'>
+      {onBack ? (
+        <button
+          type='button'
+          onClick={onBack}
+          aria-label='Go back'
+          className='mb-3 flex h-7 w-7 items-center justify-center rounded-lg text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
+        >
+          <ArrowRight className='h-4 w-4 rotate-180' />
+        </button>
+      ) : null}
       {/* Compact progress indicator for small screens */}
       <div className='flex items-center gap-3 sm:hidden'>
         <span className='text-[13px] font-[560] text-primary-token'>
@@ -674,8 +726,7 @@ function OnboardingSidebar({
       <ul className='hidden space-y-1.5 sm:block'>
         {SIDEBAR_STEPS.map(step => {
           const state = getSidebarStepState(step.id, displayStep);
-          const Icon = state === 'complete' ? Circle : CircleDashed;
-          const isCurrent = step.id === displayStep;
+          const isCurrent = state === 'current';
 
           return (
             <li key={step.id} aria-current={isCurrent ? 'step' : undefined}>
@@ -687,13 +738,10 @@ function OnboardingSidebar({
                     : 'text-secondary-token'
                 )}
               >
-                <Icon
-                  className={cn(
-                    'h-4 w-4 shrink-0',
-                    state === 'complete'
-                      ? 'fill-current text-primary-token'
-                      : 'text-tertiary-token'
-                  )}
+                <StepCircleIcon
+                  className='h-4 w-4 shrink-0'
+                  color={state === 'pending' ? 'currentColor' : step.color}
+                  state={state}
                 />
                 <span className='font-[560]'>{step.label}</span>
               </div>
@@ -849,21 +897,18 @@ export function OnboardingV2Form({
       setCurrentStep('artist-confirm');
     },
     onAutoConnectFailed: message => {
-      const currentStepAtFailure = currentStepRef.current;
-
-      if (
-        currentStepAtFailure !== 'spotify' &&
-        currentStepAtFailure !== 'artist-confirm'
-      ) {
-        setDiscoveryError(message);
-        return;
-      }
-
+      setDiscoveryError(message);
       setSelectedArtist(
         discoverySnapshotRef.current?.selectedSpotifyProfile ?? null
       );
-      setCurrentStep('spotify');
-      setDiscoveryError(message);
+      // Stay on artist-confirm so the user sees the error in context
+      // instead of being bounced back to "Are you on Spotify?"
+      if (
+        currentStepRef.current === 'spotify' ||
+        currentStepRef.current === 'artist-confirm'
+      ) {
+        setCurrentStep('artist-confirm');
+      }
     },
     onCompleted: result => {
       setProfileId(result.profileId);
@@ -882,7 +927,6 @@ export function OnboardingV2Form({
       const requestSeq = discoveryRequestSeqRef.current + 1;
       discoveryRequestSeqRef.current = requestSeq;
       setIsDiscoveryLoading(true);
-      setDiscoveryError(null);
 
       try {
         const nextSnapshot = await fetchDiscoverySnapshot(profileId, signal);
@@ -890,6 +934,8 @@ export function OnboardingV2Form({
           return;
         }
 
+        // Only clear error on successful fetch — don't clear on poll start
+        setDiscoveryError(null);
         const previousSnapshot = discoverySnapshotRef.current;
         discoverySnapshotRef.current = nextSnapshot;
         setDiscoverySnapshot(nextSnapshot);
@@ -1104,15 +1150,12 @@ export function OnboardingV2Form({
         }
       } catch (error) {
         setIsArtistConnectPending(false);
-        setSelectedArtist(
-          discoverySnapshotRef.current?.selectedSpotifyProfile ?? null
-        );
-        setCurrentStep('spotify');
         setDiscoveryError(
           error instanceof Error
             ? error.message
             : 'Failed to connect your Spotify artist.'
         );
+        // Stay on artist-confirm so the user sees the error in context
         return;
       }
 
@@ -1570,52 +1613,78 @@ export function OnboardingV2Form({
     return (
       <ContentSurfaceCard
         as='ul'
-        className='absolute top-full right-0 left-0 z-10 mt-2 max-h-[280px] overflow-y-auto p-1'
+        className='absolute top-full right-0 left-0 z-10 mt-2 max-h-[320px] overflow-y-auto p-1'
       >
-        {results.map(artist => (
-          <li key={artist.id}>
-            <button
-              type='button'
-              onClick={() => {
-                connectArtist({
-                  id: artist.id,
-                  imageUrl: artist.imageUrl ?? null,
-                  name: artist.name,
-                  url: artist.url,
-                });
-              }}
-              className='flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition-colors hover:bg-surface-0'
-            >
-              {artist.imageUrl ? (
-                <Image
-                  src={artist.imageUrl}
-                  alt=''
-                  width={40}
-                  height={40}
-                  className='h-10 w-10 rounded-full object-cover'
-                  unoptimized
-                />
-              ) : (
-                <div className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-0 text-tertiary-token'>
-                  <Music2 className='h-4 w-4' />
+        {results.map(artist => {
+          const unavailable = isReservedArtist(artist);
+
+          return (
+            <li key={artist.id}>
+              <button
+                type='button'
+                disabled={unavailable}
+                onClick={() => {
+                  connectArtist({
+                    id: artist.id,
+                    imageUrl: artist.imageUrl ?? null,
+                    name: artist.name,
+                    url: artist.url,
+                  });
+                }}
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition-colors',
+                  unavailable
+                    ? 'cursor-default opacity-35'
+                    : 'hover:bg-surface-0'
+                )}
+              >
+                {artist.imageUrl ? (
+                  <Image
+                    src={artist.imageUrl}
+                    alt=''
+                    width={40}
+                    height={40}
+                    className='h-10 w-10 rounded-full object-cover'
+                    unoptimized
+                  />
+                ) : (
+                  <div className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-0 text-tertiary-token'>
+                    <Music2 className='h-4 w-4' />
+                  </div>
+                )}
+
+                <div className='min-w-0 flex-1'>
+                  <p className='truncate text-sm font-[560] text-primary-token'>
+                    {artist.name}
+                  </p>
+                  <p className='text-xs text-secondary-token'>
+                    {unavailable
+                      ? 'Unavailable'
+                      : artist.followers
+                        ? `${artist.followers.toLocaleString()} followers`
+                        : 'Spotify'}
+                  </p>
                 </div>
-              )}
 
-              <div className='min-w-0 flex-1'>
-                <p className='truncate text-sm font-[560] text-primary-token'>
-                  {artist.name}
-                </p>
-                <p className='text-xs text-secondary-token'>
-                  {artist.followers
-                    ? `${artist.followers.toLocaleString()} followers`
-                    : 'Spotify'}
-                </p>
-              </div>
+                {unavailable ? (
+                  <Lock className='h-4 w-4 shrink-0 text-tertiary-token' />
+                ) : (
+                  <ArrowRight className='h-4 w-4 shrink-0 text-tertiary-token' />
+                )}
+              </button>
+            </li>
+          );
+        })}
 
-              <ArrowRight className='h-4 w-4 shrink-0 text-tertiary-token' />
-            </button>
-          </li>
-        ))}
+        <li className='flex items-center justify-between border-t border-subtle px-3 py-2'>
+          <span className='text-xs text-tertiary-token'>Need help?</span>
+          <a
+            href='mailto:support@jov.ie'
+            className='text-xs text-secondary-token transition-colors hover:text-primary-token'
+          >
+            Contact support
+          </a>
+        </li>
       </ContentSurfaceCard>
     );
   };
@@ -1638,17 +1707,14 @@ export function OnboardingV2Form({
             onHandleChange={setProfileHandle}
             onSubmit={handleSubmit}
             stateError={state.error}
-            title='Choose your handle'
-            prompt='This is the username fans will use to find you.'
+            title='Claim your link'
+            prompt='This is the only link you need to share your music. Make it yours.'
           />
         );
 
       case 'spotify':
         return (
-          <StepFrame
-            title='Pick your Spotify artist'
-            prompt='Search for your artist page or paste a Spotify artist URL. We will finish your import and discovery before you leave onboarding.'
-          >
+          <StepFrame title='Are you on Spotify?'>
             {discoveryError ? (
               <InlineNotice>{discoveryError}</InlineNotice>
             ) : null}
@@ -1673,71 +1739,58 @@ export function OnboardingV2Form({
               </div>
               {renderSpotifySearchResults(artistResults)}
             </div>
-
-            <FlatPanel>
-              <p className='text-sm font-[560] text-primary-token'>
-                What happens next
-              </p>
-              <ul className='mt-3 space-y-2 text-sm leading-6 text-secondary-token'>
-                <li>We claim the Spotify artist on your profile right away.</li>
-                <li>
-                  We finish your first import before the next step unlocks.
-                </li>
-                <li>
-                  Cross-platform discovery is completed during onboarding.
-                </li>
-                <li>You can still reselect a different artist if needed.</li>
-              </ul>
-            </FlatPanel>
           </StepFrame>
         );
 
-      case 'artist-confirm':
+      case 'artist-confirm': {
+        const hasError =
+          discoveryError ||
+          getBlockingReason(discoverySnapshot) === 'spotify_import_failed';
+        const isImporting =
+          isArtistConnectPending ||
+          isConnecting ||
+          isEnriching ||
+          isDiscoveryLoading;
+
         return (
           <StepFrame
-            title='Spotify is connected'
-            prompt='We are finishing your import and discovery now.'
+            title={hasError ? 'Import ran into an issue' : 'Spotify connected'}
+            prompt={
+              hasError
+                ? 'You can try connecting again or skip ahead.'
+                : "We'll import your discography in the background. You can keep going."
+            }
             actions={
               <>
                 <Button
-                  onClick={() => setCurrentStep('spotify')}
-                  disabled={isArtistConnectPending || isConnecting}
+                  onClick={() => {
+                    setDiscoveryError(null);
+                    setCurrentStep('spotify');
+                  }}
+                  disabled={isImporting}
                   variant='secondary'
                 >
-                  Choose a different artist
+                  {hasError ? 'Try again' : 'Choose a different artist'}
                 </Button>
                 <Button
-                  disabled={
-                    isArtistConnectPending ||
-                    isConnecting ||
-                    !canProceedToDashboard(discoverySnapshot)
-                  }
-                  onClick={advanceFromStep}
+                  onClick={() => setCurrentStep('upgrade')}
+                  disabled={isImporting}
                 >
-                  {canProceedToDashboard(discoverySnapshot)
-                    ? 'Continue'
-                    : 'Finishing import'}
+                  Continue
                   <ArrowRight className='ml-1 h-4 w-4' />
                 </Button>
               </>
             }
           >
-            {getReadinessMessage(discoverySnapshot) ? (
-              <InlineNotice>
-                {getReadinessMessage(discoverySnapshot)}
-              </InlineNotice>
+            {isImporting && !hasError ? (
+              <div className='flex items-center gap-2 text-sm text-secondary-token'>
+                <LoadingSpinner size='sm' className='text-tertiary-token' />
+                <span>Importing…</span>
+              </div>
             ) : null}
-            <SelectedArtistCard
-              artist={selectedArtist}
-              isLoading={
-                isArtistConnectPending ||
-                isConnecting ||
-                isEnriching ||
-                isDiscoveryLoading
-              }
-            />
           </StepFrame>
         );
+      }
 
       case 'upgrade':
         return (
@@ -2147,18 +2200,20 @@ export function OnboardingV2Form({
     <OnboardingExperienceShell
       mode='standalone'
       stableStageHeight={currentStep === 'handle' ? 'tall' : 'default'}
-      sidebar={<OnboardingSidebar currentStep={currentStep} />}
+      sidebar={
+        <OnboardingSidebar
+          currentStep={currentStep}
+          onBack={
+            currentStep === 'spotify' ||
+            currentStep === 'artist-confirm' ||
+            currentStep === 'upgrade'
+              ? handleGoBack
+              : undefined
+          }
+        />
+      }
       sidebarTitle='Jovie Setup'
       stageVariant='flat'
-      topBar={
-        currentStep === 'spotify' ||
-        currentStep === 'artist-confirm' ||
-        currentStep === 'upgrade' ? (
-          <div className='pb-2'>
-            <AuthBackButton onClick={handleGoBack} ariaLabel='Go back' />
-          </div>
-        ) : null
-      }
       data-testid='onboarding-experience-shell'
     >
       {stepContent}
