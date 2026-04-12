@@ -48,6 +48,21 @@
           }
         },
         {
+          "matchingUrlPattern": "http://localhost:3000/tim$",
+          "assertions": {
+            "cumulative-layout-shift": ["error", { "maxNumericValue": 0.05 }],
+            "resource-summary:script:size": [
+              "error",
+              { "maxNumericValue": 1076000 }
+            ],
+            "resource-summary:total:size": [
+              "error",
+              { "maxNumericValue": 1229000 }
+            ],
+            "categories:accessibility": ["error", { "minScore": 0.9 }]
+          }
+        },
+        {
           "matchingUrlPattern": "http://localhost:3000/legal/(privacy|terms|cookies)$",
           "assertions": {
             "errors-in-console": "warn",
