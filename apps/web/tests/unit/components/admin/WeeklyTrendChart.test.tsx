@@ -13,7 +13,10 @@ vi.mock('next/dynamic', () => ({
   },
 }));
 
-import { WeeklyTrendChart } from '@/features/admin/WeeklyTrendChart';
+import {
+  formatWeekLabel,
+  WeeklyTrendChart,
+} from '@/features/admin/WeeklyTrendChart';
 
 const mockData = [
   {
@@ -57,5 +60,18 @@ describe('WeeklyTrendChart', () => {
     expect(screen.getByText('Contacted')).toBeInTheDocument();
     expect(screen.getByText('Signups')).toBeInTheDocument();
     expect(screen.getByText('Paid')).toBeInTheDocument();
+  });
+});
+
+describe('formatWeekLabel', () => {
+  it('formats ISO date as short month + day', () => {
+    expect(formatWeekLabel('2026-03-16')).toBe('Mar 16');
+    expect(formatWeekLabel('2026-04-06')).toBe('Apr 6');
+    expect(formatWeekLabel('2026-12-25')).toBe('Dec 25');
+  });
+
+  it('handles month boundaries correctly', () => {
+    expect(formatWeekLabel('2026-01-01')).toBe('Jan 1');
+    expect(formatWeekLabel('2026-02-28')).toBe('Feb 28');
   });
 });
