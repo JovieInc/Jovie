@@ -9,8 +9,8 @@
 
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { generateMusicStructuredData } from '@/app/[username]/[slug]/_lib/structured-data';
 import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
-import { generateMusicStructuredData } from '@/app/[username]/[slug]/page';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { BASE_URL } from '@/constants/app';
 import { buildBreadcrumbObject } from '@/lib/constants/schemas';
