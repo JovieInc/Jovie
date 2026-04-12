@@ -13,7 +13,7 @@ export default function SettingsBillingLoading() {
               Billing &amp; Subscription
             </h2>
             <p className='text-sm text-secondary-token'>
-              Subscription, payment methods, and invoices.
+              Plan, payment methods, and invoices.
             </p>
           </div>
 
