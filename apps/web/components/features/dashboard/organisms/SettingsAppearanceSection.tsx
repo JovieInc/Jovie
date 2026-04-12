@@ -75,7 +75,7 @@ export function SettingsAppearanceSection() {
                 onClick={() => handleThemeChange(option.value)}
                 disabled={isThemePending}
                 className={cn(
-                  'h-auto justify-start rounded-[12px] border px-3 py-2.5 text-left',
+                  'h-auto justify-start rounded-[10px] border px-3 py-2.5 text-left',
                   'focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-0',
                   isSelected
                     ? 'border-accent/45 bg-accent/6 text-primary-token'

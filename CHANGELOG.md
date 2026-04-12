@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.146.3] - 2026-04-11
+
+### Changed
+
+- Standardize badge styling across settings pages to use Badge component variants instead of custom inline classes
+- Add CheckCircle icon to "Verified" badge in Connected Accounts for consistency with Email section
+- Convert raw `<span>` "Current session" badge to Badge component in Session Management
+- Correct theme selector card border radius from 12px to 10px in Appearance settings
+
+## [26.4.146.2] - 2026-04-11
+
+### Fixed
+
+- Pass CSP nonce from middleware to theme-init Script in root layout, fixing hydration mismatch on authenticated pages
+- Suppress expected hydration warning on smart link URLs where server/client origins intentionally differ
+
 ## [26.4.146.1] - 2026-04-11
 
 ### Changed

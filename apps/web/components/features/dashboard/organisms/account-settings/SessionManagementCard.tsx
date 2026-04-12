@@ -7,7 +7,7 @@
  * Allows users to view and revoke sessions on other devices.
  */
 
-import { Button } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import { useEffect, useState } from 'react';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
@@ -154,9 +154,9 @@ export function SessionManagementCard({
                       : activity?.browserName || 'Unknown device'}
                   </p>
                   {isCurrent ? (
-                    <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token'>
-                      Current session
-                    </span>
+                    <Badge variant='secondary' size='sm'>
+                      Current Session
+                    </Badge>
                   ) : null}
                 </div>
                 <p className='mt-0.5 text-[11px] text-secondary-token'>

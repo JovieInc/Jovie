@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
+import { headers } from 'next/headers';
 import Script from 'next/script';
 import React from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
 import './globals.css';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';
@@ -137,6 +139,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const nonce = (await headers()).get(SCRIPT_NONCE_HEADER) ?? undefined;
+
   const isE2EClientRuntime =
     process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
     process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
@@ -199,8 +203,12 @@ export default async function RootLayout({
       data-scroll-behavior='smooth'
       suppressHydrationWarning
     >
-      <head>
-        <Script nonce='' src='/theme-init.js' strategy='beforeInteractive' />
+      <head suppressHydrationWarning>
+        <Script
+          src='/theme-init.js'
+          strategy='beforeInteractive'
+          nonce={nonce}
+        />
       </head>
       <body className={bodyClassName}>
         {FlagBadgeProvider ? (
