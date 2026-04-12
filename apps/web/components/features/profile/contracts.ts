@@ -83,6 +83,9 @@ export interface ProfilePublicViewModel {
   readonly visitTrackingToken?: string;
   readonly showSubscriptionConfirmedBanner: boolean;
   readonly showShopButton: boolean;
+  readonly profileSettings?: {
+    readonly showOldReleases?: boolean;
+  } | null;
 }
 
 export interface ProfileIdentityFields {

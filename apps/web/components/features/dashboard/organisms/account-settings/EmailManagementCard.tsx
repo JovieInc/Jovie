@@ -73,31 +73,19 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                       {email.emailAddress}
                     </p>
                     {isPrimary ? (
-                      <Badge
-                        variant='secondary'
-                        size='sm'
-                        className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 text-[10px] text-secondary-token'
-                      >
+                      <Badge variant='secondary' size='sm'>
                         Primary
                       </Badge>
                     ) : null}
                   </div>
                   <div className='mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-secondary-token'>
                     {isVerified ? (
-                      <Badge
-                        variant='success'
-                        size='sm'
-                        className='inline-flex items-center gap-1 rounded-[6px] border border-emerald-500/20 bg-emerald-500/10 px-1.5 text-[10px] text-emerald-700 dark:text-emerald-300'
-                      >
+                      <Badge variant='success' size='sm' className='gap-1'>
                         <CheckCircle className='h-3.5 w-3.5' aria-hidden />
                         Verified
                       </Badge>
                     ) : (
-                      <Badge
-                        variant='warning'
-                        size='sm'
-                        className='inline-flex items-center gap-1 rounded-[6px] border border-amber-500/20 bg-amber-500/10 px-1.5 text-[10px] text-amber-700 dark:text-amber-300'
-                      >
+                      <Badge variant='warning' size='sm' className='gap-1'>
                         <ShieldAlert className='h-3.5 w-3.5' aria-hidden />
                         Unverified
                       </Badge>
