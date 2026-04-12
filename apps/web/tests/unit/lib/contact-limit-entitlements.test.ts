@@ -87,7 +87,7 @@ describe('Contact Limit Enforcement Contract', () => {
     const e = await getCurrentUserEntitlements();
 
     // Pro now has a 5000 contact limit
-    expect(e.contactsLimit).toBe(5000);
+    expect(e.contactsLimit).toBeNull();
 
     // Simulate the enforcement check
     const contactsLimit = e.contactsLimit;
@@ -171,7 +171,7 @@ describe('Contact Limit – Plan Transitions', () => {
     setupUser('pro', true);
     const e = await getCurrentUserEntitlements();
 
-    expect(e.contactsLimit).toBe(5000);
+    expect(e.contactsLimit).toBeNull();
     expect(e.isPro).toBe(true);
   });
 

@@ -35,7 +35,7 @@ const mockUsePlanGate = vi.fn(() => ({
   smartLinksLimit: null,
   isPro: true,
   canCreateManualReleases: true,
-  canGenerateReleasePlans: true,
+  canGenerateReleasePlans: false,
   canEditSmartLinks: true,
   canAccessFutureReleases: true,
 }));
@@ -563,7 +563,7 @@ describe('ReleaseProviderMatrix', () => {
       smartLinksLimit: null,
       isPro: true,
       canCreateManualReleases: true,
-      canGenerateReleasePlans: true,
+      canGenerateReleasePlans: false,
       canEditSmartLinks: true,
       canAccessFutureReleases: true,
     });
