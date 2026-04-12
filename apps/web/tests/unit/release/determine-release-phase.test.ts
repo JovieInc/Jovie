@@ -6,19 +6,27 @@ describe('determineReleasePhase', () => {
   const now = FIXED_NOW;
 
   it('returns mystery when revealDate is in the future', () => {
-    expect(determineReleasePhase(DATES.futureRelease, DATES.futureReveal, now)).toBe('mystery');
+    expect(
+      determineReleasePhase(DATES.futureRelease, DATES.futureReveal, now)
+    ).toBe('mystery');
   });
 
   it('returns revealed when revealDate has passed but releaseDate is in the future', () => {
-    expect(determineReleasePhase(DATES.futureRelease, DATES.pastReveal, now)).toBe('revealed');
+    expect(
+      determineReleasePhase(DATES.futureRelease, DATES.pastReveal, now)
+    ).toBe('revealed');
   });
 
   it('returns released when releaseDate has passed', () => {
-    expect(determineReleasePhase(DATES.pastRelease, '2025-11-01', now)).toBe('released');
+    expect(determineReleasePhase(DATES.pastRelease, '2025-11-01', now)).toBe(
+      'released'
+    );
   });
 
   it('returns revealed when revealDate is null and releaseDate is in the future', () => {
-    expect(determineReleasePhase(DATES.futureRelease, null, now)).toBe('revealed');
+    expect(determineReleasePhase(DATES.futureRelease, null, now)).toBe(
+      'revealed'
+    );
   });
 
   it('returns released when both dates are null', () => {
@@ -31,7 +39,11 @@ describe('determineReleasePhase', () => {
 
   it('accepts Date objects', () => {
     expect(
-      determineReleasePhase(new Date(DATES.futureRelease), new Date(DATES.futureReveal), now)
+      determineReleasePhase(
+        new Date(DATES.futureRelease),
+        new Date(DATES.futureReveal),
+        now
+      )
     ).toBe('mystery');
   });
 

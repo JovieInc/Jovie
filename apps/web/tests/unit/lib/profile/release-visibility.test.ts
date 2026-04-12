@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DATES, FIXED_NOW } from '../../fixtures/release-dates';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
+import { DATES, FIXED_NOW } from '../../fixtures/release-dates';
 
 describe('getProfileReleaseVisibility', () => {
   const now = FIXED_NOW;
