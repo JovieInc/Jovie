@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { DATES, FIXED_NOW } from '../../fixtures/release-dates';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 
 describe('getProfileReleaseVisibility', () => {
-  const now = new Date('2026-04-11T12:00:00Z');
+  const now = FIXED_NOW;
 
   it('returns null when release is null', () => {
     expect(getProfileReleaseVisibility(null, null, now)).toBeNull();
@@ -14,16 +15,16 @@ describe('getProfileReleaseVisibility', () => {
 
   it('returns null when release is in mystery phase', () => {
     const release = {
-      releaseDate: '2026-06-01',
-      revealDate: '2026-05-01', // still in the future
+      releaseDate: DATES.futureRelease,
+      revealDate: DATES.futureReveal, // still in the future
     };
     expect(getProfileReleaseVisibility(release, null, now)).toBeNull();
   });
 
   it('returns isCountdown: true when release is in revealed phase', () => {
     const release = {
-      releaseDate: '2026-06-01', // future
-      revealDate: '2026-04-01', // already passed
+      releaseDate: DATES.futureRelease, // future
+      revealDate: DATES.pastReveal, // already passed
     };
     const result = getProfileReleaseVisibility(release, null, now);
     expect(result).toEqual({
@@ -35,7 +36,7 @@ describe('getProfileReleaseVisibility', () => {
 
   it('returns isCountdown: true when revealDate is null and releaseDate is in the future', () => {
     const release = {
-      releaseDate: '2026-06-01', // future
+      releaseDate: DATES.futureRelease, // future
       revealDate: null,
     };
     const result = getProfileReleaseVisibility(release, null, now);
@@ -48,7 +49,7 @@ describe('getProfileReleaseVisibility', () => {
 
   it('returns show: true for a released release within 90 days', () => {
     const release = {
-      releaseDate: '2026-03-15', // 27 days ago
+      releaseDate: DATES.recentRelease, // 27 days ago
       revealDate: '2026-03-01',
     };
     const result = getProfileReleaseVisibility(release, null, now);
@@ -61,7 +62,7 @@ describe('getProfileReleaseVisibility', () => {
 
   it('returns show: false, isRetired: true for a release older than 90 days', () => {
     const release = {
-      releaseDate: '2025-12-01', // ~131 days ago
+      releaseDate: DATES.retiredRelease, // ~131 days ago
       revealDate: '2025-11-15',
     };
     const result = getProfileReleaseVisibility(release, null, now);
@@ -74,7 +75,7 @@ describe('getProfileReleaseVisibility', () => {
 
   it('returns show: true when release is older than 90 days but showOldReleases is true', () => {
     const release = {
-      releaseDate: '2025-12-01', // ~131 days ago
+      releaseDate: DATES.retiredRelease, // ~131 days ago
       revealDate: '2025-11-15',
     };
     const result = getProfileReleaseVisibility(
@@ -145,7 +146,7 @@ describe('getProfileReleaseVisibility', () => {
 
   it('handles undefined settings the same as null', () => {
     const release = {
-      releaseDate: '2025-12-01',
+      releaseDate: DATES.retiredRelease,
       revealDate: null,
     };
     const result = getProfileReleaseVisibility(release, undefined, now);
