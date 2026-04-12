@@ -30,7 +30,7 @@ export function HeroCinematic({
         <div className='hero-glow pointer-events-none absolute inset-0' />
 
         <Container size='homepage'>
-          <div className='mx-auto max-w-[1120px]'>
+          <div className='mx-auto max-w-[1200px]'>
             <div className='hero-stagger'>
               <div className='flex max-lg:flex-col items-center gap-10 lg:flex-row lg:items-center lg:gap-16'>
                 <div className='max-w-[44rem] max-lg:text-center lg:flex-1 lg:text-left'>

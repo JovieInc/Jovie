@@ -168,7 +168,7 @@ export function BentoFeatureGrid() {
       aria-labelledby='bento-heading'
     >
       <Container size='homepage'>
-        <div className='mx-auto max-w-[1120px]'>
+        <div className='mx-auto max-w-[1200px]'>
           <h2
             id='bento-heading'
             className='marketing-h2-linear text-primary-token'

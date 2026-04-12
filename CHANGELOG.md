@@ -9,10 +9,23 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Marketing typography: Inter replaced with Satoshi (display) + DM Sans (body) for all marketing pages
+- All marketing container widths unified from 1120px to 1200px across 10 files
+- Feature grid icons replaced with accent-colored title text (no more emoji-on-colored-square pattern)
+- Container homepage variant simplified from padding hack to standard max-width
+- CTA philosophy documented as white-on-black (Apple approach), no saturated brand color
 - Replace hardcoded hex colors in mobile swipe actions with design system tokens
 - Unify empty state styling across releases page (consistent min-height, heading size, button spacing)
 - Align table base text to 13px per DESIGN.md specification
 - Wrap connected-but-empty state in DrawerSurfaceCard for visual consistency
+
+### Added
+
+- Self-hosted Satoshi Variable (42KB) and DM Sans Variable (48KB) font files
+- Marketing font loading via next/font/local, scoped to .linear-marketing wrapper
+- Font families registered in @theme block (--font-display, --font-body)
+- Feature accent color system documented in DESIGN.md with usage rules
+- Explicit anti-patterns added to DESIGN.md: gold colors, emoji-on-square icons, saturated brand colors
 
 ## [26.4.149.0] - 2026-04-12
 
