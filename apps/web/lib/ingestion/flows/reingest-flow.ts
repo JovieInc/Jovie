@@ -7,6 +7,7 @@
  * Extracted to reduce cognitive complexity of the creator-ingest route.
  */
 
+import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -17,6 +18,7 @@ import { logger } from '@/lib/utils/logger';
 import type { fetchFullExtractionProfile } from './full-extraction-flow';
 import type { checkExistingProfile } from './profile-operations';
 import { processProfileExtraction } from './profile-processing';
+import { evaluateProfileQuality } from './profile-quality-gate';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -57,6 +59,30 @@ export async function handleReingestProfile({
       displayName
     );
 
+    // Promote quarantined profiles if quality now passes (never demote public profiles)
+    let promoted = false;
+    if (existing.isPublic === false && !mergeError) {
+      const qualityResult = evaluateProfileQuality({
+        displayName: existing.displayNameLocked
+          ? (existing.displayName ?? displayName)
+          : displayName,
+        avatarUrl: extraction.avatarUrl ?? existing.avatarUrl,
+        linkCount: extraction.links.length,
+      });
+      if (qualityResult.isPublic) {
+        await tx
+          .update(creatorProfiles)
+          .set({ isPublic: true, updatedAt: new Date() })
+          .where(eq(creatorProfiles.id, existing.id));
+        await invalidateProfileCache(existing.usernameNormalized);
+        promoted = true;
+        logger.info('Quarantined profile promoted to public after reingest', {
+          profileId: existing.id,
+          handle: existing.usernameNormalized,
+        });
+      }
+    }
+
     return NextResponse.json(
       {
         ok: !mergeError,
@@ -66,6 +92,8 @@ export async function handleReingestProfile({
           usernameNormalized: existing.usernameNormalized,
         },
         links: extraction.links.length,
+        quarantined: existing.isPublic === false && !promoted,
+        promoted: promoted || undefined,
         warning: mergeError
           ? `Profile updated but link extraction had issues: ${mergeError}`
           : undefined,
@@ -108,6 +136,12 @@ export async function handleNewProfileIngest({
       expiresAt: claimTokenExpiresAt,
     } = await generateClaimTokenPair();
 
+    const qualityResult = evaluateProfileQuality({
+      displayName,
+      avatarUrl: hostedAvatarUrl,
+      linkCount: extraction.links.length,
+    });
+
     const [created] = await tx
       .insert(creatorProfiles)
       .values({
@@ -116,7 +150,7 @@ export async function handleNewProfileIngest({
         usernameNormalized: finalHandle,
         displayName,
         avatarUrl: hostedAvatarUrl,
-        isPublic: true,
+        isPublic: qualityResult.isPublic,
         isVerified: false,
         isFeatured: false,
         marketingOptOut: false,
@@ -153,6 +187,14 @@ export async function handleNewProfileIngest({
       );
     }
 
+    if (!qualityResult.isPublic) {
+      logger.info('New profile quarantined by quality gate', {
+        profileId: created.id,
+        handle: finalHandle,
+        reasons: qualityResult.quarantineReasons,
+      });
+    }
+
     await invalidateProfileCache(created.usernameNormalized);
 
     const { mergeError } = await processProfileExtraction(
@@ -186,6 +228,11 @@ export async function handleNewProfileIngest({
           claimToken,
         },
         links: extraction.links.length,
+        quarantined: !qualityResult.isPublic,
+        quarantineReasons:
+          qualityResult.quarantineReasons.length > 0
+            ? qualityResult.quarantineReasons
+            : undefined,
         warning: mergeError
           ? `Profile created but link extraction had issues: ${mergeError}`
           : undefined,
