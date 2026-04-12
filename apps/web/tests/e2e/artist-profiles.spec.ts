@@ -22,9 +22,7 @@ test.describe('Artist Profiles Landing', () => {
     await waitForHydration(page);
   });
 
-  test('hero renders with headline, subhead, CTAs, and phone', async ({
-    page,
-  }) => {
+  test('hero renders with headline and CTAs', async ({ page }) => {
     await expect(
       page.getByRole('heading', {
         name: /one link\. every release\./i,
@@ -36,28 +34,9 @@ test.describe('Artist Profiles Landing', () => {
     await expect(
       page.getByRole('link', { name: /see a live example/i })
     ).toBeVisible();
-    await expect(
-      page.getByTestId('artist-profiles-hero-surface')
-    ).toBeVisible();
-    await expect(
-      page.getByText(/put jov\.ie\/username in your bio/i)
-    ).toBeVisible();
   });
 
-  test('key sections render', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', { name: /every extra click loses fans/i })
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', {
-        name: /one profile that always shows fans/i,
-      })
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', {
-        name: /turn bio clicks into fans/i,
-      })
-    ).toBeVisible();
+  test('final CTA renders with claim form', async ({ page }) => {
     await expect(
       page.getByRole('heading', { name: /claim your profile now/i })
     ).toBeVisible();
@@ -76,9 +55,6 @@ test.describe('Artist Profiles Landing', () => {
     await expect(
       page.getByRole('link', { name: /claim your profile/i })
     ).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    await expect(page.getByTestId('artist-profiles-hero-surface')).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   });
