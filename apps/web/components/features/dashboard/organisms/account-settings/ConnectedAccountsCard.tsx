@@ -121,7 +121,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
                     </p>
                     {isVerified ? (
                       <Badge variant='success' size='sm' className='gap-1'>
-                        <CheckCircle className='h-3.5 w-3.5' aria-hidden />
+                        <CheckCircle className='size-3.5' aria-hidden />
                         Verified
                       </Badge>
                     ) : null}
