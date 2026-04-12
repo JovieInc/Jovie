@@ -105,6 +105,29 @@ export const PERFORMANCE_BUDGETS = {
     domContentLoaded: 2600,
     loadTime: 3600,
   }),
+
+  // Release pages
+  release: budgetFromRoute('public-release', {
+    domContentLoaded: 3500,
+    loadTime: 4500,
+  }),
+
+  // Creator shell pages
+  chat: budgetFromRoute('creator-chat', {
+    domContentLoaded: 4000,
+    loadTime: 5000,
+  }),
+  releases: budgetFromRoute('creator-releases', {
+    domContentLoaded: 4000,
+    loadTime: 5000,
+  }),
+
+  // Billing
+  billing: budgetFromRoute('billing', {
+    domContentLoaded: 4000,
+    loadTime: 5000,
+  }),
+
   spotifySearchWarm: {
     apiResponseTime: 200,
   },
