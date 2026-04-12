@@ -72,7 +72,7 @@ export const PLATFORM_MEDIA_DOMAINS: Record<string, readonly string[]> = {
   // Audio preview CDNs (loaded by HTMLAudioElement in the browser)
   spotify: ['*.scdn.co', '*.spotifycdn.com'],
   apple_music: ['*.mzstatic.com'],
-  deezer: ['*.dzcdn.net'],
+  deezer: ['*.dzcdn.net', 'cdnt-preview.dzcdn.net'],
 };
 
 /**
