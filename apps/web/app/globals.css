@@ -275,6 +275,11 @@ body {
   /* Font stack: var(--font-inter) for Next.js localFont, then Linear's exact fallbacks */
   --font-sans:
     var(--font-inter), "Inter Variable", "SF Pro Display", -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  /* Marketing display + body fonts (scoped via CSS variables set by next/font/local in marketing layout) */
+  --font-display:
+    var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
+  --font-body:
+    var(--font-dm-sans), "DM Sans", -apple-system, "system-ui", sans-serif;
   --color-gray-50: #f9fafb;
   --color-gray-100: #f3f4f6;
   --color-gray-200: #e5e7eb;

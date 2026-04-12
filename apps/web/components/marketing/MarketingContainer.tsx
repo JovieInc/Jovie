@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils';
 
 const widthClasses = {
   landing: 'max-w-[1280px]',
-  page: 'max-w-[1120px]',
+  page: 'max-w-[1200px]',
   prose: 'max-w-[680px]',
 } as const;
 

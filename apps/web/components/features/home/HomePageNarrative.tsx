@@ -63,7 +63,7 @@ function HomeTrustBar() {
   return (
     <section className='bg-page py-8 sm:py-10'>
       <Container size='homepage'>
-        <div className='mx-auto flex max-w-[1120px] items-center justify-center gap-x-8 sm:gap-x-10 lg:gap-x-14'>
+        <div className='mx-auto flex max-w-[1200px] items-center justify-center gap-x-8 sm:gap-x-10 lg:gap-x-14'>
           {TRUST_LABELS.map(partner => (
             <HomepageLabelLogoMark
               key={partner}
@@ -81,7 +81,7 @@ function ArtistProfileSection() {
   return (
     <section className='border-b border-subtle bg-page py-16 sm:py-20 lg:py-24'>
       <Container size='homepage'>
-        <div className='mx-auto grid max-w-[1120px] gap-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:items-center lg:gap-10'>
+        <div className='mx-auto grid max-w-[1200px] gap-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:items-center lg:gap-10'>
           <div className='max-w-[34rem]'>
             <SectionHeader
               eyebrow='Artist Profiles'
@@ -105,7 +105,7 @@ function ReleaseDestinationsSection() {
   return (
     <section className='border-b border-subtle bg-page py-20 sm:py-24 lg:py-32'>
       <Container size='homepage'>
-        <div className='mx-auto max-w-[1120px]'>
+        <div className='mx-auto max-w-[1200px]'>
           <SectionHeader
             eyebrow='Release Destinations'
             title='Share every release. Reach every fan. Automatically.'
@@ -167,7 +167,7 @@ function FinalCallToAction() {
       className='bg-page py-28 sm:py-36 lg:py-44'
     >
       <Container size='homepage'>
-        <div className='mx-auto max-w-[1120px] text-center'>
+        <div className='mx-auto max-w-[1200px] text-center'>
           <h2
             data-testid='final-cta-headline'
             className='marketing-h1-linear text-primary-token'

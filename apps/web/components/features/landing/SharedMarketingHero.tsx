@@ -60,7 +60,7 @@ export function SharedMarketingHero({
       <div className='hero-glow pointer-events-none absolute inset-x-0 top-0 h-[36rem]' />
 
       <Container size='homepage'>
-        <div className='mx-auto max-w-[1120px]'>
+        <div className='mx-auto max-w-[1200px]'>
           <div
             className={cn(
               'grid items-center gap-12 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-10',
