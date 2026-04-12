@@ -99,6 +99,29 @@ export function isTrackingAllowed(): boolean {
 }
 
 /**
+ * Check if marketing tracking is allowed.
+ *
+ * Reads the granular consent object from localStorage (jv_cc).
+ * Returns true if marketing consent has NOT been explicitly rejected.
+ * This means: no cookie = allowed (fire by default), marketing: true = allowed,
+ * marketing: false = blocked.
+ */
+export function isMarketingAllowed(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  if (isGPCEnabled() || isDNTEnabled()) return false;
+
+  try {
+    const raw = globalThis.localStorage?.getItem('jv_cc');
+    if (!raw) return true; // No consent interaction yet — fire by default
+    const parsed = JSON.parse(raw);
+    return parsed?.marketing !== false;
+  } catch {
+    return true; // Malformed data — treat as no consent interaction
+  }
+}
+
+/**
  * Generate a session ID for anonymous tracking
  * This is NOT PII - it's a random identifier that doesn't persist long-term
  */
