@@ -1,6 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import type { ExtensionSessionStatusResponse } from '@jovie/extension-contracts';
 import { NextResponse } from 'next/server';
+import { getOptionalAuth } from '@/lib/auth/cached';
 import { getSessionContext } from '@/lib/auth/session';
 import { createExtensionCorsHeaders } from '@/lib/extensions/http';
 
@@ -12,7 +12,7 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const { userId } = await auth();
+  const { userId } = await getOptionalAuth();
 
   if (!userId) {
     const body: ExtensionSessionStatusResponse = {

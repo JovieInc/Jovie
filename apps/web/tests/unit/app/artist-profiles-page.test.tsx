@@ -18,8 +18,14 @@ vi.mock('@/features/home/claim-handle', () => ({
   ),
 }));
 
+vi.mock('@/features/home/StickyPhoneTour', () => ({
+  StickyPhoneTour: (props: Record<string, unknown>) => (
+    <div data-testid='sticky-phone-tour'>{String(props.introTitle ?? '')}</div>
+  ),
+}));
+
 describe('ArtistProfilesPage', () => {
-  it('renders the marketing-native hero and CTA flow', () => {
+  it('renders the text-only hero with headline and phone tour', () => {
     render(<ArtistProfilesPage />);
 
     expect(
@@ -28,11 +34,17 @@ describe('ArtistProfilesPage', () => {
         name: 'One link. Every release.',
       })
     ).toBeInTheDocument();
-    expect(
-      screen.getByTestId('artist-profiles-hero-surface')
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('sticky-phone-tour')).toBeInTheDocument();
     expect(screen.getByTestId('artist-profiles-cta-form')).toBeInTheDocument();
     expect(screen.getByTestId('claim-handle-form')).toBeInTheDocument();
+  });
+
+  it('passes artist-profile modes to the phone tour', () => {
+    render(<ArtistProfilesPage />);
+
+    expect(screen.getByTestId('sticky-phone-tour')).toHaveTextContent(
+      'Your profile adapts to what matters right now.'
+    );
   });
 
   it('links the profile example CTA to the canonical public-profile review route', () => {

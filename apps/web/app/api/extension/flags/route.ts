@@ -1,5 +1,5 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { getOptionalAuth } from '@/lib/auth/cached';
 import { getExtensionFlags } from '@/lib/extensions/flags';
 import { createExtensionCorsHeaders } from '@/lib/extensions/http';
 
@@ -11,7 +11,7 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const { userId } = await auth();
+  const { userId } = await getOptionalAuth();
 
   return NextResponse.json(getExtensionFlags(Boolean(userId)), {
     headers: createExtensionCorsHeaders(request, 'GET, OPTIONS'),
